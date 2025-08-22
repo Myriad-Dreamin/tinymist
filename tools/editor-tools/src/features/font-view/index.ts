@@ -9,7 +9,7 @@ import {
   WeightFilter,
 } from "./components";
 import { filterFontFamilies } from "./filtering";
-import { FontAction, FontFamilySlot } from "./font-components";
+import { FontFamilySlot, ToggleButton } from "./font-components";
 import { DOC_MOCK } from "./mock-data";
 import type { FontFamily, FontResources } from "./types";
 import "./styles.css";
@@ -75,7 +75,7 @@ function createFontFamiliesContent(
     div(
       { class: "font-families-container" },
       filteredFamilies.val.length === 0
-        ? div({ class: "no-fonts-message" }, "No fonts match the current filters")
+        ? div({ class: "no-fonts-message text-desc" }, "No fonts match the current filters")
         : filteredFamilies.val.map((family: FontFamily) =>
             FontFamilySlot(family, fontResources.val, showNumberOpt.val),
           ),
@@ -160,25 +160,25 @@ export const FontView = () => {
   return div(
     { class: "font-view-container" },
     div(
-      { class: "font-view-header flex-col" },
+      { class: "font-view-header card" },
       SearchInput(filterStates.searchQuery),
       div(
         { class: "font-filters-section" },
         WeightFilter(filterStates.weightFilter),
         StretchFilter(filterStates.stretchFilter),
         StyleFilter(filterStates.styleFilter),
-        ClearFiltersButton(clearFilters),
       ),
+      ClearFiltersButton(clearFilters),
       div(
         { class: "font-stats-section" },
         div({ class: "font-stats" }, fontStats),
-        FontAction(
+        ToggleButton(
           "Show Numbers",
           "Toggle to show weight and stretch numbers",
           () => {
             showNumber.val = !showNumber.val;
           },
-          { active: showNumber, variant: "toggle" },
+          { active: showNumber.val },
         ),
       ),
     ),

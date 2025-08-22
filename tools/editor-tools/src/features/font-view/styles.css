@@ -1,38 +1,16 @@
-/* Font View Styles - VSCode compatible */
-
 .font-view-container {
   width: 100%;
   max-width: 72rem;
   margin: auto;
+
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .font-view-header {
+  display: flex;
+  flex-direction: column;
   gap: 0.75em;
   margin-bottom: 1.25em;
-  padding: 0.75em;
-  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
-  border-radius: 6px;
-  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
-}
-
-.font-search-input {
-  flex: 1;
-  padding: 0.5em 0.75em;
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
-  border-radius: 4px;
-  background: var(--vscode-input-background, #2d2d30);
-  color: var(--vscode-input-foreground, #cccccc);
-  font-size: 0.85em;
-  outline: none;
-}
-
-.font-search-input:focus {
-  border-color: var(--vscode-focusBorder, #007acc);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
-}
-
-.font-search-input::placeholder {
-  color: var(--vscode-input-placeholderForeground, #767676);
 }
 
 .font-filters-section {
@@ -40,16 +18,12 @@
   flex-direction: column;
   gap: 0.5em;
 }
-
-.filter-group {
+.font-filters-section > div {
   display: flex;
+  gap: 1em;
 }
-
-.filter-label {
-  font-weight: 600;
-  color: var(--vscode-editor-foreground);
-  font-size: 0.9em;
-  width: 6rem;
+.font-filters-section > div > div:nth-child(1) {
+  min-width: 3rem;
 }
 
 .filter-options {
@@ -64,7 +38,6 @@
   border-radius: 4px;
   background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
   color: var(--vscode-button-secondaryForeground, #cccccc);
-  font-size: 0.8em;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -106,22 +79,6 @@
   color: var(--vscode-textLink-activeForeground, #74b0ff);
 }
 
-.filter-clear-button {
-  padding: 0.4em 0.8em;
-  border: 1px solid var(--vscode-button-border, #3c3c3c);
-  border-radius: 4px;
-  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
-  color: var(--vscode-button-secondaryForeground, #cccccc);
-  font-size: 0.8em;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  align-self: flex-start;
-}
-
-.filter-clear-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
-}
-
 .font-stats-section {
   display: flex;
   justify-content: space-between;
@@ -142,10 +99,6 @@
 }
 
 .font-family-card {
-  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
-  border-radius: 8px;
-  padding: 1em;
   transition: all 0.2s ease;
 }
 
@@ -162,15 +115,6 @@
   gap: 0.75em;
 }
 
-.font-family-name {
-  font-size: 1.15em;
-  font-weight: 600;
-  color: var(--vscode-editor-foreground);
-  margin: 0;
-  flex: 1;
-  min-width: 0; /* Allow text to truncate */
-}
-
 .font-family-actions {
   display: flex;
   gap: 0.5em;
@@ -178,53 +122,14 @@
   flex-wrap: wrap;
 }
 
-.font-action-button {
-  padding: 0.35em 0.6em;
-  border: 1px solid var(--vscode-button-secondaryBorder, #3c3c3c);
-  border-radius: 4px;
-  background: var(--vscode-button-secondaryBackground, transparent);
-  color: var(--vscode-button-secondaryForeground, #cccccc);
-  font-size: 0.75em;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.font-action-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
-  border-color: var(--vscode-inputOption-activeBorder, #007acc);
-}
-
-.font-action-button:active {
-  background: var(--vscode-button-background, #0e639c);
-  color: var(--vscode-button-foreground, #ffffff);
-  border-color: var(--vscode-button-background, #0e639c);
-  transform: scale(0.95);
-}
-
-.font-action-button.toggle-button {
-  background: var(--vscode-button-secondaryBackground, #5a5d5e);
-}
-
-.font-action-button.toggle-button.activated {
-  background: var(--vscode-inputOption-activeBackground, #094771);
-  border-color: var(--vscode-inputOption-activeBorder, #007acc);
-}
-
 .font-variants-container {
   margin-top: 8px;
-}
-
-.font-variant-summary {
-  margin: 4px 0;
-  font-size: 13px;
-  color: var(--vscode-descriptionForeground, #999999);
 }
 
 .font-variant-item {
   display: flex;
   align-items: center;
-  padding: 8px 0;
+  padding: 0.375rem 0;
   border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
 }
 
@@ -241,19 +146,6 @@
   gap: 1em;
 }
 
-.font-variant-name {
-  font-size: 14px;
-  color: var(--vscode-editor-foreground);
-  cursor: pointer;
-  text-decoration: none;
-  word-break: break-word;
-}
-
-.font-variant-name:hover {
-  color: var(--vscode-textLink-foreground, #3794ff);
-  text-decoration: underline;
-}
-
 .font-variant-details {
   display: flex;
   gap: 0.5em;
@@ -261,21 +153,12 @@
   align-items: center;
 }
 
-.font-detail-tag {
-  font-size: 11px;
-  color: var(--vscode-button-foreground, #fff);
-  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--vscode-button-border, rgba(255, 255, 255, 0.2));
-  white-space: nowrap;
-  font-weight: 500;
-}
 
+/* todo: redesign this */
 .font-file-info {
   font-size: 11px;
   color: var(--vscode-descriptionForeground, #999999);
-  font-family: var(--vscode-editor-font-family, "Courier New", monospace);
+  font-family: var(--vscode-editor-font-family, monospace, "Courier New");
   background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));
   padding: 2px 6px;
   border-radius: 3px;
@@ -295,22 +178,5 @@
 .no-fonts-message {
   text-align: center;
   padding: 40px 20px;
-  color: var(--vscode-descriptionForeground, #999999);
   font-style: italic;
-}
-
-/* Responsive design for smaller screens */
-@media (max-width: 768px) {
-  .font-filter-group {
-    justify-content: stretch;
-  }
-
-  .font-filter-select {
-    flex: 1;
-    min-width: auto;
-  }
-
-  .font-search-input {
-    min-width: auto;
-  }
 }

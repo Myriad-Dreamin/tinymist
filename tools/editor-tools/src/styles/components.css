@@ -1,0 +1,102 @@
+.font-mono {
+  font-family: var(--vscode-editor-font-family, "Courier New", monospace);
+}
+.text-desc {
+  color: var(--vscode-descriptionForeground, #999999);
+}
+
+.badge {
+  font-size: 0.875rem;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-button-border, rgba(255, 255, 255, 0.2));
+  white-space: nowrap;
+}
+
+.btn {
+  --btn-color: var(--vscode-button-secondaryBackground, transparent);
+  --btn-fg: var(--vscode-button-secondaryForeground, #cccccc);
+  --btn-border: var(--vscode-button-secondaryBorder, #3c3c3c);
+
+  padding: 0.25rem 0.4rem;
+  font-size: var(--fontsize, 0.75em);
+  white-space: nowrap;
+  background: var(--btn-color);
+  color: var(--btn-fg);
+
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+/* todo: hover of .btn */
+
+/* todo: fix colors and other variables */
+.btn-primary {
+  --btn-color: var(--vscode-button-background, #0e639c);
+  --btn-fg: var(--vscode-button-foreground, #ffffff);
+}
+.btn-primary:hover {
+  --btn-color: var(--vscode-button-background, #0e639c);
+  --btn-fg: var(--vscode-button-foreground, #ffffff);
+}
+.btn-primary:active {
+  --btn-color: var(--vscode-button-background, #0e639c);
+  --btn-fg: var(--vscode-button-foreground, #ffffff);
+}
+
+/* todo: simplify */
+.toggle-btn {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--vscode-button-secondaryBorder, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground, transparent);
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.toggle-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
+  border-color: var(--vscode-inputOption-activeBorder, #007acc);
+}
+.toggle-btn:active {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+.toggle-btn {
+  background: var(--vscode-button-secondaryBackground, #5a5d5e);
+}
+.toggle-btn.activated {
+  background: var(--vscode-inputOption-activeBackground, #094771);
+  border-color: var(--vscode-inputOption-activeBorder, #007acc);
+}
+
+
+.card {
+  padding: 1rem;
+  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+  border-radius: 6px;
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.input {
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-input-background, #2d2d30);
+  color: var(--vscode-input-foreground, #cccccc);
+  font-size: 0.85em;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+.input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #767676);
+}

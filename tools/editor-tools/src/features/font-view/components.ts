@@ -8,7 +8,7 @@ const { input, div, button } = van.tags;
  */
 export const SearchInput = (searchQuery: State<string>) => {
   return input({
-    class: "font-search-input",
+    class: "input flex",
     type: "text",
     placeholder: "Search font families or file names...",
     value: searchQuery,
@@ -36,8 +36,7 @@ export const WeightFilter = (weightFilter: State<string>) => {
   };
 
   return div(
-    { class: "filter-group" },
-    div({ class: "filter-label" }, "Weight"),
+    div("Weight"),
     div(
       { class: "filter-options" },
       ...Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
@@ -75,8 +74,7 @@ export const StretchFilter = (stretchFilter: State<string>) => {
   };
 
   return div(
-    { class: "filter-group" },
-    div({ class: "filter-label" }, "Width"),
+    div("Width"),
     div(
       { class: "filter-options" },
       ...Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) =>
@@ -116,8 +114,7 @@ export const StyleFilter = (styleFilter: State<string>) => {
   };
 
   return div(
-    { class: "filter-group" },
-    div({ class: "filter-label" }, "Style"),
+    div("Style"),
     div(
       { class: "filter-options" },
       ...Object.entries(FONT_STYLE_OPTIONS).map(([key, category]) =>
@@ -144,9 +141,10 @@ export const StyleFilter = (styleFilter: State<string>) => {
 export const ClearFiltersButton = (clearFilters: () => void) => {
   return button(
     {
-      class: "filter-clear-button",
-      onclick: clearFilters,
+      class: "btn",
+      style: "align-self: flex-start",
       title: "Clear all filters",
+      onclick: clearFilters,
     },
     "Clear Filters",
   );
