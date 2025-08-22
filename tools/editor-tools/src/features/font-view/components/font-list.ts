@@ -1,102 +1,21 @@
-import van, { type ChildDom, type PropsWithKnownKeys } from "vanjs-core";
-import { humanStretch, humanStyle, humanWeight } from "../../utils/font-format";
-import { copyToClipboard, requestRevealPath, requestTextEdit } from "../../vscode";
-import { FONT_DEFAULTS } from "./constants";
-import type { FontFamily, FontInfo, FontResources } from "./types";
+import van, { type ChildDom, type State } from "vanjs-core";
+import { humanStretch, humanStyle, humanWeight } from "@/utils/font-format";
+import { copyToClipboard, requestRevealPath, requestTextEdit } from "@/vscode";
+import { FONT_DEFAULTS } from "../constants";
+import type { FontFamily, FontInfo, FontResources } from "../fonts";
+import { getFontFileInfo } from "../fonts";
 
 const { div, a, span, button } = van.tags;
-
-export const ToggleButton = (
-  body: ChildDom,
-  title: string,
-  onclick: (this: HTMLButtonElement) => void,
-  opts?: PropsWithKnownKeys<HTMLButtonElement> & {
-    active?: boolean;
-  },
-) => {
-  const classProp = opts?.active ? "toggle-btn activated" : "toggle-btn";
-
-  return button(
-    {
-      ...opts,
-      class: classProp,
-      title,
-      onclick,
-    },
-    body,
-  );
-};
-
-/**
- * Font action button component with activation animation
- */
-export const FontAction = (
-  body: ChildDom,
-  title: string,
-  onclick: (this: HTMLButtonElement) => void,
-) => {
-  return button(
-    {
-      class: "btn btn-primary",
-      title,
-      onclick,
-    },
-    body,
-  );
-};
-
-/**
- * Extracts file information from font source
- */
-function getFileInfo(
-  font: FontInfo,
-  fontResources: FontResources,
-): {
-  fileName: string;
-  filePath: string;
-  canReveal: boolean;
-} {
-  if (typeof font.source !== "number") {
-    return {
-      fileName: "Unknown source",
-      filePath: "",
-      canReveal: false,
-    };
-  }
-
-  const source = fontResources.sources[font.source];
-  if (!source) {
-    return {
-      fileName: "Invalid source",
-      filePath: "",
-      canReveal: false,
-    };
-  }
-
-  if (source.kind === "fs") {
-    return {
-      fileName: source.path.split(/[\\/]/g).pop() || "Unknown file",
-      filePath: source.path,
-      canReveal: true,
-    };
-  } else {
-    return {
-      fileName: `Embedded: ${source.name}`,
-      filePath: source.name,
-      canReveal: false,
-    };
-  }
-}
 
 /**
  * Font variant component displaying individual font information
  */
-export const FontSlot = (
+const FontSlot = (
   font: FontInfo,
   fontResources: FontResources,
   showNumberOpt: { showNumber: boolean },
 ) => {
-  const { fileName, filePath, canReveal } = getFileInfo(font, fontResources);
+  const { fileName, filePath, canReveal } = getFontFileInfo(font, fontResources);
 
   return div(
     { class: "font-variant-item" },
@@ -138,6 +57,20 @@ export const FontSlot = (
 };
 
 /**
+ * Font action button component with activation animation
+ */
+const FontAction = (body: ChildDom, title: string, onclick: (this: HTMLButtonElement) => void) => {
+  return button(
+    {
+      class: "btn btn-primary",
+      title,
+      onclick,
+    },
+    body,
+  );
+};
+
+/**
  * Creates font action buttons for font family
  */
 function createFontActions(family: FontFamily) {
@@ -171,7 +104,7 @@ function createFontActions(family: FontFamily) {
 /**
  * Font family card component displaying family and its variants
  */
-export const FontFamilySlot = (
+const FontFamilySlot = (
   family: FontFamily,
   fontResources: FontResources,
   showNumberOpt: { showNumber: boolean },
@@ -196,5 +129,21 @@ export const FontFamilySlot = (
       ),
       ...family.infos.map((font) => FontSlot(font, fontResources, showNumberOpt)),
     ),
+  );
+};
+
+export const FontList = (
+  filteredFamilies: State<FontFamily[]>,
+  fontResources: State<FontResources>,
+  showNumber: State<boolean>,
+) => {
+  const showNumberOpt = { showNumber: showNumber.val };
+  return div(
+    { class: "font-families-container" },
+    filteredFamilies.val.length === 0
+      ? div({ class: "no-fonts-message text-desc" }, "No fonts match the current filters")
+      : filteredFamilies.val.map((family: FontFamily) =>
+          FontFamilySlot(family, fontResources.val, showNumberOpt),
+        ),
   );
 };

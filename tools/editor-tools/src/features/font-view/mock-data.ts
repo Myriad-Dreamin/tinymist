@@ -1,6 +1,6 @@
-import type { FontResources } from "./types";
+import type { FontResources } from "./fonts";
 
-export const DOC_MOCK: FontResources = {
+export const MOCK_DATA: FontResources = {
   sources: [
     {
       kind: "fs",

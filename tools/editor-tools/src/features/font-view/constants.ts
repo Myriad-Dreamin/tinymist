@@ -1,7 +1,3 @@
-/**
- * Simple constants for font view component
- */
-
 export const FONT_DEFAULTS = {
   WEIGHT: 400,
   STRETCH: 1000,
@@ -62,7 +58,7 @@ export const FONT_STRETCH_CATEGORIES = {
   },
 } as const;
 
-export const FONT_STYLE_OPTIONS = {
+export const FONT_STYLE_CATEGORIES = {
   normal: { label: "Normal" },
   italic: { label: "Italic" },
   oblique: { label: "Oblique" },

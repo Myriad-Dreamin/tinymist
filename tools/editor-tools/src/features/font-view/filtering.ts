@@ -1,5 +1,19 @@
+import van, { type State } from "vanjs-core";
 import { FONT_DEFAULTS, FONT_STRETCH_CATEGORIES, FONT_WEIGHT_CATEGORIES } from "./constants";
-import type { FontFamily, FontFilters, FontResources } from "./types";
+import type { FontFamily, FontFilters, FontResources } from "./fonts";
+
+export interface FontFilterStates {
+  searchQuery: State<string>;
+  weightFilter: State<string>;
+  styleFilter: State<string>;
+  stretchFilter: State<string>;
+}
+
+export interface FontStats {
+  total: number;
+  filtered: number;
+  variants: number;
+}
 
 export function filterFontFamilies(
   fontResources: FontResources,
@@ -49,7 +63,7 @@ export function filterFontFamilies(
             const matchesAnyWeight = selectedWeights.some((weightKey) => {
               const category =
                 FONT_WEIGHT_CATEGORIES[weightKey as keyof typeof FONT_WEIGHT_CATEGORIES];
-              return category.weight === weight;
+              return category?.weight === weight;
             });
             if (!matchesAnyWeight) return false;
           }
@@ -87,4 +101,47 @@ export function filterFontFamilies(
       return { ...family, infos: filteredVariants };
     })
     .filter((family) => family.infos.length > 0);
+}
+
+export function useFontFilters(fontResources: State<FontResources>) {
+  const fontFilters = {
+    searchQuery: van.state(""),
+    weightFilter: van.state(""),
+    styleFilter: van.state(""),
+    stretchFilter: van.state(""),
+  };
+
+  const clearFilters = () => {
+    fontFilters.searchQuery.val = "";
+    fontFilters.weightFilter.val = "";
+    fontFilters.styleFilter.val = "";
+    fontFilters.stretchFilter.val = "";
+  };
+
+  const filteredFamilies = van.derive(() => {
+    try {
+      return filterFontFamilies(fontResources.val, {
+        searchQuery: fontFilters.searchQuery.val,
+        weightFilter: fontFilters.weightFilter.val,
+        styleFilter: fontFilters.styleFilter.val,
+        stretchFilter: fontFilters.stretchFilter.val,
+      });
+    } catch (error) {
+      console.error("Error filtering font families:", error);
+      return [];
+    }
+  });
+
+  const fontStats = van.derive(() => {
+    const total = fontResources.val.families.length;
+    const filtered = filteredFamilies.val.length;
+    const variants = filteredFamilies.val.reduce(
+      (sum: number, family: FontFamily) => sum + family.infos.length,
+      0,
+    );
+
+    return { total, filtered, variants };
+  });
+
+  return { fontFilters, clearFilters, filteredFamilies, fontStats };
 }
