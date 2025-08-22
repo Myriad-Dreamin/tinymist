@@ -1,3 +1,4 @@
+use tinymist_lint::KnownLintIssues;
 use tinymist_project::LspCompiledArtifact;
 
 use crate::{DiagWorker, DiagnosticsMap, SemanticRequest, prelude::*};
@@ -14,6 +15,9 @@ impl SemanticRequest for CheckRequest {
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let worker = DiagWorker::new(ctx);
-        Some(worker.check().convert_all(self.snap.diagnostics()))
+        let compiler_diags = self.snap.diagnostics();
+
+        let known_issues = KnownLintIssues::from_compiler_diagnostics(compiler_diags.clone());
+        Some(worker.check(&known_issues).convert_all(compiler_diags))
     }
 }

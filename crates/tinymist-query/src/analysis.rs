@@ -610,6 +610,8 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
+    use tinymist_lint::KnownLintIssues;
+
     use crate::tests::*;
 
     #[test]
@@ -617,7 +619,7 @@ mod lint_tests {
         snapshot_testing("lint", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ctx.lint(&source);
+            let result = ctx.lint(&source, &KnownLintIssues::none());
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
