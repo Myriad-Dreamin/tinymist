@@ -43,26 +43,42 @@ export function filterFontFamilies(
       const filteredVariants = family.infos.filter((info) => {
         // Weight filter
         if (weightFilter) {
-          const weight = info.weight ?? FONT_DEFAULTS.WEIGHT;
-          const category =
-            FONT_WEIGHT_CATEGORIES[weightFilter as keyof typeof FONT_WEIGHT_CATEGORIES];
-          if (category && !category.test(weight)) return false;
+          const selectedWeights = weightFilter.split(",").filter(Boolean);
+          if (selectedWeights.length > 0) {
+            const weight = info.weight ?? FONT_DEFAULTS.WEIGHT;
+            const matchesAnyWeight = selectedWeights.some((weightKey) => {
+              const category =
+                FONT_WEIGHT_CATEGORIES[weightKey as keyof typeof FONT_WEIGHT_CATEGORIES];
+              return category.weight === weight;
+            });
+            if (!matchesAnyWeight) return false;
+          }
         }
 
         // Style filter
         if (styleFilter) {
-          const style = info.style || FONT_DEFAULTS.STYLE;
-          if (styleFilter !== style && !(styleFilter === "normal" && !info.style)) {
-            return false;
+          const selectedStyles = styleFilter.split(",").filter(Boolean);
+          if (selectedStyles.length > 0) {
+            const style = info.style || FONT_DEFAULTS.STYLE;
+            const matchesAnyStyle = selectedStyles.some((selectedStyle) => {
+              return selectedStyle === style || (selectedStyle === "normal" && !info.style);
+            });
+            if (!matchesAnyStyle) return false;
           }
         }
 
         // Stretch filter
         if (stretchFilter) {
-          const stretch = info.stretch ?? FONT_DEFAULTS.STRETCH;
-          const category =
-            FONT_STRETCH_CATEGORIES[stretchFilter as keyof typeof FONT_STRETCH_CATEGORIES];
-          if (category && !category.test(stretch)) return false;
+          const selectedStretches = stretchFilter.split(",").filter(Boolean);
+          if (selectedStretches.length > 0) {
+            const stretch = info.stretch ?? FONT_DEFAULTS.STRETCH;
+            const matchesAnyStretch = selectedStretches.some((stretchKey) => {
+              const category =
+                FONT_STRETCH_CATEGORIES[stretchKey as keyof typeof FONT_STRETCH_CATEGORIES];
+              return category?.test(stretch);
+            });
+            if (!matchesAnyStretch) return false;
+          }
         }
 
         return true;

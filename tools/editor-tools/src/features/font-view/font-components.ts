@@ -48,11 +48,13 @@ function getFileInfo(
   fontResources: FontResources,
 ): {
   fileName: string;
+  filePath: string;
   canReveal: boolean;
 } {
   if (typeof font.source !== "number") {
     return {
       fileName: "Unknown source",
+      filePath: "",
       canReveal: false,
     };
   }
@@ -61,6 +63,7 @@ function getFileInfo(
   if (!source) {
     return {
       fileName: "Invalid source",
+      filePath: "",
       canReveal: false,
     };
   }
@@ -68,11 +71,13 @@ function getFileInfo(
   if (source.kind === "fs") {
     return {
       fileName: source.path.split(/[\\/]/g).pop() || "Unknown file",
+      filePath: source.path,
       canReveal: true,
     };
   } else {
     return {
       fileName: `Embedded: ${source.name}`,
+      filePath: source.name,
       canReveal: false,
     };
   }
@@ -86,12 +91,13 @@ export const FontSlot = (
   fontResources: FontResources,
   showNumberOpt: { showNumber: boolean },
 ) => {
-  const { fileName, canReveal } = getFileInfo(font, fontResources);
+  const { fileName, filePath, canReveal } = getFileInfo(font, fontResources);
 
-  const variantElement = canReveal
+  const fileInfoElement = canReveal
     ? a(
         {
-          class: "font-variant-name",
+          class: "font-file-info clickable",
+          title: `Click to reveal in file explorer:\n${filePath}`,
           onclick() {
             const source = fontResources.sources[font.source as number];
             if (source?.kind === "fs") {
@@ -99,24 +105,28 @@ export const FontSlot = (
             }
           },
         },
-        font.name,
+        fileName,
       )
-    : span({ class: "font-variant-name" }, font.name);
+    : span({ class: "font-file-info" }, fileName);
 
   return div(
     { class: "font-variant-item" },
     div(
-      { class: "font-variant-info flex-row" },
-      variantElement,
-      span(
+      { class: "font-variant-info" },
+      div(
         { class: "font-variant-details" },
-        span(humanWeight(font.weight, showNumberOpt)),
+        span({ class: "font-detail-tag weight-tag" }, humanWeight(font.weight, showNumberOpt)),
         font.stretch && font.stretch !== FONT_DEFAULTS.STRETCH
-          ? span(humanStretch(font.stretch, showNumberOpt))
+          ? span(
+              { class: "font-detail-tag stretch-tag" },
+              humanStretch(font.stretch, showNumberOpt),
+            )
           : null,
-        font.style && font.style !== FONT_DEFAULTS.STYLE ? span(humanStyle(font.style)) : null,
+        font.style && font.style !== FONT_DEFAULTS.STYLE
+          ? span({ class: "font-detail-tag style-tag" }, humanStyle(font.style))
+          : null,
       ),
-      span({ class: "font-file-info" }, fileName),
+      fileInfoElement,
     ),
   );
 };

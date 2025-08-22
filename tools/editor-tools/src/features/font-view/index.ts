@@ -161,26 +161,26 @@ export const FontView = () => {
     { class: "font-view-container" },
     div(
       { class: "font-view-header flex-col" },
+      SearchInput(filterStates.searchQuery),
       div(
-        { class: "font-view-controls" },
-        SearchInput(filterStates.searchQuery),
-        div(
-          { class: "font-filter-group" },
-          WeightFilter(filterStates.weightFilter),
-          StretchFilter(filterStates.stretchFilter),
-          StyleFilter(filterStates.styleFilter),
-          FontAction(
-            "Show Numbers",
-            "Toggle to show weight and stretch numbers",
-            () => {
-              showNumber.val = !showNumber.val;
-            },
-            { active: showNumber, variant: "toggle" },
-          ),
-          ClearFiltersButton(clearFilters),
+        { class: "font-filters-section" },
+        WeightFilter(filterStates.weightFilter),
+        StretchFilter(filterStates.stretchFilter),
+        StyleFilter(filterStates.styleFilter),
+        ClearFiltersButton(clearFilters),
+      ),
+      div(
+        { class: "font-stats-section" },
+        div({ class: "font-stats" }, fontStats),
+        FontAction(
+          "Show Numbers",
+          "Toggle to show weight and stretch numbers",
+          () => {
+            showNumber.val = !showNumber.val;
+          },
+          { active: showNumber, variant: "toggle" },
         ),
       ),
-      div({ class: "font-stats" }, fontStats),
     ),
     fontFamiliesContent,
   );

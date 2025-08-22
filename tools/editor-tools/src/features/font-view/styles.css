@@ -2,9 +2,8 @@
 
 .font-view-container {
   width: 100%;
-  padding: 1em;
-  background: var(--vscode-editor-background);
-  color: var(--vscode-editor-foreground);
+  max-width: 72rem;
+  margin: auto;
 }
 
 .font-view-header {
@@ -16,16 +15,8 @@
   border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
 }
 
-.font-view-controls {
-  display: flex;
-  gap: 0.5em;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .font-search-input {
   flex: 1;
-  min-width: 200px;
   padding: 0.5em 0.75em;
   border: 1px solid var(--vscode-input-border, #3c3c3c);
   border-radius: 4px;
@@ -44,31 +35,104 @@
   color: var(--vscode-input-placeholderForeground, #767676);
 }
 
-.font-filter-group {
+.font-filters-section {
   display: flex;
+  flex-direction: column;
   gap: 0.5em;
-  align-items: center;
+}
+
+.filter-group {
+  display: flex;
+}
+
+.filter-label {
+  font-weight: 600;
+  color: var(--vscode-editor-foreground);
+  font-size: 0.9em;
+  width: 6rem;
+}
+
+.filter-options {
+  display: flex;
   flex-wrap: wrap;
+  gap: 0.5em;
 }
 
-.font-filter-select {
-  padding: 0.35em 0.6em;
-  border: 1px solid var(--vscode-dropdown-border, #3c3c3c);
+.filter-toggle-button {
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--vscode-button-border, #3c3c3c);
   border-radius: 4px;
-  background: var(--vscode-dropdown-background, #2d2d30);
-  color: var(--vscode-dropdown-foreground, #cccccc);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  color: var(--vscode-button-secondaryForeground, #cccccc);
   font-size: 0.8em;
-  min-width: 120px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  outline: none;
 }
 
-.font-filter-select:focus {
-  outline: 1px solid var(--vscode-focusBorder, #007acc);
+.filter-toggle-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.filter-toggle-button.active {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border-color: var(--vscode-button-background, #0e639c);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+
+.filter-toggle-button.active:hover {
+  background: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  cursor: pointer;
+  font-size: 0.85em;
+  color: var(--vscode-editor-foreground);
+  padding: 0.25em 0;
+}
+
+.filter-option input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.filter-option:hover {
+  color: var(--vscode-textLink-activeForeground, #74b0ff);
+}
+
+.filter-clear-button {
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--vscode-button-border, #3c3c3c);
+  border-radius: 4px;
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  color: var(--vscode-button-secondaryForeground, #cccccc);
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  align-self: flex-start;
+}
+
+.filter-clear-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
+}
+
+.font-stats-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75em;
+  border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
 }
 
 .font-stats {
   font-size: 0.8em;
   color: var(--vscode-descriptionForeground, #999999);
-  margin-top: 0.5em;
 }
 
 .font-families-container {
@@ -169,11 +233,12 @@
 }
 
 .font-variant-info {
-  flex: 1;
-  gap: 0.25em 1em;
-  flex-wrap: wrap;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
+  flex: 1;
   min-width: 0; /* Allow text to truncate */
+  gap: 1em;
 }
 
 .font-variant-name {
@@ -190,11 +255,21 @@
 }
 
 .font-variant-details {
-  font-size: 12px;
-  color: var(--vscode-descriptionForeground, #999999);
-  display: inline-flex;
+  display: flex;
   gap: 0.5em;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.font-detail-tag {
+  font-size: 11px;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--vscode-button-border, rgba(255, 255, 255, 0.2));
+  white-space: nowrap;
+  font-weight: 500;
 }
 
 .font-file-info {
@@ -208,26 +283,20 @@
   word-break: break-all;
 }
 
+.font-file-info.clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.font-file-info.clickable:hover {
+  background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.1));
+}
+
 .no-fonts-message {
   text-align: center;
   padding: 40px 20px;
   color: var(--vscode-descriptionForeground, #999999);
   font-style: italic;
-}
-
-.filter-clear-button {
-  padding: 4px 8px;
-  border: 1px solid var(--vscode-button-secondaryBorder, #3c3c3c);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--vscode-button-secondaryForeground, #cccccc);
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.filter-clear-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.1));
 }
 
 /* Responsive design for smaller screens */

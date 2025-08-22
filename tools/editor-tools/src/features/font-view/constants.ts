@@ -10,24 +10,40 @@ export const FONT_DEFAULTS = {
 
 export const FONT_WEIGHT_CATEGORIES = {
   thin: {
-    label: "Thin & Light",
-    test: (weight: number) => weight <= 300,
+    label: "Thin",
+    weight: 100,
+  },
+  extralight: {
+    label: "Extra Light",
+    weight: 200,
+  },
+  light: {
+    label: "Light",
+    weight: 300,
   },
   normal: {
     label: "Normal",
-    test: (weight: number) => weight >= 350 && weight <= 450,
+    weight: 400,
   },
   medium: {
     label: "Medium",
-    test: (weight: number) => weight >= 500 && weight <= 550,
+    weight: 500,
   },
   semibold: {
     label: "Semi Bold",
-    test: (weight: number) => weight >= 600 && weight <= 650,
+    weight: 600,
   },
   bold: {
-    label: "Bold & Heavy",
-    test: (weight: number) => weight >= 700,
+    label: "Bold",
+    weight: 700,
+  },
+  extrabold: {
+    label: "Extra Bold",
+    weight: 800,
+  },
+  black: {
+    label: "Black",
+    weight: 900,
   },
 } as const;
 

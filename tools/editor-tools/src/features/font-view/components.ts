@@ -1,7 +1,7 @@
 import van, { type State } from "vanjs-core";
-import { FONT_STYLE_OPTIONS, FONT_WEIGHT_CATEGORIES } from "./constants";
+import { FONT_STRETCH_CATEGORIES, FONT_STYLE_OPTIONS, FONT_WEIGHT_CATEGORIES } from "./constants";
 
-const { input, select, option, button } = van.tags;
+const { input, div, button } = van.tags;
 
 /**
  * Creates a search input component for filtering fonts
@@ -20,59 +20,121 @@ export const SearchInput = (searchQuery: State<string>) => {
 };
 
 /**
- * Creates a weight filter dropdown with value ranges
+ * Creates a weight filter as toggle buttons
  */
 export const WeightFilter = (weightFilter: State<string>) => {
-  return select(
-    {
-      class: "font-filter-select",
-      value: weightFilter,
-      onchange: (e: Event) => {
-        const target = e.target as HTMLSelectElement;
-        weightFilter.val = target.value;
-      },
-    },
-    option({ value: "" }, "All Weights"),
-    ...Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
-      option({ value: key }, category.label),
+  const selectedWeights = van.derive(() =>
+    weightFilter.val ? weightFilter.val.split(",").filter(Boolean) : [],
+  );
+
+  const toggleWeight = (key: string) => {
+    const current = selectedWeights.val;
+    const newSelection = current.includes(key)
+      ? current.filter((w) => w !== key)
+      : [...current, key];
+    weightFilter.val = newSelection.join(",");
+  };
+
+  return div(
+    { class: "filter-group" },
+    div({ class: "filter-label" }, "Weight"),
+    div(
+      { class: "filter-options" },
+      ...Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
+        button(
+          {
+            class: van.derive(() =>
+              selectedWeights.val.includes(key)
+                ? "filter-toggle-button active"
+                : "filter-toggle-button",
+            ),
+            onclick: () => toggleWeight(key),
+            title: `${category.label} (${category.weight})`,
+          },
+          `${category.label} (${category.weight})`,
+        ),
+      ),
     ),
   );
 };
 
 /**
- * Creates a stretch filter dropdown
+ * Creates a stretch filter as toggle buttons
  */
 export const StretchFilter = (stretchFilter: State<string>) => {
-  return select(
-    {
-      class: "font-filter-select",
-      value: stretchFilter,
-      onchange: (e: Event) => {
-        const target = e.target as HTMLSelectElement;
-        stretchFilter.val = target.value;
-      },
-    },
-    option({ value: "" }, "All Widths"),
-    option({ value: "condensed" }, "Condensed"),
-    option({ value: "normal" }, "Normal Width"),
-    option({ value: "expanded" }, "Expanded"),
+  const selectedStretches = van.derive(() =>
+    stretchFilter.val ? stretchFilter.val.split(",").filter(Boolean) : [],
+  );
+
+  const toggleStretch = (key: string) => {
+    const current = selectedStretches.val;
+    const newSelection = current.includes(key)
+      ? current.filter((s) => s !== key)
+      : [...current, key];
+    stretchFilter.val = newSelection.join(",");
+  };
+
+  return div(
+    { class: "filter-group" },
+    div({ class: "filter-label" }, "Width"),
+    div(
+      { class: "filter-options" },
+      ...Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) =>
+        button(
+          {
+            class: van.derive(() =>
+              selectedStretches.val.includes(key)
+                ? "filter-toggle-button active"
+                : "filter-toggle-button",
+            ),
+            onclick: () => toggleStretch(key),
+            title: category.label,
+          },
+          category.label,
+        ),
+      ),
+    ),
   );
 };
 
 /**
- * Creates a style filter dropdown
+ * Creates a style filter as toggle buttons
  */
 export const StyleFilter = (styleFilter: State<string>) => {
-  return select(
-    {
-      class: "font-filter-select",
-      value: styleFilter,
-      onchange: (e: Event) => {
-        const target = e.target as HTMLSelectElement;
-        styleFilter.val = target.value;
-      },
-    },
-    ...FONT_STYLE_OPTIONS.map(({ value, label }) => option({ value }, label)),
+  const selectedStyles = van.derive(() =>
+    styleFilter.val ? styleFilter.val.split(",").filter(Boolean) : [],
+  );
+
+  const toggleStyle = (value: string) => {
+    if (!value) return; // Skip "All Styles" option
+
+    const current = selectedStyles.val;
+    const newSelection = current.includes(value)
+      ? current.filter((s) => s !== value)
+      : [...current, value];
+    styleFilter.val = newSelection.join(",");
+  };
+
+  return div(
+    { class: "filter-group" },
+    div({ class: "filter-label" }, "Style"),
+    div(
+      { class: "filter-options" },
+      ...FONT_STYLE_OPTIONS.filter((opt) => opt.value !== "").map(({ value, label: optionLabel }) =>
+        button(
+          {
+            class: van.derive(() =>
+              selectedStyles.val.includes(value)
+                ? "filter-toggle-button active"
+                : "filter-toggle-button",
+            ),
+            onclick: () => toggleStyle(value),
+            title: optionLabel,
+          },
+          optionLabel,
+        ),
+      ),
+    ),
   );
 };
 
