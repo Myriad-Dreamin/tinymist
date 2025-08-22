@@ -172,13 +172,7 @@ export const FontFamilySlot = (
     { class: "font-family-card" },
     div(
       { class: "font-family-header" },
-      h3(
-        {
-          class: "font-family-name",
-          style: `font-family: "${family.name}", sans-serif`,
-        },
-        family.name,
-      ),
+      h3({ class: "font-family-name" }, family.name),
       div({ class: "font-family-actions" }, ...createFontActions(family)),
     ),
     div(
