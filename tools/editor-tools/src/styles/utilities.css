@@ -44,3 +44,7 @@
 span[aria-hidden="true"] {
   display: none;
 }
+
+.cursor-pointer {
+  cursor: pointer;
+}

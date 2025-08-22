@@ -11,7 +11,7 @@ const { input, div, button } = van.tags;
 /**
  * Creates a search input component for filtering fonts
  */
-const SearchInput = (searchQuery: State<string>) => {
+const SearchInput = (searchQuery: State<string>) => () => {
   return input({
     class: "input flex",
     type: "text",
@@ -24,120 +24,106 @@ const SearchInput = (searchQuery: State<string>) => {
   });
 };
 
+const useArrayToggle =
+  <T>(filter: State<T[]>) =>
+  (key: T) => {
+    const current = filter.val;
+    filter.val = current.includes(key) ? current.filter((w) => w !== key) : [...current, key];
+  };
+
+const FilterToggle = (
+  label: string,
+  style: string,
+  isActive: () => boolean,
+  onclick: () => void,
+) => {
+  return button(
+    {
+      class: van.derive(() => (isActive() ? "toggle-btn active" : "toggle-btn")),
+      style,
+      onclick,
+    },
+    label,
+  );
+};
+
+/**
+ * Base filter component that handles common filter structure
+ */
+const FilterGroup = (title: string, options: ChildDom[], filter: State<string[]>) => {
+  return div(
+    div({ class: "text-desc" }, title),
+    div(
+      { class: "filter-options" },
+      ...options,
+      filter.val.length > 0
+        ? button(
+            {
+              class: "btn",
+              title: "Clear filters",
+              onclick: () => {
+                filter.val = [];
+              },
+            },
+            "×",
+          )
+        : null,
+    ),
+  );
+};
+
 /**
  * Creates a weight filter as toggle buttons
  */
-const WeightFilter = (weightFilter: State<string>) => {
-  const selectedWeights = van.derive(() =>
-    weightFilter.val ? weightFilter.val.split(",").filter(Boolean) : [],
-  );
+const WeightFilter = (weightFilter: State<string[]>) => {
+  const toggleWeight = useArrayToggle(weightFilter);
 
-  const toggleWeight = (key: string) => {
-    const current = selectedWeights.val;
-    const newSelection = current.includes(key)
-      ? current.filter((w) => w !== key)
-      : [...current, key];
-    weightFilter.val = newSelection.join(",");
-  };
-
-  return div(
-    div("Weight"),
-    div(
-      { class: "filter-options" },
-      ...Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
-        button(
-          {
-            class: van.derive(() =>
-              selectedWeights.val.includes(key)
-                ? "filter-toggle-button active"
-                : "filter-toggle-button",
-            ),
-            style: `font-weight: ${category.weight}`,
-            onclick: () => toggleWeight(key),
-          },
-          `${category.label} (${category.weight})`,
-        ),
-      ),
+  const options = Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
+    FilterToggle(
+      `${category.label} (${category.weight})`,
+      `font-weight: ${category.weight}`,
+      () => weightFilter.val.includes(key),
+      () => toggleWeight(key),
     ),
   );
+
+  return FilterGroup("Weight", options, weightFilter);
 };
 
 /**
  * Creates a stretch filter as toggle buttons
  */
-const StretchFilter = (stretchFilter: State<string>) => {
-  const selectedStretches = van.derive(() =>
-    stretchFilter.val ? stretchFilter.val.split(",").filter(Boolean) : [],
-  );
+const StretchFilter = (stretchFilter: State<string[]>) => {
+  const toggleStretch = useArrayToggle(stretchFilter);
 
-  const toggleStretch = (key: string) => {
-    const current = selectedStretches.val;
-    const newSelection = current.includes(key)
-      ? current.filter((s) => s !== key)
-      : [...current, key];
-    stretchFilter.val = newSelection.join(",");
-  };
-
-  return div(
-    div("Width"),
-    div(
-      { class: "filter-options" },
-      ...Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) =>
-        button(
-          {
-            class: van.derive(() =>
-              selectedStretches.val.includes(key)
-                ? "filter-toggle-button active"
-                : "filter-toggle-button",
-            ),
-            style: `font-stretch: ${key}`,
-            onclick: () => toggleStretch(key),
-          },
-          category.label,
-        ),
-      ),
+  const options = Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) =>
+    FilterToggle(
+      category.label,
+      `font-stretch: ${key}`,
+      () => stretchFilter.val.includes(key),
+      () => toggleStretch(key),
     ),
   );
+
+  return FilterGroup("Width", options, stretchFilter);
 };
 
 /**
  * Creates a style filter as toggle buttons
  */
-const StyleFilter = (styleFilter: State<string>) => {
-  const selectedStyles = van.derive(() =>
-    styleFilter.val ? styleFilter.val.split(",").filter(Boolean) : [],
-  );
+const StyleFilter = (styleFilter: State<string[]>) => {
+  const toggleStyle = useArrayToggle(styleFilter);
 
-  const toggleStyle = (value: string) => {
-    if (!value) return; // Skip "All Styles" option
-
-    const current = selectedStyles.val;
-    const newSelection = current.includes(value)
-      ? current.filter((s) => s !== value)
-      : [...current, value];
-    styleFilter.val = newSelection.join(",");
-  };
-
-  return div(
-    div("Style"),
-    div(
-      { class: "filter-options" },
-      ...Object.entries(FONT_STYLE_CATEGORIES).map(([key, category]) =>
-        button(
-          {
-            class: van.derive(() =>
-              selectedStyles.val.includes(key)
-                ? "filter-toggle-button active"
-                : "filter-toggle-button",
-            ),
-            style: `font-style: ${key}`,
-            onclick: () => toggleStyle(key),
-          },
-          category.label,
-        ),
-      ),
+  const options = Object.entries(FONT_STYLE_CATEGORIES).map(([key, category]) =>
+    FilterToggle(
+      category.label,
+      `font-style: ${key}`,
+      () => styleFilter.val.includes(key),
+      () => toggleStyle(key),
     ),
   );
+
+  return FilterGroup("Style", options, styleFilter);
 };
 
 /**
@@ -155,23 +141,19 @@ const ClearFiltersButton = (clearFilters: () => void) => {
   );
 };
 
-const ToggleButton = (
-  body: ChildDom,
-  title: string,
-  onclick: (this: HTMLButtonElement) => void,
-  active?: boolean,
-) => {
-  return button(
-    {
-      class: active ? "toggle-btn activated" : "toggle-btn",
-      title,
-      onclick,
-    },
-    body,
-  );
-};
+const ToggleButton =
+  (body: ChildDom, title: string, onclick: () => void, active?: boolean) => () => {
+    return button(
+      {
+        class: active ? "toggle-btn active" : "toggle-btn",
+        title,
+        onclick,
+      },
+      body,
+    );
+  };
 
-const StatsText = (stats: State<FontStats>) => {
+const StatsText = (stats: State<FontStats>) => () => {
   const { filtered, total, variants } = stats.val;
   const text =
     filtered === total
@@ -180,33 +162,35 @@ const StatsText = (stats: State<FontStats>) => {
   return div({ class: "font-stats" }, text);
 };
 
-export const Header = (
-  filterStates: FontFilterStates,
-  stats: State<FontStats>,
-  showNumber: State<boolean>,
-  clearFilters: () => void,
-) => {
-  return div(
-    { class: "font-view-header card" },
-    SearchInput(filterStates.searchQuery),
-    div(
-      { class: "font-filters-section" },
-      WeightFilter(filterStates.weightFilter),
-      StretchFilter(filterStates.stretchFilter),
-      StyleFilter(filterStates.styleFilter),
-    ),
-    ClearFiltersButton(clearFilters),
-    div(
-      { class: "font-stats-section" },
-      StatsText(stats),
-      ToggleButton(
-        "Show Numbers",
-        "Toggle to show weight and stretch numbers",
-        () => {
-          showNumber.val = !showNumber.val;
-        },
-        showNumber.val,
+export const Header =
+  (
+    filterStates: FontFilterStates,
+    stats: State<FontStats>,
+    showNumber: State<boolean>,
+    clearFilters: () => void,
+  ) =>
+  () => {
+    return div(
+      { class: "font-view-header card" },
+      SearchInput(filterStates.searchQuery),
+      div(
+        { class: "font-filters-section" },
+        WeightFilter(filterStates.weightFilter),
+        StretchFilter(filterStates.stretchFilter),
+        StyleFilter(filterStates.styleFilter),
       ),
-    ),
-  );
-};
+      ClearFiltersButton(clearFilters),
+      div(
+        { class: "font-stats-section" },
+        StatsText(stats),
+        ToggleButton(
+          "Show Numbers",
+          "Toggle to show weight and stretch numbers",
+          () => {
+            showNumber.val = !showNumber.val;
+          },
+          showNumber.val,
+        ),
+      ),
+    );
+  };

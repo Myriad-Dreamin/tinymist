@@ -20,13 +20,6 @@ export interface FontResources {
   families: FontFamily[];
 }
 
-export interface FontFilters {
-  searchQuery: string;
-  weightFilter: string;
-  styleFilter: string;
-  stretchFilter: string;
-}
-
 /**
  * Extracts file information from font source
  */

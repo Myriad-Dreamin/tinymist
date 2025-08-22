@@ -32,34 +32,6 @@
   gap: 0.5em;
 }
 
-.filter-toggle-button {
-  padding: 0.4em 0.8em;
-  border: 1px solid var(--vscode-button-border, #3c3c3c);
-  border-radius: 4px;
-  background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
-  color: var(--vscode-button-secondaryForeground, #cccccc);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  outline: none;
-}
-
-.filter-toggle-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
-  border-color: var(--vscode-focusBorder, #007acc);
-}
-
-.filter-toggle-button.active {
-  background: var(--vscode-button-background, #0e639c);
-  color: var(--vscode-button-foreground, #ffffff);
-  border-color: var(--vscode-button-background, #0e639c);
-  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
-}
-
-.filter-toggle-button.active:hover {
-  background: var(--vscode-button-hoverBackground, #1177bb);
-}
-
 .filter-option {
   display: flex;
   align-items: center;
@@ -155,7 +127,7 @@
 
 /* todo: redesign this */
 .font-file-info {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--vscode-descriptionForeground, #999999);
   font-family: var(--vscode-editor-font-family, monospace, "Courier New");
   background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));

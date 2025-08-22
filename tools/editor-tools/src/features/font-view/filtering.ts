@@ -1,12 +1,19 @@
 import van, { type State } from "vanjs-core";
 import { FONT_DEFAULTS, FONT_STRETCH_CATEGORIES, FONT_WEIGHT_CATEGORIES } from "./constants";
-import type { FontFamily, FontFilters, FontResources } from "./fonts";
+import type { FontFamily, FontResources } from "./fonts";
+
+export interface FontFilters {
+  searchQuery: string;
+  weightFilter: string[];
+  styleFilter: string[];
+  stretchFilter: string[];
+}
 
 export interface FontFilterStates {
   searchQuery: State<string>;
-  weightFilter: State<string>;
-  styleFilter: State<string>;
-  stretchFilter: State<string>;
+  weightFilter: State<string[]>;
+  styleFilter: State<string[]>;
+  stretchFilter: State<string[]>;
 }
 
 export interface FontStats {
@@ -56,43 +63,34 @@ export function filterFontFamilies(
       // Apply variant filtering
       const filteredVariants = family.infos.filter((info) => {
         // Weight filter
-        if (weightFilter) {
-          const selectedWeights = weightFilter.split(",").filter(Boolean);
-          if (selectedWeights.length > 0) {
-            const weight = info.weight ?? FONT_DEFAULTS.WEIGHT;
-            const matchesAnyWeight = selectedWeights.some((weightKey) => {
-              const category =
-                FONT_WEIGHT_CATEGORIES[weightKey as keyof typeof FONT_WEIGHT_CATEGORIES];
-              return category?.weight === weight;
-            });
-            if (!matchesAnyWeight) return false;
-          }
+        if (weightFilter.length > 0) {
+          const weight = info.weight ?? FONT_DEFAULTS.WEIGHT;
+          const matchesAnyWeight = weightFilter.some((weightKey) => {
+            const category =
+              FONT_WEIGHT_CATEGORIES[weightKey as keyof typeof FONT_WEIGHT_CATEGORIES];
+            return category?.weight === weight;
+          });
+          if (!matchesAnyWeight) return false;
         }
 
         // Style filter
-        if (styleFilter) {
-          const selectedStyles = styleFilter.split(",").filter(Boolean);
-          if (selectedStyles.length > 0) {
-            const style = info.style || FONT_DEFAULTS.STYLE;
-            const matchesAnyStyle = selectedStyles.some((selectedStyle) => {
-              return selectedStyle === style || (selectedStyle === "normal" && !info.style);
-            });
-            if (!matchesAnyStyle) return false;
-          }
+        if (styleFilter.length > 0) {
+          const style = info.style ?? FONT_DEFAULTS.STYLE;
+          const matchesAnyStyle = styleFilter.some((selectedStyle) => {
+            return selectedStyle === style || (selectedStyle === "normal" && !info.style);
+          });
+          if (!matchesAnyStyle) return false;
         }
 
         // Stretch filter
-        if (stretchFilter) {
-          const selectedStretches = stretchFilter.split(",").filter(Boolean);
-          if (selectedStretches.length > 0) {
-            const stretch = info.stretch ?? FONT_DEFAULTS.STRETCH;
-            const matchesAnyStretch = selectedStretches.some((stretchKey) => {
-              const category =
-                FONT_STRETCH_CATEGORIES[stretchKey as keyof typeof FONT_STRETCH_CATEGORIES];
-              return category?.test(stretch);
-            });
-            if (!matchesAnyStretch) return false;
-          }
+        if (stretchFilter.length > 0) {
+          const stretch = info.stretch ?? FONT_DEFAULTS.STRETCH;
+          const matchesAnyStretch = stretchFilter.some((stretchKey) => {
+            const category =
+              FONT_STRETCH_CATEGORIES[stretchKey as keyof typeof FONT_STRETCH_CATEGORIES];
+            return category?.test(stretch);
+          });
+          if (!matchesAnyStretch) return false;
         }
 
         return true;
@@ -104,18 +102,18 @@ export function filterFontFamilies(
 }
 
 export function useFontFilters(fontResources: State<FontResources>) {
-  const fontFilters = {
+  const fontFilters: FontFilterStates = {
     searchQuery: van.state(""),
-    weightFilter: van.state(""),
-    styleFilter: van.state(""),
-    stretchFilter: van.state(""),
+    weightFilter: van.state([]),
+    styleFilter: van.state([]),
+    stretchFilter: van.state([]),
   };
 
   const clearFilters = () => {
     fontFilters.searchQuery.val = "";
-    fontFilters.weightFilter.val = "";
-    fontFilters.styleFilter.val = "";
-    fontFilters.stretchFilter.val = "";
+    fontFilters.weightFilter.val = [];
+    fontFilters.styleFilter.val = [];
+    fontFilters.stretchFilter.val = [];
   };
 
   const filteredFamilies = van.derive(() => {

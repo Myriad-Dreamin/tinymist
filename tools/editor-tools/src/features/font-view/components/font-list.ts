@@ -132,18 +132,20 @@ const FontFamilySlot = (
   );
 };
 
-export const FontList = (
-  filteredFamilies: State<FontFamily[]>,
-  fontResources: State<FontResources>,
-  showNumber: State<boolean>,
-) => {
-  const showNumberOpt = { showNumber: showNumber.val };
-  return div(
-    { class: "font-families-container" },
-    filteredFamilies.val.length === 0
-      ? div({ class: "no-fonts-message text-desc" }, "No fonts match the current filters")
-      : filteredFamilies.val.map((family: FontFamily) =>
-          FontFamilySlot(family, fontResources.val, showNumberOpt),
-        ),
-  );
-};
+export const FontList =
+  (
+    filteredFamilies: State<FontFamily[]>,
+    fontResources: State<FontResources>,
+    showNumber: State<boolean>,
+  ) =>
+  () => {
+    const showNumberOpt = { showNumber: showNumber.val };
+    return div(
+      { class: "font-families-container" },
+      filteredFamilies.val.length === 0
+        ? div({ class: "no-fonts-message text-desc" }, "No fonts match the current filters")
+        : filteredFamilies.val.map((family: FontFamily) =>
+            FontFamilySlot(family, fontResources.val, showNumberOpt),
+          ),
+    );
+  };
