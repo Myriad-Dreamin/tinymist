@@ -55,8 +55,34 @@ impl<'a> CodeActionWorker<'a> {
     fn local_edit(&self, edit: EcoSnippetTextEdit) -> Option<EcoWorkspaceEdit> {
         self.local_edits(vec![edit])
     }
+}
 
-    pub(crate) fn autofix(
+#[derive(Debug, Clone, Copy)]
+enum AutofixKind {
+    UnknownVariable,
+    FileNotFound,
+}
+
+fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
+    static PATTERNS: &[(&str, AutofixKind)] = &[
+        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
+        ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
+        ("file not found", AutofixKind::FileNotFound),
+    ];
+
+    for (pattern, kind) in PATTERNS {
+        if msg.starts_with(pattern) {
+            return Some(*kind);
+        }
+    }
+
+    None
+}
+
+/// Diagnostic autofix code actions.
+impl CodeActionWorker<'_> {
+    /// Suggests fixes for compiler/linter diagnostics.
+    pub fn autofix(
         &mut self,
         root: &LinkedNode<'_>,
         range: &Range<usize>,
@@ -273,7 +299,39 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    /// Starts to work.
+    fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
+        let change_id = "Typst Create Missing Files".to_string();
+
+        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
+            uri,
+            options: Some(CreateFileOptions {
+                overwrite: Some(false),
+                ignore_if_exists: None,
+            }),
+            annotation_id: Some(change_id.clone()),
+        }));
+
+        let mut change_annotations = HashMap::new();
+        change_annotations.insert(
+            change_id.clone(),
+            ChangeAnnotation {
+                label: change_id,
+                needs_confirmation: Some(needs_confirmation),
+                description: Some("The file is missing but required by code".to_string()),
+            },
+        );
+
+        EcoWorkspaceEdit {
+            changes: None,
+            document_changes: Some(EcoDocumentChanges::Operations(vec![create_op])),
+            change_annotations: Some(change_annotations),
+        }
+    }
+}
+
+/// Scoped code actions.
+impl CodeActionWorker<'_> {
+    /// Provides code actions that modify existing constructs.
     pub fn scoped(&mut self, root: &LinkedNode, range: &Range<usize>) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
@@ -575,55 +633,4 @@ impl<'a> CodeActionWorker<'a> {
 
         Some(())
     }
-
-    fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
-        let change_id = "Typst Create Missing Files".to_string();
-
-        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
-            uri,
-            options: Some(CreateFileOptions {
-                overwrite: Some(false),
-                ignore_if_exists: None,
-            }),
-            annotation_id: Some(change_id.clone()),
-        }));
-
-        let mut change_annotations = HashMap::new();
-        change_annotations.insert(
-            change_id.clone(),
-            ChangeAnnotation {
-                label: change_id,
-                needs_confirmation: Some(needs_confirmation),
-                description: Some("The file is missing but required by code".to_string()),
-            },
-        );
-
-        EcoWorkspaceEdit {
-            changes: None,
-            document_changes: Some(EcoDocumentChanges::Operations(vec![create_op])),
-            change_annotations: Some(change_annotations),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum AutofixKind {
-    UnknownVariable,
-    FileNotFound,
-}
-
-fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
-    static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
-        ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
-        ("file not found", AutofixKind::FileNotFound),
-    ];
-
-    for (pattern, kind) in PATTERNS {
-        if msg.starts_with(pattern) {
-            return Some(*kind);
-        }
-    }
-
-    None
 }
