@@ -115,15 +115,21 @@ export const FontSlot = (
       { class: "font-variant-info" },
       div(
         { class: "font-variant-details" },
-        span({ class: "font-detail-tag weight-tag" }, humanWeight(font.weight, showNumberOpt)),
+        span(
+          { class: "font-detail-tag weight-tag", style: `font-weight: ${font.weight}` },
+          humanWeight(font.weight, showNumberOpt),
+        ),
         font.stretch && font.stretch !== FONT_DEFAULTS.STRETCH
           ? span(
-              { class: "font-detail-tag stretch-tag" },
+              { class: "font-detail-tag stretch-tag", style: `font-stretch: ${font.stretch}` },
               humanStretch(font.stretch, showNumberOpt),
             )
           : null,
         font.style && font.style !== FONT_DEFAULTS.STYLE
-          ? span({ class: "font-detail-tag style-tag" }, humanStyle(font.style))
+          ? span(
+              { class: "font-detail-tag style-tag", style: `font-style: ${font.style}` },
+              humanStyle(font.style),
+            )
           : null,
       ),
       fileInfoElement,

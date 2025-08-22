@@ -48,8 +48,8 @@ export const WeightFilter = (weightFilter: State<string>) => {
                 ? "filter-toggle-button active"
                 : "filter-toggle-button",
             ),
+            style: `font-weight: ${category.weight}`,
             onclick: () => toggleWeight(key),
-            title: `${category.label} (${category.weight})`,
           },
           `${category.label} (${category.weight})`,
         ),
@@ -87,8 +87,8 @@ export const StretchFilter = (stretchFilter: State<string>) => {
                 ? "filter-toggle-button active"
                 : "filter-toggle-button",
             ),
+            style: `font-stretch: ${key}`,
             onclick: () => toggleStretch(key),
-            title: category.label,
           },
           category.label,
         ),
@@ -120,18 +120,18 @@ export const StyleFilter = (styleFilter: State<string>) => {
     div({ class: "filter-label" }, "Style"),
     div(
       { class: "filter-options" },
-      ...FONT_STYLE_OPTIONS.filter((opt) => opt.value !== "").map(({ value, label: optionLabel }) =>
+      ...Object.entries(FONT_STYLE_OPTIONS).map(([key, category]) =>
         button(
           {
             class: van.derive(() =>
-              selectedStyles.val.includes(value)
+              selectedStyles.val.includes(key)
                 ? "filter-toggle-button active"
                 : "filter-toggle-button",
             ),
-            onclick: () => toggleStyle(value),
-            title: optionLabel,
+            style: `font-style: ${key}`,
+            onclick: () => toggleStyle(key),
           },
-          optionLabel,
+          category.label,
         ),
       ),
     ),

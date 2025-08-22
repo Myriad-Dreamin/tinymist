@@ -62,9 +62,8 @@ export const FONT_STRETCH_CATEGORIES = {
   },
 } as const;
 
-export const FONT_STYLE_OPTIONS = [
-  { value: "", label: "All Styles" },
-  { value: "normal", label: "Normal" },
-  { value: "italic", label: "Italic" },
-  { value: "oblique", label: "Oblique" },
-] as const;
+export const FONT_STYLE_OPTIONS = {
+  normal: { label: "Normal" },
+  italic: { label: "Italic" },
+  oblique: { label: "Oblique" },
+} as const;
