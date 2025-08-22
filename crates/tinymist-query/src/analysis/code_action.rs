@@ -58,12 +58,12 @@ impl<'a> CodeActionWorker<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum AutofixKind {
+pub(crate) enum AutofixKind {
     UnknownVariable,
     FileNotFound,
 }
 
-fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
+pub(crate) fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
     static PATTERNS: &[(&str, AutofixKind)] = &[
         ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
         ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
@@ -235,26 +235,11 @@ impl CodeActionWorker<'_> {
 
     /// Add spaces between letters in an unknown math identifier: `$xyz$` -> `$x y z$`.
     fn add_spaces_to_math_unknown_variable(&mut self, node: &LinkedNode<'_>) -> Option<()> {
-        let ident = node.cast::<ast::MathIdent>()?.get();
-
-        // Rewrite `a_ij` as `a_(i j)`, not `a_i j`.
-        // Likewise rewrite `ab/c` as `(a b)/c`, not `a b/c`.
-        let needs_parens = matches!(
-            node.parent_kind(),
-            Some(SyntaxKind::MathAttach | SyntaxKind::MathFrac)
-        );
-        let new_text = if needs_parens {
-            eco_format!("({})", ident.chars().join(" "))
-        } else {
-            ident.chars().join(" ").into()
-        };
-
-        let range = self.ctx.to_lsp_range(node.range(), &self.source);
-        let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
+        let edit = suggest_math_unknown_variable_spaces_edit(self.ctx, &self.source, node)?;
         let action = CodeAction {
             title: "Add spaces between letters".to_string(),
             kind: Some(CodeActionKind::QUICKFIX),
-            edit: Some(edit),
+            edit: Some(self.local_edit(edit)?),
             ..CodeAction::default()
         };
         self.actions.push(action);
@@ -327,6 +312,33 @@ impl CodeActionWorker<'_> {
             change_annotations: Some(change_annotations),
         }
     }
+}
+
+/// Generate an edit that adds spaces between letters in an unknown math variable.
+///
+/// This function is split out from `CodeActionWorker` to allow for code sharing with the
+/// `codeAction/resolve` request handler.
+pub(crate) fn suggest_math_unknown_variable_spaces_edit(
+    ctx: &LocalContext,
+    source: &Source,
+    ident_node: &LinkedNode,
+) -> Option<EcoSnippetTextEdit> {
+    let ident = ident_node.cast::<ast::MathIdent>()?.get();
+
+    // Rewrite `a_ij` as `a_(i j)`, not `a_i j`.
+    // Likewise rewrite `ab/c` as `(a b)/c`, not `a b/c`.
+    let needs_parens = matches!(
+        ident_node.parent_kind(),
+        Some(SyntaxKind::MathAttach | SyntaxKind::MathFrac)
+    );
+    let new_text = if needs_parens {
+        eco_format!("({})", ident.chars().join(" "))
+    } else {
+        ident.chars().join(" ").into()
+    };
+
+    let range = ctx.to_lsp_range(ident_node.range(), source);
+    Some(EcoSnippetTextEdit::new(range, new_text))
 }
 
 /// Scoped code actions.
