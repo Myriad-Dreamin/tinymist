@@ -52,9 +52,10 @@ const FilterToggle = (
  */
 const FilterGroup = (title: string, options: ChildDom[], filter: State<string[]>) => {
   return div(
-    div({ class: "text-desc" }, title),
+    { class: "flex gap-xs" },
+    div({ class: "text-sm", style: "min-width: 3rem" }, title),
     div(
-      { class: "filter-options" },
+      { class: "flex flex-wrap gap-xs" },
       ...options,
       filter.val.length > 0
         ? button(
@@ -159,7 +160,7 @@ const StatsText = (stats: State<FontStats>) => () => {
     filtered === total
       ? `Showing ${total} font families (${variants} variants)`
       : `Showing ${filtered} of ${total} font families (${variants} variants)`;
-  return div({ class: "font-stats" }, text);
+  return div({ class: "text-sm" }, text);
 };
 
 export const Header =
@@ -171,17 +172,18 @@ export const Header =
   ) =>
   () => {
     return div(
-      { class: "font-view-header card" },
+      { class: "card flex flex-col gap-sm", style: "margin-bottom: 1rem" },
       SearchInput(filterStates.searchQuery),
       div(
-        { class: "font-filters-section" },
+        { class: "flex flex-col gap-xs" },
         WeightFilter(filterStates.weightFilter),
         StretchFilter(filterStates.stretchFilter),
         StyleFilter(filterStates.styleFilter),
       ),
       ClearFiltersButton(clearFilters),
+      div({ class: "divider" }),
       div(
-        { class: "font-stats-section" },
+        { class: "flex justify-between items-center" },
         StatsText(stats),
         ToggleButton(
           "Show Numbers",

@@ -58,7 +58,7 @@ export const FontView = () => {
   const { fontFilters, clearFilters, filteredFamilies, fontStats } = useFontFilters(fontResources);
 
   return div(
-    { class: "font-view-container" },
+    { class: "font-view-container text-base-content" },
     Header(fontFilters, fontStats, showNumber, clearFilters),
     FontList(filteredFamilies, fontResources, showNumber),
   );

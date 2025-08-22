@@ -1,3 +1,4 @@
+/* Typography */
 .text-xs {
   font-size: 0.75rem;
 }
@@ -21,6 +22,15 @@
   font-weight: bold;
 }
 
+.italic {
+  font-style: italic;
+}
+
+.text-center {
+  text-align: center;
+}
+
+/* Layout & Display */
 .flex {
   display: flex;
 }
@@ -32,19 +42,42 @@
   display: flex;
   flex-direction: column;
 }
-/* .flex-wrap {
-  flex-wrap: wrap;
-} */
 
 .hidden {
   display: none;
 }
 
-/* aria-hidden */
-span[aria-hidden="true"] {
-  display: none;
+/* Flexbox Properties */
+.flex-wrap {
+  flex-wrap: wrap;
+}
+.flex-1 {
+  flex: 1;
 }
 
+.items-start {
+  align-items: start;
+}
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+/* Spacing */
+.gap-xs {
+  gap: 0.25rem;
+}
+.gap-sm {
+  gap: 0.5rem;
+}
+.gap-md {
+  gap: 1rem;
+}
+
+/* Interaction */
 .cursor-pointer {
   cursor: pointer;
 }

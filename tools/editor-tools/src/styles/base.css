@@ -2,3 +2,8 @@ html,
 body {
   margin: 0;
 }
+
+/* aria-hidden */
+span[aria-hidden="true"] {
+  display: none;
+}

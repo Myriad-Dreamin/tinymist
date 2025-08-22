@@ -1,21 +1,62 @@
+/* ===== Theme Variables ===== */
+:root {
+  --color-base-content: var(--vscode-foreground, #cccccc);
+}
+
 /* ===== Typography & Text Utilities ===== */
+.text-base-content {
+  color: var(--color-base-content);
+}
+
 .font-mono {
-  font-family: var(--vscode-editor-font-family, "Courier New", monospace);
+  font-family: var(--vscode-editor-font-family, monospace, "Courier New");
 }
 
 .text-desc {
-  color: var(--vscode-descriptionForeground, #999999);
+  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
 }
 
 /* ===== Badges ===== */
 .badge {
-  font-size: 0.875rem;
-  color: var(--vscode-button-foreground, #ffffff);
-  background: var(--vscode-button-background, #4d4d4d);
+  font-size: 0.75rem;
+  color: var(--vscode-badge-foreground, #ffffff);
+  background: var(--vscode-badge-background, #4d4d4d);
   padding: 0.125rem 0.5rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--vscode-button-border, rgba(255, 255, 255, 0.2));
+  border-radius: 4px;
   white-space: nowrap;
+}
+
+/* ===== Cards ===== */
+.card {
+  padding: 1rem;
+  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  border-radius: 0.375rem;
+}
+
+/* ===== Dividers ===== */
+
+.divider {
+  white-space: nowrap;
+  margin: 0.5rem 0;
+  flex-direction: row;
+  align-self: stretch;
+  align-items: center;
+  display: flex;
+  border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.divider:not(:empty) {
+  gap: 1rem;
+}
+
+/* ===== Lists ===== */
+.list-highlight > * {
+  transition: all 0.2s ease;
+}
+
+.list-highlight > *:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
 }
 
 /* ===== Buttons ===== */
@@ -24,7 +65,7 @@
   --btn-fg: var(--vscode-button-foreground, #ffffff);
 
   padding: 0.25rem 0.375rem;
-  font-size: var(--fontsize, 0.75em);
+  font-size: var(--fontsize, 0.75rem);
   white-space: nowrap;
   background: var(--btn-color);
   color: var(--btn-fg);
@@ -36,8 +77,7 @@
 }
 
 .btn:hover {
-  --btn-color: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
-  --btn-border: var(--vscode-focusBorder, #007acc);
+  --btn-color: var(--vscode-button-secondaryHoverBackground, #1177bb);
 }
 
 .btn:active {
@@ -45,18 +85,9 @@
 }
 
 /* Button variants */
-.btn-primary {
-  --btn-color: var(--vscode-button-background, #0e639c);
-  --btn-fg: var(--vscode-button-foreground, #ffffff);
-}
-
-.btn-primary:hover {
-  --btn-color: var(--vscode-button-hoverBackground, #1177bb);
-}
-
 .btn-secondary {
   --btn-color: var(--vscode-button-background, #3a3d41);
-  --btn-fg: var(--vscode-button-foreground, #ffffff);
+  --btn-fg: var(--color-base-content);
 }
 
 .btn-secondary:hover {
@@ -66,7 +97,7 @@
 /* ===== Toggle Button ===== */
 .toggle-btn {
   --btn-color: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
-  --btn-fg: var(--vscode-button-secondaryForeground, #cccccc);
+  --btn-fg: var(--vscode-button-secondaryForeground, #ffffff);
 
   padding: 0.25rem 0.375rem;
   font-size: 0.75rem;
@@ -81,7 +112,6 @@
 
 .toggle-btn:hover {
   --btn-color: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
-  --btn-fg: var(--vscode-inputOption-activeBorder, #007acc);
 }
 
 .toggle-btn:active {
@@ -95,14 +125,6 @@
 
 .toggle-btn.active:hover {
   --btn-color: var(--vscode-button-hoverBackground, #1177bb);
-}
-
-/* ===== Cards ===== */
-.card {
-  padding: 1rem;
-  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
-  border-radius: 0.375rem;
 }
 
 /* ===== Form Inputs ===== */

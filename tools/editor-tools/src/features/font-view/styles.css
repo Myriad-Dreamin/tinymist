@@ -2,106 +2,12 @@
   width: 100%;
   max-width: 72rem;
   margin: auto;
-
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.font-view-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75em;
-  margin-bottom: 1.25em;
-}
-
-.font-filters-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5em;
-}
-.font-filters-section > div {
-  display: flex;
-  gap: 1em;
-}
-.font-filters-section > div > div:nth-child(1) {
-  min-width: 3rem;
-}
-
-.filter-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5em;
-}
-
-.filter-option {
-  display: flex;
-  align-items: center;
-  gap: 0.4em;
-  cursor: pointer;
-  font-size: 0.85em;
-  color: var(--vscode-editor-foreground);
-  padding: 0.25em 0;
-}
-
-.filter-option input[type="radio"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-.filter-option:hover {
-  color: var(--vscode-textLink-activeForeground, #74b0ff);
-}
-
-.font-stats-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 0.75em;
-  border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
-}
-
-.font-stats {
-  font-size: 0.8em;
-  color: var(--vscode-descriptionForeground, #999999);
-}
-
-.font-families-container {
-  display: flex;
-  flex-direction: column;
-  gap: 1em;
-}
-
-.font-family-card {
-  transition: all 0.2s ease;
-}
-
-.font-family-card:hover {
-  border-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
-  background: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.08));
-}
-
-.font-family-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0.75em;
-  gap: 0.75em;
-}
-
-.font-family-actions {
-  display: flex;
-  gap: 0.5em;
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.font-variants-container {
-  margin-top: 8px;
 }
 
 .font-variant-item {
   display: flex;
   align-items: center;
-  padding: 0.375rem 0;
+  padding: 0.25rem 0;
   border-bottom: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
 }
 
@@ -109,32 +15,13 @@
   border-bottom: none;
 }
 
-.font-variant-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex: 1;
-  min-width: 0; /* Allow text to truncate */
-  gap: 1em;
-}
-
-.font-variant-details {
-  display: flex;
-  gap: 0.5em;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-/* todo: redesign this */
 .font-file-info {
   font-size: 0.75rem;
   color: var(--vscode-descriptionForeground, #999999);
-  font-family: var(--vscode-editor-font-family, monospace, "Courier New");
   background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.05));
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
-  word-break: break-all;
 }
 
 .font-file-info.clickable {
@@ -144,10 +31,4 @@
 
 .font-file-info.clickable:hover {
   background: var(--vscode-textCodeBlock-background, rgba(255, 255, 255, 0.1));
-}
-
-.no-fonts-message {
-  text-align: center;
-  padding: 40px 20px;
-  font-style: italic;
 }
