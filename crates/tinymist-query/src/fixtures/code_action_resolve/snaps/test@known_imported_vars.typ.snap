@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/code_action_resolve.rs
+expression: "JsonRepr::new_redacted(result.map(|action| action.edit), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action_resolve/known_imported_vars.typ
+---
+{
+ "changes": {
+  "s0.typ": []
+ }
+}

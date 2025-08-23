@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/code_action_resolve.rs
+expression: "JsonRepr::new_redacted(result.map(|action| action.edit), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action_resolve/unknown_vars.typ
+---
+{
+ "changes": {
+  "s0.typ": [
+   {
+    "insertTextFormat": 1,
+    "newText": "a c",
+    "range": "2:15:2:17"
+   },
+   {
+    "insertTextFormat": 1,
+    "newText": "(m 1)",
+    "range": "6:12:6:14"
+   },
+   {
+    "insertTextFormat": 1,
+    "newText": "(m n)",
+    "range": "6:38:6:40"
+   },
+   {
+    "insertTextFormat": 1,
+    "newText": "a b",
+    "range": "2:10:2:12"
+   }
+  ]
+ }
+}
