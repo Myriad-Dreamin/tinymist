@@ -9,6 +9,8 @@ pub mod completion;
 pub use completion::*;
 pub mod code_action;
 pub use code_action::*;
+pub mod code_action_resolve;
+pub use code_action_resolve::*;
 pub mod color_expr;
 pub use color_expr::*;
 pub mod doc_highlight;

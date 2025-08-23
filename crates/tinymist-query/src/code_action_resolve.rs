@@ -1,0 +1,68 @@
+use std::path::PathBuf;
+
+use ecow::EcoVec;
+use lsp_types::Diagnostic;
+use tinymist_lint::KnownLintIssues;
+use tinymist_project::{CompiledArtifact, LspComputeGraph};
+use typst::syntax::LinkedNode;
+
+use crate::analysis::CodeActionResolveWorker;
+use crate::code_action::proto::*;
+use crate::{DiagWorker, LocalContext, StatefulRequest};
+
+/// A `codeAction/resolve` request.
+#[derive(Debug, Clone)]
+pub struct CodeActionResolveRequest {
+    /// The path of the document to request for.
+    ///
+    /// Note that the `codeAction/resolve` request does not specify the document directly, so we
+    /// pass the document URL in the data field by convention when sending deferred code actions, and
+    /// parse it back ourselves when handling the request.
+    ///
+    /// This is the same approach that the [Ruff language server takes][ruff].
+    ///
+    /// [ruff]: https://github.com/astral-sh/ruff/blob/v0.4.10/crates/ruff_server/src/server/api/requests/code_action_resolve.rs#L23-L26.
+    pub path: PathBuf,
+
+    /// The code action to resolve edits for.
+    pub action: lsp_types::CodeAction,
+}
+
+impl StatefulRequest for CodeActionResolveRequest {
+    type Response = Box<CodeAction>;
+
+    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+        log::trace!("resolving code action: {self:?}");
+
+        let kind = self.action.kind?;
+        let source = ctx.source_by_path(&self.path).ok()?;
+        let root = LinkedNode::new(source.root());
+
+        let diagnostics: EcoVec<Diagnostic> = {
+            // Rerun the compiler to make sure we have the latest diagnostics.
+            // TODO: is this the correct API to use?
+            let is_html = ctx.world.library.features.is_enabled(typst::Feature::Html);
+            let art = CompiledArtifact::from_graph(graph, is_html);
+
+            let compiler_diags = art.diagnostics();
+            let worker = DiagWorker::new(ctx);
+            let known_issues = KnownLintIssues::from_compiler_diagnostics(compiler_diags.clone());
+            worker
+                .check(&source, &known_issues)
+                .convert_all(compiler_diags)
+                .into_values()
+                .flatten()
+                .collect()
+        };
+
+        let edit = CodeActionResolveWorker::try_new(ctx, source.clone(), diagnostics)?
+            .resolve_edit(&root, &kind)?;
+
+        Some(Box::new(CodeAction {
+            title: self.action.title,
+            kind: Some(kind),
+            edit: Some(edit),
+            ..CodeAction::default()
+        }))
+    }
+}
