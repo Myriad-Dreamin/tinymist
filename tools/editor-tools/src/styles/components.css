@@ -76,8 +76,9 @@
   transition: all 0.15s;
 }
 
-.btn:hover, .btn.activated {
-  --btn-color: var(--vscode-button-secondaryHoverBackground, #1177bb);
+.btn:hover,
+.btn.activated {
+  --btn-color: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 /* todo: warning style */
@@ -145,6 +146,43 @@ body.typst-preview-light .btn.warning.activated {
 
 .toggle-btn.active:hover {
   --btn-color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 2rem;
+  height: 1rem;
+  background-color: var(--vscode-input-background, #2d2d30);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 1rem;
+  transition: background-color 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+}
+
+.toggle:checked {
+  background-color: var(--vscode-button-background, #0e639c);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+
+.toggle::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: var(--vscode-foreground, #cccccc);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.toggle:checked::before {
+  transform: translateX(1rem);
 }
 
 /* ===== Form Inputs ===== */

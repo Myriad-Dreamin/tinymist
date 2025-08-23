@@ -2,7 +2,6 @@ import type { FontResources } from "./fonts";
 
 export const MOCK_DATA: FontResources = {
   sources: [
-
     {
       kind: "fs",
       path: "C:\\Users\\OvO\\work\\assets\\fonts\\TimesNewRoman-Regular.ttf",
