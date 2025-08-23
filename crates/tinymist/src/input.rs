@@ -1,17 +1,22 @@
 use lsp_types::*;
 use reflexo_typst::Bytes;
+use serde::{Deserialize, Serialize};
 use tinymist_query::{to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
-use typst::{diag::FileResult, syntax::Source};
+use typst::ecow::EcoString;
+use typst::{
+    diag::{FileError, FileResult},
+    syntax::Source,
+};
 
 use crate::project::Interrupt;
-use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet, FilesystemEvent};
 use crate::world::TaskInputs;
 use crate::*;
 
-mod client;
-pub use client::ClientAccessModel;
+mod watch;
+pub use watch::WatchAccessModel;
 
 #[cfg(feature = "lock")]
 use crate::project::ProjectResolutionKind;
@@ -118,6 +123,42 @@ impl ServerState {
         let source = snapshot.clone();
         f(source)
     }
+
+    /// Handles file system change event emitted by the client.
+    pub fn fs_change(&mut self, params: FsChangeParams) -> ScheduleResult {
+        use base64::Engine;
+        let _scope = typst_timing::TimingScope::new("fs_change");
+
+        let mut inserts = vec![];
+        let mut removes = vec![];
+
+        for change in params.inserts {
+            let path: ImmutPath =
+                tinymist_query::url_to_path(&Url::parse(&change.uri).unwrap()).into();
+            let content: FileResult<Bytes> = match change.content {
+                FileChangeResult::Ok { content } => base64::engine::general_purpose::STANDARD
+                    .decode(content)
+                    .map(Bytes::new)
+                    .map_err(|e| FileError::Other(Some(_eco_format!("base64 decode error: {e}")))),
+                FileChangeResult::Err { error } => {
+                    log::info!("file content not available: {path:?} {error}");
+                    Err(FileError::Other(Some(error)))
+                }
+            };
+            inserts.push((path, content.into()));
+        }
+
+        for path in params.removes {
+            removes.push(tinymist_query::url_to_path(&Url::parse(&path).unwrap()).into());
+        }
+
+        let update = FilesystemEvent::Update(FileChangeSet { inserts, removes }, params.is_sync);
+        log::info!("fs_change: {update:?}");
+        self.project.interrupt(Interrupt::Fs(update));
+
+        self.schedule_async();
+        just_ok(serde_json::Value::Null)
+    }
 }
 
 /// Main file mutations on the primary project (which is used for the language
@@ -131,10 +172,14 @@ impl ServerState {
 
     /// Changes main file to the given path.
     pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
-        if path
-            .as_deref()
-            .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
-        {
+        if path.as_deref().is_some_and(|p| {
+            let is_absolute = if cfg!(target_arch = "wasm32") {
+                p.has_root()
+            } else {
+                p.is_absolute()
+            };
+            !is_absolute && !p.starts_with("/untitled")
+        }) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
@@ -282,4 +327,51 @@ impl ServerState {
             .flatten()
             .unwrap_or_else(|| self.resolve_task_without_lock(Some(path)))
     }
+}
+
+/// The file system change request.
+pub enum FsChange {}
+
+impl lsp_types::request::Request for FsChange {
+    type Params = FsChangeParams;
+    type Result = ();
+    const METHOD: &'static str = "tinymist/fsChange";
+}
+
+/// The file system change parameters.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FsChangeParams {
+    /// The inserted files.
+    pub inserts: Vec<FileChange>,
+    /// The removed files.
+    pub removes: Vec<String>,
+    /// Whether the change is emitted by sync event.
+    pub is_sync: bool,
+}
+
+/// A file change.
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileChange {
+    /// The file URI.
+    pub uri: String,
+    /// The file content.
+    pub content: FileChangeResult,
+}
+
+/// The result of a file change.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum FileChangeResult {
+    /// The file content is available.
+    Ok {
+        /// The file content.
+        content: String,
+    },
+    /// The file content is not available.
+    Err {
+        /// The error message.
+        error: EcoString,
+    },
 }

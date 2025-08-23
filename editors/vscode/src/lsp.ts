@@ -4,19 +4,13 @@ import { resolve } from "path";
 import * as vscode from "vscode";
 import * as lc from "vscode-languageclient";
 import * as Is from "vscode-languageclient/lib/common/utils/is";
-import { ExtensionMode } from "vscode";
-import type {
-  LanguageClient,
-  SymbolInformation,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import type { SymbolInformation, LanguageClientOptions } from "vscode-languageclient/node";
+import type { BaseLanguageClient as LanguageClient } from "vscode-languageclient";
 
 import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import {
-  base64Encode,
   bytesBase64Encode,
   DisposeList,
   getSensibleTextEditorColumn,
@@ -26,6 +20,7 @@ import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
 import { wordPattern } from "./language";
+import type { createSystemLanguageClient } from "./lsp.system";
 
 interface ResourceRoutes {
   "/fonts": any;
@@ -97,12 +92,13 @@ interface JumpInfo {
 }
 
 export class LanguageState {
-  static Client: typeof LanguageClient = undefined!;
+  static Client: typeof createSystemLanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
 
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
+  _watcher: vscode.FileSystemWatcher | undefined = undefined;
   clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
@@ -114,6 +110,10 @@ export class LanguageState {
       this.clientPromiseResolve = resolve;
     });
 
+    if (this._watcher) {
+      this._watcher.dispose();
+      this._watcher = undefined;
+    }
     if (this.client) {
       await this.client.stop();
       this.client = undefined;
@@ -171,29 +171,8 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: TinymistConfig) {
+  async initClient(config: TinymistConfig) {
     const context = this.context;
-    const isProdMode = context.extensionMode === ExtensionMode.Production;
-
-    /// The `--mirror` flag is only used in development/test mode for testing
-    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
-    /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
-    /// production mode because we don't put the debug information in the binary.
-    ///
-    /// Note: Developers can still download the debug information from the GitHub Releases and enable the backtrace
-    /// manually by themselves.
-    const RUST_BACKTRACE = isProdMode ? "1" : "full";
-
-    const run = {
-      command: config.probedServerPath,
-      args: ["lsp", ...mirrorFlag],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
-    };
-    // console.log("use arguments", run);
-    const serverOptions: ServerOptions = {
-      run,
-      debug: run,
-    };
 
     const trustedCommands = {
       enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
@@ -296,12 +275,7 @@ export class LanguageState {
       },
     };
 
-    const client = (this.client = new LanguageState.Client(
-      "tinymist",
-      "Tinymist Typst Language Server",
-      serverOptions,
-      clientOptions,
-    ));
+    const client = (this.client = await LanguageState.Client(context, config, clientOptions));
 
     this.clientPromiseResolve(client);
     return client;
@@ -309,25 +283,18 @@ export class LanguageState {
 
   async startClient(): Promise<void> {
     const client = this.client;
+    console.log("this.client", !!this.client);
     if (!client) {
       throw new Error("Language client is not set");
     }
 
-    client.onRequest("tinymist/fs/content", (params: FsReadRequest) => {
-      const fsUrl = vscode.Uri.file(params.path);
-      return vscode.workspace.fs.readFile(fsUrl).then(
-        (data) => ({ content: bytesBase64Encode(data) }),
-        (err) => {
-          console.error("Failed to read file", params, err);
-          throw err;
-        },
-      );
-    });
+    this.registerClientSideWatch(client);
     client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
-
-    this.registerPreviewNotifications(client);
+    if (extensionState.features.preview) {
+      this.registerPreviewNotifications(client);
+    }
 
     await client.start();
 
@@ -453,6 +420,124 @@ export class LanguageState {
    */
   async scrollAllPreview(): Promise<void> {
     return await tinymist.executeCommand(`tinymist.scrollPreview`, []);
+  }
+
+  registerClientSideWatch(client: LanguageClient) {
+    const watches = new Set<string>();
+    const hasRead = new Map<string, [number, FileResult | undefined]>();
+    let watchClock = 0;
+
+    const tryRead = async (uri: vscode.Uri) =>
+      vscode.workspace.fs.readFile(uri).then(
+        (data): FileResult => {
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        },
+        (err: any): FileResult => {
+          console.error("Failed to read file", uri, err);
+          return { type: "err", error: err.message as string } as const;
+        },
+      );
+
+    const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
+      const previous = hasRead.get(uri);
+      if (previous && previous[0] >= currentClock) {
+        return false;
+      }
+      hasRead.set(uri, [currentClock, content]);
+      return true;
+    };
+
+    let watcher = () => {
+      if (this._watcher) {
+        return this._watcher;
+      }
+      console.log("registering watcher");
+
+      this._watcher = vscode.workspace.createFileSystemWatcher("**/*");
+
+      const watchRead = async (currentClock: number, uri: vscode.Uri) => {
+        console.log("watchRead", uri, currentClock, watches);
+        const uriStr = uri.toString();
+        if (!watches.has(uriStr)) {
+          return;
+        }
+
+        const content = await tryRead(uri);
+        if (!registerHasRead(uriStr, currentClock, content)) {
+          return;
+        }
+
+        const inserts: FileChange[] = [{ uri: uriStr, content }];
+        const removes: string[] = [];
+
+        client.sendRequest(fsChange, { inserts, removes, isSync: false });
+      };
+
+      this._watcher.onDidChange((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs change", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidCreate((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs create", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidDelete((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs delete", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+
+      return this._watcher;
+    };
+
+    // todo: move registering to initClient to avoid unhandled errors.
+    client.onRequest("tinymist/fs/watch", (params: FsWatchRequest) => {
+      const currentClock = watchClock++;
+      console.log(
+        "fs watch request",
+        params,
+        vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
+      );
+
+      const filesToRead = new Set<string>();
+      const filesDeleted = new Set<string>();
+
+      for (const path of params.inserts) {
+        if (!watches.has(path)) {
+          filesToRead.add(path);
+          watches.add(path);
+        }
+      }
+
+      for (const path of params.removes) {
+        if (watches.has(path)) {
+          filesDeleted.add(path);
+          watches.delete(path);
+        }
+      }
+      const removes: string[] = params.removes.filter((path) => {
+        return filesDeleted.has(path) && registerHasRead(path, currentClock, undefined);
+      });
+
+      (async () => {
+        const paths = Array.from(filesToRead);
+        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
+
+        watcher();
+
+        const inserts: FileChange[] = paths
+          .map((path, idx) => ({
+            uri: path,
+            content: readFiles[idx],
+          }))
+          .filter((change) => registerHasRead(change.uri, currentClock, change.content));
+
+        console.log("fs watch read", currentClock, inserts, removes);
+        client.sendRequest(fsChange, { inserts, removes, isSync: true });
+      })();
+    });
   }
 
   /**
@@ -678,6 +763,29 @@ function isCodeActionWithoutEditsAndCommands(value: any): boolean {
   );
 }
 
-interface FsReadRequest {
-  path: string;
+interface FsWatchRequest {
+  inserts: string[];
+  removes: string[];
 }
+
+interface FileResult {
+  type: "ok" | "err";
+  content?: string;
+  error?: string;
+}
+
+interface FileChange {
+  uri: string;
+  content: FileResult;
+}
+
+/**
+ * A parameter literal used in requests to pass a list of file changes.
+ */
+export interface FsChangeParams {
+  inserts: FileChange[];
+  removes: string[];
+  isSync: boolean;
+}
+
+const fsChange = new lc.RequestType<FsChangeParams, void, void>("tinymist/fsChange");

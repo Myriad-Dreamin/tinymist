@@ -42,6 +42,7 @@ use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 #[cfg(feature = "export")]
 use crate::task::ExportUserConfig;
+use crate::vfs::notify::NotifyMessage;
 use crate::Config;
 #[cfg(feature = "preview")]
 use crate::ServerEvent;
@@ -92,6 +93,7 @@ impl ServerState {
             &self.config,
             editor_tx,
             self.client.clone(),
+            self.dep_tx.clone(),
             #[cfg(feature = "preview")]
             self.preview.watchers.clone(),
         );
@@ -135,6 +137,7 @@ impl ServerState {
         config: &Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
+        dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
     ) -> ProjectState {
         let const_config = &config.const_config;
@@ -209,24 +212,7 @@ impl ServerState {
             access_model,
         );
 
-        // todo: unify filesystem watcher
-        let (dep_tx, dep_rx) = mpsc::unbounded_channel();
-        // todo: notify feature?
-        #[cfg(feature = "system")]
-        {
-            let fs_client = client.clone().to_untyped();
-            let async_handle = client.handle.clone();
-            async_handle.spawn(watch_deps(dep_rx, move |event| {
-                fs_client.send_event(LspInterrupt::Fs(event));
-            }));
-        }
-        #[cfg(not(feature = "system"))]
-        {
-            let _ = dep_rx;
-            log::warn!("Project: system watcher is not enabled, file changes will not be watched");
-        }
-
-        // Create the actor
+        // Creates the actor
         let compile_handle = handle.clone();
         let compiler = ProjectCompiler::new(
             verse,
