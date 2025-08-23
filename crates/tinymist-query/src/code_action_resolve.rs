@@ -70,3 +70,44 @@ impl StatefulRequest for CodeActionResolveRequest {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::CodeActionKind;
+
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("code_action_resolve", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+            let resolve_kind = CodeActionKind::from(
+                properties
+                    .get("resolve")
+                    .expect("a `resolve` property specifying the code action kind")
+                    .to_string(),
+            );
+
+            let graph = WorldComputeGraph::from_world(ctx.world.clone());
+
+            let action = lsp_types::CodeAction {
+                kind: Some(resolve_kind),
+                // Leave the other fields blank; we'll only snapshot the edit.
+                ..lsp_types::CodeAction::default()
+            };
+            let request = CodeActionResolveRequest {
+                path: path.clone(),
+                action,
+            };
+            let result = request.request(ctx, graph);
+            assert_snapshot!(JsonRepr::new_redacted(
+                result.map(|action| action.edit),
+                &REDACT_LOC
+            ));
+        })
+    }
+}
