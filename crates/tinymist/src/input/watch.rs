@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use lsp_types::request::Request;
@@ -68,9 +68,9 @@ impl WatchAccessModel {
     }
 
     pub fn add_watch(&self, path: &Path) {
-        log::trace!("add watch: {path:?}");
+        log::info!("add watch: {path:?}");
         let req = FsWatchRequest {
-            inserts: vec![path.to_owned()],
+            inserts: vec![tinymist_query::path_to_url(path).unwrap()],
             removes: vec![],
         };
         self.client
@@ -92,7 +92,7 @@ impl WatchAccessModel {
         watches.retain(|path| {
             if !filter(path) {
                 // todo: clone here
-                removes.push(path.as_ref().to_owned());
+                removes.push(tinymist_query::path_to_url(path.as_ref()).unwrap());
                 return false;
             }
 
@@ -133,8 +133,8 @@ pub struct DelegateFileContent {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FsWatchRequest {
-    inserts: Vec<PathBuf>,
-    removes: Vec<PathBuf>,
+    inserts: Vec<lsp_types::Url>,
+    removes: Vec<lsp_types::Url>,
 }
 
 impl Request for FsWatchRequest {

@@ -276,7 +276,6 @@ export class LanguageState {
     };
 
     const client = (this.client = await LanguageState.Client(context, config, clientOptions));
-    console.log("this.client", !!this.client);
 
     this.clientPromiseResolve(client);
     return client;
@@ -289,123 +288,10 @@ export class LanguageState {
       throw new Error("Language client is not set");
     }
 
-    const watches = new Set<string>();
-    const hasRead = new Map<string, [number, FileResult | undefined]>();
-    let watchClock = 0;
-
-    const tryRead = async (uri: vscode.Uri) =>
-      vscode.workspace.fs.readFile(uri).then(
-        (data): FileResult => {
-          return { type: "ok", content: bytesBase64Encode(data) } as const;
-        },
-        (err: any): FileResult => {
-          console.error("Failed to read file", uri, err);
-          return { type: "err", error: err.message as string } as const;
-        },
-      );
-
-    const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
-      const previous = hasRead.get(uri);
-      if (previous && previous[0] >= currentClock) {
-        return false;
-      }
-      hasRead.set(uri, [currentClock, content]);
-      return true;
-    };
-
-    let watcher = () => {
-      if (this._watcher) {
-        return this._watcher;
-      }
-
-      this._watcher = vscode.workspace.createFileSystemWatcher("**/*");
-
-      const watchRead = async (currentClock: number, uri: vscode.Uri) => {
-        const uriStr = uri.toString();
-        if (!watches.has(uriStr)) {
-          return;
-        }
-
-        const content = await tryRead(uri);
-        if (!registerHasRead(uriStr, currentClock, content)) {
-          return;
-        }
-
-        const inserts: FileChange[] = [{ uri: uriStr, content }];
-        const removes: string[] = [];
-
-        client.sendRequest(fsChange, { inserts, removes, isSync: false });
-      };
-
-      this._watcher.onDidChange((uri) => {
-        const currentClock = watchClock++;
-        console.log("fs change", uri, currentClock);
-        watchRead(currentClock, uri);
-      });
-      this._watcher.onDidCreate((uri) => {
-        const currentClock = watchClock++;
-        console.log("fs create", uri, currentClock);
-        watchRead(currentClock, uri);
-      });
-      this._watcher.onDidDelete((uri) => {
-        const currentClock = watchClock++;
-        console.log("fs delete", uri, currentClock);
-        watchRead(currentClock, uri);
-      });
-
-      return this._watcher;
-    };
-
-    // todo: move registering to initClient to avoid unhandled errors.
-    client.onRequest("tinymist/fs/watch", (params: FsWatchRequest) => {
-      const currentClock = watchClock++;
-      console.log(
-        "fs read request",
-        params,
-        vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
-      );
-
-      const filesToRead = new Set<string>();
-      const filesDeleted = new Set<string>();
-
-      for (const path of params.inserts) {
-        if (!watches.has(path)) {
-          filesToRead.add(path);
-          watches.add(path);
-        }
-      }
-
-      for (const path of params.removes) {
-        if (watches.has(path)) {
-          filesDeleted.add(path);
-          watches.delete(path);
-        }
-      }
-
-      (async () => {
-        const paths = Array.from(filesToRead);
-        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
-
-        watcher();
-
-        const inserts: FileChange[] = paths
-          .map((path, idx) => ({
-            uri: path,
-            content: readFiles[idx],
-          }))
-          .filter((change) => registerHasRead(change.uri, currentClock, change.content));
-        const removes: string[] = params.removes.filter((path) => {
-          return registerHasRead(path, currentClock, undefined);
-        });
-
-        client.sendRequest(fsChange, { inserts, removes, isSync: true });
-      })();
-    });
-
+    this.registerClientSideWatch(client);
     client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
-
     if (extensionState.features.preview) {
       this.registerPreviewNotifications(client);
     }
@@ -534,6 +420,124 @@ export class LanguageState {
    */
   async scrollAllPreview(): Promise<void> {
     return await tinymist.executeCommand(`tinymist.scrollPreview`, []);
+  }
+
+  registerClientSideWatch(client: LanguageClient) {
+    const watches = new Set<string>();
+    const hasRead = new Map<string, [number, FileResult | undefined]>();
+    let watchClock = 0;
+
+    const tryRead = async (uri: vscode.Uri) =>
+      vscode.workspace.fs.readFile(uri).then(
+        (data): FileResult => {
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        },
+        (err: any): FileResult => {
+          console.error("Failed to read file", uri, err);
+          return { type: "err", error: err.message as string } as const;
+        },
+      );
+
+    const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
+      const previous = hasRead.get(uri);
+      if (previous && previous[0] >= currentClock) {
+        return false;
+      }
+      hasRead.set(uri, [currentClock, content]);
+      return true;
+    };
+
+    let watcher = () => {
+      if (this._watcher) {
+        return this._watcher;
+      }
+      console.log("registering watcher");
+
+      this._watcher = vscode.workspace.createFileSystemWatcher("**/*");
+
+      const watchRead = async (currentClock: number, uri: vscode.Uri) => {
+        console.log("watchRead", uri, currentClock, watches);
+        const uriStr = uri.toString();
+        if (!watches.has(uriStr)) {
+          return;
+        }
+
+        const content = await tryRead(uri);
+        if (!registerHasRead(uriStr, currentClock, content)) {
+          return;
+        }
+
+        const inserts: FileChange[] = [{ uri: uriStr, content }];
+        const removes: string[] = [];
+
+        client.sendRequest(fsChange, { inserts, removes, isSync: false });
+      };
+
+      this._watcher.onDidChange((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs change", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidCreate((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs create", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidDelete((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs delete", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+
+      return this._watcher;
+    };
+
+    // todo: move registering to initClient to avoid unhandled errors.
+    client.onRequest("tinymist/fs/watch", (params: FsWatchRequest) => {
+      const currentClock = watchClock++;
+      console.log(
+        "fs watch request",
+        params,
+        vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
+      );
+
+      const filesToRead = new Set<string>();
+      const filesDeleted = new Set<string>();
+
+      for (const path of params.inserts) {
+        if (!watches.has(path)) {
+          filesToRead.add(path);
+          watches.add(path);
+        }
+      }
+
+      for (const path of params.removes) {
+        if (watches.has(path)) {
+          filesDeleted.add(path);
+          watches.delete(path);
+        }
+      }
+      const removes: string[] = params.removes.filter((path) => {
+        return filesDeleted.has(path) && registerHasRead(path, currentClock, undefined);
+      });
+
+      (async () => {
+        const paths = Array.from(filesToRead);
+        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
+
+        watcher();
+
+        const inserts: FileChange[] = paths
+          .map((path, idx) => ({
+            uri: path,
+            content: readFiles[idx],
+          }))
+          .filter((change) => registerHasRead(change.uri, currentClock, change.content));
+
+        console.log("fs watch read", currentClock, inserts, removes);
+        client.sendRequest(fsChange, { inserts, removes, isSync: true });
+      })();
+    });
   }
 
   /**

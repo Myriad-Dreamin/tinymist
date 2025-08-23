@@ -695,7 +695,7 @@ impl Config {
         &self,
         client: &TypedLspClient<ServerState>,
     ) -> Arc<dyn LspAccessModel> {
-        self.create_delegate_access_model(client)
+        self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>
     }
 
     #[cfg(feature = "system")]

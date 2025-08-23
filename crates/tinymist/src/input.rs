@@ -140,9 +140,9 @@ impl ServerState {
                     .decode(content)
                     .map(Bytes::new)
                     .map_err(|e| FileError::Other(Some(_eco_format!("base64 decode error: {e}")))),
-                FileChangeResult::Err { message } => {
-                    log::info!("file content not available: {path:?} {message}");
-                    Err(FileError::Other(Some(message)))
+                FileChangeResult::Err { error } => {
+                    log::info!("file content not available: {path:?} {error}");
+                    Err(FileError::Other(Some(error)))
                 }
             };
             inserts.push((path, content.into()));
@@ -156,6 +156,7 @@ impl ServerState {
         log::info!("fs_change: {update:?}");
         self.project.interrupt(Interrupt::Fs(update));
 
+        self.schedule_async();
         just_ok(serde_json::Value::Null)
     }
 }
@@ -339,6 +340,7 @@ impl lsp_types::request::Request for FsChange {
 
 /// The file system change parameters.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FsChangeParams {
     /// The inserted files.
     pub inserts: Vec<FileChange>,
@@ -360,7 +362,7 @@ pub struct FileChange {
 
 /// The result of a file change.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", tag = "type")]
 pub enum FileChangeResult {
     /// The file content is available.
     Ok {
@@ -370,6 +372,6 @@ pub enum FileChangeResult {
     /// The file content is not available.
     Err {
         /// The error message.
-        message: EcoString,
+        error: EcoString,
     },
 }

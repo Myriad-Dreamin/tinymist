@@ -117,16 +117,17 @@ impl ServerState {
         // todo: unify filesystem watcher
         let (dep_tx, rx) = mpsc::unbounded_channel();
         // todo: notify feature?
-        let dep_rx = if cfg!(feature = "system") {
+        #[cfg(feature = "system")]
+        let dep_rx = {
             let fs_client = client.clone().to_untyped();
             let async_handle = client.handle.clone();
             async_handle.spawn(crate::project::watch_deps(rx, move |event| {
                 fs_client.send_event(LspInterrupt::Fs(event));
             }));
             None
-        } else {
-            Some(rx)
         };
+        #[cfg(not(feature = "system"))]
+        let dep_rx = Some(rx);
 
         #[cfg(feature = "preview")]
         let watchers = crate::project::ProjectPreviewState::default();
@@ -386,7 +387,6 @@ impl ServerState {
     }
 
     #[cfg(feature = "system")]
-    #[inline(always)]
     pub(crate) fn schedule_async(&mut self) {
         self.handle_deps();
     }

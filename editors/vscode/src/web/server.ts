@@ -48,8 +48,10 @@ import wasmURL from "../../out/tinymist_bg.wasm";
   });
 
   const h = <T>(res: T): T => {
-    for (const event of events.splice(0)) {
-      bridge.on_event(event);
+    while (events.length > 0) {
+      for (const event of events.splice(0)) {
+        bridge.on_event(event);
+      }
     }
     return res;
   };
