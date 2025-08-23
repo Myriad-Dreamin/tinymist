@@ -435,6 +435,7 @@ impl DataFlowVisitor for Linter<'_, '_> {
         if expr.callee().to_untyped().text() == "text" {
             self.check_variable_font(expr.args().items());
         }
+        self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
         Some(())
     }
 
