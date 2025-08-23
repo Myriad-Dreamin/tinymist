@@ -52,7 +52,7 @@ impl ServerState {
     }
 }
 
-/// Provides ClientAccessModel that only accesses file system via client APIs.
+/// The access model that watches the file content from the client.
 #[derive(Clone)]
 pub struct WatchAccessModel {
     pub watches: Arc<Mutex<HashSet<ImmutPath>>>,
@@ -115,8 +115,9 @@ impl WatchAccessModel {
 
 impl PathAccessModel for WatchAccessModel {
     fn content(&self, src: &Path) -> FileResult<Bytes> {
+        // Requests to load the file content from the client.
         self.add_watch(src);
-
+        // Returns an error to indicate that the file is not available locally.
         Err(FILE_MISSING_ERROR.clone())
     }
 }
