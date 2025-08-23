@@ -132,28 +132,12 @@ fn main() -> Result<()> {
     // Loads translations
     #[cfg(feature = "l10n")]
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
-
     // Starts logging
-    let _ = {
-        use log::LevelFilter::*;
-
-        let is_transient_cmd = matches!(cmd, Commands::Compile(..));
-        let is_test_no_verbose = matches!(&cmd, Commands::Test(test) if !test.verbose);
-        let base_no_info = is_transient_cmd || is_test_no_verbose;
-        let base_level = if base_no_info { Warn } else { Info };
-        let preview_level = if is_test_no_verbose { Warn } else { Debug };
-        let diag_level = if is_test_no_verbose { Warn } else { Info };
-
-        env_logger::builder()
-            .filter_module("tinymist", base_level)
-            .filter_module("tinymist_preview", preview_level)
-            .filter_module("typlite", base_level)
-            .filter_module("reflexo", base_level)
-            .filter_module("sync_ls", base_level)
-            .filter_module("reflexo_typst2vec::pass::span2vec", Error)
-            .filter_module("reflexo_typst::diag::console", diag_level)
-            .try_init()
-    };
+    let _ = tinymist::init_log(tinymist::InitLogOpts {
+        is_transient_cmd: matches!(command, Commands::Compile(..)),
+        is_test_no_verbose: matches!(&command, Commands::Test(test) if !test.verbose),
+        output: None,
+    });
 
     match cmd {
         Commands::Probe => Ok(()),

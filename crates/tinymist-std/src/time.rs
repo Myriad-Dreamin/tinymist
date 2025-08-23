@@ -33,6 +33,8 @@ pub fn now() -> Time {
     Time::UNIX_EPOCH
 }
 
+pub use time::format_description::well_known::Rfc3339;
+
 /// The trait helping convert to a [`UtcDateTime`].
 pub trait ToUtcDateTime {
     /// Converts to a [`UtcDateTime`].

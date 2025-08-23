@@ -2,7 +2,7 @@
 name = "tinymist"
 description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
-keywords = ["api", "language", "typst"]
+keywords = ["api", "lsp", "language", "typst"]
 authors.workspace = true
 version.workspace = true
 license.workspace = true
