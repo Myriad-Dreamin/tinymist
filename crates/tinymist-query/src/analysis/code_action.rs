@@ -338,7 +338,7 @@ pub(crate) fn suggest_math_unknown_variable_spaces_edit(
     };
 
     let range = ctx.to_lsp_range(ident_node.range(), source);
-    Some(EcoSnippetTextEdit::new(range, new_text))
+    Some(EcoSnippetTextEdit::new_plain(range, new_text))
 }
 
 pub(crate) const SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS: CodeActionKind =

@@ -25,7 +25,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/unknown_math_ident.ty
    "changes": {
     "s0.typ": [
      {
-      "insertTextFormat": 2,
+      "insertTextFormat": 1,
       "newText": "x y z",
       "range": "0:1:0:4"
      }
