@@ -4,19 +4,15 @@ use std::sync::{Arc, Mutex};
 
 use lsp_types::request::Request;
 use reflexo::ImmutPath;
-use reflexo_typst::vfs::FileChangeSet;
-use reflexo_typst::{vfs::PathAccessModel, Bytes};
+use reflexo_typst::vfs::{FileChangeSet, PathAccessModel};
+use reflexo_typst::Bytes;
 use serde::{Deserialize, Serialize};
 use sync_ls::TypedLspClient;
-use tinymist_project::Interrupt;
-use typst::diag::{FileError, FileResult};
-use typst::ecow::EcoString;
+use tinymist_project::{Interrupt, FILE_MISSING_ERROR};
+use typst::diag::FileResult;
 
 use crate::vfs::notify::NotifyMessage;
 use crate::ServerState;
-
-pub const FILE_MISSING_ERROR: FileError =
-    FileError::Other(Some(EcoString::inline("t-file-missing")));
 
 impl ServerState {
     /// Handles the dependency changes.

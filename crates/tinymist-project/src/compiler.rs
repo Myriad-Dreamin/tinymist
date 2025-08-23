@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{EcoVec, eco_vec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use tinymist_std::error::prelude::Result;
 use tinymist_std::{ImmutPath, typst::TypstDocument};
 use tinymist_task::ExportTarget;
@@ -19,6 +19,7 @@ use tinymist_world::{
     WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
+use typst::diag::FileError;
 
 /// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
@@ -316,6 +317,10 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
         }
     }
 }
+
+const FILE_MISSING_ERROR_MSG: EcoString = EcoString::inline("t-file-missing");
+/// The file missing error constant.
+pub const FILE_MISSING_ERROR: FileError = FileError::Other(Some(FILE_MISSING_ERROR_MSG));
 
 /// The synchronous compiler that runs on one project or multiple projects.
 pub struct ProjectCompiler<F: CompilerFeat, Ext> {
@@ -860,9 +865,15 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             // todo: we need to check revision for really concurrent compilation
             log_compile_report(&rep);
 
+            if compiled
+                .diagnostics()
+                .any(|d| d.message == FILE_MISSING_ERROR_MSG)
+            {
+                return compiled;
+            }
+
             h.status(revision, rep);
             h.notify_compile(&compiled);
-
             compiled
         }
     }
