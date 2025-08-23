@@ -138,6 +138,10 @@ mod tests {
             .flatten();
 
         CodeActionContext {
+            // The filtering here matches the LSP specification and VS Code behavior;
+            // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
+            //   `diagnostics`: An array of diagnostics known on the client side overlapping the range
+            //   provided to the textDocument/codeAction request [...]
             diagnostics: diagnostics
                 .filter(|diag| ranges_overlap(&diag.range, request_range))
                 .collect(),
@@ -147,6 +151,6 @@ mod tests {
     }
 
     fn ranges_overlap(r1: &LspRange, r2: &LspRange) -> bool {
-        !(r1.end < r2.start || r2.end < r1.start)
+        !(r1.end <= r2.start || r2.end <= r1.start)
     }
 }
