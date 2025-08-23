@@ -31,32 +31,32 @@ const useArrayToggle =
     filter.val = current.includes(key) ? current.filter((w) => w !== key) : [...current, key];
   };
 
-const FilterToggle = (
-  label: string,
-  style: string,
-  isActive: () => boolean,
-  onclick: () => void,
-) => {
-  return button(
-    {
-      class: van.derive(() => (isActive() ? "toggle-btn active" : "toggle-btn")),
-      style,
-      onclick,
-    },
-    label,
-  );
-};
-
 /**
  * Base filter component that handles common filter structure
  */
-const FilterGroup = (title: string, options: ChildDom[], filter: State<string[]>) => {
+const FilterGroup = (
+  filter: State<string[]>,
+  title: string,
+  options: { key: string; label: string; style: string }[],
+) => {
+  const toggle = useArrayToggle(filter);
+
   return div(
     { class: "flex gap-xs" },
     div({ class: "text-sm", style: "min-width: 3rem" }, title),
     div(
       { class: "flex flex-wrap gap-xs" },
-      ...options,
+      ...options.map(({ key, label, style }) =>
+        button(
+          {
+            class: filter.val.includes(key) ? "toggle-btn active" : "toggle-btn",
+            style,
+            title: style,
+            onclick: () => toggle(key),
+          },
+          label,
+        ),
+      ),
       filter.val.length > 0
         ? button(
             {
@@ -76,55 +76,46 @@ const FilterGroup = (title: string, options: ChildDom[], filter: State<string[]>
 /**
  * Creates a weight filter as toggle buttons
  */
-const WeightFilter = (weightFilter: State<string[]>) => {
-  const toggleWeight = useArrayToggle(weightFilter);
-
-  const options = Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) =>
-    FilterToggle(
-      `${category.label} (${category.weight})`,
-      `font-weight: ${category.weight}`,
-      () => weightFilter.val.includes(key),
-      () => toggleWeight(key),
-    ),
+const WeightFilter = (weightFilter: State<string[]>, showNumber: State<boolean>) => {
+  return FilterGroup(
+    weightFilter,
+    "Weight",
+    Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) => ({
+      key,
+      label: showNumber.val ? `${category.label} (${category.weight})` : category.label,
+      style: `font-weight: ${key}`,
+    })),
   );
-
-  return FilterGroup("Weight", options, weightFilter);
 };
 
 /**
  * Creates a stretch filter as toggle buttons
  */
 const StretchFilter = (stretchFilter: State<string[]>) => {
-  const toggleStretch = useArrayToggle(stretchFilter);
-
-  const options = Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) =>
-    FilterToggle(
-      category.label,
-      `font-stretch: ${key}`,
-      () => stretchFilter.val.includes(key),
-      () => toggleStretch(key),
-    ),
+  return FilterGroup(
+    stretchFilter,
+    "Width",
+    Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) => ({
+      key,
+      label: category.label,
+      style: `font-stretch: ${key}`,
+    })),
   );
-
-  return FilterGroup("Width", options, stretchFilter);
 };
 
 /**
  * Creates a style filter as toggle buttons
  */
 const StyleFilter = (styleFilter: State<string[]>) => {
-  const toggleStyle = useArrayToggle(styleFilter);
-
-  const options = Object.entries(FONT_STYLE_CATEGORIES).map(([key, category]) =>
-    FilterToggle(
-      category.label,
-      `font-style: ${key}`,
-      () => styleFilter.val.includes(key),
-      () => toggleStyle(key),
-    ),
+  return FilterGroup(
+    styleFilter,
+    "Style",
+    Object.entries(FONT_STYLE_CATEGORIES).map(([key, category]) => ({
+      key,
+      label: category.label,
+      style: `font-style: ${key}`,
+    })),
   );
-
-  return FilterGroup("Style", options, styleFilter);
 };
 
 /**
@@ -143,10 +134,10 @@ const ClearFiltersButton = (clearFilters: () => void) => {
 };
 
 const ToggleButton =
-  (body: ChildDom, title: string, onclick: () => void, active?: boolean) => () => {
+  (body: ChildDom, title: string, onclick: () => void, active: State<boolean>) => () => {
     return button(
       {
-        class: active ? "toggle-btn active" : "toggle-btn",
+        class: active.val ? "toggle-btn active" : "toggle-btn",
         title,
         onclick,
       },
@@ -176,7 +167,7 @@ export const Header =
       SearchInput(filterStates.searchQuery),
       div(
         { class: "flex flex-col gap-xs" },
-        WeightFilter(filterStates.weightFilter),
+        WeightFilter(filterStates.weightFilter, showNumber),
         StretchFilter(filterStates.stretchFilter),
         StyleFilter(filterStates.styleFilter),
       ),
@@ -191,7 +182,7 @@ export const Header =
           () => {
             showNumber.val = !showNumber.val;
           },
-          showNumber.val,
+          showNumber,
         ),
       ),
     );
