@@ -121,12 +121,13 @@ pub struct Config {
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
-    /// Computed fonts based on configuration.
-    pub watch_access_model: OnceLock<Derived<Arc<WatchAccessModel>>>,
-    /// Computed fonts based on configuration.
-    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
+
+    /// Computed watch access model based on configuration.
+    pub watch_access_model: OnceLock<Derived<Arc<WatchAccessModel>>>,
+    /// Computed access model based on configuration.
+    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
 
     /// Tinymist's default export target.
     pub export_target: ExportTarget,
