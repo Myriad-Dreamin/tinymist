@@ -1,0 +1,2 @@
+{"run_id":"1755988819-559335217","line":7,"new":{"module_name":"tinymist_e2e_tests__e2e__cli","snapshot_name":"probe","metadata":{"source":"tests/e2e/e2e/cli.rs","assertion_line":7,"info":{"program":"tinymist","args":["probe"]}},"snapshot":"success: true\nexit_code: 0\n----- stdout -----\n\n----- stderr -----"},"old":{"module_name":"tinymist_e2e_tests__e2e__cli","metadata":{},"snapshot":"success: true\nexit_code: 0\n----- stdout -----"}}
+{"run_id":"1755988856-449795873","line":7,"new":null,"old":null}
