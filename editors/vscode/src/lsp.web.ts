@@ -26,7 +26,7 @@ export async function createBrowserLanguageClient(
     const workerTimeout = setTimeout(() => {
       worker.removeEventListener("message", onReady);
       reject(new Error("failed to initialize server worker: timeout"));
-    }, 10000);
+    }, 60000 * 5);
 
     worker.addEventListener("message", onReady);
   });
