@@ -1,6 +1,6 @@
-import * as textmate from "./textmate.mjs";
-import { languages as rawLanguages } from "./fenced.meta.mjs";
-import { SYNTAX_WITH_LANGS } from "./feature.mjs";
+import * as textmate from "./textmate.ts";
+import { languages as rawLanguages } from "./fenced.meta.ts";
+import { SYNTAX_WITH_LANGS } from "./feature.ts";
 
 const IDENTIFIER_BARE = /[\p{XID_Start}_][\p{XID_Continue}_\-]*/u;
 
@@ -9,9 +9,7 @@ export interface Lang {
   candidates: string[];
 }
 
-const genLang = (
-  langMeta: Lang
-): textmate.PatternInclude & { lang: string } => {
+const genLang = (langMeta: Lang): textmate.PatternInclude & { lang: string } => {
   const lang = langMeta.candidates[0];
   let includes = langMeta.as;
   if (!includes) {
@@ -21,15 +19,11 @@ const genLang = (
   }
 
   const sourcePatterns = includes.map((include) => ({ include }));
-  const candidates = langMeta.candidates.map((s) =>
-    s.replace(/[.+]/g, (e) => `\\${e}`)
-  );
+  const candidates = langMeta.candidates.map((s) => s.replace(/[.+]/g, (e) => `\\${e}`));
 
   const enter = (n: number): textmate.Pattern => ({
     name: `markup.raw.block.typst`,
-    begin: new RegExp(
-      "(`{" + n.toString() + "})" + `(${candidates.join("|")})\\b`
-    ),
+    begin: new RegExp("(`{" + n.toString() + "})" + `(${candidates.join("|")})\\b`),
     beginCaptures: {
       "1": {
         name: "punctuation.definition.raw.begin.typst",
@@ -61,9 +55,7 @@ const genLang = (
       // one line case
       {
         name: `markup.raw.block.typst`,
-        match: new RegExp(
-          /(`{3,})/.source + `(${candidates.join("|")})` + /\b(.*?)(\1)/.source
-        ),
+        match: new RegExp(/(`{3,})/.source + `(${candidates.join("|")})` + /\b(.*?)(\1)/.source),
         captures: {
           "1": {
             name: "punctuation.definition.raw.begin.typst",

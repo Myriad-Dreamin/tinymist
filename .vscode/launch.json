@@ -52,7 +52,7 @@
             "outFiles": [
                 "${workspaceFolder}/contrib/typst-preview/editors/vscode/out/**/*.js"
             ],
-            "preLaunchTask": "VS Code Extension Prelaunch"
+            "preLaunchTask": "VS Code Extension Prelaunch Preview"
         },
         {
             "type": "lldb",
