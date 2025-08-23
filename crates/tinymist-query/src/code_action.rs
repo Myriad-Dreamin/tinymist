@@ -85,6 +85,7 @@ impl SemanticRequest for CodeActionRequest {
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
         worker.autofix(&root, &range, &self.context);
+        worker.source_autofix(&self.context);
         worker.scoped(&root, &range);
 
         (!worker.actions.is_empty()).then_some(worker.actions)

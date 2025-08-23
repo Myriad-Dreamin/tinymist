@@ -57,7 +57,7 @@ impl<'a> CodeActionWorker<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AutofixKind {
     UnknownVariable,
     FileNotFound,
@@ -339,6 +339,43 @@ pub(crate) fn suggest_math_unknown_variable_spaces_edit(
 
     let range = ctx.to_lsp_range(ident_node.range(), source);
     Some(EcoSnippetTextEdit::new(range, new_text))
+}
+
+pub(crate) const SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS: CodeActionKind =
+    CodeActionKind::new("source.typst.spaceUnknownMathVars");
+
+/// Source-level autofix actions. The edits for these code actions are lazily computed in a followup
+/// `codeAction/resolve` LSP request.
+impl CodeActionWorker<'_> {
+    /// Suggests autofix actions that apply to the entire document.
+    pub fn source_autofix(&mut self, context: &lsp_types::CodeActionContext) -> Option<()> {
+        // Only suggest source-level actions if explicitly requested via `context.only`.
+        if let Some(only) = &context.only
+            && only.iter().any(|kind| {
+                *kind == CodeActionKind::SOURCE || *kind == SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS
+            })
+        {
+            self.source_action(
+                SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS,
+                "Add spaces to all unknown math vars",
+            );
+        }
+
+        Some(())
+    }
+
+    fn source_action(&mut self, kind: CodeActionKind, title: &str) {
+        // Pass the document URL as the data; see comment on `CodeActionResolveRequest.path`.
+        let data = serde_json::to_value(self.local_url())
+            .expect("document URL should be valid JSON value");
+        self.actions.push(CodeAction {
+            title: title.to_string(),
+            kind: Some(kind),
+            edit: None, // computed in followup `codeAction/resolve`
+            data: Some(data),
+            ..CodeAction::default()
+        });
+    }
 }
 
 /// Scoped code actions.

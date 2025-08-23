@@ -1,5 +1,9 @@
 //! Resolves edits for expensive code actions.
 
+use crate::analysis::code_action::{
+    AutofixKind, SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS, match_autofix_kind,
+    suggest_math_unknown_variable_spaces_edit,
+};
 use crate::prelude::*;
 
 /// Resolves edits for a code action.
@@ -46,6 +50,30 @@ impl CodeActionResolveWorker<'_> {
         root: &LinkedNode,
         kind: &CodeActionKind,
     ) -> Option<EcoWorkspaceEdit> {
-        None
+        if kind == &SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS {
+            Some(self.resolve_space_all_unknown_math_vars(root))
+        } else {
+            log::warn!("unexpected code action kind in `codeAction/resolve` request: {kind:?}");
+            None
+        }
+    }
+
+    fn resolve_space_all_unknown_math_vars(&self, root: &LinkedNode) -> EcoWorkspaceEdit {
+        let fix = |diag: &Diagnostic| -> Option<EcoSnippetTextEdit> {
+            let range = self.ctx.to_typst_range(diag.range, &self.source)?;
+            let cursor = (range.start + 1).min(self.source.text().len());
+            let node = root.leaf_at_compat(cursor)?;
+            suggest_math_unknown_variable_spaces_edit(self.ctx, &self.source, &node)
+        };
+
+        self.local_edits(
+            self.diagnostics
+                .iter()
+                .filter(|diag| {
+                    match_autofix_kind(&diag.message) == Some(AutofixKind::UnknownVariable)
+                })
+                .flat_map(fix)
+                .collect(),
+        )
     }
 }

@@ -45,6 +45,10 @@ impl StatefulRequest for CodeActionResolveRequest {
             let art = CompiledArtifact::from_graph(graph, is_html);
 
             let compiler_diags = art.diagnostics();
+
+            // TODO: It seems a bit wasteful that we convert `SourceDiagnostic`s to LSP diagnostics
+            // in `DiagWorker`, and then convert back to Typst positions in
+            // `CodeActionResolveWorker`.
             let worker = DiagWorker::new(ctx);
             let known_issues = KnownLintIssues::from_compiler_diagnostics(compiler_diags.clone());
             worker
