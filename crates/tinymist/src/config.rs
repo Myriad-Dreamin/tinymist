@@ -24,6 +24,7 @@ use typst::Features;
 use typst_shim::utils::LazyHash;
 
 use super::*;
+use crate::input::WatchAccessModel;
 use crate::project::{
     EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
@@ -120,6 +121,8 @@ pub struct Config {
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
+    /// Computed fonts based on configuration.
+    pub watch_access_model: OnceLock<Derived<Arc<WatchAccessModel>>>,
     /// Computed fonts based on configuration.
     pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
     /// Whether to use system fonts.
@@ -692,7 +695,7 @@ impl Config {
         &self,
         client: &TypedLspClient<ServerState>,
     ) -> Arc<dyn LspAccessModel> {
-        self.create_delegate_access_model(client)
+        self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>
     }
 
     #[cfg(feature = "system")]
@@ -704,12 +707,15 @@ impl Config {
         Arc::new(SystemAccessModel {})
     }
 
-    fn create_delegate_access_model(
+    pub(crate) fn watch_access_model(
         &self,
         client: &TypedLspClient<ServerState>,
-    ) -> Arc<dyn LspAccessModel> {
+    ) -> &Arc<WatchAccessModel> {
         let client = client.clone();
-        Arc::new(crate::input::ClientAccessModel::new(client))
+        &self
+            .watch_access_model
+            .get_or_init(|| Derived(Arc::new(WatchAccessModel::new(client))))
+            .0
     }
 
     pub(crate) fn access_model(&self, client: &TypedLspClient<ServerState>) -> DynAccessModel {
@@ -719,7 +725,7 @@ impl Config {
                 self.delegate_fs_requests
             );
             if self.delegate_fs_requests {
-                Derived(self.create_delegate_access_model(client))
+                Derived(self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>)
             } else {
                 Derived(self.create_physical_access_model(client))
             }
