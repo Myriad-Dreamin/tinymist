@@ -2,10 +2,11 @@
 
 use std::{borrow::Cow, path::Path};
 
-use clap_complete::Shell;
-use reflexo::path::unix_slash;
 use tinymist::project::*;
+use tinymist_std::path::unix_slash;
 use tinymist_std::{bail, error::prelude::*};
+
+use crate::completion::Shell;
 
 /// Arguments for generating a build script.
 #[derive(Debug, Clone, clap::Parser)]

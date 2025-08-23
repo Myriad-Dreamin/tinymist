@@ -9,49 +9,29 @@ use std::sync::{Arc, atomic::AtomicBool};
 use itertools::Either;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use reflexo::ImmutPath;
-use reflexo_typst::{TypstDocument, TypstHtmlDocument, vfs::FileId};
+use tinymist::project::*;
+use tinymist::tool::project::{StartProjectResult, start_project};
+use tinymist::world::{SourceWorld, with_main};
 use tinymist_debug::CoverageResult;
 use tinymist_project::world::{DiagnosticFormat, system::print_diagnostics};
 use tinymist_query::analysis::Analysis;
 use tinymist_query::syntax::{cast_include_expr, find_source_by_expr, node_ancestors};
 use tinymist_query::testing::{TestCaseKind, TestSuites};
+use tinymist_std::ImmutPath;
+use tinymist_std::typst::{TypstDocument, TypstHtmlDocument};
 use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
-use typst::syntax::{LinkedNode, Source, Span, ast};
+use typst::syntax::{FileId, LinkedNode, Source, Span, ast};
 use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
 
-use tinymist::project::*;
-use tinymist::tool::project::{StartProjectResult, start_project};
-use tinymist::world::{SourceWorld, with_main};
-
+use crate::print_diag_or_error;
 use crate::utils::exit_on_ctrl_c;
 
 const TEST_EVICT_MAX_AGE: usize = 30;
 const PREFIX_LEN: usize = 7;
-
-/// Runs coverage test on a document
-pub fn coverage_main(args: CompileOnceArgs) -> Result<()> {
-    // Prepares for the compilation
-    let universe = args.resolve()?;
-    let world = universe.snapshot();
-
-    let result = Ok(()).and_then(|_| -> Result<()> {
-        let res = tinymist_debug::collect_coverage::<TypstPagedDocument, _>(&world)?;
-        let cov_path = Path::new("target/coverage.json");
-        let res = serde_json::to_string(&res.to_json(&world)).context("coverage")?;
-
-        std::fs::create_dir_all(cov_path.parent().context("parent")?).context("create coverage")?;
-        std::fs::write(cov_path, res).context("write coverage")?;
-
-        Ok(())
-    });
-
-    print_diag_or_error(&world, result)
-}
 
 /// Testing arguments
 #[derive(Debug, Clone, clap::Parser)]
@@ -593,21 +573,6 @@ fn get_example_file(world: &dyn World, name: &str, id: FileId, span: Span) -> Re
     let included =
         cast_include_expr(name, closure.body()).context("cannot find example function")?;
     find_source_by_expr(world, id, included).context("cannot find example file")
-}
-
-fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
-    match result {
-        Ok(v) => Ok(v),
-        Err(err) => {
-            if let Some(diagnostics) = err.diagnostics() {
-                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
-                    .context_ut("print diagnostics")?;
-                bail!("");
-            }
-
-            Err(err)
-        }
-    }
 }
 
 enum Level {
