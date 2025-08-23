@@ -1,9 +1,8 @@
 import van, { type ChildDom, type State } from "vanjs-core";
 import { humanStretch, humanStyle, humanWeight } from "@/utils/font-format";
 import { copyToClipboard, requestRevealPath, requestTextEdit } from "@/vscode";
-import { FONT_DEFAULTS } from "../constants";
 import type { FontFamily, FontInfo, FontResources } from "../fonts";
-import { getFontFileInfo } from "../fonts";
+import { FONT_DEFAULTS, getFontFileInfo } from "../fonts";
 
 const { div, a, span, button } = van.tags;
 
@@ -20,20 +19,20 @@ const FontSlot = (
   return div(
     { class: "font-variant-item" },
     div(
-      { class: "flex flex-1 justify-between items-center gap-md" },
+      { class: "flex flex-1 flex-wrap justify-between items-center gap-sm" },
       div(
-        { class: "flex flex-wrap items-center gap-sm" },
+        { class: "flex flex-wrap items-center gap-xs" },
         span(
           { class: "badge", style: `font-weight: ${font.weight}` },
           humanWeight(font.weight, showNumberOpt),
         ),
-        font.stretch && font.stretch !== FONT_DEFAULTS.STRETCH
+        font.stretch !== FONT_DEFAULTS.STRETCH
           ? span(
-              { class: "badge", style: `font-stretch: ${font.stretch}` },
+              { class: "badge", style: `font-stretch: ${font.stretch / 10}%` },
               humanStretch(font.stretch, showNumberOpt),
             )
           : null,
-        font.style && font.style !== FONT_DEFAULTS.STYLE
+        font.style !== FONT_DEFAULTS.STYLE
           ? span({ class: "badge", style: `font-style: ${font.style}` }, humanStyle(font.style))
           : null,
       ),
@@ -117,9 +116,9 @@ const FontFamilySlot = (
   return div(
     { class: "font-family-card card" },
     div(
-      { class: "flex justify-between items-start gap-md" },
+      { class: "flex flex-wrap justify-between items-start gap-md" },
       div({ class: "text-lg font-bold" }, family.name),
-      div({ class: "flex flex-wrap gap-sm" }, ...createFontActions(family)),
+      div({ class: "flex flex-wrap gap-xs" }, ...createFontActions(family)),
     ),
     div(
       { style: "margin-top: 0.5rem" },

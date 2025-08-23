@@ -1,10 +1,6 @@
 import van, { type ChildDom, type State } from "vanjs-core";
-import {
-  FONT_STRETCH_CATEGORIES,
-  FONT_STYLE_CATEGORIES,
-  FONT_WEIGHT_CATEGORIES,
-} from "../constants";
 import type { FontFilterStates, FontStats } from "../filtering";
+import { FONT_STRETCH_CATEGORIES, FONT_STYLE_CATEGORIES, FONT_WEIGHT_CATEGORIES } from "../fonts";
 
 const { input, div, button } = van.tags;
 
@@ -82,7 +78,7 @@ const WeightFilter = (weightFilter: State<string[]>, showNumber: State<boolean>)
     "Weight",
     Object.entries(FONT_WEIGHT_CATEGORIES).map(([key, category]) => ({
       key,
-      label: showNumber.val ? `${category.label} (${category.weight})` : category.label,
+      label: showNumber.val ? `${category.label} (${category.value})` : category.label,
       style: `font-weight: ${key}`,
     })),
   );
@@ -94,7 +90,7 @@ const WeightFilter = (weightFilter: State<string[]>, showNumber: State<boolean>)
 const StretchFilter = (stretchFilter: State<string[]>) => {
   return FilterGroup(
     stretchFilter,
-    "Width",
+    "Stretch",
     Object.entries(FONT_STRETCH_CATEGORIES).map(([key, category]) => ({
       key,
       label: category.label,
@@ -174,7 +170,7 @@ export const Header =
       ClearFiltersButton(clearFilters),
       div({ class: "divider" }),
       div(
-        { class: "flex justify-between items-center" },
+        { class: "flex flex-wrap justify-between items-center gap-sm" },
         StatsText(stats),
         ToggleButton(
           "Show Numbers",

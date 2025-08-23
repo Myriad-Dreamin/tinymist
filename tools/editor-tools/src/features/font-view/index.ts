@@ -50,6 +50,7 @@ export const FontView = () => {
   // Initialize data sources
   const fontResources = initializeFontResources();
   const lastStylesAtCursor = initializeStyleAtCursor();
+  console.log("fontResources", fontResources.val);
 
   // Setup reactivity
   setupStyleAtCursorReactivity(lastStylesAtCursor);

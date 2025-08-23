@@ -1,19 +1,19 @@
 import van, { type State } from "vanjs-core";
-import { FONT_DEFAULTS, FONT_STRETCH_CATEGORIES, FONT_WEIGHT_CATEGORIES } from "./constants";
-import type { FontFamily, FontResources } from "./fonts";
+import type { FontFamily, FontResources, FontStretch, FontStyle, FontWeight } from "./fonts";
+import { FONT_STRETCH_CATEGORIES, FONT_WEIGHT_CATEGORIES } from "./fonts";
 
 export interface FontFilters {
   searchQuery: string;
-  weightFilter: string[];
-  styleFilter: string[];
-  stretchFilter: string[];
+  weightFilter: FontWeight[];
+  stretchFilter: FontStretch[];
+  styleFilter: FontStyle[];
 }
 
 export interface FontFilterStates {
   searchQuery: State<string>;
-  weightFilter: State<string[]>;
-  styleFilter: State<string[]>;
-  stretchFilter: State<string[]>;
+  weightFilter: State<FontWeight[]>;
+  stretchFilter: State<FontStretch[]>;
+  styleFilter: State<FontStyle[]>;
 }
 
 export interface FontStats {
@@ -60,37 +60,32 @@ export function filterFontFamilies(
       return matchesFamilyName() || matchesFileName();
     })
     .map((family) => {
+      // We assume that the weight/stretch value are all in pre-defined values.
+
       // Apply variant filtering
       const filteredVariants = family.infos.filter((info) => {
         // Weight filter
         if (weightFilter.length > 0) {
-          const weight = info.weight ?? FONT_DEFAULTS.WEIGHT;
           const matchesAnyWeight = weightFilter.some((weightKey) => {
-            const category =
-              FONT_WEIGHT_CATEGORIES[weightKey as keyof typeof FONT_WEIGHT_CATEGORIES];
-            return category?.weight === weight;
+            const category = FONT_WEIGHT_CATEGORIES[weightKey];
+            return category?.value === info.weight;
           });
           if (!matchesAnyWeight) return false;
         }
 
-        // Style filter
-        if (styleFilter.length > 0) {
-          const style = info.style ?? FONT_DEFAULTS.STYLE;
-          const matchesAnyStyle = styleFilter.some((selectedStyle) => {
-            return selectedStyle === style || (selectedStyle === "normal" && !info.style);
-          });
-          if (!matchesAnyStyle) return false;
-        }
-
         // Stretch filter
         if (stretchFilter.length > 0) {
-          const stretch = info.stretch ?? FONT_DEFAULTS.STRETCH;
           const matchesAnyStretch = stretchFilter.some((stretchKey) => {
-            const category =
-              FONT_STRETCH_CATEGORIES[stretchKey as keyof typeof FONT_STRETCH_CATEGORIES];
-            return category?.test(stretch);
+            const category = FONT_STRETCH_CATEGORIES[stretchKey];
+            return category?.value === info.stretch;
           });
           if (!matchesAnyStretch) return false;
+        }
+
+        // Style filter
+        if (styleFilter.length > 0) {
+          const matchesAnyStyle = styleFilter.includes(info.style as FontStyle);
+          if (!matchesAnyStyle) return false;
         }
 
         return true;
@@ -105,15 +100,15 @@ export function useFontFilters(fontResources: State<FontResources>) {
   const fontFilters: FontFilterStates = {
     searchQuery: van.state(""),
     weightFilter: van.state([]),
-    styleFilter: van.state([]),
     stretchFilter: van.state([]),
+    styleFilter: van.state([]),
   };
 
   const clearFilters = () => {
     fontFilters.searchQuery.val = "";
     fontFilters.weightFilter.val = [];
-    fontFilters.styleFilter.val = [];
     fontFilters.stretchFilter.val = [];
+    fontFilters.styleFilter.val = [];
   };
 
   const filteredFamilies = van.derive(() => {
@@ -121,8 +116,8 @@ export function useFontFilters(fontResources: State<FontResources>) {
       return filterFontFamilies(fontResources.val, {
         searchQuery: fontFilters.searchQuery.val,
         weightFilter: fontFilters.weightFilter.val,
-        styleFilter: fontFilters.styleFilter.val,
         stretchFilter: fontFilters.stretchFilter.val,
+        styleFilter: fontFilters.styleFilter.val,
       });
     } catch (error) {
       console.error("Error filtering font families:", error);
