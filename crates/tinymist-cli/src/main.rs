@@ -134,8 +134,8 @@ fn main() -> Result<()> {
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
     // Starts logging
     let _ = tinymist::init_log(tinymist::InitLogOpts {
-        is_transient_cmd: matches!(command, Commands::Compile(..)),
-        is_test_no_verbose: matches!(&command, Commands::Test(test) if !test.verbose),
+        is_transient_cmd: matches!(cmd, Commands::Compile(..)),
+        is_test_no_verbose: matches!(&cmd, Commands::Test(test) if !test.verbose),
         output: None,
     });
 
