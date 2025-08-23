@@ -1,4 +1,4 @@
-import type { Lang } from "./fenced.mjs";
+import type { Lang } from "./fenced.ts";
 
 // prettier-ignore
 export const languages: Lang[] = [

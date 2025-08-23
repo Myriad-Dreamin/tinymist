@@ -9,17 +9,17 @@
  * - [./typst-code.tmLanguage.json](./typst-code.tmLanguage.json) is the grammar for typst in code mode.
  */
 
-import * as textmate from "./textmate.mjs";
-import { blockRaw, blockRawGeneral, blockRawLangs, inlineRaw } from "./fenced.mjs";
+import * as textmate from "./textmate.ts";
+import { blockRaw, blockRawGeneral, blockRawLangs, inlineRaw } from "./fenced.ts";
 
-import * as fs from "fs";
+import * as fs from "fs/promises";
 import * as path from "path";
 import {
   FIXED_LENGTH_LOOK_BEHIND,
   POLYFILL_P_XID,
   SYNTAX_WITH_BOLD_ITALIC,
   SYNTAX_WITH_MATH,
-} from "./feature.mjs";
+} from "./feature.ts";
 
 const { lookAhead, oneOf, replaceGroup, metaName } = textmate;
 
@@ -1482,7 +1482,7 @@ export const typst: textmate.Grammar = {
   },
 };
 
-function generate() {
+export async function generate() {
   let compiled = textmate.compile(typst);
 
   if (POLYFILL_P_XID) {
@@ -1506,33 +1506,49 @@ function generate() {
 
   const repository = JSON.parse(compiled).repository;
 
-  // dump to file
-  fs.writeFileSync(
-    path.join(import.meta.dirname, "../typst.tmLanguage.json"),
-    JSON.stringify({
-      $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-      scopeName: "source.typst",
-      name: "typst",
-      patterns: [{ include: "#shebang" }, { include: "#markup" }],
-      repository,
-    }),
-  );
-
-  // dump to file
-  fs.writeFileSync(
-    path.join(import.meta.dirname, "../typst-code.tmLanguage.json"),
-    JSON.stringify({
-      $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-      scopeName: "source.typst-code",
-      name: "typst-code",
-      patterns: [{ include: "#code" }],
-      repository,
-    }),
-  );
+  await Promise.all([
+    // dump to file
+    fs.writeFile(
+      path.join(import.meta.dirname, "typst.tmLanguage.json"),
+      JSON.stringify({
+        $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+        scopeName: "source.typst",
+        name: "typst",
+        patterns: [{ include: "#shebang" }, { include: "#markup" }],
+        repository,
+      }),
+    ),
+    // dump to file
+    fs.writeFile(
+      path.join(import.meta.dirname, "typst-code.tmLanguage.json"),
+      JSON.stringify({
+        $schema: "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+        scopeName: "source.typst-code",
+        name: "typst-code",
+        patterns: [{ include: "#code" }],
+        repository,
+      }),
+    ),
+  ]);
 }
 
-// console.log(typst!.repository!.forStatement);
-generate();
+/**
+ * Installs a language to the vscode extension
+ */
+async function installLanguage(id: string): Promise<void> {
+  const filePath = path.join(import.meta.dirname, `${id}.tmLanguage.json`);
+  const data = await fs.readFile(filePath, "utf8");
+  const json = JSON.parse(data);
+  const outPath = path.join(import.meta.dirname, `../../editors/vscode/out/${id}.tmLanguage.json`);
+  await fs.writeFile(outPath, JSON.stringify(json, null, 4), "utf8");
+}
+
+/**
+ * Installs all languages to the vscode extension
+ */
+export async function install() {
+  await Promise.all([installLanguage("typst"), installLanguage("typst-code")]);
+}
 
 // todo: this is fixed in v0.11.0
 // #code(```typ
