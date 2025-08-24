@@ -869,6 +869,7 @@
         "balancedBracketScopes": [
           "meta.expr",
           "meta.brace",
+          "meta.embedded.block.cpp",
           "markup.math.typst"
         ],
         "unbalancedBracketScopes": [
@@ -881,7 +882,12 @@
           "constant.character.escape",
           "comment.block.typst",
           "comment.line.double-slash.typst"
-        ]
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.cpp": "cpp",
+          "meta.embedded.block.js": "js",
+          "meta.embedded.block.python": "python"
+        }
       },
       {
         "language": "typst-code",

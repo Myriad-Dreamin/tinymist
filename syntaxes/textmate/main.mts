@@ -1482,7 +1482,7 @@ export const typst: textmate.Grammar = {
   },
 };
 
-function generate() {
+function generate({ updatePackageJson = false } = {}) {
   let compiled = textmate.compile(typst);
 
   if (POLYFILL_P_XID) {
@@ -1529,10 +1529,17 @@ function generate() {
       repository,
     }),
   );
+
+  if (updatePackageJson) {
+    const packageJsonPath = path.join(import.meta.dirname, "../../../editors/vscode/package.json");
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+    packageJson.contributes.grammars[0].scopeName = "source.typst";
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+  }
 }
 
 // console.log(typst!.repository!.forStatement);
-generate();
+generate({ updatePackageJson: false });
 
 // todo: this is fixed in v0.11.0
 // #code(```typ
