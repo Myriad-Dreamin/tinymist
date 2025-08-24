@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import path from "node:path";
 
 // /src/main.ts
 
@@ -15,6 +16,12 @@ if (componentArgs) {
 }
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
+
   plugins: [viteSingleFile()],
   assetsInclude: ["**/*.onnx"],
   build: {
