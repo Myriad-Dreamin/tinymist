@@ -63,20 +63,24 @@ impl From<RefreshStyle> for TaskWhen {
     }
 }
 
-/// Specia Arguments for the preview tool.
+/// Specify arguments related to the preview service.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewArgs {
-    /// Preview mode
+    /// Configure the preview mode.
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
-    /// Only render visible part of the document. This can improve performance
-    /// but still being experimental.
+    /// Only render visible part of the document.
+    ///
+    /// This can improve performance but still being experimental.
     #[clap(long = "partial-rendering")]
     pub enable_partial_rendering: Option<bool>,
 
-    /// Invert colors of the preview (useful for dark themes without cost).
-    /// Please note you could see the origin colors when you hover elements in
+    /// Configure the way to invert colors of the preview.
+    ///
+    /// This is useful for dark themes without cost.
+    ///
+    /// Please note you could see the original colors when you hover elements in
     /// the preview.
     ///
     /// It is also possible to specify strategy to each element kind by an
@@ -105,6 +109,8 @@ pub struct PreviewArgs {
     pub invert_colors: Option<String>,
 
     /// Used by lsp for controlling the preview refresh style.
+    ///
+    /// This is hidden from the CLI.
     #[clap(long, hide(true))]
     pub refresh_style: Option<RefreshStyle>,
 }
@@ -128,18 +134,21 @@ impl PreviewArgs {
     }
 }
 
-/// CLI Arguments for the preview tool.
+/// Specify arguments related to the preview CLI.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewCliArgs {
-    /// Preview arguments
+    /// Configure the preview service.
     #[clap(flatten)]
     pub preview: PreviewArgs,
 
-    /// Compile arguments
+    /// Specify common arguments to create a world (environment) to run typst
+    /// tasks.
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
 
     /// Used by lsp for identifying the task.
+    ///
+    /// This is hidden from the CLI.
     #[clap(
         long = "task-id",
         default_value = "default_preview",
@@ -148,8 +157,9 @@ pub struct PreviewCliArgs {
     )]
     pub task_id: String,
 
-    /// Data plane server will bind to this address. Note: if it equals to
-    /// `static_file_host`, same address will be used.
+    /// Configure the data plane server address.
+    ///
+    /// Note: if it equals to `static_file_host`, same address will be used.
     #[clap(
         long = "data-plane-host",
         default_value = "127.0.0.1:23625",
@@ -158,7 +168,7 @@ pub struct PreviewCliArgs {
     )]
     pub data_plane_host: String,
 
-    /// Control plane server will bind to this address
+    /// Configure the control plane server address.
     #[clap(
         long = "control-plane-host",
         default_value = "127.0.0.1:23626",
@@ -167,8 +177,9 @@ pub struct PreviewCliArgs {
     )]
     pub control_plane_host: String,
 
-    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
-    /// `data_plane_host`, same address will be used.
+    /// (Deprecated) Configure (File) Host address for the preview server.
+    ///
+    /// Note: if it equals to `data_plane_host`, same address will be used.
     #[clap(
         long = "host",
         value_name = "HOST",
@@ -178,6 +189,8 @@ pub struct PreviewCliArgs {
     pub static_file_host: String,
 
     /// Let it not be the primary instance.
+    ///
+    /// This is hidden from the CLI.
     #[clap(long = "not-primary", hide(true))]
     pub not_as_primary: bool,
 
@@ -193,13 +206,13 @@ pub struct PreviewCliArgs {
 }
 
 impl PreviewCliArgs {
-    /// Whether to open the preview in the browser after compilation.
+    /// Determines whether to open the preview in the browser after compilation.
     pub fn open_in_browser(&self, default: bool) -> bool {
         !self.no_open && (self.open || default)
     }
 }
 
-/// Response for starting a preview.
+/// Response for starting a preview instance.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPreviewResponse {
