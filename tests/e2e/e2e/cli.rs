@@ -1,7 +1,15 @@
 use tinymist_std::path::PathClean;
 
 use crate::artifact::{cli, GIT_ROOT};
-
+macro_rules! apply_common_filters {
+    {} => {
+        let mut settings = insta::Settings::clone_current();
+        // Env redaction
+        // [env: key=value]
+        settings.add_filter(r"\[env:\s*([^=]+)=[^\]]*\]", "[env: $1=REDACTED]");
+        let _bound = settings.bind_to_scope();
+    }
+}
 #[test]
 fn test_probe() {
     insta_cmd::assert_cmd_snapshot!(cli().arg("probe"), @r"
@@ -15,6 +23,7 @@ fn test_probe() {
 
 #[test]
 fn test_help() {
+    apply_common_filters!();
     insta_cmd::assert_cmd_snapshot!(cli().arg("--help"), @r"
     success: true
     exit_code: 0
@@ -43,6 +52,7 @@ fn test_help() {
 
 #[test]
 fn test_help_lsp() {
+    apply_common_filters!();
     insta_cmd::assert_cmd_snapshot!(cli().arg("lsp").arg("--help"), @r"
     success: true
     exit_code: 0
@@ -68,7 +78,7 @@ fn test_help_lsp() {
               If multiple paths are specified, they are separated by the system's path separator (`:` on
               Unix-like systems and `;` on Windows).
               
-              [env: TYPST_FONT_PATHS=]
+              [env: TYPST_FONT_PATHS=REDACTED]
 
           --ignore-system-fonts
               Ensure system fonts won't be searched, unless explicitly included via `--font-path`
@@ -82,6 +92,7 @@ fn test_help_lsp() {
 
 #[test]
 fn test_help_compile() {
+    apply_common_filters!();
     insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--help"), @r"
     success: true
     exit_code: 0
@@ -111,7 +122,7 @@ fn test_help_compile() {
               Configure the project root (for absolute paths). If the path is relative, it will be
               resolved relative to the current working directory (PWD)
               
-              [env: TYPST_ROOT=]
+              [env: TYPST_ROOT=REDACTED]
 
           --font-path <DIR>
               Add additional directories that are recursively searched for fonts.
@@ -119,7 +130,7 @@ fn test_help_compile() {
               If multiple paths are specified, they are separated by the system's path separator (`:` on
               Unix-like systems and `;` on Windows).
               
-              [env: TYPST_FONT_PATHS=]
+              [env: TYPST_FONT_PATHS=REDACTED]
 
           --ignore-system-fonts
               Ensure system fonts won't be searched, unless explicitly included via `--font-path`
@@ -127,12 +138,12 @@ fn test_help_compile() {
           --package-path <DIR>
               Specify a custom path to local packages, defaults to system-dependent location
               
-              [env: TYPST_PACKAGE_PATH=]
+              [env: TYPST_PACKAGE_PATH=REDACTED]
 
           --package-cache-path <DIR>
               Specify a custom path to package cache, defaults to system-dependent location
               
-              [env: TYPST_PACKAGE_CACHE_PATH=]
+              [env: TYPST_PACKAGE_CACHE_PATH=REDACTED]
 
           --when <WHEN>
               Configure when to run the task
@@ -196,6 +207,7 @@ fn test_help_compile() {
 
 #[test]
 fn test_help_preview() {
+    apply_common_filters!();
     insta_cmd::assert_cmd_snapshot!(cli().arg("preview").arg("--help"), @r#"
     success: true
     exit_code: 0
@@ -260,7 +272,7 @@ fn test_help_preview() {
               If multiple paths are specified, they are separated by the system's path separator (`:` on
               Unix-like systems and `;` on Windows).
               
-              [env: TYPST_FONT_PATHS=]
+              [env: TYPST_FONT_PATHS=REDACTED]
 
           --ignore-system-fonts
               Ensure system fonts won't be searched, unless explicitly included via `--font-path`
@@ -268,17 +280,17 @@ fn test_help_preview() {
           --package-path <DIR>
               Specify a custom path to local packages, defaults to system-dependent location
               
-              [env: TYPST_PACKAGE_PATH=]
+              [env: TYPST_PACKAGE_PATH=REDACTED]
 
           --package-cache-path <DIR>
               Specify a custom path to package cache, defaults to system-dependent location
               
-              [env: TYPST_PACKAGE_CACHE_PATH=]
+              [env: TYPST_PACKAGE_CACHE_PATH=REDACTED]
 
           --features <FEATURES>
               Enable in-development features that may be changed or removed at any time
               
-              [env: TYPST_FEATURES=]
+              [env: TYPST_FEATURES=REDACTED]
 
               Possible values:
               - html: The HTML feature
@@ -306,7 +318,7 @@ fn test_help_preview() {
               Specify the path to CA certificate file for network access, especially for downloading
               typst packages
               
-              [env: TYPST_CERT=]
+              [env: TYPST_CERT=REDACTED]
 
           --host <HOST>
               (Deprecated) Configure (File) Host address for the preview server.
