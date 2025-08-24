@@ -1,3 +1,77 @@
+/* Theme Variables */
+:root {
+  /* Base theme colors - Classic theme (default) */
+  --tinymist-card-bg: rgba(255, 255, 255, 0.05);
+  --tinymist-category-bg: rgba(255, 255, 255, 0.15);
+  --tinymist-button-bg: rgba(129, 60, 133, 0.6);
+  --tinymist-button-bg-hover: rgba(129, 60, 133, 0.9);
+  --tinymist-button-bg-activated: rgba(129, 60, 133, 0.9);
+  --tinymist-button-warning-bg: rgba(252, 211, 55, 0.6);
+  --tinymist-button-warning-bg-hover: rgba(252, 211, 55, 0.9);
+  --tinymist-button-warning-bg-activated: rgba(252, 211, 55, 0.9);
+  --tinymist-canvas-panel-bg: rgba(201, 209, 217, 0.15);
+  --tinymist-symbol-cell-bg: rgba(201, 209, 217, 0.15);
+  --tinymist-symbol-cell-hover-color: rgba(68, 147, 248, 0.9);
+  --tinymist-symbol-cell-active-color: rgba(249, 189, 16, 0.9);
+  --tinymist-highlight-bg: rgba(255, 255, 0, 0.15);
+  --modal-background: rgba(0, 0, 0, 0.6);
+}
+
+/* Light theme overrides */
+:root.light {
+  --tinymist-card-bg: rgba(0, 0, 0, 0.05);
+  --tinymist-category-bg: rgba(0, 0, 0, 0.05);
+  --tinymist-button-bg: rgba(186, 204, 217, 0.6);
+  --tinymist-button-bg-hover: rgba(186, 204, 217, 0.9);
+  --tinymist-button-bg-activated: rgba(186, 204, 217, 0.9);
+  --tinymist-button-warning-bg: rgba(243, 202, 99, 0.6);
+  --tinymist-button-warning-bg-hover: rgba(243, 202, 99, 0.9);
+  --tinymist-button-warning-bg-activated: rgba(243, 202, 99, 0.9);
+  --modal-background: rgba(255, 255, 255, 0.8);
+}
+
+/* Dark theme overrides (explicit) */
+:root.dark {
+  --tinymist-card-bg: rgba(193, 108, 108, 0.05);
+  --tinymist-category-bg: rgba(255, 255, 255, 0.05);
+  --tinymist-button-bg: rgba(129, 60, 133, 0.6);
+  --tinymist-button-bg-hover: rgba(129, 60, 133, 0.9);
+  --tinymist-button-bg-activated: rgba(129, 60, 133, 0.9);
+  --tinymist-button-warning-bg: rgba(252, 211, 55, 0.6);
+  --tinymist-button-warning-bg-hover: rgba(252, 211, 55, 0.9);
+  --tinymist-button-warning-bg-activated: rgba(252, 211, 55, 0.9);
+  --modal-background: rgba(0, 0, 0, 0.6);
+}
+
+/* Material-UI theme */
+:root.material-ui.light {
+  --tinymist-card-bg: rgba(25, 118, 210, 0.08);
+  --tinymist-category-bg: rgba(25, 118, 210, 0.12);
+  --tinymist-button-bg: rgba(25, 118, 210, 0.7);
+  --tinymist-button-bg-hover: rgba(25, 118, 210, 0.9);
+  --tinymist-button-bg-activated: rgba(25, 118, 210, 1);
+  --tinymist-button-warning-bg: rgba(237, 108, 2, 0.7);
+  --tinymist-button-warning-bg-hover: rgba(237, 108, 2, 0.9);
+  --tinymist-button-warning-bg-activated: rgba(237, 108, 2, 1);
+  --tinymist-symbol-cell-hover-color: rgba(25, 118, 210, 0.9);
+  --tinymist-symbol-cell-active-color: rgba(237, 108, 2, 0.9);
+  --modal-background: rgba(255, 255, 255, 0.8);
+}
+
+:root.material-ui.dark {
+  --tinymist-card-bg: rgba(25, 118, 210, 0.12);
+  --tinymist-category-bg: rgba(25, 118, 210, 0.15);
+  --tinymist-button-bg: rgba(25, 118, 210, 0.7);
+  --tinymist-button-bg-hover: rgba(25, 118, 210, 0.9);
+  --tinymist-button-bg-activated: rgba(25, 118, 210, 1);
+  --tinymist-button-warning-bg: rgba(237, 108, 2, 0.7);
+  --tinymist-button-warning-bg-hover: rgba(237, 108, 2, 0.9);
+  --tinymist-button-warning-bg-activated: rgba(237, 108, 2, 1);
+  --tinymist-symbol-cell-hover-color: rgba(100, 181, 246, 0.9);
+  --tinymist-symbol-cell-active-color: rgba(255, 183, 77, 0.9);
+  --modal-background: rgba(0, 0, 0, 0.6);
+}
+
 html,
 body {
   margin: 0;
@@ -14,7 +88,7 @@ body {
 }
 
 .tinymist-card {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tinymist-card-bg);
   border-radius: 0.75rem;
 }
 
@@ -42,7 +116,7 @@ body {
 }
 
 .tinymist-category {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--tinymist-category-bg);
   border-radius: 0.4rem;
   padding: 0.1rem 0.5rem;
 }
@@ -58,7 +132,7 @@ body {
 }
 
 .tinymist-button {
-  background: rgba(129, 60, 133, 0.6);
+  background: var(--tinymist-button-bg);
   border: none;
   border-radius: 0.2rem;
   cursor: pointer;
@@ -66,21 +140,21 @@ body {
 }
 
 .tinymist-button:hover {
-  background: rgba(129, 60, 133, 0.9);
+  background: var(--tinymist-button-bg-hover);
 }
 
 .tinymist-button.activated {
-  background: rgba(129, 60, 133, 0.9);
+  background: var(--tinymist-button-bg-activated);
 }
 
 .tinymist-canvas-panel {
-  background: rgba(201, 209, 217, 0.15);
+  background: var(--tinymist-canvas-panel-bg);
   border-radius: 3px;
   width: 160px;
 }
 
 .tinymist-symbol-cell {
-  background: rgba(201, 209, 217, 0.15);
+  background: var(--tinymist-symbol-cell-bg);
   border-radius: 3px;
 
   cursor: pointer;
@@ -88,16 +162,16 @@ body {
 }
 
 .tinymist-symbol-cell:hover {
-  color: rgba(68, 147, 248, 0.9);
+  color: var(--tinymist-symbol-cell-hover-color);
 }
 
 .tinymist-symbol-cell.active {
-  color: rgba(249, 189, 16, 0.9);
+  color: var(--tinymist-symbol-cell-active-color);
   transition: color 0.05s;
 }
 
 .tinymist-highlight {
-  background: rgba(255, 255, 0, 0.15);
+  background: var(--tinymist-highlight-bg);
 }
 
 .tinymist-code {
@@ -119,60 +193,23 @@ body {
 }
 
 body.typst-preview-dark {
-  --modal-background: rgba(0, 0, 0, 0.6);
+  --modal-background: var(--modal-background);
 }
 body.typst-preview-light {
-  --modal-background: rgba(255, 255, 255, 0.8);
+  --modal-background: var(--modal-background);
 }
 
-body.typst-preview-dark .tinymist-card {
-  background: rgba(193, 108, 108, 0.05);
-}
-body.typst-preview-dark .tinymist-category {
-  background: rgba(255, 255, 255, 0.05);
-}
-body.typst-preview-dark .tinymist-button {
-  background: rgba(129, 60, 133, 0.6);
-}
-body.typst-preview-dark .tinymist-button:hover {
-  background: rgba(129, 60, 133, 0.9);
-}
-body.typst-preview-dark .tinymist-button.activated {
-  background: rgba(129, 60, 133, 0.9);
-}
-body.typst-preview-dark .tinymist-button.warning {
-  background: rgba(252, 211, 55, 0.6);
-}
-body.typst-preview-dark .tinymist-button.warning:hover {
-  background: rgba(252, 211, 55, 0.9);
-}
-body.typst-preview-dark .tinymist-button.warning.activated {
-  background: rgba(252, 211, 55, 0.9);
+/* Warning button variants */
+.tinymist-button.warning {
+  background: var(--tinymist-button-warning-bg);
 }
 
-body.typst-preview-light .tinymist-card {
-  background: rgba(0, 0, 0, 0.05);
+.tinymist-button.warning:hover {
+  background: var(--tinymist-button-warning-bg-hover);
 }
-body.typst-preview-light .tinymist-category {
-  background: rgba(0, 0, 0, 0.05);
-}
-body.typst-preview-light .tinymist-button {
-  background: rgba(186, 204, 217, 0.6);
-}
-body.typst-preview-light .tinymist-button:hover {
-  background: rgba(186, 204, 217, 0.9);
-}
-body.typst-preview-light .tinymist-button.activated {
-  background: rgba(186, 204, 217, 0.9);
-}
-body.typst-preview-light .tinymist-button.warning {
-  background: rgba(243, 202, 99, 0.6);
-}
-body.typst-preview-light .tinymist-button.warning:hover {
-  background: rgba(243, 202, 99, 0.9);
-}
-body.typst-preview-light .tinymist-button.warning.activated {
-  background: rgba(243, 202, 99, 0.9);
+
+.tinymist-button.warning.activated {
+  background: var(--tinymist-button-warning-bg-activated);
 }
 
 .tinymist-icon :is(path, rect) {
