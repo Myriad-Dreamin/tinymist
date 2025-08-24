@@ -11,7 +11,7 @@ use typst::World;
 use typst::diag::EcoString;
 
 use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePath};
-use crate::{LOCK_FILENAME, LOCK_VERSION, LockFile, LockFileCompat, LspWorld, ProjectPathMaterial};
+use crate::{LOCK_FILENAME, LOCK_VERSION, LockFile, LockFileCompat, ProjectPathMaterial};
 
 impl LockFile {
     /// Gets the input by the id.
@@ -261,7 +261,8 @@ pub struct LockFileUpdate {
 
 impl LockFileUpdate {
     /// Compiles the lock file.
-    pub fn compiled(&mut self, world: &LspWorld, ctx: CtxPath) -> Option<Id> {
+    #[cfg(feature = "lsp")]
+    pub fn compiled(&mut self, world: &crate::LspWorld, ctx: CtxPath) -> Option<Id> {
         let id = Id::from_world(world, ctx)?;
 
         let root = ResourcePath::from_user_sys(Path::new("."), ctx);

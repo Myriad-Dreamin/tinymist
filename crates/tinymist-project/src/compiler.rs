@@ -785,10 +785,10 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Compile the document once if there is any reason and the entry is
     /// active. (this is used for experimenting typst.node compilations)
     #[must_use]
-    pub fn may_compile2(
+    pub fn may_compile2<'a>(
         &mut self,
-        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>),
-    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>>> {
+        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>) + 'a,
+    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>> + 'a> {
         if !self.reason.any() || self.verse.entry_state().is_inactive() {
             return None;
         }

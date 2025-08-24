@@ -427,7 +427,7 @@ impl BrowserFontSearcher {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
 
-            self.fonts.extend(
+            self.base.fonts.extend(
                 Font::iter(buffer)
                     .map(|font| (font.info().clone(), FontSlot::new_loaded(Some(font)))),
             );
