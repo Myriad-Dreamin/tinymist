@@ -1,13 +1,15 @@
 {
   "compilerOptions": {
-    "module": "es2020",
+    "module": "es2022",
     "moduleResolution": "Bundler",
-    "target": "es2020",
-    "lib": ["es2020"],
+    "target": "es2022",
+    "lib": ["es2022"],
     "outDir": "dist",
     "sourceMap": true,
-    "strict": true
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["*.mts", "scripts"],
+  "include": ["*.ts", "scripts"],
   "exclude": ["node_modules"]
 }
