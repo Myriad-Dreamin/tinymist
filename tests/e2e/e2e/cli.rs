@@ -1,6 +1,7 @@
 use tinymist_std::path::PathClean;
 
 use crate::artifact::{cli, GIT_ROOT};
+
 macro_rules! apply_common_filters {
     {} => {
         let mut settings = insta::Settings::clone_current();
@@ -10,6 +11,7 @@ macro_rules! apply_common_filters {
         let _bound = settings.bind_to_scope();
     }
 }
+
 #[test]
 fn test_probe() {
     insta_cmd::assert_cmd_snapshot!(cli().arg("probe"), @r"
