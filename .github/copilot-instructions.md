@@ -8,6 +8,10 @@ This is a Rust+JavaScript repository. It builds:
 
 It is primarily responsible for providing integrated typst language service to various editors like VS Code, Neovim, Emacs, and Zed. Please follow these guidelines when contributing:
 
+## Specialized Instructions
+
+- **Localization**: See [copilot-instructions-l10n.md](./copilot-instructions-l10n.md) for comprehensive guidance on adding, updating, and maintaining localization in the project.
+
 ## Code Standards
 
 ### Keep Good PR Title
