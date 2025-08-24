@@ -3,10 +3,9 @@
 mod args;
 mod compiler;
 mod entry;
+mod lock;
 mod model;
 
-#[cfg(feature = "lsp")]
-mod lock;
 #[cfg(feature = "lsp")]
 mod lsp;
 #[cfg(feature = "system")]

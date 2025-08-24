@@ -3027,8 +3027,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.6.1-rc2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49bb801abf7897f79246c3ad6f24a209946068cfcd7b5023a87b4e193c379036"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=3eeb078e2a21caf8256585e4f533df1810c33a09#3eeb078e2a21caf8256585e4f533df1810c33a09"
 dependencies = [
  "base64",
  "bitvec",
@@ -3054,8 +3053,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.6.1-rc2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52aec9144a211331de8a5c3049f6208a011ec237aea942a44d5fad348c85dcbc"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=3eeb078e2a21caf8256585e4f533df1810c33a09#3eeb078e2a21caf8256585e4f533df1810c33a09"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -3087,8 +3085,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.6.1-rc2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cf52ed5c3ebb05573ee1b866726f42307de567eeb9bd26575f44e2bae52addc"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=3eeb078e2a21caf8256585e4f533df1810c33a09#3eeb078e2a21caf8256585e4f533df1810c33a09"
 dependencies = [
  "bitvec",
  "comemo",
@@ -3114,8 +3111,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.6.1-rc2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee562f404dbb724c33361281eb5fca8f30fa7a50184c8d4fcfa9e336eda79c3c"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=3eeb078e2a21caf8256585e4f533df1810c33a09#3eeb078e2a21caf8256585e4f533df1810c33a09"
 dependencies = [
  "base64",
  "comemo",
@@ -4360,7 +4356,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -4368,7 +4364,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4396,7 +4392,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "base64",
  "comemo",
@@ -4447,7 +4443,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4542,7 +4538,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "anyhow",
  "base64",
@@ -4579,7 +4575,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4625,7 +4621,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "comemo",
  "ecow",
@@ -4643,7 +4639,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5232,7 +5228,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.13.16"
+version = "0.13.24-rc1"
 dependencies = [
  "cfg-if",
  "comemo",
