@@ -194,11 +194,12 @@ fn test_help_compile() {
               [default: 144]
 
           --save-lock
-              Save the compilation arguments to the lock file
+              Save the compilation arguments to the lock file. If `--lockfile` is not set, the lock file
+              will be saved in the cwd
 
           --lockfile <LOCKFILE>
-              Specify the path to the lock file. If the path is set, the lock file will be saved,
-              otherwise the lock file will be saved in the cwd
+              Specify the path to the lock file. If the path is set, the lockfile will be saved
+              (--save-lock)
 
       -h, --help
               Print help (see a summary with '-h')

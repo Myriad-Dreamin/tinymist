@@ -15,12 +15,13 @@ pub struct CompileArgs {
     #[clap(flatten)]
     pub compile: TaskCompileArgs,
 
-    /// Save the compilation arguments to the lock file.
+    /// Save the compilation arguments to the lock file. If `--lockfile` is not
+    /// set, the lock file will be saved in the cwd.
     #[clap(long)]
     pub save_lock: bool,
 
-    /// Specify the path to the lock file. If the path is set, the lock file
-    /// will be saved, otherwise the lock file will be saved in the cwd.
+    /// Specify the path to the lock file. If the path is set, the lockfile will
+    /// be saved (--save-lock).
     #[clap(long)]
     pub lockfile: Option<PathBuf>,
 }
