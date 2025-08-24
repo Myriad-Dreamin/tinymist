@@ -7,17 +7,16 @@ import type { LanguageClient } from "vscode-languageclient/node";
 export function resolveCodeAction(): any {
   return async (params: lc.CodeAction) => {
     console.log("triggered resolveCodeAction", params);
-    // tinymist doesn't have resolve action.
-    // const client = ctx.client;
-    // params.command = undefined;
-    // const item = await client.sendRequest(lc.CodeActionResolveRequest.type, params);
-    // const itemEdit = item.edit;
-
+  
     const client = await tinymist.getClient();
 
-    const itemEdit = params.edit;
+    let itemEdit = params.edit;
     if (!itemEdit) {
-      return;
+      console.log("resolving code edit", params);
+
+      // Resolve the code edit.
+      const resolvedItem = await client.sendRequest(lc.CodeActionResolveRequest.type, params);
+      itemEdit = resolvedItem.edit;
     }
 
     // console.log("itemEdit", itemEdit);

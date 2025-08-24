@@ -14,6 +14,7 @@ pub use upstream::with_vm;
 
 pub use check::*;
 pub use code_action::*;
+pub use code_action_resolve::*;
 pub use code_context::*;
 pub use code_lens::*;
 pub use color_presentation::*;
@@ -59,6 +60,7 @@ mod prelude;
 mod bib;
 mod check;
 mod code_action;
+mod code_action_resolve;
 mod code_context;
 mod code_lens;
 mod color_presentation;
@@ -211,6 +213,8 @@ mod polymorphic {
         ColorPresentation(ColorPresentationRequest),
         /// A request to get the code actions.
         CodeAction(CodeActionRequest),
+        /// A request to resolve a code action.
+        CodeActionResolve(CodeActionResolveRequest),
         /// A request to get the code lenses.
         CodeLens(CodeLensRequest),
         /// A request to get the completions.
@@ -267,6 +271,7 @@ mod polymorphic {
                 Self::DocumentHighlight(..) => PinnedFirst,
                 Self::ColorPresentation(..) => ContextFreeUnique,
                 Self::CodeAction(..) => Unique,
+                Self::CodeActionResolve(..) => Unique,
                 Self::CodeLens(..) => Unique,
                 Self::Completion(..) => Mergeable,
                 Self::SignatureHelp(..) => PinnedFirst,
@@ -304,6 +309,7 @@ mod polymorphic {
                 Self::DocumentHighlight(req) => &req.path,
                 Self::ColorPresentation(req) => &req.path,
                 Self::CodeAction(req) => &req.path,
+                Self::CodeActionResolve(req) => &req.path,
                 Self::CodeLens(req) => &req.path,
                 Self::Completion(req) => &req.path,
                 Self::SignatureHelp(req) => &req.path,
@@ -354,6 +360,8 @@ mod polymorphic {
         ColorPresentation(Option<Vec<ColorPresentation>>),
         /// The response to the code action request.
         CodeAction(Option<Vec<CodeAction>>),
+        /// The response to the code action resolve request.
+        CodeActionResolve(Option<Box<CodeAction>>),
         /// The response to the code lens request.
         CodeLens(Option<Vec<CodeLens>>),
         /// The response to the completion request.

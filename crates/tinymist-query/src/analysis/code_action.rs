@@ -55,8 +55,34 @@ impl<'a> CodeActionWorker<'a> {
     fn local_edit(&self, edit: EcoSnippetTextEdit) -> Option<EcoWorkspaceEdit> {
         self.local_edits(vec![edit])
     }
+}
 
-    pub(crate) fn autofix(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AutofixKind {
+    UnknownVariable,
+    FileNotFound,
+}
+
+pub(crate) fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
+    static PATTERNS: &[(&str, AutofixKind)] = &[
+        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
+        ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
+        ("file not found", AutofixKind::FileNotFound),
+    ];
+
+    for (pattern, kind) in PATTERNS {
+        if msg.starts_with(pattern) {
+            return Some(*kind);
+        }
+    }
+
+    None
+}
+
+/// Diagnostic autofix code actions.
+impl CodeActionWorker<'_> {
+    /// Suggests fixes for compiler/linter diagnostics.
+    pub fn autofix(
         &mut self,
         root: &LinkedNode<'_>,
         range: &Range<usize>,
@@ -99,7 +125,16 @@ impl<'a> CodeActionWorker<'a> {
     ) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
+        self.create_missing_variable(root, &node);
+        self.add_spaces_to_math_unknown_variable(&node);
+        Some(())
+    }
 
+    fn create_missing_variable(
+        &mut self,
+        root: &LinkedNode<'_>,
+        node: &LinkedNode<'_>,
+    ) -> Option<()> {
         let ident = 'determine_ident: {
             if let Some(ident) = node.cast::<ast::Ident>() {
                 break 'determine_ident ident.get().clone();
@@ -117,7 +152,7 @@ impl<'a> CodeActionWorker<'a> {
             Bad,
         }
 
-        let previous_decl = previous_items(node, |item| {
+        let previous_decl = previous_items(node.clone(), |item| {
             match item {
                 PreviousItem::Parent(parent, ..) => match parent.kind() {
                     SyntaxKind::LetBinding => {
@@ -198,6 +233,19 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
+    /// Add spaces between letters in an unknown math identifier: `$xyz$` -> `$x y z$`.
+    fn add_spaces_to_math_unknown_variable(&mut self, node: &LinkedNode<'_>) -> Option<()> {
+        let edit = suggest_math_unknown_variable_spaces_edit(self.ctx, &self.source, node)?;
+        let action = CodeAction {
+            title: "Add spaces between letters".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(self.local_edit(edit)?),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+        Some(())
+    }
+
     /// Automatically fixes file not found errors.
     pub fn autofix_file_not_found(
         &mut self,
@@ -236,7 +284,103 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    /// Starts to work.
+    fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
+        let change_id = "Typst Create Missing Files".to_string();
+
+        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
+            uri,
+            options: Some(CreateFileOptions {
+                overwrite: Some(false),
+                ignore_if_exists: None,
+            }),
+            annotation_id: Some(change_id.clone()),
+        }));
+
+        let mut change_annotations = HashMap::new();
+        change_annotations.insert(
+            change_id.clone(),
+            ChangeAnnotation {
+                label: change_id,
+                needs_confirmation: Some(needs_confirmation),
+                description: Some("The file is missing but required by code".to_string()),
+            },
+        );
+
+        EcoWorkspaceEdit {
+            changes: None,
+            document_changes: Some(EcoDocumentChanges::Operations(vec![create_op])),
+            change_annotations: Some(change_annotations),
+        }
+    }
+}
+
+/// Generate an edit that adds spaces between letters in an unknown math variable.
+///
+/// This function is split out from `CodeActionWorker` to allow for code sharing with the
+/// `codeAction/resolve` request handler.
+pub(crate) fn suggest_math_unknown_variable_spaces_edit(
+    ctx: &LocalContext,
+    source: &Source,
+    ident_node: &LinkedNode,
+) -> Option<EcoSnippetTextEdit> {
+    let ident = ident_node.cast::<ast::MathIdent>()?.get();
+
+    // Rewrite `a_ij` as `a_(i j)`, not `a_i j`.
+    // Likewise rewrite `ab/c` as `(a b)/c`, not `a b/c`.
+    let needs_parens = matches!(
+        ident_node.parent_kind(),
+        Some(SyntaxKind::MathAttach | SyntaxKind::MathFrac)
+    );
+    let new_text = if needs_parens {
+        eco_format!("({})", ident.chars().join(" "))
+    } else {
+        ident.chars().join(" ").into()
+    };
+
+    let range = ctx.to_lsp_range(ident_node.range(), source);
+    Some(EcoSnippetTextEdit::new_plain(range, new_text))
+}
+
+pub(crate) const SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS: CodeActionKind =
+    CodeActionKind::new("source.typst.spaceUnknownMathVars");
+
+/// Source-level autofix actions. The edits for these code actions are lazily computed in a followup
+/// `codeAction/resolve` LSP request.
+impl CodeActionWorker<'_> {
+    /// Suggests autofix actions that apply to the entire document.
+    pub fn source_autofix(&mut self, context: &lsp_types::CodeActionContext) -> Option<()> {
+        // Only suggest source-level actions if explicitly requested via `context.only`.
+        if let Some(only) = &context.only
+            && only.iter().any(|kind| {
+                *kind == CodeActionKind::SOURCE || *kind == SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS
+            })
+        {
+            self.source_action(
+                SOURCE_TYPST_SPACE_UNKNOWN_MATH_VARS,
+                "Add spaces to all unknown math vars",
+            );
+        }
+
+        Some(())
+    }
+
+    fn source_action(&mut self, kind: CodeActionKind, title: &str) {
+        // Pass the document URL as the data; see comment on `CodeActionResolveRequest.path`.
+        let data = serde_json::to_value(self.local_url())
+            .expect("document URL should be valid JSON value");
+        self.actions.push(CodeAction {
+            title: title.to_string(),
+            kind: Some(kind),
+            edit: None, // computed in followup `codeAction/resolve`
+            data: Some(data),
+            ..CodeAction::default()
+        });
+    }
+}
+
+/// Scoped code actions.
+impl CodeActionWorker<'_> {
+    /// Provides code actions that modify existing constructs.
     pub fn scoped(&mut self, root: &LinkedNode, range: &Range<usize>) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
@@ -538,54 +682,4 @@ impl<'a> CodeActionWorker<'a> {
 
         Some(())
     }
-
-    fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
-        let change_id = "Typst Create Missing Files".to_string();
-
-        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
-            uri,
-            options: Some(CreateFileOptions {
-                overwrite: Some(false),
-                ignore_if_exists: None,
-            }),
-            annotation_id: Some(change_id.clone()),
-        }));
-
-        let mut change_annotations = HashMap::new();
-        change_annotations.insert(
-            change_id.clone(),
-            ChangeAnnotation {
-                label: change_id,
-                needs_confirmation: Some(needs_confirmation),
-                description: Some("The file is missing but required by code".to_string()),
-            },
-        );
-
-        EcoWorkspaceEdit {
-            changes: None,
-            document_changes: Some(EcoDocumentChanges::Operations(vec![create_op])),
-            change_annotations: Some(change_annotations),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum AutofixKind {
-    UnknownVariable,
-    FileNotFound,
-}
-
-fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
-    static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable),
-        ("file not found", AutofixKind::FileNotFound),
-    ];
-
-    for (pattern, kind) in PATTERNS {
-        if msg.starts_with(pattern) {
-            return Some(*kind);
-        }
-    }
-
-    None
 }

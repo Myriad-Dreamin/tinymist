@@ -198,7 +198,17 @@ impl Initializer for SuperInit {
                 document_formatting_provider,
                 document_range_formatting_provider,
                 inlay_hint_provider: Some(OneOf::Left(true)),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Options(
+                    CodeActionOptions {
+                        code_action_kinds: Some(vec![
+                            CodeActionKind::SOURCE,
+                            CodeActionKind::REFACTOR,
+                            CodeActionKind::QUICKFIX,
+                        ]),
+                        resolve_provider: Some(true),
+                        ..CodeActionOptions::default()
+                    },
+                )),
                 code_lens_provider: Some(CodeLensOptions {
                     resolve_provider: Some(false),
                 }),
