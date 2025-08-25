@@ -26,7 +26,7 @@
           pname = "tinymist";
           # Please update the corresponding vscode extension when updating
           # this derivation.
-          version = "0.13.24-rc2";
+          version = "0.13.24-rc3";
 
           src = pkgs.lib.cleanSource ../../..;
 
