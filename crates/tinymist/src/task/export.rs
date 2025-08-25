@@ -69,6 +69,7 @@ impl ServerState {
             });
 
             let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+            // todo: we may get some file missing errors here
             let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
             let res = ExportTask::do_export(task, artifact, lock_dir)
                 .await
