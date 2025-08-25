@@ -70,7 +70,7 @@ jobs:
 
       - name: Build tinymist binary
         run: |
-          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
+          cargo build --profile=gh-release --bin tinymist --target $RUST_TARGET
       - name: Split debug symbols
         run: |
           cd target/$RUST_TARGET/gh-release
