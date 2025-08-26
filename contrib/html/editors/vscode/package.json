@@ -1,6 +1,6 @@
 {
   "name": "tinymist-vscode-html",
-  "version": "0.13.24-rc3",
+  "version": "0.13.24",
   "description": "Extending Typst with HTML features",
   "keywords": [
     "html",
