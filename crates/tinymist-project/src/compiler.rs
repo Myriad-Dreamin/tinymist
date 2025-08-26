@@ -409,13 +409,11 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             ext: Default::default(),
             verse,
             reason: no_reason(),
-            snapshot: None,
             handler,
             export_target,
-            compilation: OnceLock::default(),
-            latest_success_doc: None,
             deps: Default::default(),
-            committed_revision: 0,
+            latest_compilation: None,
+            cached_snapshot: None,
         }
     }
 
@@ -548,8 +546,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         });
                     }
 
-                    // Reset the watch state and document state.
-                    proj.latest_success_doc = None;
+                    // Forget the old compilation state.
+                    proj.latest_compilation = None;
                 }
 
                 proj.reason.merge(reason_by_entry_change());
@@ -748,46 +746,51 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub export_target: ExportTarget,
     /// The reason to compile.
     pub reason: CompileSignal,
-    /// The latest compute graph (snapshot).
-    snapshot: Option<Arc<WorldComputeGraph<F>>>,
-    /// The latest compilation.
-    pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
-    /// The latest successly compiled document.
-    latest_success_doc: Option<TypstDocument>,
+    latest_compilation: Option<CompilationState>,
+    /// The latest compute graph (snapshot), derived lazily from
+    /// `latest_compilation` as needed.
+    cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
+}
 
-    committed_revision: usize,
+/// Information about a completed compilation.
+struct CompilationState {
+    revision: usize,
+    /// The document, if it compiled successfully.
+    doc: Option<TypstDocument>,
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
-    /// Creates a snapshot of the project.
+    /// Gets a snapshot of the project.
     pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
-        match self.snapshot.as_ref() {
-            Some(snap) if snap.world().revision() == self.verse.revision => snap.clone(),
+        // Tries to use the cached snapshot if possible.
+        match self.cached_snapshot.as_ref() {
+            Some(cached) if cached.world().revision() == self.verse.revision => cached.clone(),
             _ => {
                 let snap = self.make_snapshot();
-                self.snapshot = Some(snap.clone());
+                self.cached_snapshot = Some(snap.clone());
                 snap
             }
         }
     }
 
+    /// Creates a new snapshot of the project derived from `latest_compilation`.
     fn make_snapshot(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.verse.snapshot();
         let snap = CompileSnapshot {
             id: self.id.clone(),
             world,
             signal: self.reason,
-            success_doc: self.latest_success_doc.clone(),
+            success_doc: self.latest_compilation.as_ref().and_then(|c| c.doc.clone()),
         };
         WorldComputeGraph::new(snap)
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active. (this is used for experimenting typst.node compilations)
     #[must_use]
     pub fn may_compile2<'a>(
@@ -806,7 +809,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         })
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active.
     #[must_use]
     pub fn may_compile(
@@ -881,18 +884,22 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>) -> bool {
         let world = &artifact.snap.world;
         let compiled_revision = world.revision().get();
-        if self.committed_revision >= compiled_revision {
+        if let Some(cur) = &self.latest_compilation
+            && cur.revision >= compiled_revision
+        {
             return false;
         }
 
-        // Update state.
+        // Updates state.
         let doc = artifact.doc.clone();
-        self.committed_revision = compiled_revision;
-        if doc.is_some() {
-            self.latest_success_doc = doc;
-        }
+        self.latest_compilation = Some(CompilationState {
+            revision: compiled_revision,
+            doc,
+        });
+        // Invalidates the snapshot. It will be recomputed on demand.
+        self.cached_snapshot = None;
 
-        // Notify the new file dependencies.
+        // Notifies the new file dependencies.
         let mut deps = eco_vec![];
         world.iter_dependencies(&mut |dep| {
             if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
