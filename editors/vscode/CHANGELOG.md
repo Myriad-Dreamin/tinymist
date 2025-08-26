@@ -30,10 +30,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * Completing both `#f` and `#f.paren` in some cases (#1940) in https://github.com/Myriad-Dreamin/tinymist/pull/2014
 
-### Rename
-
-* Renaming labels in https://github.com/Myriad-Dreamin/tinymist/pull/1858
-
 ### Docstring
 
 * (Fix) Cleaning typlite markers from doc strings by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2017
