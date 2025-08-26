@@ -748,7 +748,8 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     deps: EcoVec<ImmutPath>,
 
     latest_compilation: Option<CompilationState>,
-    /// The latest compute graph (snapshot), derived lazily from `latest_compilation` as needed.
+    /// The latest compute graph (snapshot), derived lazily from
+    /// `latest_compilation` as needed.
     cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
 }
 
@@ -762,7 +763,7 @@ struct CompilationState {
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Gets a snapshot of the project.
     pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
-        // Try to use the cached snapshot if possible.
+        // Tries to use the cached snapshot if possible.
         match self.cached_snapshot.as_ref() {
             Some(cached) if cached.world().revision() == self.verse.revision => cached.clone(),
             _ => {
@@ -773,7 +774,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         }
     }
 
-    /// Create a new snapshot of the project derived from `latest_compilation`.
+    /// Creates a new snapshot of the project derived from `latest_compilation`.
     fn make_snapshot(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.verse.snapshot();
         let snap = CompileSnapshot {
@@ -785,7 +786,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         WorldComputeGraph::new(snap)
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active. (this is used for experimenting typst.node compilations)
     #[must_use]
     pub fn may_compile2(
@@ -804,7 +805,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         })
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active.
     #[must_use]
     pub fn may_compile(
@@ -879,15 +880,16 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             return false;
         }
 
-        // Update state.
+        // Updates state.
         let doc = artifact.doc.clone();
         self.latest_compilation = Some(CompilationState {
             revision: compiled_revision,
             doc,
         });
-        self.cached_snapshot = None; // invalidate; will be recomputed on demand
+        // Invalidates the snapshot. It will be recomputed on demand.
+        self.cached_snapshot = None;
 
-        // Notify the new file dependencies.
+        // Notifies the new file dependencies.
         let mut deps = eco_vec![];
         world.iter_dependencies(&mut |dep| {
             if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
