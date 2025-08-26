@@ -1,0 +1,29 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/label.typ
+---
+{
+ "changeAnnotations": {
+  "Typst Rename Labels": {
+   "description": "The language server searched the labels ambiguously",
+   "label": "Typst Rename Labels",
+   "needsConfirmation": true
+  }
+ },
+ "documentChanges": [
+  {
+   "edits": [
+    {
+     "annotationId": "Typst Rename Labels",
+     "newText": "new_name",
+     "range": "6:21:6:33"
+    }
+   ],
+   "textDocument": {
+    "uri": "s0.typ",
+    "version": null
+   }
+  }
+ ]
+}
