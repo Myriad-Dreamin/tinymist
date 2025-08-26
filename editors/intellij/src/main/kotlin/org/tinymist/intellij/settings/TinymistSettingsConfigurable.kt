@@ -1,15 +1,11 @@
 package org.tinymist.intellij.settings
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.diagnostic.Logger
-import com.redhat.devtools.lsp4ij.LanguageServerManager
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry
-import com.redhat.devtools.lsp4ij.LanguageServerManager.StopOptions
-import com.redhat.devtools.lsp4ij.LanguageServiceAccessor
-import com.redhat.devtools.lsp4ij.ServerStatus
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener.LanguageServerChangedEvent
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener.LanguageServerDefinitionEvent
 import javax.swing.JComponent
 
 class TinymistSettingsConfigurable : Configurable {
@@ -57,6 +53,7 @@ class TinymistSettingsConfigurable : Configurable {
                     if (!project.isDisposed && project.isOpen) {
                         // Construct and fire the LanguageServerChangedEvent
                         val event = LanguageServerChangedEvent(
+                            LanguageServerDefinitionEvent.UpdatedBy.USER, // who triggered the update
                             project,       // current project
                             serverDefinition, // the definition of our server
                             false,         // nameChanged
@@ -64,9 +61,8 @@ class TinymistSettingsConfigurable : Configurable {
                             false,         // userEnvironmentVariablesChanged
                             false,         // includeSystemEnvironmentVariablesChanged
                             false,         // mappingsChanged
-                            false,         // configurationContentChanged
-                            false,         // initializationOptionsContentChanged
-                            false          // clientConfigurationContentChanged
+                            false,         // clientConfigurationContentChanged
+                            false          // installerConfigurationContentChanged
                         )
                         registry.handleChangeEvent(event) // Notify lsp4ij about the change
                         LOG.info("Fired LanguageServerChangedEvent for project: ${project.name}. lsp4ij should handle server restart.")
