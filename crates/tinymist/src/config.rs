@@ -912,6 +912,7 @@ impl LintFeat {
 }
 /// The lint features.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OnEnterFeat {
     /// Whether to handle list.
     #[serde(default, deserialize_with = "deserialize_null_default")]
