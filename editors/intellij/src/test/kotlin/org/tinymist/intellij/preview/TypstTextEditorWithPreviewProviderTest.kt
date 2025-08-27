@@ -1,8 +1,6 @@
 package org.tinymist.intellij.preview
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
-import org.tinymist.intellij.TypstFileType
 
 class TypstTextEditorWithPreviewProviderTest : BasePlatformTestCase() {
 
@@ -13,7 +11,6 @@ class TypstTextEditorWithPreviewProviderTest : BasePlatformTestCase() {
         provider = TypstTextEditorWithPreviewProvider()
     }
 
-    @Test
     fun testAcceptTypstFile() {
         // Create a temporary Typst file
         val fileName = "test.typ"
@@ -26,7 +23,6 @@ class TypstTextEditorWithPreviewProviderTest : BasePlatformTestCase() {
         assertTrue("Provider should accept Typst files", provider.accept(project, virtualFile))
     }
 
-    @Test
     fun testRejectNonTypstFile() {
         // Create a temporary non-Typst file
         val fileName = "test.txt"

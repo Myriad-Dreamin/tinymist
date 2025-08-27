@@ -1,8 +1,6 @@
 package org.tinymist.intellij.lsp
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
-import org.junit.Assert.assertTrue
 
 /**
  * Test for "Go to Definition" functionality in Typst files.
@@ -19,7 +17,6 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
      * places the caret on the function call, and verifies that "Go to Definition"
      * navigates to the function definition.
      */
-    @Test
     fun testGoToDefinitionForFunctionCall() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -64,7 +61,6 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
      * places the caret on the parameter reference, and verifies that "Go to Definition"
      * navigates to the parameter definition.
      */
-    @Test
     fun testGoToDefinitionForParameterReference() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"

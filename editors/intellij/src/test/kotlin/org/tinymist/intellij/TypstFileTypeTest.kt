@@ -1,11 +1,8 @@
 package org.tinymist.intellij
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
 
 class TypstFileTypeTest : BasePlatformTestCase() {
-
-    @Test
     fun testFileTypeProperties() {
         // Test basic properties of the TypstFileType
         assertEquals("Typst file", TypstFileType.getName())
@@ -15,7 +12,6 @@ class TypstFileTypeTest : BasePlatformTestCase() {
         assertNull(TypstFileType.getIcon())
     }
 
-    @Test
     fun testFileTypeAssociation() {
         // Create a temporary file with .typ extension
         val fileName = "test.typ"

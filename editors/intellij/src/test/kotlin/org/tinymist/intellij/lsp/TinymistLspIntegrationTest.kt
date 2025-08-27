@@ -3,7 +3,6 @@ package org.tinymist.intellij.lsp
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
 import org.tinymist.intellij.TypstFileType
 
 class TinymistLspIntegrationTest : BasePlatformTestCase() {
@@ -12,7 +11,6 @@ class TinymistLspIntegrationTest : BasePlatformTestCase() {
      * Test that verifies the LSP server is correctly started when a Typst file is opened.
      * This test uses a mock LSP server to avoid dependencies on the actual tinymist executable.
      */
-    @Test
     fun testLspServerStartsForTypstFile() {
         // Creates a temporary Typst file
         val fileName = "test.typ"
@@ -37,8 +35,9 @@ class TinymistLspIntegrationTest : BasePlatformTestCase() {
         }
 
         // Verifies that the LSP server exists for this file
-        // Note: This is a simplified check. In a real test, you would need to
-        // verify that the server is actually running and responding to requests.
+
+        // Note: LanguageServiceAccessor is used here despite being marked with @ApiStatus.Internal in LSP4IJ.
+        // This may lead to issues in the future if the API changes.
         val languageServiceAccessor = com.redhat.devtools.lsp4ij.LanguageServiceAccessor.getInstance(project)
         val hasServer = languageServiceAccessor.hasAny(myFixture.file) { true }
         assertTrue("LSP server should exist for Typst files", hasServer)
@@ -48,7 +47,6 @@ class TinymistLspIntegrationTest : BasePlatformTestCase() {
      * Test that verifies basic LSP features like code completion work correctly.
      * This test requires the actual tinymist executable to be available.
      */
-    @Test
     fun testLspCompletion() {
         // Creates a temporary Typst file with content that should trigger completion
         val fileName = "completion_test.typ"
