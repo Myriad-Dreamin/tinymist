@@ -8,6 +8,10 @@ This is a Rust+JavaScript repository. It builds:
 
 It is primarily responsible for providing integrated typst language service to various editors like VS Code, Neovim, Emacs, and Zed. Please follow these guidelines when contributing:
 
+## Specialized Instructions
+
+- **Localization**: See [copilot-instructions-l10n.md](./copilot-instructions-l10n.md) for comprehensive guidance on adding, updating, and maintaining localization in the project.
+
 ## Code Standards
 
 ### Keep Good PR Title
@@ -49,7 +53,7 @@ Available types:
 ## Repository Structure
 - `crates/`: rust crates for the server and related functionality
 - `editors/vscode/`: VS Code extension code
-- `editors/neovim/`: Lua plugin for Neovim
+- `editors/neovim/`: Lua plugin for Neovim (canonical implementation - see [CONTRIBUTING.md](editors/neovim/CONTRIBUTING.md) and [Specification.md](editors/neovim/Specification.md))
 - `tools/editor-tools`: utility GUI tools for typst
 - `tools/typst-preview-frontend`: Preview GUI for typst
 - `docs/`: documentation for the project
@@ -62,6 +66,18 @@ Available types:
 2. Maintain existing code structure and organization
 4. Write unit tests for new functionality. Use snapshot-based unit tests when possible.
 5. Document public APIs and complex logic in code comments
+
+## Editor Integration Guidelines
+
+### Neovim Canonical Implementation
+
+The Neovim plugin in `editors/neovim/` serves as the **canonical implementation** of a Tinymist editor language client. When working on editor integrations:
+
+- **Reference Implementation**: Use the Neovim plugin as the reference for LSP client patterns, configuration handling, and event subscription mechanisms
+- **Test Suite**: Refer to `editors/neovim/spec/` for comprehensive test coverage examples
+- **Documentation**: See [editors/neovim/Specification.md](editors/neovim/Specification.md) for complete API and functionality documentation
+- **Development Workflow**: Use `./bootstrap.sh editor` for interactive testing and `./bootstrap.sh test` for automated validation
+- **Contributing**: Follow patterns established in [editors/neovim/CONTRIBUTING.md](editors/neovim/CONTRIBUTING.md)
 
 ## Development Guidelines
 

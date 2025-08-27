@@ -1,4 +1,4 @@
-// use std::sync::Arc;
+//! The source database of the world.
 
 use core::fmt;
 use std::sync::Arc;
@@ -11,10 +11,15 @@ use typst::syntax::Source;
 
 type FileQuery<T> = QueryRef<T, FileError>;
 
+/// A cache for a single file.
 pub struct SourceCache {
+    /// Whether the file is touched by the compile.
     touched_by_compile: bool,
+    /// The file id.
     fid: FileId,
+    /// The source of the file.
     source: FileQuery<Source>,
+    /// The buffer of the file.
     buffer: FileQuery<Bytes>,
 }
 
@@ -24,8 +29,10 @@ impl fmt::Debug for SourceCache {
     }
 }
 
+/// The source database of the world.
 #[derive(Clone)]
 pub struct SourceDb {
+    /// Whether the database is currently compiling.
     pub is_compiling: bool,
     /// The slots for all the files during a single lifecycle.
     pub slots: Arc<Mutex<FxHashMap<FileId, SourceCache>>>,
@@ -38,11 +45,12 @@ impl fmt::Debug for SourceDb {
 }
 
 impl SourceDb {
+    /// Sets whether the database is currently compiling.
     pub fn set_is_compiling(&mut self, is_compiling: bool) {
         self.is_compiling = is_compiling;
     }
 
-    /// Returns the overall memory usage for the stored files.
+    /// Gets the overall memory usage for the stored files.
     pub fn memory_usage(&self) -> usize {
         let mut w = self.slots.lock().len() * core::mem::size_of::<SourceCache>();
         w += self
@@ -65,7 +73,7 @@ impl SourceDb {
         w
     }
 
-    /// Get all the files that are currently in the VFS.
+    /// Gets all the files that are currently in the VFS.
     ///
     /// This is typically corresponds to the file dependencies of a single
     /// compilation.
@@ -81,12 +89,12 @@ impl SourceDb {
         }
     }
 
-    /// Get file content by path.
+    /// Gets the file content by path.
     pub fn file(&self, fid: FileId, p: &impl FsProvider) -> FileResult<Bytes> {
         self.slot(fid, |slot| slot.buffer.compute(|| p.read(fid)).cloned())
     }
 
-    /// Get source content by path and assign the source with a given typst
+    /// Gets the source content by path and assign the source with a given typst
     /// global file id.
     ///
     /// See `Vfs::resolve_with_f` for more information.
@@ -96,7 +104,7 @@ impl SourceDb {
         })
     }
 
-    /// Insert a new slot into the vfs.
+    /// Inserts a new slot into the vfs.
     fn slot<T>(&self, fid: FileId, f: impl FnOnce(&SourceCache) -> T) -> T {
         let mut slots = self.slots.lock();
         f({
@@ -115,6 +123,7 @@ impl SourceDb {
         })
     }
 
+    /// Takes state of the source database.
     pub(crate) fn take(&mut self) -> Self {
         Self {
             is_compiling: self.is_compiling,

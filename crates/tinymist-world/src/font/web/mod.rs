@@ -1,3 +1,5 @@
+//! Font searchers to run the compiler in the browser environment.
+
 use std::borrow::Cow;
 
 use js_sys::ArrayBuffer;
@@ -318,15 +320,21 @@ impl FontBuilder {
     }
 }
 
+/// A web font.
 #[derive(Clone, Debug)]
 pub struct WebFont {
+    /// The font info.
     pub info: FontInfo,
+    /// The context of the font.
     pub context: JsValue,
+    /// The blob loader.
     pub blob: js_sys::Function,
+    /// The index in a font file.
     pub index: u32,
 }
 
 impl WebFont {
+    /// Loads the font from the blob.
     pub fn load(&self) -> Option<ArrayBuffer> {
         self.blob
             .call1(&self.context, &self.index.into())
@@ -340,13 +348,17 @@ impl WebFont {
 /// cannot share data between workers.
 unsafe impl Send for WebFont {}
 
+/// A web font loader.
 #[derive(Debug)]
 pub struct WebFontLoader {
+    /// The font.
     font: WebFont,
+    /// The index in a font file.
     index: u32,
 }
 
 impl WebFontLoader {
+    /// Creates a new web font loader.
     pub fn new(font: WebFont, index: u32) -> Self {
         Self { font, index }
     }
@@ -368,7 +380,7 @@ impl FontLoader for WebFontLoader {
     }
 }
 
-/// Searches for fonts.
+/// Searches for fonts in the browser.
 pub struct BrowserFontSearcher {
     /// The base font searcher.
     base: MemoryFontSearcher,
@@ -382,20 +394,20 @@ impl BrowserFontSearcher {
         }
     }
 
-    /// Creates a new browser searcher with fonts in a FontResolverImpl.
+    /// Creates a new searcher with fonts in a font resolver.
     pub fn from_resolver(resolver: FontResolverImpl) -> Self {
         let base = MemoryFontSearcher::from_resolver(resolver);
         Self { base }
     }
 
-    /// Builds a FontResolverImpl.
+    /// Builds a font resolver.
     pub fn build(self) -> FontResolverImpl {
         self.base.build()
     }
 }
 
 impl BrowserFontSearcher {
-    /// Resolves fonts from given options.
+    /// Resolves fonts from given options and adds them to the searcher.
     pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> Result<()> {
         // Source3: add the fonts in memory.
         self.add_memory_fonts(opts.with_embedded_fonts.into_par_iter().map(|font_data| {
@@ -408,25 +420,26 @@ impl BrowserFontSearcher {
         Ok(())
     }
 
-    /// Adds fonts that are embedded in the binary.
+    /// Adds fonts that are embedded in the binary to the searcher.
     #[cfg(feature = "fonts")]
     #[deprecated(note = "use `typst_assets::fonts` directly")]
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
 
-            self.fonts.extend(
+            self.base.fonts.extend(
                 Font::iter(buffer)
                     .map(|font| (font.info().clone(), FontSlot::new_loaded(Some(font)))),
             );
         }
     }
 
-    /// Adds in-memory fonts.
+    /// Adds in-memory fonts to the searcher.
     pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
         self.base.add_memory_fonts(data);
     }
 
+    /// Adds web fonts to the searcher.
     pub async fn add_web_fonts(&mut self, fonts: js_sys::Array) -> Result<()> {
         let font_builder = FontBuilder {};
 
@@ -453,6 +466,7 @@ impl BrowserFontSearcher {
         Ok(())
     }
 
+    /// Adds font data to the searcher.
     pub fn add_font_data(&mut self, buffer: Bytes) {
         for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
             let buffer = buffer.clone();
@@ -466,6 +480,7 @@ impl BrowserFontSearcher {
         }
     }
 
+    /// Mutates the fonts in the searcher.
     pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
         func(&mut self.base.fonts);
     }

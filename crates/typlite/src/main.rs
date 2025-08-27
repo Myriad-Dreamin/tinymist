@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+// todo: remove me
+#![allow(missing_docs)]
 
 use std::{
     io::Write,

@@ -3,6 +3,17 @@ use tinymist_std::path::PathClean;
 use crate::artifact::{cli, GIT_ROOT};
 
 #[test]
+fn test_probe() {
+    insta_cmd::assert_cmd_snapshot!(cli().arg("probe"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    
+    ----- stderr -----
+    ");
+}
+
+#[test]
 fn test_compile() {
     const INPUT_REL: &str = "tests/workspaces/individuals/tiny.typ";
 

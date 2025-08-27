@@ -77,6 +77,7 @@ impl<T: FontResolver> FontResolver for Arc<T> {
     }
 }
 
+/// A reusable font resolver.
 pub trait ReusableFontResolver: FontResolver {
     /// Reuses the font resolver.
     fn slots(&self) -> impl Iterator<Item = FontSlot>;
@@ -96,8 +97,11 @@ impl<T: ReusableFontResolver> ReusableFontResolver for Arc<T> {
 /// - Otherwise, [`crate::font::pure::MemoryFontBuilder`] in memory.
 #[derive(Debug)]
 pub struct FontResolverImpl {
+    /// The user-specified font paths.
     pub(crate) font_paths: Vec<PathBuf>,
+    /// The font book.
     pub(crate) book: LazyHash<FontBook>,
+    /// The slots of the font resolver.
     pub(crate) slots: Vec<FontSlot>,
 }
 
@@ -111,6 +115,7 @@ impl FontResolverImpl {
         }
     }
 
+    /// Creates a new font resolver with fonts.
     pub fn new_with_fonts(
         font_paths: Vec<PathBuf>,
         fonts: impl Iterator<Item = (FontInfo, FontSlot)>,
@@ -135,7 +140,7 @@ impl FontResolverImpl {
         self.slots.len()
     }
 
-    /// Tests whether the resolver doesn't hold any fonts.
+    /// Checks if the resolver holds any fonts.
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
     }
@@ -183,6 +188,7 @@ impl FontResolverImpl {
         self.slot(index)?.description.clone()
     }
 
+    /// Sets the user-specified font paths.
     pub fn with_font_paths(mut self, font_paths: Vec<PathBuf>) -> Self {
         self.font_paths = font_paths;
         self
@@ -218,6 +224,7 @@ impl fmt::Display for FontResolverImpl {
 }
 
 impl ReusableFontResolver for FontResolverImpl {
+    /// Returns an iterator over all slots in the resolver.
     fn slots(&self) -> impl Iterator<Item = FontSlot> {
         self.slots.iter().cloned()
     }

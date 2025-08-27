@@ -19,7 +19,7 @@
     "build:editor-tools": "cd tools/editor-tools/ && yarn run build",
     "build:preview": "cd tools/typst-preview-frontend && yarn run build && rimraf ../../crates/tinymist-assets/src/typst-preview.html && cpr ./dist/index.html ../../crates/tinymist-assets/src/typst-preview.html",
     "build:l10n": "yarn extract:l10n && node scripts/build-l10n.mjs",
-    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.24-rc1 .",
+    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.24 .",
     "build:web": "cd crates/tinymist && yarn build && rimraf ../../editors/vscode/out/tinymist_bg.wasm && cpr pkg/tinymist_bg.wasm ../../editors/vscode/out/tinymist_bg.wasm",
     "watch:web": "cd crates/tinymist && yarn watch",
     "extract:l10n": "yarn extract:l10n:ts && yarn extract:l10n:rs",
@@ -42,6 +42,7 @@
     "generate-ci": "dist generate",
     "generate-nix": "nix run github:cargo2nix/cargo2nix --locked",
     "project-build-script:ps1": "cargo run --bin tinymist -- generate-script -o ./scripts/project-build.ps1",
+    "release": "node scripts/release.mjs",
     "draft-release": "node scripts/draft-release.mjs"
   },
   "dependencies": {},

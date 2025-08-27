@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::prelude::*;
 
-/// Extract the module-level documentation from a source.
+/// Extracts the module-level documentation from a source.
 pub fn find_module_level_docs(src: &Source) -> Option<String> {
     crate::log_debug_ct!("finding docs at: {id:?}", id = src.id());
 
@@ -20,6 +20,7 @@ pub fn find_module_level_docs(src: &Source) -> Option<String> {
     extract_mod_docs_between(&root, 0..src.text().len(), true)
 }
 
+/// Extracts the module-level documentation from a source.
 fn extract_mod_docs_between(
     node: &LinkedNode,
     rng: Range<usize>,
@@ -72,13 +73,13 @@ pub struct CommentGroupMatcher {
 }
 
 impl CommentGroupMatcher {
-    /// Reset the matcher. This usually happens after a group is collected or
+    /// Resets the matcher. This usually happens after a group is collected or
     /// when some other child item is breaking the comment group manually.
     pub fn reset(&mut self) {
         self.newline_count = 0;
     }
 
-    /// Process a child relative to some [`SyntaxNode`].
+    /// Processes a child relative to some [`SyntaxNode`].
     ///
     /// ## Example
     ///
@@ -119,28 +120,35 @@ impl CommentGroupMatcher {
         }
     }
 }
+
+/// A raw comment.
 enum RawComment {
+    /// A line comment.
     Line(EcoString),
+    /// A block comment.
     Block(EcoString),
 }
 
 /// A matcher that collects documentation comments.
 #[derive(Default)]
 pub struct DocCommentMatcher {
+    /// The collected comments.
     comments: Vec<RawComment>,
+    /// The matcher for grouping comments.
     group_matcher: CommentGroupMatcher,
+    /// Whether to strictly match the comment format.
     strict: bool,
 }
 
 impl DocCommentMatcher {
-    /// Reset the matcher. This usually happens after a group is collected or
+    /// Resets the matcher. This usually happens after a group is collected or
     /// when some other child item is breaking the comment group manually.
     pub fn reset(&mut self) {
         self.comments.clear();
         self.group_matcher.reset();
     }
 
-    /// Process a child relative to some [`SyntaxNode`].
+    /// Processes a child relative to some [`SyntaxNode`].
     pub fn process(&mut self, n: &SyntaxNode) -> bool {
         match self.group_matcher.process(n) {
             CommentGroupSignal::LineComment => {
@@ -164,7 +172,7 @@ impl DocCommentMatcher {
         false
     }
 
-    /// Collect the comments and return the result.
+    /// Collects the comments and returns the result.
     pub fn collect(&mut self) -> Option<String> {
         let comments = &self.comments;
         if comments.is_empty() {

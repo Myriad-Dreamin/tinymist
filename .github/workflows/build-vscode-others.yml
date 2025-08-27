@@ -70,7 +70,7 @@ jobs:
 
       - name: Build tinymist binary
         run: |
-          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
+          cargo build --profile=gh-release --bin tinymist --target $RUST_TARGET
       - name: Split debug symbols
         run: |
           cd target/$RUST_TARGET/gh-release
@@ -150,14 +150,14 @@ jobs:
           version: "v0.13.1"
       - name: Install deps
         run: yarn install
+      - name: Build tinymist library
+        run: yarn build:web
+        working-directory: .
       - name: Build tinymist vscode extension
         run: |
           yarn
           yarn run compile:web
         working-directory: ./editors/vscode
-      - name: Build tinymist library
-        run: yarn build:web
-        working-directory: .
       - name: Pack tinymist npm library
         run: |
           npm pack > package-name

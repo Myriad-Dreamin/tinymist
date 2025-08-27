@@ -3,35 +3,56 @@ use typst::foundations::{Func, Value};
 use super::BoundChecker;
 use crate::ty::prelude::*;
 
+/// A signature.
 #[derive(Debug, Clone, Copy)]
 pub enum Sig<'a> {
+    /// A builtin signature.        
     Builtin(BuiltinSig<'a>),
+    /// A type signature.
     Type(&'a Interned<SigTy>),
+    /// A type constructor.
     TypeCons {
+        /// The type.
         val: &'a typst::foundations::Type,
+        /// The original type.
         at: &'a Ty,
     },
+    /// An array constructor.
     ArrayCons(&'a TyRef),
+    /// A tuple constructor.
     TupleCons(&'a Interned<Vec<Ty>>),
+    /// A dictionary constructor.
     DictCons(&'a Interned<RecordTy>),
+    /// A value signature.
     Value {
+        /// The value.
         val: &'a Func,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A partialize signature.
     Partialize(&'a Sig<'a>),
+    /// A with signature.
     With {
+        /// The signature.
         sig: &'a Sig<'a>,
+        /// The bounds.
         withs: &'a Vec<Interned<ArgsTy>>,
+        /// The original type.
         at: &'a Ty,
     },
 }
 
+/// A shape of a signature.
 pub struct SigShape<'a> {
+    /// The signature.
     pub sig: Interned<SigTy>,
+    /// The withs.
     pub withs: Option<&'a Vec<Interned<SigTy>>>,
 }
 
 impl<'a> Sig<'a> {
+    /// Gets the type of the signature.
     pub fn ty(self) -> Option<Ty> {
         Some(match self {
             Sig::Builtin(_) => return None,
@@ -46,6 +67,7 @@ impl<'a> Sig<'a> {
         })
     }
 
+    /// Gets the shape of the signature.
     pub fn shape(self, ctx: &mut impl TyCtxMut) -> Option<SigShape<'a>> {
         let (sig, _is_partialize) = match self {
             Sig::Partialize(sig) => (*sig, true),
@@ -74,15 +96,22 @@ impl<'a> Sig<'a> {
     }
 }
 
+/// A kind of signature surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigSurfaceKind {
+    /// A call signature.
     Call,
+    /// An array signature.
     Array,
+    /// A dictionary signature.
     Dict,
+    /// An array or dictionary signature.
     ArrayOrDict,
 }
 
+/// A trait to check a signature.
 pub trait SigChecker: TyCtx {
+    /// Checks the signature.
     fn check(&mut self, sig: Sig, args: &mut SigCheckContext, pol: bool) -> Option<()>;
 }
 
@@ -131,12 +160,17 @@ impl Ty {
     }
 }
 
+/// A context to check a signature.
 pub struct SigCheckContext {
+    /// The kind of signature surface.
     pub sig_kind: SigSurfaceKind,
+    /// The arguments.
     pub args: Vec<Interned<SigTy>>,
+    /// The type.
     pub at: TyRef,
 }
 
+/// A driver to check a signature.
 #[derive(BindTyCtx)]
 #[bind(checker)]
 pub struct SigCheckDriver<'a> {
@@ -145,10 +179,12 @@ pub struct SigCheckDriver<'a> {
 }
 
 impl SigCheckDriver<'_> {
+    /// Determines whether the signature is a function.
     fn func_as_sig(&self) -> bool {
         matches!(self.ctx.sig_kind, SigSurfaceKind::Call)
     }
 
+    /// Determines whether the signature is an array.
     fn array_as_sig(&self) -> bool {
         matches!(
             self.ctx.sig_kind,
@@ -156,6 +192,7 @@ impl SigCheckDriver<'_> {
         )
     }
 
+    /// Determines whether the signature is a dictionary.
     fn dict_as_sig(&self) -> bool {
         matches!(
             self.ctx.sig_kind,
@@ -163,6 +200,7 @@ impl SigCheckDriver<'_> {
         )
     }
 
+    /// Checks the signature of the given type.
     fn ty(&mut self, at: &Ty, pol: bool) {
         crate::log_debug_ct!("check sig: {at:?}");
         match at {
@@ -258,6 +296,7 @@ impl BoundChecker for SigCheckDriver<'_> {
     }
 }
 
+/// A driver to check a method.
 #[derive(BindTyCtx)]
 #[bind(0)]
 struct MethodDriver<'a, 'b>(&'a mut SigCheckDriver<'b>, &'a StrRef);

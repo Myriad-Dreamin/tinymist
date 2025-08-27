@@ -1,3 +1,5 @@
+//! The computation for text export.
+
 use core::fmt;
 use std::sync::Arc;
 use typst::html::{HtmlNode::*, tag};
@@ -7,9 +9,11 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 
+/// The computation for text export.
 pub struct TextExport;
 
 impl TextExport {
+    /// Runs the computation on a document.
     pub fn run_on_doc(doc: &TypstDocument) -> Result<String> {
         Ok(format!("{}", FullTextDigest(doc)))
     }

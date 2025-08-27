@@ -329,6 +329,7 @@ pub struct ParamDocsT<T> {
 }
 
 impl ParamDocs {
+    /// Create a new parameter documentation.
     pub fn new(param: &ParamTy, ty: Option<&Ty>) -> Self {
         Self {
             name: param.name.as_ref().into(),
@@ -340,6 +341,7 @@ impl ParamDocs {
     }
 }
 
+/// Formats the type.
 pub fn format_ty(ty: Option<&Ty>) -> TypeRepr {
     let ty = ty?;
     let short = ty.repr().unwrap_or_else(|| "any".into());

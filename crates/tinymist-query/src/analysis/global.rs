@@ -33,7 +33,7 @@ use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
-    AnalysisStats, BibInfo, CompletionFeat, Definition, PathPreference, QueryStatGuard,
+    AnalysisStats, BibInfo, CompletionFeat, Definition, PathKind, QueryStatGuard,
     SemanticTokenCache, SemanticTokenContext, SemanticTokens, Signature, SignatureTarget, Ty,
     TypeInfo, analyze_signature, bib_info, definition, post_type_check,
 };
@@ -339,16 +339,13 @@ impl LocalContext {
     }
 
     /// Get all the source files in the workspace.
-    pub(crate) fn completion_files(
-        &self,
-        pref: &PathPreference,
-    ) -> impl Iterator<Item = &TypstFileId> {
+    pub(crate) fn completion_files(&self, pref: &PathKind) -> impl Iterator<Item = &TypstFileId> {
         let regexes = pref.ext_matcher();
         self.caches
             .completion_files
             .get_or_init(|| {
                 if let Some(root) = self.world.entry_state().workspace_root() {
-                    scan_workspace_files(&root, PathPreference::Special.ext_matcher(), |path| {
+                    scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
                         WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
                     })
                 } else {
@@ -368,7 +365,7 @@ impl LocalContext {
     /// Get all the source files in the workspace.
     pub fn source_files(&self) -> &Vec<TypstFileId> {
         self.caches.root_files.get_or_init(|| {
-            self.completion_files(&PathPreference::Source {
+            self.completion_files(&PathKind::Source {
                 allow_package: false,
             })
             .copied()
@@ -391,7 +388,7 @@ impl LocalContext {
     /// Get all depended files in the workspace, inclusively.
     pub fn depended_source_files(&self) -> EcoVec<TypstFileId> {
         let mut ids = self.depended_files();
-        let preference = PathPreference::Source {
+        let preference = PathKind::Source {
             allow_package: false,
         };
         ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));

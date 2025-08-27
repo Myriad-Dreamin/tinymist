@@ -1,3 +1,5 @@
+//! The configuration of the world.
+
 use std::borrow::Cow;
 use std::path::PathBuf;
 
@@ -8,49 +10,51 @@ use typst::foundations::Dict;
 
 use crate::EntryOpts;
 
+/// The options to create the world.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CompileOpts {
-    /// Path to entry
+    /// The path to the entry.
     pub entry: EntryOpts,
 
     /// Additional input arguments to compile the entry file.
     pub inputs: Dict,
 
-    /// Path to font profile for cache
+    /// The path to the font profile for cache.
     #[serde(rename = "fontProfileCachePath")]
     pub font_profile_cache_path: PathBuf,
 
-    /// will remove later
+    /// The paths to the font files.
     #[serde(rename = "fontPaths")]
     pub font_paths: Vec<PathBuf>,
 
-    /// Exclude system font paths
+    /// Whether to exclude system font paths.
     #[serde(rename = "noSystemFonts")]
     pub no_system_fonts: bool,
 
-    /// Include embedded fonts
+    /// Whether to include embedded fonts.
     #[serde(rename = "withEmbeddedFonts")]
     #[serde_as(as = "Vec<AsCowBytes>")]
     pub with_embedded_fonts: Vec<Cow<'static, [u8]>>,
 
-    /// Fixed creation timestamp for the world.
+    /// The fixed creation timestamp for the world.
     #[serde(rename = "creationTimestamp")]
     pub creation_timestamp: Option<i64>,
 }
 
+/// The options to specify the fonts for the world.
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct CompileFontOpts {
-    /// will remove later
+    /// The paths to the font files.
     #[serde(rename = "fontPaths")]
     pub font_paths: Vec<PathBuf>,
 
-    /// Exclude system font paths
+    /// Whether to exclude system font paths.
     #[serde(rename = "noSystemFonts")]
     pub no_system_fonts: bool,
 
-    /// Include embedded fonts
+    /// The embedded fonts to include.
     #[serde(rename = "withEmbeddedFonts")]
     #[serde_as(as = "Vec<AsCowBytes>")]
     pub with_embedded_fonts: Vec<Cow<'static, [u8]>>,

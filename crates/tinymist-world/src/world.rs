@@ -1,3 +1,17 @@
+//! The world of the compiler.
+//!
+//! A world is a collection of resources that are used by the compiler.
+//! A world is created by a universe.
+//!
+//! The universe is not shared between threads.
+//! The world can be shared between threads.
+//!
+//! Both the universe and the world can be mutated. The difference is that the
+//! universe is mutated to change the global state of the compiler, while the
+//! world is mutated to run some intermediate computation.
+//!
+//! Note: If a world is mutated, the cache of the world is invalidated.
+
 use std::{
     borrow::Cow,
     num::NonZeroUsize,
@@ -39,7 +53,7 @@ use crate::{CompilerFeat, ShadowApi, WorldDeps, font::FontResolver};
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
 
-/// A universe that provides access to the operating system.
+/// A universe that provides access to the operating system and the compiler.
 ///
 /// Use [`CompilerUniverse::new_raw`] to create a new universe. The concrete
 /// implementation usually wraps this function with a more user-friendly `new`
@@ -47,30 +61,33 @@ type CodespanError = codespan_reporting::files::Error;
 /// Use [`CompilerUniverse::snapshot`] to create a new world.
 #[derive(Debug)]
 pub struct CompilerUniverse<F: CompilerFeat> {
-    /// State for the *root & entry* of compilation.
+    /// The state for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
     entry: EntryState,
-    /// Additional input arguments to compile the entry file.
+    /// The additional input arguments to compile the entry file.
     inputs: Arc<LazyHash<Dict>>,
-    /// Features enabled for the compiler.
+    /// The features enabled for the compiler.
     pub features: Features,
 
-    /// Provides font management for typst compiler.
+    /// The font resolver for the compiler.
     pub font_resolver: Arc<F::FontResolver>,
-    /// Provides package management for typst compiler.
+    /// The package registry for the compiler.
     pub registry: Arc<F::Registry>,
-    /// Provides path-based data access for typst compiler.
+    /// The virtual file system for the compiler.
     vfs: Vfs<F::AccessModel>,
 
     /// The current revision of the universe.
+    ///
+    /// The revision is incremented when the universe is mutated.
     pub revision: NonZeroUsize,
+
     /// The creation timestamp for reproducible builds.
     pub creation_timestamp: Option<i64>,
 }
 
 /// Creates, snapshots, and manages the compiler universe.
 impl<F: CompilerFeat> CompilerUniverse<F> {
-    /// Create a [`CompilerUniverse`] with feature implementation.
+    /// Creates a [`CompilerUniverse`] with feature implementation.
     ///
     /// Although this function is public, it is always unstable and not intended
     /// to be used directly.
@@ -99,44 +116,53 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         }
     }
 
-    /// Wrap driver with a given entry file.
+    /// Wraps the universe with a given entry file.
     pub fn with_entry_file(mut self, entry_file: PathBuf) -> Self {
         let _ = self.increment_revision(|this| this.set_entry_file_(entry_file.as_path().into()));
         self
     }
 
+    /// Gets the entry file of the universe.
     pub fn entry_file(&self) -> Option<PathResolution> {
         self.path_for_id(self.main_id()?).ok()
     }
 
+    /// Gets the inputs of the universe.
     pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
         self.inputs.clone()
     }
 
+    /// Creates a new world from the universe.
     pub fn snapshot(&self) -> CompilerWorld<F> {
         self.snapshot_with(None)
     }
 
-    // todo: remove me.
+    /// Creates a new computation graph from the universe.
+    ///
+    /// This is a legacy method and will be removed in the future.
+    ///
+    /// TODO: remove me.
     pub fn computation(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.snapshot();
         let snap = CompileSnapshot::from_world(world);
         WorldComputeGraph::new(snap)
     }
 
+    /// Creates a new computation graph from the universe with a given mutant.
     pub fn computation_with(&self, mutant: TaskInputs) -> Arc<WorldComputeGraph<F>> {
         let world = self.snapshot_with(Some(mutant));
         let snap = CompileSnapshot::from_world(world);
         WorldComputeGraph::new(snap)
     }
 
+    /// Creates a new computation graph from the universe with a given entry
+    /// content and inputs.
     pub fn snapshot_with_entry_content(
         &self,
         content: Bytes,
         inputs: Option<TaskInputs>,
     ) -> Arc<WorldComputeGraph<F>> {
-        // checkout the entry file
-
+        // Checks out the entry file.
         let mut world = if self.main_id().is_some() {
             self.snapshot_with(inputs)
         } else {
@@ -155,6 +181,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         WorldComputeGraph::new(snap)
     }
 
+    /// Creates a new world from the universe with a given mutant.
     pub fn snapshot_with(&self, mutant: Option<TaskInputs>) -> CompilerWorld<F> {
         let w = CompilerWorld {
             entry: self.entry.clone(),
@@ -176,7 +203,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         mutant.map(|m| w.task(m)).unwrap_or(w)
     }
 
-    /// Increment revision with actions.
+    /// Increments the revision with actions.
     pub fn increment_revision<T>(&mut self, f: impl FnOnce(&mut RevisingUniverse<F>) -> T) -> T {
         f(&mut RevisingUniverse {
             vfs_revision: self.vfs.revision(),
@@ -190,13 +217,13 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         })
     }
 
-    /// Mutate the entry state and return the old state.
+    /// Mutates the entry state and returns the old state.
     fn mutate_entry_(&mut self, mut state: EntryState) -> SourceResult<EntryState> {
         std::mem::swap(&mut self.entry, &mut state);
         Ok(state)
     }
 
-    /// set an entry file.
+    /// Sets an entry file.
     fn set_entry_file_(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         let state = self.entry_state();
         let state = state
@@ -210,30 +237,33 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         Ok(())
     }
 
+    /// Gets the virtual file system of the universe.
+    ///
+    /// To mutate the vfs, use [`CompilerUniverse::increment_revision`].
     pub fn vfs(&self) -> &Vfs<F::AccessModel> {
         &self.vfs
     }
 }
 
 impl<F: CompilerFeat> CompilerUniverse<F> {
-    /// Reset the world for a new lifecycle (of garbage collection).
+    /// Resets the world for a new lifecycle (of garbage collection).
     pub fn reset(&mut self) {
         self.vfs.reset_all();
         // todo: shared state
     }
 
-    /// Clear the vfs cache that is not touched for a long time.
+    /// Clears the vfs cache that is not touched for a long time.
     pub fn evict(&mut self, vfs_threshold: usize) {
         self.vfs.reset_access_model();
         self.vfs.evict(vfs_threshold);
     }
 
-    /// Resolve the real path for a file id.
+    /// Resolves the real path for a file id.
     pub fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.vfs.file_path(id)
     }
 
-    /// Resolve the root of the workspace.
+    /// Resolves the root of the workspace.
     pub fn id_for_path(&self, path: &Path) -> Option<FileId> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
@@ -242,10 +272,12 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         ))
     }
 
+    /// Gets the semantic token legend.
     pub fn get_semantic_token_legend(&self) -> Arc<SemanticTokensLegend> {
         Arc::new(get_semantic_tokens_legend())
     }
 
+    /// Gets the semantic tokens.
     pub fn get_semantic_tokens(
         &self,
         file_path: Option<String>,
@@ -324,14 +356,23 @@ impl<F: CompilerFeat> EntryManager for CompilerUniverse<F> {
     }
 }
 
+/// The state of the universe during revision.
 pub struct RevisingUniverse<'a, F: CompilerFeat> {
+    /// Whether the view has changed.
     view_changed: bool,
+    /// The revision of the vfs.
     vfs_revision: NonZeroUsize,
+    /// Whether the font has changed.
     font_changed: bool,
+    /// Whether the creation timestamp has changed.
     creation_timestamp_changed: bool,
+    /// The revision of the font.
     font_revision: Option<NonZeroUsize>,
+    /// Whether the registry has changed.
     registry_changed: bool,
+    /// The revision of the registry.
     registry_revision: Option<NonZeroUsize>,
+    /// The inner revising universe.
     pub inner: &'a mut CompilerUniverse<F>,
 }
 
@@ -377,37 +418,42 @@ impl<F: CompilerFeat> Drop for RevisingUniverse<'_, F> {
 }
 
 impl<F: CompilerFeat> RevisingUniverse<'_, F> {
+    /// Gets the revising vfs.
     pub fn vfs(&mut self) -> RevisingVfs<'_, F::AccessModel> {
         self.vfs.revise()
     }
 
+    /// Sets the fonts.
     pub fn set_fonts(&mut self, fonts: Arc<F::FontResolver>) {
         self.font_changed = true;
         self.inner.font_resolver = fonts;
     }
 
+    /// Sets the package.
     pub fn set_package(&mut self, packages: Arc<F::Registry>) {
         self.registry_changed = true;
         self.inner.registry = packages;
     }
 
-    /// Set the inputs for the compiler.
+    /// Sets the inputs for the compiler.
     pub fn set_inputs(&mut self, inputs: Arc<LazyHash<Dict>>) {
         self.view_changed = true;
         self.inner.inputs = inputs;
     }
 
-    /// Set the creation timestamp for reproducible builds.
+    /// Sets the creation timestamp for reproducible builds.
     pub fn set_creation_timestamp(&mut self, creation_timestamp: Option<i64>) {
         self.creation_timestamp_changed = creation_timestamp != self.inner.creation_timestamp;
         self.inner.creation_timestamp = creation_timestamp;
     }
 
+    /// Sets the entry file.
     pub fn set_entry_file(&mut self, entry_file: Arc<Path>) -> SourceResult<()> {
         self.view_changed = true;
         self.inner.set_entry_file_(entry_file)
     }
 
+    /// Mutates the entry state.
     pub fn mutate_entry(&mut self, state: EntryState) -> SourceResult<EntryState> {
         self.view_changed = true;
 
@@ -421,28 +467,34 @@ impl<F: CompilerFeat> RevisingUniverse<'_, F> {
         self.inner.mutate_entry_(state)
     }
 
+    /// Increments the revision without any changes.
     pub fn flush(&mut self) {
         self.view_changed = true;
     }
 
+    /// Checks if the font has changed.
     pub fn font_changed(&self) -> bool {
         self.font_changed && is_revision_changed(self.font_revision, self.font_resolver.revision())
     }
 
+    /// Checks if the creation timestamp has changed.
     pub fn creation_timestamp_changed(&self) -> bool {
         self.creation_timestamp_changed
     }
 
+    /// Checks if the registry has changed.
     pub fn registry_changed(&self) -> bool {
         self.registry_changed
             && is_revision_changed(self.registry_revision, self.registry.revision())
     }
 
+    /// Checks if the vfs has changed.
     pub fn vfs_changed(&self) -> bool {
         self.vfs_revision != self.vfs.revision()
     }
 }
 
+/// Checks if the revision has changed.
 fn is_revision_changed(a: Option<NonZeroUsize>, b: Option<NonZeroUsize>) -> bool {
     a.is_none() || b.is_none() || a != b
 }
@@ -452,6 +504,7 @@ type NowStorage = chrono::DateTime<chrono::Local>;
 #[cfg(not(any(feature = "web", feature = "system")))]
 type NowStorage = tinymist_std::time::UtcDateTime;
 
+/// The world of the compiler.
 pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
     /// The world forbids direct access to files outside this directory.
@@ -486,13 +539,17 @@ impl<F: CompilerFeat> Clone for CompilerWorld<F> {
     }
 }
 
+/// The inputs for the compiler.
 #[derive(Debug, Default)]
 pub struct TaskInputs {
+    /// The entry state.
     pub entry: Option<EntryState>,
+    /// The inputs.
     pub inputs: Option<Arc<LazyHash<Dict>>>,
 }
 
 impl<F: CompilerFeat> CompilerWorld<F> {
+    /// Creates a new world from the current world with the given inputs.
     pub fn task(&self, mutant: TaskInputs) -> CompilerWorld<F> {
         // Fetch to avoid inconsistent state.
         let _ = self.today(None);
@@ -549,8 +606,14 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.source_db.take()
     }
 
+    /// Gets the vfs.
     pub fn vfs(&self) -> &Vfs<F::AccessModel> {
         &self.vfs
+    }
+
+    /// Gets the inputs.
+    pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
+        self.inputs.clone()
     }
 
     /// Sets flag to indicate whether the compiler is currently compiling.
@@ -560,18 +623,17 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.source_db.is_compiling = is_compiling;
     }
 
-    pub fn inputs(&self) -> Arc<LazyHash<Dict>> {
-        self.inputs.clone()
-    }
-
+    /// Gets the revision.
     pub fn revision(&self) -> NonZeroUsize {
         self.revision
     }
 
+    /// Evicts the vfs.
     pub fn evict_vfs(&mut self, threshold: usize) {
         self.vfs.evict(threshold);
     }
 
+    /// Evicts the source cache.
     pub fn evict_source_cache(&mut self, threshold: usize) {
         self.vfs
             .clone_source_cache()
@@ -592,6 +654,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         ))
     }
 
+    /// Resolves the file id by path.
     pub fn file_id_by_path(&self, path: &Path) -> FileResult<FileId> {
         // todo: source in packages
         match self.id_for_path(path) {
@@ -603,10 +666,12 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         }
     }
 
+    /// Resolves the source by path.
     pub fn source_by_path(&self, path: &Path) -> FileResult<Source> {
         self.source(self.file_id_by_path(path)?)
     }
 
+    /// Gets the depended files.
     pub fn depended_files(&self) -> EcoVec<FileId> {
         let mut deps = EcoVec::new();
         self.iter_dependencies(&mut |file_id| {
@@ -615,6 +680,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         deps
     }
 
+    /// Gets the depended fs paths.
     pub fn depended_fs_paths(&self) -> EcoVec<ImmutPath> {
         let mut deps = EcoVec::new();
         self.iter_dependencies(&mut |file_id| {
@@ -635,6 +701,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         self.registry.packages()
     }
 
+    /// Creates a task target for paged documents.
     pub fn paged_task(&self) -> Cow<'_, CompilerWorld<F>> {
         let force_html = self.features.is_enabled(typst::Feature::Html);
         let enabled_paged = !self.library.features.is_enabled(typst::Feature::Html) || force_html;
@@ -649,6 +716,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         Cow::Owned(world)
     }
 
+    /// Creates a task target for html documents.
     pub fn html_task(&self) -> Cow<'_, CompilerWorld<F>> {
         let enabled_html = self.library.features.is_enabled(typst::Feature::Html);
 
@@ -848,6 +916,7 @@ pub fn with_main(world: &dyn World, id: FileId) -> WorldWithMain<'_> {
     WorldWithMain { world, main: id }
 }
 
+/// A world with a main file.
 pub struct WorldWithMain<'a> {
     world: &'a dyn World,
     main: FileId,
@@ -883,15 +952,21 @@ impl typst::World for WorldWithMain<'_> {
     }
 }
 
+/// A world that can be used for source code reporting.
 pub trait SourceWorld: World {
+    /// Gets the world as a world.
     fn as_world(&self) -> &dyn World;
 
+    /// Gets the path for a file id.
     fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError>;
+
+    /// Gets the source by file id.
     fn lookup(&self, id: FileId) -> Source {
         self.source(id)
             .expect("file id does not point to any source file")
     }
 
+    /// Gets the source range by span.
     fn source_range(&self, span: Span) -> Option<std::ops::Range<usize>> {
         self.range(span)
     }
@@ -902,17 +977,20 @@ impl<F: CompilerFeat> SourceWorld for CompilerWorld<F> {
         self
     }
 
-    /// Resolve the real path for a file id.
+    /// Resolves the real path for a file id.
     fn path_for_id(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.path_for_id(id)
     }
 }
 
+/// A world that can be used for source code reporting.
 pub struct CodeSpanReportWorld<'a> {
+    /// The world to report.
     pub world: &'a dyn SourceWorld,
 }
 
 impl<'a> CodeSpanReportWorld<'a> {
+    /// Creates a new code span report world.
     pub fn new(world: &'a dyn SourceWorld) -> Self {
         Self { world }
     }

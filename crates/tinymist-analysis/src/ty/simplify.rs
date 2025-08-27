@@ -4,6 +4,7 @@ use ecow::EcoVec;
 
 use crate::{syntax::DeclExpr, ty::prelude::*};
 
+/// A compact type.
 #[derive(Default)]
 struct CompactTy {
     equiv_vars: HashSet<DefId>,
@@ -15,7 +16,7 @@ struct CompactTy {
 }
 
 impl TypeInfo {
-    /// Simplify (Canonicalize) the given type with the given type scheme.
+    /// Simplifies (canonicalizes) the given type with the given type scheme.
     pub fn simplify(&self, ty: Ty, principal: bool) -> Ty {
         let mut cache = self.cano_cache.lock();
         let cache = &mut *cache;
@@ -38,6 +39,7 @@ impl TypeInfo {
     }
 }
 
+/// A simplifier to simplify a type.
 struct TypeSimplifier<'a, 'b> {
     principal: bool,
 
@@ -50,6 +52,7 @@ struct TypeSimplifier<'a, 'b> {
 }
 
 impl TypeSimplifier<'_, '_> {
+    /// Simplifies the given type.
     fn simplify(&mut self, ty: Ty, principal: bool) -> Ty {
         if let Some(cano) = self.cano_cache.get(&(ty.clone(), principal)) {
             return cano.clone();
@@ -60,6 +63,7 @@ impl TypeSimplifier<'_, '_> {
         self.transform(&ty, true)
     }
 
+    /// Analyzes the given type.
     fn analyze(&mut self, ty: &Ty, pol: bool) {
         match ty {
             Ty::Var(var) => {
@@ -162,6 +166,7 @@ impl TypeSimplifier<'_, '_> {
         }
     }
 
+    /// Transforms the given type.
     fn transform(&mut self, ty: &Ty, pol: bool) -> Ty {
         match ty {
             Ty::Let(bounds) => self.transform_let(bounds.lbs.iter(), bounds.ubs.iter(), None, pol),
@@ -250,11 +255,13 @@ impl TypeSimplifier<'_, '_> {
         }
     }
 
+    /// Transforms the given sequence of types.
     fn transform_seq(&mut self, types: &[Ty], pol: bool) -> Interned<Vec<Ty>> {
         let seq = types.iter().map(|ty| self.transform(ty, pol));
         seq.collect::<Vec<_>>().into()
     }
 
+    /// Transforms the given let type.
     #[allow(clippy::mutable_key_type)]
     fn transform_let<'a>(
         &mut self,
@@ -299,6 +306,7 @@ impl TypeSimplifier<'_, '_> {
         Ty::Let(TypeBounds { lbs, ubs }.into())
     }
 
+    /// Transforms the given signature.
     fn transform_sig(&mut self, sig: &SigTy, pol: bool) -> Interned<SigTy> {
         let mut sig = sig.clone();
         sig.inputs = self.transform_seq(&sig.inputs, !pol);
