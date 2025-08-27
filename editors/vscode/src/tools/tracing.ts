@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { extensionState } from "../../../state";
-import type { EditorTool } from "..";
+import { extensionState } from "../state";
+import type { EditorTool } from ".";
 
 export default {
   id: "tracing",

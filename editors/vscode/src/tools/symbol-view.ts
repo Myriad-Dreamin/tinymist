@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { tinymist } from "../../../lsp";
-import { substituteTemplateString } from "../../../util";
-import { defineEditorTool } from "..";
+import { tinymist } from "../lsp";
+import { substituteTemplateString } from "../util";
+import { defineEditorTool } from ".";
 
 export default defineEditorTool({
   id: "symbol-view",

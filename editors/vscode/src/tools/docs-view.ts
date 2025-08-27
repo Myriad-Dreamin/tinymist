@@ -1,6 +1,6 @@
-import type { PackageInfo } from "../../../lsp";
-import { substituteTemplateString } from "../../../util";
-import { defineEditorTool } from "..";
+import type { PackageInfo } from "../lsp";
+import { substituteTemplateString } from "../util";
+import { defineEditorTool } from ".";
 
 interface DocsViewOptions {
   pkg: PackageInfo;

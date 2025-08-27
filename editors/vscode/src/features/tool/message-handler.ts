@@ -1,8 +1,34 @@
 import * as vscode from "vscode";
 import { extensionState } from "../../state";
-import type { MessageHandler } from "./message-handler";
-import { FONTS_EXPORT_CONFIGURE_VERSION } from "./tools/summary";
-import { USER_PACKAGE_VERSION } from "./tools/template-gallery";
+import type { EditorToolContext } from "../../tools";
+import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
+
+export interface WebviewMessage {
+  type: string;
+}
+
+export type MessageHandler = (
+  // biome-ignore lint/suspicious/noExplicitAny: type-erased
+  message: any,
+  context: EditorToolContext,
+) => Promise<void> | void;
+
+export async function handleMessage(
+  message: WebviewMessage,
+  context: EditorToolContext,
+): Promise<boolean> {
+  const handler = messageHandlers[message.type];
+  if (handler) {
+    try {
+      await handler(message, context);
+      return true;
+    } catch (error) {
+      console.error(`Error handling message ${message}:`, error);
+      return false;
+    }
+  }
+  return false;
+}
 
 // Message type interfaces
 // todo: make API typed in both sides
@@ -159,7 +185,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
 
   saveFontsExportConfigure: async ({ data }: SaveFontsExportConfigureMessage, { context }) => {
     await context.globalState.update("fontsExportConfigure", {
-      version: FONTS_EXPORT_CONFIGURE_VERSION,
+      version: FONTS_EXPORT_CONFIG_VERSION,
       data,
     });
   },

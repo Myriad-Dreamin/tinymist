@@ -2,11 +2,19 @@
 import * as vscode from "vscode";
 import type { IContext } from "../context";
 import type { ExtensionContext } from "../state";
+import type { EditorTool, EditorToolContext } from "../tools";
 import { loadHTMLFile } from "../util";
-import type { EditorTool, EditorToolContext } from "./tools";
-import { DisposalManager } from "./tools/disposal-manager";
-import { handleMessage, type WebviewMessage } from "./tools/message-handler";
-import { tools } from "./tools/registry";
+import { handleMessage, type WebviewMessage } from "./tool/message-handler";
+import { tools } from "./tool/registry";
+import { ToolViewProvider } from "./tool/views";
+
+export const FONTS_EXPORT_CONFIG_VERSION = "0.0.1";
+export const USER_PACKAGE_VERSION = "0.0.1";
+
+export interface Versioned<T> {
+  version: string;
+  data: T;
+}
 
 export function toolActivate(context: IContext) {
   const toolView = new ToolViewProvider();
@@ -126,47 +134,43 @@ async function loadToolHtml<TOptions>(
   );
 }
 
-class ToolViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  refresh(): void {}
+/**
+ * Simple disposal manager for cleaning up resources
+ */
+export class DisposalManager {
+  private disposables: vscode.Disposable[] = [];
+  private disposed = false;
 
-  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
-    return element;
+  /**
+   * Add a disposable resource
+   */
+  add(disposable: vscode.Disposable): void {
+    if (this.disposed) {
+      disposable.dispose();
+    } else {
+      this.disposables.push(disposable);
+    }
   }
 
-  getChildren(): Thenable<vscode.TreeItem[]> {
-    return Promise.resolve(
-      tools
-        .filter((tool) => tool.command)
-        .map((tool) => {
-          if (tool.command) {
-            return new CommandItem(tool.command);
-          }
-          return undefined;
-        })
-        .filter((item): item is CommandItem => item !== undefined),
-    );
-  }
-}
+  /**
+   * Dispose all resources
+   */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
 
-class CommandItem extends vscode.TreeItem {
-  constructor(
-    public readonly command: vscode.Command,
-    public description = "",
-  ) {
-    super(command.title, vscode.TreeItemCollapsibleState.None);
-    this.tooltip = this.command.tooltip || ``;
+    for (const disposable of this.disposables) {
+      disposable.dispose();
+    }
+    this.disposables.length = 0;
   }
 
-  iconPath = new vscode.ThemeIcon("tools");
-
-  contextValue = "tool-command";
-}
-
-export const USER_PACKAGE_VERSION = "0.0.1";
-
-interface Versioned<T> {
-  version: string;
-  data: T;
+  /**
+   * Check if disposed
+   */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
 }
 
 interface PackageData {

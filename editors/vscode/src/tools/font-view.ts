@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { tinymist } from "../../../lsp";
-import { activeTypstEditor, isTypstDocument, substituteTemplateString } from "../../../util";
-import type { EditorTool } from "..";
+import { tinymist } from "../lsp";
+import { activeTypstEditor, isTypstDocument, substituteTemplateString } from "../util";
+import type { EditorTool } from ".";
 
 interface InteractCodeContextResponse {
   // biome-ignore lint/suspicious/noExplicitAny: any style

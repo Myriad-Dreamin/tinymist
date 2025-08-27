@@ -1,14 +1,9 @@
 import * as vscode from "vscode";
-import { tinymist } from "../../../lsp";
-import { type ExtensionContext, extensionState } from "../../../state";
-import { substituteTemplateString } from "../../../util";
-import { defineEditorTool } from "..";
-
-// todo: dup
-interface Versioned<T> {
-  version: string;
-  data: T;
-}
+import { FONTS_EXPORT_CONFIG_VERSION, type Versioned } from "../features/tool";
+import { tinymist } from "../lsp";
+import { type ExtensionContext, extensionState } from "../state";
+import { substituteTemplateString } from "../util";
+import { defineEditorTool } from ".";
 
 interface FsFontSource {
   kind: "fs";
@@ -22,9 +17,9 @@ interface MemoryFontSource {
 
 type FontSource = FsFontSource | MemoryFontSource;
 
-export type fontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
+export type FontLocation = FontSource extends { kind: infer Kind } ? Kind : never;
 
-export type fontsCSVHeader =
+export type FontsCSVHeader =
   | "name"
   | "postscript"
   | "style"
@@ -33,36 +28,34 @@ export type fontsCSVHeader =
   | "location"
   | "path";
 
-export interface fontsExportCSVConfigure {
+export interface FontsExportCSVConfig {
   header: boolean;
   delimiter: string;
-  fields: fontsCSVHeader[];
+  fields: FontsCSVHeader[];
 }
 
-export interface fontsExportJSONConfigure {
+export interface FontsExportJSONConfig {
   indent: number;
 }
 
-export interface fontsExportFormatConfigure {
-  csv: fontsExportCSVConfigure;
-  json: fontsExportJSONConfigure;
+export interface FontsExportFormatConfig {
+  csv: FontsExportCSVConfig;
+  json: FontsExportJSONConfig;
 }
 
-export type fontsExportFormat = keyof fontsExportFormatConfigure;
+export type FontsExportFormat = keyof FontsExportFormatConfig;
 
-interface fontsExportCommonConfigure {
-  format: fontsExportFormat;
+interface FontsExportCommonConfig {
+  format: FontsExportFormat;
   filters: {
-    location: fontLocation[];
+    location: FontLocation[];
   };
 }
 
-export type fontsExportConfigure = fontsExportCommonConfigure & fontsExportFormatConfigure;
-
-export const FONTS_EXPORT_CONFIGURE_VERSION = "0.0.1";
+export type FontsExportConfig = FontsExportCommonConfig & FontsExportFormatConfig;
 
 // todo: deduplicate me. it also occurs in tools/editor-tools/src/features/summary.ts
-const fontsExportDefaultConfigure: fontsExportConfigure = {
+const fontsExportDefaultConfigure: FontsExportConfig = {
   format: "csv",
   filters: {
     location: ["fs"],
@@ -78,13 +71,13 @@ const fontsExportDefaultConfigure: fontsExportConfigure = {
 };
 
 export function getFontsExportConfigure(context: ExtensionContext) {
-  const defaultConfigure: Versioned<fontsExportConfigure> = {
-    version: FONTS_EXPORT_CONFIGURE_VERSION,
+  const defaultConfigure: Versioned<FontsExportConfig> = {
+    version: FONTS_EXPORT_CONFIG_VERSION,
     data: fontsExportDefaultConfigure,
   };
 
   const configure = context.globalState.get("fontsExportConfigure", defaultConfigure);
-  if (configure?.version !== FONTS_EXPORT_CONFIGURE_VERSION) {
+  if (configure?.version !== FONTS_EXPORT_CONFIG_VERSION) {
     return defaultConfigure;
   }
 
@@ -167,9 +160,5 @@ export default defineEditorTool({
       ":[[preview:DocumentMetrics]]:": docMetrics,
       ":[[preview:ServerInfo]]:": serverInfo,
     });
-  },
-
-  postLoadHtml: async (_ctx) => {
-    // Any specific setup for summary tool can go here
   },
 });

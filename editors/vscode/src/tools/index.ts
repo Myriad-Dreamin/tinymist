@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: type-erased */
 import type * as vscode from "vscode";
-import type { ExtensionContext } from "../../state";
+import type { ExtensionContext } from "../state";
 
 export interface EditorToolContext<Options = any> {
   context: ExtensionContext;

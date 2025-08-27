@@ -1,8 +1,7 @@
-import type { ExtensionContext } from "../../../state";
-import { substituteTemplateString } from "../../../util";
-import { defineEditorTool } from "..";
-
-export const USER_PACKAGE_VERSION = "0.0.1";
+import { USER_PACKAGE_VERSION } from "../features/tool";
+import type { ExtensionContext } from "../state";
+import { substituteTemplateString } from "../util";
+import { defineEditorTool } from ".";
 
 interface Versioned<T> {
   version: string;
