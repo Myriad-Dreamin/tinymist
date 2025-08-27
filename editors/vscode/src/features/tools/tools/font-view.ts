@@ -1,7 +1,12 @@
-import type { EditorTool } from "..";
 import * as vscode from "vscode";
-import { activeTypstEditor, isTypstDocument, substituteTemplateString } from "../../../util";
 import { tinymist } from "../../../lsp";
+import { activeTypstEditor, isTypstDocument, substituteTemplateString } from "../../../util";
+import type { EditorTool } from "..";
+
+interface InteractCodeContextResponse {
+  // biome-ignore lint/suspicious/noExplicitAny: any style
+  style: any[];
+}
 
 export default {
   id: "font-view",
@@ -49,10 +54,13 @@ export default {
         };
         const style = ["text.font"];
         const styleAt = (
-          await vscode.commands.executeCommand<{ style: any[] }[]>("tinymist.interactCodeContext", {
-            textDocument,
-            query: [{ kind: "styleAt", position, style }],
-          })
+          await vscode.commands.executeCommand<InteractCodeContextResponse[]>(
+            "tinymist.interactCodeContext",
+            {
+              textDocument,
+              query: [{ kind: "styleAt", position, style }],
+            },
+          )
         )?.[0]?.style;
 
         return {

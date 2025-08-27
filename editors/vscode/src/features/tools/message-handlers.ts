@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
-import type { MessageHandler } from "./message-handler";
 import { extensionState } from "../../state";
-import { USER_PACKAGE_VERSION } from "./tools/template-gallery";
+import type { MessageHandler } from "./message-handler";
 import { FONTS_EXPORT_CONFIGURE_VERSION } from "./tools/summary";
+import { USER_PACKAGE_VERSION } from "./tools/template-gallery";
 
 // Message type interfaces
 // todo: make API typed in both sides

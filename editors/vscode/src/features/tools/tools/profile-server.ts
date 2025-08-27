@@ -1,5 +1,5 @@
-import { defineEditorTool } from "..";
 import * as vscode from "vscode";
+import { defineEditorTool } from "..";
 
 export default defineEditorTool({
   id: "profile-server",

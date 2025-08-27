@@ -1,12 +1,12 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: type-erased */
 import * as vscode from "vscode";
+import type { IContext } from "../context";
 import type { ExtensionContext } from "../state";
 import { loadHTMLFile } from "../util";
-import type { IContext } from "../context";
 import type { EditorTool, EditorToolContext } from "./tools";
-import { tools } from "./tools/registry";
-import { handleMessage, type WebviewMessage } from "./tools/message-handler";
 import { DisposalManager } from "./tools/disposal-manager";
+import { handleMessage, type WebviewMessage } from "./tools/message-handler";
+import { tools } from "./tools/registry";
 
 export function toolActivate(context: IContext) {
   const toolView = new ToolViewProvider();

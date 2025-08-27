@@ -1,6 +1,6 @@
-import { defineEditorTool } from "..";
 import type { ExtensionContext } from "../../../state";
 import { substituteTemplateString } from "../../../util";
+import { defineEditorTool } from "..";
 
 export const USER_PACKAGE_VERSION = "0.0.1";
 

@@ -1,8 +1,8 @@
-import { defineEditorTool } from "..";
-import { tinymist } from "../../../lsp";
-import { ExtensionContext, extensionState } from "../../../state";
-import { substituteTemplateString } from "../../../util";
 import * as vscode from "vscode";
+import { tinymist } from "../../../lsp";
+import { type ExtensionContext, extensionState } from "../../../state";
+import { substituteTemplateString } from "../../../util";
+import { defineEditorTool } from "..";
 
 // todo: dup
 interface Versioned<T> {

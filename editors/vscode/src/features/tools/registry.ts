@@ -1,13 +1,13 @@
 import type { EditorTool } from "./index";
-import templateGallery from "./tools/template-gallery";
-import summary from "./tools/summary";
-import tracing from "./tools/tracing";
-import profileServer from "./tools/profile-server";
-import fontView from "./tools/font-view";
-import symbolView from "./tools/symbol-view";
 import docsView from "./tools/docs-view";
+import fontView from "./tools/font-view";
+import profileServer from "./tools/profile-server";
+import summary from "./tools/summary";
+import symbolView from "./tools/symbol-view";
+import templateGallery from "./tools/template-gallery";
+import tracing from "./tools/tracing";
 
-export const tools : EditorTool[] = [
+export const tools: EditorTool[] = [
   templateGallery,
   summary,
   tracing,
@@ -15,4 +15,4 @@ export const tools : EditorTool[] = [
   fontView,
   symbolView,
   docsView,
-]
+];
