@@ -914,7 +914,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let is_primary = self.id == ProjectInsId("primary".into());
 
         // Trigger an evict task.
-        rayon::spawn(move || {
+        spawn_cpu(move || {
             let evict_start = tinymist_std::time::Instant::now();
             if is_primary {
                 comemo::evict(10);
@@ -953,4 +953,23 @@ impl NotifyDeps for ProjectDeps {
             f(deps);
         }
     }
+}
+
+// todo: move me to tinymist-std
+#[cfg(not(target_arch = "wasm32"))]
+/// Spawns a CPU thread to run a computing-heavy task.
+pub fn spawn_cpu<F>(func: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    rayon::spawn(func);
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Spawns a CPU thread to run a computing-heavy task.
+pub fn spawn_cpu<F>(func: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    func();
 }

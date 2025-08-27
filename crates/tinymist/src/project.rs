@@ -115,7 +115,7 @@ impl ServerState {
         self.project
             .interrupt(Interrupt::Memory(MemoryEvent::Update(snapshot)));
 
-        rayon::spawn(move || {
+        spawn_cpu(move || {
             old_project.stop();
         });
 
@@ -545,7 +545,7 @@ impl CompileHandlerImpl {
             let snap = art.clone();
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
-            rayon::spawn(move || {
+            spawn_cpu(move || {
                 let world = snap.world().clone();
                 let mut ctx = analysis.enter(world);
 
@@ -648,8 +648,9 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
+
             s.ext.compiling_since = Some(tinymist_std::time::now());
-            rayon::spawn(move || {
+            spawn_cpu(move || {
                 compile_fn();
             });
         }
