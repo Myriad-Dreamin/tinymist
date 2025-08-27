@@ -1,59 +1,37 @@
 import van, { type State } from "vanjs-core";
 import { base64Decode } from "@/utils";
-import { type StyleAtCursor, styleAtCursor } from "@/vscode";
 import { useFontFilters } from "./filtering";
 import type { FontResources } from "./fonts";
-import { MOCK_DATA } from "./mock-data";
 import "./styles.css";
 import { FontList } from "./components/font-list";
 import { Header } from "./components/header";
 
 const { div } = van.tags;
 
-/**
- * Initializes font resources data from various sources
- */
-function initializeFontResources(): State<FontResources> {
-  const FontResourcesData = `:[[preview:FontInformation]]:`;
-  return van.state<FontResources>(
-    FontResourcesData.startsWith(":") ? MOCK_DATA : JSON.parse(base64Decode(FontResourcesData)),
-  );
-}
+function useFontResources(): State<FontResources> {
+  const stub = `:[[preview:FontInformation]]:`;
 
-/**
- * Initializes style at cursor data
- */
-function initializeStyleAtCursor(): State<StyleAtCursor | undefined> {
-  const StyleAtCursorData = `:[[preview:StyleAtCursor]]:`;
-  return van.state<StyleAtCursor | undefined>(
-    StyleAtCursorData.startsWith(":") ? undefined : JSON.parse(base64Decode(StyleAtCursorData)),
+  const fontResources = van.state<FontResources>(
+    stub.startsWith(":") ? { sources: [], families: [] } : JSON.parse(base64Decode(stub)),
   );
-}
 
-/**
- * Sets up reactive style at cursor updates
- */
-function setupStyleAtCursorReactivity(lastStylesAtCursor: State<StyleAtCursor | undefined>) {
-  van.derive(() => {
-    const version = styleAtCursor.val?.version;
-    const lastVersion = lastStylesAtCursor.val?.version;
-    if (version && (typeof lastVersion !== "number" || lastVersion < version)) {
-      lastStylesAtCursor.val = styleAtCursor.val;
-    }
-  });
+  if (import.meta.env.DEV) {
+    // Dynamically import mock data in development mode if no real data is present
+    import("./mock-data").then((module) => {
+      fontResources.val = module.MOCK_DATA;
+    });
+  }
+
+  return fontResources;
 }
 
 /**
  * Main Font View Component
  */
-export const FontView = () => {
+const FontView = () => {
   // Initialize data sources
-  const fontResources = initializeFontResources();
-  const lastStylesAtCursor = initializeStyleAtCursor();
+  const fontResources = useFontResources();
   console.log("fontResources", fontResources.val);
-
-  // Setup reactivity
-  setupStyleAtCursorReactivity(lastStylesAtCursor);
 
   const showNumber = van.state(false);
   const { fontFilters, clearFilters, filteredFamilies, fontStats } = useFontFilters(fontResources);
@@ -64,3 +42,5 @@ export const FontView = () => {
     FontList(filteredFamilies, fontResources, showNumber),
   );
 };
+
+export default FontView;

@@ -29,8 +29,8 @@
 /* ===== Cards ===== */
 .card {
   padding: 1rem;
-  background: var(--vscode-sideBar-background, rgba(255, 255, 255, 0.05));
-  border: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+  background: var(--vscode-panel-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   border-radius: 0.375rem;
 }
 
@@ -86,12 +86,12 @@
 
 /* Button variants */
 .btn-secondary {
-  --btn-color: var(--vscode-button-background, #3a3d41);
-  --btn-fg: var(--color-base-content);
+  --btn-color: var(--vscode-button-secondaryBackground, #3a3d41);
+  --btn-fg: var(--color-base-secondaryForeground, #ffffff);
 }
 
 .btn-secondary:hover {
-  --btn-color: var(--vscode-button-hoverBackground, #45494e);
+  --btn-color: var(--vscode-button-secondaryHoverBackground, #45494e);
 }
 
 /* ===== Toggle Button ===== */
