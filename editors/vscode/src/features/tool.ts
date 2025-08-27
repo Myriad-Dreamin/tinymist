@@ -3,13 +3,14 @@ import * as vscode from "vscode";
 import type { ExtensionContext } from "../state";
 import { loadHTMLFile } from "../util";
 import type { IContext } from "../context";
-import type { EditorTool, PostLoadHtmlContext } from "./tools";
+import type { EditorTool, PostLoadHtmlContext as EditorToolContext } from "./tools";
 import { tools } from "./tools/registry";
 import {
   handleMessage,
   type MessageHandlerContext,
   type WebviewMessage,
 } from "./tools/message-handler";
+import { DisposalManager } from "./tools/disposal-manager";
 
 export function toolActivate(context: IContext) {
   const toolView = new ToolViewProvider();
@@ -20,7 +21,7 @@ export function toolActivate(context: IContext) {
       .filter((tool) => tool.command)
       .map((tool) =>
         vscode.commands.registerCommand(tool.command?.command || "", async () => {
-          await editorTool(context.context, tool.id);
+          await createEditorToolView(context.context, tool.id);
         }),
       ),
   );
@@ -34,7 +35,7 @@ function getTool<T extends EditorTool<TOptions>, TOptions = any>(toolId: string)
   return tool as T;
 }
 
-export async function editorTool<T extends EditorTool<TOptions>, TOptions = any>(
+export async function createEditorToolView<T extends EditorTool<TOptions>, TOptions = any>(
   context: ExtensionContext,
   toolId: string,
   opts?: TOptions,
@@ -58,71 +59,51 @@ export async function editorTool<T extends EditorTool<TOptions>, TOptions = any>
     },
   );
 
-  await editorToolAt(context, tool, panel, opts);
+  await updateEditorToolView(context, toolId, panel, opts);
 }
 
-export async function editorToolAt<T extends EditorTool<TOptions>, TOptions = any>(
+export async function updateEditorToolView<T extends EditorTool<TOptions>, TOptions = any>(
   context: ExtensionContext,
-  toolInstance: T,
+  toolId: string,
   panel: vscode.WebviewView | vscode.WebviewPanel,
   opts?: TOptions,
 ): Promise<void> {
-  const disposes: vscode.Disposable[] = [];
-  let disposed = false;
+  const toolInstance = getTool<T, TOptions>(toolId);
+
+  const disposalManager = new DisposalManager();
 
   const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-
-    for (const d of disposes) {
-      d.dispose();
-    }
-
-    // Call tool-specific dispose if available
-    if (toolInstance.dispose) {
-      toolInstance.dispose();
-    }
-
-    // if has dispose method
-    if ("dispose" in panel) {
-      panel.dispose();
-    }
-  };
-
-  const registerDisposable = (disposable: vscode.Disposable) => {
-    if (!disposed) {
-      disposes.push(disposable);
-    } else {
-      disposable.dispose();
-    }
+    toolInstance.dispose?.();
+    disposalManager.dispose();
   };
 
   const messageHandlerContext: MessageHandlerContext = {
     context,
     panel,
     dispose,
-    registerDisposable,
+    addDisposable: (disposable) => disposalManager.add(disposable),
   };
 
-  const messageDisposable = panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
-    console.log("onDidReceiveMessage", message);
-    handleMessage(message, messageHandlerContext);
-  });
-  registerDisposable(messageDisposable);
+  // Register message handler
+  disposalManager.add(
+    panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
+      console.log("onDidReceiveMessage", message);
+      handleMessage(message, messageHandlerContext);
+    }),
+  );
 
-  panel.onDidDispose(() => {
-    dispose();
-  });
+  // Handle panel disposal
+  disposalManager.add(panel.onDidDispose(dispose));
 
   let html = await loadToolHtml(toolInstance, context);
 
-  const postLoadHtmlContext: PostLoadHtmlContext<TOptions> = {
+  const postLoadHtmlContext: EditorToolContext<TOptions> = {
     context,
-    dispose,
-    addDisposable: registerDisposable,
     opts: opts as TOptions,
+    dispose,
+    addDisposable: (disposable) => disposalManager.add(disposable),
     postMessage: (message) => {
-      if (!disposed) {
+      if (!disposalManager.isDisposed) {
         panel.webview.postMessage(message);
       }
     },

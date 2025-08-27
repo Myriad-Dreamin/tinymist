@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ExtensionContext } from "../state";
-import { editorToolAt } from "./tool";
+import { updateEditorToolView } from "./tool";
 
 export class SymbolViewProvider implements vscode.WebviewViewProvider {
   static readonly Name = "tinymist.side-symbol-view";
@@ -17,6 +17,6 @@ export class SymbolViewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
     };
 
-    editorToolAt(this.context, "symbol-view", webviewView);
+    updateEditorToolView(this.context, "symbol-view", webviewView);
   }
 }

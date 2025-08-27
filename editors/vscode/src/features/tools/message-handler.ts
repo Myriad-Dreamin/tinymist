@@ -6,7 +6,7 @@ export interface MessageHandlerContext {
   context: ExtensionContext;
   panel: vscode.WebviewView | vscode.WebviewPanel;
   dispose: () => void;
-  registerDisposable: (disposable: vscode.Disposable) => void;
+  addDisposable: (disposable: vscode.Disposable) => void;
 }
 
 export interface WebviewMessage {
