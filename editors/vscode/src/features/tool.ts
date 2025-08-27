@@ -3,13 +3,9 @@ import * as vscode from "vscode";
 import type { ExtensionContext } from "../state";
 import { loadHTMLFile } from "../util";
 import type { IContext } from "../context";
-import type { EditorTool, PostLoadHtmlContext as EditorToolContext } from "./tools";
+import type { EditorTool, EditorToolContext } from "./tools";
 import { tools } from "./tools/registry";
-import {
-  handleMessage,
-  type MessageHandlerContext,
-  type WebviewMessage,
-} from "./tools/message-handler";
+import { handleMessage, type WebviewMessage } from "./tools/message-handler";
 import { DisposalManager } from "./tools/disposal-manager";
 
 export function toolActivate(context: IContext) {
@@ -68,36 +64,16 @@ export async function updateEditorToolView<T extends EditorTool<TOptions>, TOpti
   panel: vscode.WebviewView | vscode.WebviewPanel,
   opts?: TOptions,
 ): Promise<void> {
-  const toolInstance = getTool<T, TOptions>(toolId);
+  const tool = getTool<T, TOptions>(toolId);
 
   const disposalManager = new DisposalManager();
 
   const dispose = () => {
-    toolInstance.dispose?.();
+    tool.dispose?.();
     disposalManager.dispose();
   };
 
-  const messageHandlerContext: MessageHandlerContext = {
-    context,
-    panel,
-    dispose,
-    addDisposable: (disposable) => disposalManager.add(disposable),
-  };
-
-  // Register message handler
-  disposalManager.add(
-    panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
-      console.log("onDidReceiveMessage", message);
-      handleMessage(message, messageHandlerContext);
-    }),
-  );
-
-  // Handle panel disposal
-  disposalManager.add(panel.onDidDispose(dispose));
-
-  let html = await loadToolHtml(toolInstance, context);
-
-  const postLoadHtmlContext: EditorToolContext<TOptions> = {
+  const toolContext: EditorToolContext<TOptions> = {
     context,
     opts: opts as TOptions,
     dispose,
@@ -109,8 +85,21 @@ export async function updateEditorToolView<T extends EditorTool<TOptions>, TOpti
     },
   };
 
-  if (toolInstance.transformHtml) {
-    const transformed = await toolInstance.transformHtml(html, postLoadHtmlContext);
+  // Register message handler
+  disposalManager.add(
+    panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
+      console.log("onDidReceiveMessage", message);
+      handleMessage(message, toolContext);
+    }),
+  );
+
+  // Handle panel disposal
+  disposalManager.add(panel.onDidDispose(dispose));
+
+  let html = await loadToolHtml(tool, context);
+
+  if (tool.transformHtml) {
+    const transformed = await tool.transformHtml(html, toolContext);
     if (transformed) {
       html = transformed;
     } else {
@@ -121,7 +110,7 @@ export async function updateEditorToolView<T extends EditorTool<TOptions>, TOpti
 
   panel.webview.html = html;
 
-  await toolInstance.postLoadHtml?.(postLoadHtmlContext);
+  await tool.postLoadHtml?.(toolContext);
 }
 
 async function loadToolHtml<TOptions>(

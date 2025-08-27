@@ -1,13 +1,5 @@
-import type * as vscode from "vscode";
-import type { ExtensionContext } from "../../state";
+import type { EditorToolContext } from ".";
 import { messageHandlers } from "./message-handlers";
-
-export interface MessageHandlerContext {
-  context: ExtensionContext;
-  panel: vscode.WebviewView | vscode.WebviewPanel;
-  dispose: () => void;
-  addDisposable: (disposable: vscode.Disposable) => void;
-}
 
 export interface WebviewMessage {
   type: string;
@@ -16,12 +8,12 @@ export interface WebviewMessage {
 export type MessageHandler = (
   // biome-ignore lint/suspicious/noExplicitAny: type-erased
   message: any,
-  context: MessageHandlerContext,
+  context: EditorToolContext,
 ) => Promise<void> | void;
 
 export async function handleMessage(
   message: WebviewMessage,
-  context: MessageHandlerContext,
+  context: EditorToolContext,
 ): Promise<boolean> {
   const handler = messageHandlers[message.type];
   if (handler) {

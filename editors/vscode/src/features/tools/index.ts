@@ -1,8 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: type-erased */
-import type { ExtensionContext } from "../../state";
 import type * as vscode from "vscode";
+import type { ExtensionContext } from "../../state";
 
-export interface PostLoadHtmlContext<Options = any> {
+export interface EditorToolContext<Options = any> {
   context: ExtensionContext;
   dispose: () => void;
   addDisposable: (disposable: vscode.Disposable) => void;
@@ -27,10 +27,10 @@ export interface EditorTool<Options = any> {
    */
   transformHtml?: (
     html: string,
-    ctx: PostLoadHtmlContext<Options>,
+    ctx: EditorToolContext<Options>,
   ) => Promise<string | null | undefined> | string | null | undefined;
 
-  postLoadHtml?: (ctx: PostLoadHtmlContext<Options>) => Promise<void> | void;
+  postLoadHtml?: (ctx: EditorToolContext<Options>) => Promise<void> | void;
 
   /**
    * Called when the tool is being disposed

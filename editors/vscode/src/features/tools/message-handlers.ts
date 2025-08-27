@@ -157,21 +157,21 @@ export const messageHandlers: Record<string, MessageHandler> = {
     await fs.writeFile(path, data);
   },
 
-  saveFontsExportConfigure: async ({ data }: SaveFontsExportConfigureMessage, context) => {
-    await context.context.globalState.update("fontsExportConfigure", {
+  saveFontsExportConfigure: async ({ data }: SaveFontsExportConfigureMessage, { context }) => {
+    await context.globalState.update("fontsExportConfigure", {
       version: FONTS_EXPORT_CONFIGURE_VERSION,
       data,
     });
   },
 
-  savePackageData: async ({ data }: SavePackageDataMessage, context) => {
-    await context.context.globalState.update("userPackageData", {
+  savePackageData: async ({ data }: SavePackageDataMessage, { context }) => {
+    await context.globalState.update("userPackageData", {
       version: USER_PACKAGE_VERSION,
       data,
     });
   },
 
-  initTemplate: async ({ packageSpec }: InitTemplateMessage, context) => {
+  initTemplate: async ({ packageSpec }: InitTemplateMessage, { dispose }) => {
     const initArgs = [packageSpec];
     const path = await vscode.window.showOpenDialog({
       canSelectFiles: false,
@@ -185,17 +185,14 @@ export const messageHandlers: Record<string, MessageHandler> = {
     initArgs.push(path[0].fsPath);
 
     await vscode.commands.executeCommand("tinymist.initTemplate", ...initArgs);
-    context.dispose();
+    dispose();
   },
 
-  stopServerProfiling: async (_: StopServerProfilingMessage, context) => {
+  stopServerProfiling: async (_: StopServerProfilingMessage, { postMessage }) => {
     console.log("Stopping server profiling...");
     const traceDataTask = await vscode.commands.executeCommand("tinymist.stopServerProfiling");
     const traceData = await traceDataTask;
 
-    // Check if panel is still valid before posting message
-    if (context.panel.webview) {
-      context.panel.webview.postMessage({ type: "traceData", data: traceData });
-    }
+    postMessage({ type: "traceData", data: traceData });
   },
 };
