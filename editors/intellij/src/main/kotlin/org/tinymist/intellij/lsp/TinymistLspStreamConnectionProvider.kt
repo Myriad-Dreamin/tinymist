@@ -1,14 +1,14 @@
 package org.tinymist.intellij.lsp
 
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider // Assuming this is the base class
-// Remove imports for the old data classes if they are no longer used elsewhere
+// Removes imports for the old data classes if they are no longer used elsewhere
 // import org.tinymist.intellij.lsp.BackgroundPreviewOptions
 // import org.tinymist.intellij.lsp.PreviewOptions
 // import org.tinymist.intellij.lsp.TinymistInitializationOptions
 
-// Add other necessary imports
-import com.intellij.openapi.vfs.VirtualFile // Added for the updated signature
-import com.intellij.openapi.project.Project // Added for the constructor
+// Adds other necessary imports
+import com.intellij.openapi.vfs.VirtualFile // Required for the updated signature
+import com.intellij.openapi.project.Project // Required for the constructor
 import com.intellij.openapi.diagnostic.Logger
 import org.tinymist.intellij.settings.TinymistSettingsService
 import java.io.File
@@ -42,7 +42,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
                 LOG.error("Could not find Tinymist executable on PATH.")
             }
         }
-        // Only set commands if a valid executable path was resolved
+        // Sets commands only if a valid executable path was resolved
         resolvedExecutablePath?.let {
             super.setCommands(listOf(it, "lsp"))
         } ?: LOG.error("Tinymist LSP server commands not set as no executable was found.")
@@ -57,7 +57,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
                 return file.absolutePath
             }
         }
-        // Also check common variations for Windows if needed (e.g., .exe)
+        // Checks common variations for Windows if needed (e.g., .exe)
         if (System.getProperty("os.name").lowercase().contains("win")) {
             for (dir in pathDirs) {
                 val file = File(dir, "$name.exe")
@@ -70,25 +70,21 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
     }
 
     override fun getInitializationOptions(uri: VirtualFile?): Any? {
-        // Construct the nested Map structure directly
         val backgroundPreviewOpts = mapOf(
             "enabled" to true
-            // "args" to listOf("--data-plane-host=127.0.0.1:23635", "--invert-colors=auto") // Example if needed
         )
         val previewOpts = mapOf(
             "background" to backgroundPreviewOpts
         )
 
-        // Build the final options map
-        // Add other top-level options expected by tinymist
+        // Adds other top-level options expected by tinymist
         val options = mutableMapOf<String, Any>(
             "preview" to previewOpts,
             "semanticTokens" to mapOf<String, Any>(),
             "completion" to mapOf<String, Any>(),
             "lint" to mapOf<String, Any>()
-            // Add other key-value pairs as needed
         )
 
-        return options // Return the Map directly
+        return options
     }
 } 

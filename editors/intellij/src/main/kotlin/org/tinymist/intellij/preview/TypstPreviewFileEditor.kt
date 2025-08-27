@@ -28,7 +28,7 @@ class TypstPreviewFileEditor(
     private val virtualFile: VirtualFile
 ) : JCEFHtmlPanel(false, null, null), FileEditor {
 
-    // Define the Tinymist preview URL (default background port)
+    // Defines the Tinymist preview URL (default background port)
     private val previewHost = "127.0.0.1"
     private val previewPort = 23635
     private val tinymistPreviewUrl = "http://$previewHost:$previewPort"
@@ -47,9 +47,9 @@ class TypstPreviewFileEditor(
             println("TypstPreviewFileEditor: JCEF is supported. Setting up browser.")
             // setupDisplayHandler()
             setupLoadHandler()
-            // Defer starting the server check and URL loading to allow JCEF panel to initialize
+            // Defers starting the server check and URL loading to allow JCEF panel to initialize
             ApplicationManager.getApplication().invokeLater {
-                if (!isDisposed) { // Check if editor is already disposed before starting task
+                if (!isDisposed) { // Checks if editor is already disposed before starting task
                     waitForServerAndLoad()
                 } else {
                     println("TypstPreviewFileEditor: Editor disposed before waitForServerAndLoad could be scheduled.")
@@ -85,7 +85,7 @@ class TypstPreviewFileEditor(
             override fun onSuccess() {
                 if (!JBCefApp.isSupported()) return
 
-                // Check if the editor (JCEFHtmlPanel) is already disposed
+                // Checks if the editor (JCEFHtmlPanel) is already disposed
                 if (this@TypstPreviewFileEditor.isDisposed) {
                     println("TypstPreviewFileEditor: Editor disposed, skipping onSuccess URL load.")
                     return
@@ -105,7 +105,7 @@ class TypstPreviewFileEditor(
             override fun onThrowable(error: Throwable) {
                 if (!JBCefApp.isSupported()) return
 
-                // Check if the editor (JCEFHtmlPanel) is already disposed
+                // Checks if the editor (JCEFHtmlPanel) is already disposed
                 if (this@TypstPreviewFileEditor.isDisposed) {
                     println("TypstPreviewFileEditor: Editor disposed, skipping onThrowable HTML load.")
                     return
@@ -159,7 +159,7 @@ class TypstPreviewFileEditor(
 
     override fun selectNotify() {
         println("TypstPreviewFileEditor: selectNotify called for ${virtualFile.name}")
-        // Reload the content when the editor is selected, if the server is ready
+        // Reloads the content when the editor is selected, if the server is ready
         // and the JCEF component is supported and initialized.
         if (JBCefApp.isSupported() && isServerReady && !isDisposed) {
             println("TypstPreviewFileEditor: selectNotify - Server ready, reloading URL: $tinymistPreviewUrl")
@@ -179,7 +179,7 @@ class TypstPreviewFileEditor(
     override fun dispose() {
         println("TypstPreviewFileEditor: Disposing...")
         try {
-            // Attempt to stop any ongoing load operations in the browser.
+            // Attempts to stop any ongoing load operations in the browser.
             // This is a precaution; JCEFHtmlPanel.dispose() should handle cleanup.
             if (JBCefApp.isSupported() && !isDisposed) { // Check if not already disposed
                 // It's generally safer to access cefBrowser only if the panel is not yet disposed
@@ -188,11 +188,10 @@ class TypstPreviewFileEditor(
                 println("TypstPreviewFileEditor: Called cefBrowser.stopLoad()")
             }
         } catch (e: Exception) {
-            // Log any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
+            // Logs any exception during this pre-emptive stopLoad, but don't let it prevent further disposal
             println("TypstPreviewFileEditor: Exception during cefBrowser.stopLoad() in dispose: ${e.message}")
         }
-        // Explicitly call super.dispose() to ensure JCEFHtmlPanel cleans up its resources.
-        // This must be done.
+        // Explicitly calls super.dispose() to ensure JCEFHtmlPanel cleans up its resources.
         super.dispose()
         println("TypstPreviewFileEditor: super.dispose() called.")
     }
