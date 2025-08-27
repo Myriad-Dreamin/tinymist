@@ -14,7 +14,7 @@ export default {
     enableFindWidget: true,
   },
 
-  transformHtml: async (html, { postMessage, addDisposable, disposed }) => {
+  transformHtml: async (html, { postMessage, addDisposable }) => {
     const result = await tinymist.getResource("/fonts");
 
     if (!result) {
@@ -64,9 +64,6 @@ export default {
 
     addDisposable(
       vscode.window.onDidChangeTextEditorSelection(async (event) => {
-        if (disposed) {
-          return;
-        }
         if (!isTypstDocument(event.textEditor.document)) {
           return;
         }
