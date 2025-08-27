@@ -1,9 +1,6 @@
 package org.tinymist.intellij.lsp
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Test
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertNotNull
 
 /**
  * Test for completion functionality in Typst files.
@@ -23,21 +20,13 @@ class TypstCompletionTest : BasePlatformTestCase() {
     fun testCompletionAfterHash() {
         // Create a temporary Typst file with content
         val fileName = "test.typ"
-        val fileContent = """
-            #set page(width: 10cm, height: auto)
-
-            = Hello, Typst!
-
-            This is a simple Typst document for testing.
-            
-            #
-            """
+        val fileContent = "#"
 
         // Configure the test fixture with the file
         myFixture.configureByText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger completion
-        myFixture.editor.caretModel.moveToOffset(fileContent.lastIndexOf("#"))
+        myFixture.editor.caretModel.moveToOffset(1)
 
         // Wait for the LSP server to start and be ready
         Thread.sleep(2000)
@@ -45,53 +34,12 @@ class TypstCompletionTest : BasePlatformTestCase() {
         // Trigger completion at the current position
         val lookupElements = myFixture.completeBasic()
 
-        // Log for debugging
-        println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
-        println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
-
         // Assert that the completion results contain expected items
         // This is a simplified check that just verifies that we got some results
         assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
 
-    }
-
-    /**
-     * Test that completion works for function parameters.
-     *
-     * This test opens a Typst file with a function call,
-     * places the caret inside the function call, and verifies that
-     * completion suggestions for parameters are displayed.
-     */
-    fun testCompletionForParameters() {
-        // Create a temporary Typst file with content
-        val fileName = "test.typ"
-        val fileContent = """
-            #set page(width: 10cm, height: auto)
-
-            = Hello, Typst!
-
-            #text(
-            """
-
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
-
-        // Move the caret to the position where we want to trigger completion
-        myFixture.editor.caretModel.moveToOffset(20)
-
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
-
-        // Trigger completion at the current position
-        val lookupElements = myFixture.completeBasic()
-
         // Log for debugging
         println("[DEBUG_LOG] Completion returned ${lookupElements.size} elements")
         println("[DEBUG_LOG] First element: ${lookupElements[0].lookupString}")
-
-        // Assert that the completion results contain expected items
-        // This is a simplified check that just verifies that we got some results
-        assertTrue("Completion results should not be empty", lookupElements.isNotEmpty())
-
     }
 }

@@ -11,7 +11,7 @@ import org.eclipse.lsp4j.ShowMessageRequestParams
 import java.util.concurrent.CompletableFuture
 
 /**
- * Custom Language Client to handle Tinymist-specific LSP notifications.
+ * Custom Language Client to handle Tinymist-specific LSP notifications which will not be handled by LSP4IJ
  */
 class TinymistLanguageClient(
     project: Project
