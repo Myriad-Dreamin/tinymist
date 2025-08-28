@@ -1,5 +1,5 @@
 # Tinymist IntelliJ Plugin Development Notes
-> WARNING: AI Code Slop ahead
+> Last Updated: August 28, 2025
 
 
 ## Project Scope
@@ -53,13 +53,58 @@ We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redh
 
 ### I. Completed Milestones
 *   **Initial Server Integration:** Resolved server startup crashes.
-*   **Basic Diagnostics:** Implemented linting/diagnostics.
-*   **Core LSP Features (Majority):**
-    *   `textDocument/completion` (Code Completion)
-    *   `textDocument/signatureHelp` (Signature Help)
-    *   `textDocument/rename` (Rename Symbol)
-*   **Configuration:** Updated initialization options (now a `Map` in `TinymistLspStreamConnectionProvider.kt`) to support `preview.background.enabled` for `tinymist`'s preview server.
-*   **Preview Strategy Foundation:** Validated that `tinymist` LSP starts its background preview server and `TypstPreviewFileEditor` loads content from it (e.g., `http://127.0.0.1:23635`).
+*   **Basic Diagnostics:** Implemented linting/diagnostics with custom formatting.
+*   **Core LSP Features:**
+    *   `textDocument/completion` (Code Completion) - Fully implemented and tested
+    *   `textDocument/hover` (Hover Information) - Fully implemented and tested
+    *   `textDocument/definition` (Go To Definition) - Fully implemented and tested
+    *   `textDocument/signatureHelp` (Signature Help) - Implemented
+    *   `textDocument/rename` (Rename Symbol) - Implemented
+*   **Configuration:** Robust executable path resolution with settings integration
+*   **Preview Integration:** Full JCEF-based preview with tinymist's background preview server
+*   **Settings Panel:** Implemented configurable tinymist executable path
+
+## LSP Features Implementation Status
+
+The following table shows the implementation status of LSP features as supported by the tinymist server:
+
+| LSP Feature | Status | Implementation Type                 | Notes |
+|-------------|------|-------------------------------------|-------|
+| `textDocument/completion` | ✅ Implemented | Handled by lsp4ij                   | Auto-completion for Typst syntax and functions |
+| `textDocument/hover` | ✅ Implemented | Handled by lsp4ij                   | Documentation and type information on hover |
+| `textDocument/definition` | ✅ Implemented | Handled by lsp4ij                   | Go to definition functionality |
+| `textDocument/signatureHelp` | ✅ Implemented | Handled by lsp4ij                   | Function signature hints |
+| `textDocument/rename` | ✅ Implemented | Handled by lsp4ij                   | Symbol renaming |
+| `textDocument/publishDiagnostics` | ✅ Implemented | Direct implementation               | Custom diagnostic formatting with HTML support (TinymistLanguageClient.kt:24) |
+| `textDocument/semanticTokens` | ✅ Implemented | Handled by lsp4ij                   | Semantic syntax highlighting |
+| `textDocument/references` | ❌ Not implemented | -                                   | Find all references to a symbol |
+| `textDocument/documentHighlight` | ❌ Not implemented | -                                   | Highlight related symbols |
+| `textDocument/documentSymbol` | ❌ Not implemented | -                                   | Document outline/structure view |
+| `textDocument/workspaceSymbol` | ❌ Not implemented | -                                   | Workspace-wide symbol search |
+| `textDocument/codeAction` | ❌ Not implemented | -                                   | Code fixes and refactoring actions |
+| `textDocument/formatting` | ❌ Not implemented | -                                   | Document formatting |
+| `textDocument/rangeFormatting` | ❌ Not implemented | -                                   | Range-based formatting |
+| `textDocument/onTypeFormatting` | ❌ Not implemented | -                                   | Format-on-type |
+| `textDocument/codeLens` | ❌ Not implemented | -                                   | Inline code annotations |
+| `textDocument/foldingRange` | ❌ Not implemented | -                                   | Code folding regions |
+| `textDocument/selectionRange` | ❌ Not implemented | -                                   | Smart text selection |
+| `textDocument/prepareCallHierarchy` | ❌ Not implemented | -                                   | Call hierarchy preparation |
+| `textDocument/callHierarchy/incomingCalls` | ❌ Not implemented | -                                   | Incoming call hierarchy |
+| `textDocument/callHierarchy/outgoingCalls` | ❌ Not implemented | -                                   | Outgoing call hierarchy |
+| `textDocument/linkedEditingRange` | ❌ Not implemented | -                                   | Linked editing of related symbols |
+| `textDocument/moniker` | ❌ Not implemented | -                                   | Symbol monikers for cross-references |
+| `workspace/didChangeConfiguration` | ✅ Implemented | Handled by lsp4ij                   | Configuration change notifications |
+| `workspace/didChangeWatchedFiles` | ✅ Implemented | Handled by lsp4ij                   | File watching |
+| `window/showMessage` | ✅ Implemented | Handled by lsp4ij                   | Server messages to client |
+| `window/showMessageRequest` | ✅ Implemented | Handled by lsp4ij                   | Message request handling |
+| `tinymist/document` | ✅ Implemented | Direct implementation               | Custom tinymist notification (TinymistLanguageClient.kt:58) |
+| `tinymist/documentOutline` | ❌ Not implemented | Direct implementation               | Custom outline notification (TinymistLanguageClient.kt:66) |
+
+### Legend:
+- **✅ Implemented**: Feature is working and available
+- **❌ Not implemented**: Feature is not yet implemented in the plugin
+- **Handled by lsp4ij**: Feature implementation is provided by the lsp4ij library
+- **Direct implementation**: Feature has custom implementation in the plugin code
 
 ### II. Current Focus & Active Debugging
 *   **Preview Panel Scrolling Performance:**
