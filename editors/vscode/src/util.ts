@@ -45,6 +45,13 @@ export const bytesBase64Encode = (bytes: Uint8Array) =>
  */
 export const base64Encode = (utf8Str: string) => bytesBase64Encode(utf82bytes.encode(utf8Str));
 
+export function substituteTemplateString(html: string, entries: { [key: string]: string }) {
+  for (const [key, value] of Object.entries(entries)) {
+    html = html.replace(key, base64Encode(value));
+  }
+  return html;
+}
+
 export function translateExternalURL(urlStr: string): string {
   if (isGitpod()) {
     return translateGitpodURL(urlStr);

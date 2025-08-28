@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { PackageInfo, SymbolInfo, tinymist } from "../lsp";
-import { editorTool } from "./tool";
+import { createEditorToolView } from "./tool";
 import { IContext } from "../context";
 
 export function packageActivate(context: IContext) {
@@ -18,7 +18,7 @@ export function packageActivate(context: IContext) {
 
           const content = await vscode.commands.executeCommand<string>("markdown.api.render", docs);
 
-          await editorTool(context.context, "docs", { pkg, content });
+          await createEditorToolView(context.context, "docs", { pkg, content });
         } catch (e) {
           console.error("show package docs error", e);
           vscode.window.showErrorMessage(`Failed to show package documentation: ${e}`);
