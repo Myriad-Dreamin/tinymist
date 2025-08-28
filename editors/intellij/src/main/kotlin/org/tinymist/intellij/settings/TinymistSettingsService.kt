@@ -27,10 +27,28 @@ class TinymistSettingsService : PersistentStateComponent<TinymistSettingsState> 
         XmlSerializerUtil.copyBean(state, internalState)
     }
 
-    // Convenience accessor if needed, or use instance.state.tinymistExecutablePath directly
+    // Convenience accessors for settings
     var tinymistExecutablePath: String
         get() = internalState.tinymistExecutablePath
         set(value) {
             internalState.tinymistExecutablePath = value
+        }
+
+    var enableAutoInstall: Boolean
+        get() = internalState.enableAutoInstall
+        set(value) {
+            internalState.enableAutoInstall = value
+        }
+
+    var tinymistVersion: String
+        get() = internalState.tinymistVersion
+        set(value) {
+            internalState.tinymistVersion = value
+        }
+
+    var useInstallerManagedBinary: Boolean
+        get() = internalState.useInstallerManagedBinary
+        set(value) {
+            internalState.useInstallerManagedBinary = value
         }
 } 

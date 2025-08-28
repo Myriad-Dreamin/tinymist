@@ -7,7 +7,7 @@ import com.intellij.openapi.diagnostic.Logger
 import org.tinymist.intellij.settings.TinymistSettingsService
 import java.io.File
 
-class TinymistLspStreamConnectionProvider(private val project: Project) : ProcessStreamConnectionProvider() {
+class TinymistLspStreamConnectionProvider(@Suppress("unused") private val project: Project) : ProcessStreamConnectionProvider() {
 
     companion object {
         private val LOG = Logger.getInstance(TinymistLspStreamConnectionProvider::class.java)
@@ -33,7 +33,13 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
             if (resolvedExecutablePath != null) {
                 LOG.info("Found Tinymist executable on PATH: $resolvedExecutablePath")
             } else {
-                LOG.error("Could not find Tinymist executable on PATH.")
+                // Try to use the installer-managed binary as a fallback
+                resolvedExecutablePath = getInstallerManagedPath()
+                if (resolvedExecutablePath != null) {
+                    LOG.info("Using installer-managed Tinymist executable: $resolvedExecutablePath")
+                } else {
+                    LOG.error("Could not find Tinymist executable on PATH or from installer.")
+                }
             }
         }
         // Only set commands if a valid executable path was resolved
@@ -42,7 +48,7 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
         } ?: LOG.error("Tinymist LSP server commands not set as no executable was found.")
     }
 
-    private fun findExecutableOnPath(name: String): String? {
+    private fun findExecutableOnPath(@Suppress("SameParameterValue") name: String): String? {
         val systemPath = System.getenv("PATH")
         val pathDirs = systemPath?.split(File.pathSeparatorChar) ?: emptyList()
         for (dir in pathDirs) {
@@ -62,8 +68,21 @@ class TinymistLspStreamConnectionProvider(private val project: Project) : Proces
         }
         return null
     }
+    
+    /**
+     * Gets the path to the installer-managed Tinymist executable, if available.
+     */
+    private fun getInstallerManagedPath(): String? {
+        return try {
+            val installer = TinymistLanguageServerInstaller()
+            installer.getInstalledExecutablePath()
+        } catch (e: Exception) {
+            LOG.warn("Failed to check installer-managed path: ${e.message}")
+            null
+        }
+    }
 
-    override fun getInitializationOptions(uri: VirtualFile?): Any? {
+    override fun getInitializationOptions(uri: VirtualFile?): Any {
         // Construct the nested Map structure directly
         val backgroundPreviewOpts = mapOf(
             "enabled" to true
