@@ -56,18 +56,12 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install deps
         run: yarn install
-
       - name: Build typst-preview vscode extension
-        run: |
-          yarn
-          yarn run compile
+        run: yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Build tinymist vscode extension
-        run: |
-          yarn
-          yarn run compile
+        run: yarn run compile
         working-directory: ./editors/vscode
-
       - name: Build tinymist binary
         run: |
           cargo build --profile=gh-release --bin tinymist --target $RUST_TARGET
@@ -153,11 +147,6 @@ jobs:
       - name: Build tinymist library
         run: yarn build:web
         working-directory: .
-      - name: Build tinymist vscode extension
-        run: |
-          yarn
-          yarn run compile:web
-        working-directory: ./editors/vscode
       - name: Pack tinymist npm library
         run: |
           npm pack > package-name
