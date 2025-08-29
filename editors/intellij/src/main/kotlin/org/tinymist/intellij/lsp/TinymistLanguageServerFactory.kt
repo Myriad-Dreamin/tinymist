@@ -2,7 +2,6 @@ package org.tinymist.intellij.lsp
 
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
-import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
@@ -10,10 +9,6 @@ import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
 class TinymistLanguageServerFactory : LanguageServerFactory {
     override fun createConnectionProvider(project: Project): StreamConnectionProvider {
         return TinymistLspStreamConnectionProvider(project)
-    }
-
-    override fun createLanguageClient(project: Project): LanguageClientImpl {
-        return TinymistLanguageClient(project)
     }
     
     override fun createClientFeatures(): LSPClientFeatures {

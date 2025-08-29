@@ -35,7 +35,6 @@
 
     <!-- Declare dependencies on other plugins or modules -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.ultimate</depends> <!-- Required for LSP API -->
     <depends>com.redhat.devtools.lsp4ij</depends> <!-- Added dependency for LSP4IJ -->
 
     <!-- Extension points defined by the plugin. -->
@@ -45,6 +44,19 @@
 
         <!-- File editor provider for Text + Preview -->
         <fileEditorProvider implementation="org.tinymist.intellij.preview.TypstTextEditorWithPreviewProvider"/>
+
+        <!-- Register the Folding Builder of LSP4IJ to Typst -->
+        <lang.foldingBuilder language="Typst"
+                             implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
+                             order="first"/>
+        <!-- LSP textDocument/signatureHelp -->
+        <codeInsight.parameterInfo
+                language="Typst"
+                implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+        <!-- LSP textDocument/documentSymbol -->
+        <lang.psiStructureViewFactory
+                language="Typst"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
 
         <!-- Settings -->
         <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
@@ -61,6 +73,10 @@
             Provides Typst language intelligence via the tinymist LSP.
             ]]></description>
         </server>
+        <languageMapping language="Typst"
+                         serverId="tinymistServer"
+                         languageId="typst"/>
+
         <fileNamePatternMapping patterns="*.typ"
                                 serverId="tinymistServer"
                                 languageId="typst"/>
