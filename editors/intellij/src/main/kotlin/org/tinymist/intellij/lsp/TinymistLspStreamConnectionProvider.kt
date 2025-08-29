@@ -5,6 +5,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.diagnostic.Logger
 import org.tinymist.intellij.settings.TinymistSettingsService
+import org.tinymist.intellij.settings.ServerManagementMode
 import java.io.File
 
 class TinymistLspStreamConnectionProvider(@Suppress("unused") private val project: Project) : ProcessStreamConnectionProvider() {
@@ -15,33 +16,49 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
     }
 
     init {
-        val configuredPath = TinymistSettingsService.instance.tinymistExecutablePath
+        val settingsService = TinymistSettingsService.instance
+        val serverManagementMode = settingsService.serverManagementMode
         var resolvedExecutablePath: String? = null
 
-        if (configuredPath.isNotBlank()) {
-            val configFile = File(configuredPath)
-            if (configFile.exists() && configFile.isFile && configFile.canExecute()) {
-                LOG.info("Using configured Tinymist executable path: $configuredPath")
-                resolvedExecutablePath = configuredPath
-            } else {
-                LOG.warn("Configured Tinymist path is invalid or not executable: $configuredPath. Trying PATH.")
+        when (serverManagementMode) {
+            ServerManagementMode.CUSTOM_PATH -> {
+                // Use custom path specified by user
+                val customPath = settingsService.tinymistExecutablePath
+                if (customPath.isNotBlank()) {
+                    val customFile = File(customPath)
+                    if (customFile.exists() && customFile.isFile && customFile.canExecute()) {
+                        LOG.info("Using custom Tinymist executable path: $customPath")
+                        resolvedExecutablePath = customPath
+                    } else {
+                        LOG.warn("Custom Tinymist path is invalid or not executable: $customPath")
+                    }
+                } else {
+                    LOG.warn("Custom path mode selected but no path specified")
+                }
+                
+                // If custom path fails, don't fall back to other methods - user explicitly chose custom
+                if (resolvedExecutablePath == null) {
+                    LOG.error("Custom path mode: Could not use specified Tinymist executable")
+                }
             }
-        }
-
-        if (resolvedExecutablePath == null) {
-            resolvedExecutablePath = findExecutableOnPath(TINYMIST_EXECUTABLE_NAME)
-            if (resolvedExecutablePath != null) {
-                LOG.info("Found Tinymist executable on PATH: $resolvedExecutablePath")
-            } else {
-                // Try to use the installer-managed binary as a fallback
+            
+            ServerManagementMode.AUTO_MANAGE -> {
+                // Try installer-managed binary first for auto-manage mode
                 resolvedExecutablePath = getInstallerManagedPath()
                 if (resolvedExecutablePath != null) {
-                    LOG.info("Using installer-managed Tinymist executable: $resolvedExecutablePath")
+                    LOG.info("Using auto-managed Tinymist executable: $resolvedExecutablePath")
                 } else {
-                    LOG.error("Could not find Tinymist executable on PATH or from installer.")
+                    // Fall back to PATH if installer doesn't have it
+                    resolvedExecutablePath = findExecutableOnPath(TINYMIST_EXECUTABLE_NAME)
+                    if (resolvedExecutablePath != null) {
+                        LOG.info("Auto-manage mode: Found Tinymist executable on PATH: $resolvedExecutablePath")
+                    } else {
+                        LOG.error("Auto-manage mode: Could not find Tinymist executable from installer or PATH")
+                    }
                 }
             }
         }
+        
         // Only set commands if a valid executable path was resolved
         resolvedExecutablePath?.let {
             super.setCommands(listOf(it, "lsp"))

@@ -34,21 +34,16 @@ class TinymistSettingsService : PersistentStateComponent<TinymistSettingsState> 
             internalState.tinymistExecutablePath = value
         }
 
-    var enableAutoInstall: Boolean
-        get() = internalState.enableAutoInstall
+    var serverManagementMode: ServerManagementMode
+        get() = internalState.serverManagementMode
         set(value) {
-            internalState.enableAutoInstall = value
+            internalState.serverManagementMode = value
         }
-
-    var tinymistVersion: String
-        get() = internalState.tinymistVersion
-        set(value) {
-            internalState.tinymistVersion = value
-        }
-
-    var useInstallerManagedBinary: Boolean
-        get() = internalState.useInstallerManagedBinary
-        set(value) {
-            internalState.useInstallerManagedBinary = value
-        }
+    
+    // Convenience methods for checking management mode
+    val isAutoManaged: Boolean
+        get() = serverManagementMode == ServerManagementMode.AUTO_MANAGE
+        
+    val isCustomPath: Boolean
+        get() = serverManagementMode == ServerManagementMode.CUSTOM_PATH
 } 

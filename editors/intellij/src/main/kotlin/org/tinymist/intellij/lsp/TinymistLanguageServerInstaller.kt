@@ -7,6 +7,7 @@ import com.intellij.openapi.util.SystemInfo
 import com.redhat.devtools.lsp4ij.installation.LanguageServerInstallerBase
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.jetbrains.annotations.NotNull
+import org.tinymist.intellij.settings.TinymistVersion
 import java.io.FileOutputStream
 import java.net.URI
 import java.net.http.HttpClient
@@ -18,6 +19,7 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
+import com.intellij.openapi.application.PathManager
 
 /**
  * Installer for the Tinymist language server.
@@ -28,7 +30,6 @@ import java.util.zip.ZipInputStream
 class TinymistLanguageServerInstaller : LanguageServerInstallerBase() {
     
     companion object {
-        private const val TINYMIST_VERSION = "v0.13.24"  // Latest stable version
         private const val GITHUB_RELEASES_URL = "https://github.com/Myriad-Dreamin/tinymist/releases/download"
         private const val EXECUTABLE_NAME = "tinymist"
         private const val WINDOWS_EXECUTABLE_NAME = "tinymist.exe"
@@ -89,8 +90,8 @@ class TinymistLanguageServerInstaller : LanguageServerInstallerBase() {
      * Uses the plugin data directory under the user's home.
      */
     private fun getInstallationDir(): Path {
-        val pluginDir = Paths.get(System.getProperty("user.home"), ".tinymist-intellij")
-        return pluginDir.resolve("server").resolve(TINYMIST_VERSION)
+        val pluginDir = Paths.get(PathManager.PROPERTY_SYSTEM_PATH, "tinymist-intellij")
+        return pluginDir.resolve("server").resolve(TinymistVersion.CURRENT)
     }
     
     /**
@@ -133,7 +134,7 @@ class TinymistLanguageServerInstaller : LanguageServerInstallerBase() {
             ?: throw UnsupportedOperationException("Tinymist installation is not supported on this platform")
             
         val installationDir = getInstallationDir()
-        val downloadUrl = "$GITHUB_RELEASES_URL/$TINYMIST_VERSION/${platformInfo.archiveName}"
+        val downloadUrl = "$GITHUB_RELEASES_URL/${TinymistVersion.CURRENT}/${platformInfo.archiveName}"
         
         try {
             // Step 1: Create installation directory
@@ -142,7 +143,7 @@ class TinymistLanguageServerInstaller : LanguageServerInstallerBase() {
             Files.createDirectories(installationDir)
             
             // Step 2: Download the archive
-            progress("Downloading Tinymist $TINYMIST_VERSION for ${getCurrentPlatformName()}...", 0.2, indicator)
+            progress("Downloading Tinymist ${TinymistVersion.CURRENT} for ${getCurrentPlatformName()}...", 0.2, indicator)
             ProgressManager.checkCanceled()
             val tempArchive = Files.createTempFile("tinymist", getArchiveExtension(platformInfo.archiveType))
             

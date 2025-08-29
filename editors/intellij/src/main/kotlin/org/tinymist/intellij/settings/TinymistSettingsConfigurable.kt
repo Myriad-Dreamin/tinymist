@@ -28,20 +28,28 @@ class TinymistSettingsConfigurable : Configurable {
     }
 
     override fun isModified(): Boolean {
-        return settingsPanel?.tinymistExecutablePath != settingsService.tinymistExecutablePath
+        val panel = settingsPanel ?: return false
+        return panel.tinymistExecutablePath != settingsService.tinymistExecutablePath ||
+               panel.serverManagementMode != settingsService.serverManagementMode
     }
 
     override fun apply() {
+        val panel = settingsPanel ?: return
+        
         val currentSettingsPath = settingsService.state.tinymistExecutablePath
-        val newPanelPath = settingsPanel?.tinymistExecutablePathField?.text ?: ""
+        val currentManagementMode = settingsService.state.serverManagementMode
+        val newPanelPath = panel.tinymistExecutablePath
+        val newManagementMode = panel.serverManagementMode
 
         val pathChanged = currentSettingsPath != newPanelPath
+        val modeChanged = currentManagementMode != newManagementMode
 
-        // Always update the settings state with the panel's current value
+        // Always update the settings state with the panel's current values
         settingsService.state.tinymistExecutablePath = newPanelPath
+        settingsService.state.serverManagementMode = newManagementMode
 
-        if (pathChanged) {
-            LOG.info("Tinymist executable path changed. Old: '$currentSettingsPath', New: '$newPanelPath'. Requesting server restart.")
+        if (pathChanged || modeChanged) {
+            LOG.info("Tinymist settings changed. Path: '$currentSettingsPath' -> '$newPanelPath', Mode: '$currentManagementMode' -> '$newManagementMode'. Requesting server restart.")
 
             val registry = LanguageServersRegistry.getInstance()
             val serverDefinition = registry.getServerDefinition(TINYMIST_SERVER_ID)
@@ -75,7 +83,9 @@ class TinymistSettingsConfigurable : Configurable {
     }
 
     override fun reset() {
-        settingsPanel?.tinymistExecutablePath = settingsService.tinymistExecutablePath
+        val panel = settingsPanel ?: return
+        panel.tinymistExecutablePath = settingsService.tinymistExecutablePath
+        panel.serverManagementMode = settingsService.serverManagementMode
     }
 
     override fun disposeUIResources() {
