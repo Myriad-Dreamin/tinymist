@@ -1,14 +1,15 @@
 package org.tinymist.intellij.lsp
 
-import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider // Assuming this is the base class
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.diagnostic.Logger
+import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
 import org.tinymist.intellij.settings.TinymistSettingsService
 import org.tinymist.intellij.settings.ServerManagementMode
 import java.io.File
 
-class TinymistLspStreamConnectionProvider(@Suppress("unused") private val project: Project) : ProcessStreamConnectionProvider() {
+class TinymistLspStreamConnectionProvider(@Suppress("unused") private val project: Project) : OSProcessStreamConnectionProvider() {
 
     companion object {
         private val LOG = Logger.getInstance(TinymistLspStreamConnectionProvider::class.java)
@@ -61,7 +62,7 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
         
         // Only set commands if a valid executable path was resolved
         resolvedExecutablePath?.let {
-            super.setCommands(listOf(it, "lsp"))
+            super.commandLine = GeneralCommandLine(it, "lsp")
         } ?: LOG.error("Tinymist LSP server commands not set as no executable was found.")
     }
 
