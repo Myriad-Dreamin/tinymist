@@ -238,6 +238,12 @@ async function languageActivate(context: IContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
   );
+  context.subscriptions.push(
+    commands.registerTextEditorCommand(
+      "tinymist.replaceImportVersion",
+      commandReplaceImportVersion,
+    ),
+  );
 }
 
 async function openInternal(target: string): Promise<void> {
@@ -639,4 +645,18 @@ export function statusBarFormatString() {
   ).trim();
 
   return formatter;
+}
+
+async function commandReplaceImportVersion(
+  editor: TextEditor,
+  edit: vscode.TextEditorEdit,
+  args?: { range: vscode.Range; replace: string },
+): Promise<void> {
+  if (editor && args) {
+    const range = new vscode.Range(
+      new vscode.Position(args.range.start.line, args.range.start.character),
+      new vscode.Position(args.range.end.line, args.range.end.character),
+    );
+    edit.replace(range, args.replace);
+  }
 }
