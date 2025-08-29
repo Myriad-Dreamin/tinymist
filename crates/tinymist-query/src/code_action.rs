@@ -126,14 +126,20 @@ mod tests {
         source: &Source,
         request_range: &LspRange,
     ) -> CodeActionContext {
-        let Warned { output, warnings } = typst::compile::<PagedDocument>(&ctx.world);
-        let errors = output.err().unwrap_or_default();
-        let compiler_diagnostics = warnings.iter().chain(errors.iter());
+        let Warned {
+            output,
+            warnings: compiler_warnings,
+        } = typst::compile::<PagedDocument>(&ctx.world);
+        let compiler_errors = output.err().unwrap_or_default();
 
-        // Run the linter for additional diagnostics as well.
+        let lint_warnings = ctx.lint(source);
         let diagnostics = DiagWorker::new(ctx)
-            .check(source)
-            .convert_all(compiler_diagnostics)
+            .convert_all(
+                compiler_errors
+                    .iter()
+                    .chain(compiler_warnings.iter())
+                    .chain(lint_warnings.iter()),
+            )
             .into_values()
             .flatten();
 
