@@ -327,7 +327,7 @@ impl HoverWorker<'_> {
         if let Some(latest_version) = latest_version {
             if latest_version != package_spec.version {
                 info.push_str(&format!(
-                    "⚠️  **Newer version available:** `{latest_version}`\n"
+                    "⚠️  **Newer version available:** {latest_version}\n"
                 ));
             } else {
                 info.push_str("✅ **Up to date** (latest version)\n");
@@ -358,7 +358,7 @@ impl HoverWorker<'_> {
             for version in &all_versions {
                 if version == &package_spec.version {
                     // Current version
-                    info.push_str(&format!("- **`{version}`**"));
+                    info.push_str(&format!("- **{version}**\n"));
                 } else {
                     // Other versions
                     let lsp_range = self.ctx.to_lsp_range(import_str_node.range(), &self.source);
@@ -375,7 +375,7 @@ impl HoverWorker<'_> {
                         percent_encoding::NON_ALPHANUMERIC,
                     );
                     let version_url = format!("command:tinymist.replaceImportVersion?{encoded}");
-                    info.push_str(&format!("- [`{version}`]({version_url})\n"));
+                    info.push_str(&format!("- [{version}]({version_url})\n"));
                 }
             }
             info.push('\n');
