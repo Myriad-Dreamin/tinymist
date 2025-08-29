@@ -1,19 +1,17 @@
 package org.tinymist.intellij.lsp
 
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.server.OSProcessStreamConnectionProvider
-import org.tinymist.intellij.settings.TinymistSettingsService
 import org.tinymist.intellij.settings.ServerManagementMode
+import org.tinymist.intellij.settings.TinymistSettingsService
 import java.io.File
 
 class TinymistLspStreamConnectionProvider(@Suppress("unused") private val project: Project) : OSProcessStreamConnectionProvider() {
 
     companion object {
         private val LOG = Logger.getInstance(TinymistLspStreamConnectionProvider::class.java)
-        private const val TINYMIST_EXECUTABLE_NAME = "tinymist"
     }
 
     init {
@@ -44,19 +42,7 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
             }
             
             ServerManagementMode.AUTO_MANAGE -> {
-                // Try installer-managed binary first for auto-manage mode
                 resolvedExecutablePath = getInstallerManagedPath()
-                if (resolvedExecutablePath != null) {
-                    LOG.info("Using auto-managed Tinymist executable: $resolvedExecutablePath")
-                } else {
-                    // Fall back to PATH if installer doesn't have it
-                    resolvedExecutablePath = findExecutableOnPath(TINYMIST_EXECUTABLE_NAME)
-                    if (resolvedExecutablePath != null) {
-                        LOG.info("Auto-manage mode: Found Tinymist executable on PATH: $resolvedExecutablePath")
-                    } else {
-                        LOG.error("Auto-manage mode: Could not find Tinymist executable from installer or PATH")
-                    }
-                }
             }
         }
         
@@ -64,27 +50,6 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
         resolvedExecutablePath?.let {
             super.commandLine = GeneralCommandLine(it, "lsp")
         } ?: LOG.error("Tinymist LSP server commands not set as no executable was found.")
-    }
-
-    private fun findExecutableOnPath(@Suppress("SameParameterValue") name: String): String? {
-        val systemPath = System.getenv("PATH")
-        val pathDirs = systemPath?.split(File.pathSeparatorChar) ?: emptyList()
-        for (dir in pathDirs) {
-            val file = File(dir, name)
-            if (file.exists() && file.isFile && file.canExecute()) {
-                return file.absolutePath
-            }
-        }
-        // Also check common variations for Windows if needed (e.g., .exe)
-        if (System.getProperty("os.name").lowercase().contains("win")) {
-            for (dir in pathDirs) {
-                val file = File(dir, "$name.exe")
-                if (file.exists() && file.isFile && file.canExecute()) {
-                    return file.absolutePath
-                }
-            }
-        }
-        return null
     }
     
     /**
@@ -100,26 +65,27 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
         }
     }
 
-    override fun getInitializationOptions(uri: VirtualFile?): Any {
-        // Construct the nested Map structure directly
-        val backgroundPreviewOpts = mapOf(
-            "enabled" to true
-            // "args" to listOf("--data-plane-host=127.0.0.1:23635", "--invert-colors=auto") // Example if needed
-        )
-        val previewOpts = mapOf(
-            "background" to backgroundPreviewOpts
-        )
-
-        // Build the final options map
-        // Add other top-level options expected by tinymist
-        val options = mutableMapOf<String, Any>(
-            "preview" to previewOpts,
-            "semanticTokens" to mapOf<String, Any>(),
-            "completion" to mapOf<String, Any>(),
-            "lint" to mapOf<String, Any>()
-            // Add other key-value pairs as needed
-        )
-
-        return options // Return the Map directly
-    }
-} 
+    // TODO use initializeParams instead?
+    //override fun getInitializationOptions(uri: VirtualFile?): Any {
+    //    // Construct the nested Map structure directly
+    //    val backgroundPreviewOpts = mapOf(
+    //        "enabled" to true
+    //        // "args" to listOf("--data-plane-host=127.0.0.1:23635", "--invert-colors=auto") // Example if needed
+    //    )
+    //    val previewOpts = mapOf(
+    //        "background" to backgroundPreviewOpts
+    //    )
+//
+    //    // Build the final options map
+    //    // Add other top-level options expected by tinymist
+    //    val options = mutableMapOf<String, Any>(
+    //        "preview" to previewOpts,
+    //        "semanticTokens" to mapOf<String, Any>(),
+    //        "completion" to mapOf<String, Any>(),
+    //        "lint" to mapOf<String, Any>()
+    //        // Add other key-value pairs as needed
+    //    )
+//
+    //    return options // Return the Map directly
+    //}
+}
