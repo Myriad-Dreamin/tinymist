@@ -297,6 +297,7 @@ impl ServerState {
             .with_request_::<ColorPresentationRequest>(State::color_presentation)
             .with_request_::<HoverRequest>(State::hover)
             .with_request_::<CodeActionRequest>(State::code_action)
+            .with_request_::<CodeActionResolveRequest>(State::code_action_resolve)
             .with_request_::<CodeLensRequest>(State::code_lens)
             .with_request_::<FoldingRangeRequest>(State::folding_range)
             .with_request_::<SignatureHelpRequest>(State::signature_help)

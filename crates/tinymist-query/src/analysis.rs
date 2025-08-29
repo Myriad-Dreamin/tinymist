@@ -9,6 +9,8 @@ pub mod completion;
 pub use completion::*;
 pub mod code_action;
 pub use code_action::*;
+pub mod code_action_resolve;
+pub use code_action_resolve::*;
 pub mod color_expr;
 pub use color_expr::*;
 pub mod doc_highlight;
@@ -610,6 +612,8 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
+    use tinymist_lint::KnownLintIssues;
+
     use crate::tests::*;
 
     #[test]
@@ -617,7 +621,7 @@ mod lint_tests {
         snapshot_testing("lint", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ctx.lint(&source);
+            let result = ctx.lint(&source, &KnownLintIssues::none());
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()

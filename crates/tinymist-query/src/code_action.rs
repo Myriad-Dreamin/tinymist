@@ -85,6 +85,7 @@ impl SemanticRequest for CodeActionRequest {
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
         worker.autofix(&root, &range, &self.context);
+        worker.source_autofix(&self.context);
         worker.scoped(&root, &range);
 
         (!worker.actions.is_empty()).then_some(worker.actions)
@@ -93,18 +94,23 @@ impl SemanticRequest for CodeActionRequest {
 
 #[cfg(test)]
 mod tests {
+    use tinymist_lint::KnownLintIssues;
+    use typst::{diag::Warned, layout::PagedDocument};
+
     use super::*;
-    use crate::tests::*;
+    use crate::{DiagWorker, tests::*};
 
     #[test]
     fn test() {
         snapshot_testing("code_action", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
+            let request_range = find_test_range(&source);
+            let code_action_ctx = compute_code_action_context(ctx, &source, &request_range);
             let request = CodeActionRequest {
                 path: path.clone(),
-                range: find_test_range(&source),
-                context: CodeActionContext::default(),
+                range: request_range,
+                context: code_action_ctx,
             };
 
             let result = request.request(ctx);
@@ -115,5 +121,35 @@ mod tests {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             })
         });
+    }
+
+    fn compute_code_action_context(
+        ctx: &mut LocalContext,
+        source: &Source,
+        request_range: &LspRange,
+    ) -> CodeActionContext {
+        let Warned { output, warnings } = typst::compile::<PagedDocument>(&ctx.world);
+        let errors = output.err().unwrap_or_default();
+        let compiler_diagnostics = warnings.iter().chain(errors.iter());
+
+        // Run the linter for additional diagnostics as well.
+        let known_issues = KnownLintIssues::from_compiler_diagnostics(compiler_diagnostics.clone());
+        let diagnostics = DiagWorker::new(ctx)
+            .check(source, &known_issues)
+            .convert_all(compiler_diagnostics)
+            .into_values()
+            .flatten();
+
+        CodeActionContext {
+            diagnostics: diagnostics
+                .filter(|diag| ranges_overlap(&diag.range, request_range))
+                .collect(),
+            only: None,
+            trigger_kind: None,
+        }
+    }
+
+    fn ranges_overlap(r1: &LspRange, r2: &LspRange) -> bool {
+        !(r1.end < r2.start || r2.end < r1.start)
     }
 }

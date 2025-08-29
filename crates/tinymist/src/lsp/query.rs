@@ -5,7 +5,7 @@ use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use sync_ls::*;
 use tinymist_query::{
-    CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
+    url_to_path, CompilerQueryRequest, CompilerQueryResponse, FoldRequestFeature, SyntaxRequest,
 };
 use tinymist_std::ImmutPath;
 
@@ -140,6 +140,20 @@ impl ServerState {
         let range = params.range;
         let context = params.context;
         run_query!(self.CodeAction(path, range, context))
+    }
+
+    pub(crate) fn code_action_resolve(&mut self, action: CodeAction) -> ScheduleResult {
+        // The LSP request doesn't specify the document directly. See comment on
+        // `CodeActionResolveRequest.path`.
+        let data = action
+            .data
+            .clone()
+            .ok_or_else(|| invalid_params("missing code action data"))?;
+
+        let uri: Url = serde_json::from_value(data)
+            .map_err(|_| invalid_params("invalid document URL in code action data"))?;
+        let path = url_to_path(&uri);
+        run_query!(self.CodeActionResolve(path, action))
     }
 
     pub(crate) fn code_lens(&mut self, params: CodeLensParams) -> ScheduleResult {
@@ -295,6 +309,7 @@ impl ServerState {
                 DocumentColor(req) => snap.run_semantic(req, R::DocumentColor),
                 DocumentLink(req) => snap.run_semantic(req, R::DocumentLink),
                 CodeAction(req) => snap.run_semantic(req, R::CodeAction),
+                CodeActionResolve(req) => snap.run_stateful(req, R::CodeActionResolve),
                 CodeLens(req) => snap.run_semantic(req, R::CodeLens),
                 Completion(req) => snap.run_stateful(req, R::Completion),
                 SignatureHelp(req) => snap.run_semantic(req, R::SignatureHelp),
