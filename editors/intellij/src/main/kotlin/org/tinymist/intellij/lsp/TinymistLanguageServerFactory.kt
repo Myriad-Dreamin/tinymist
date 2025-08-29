@@ -3,21 +3,24 @@ package org.tinymist.intellij.lsp
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.LanguageServerFactory
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
+import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
-import org.jetbrains.annotations.NotNull
-import org.jetbrains.annotations.Nullable
 
 class TinymistLanguageServerFactory : LanguageServerFactory {
-    override fun createConnectionProvider(@NotNull project: Project): StreamConnectionProvider {
+    override fun createConnectionProvider(project: Project): StreamConnectionProvider {
         return TinymistLspStreamConnectionProvider(project)
     }
 
-    override fun createLanguageClient(@NotNull project: Project): LanguageClientImpl {
+    override fun createLanguageClient(project: Project): LanguageClientImpl {
         return TinymistLanguageClient(project)
     }
     
-    @Nullable
+    override fun createClientFeatures(): LSPClientFeatures {
+        return LSPClientFeatures()
+            .setDiagnosticFeature(TinymistLSPDiagnosticFeature())
+    }
+    
     override fun createServerInstaller(): ServerInstaller {
         return TinymistLanguageServerInstaller()
     }

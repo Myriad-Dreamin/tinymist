@@ -2,8 +2,6 @@ package org.tinymist.intellij.lsp
 
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.client.LanguageClientImpl
-import org.eclipse.lsp4j.Diagnostic
-import org.eclipse.lsp4j.PublishDiagnosticsParams
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification
 import com.intellij.openapi.diagnostic.Logger
 import org.eclipse.lsp4j.MessageActionItem
@@ -19,39 +17,6 @@ class TinymistLanguageClient(
 
     companion object {
         private val LOG = Logger.getInstance(TinymistLanguageClient::class.java)
-    }
-
-    override fun publishDiagnostics(diagnostics: PublishDiagnosticsParams) {
-        val newDiagnostics = diagnostics.diagnostics.map { originalDiagnostic ->
-            val originalMessage = originalDiagnostic.message
-            // Replace newlines with <br> for proper tooltip rendering
-            val newMessage = originalMessage.replace("\n", "<br>")
-
-            val codeAsString: String? = when {
-                originalDiagnostic.code == null -> null
-                originalDiagnostic.code.isLeft -> originalDiagnostic.code.left
-                originalDiagnostic.code.isRight -> originalDiagnostic.code.right.toString()
-                else -> null // Should not happen for Either
-            }
-
-            // Use the 5-argument constructor (Range, Message, Severity, Source, Code)
-            val newDiagnostic = Diagnostic(
-                originalDiagnostic.range,
-                newMessage,
-                originalDiagnostic.severity,
-                originalDiagnostic.source,
-                codeAsString // Pass the processed code
-            )
-
-            // Set other properties if they exist, using setters
-            originalDiagnostic.relatedInformation?.let { newDiagnostic.relatedInformation = it }
-            originalDiagnostic.tags?.let { newDiagnostic.tags = it }
-            originalDiagnostic.codeDescription?.let { newDiagnostic.codeDescription = it }
-            originalDiagnostic.data?.let { newDiagnostic.data = it }
-
-            newDiagnostic
-        }
-        super.publishDiagnostics(PublishDiagnosticsParams(diagnostics.uri, newDiagnostics))
     }
 
     @JsonNotification("tinymist/document")
