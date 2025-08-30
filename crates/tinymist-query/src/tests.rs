@@ -8,16 +8,20 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use ecow::EcoString;
 use regex::{Regex, Replacer};
 use serde_json::{Serializer, Value, ser::PrettyFormatter};
 use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
+use tinymist_std::time::UtcDateTime;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{EntryReader, ShadowApi, TaskInputs};
 use typst::syntax::ast::{self, AstNode};
+use typst::syntax::package::PackageInfo;
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -79,14 +83,41 @@ pub fn run_with_ctx<T>(
     .enter(world);
 
     ctx.test_package_list(|| {
-        vec![(
-            PackageSpec::from_str("@preview/example:0.1.0").unwrap(),
+        vec![dummy_package_from_spec(
+            &PackageSpec::from_str("@preview/example:0.1.0").unwrap(),
             Some("example package (mock).".into()),
         )]
     });
     ctx.test_completion_files(|| paths.clone());
     ctx.test_files(|| paths);
     f(&mut ctx, path)
+}
+
+fn dummy_package_from_spec(
+    spec: &PackageSpec,
+    description: Option<EcoString>,
+) -> PackageIndexEntry {
+    PackageIndexEntry {
+        namespace: spec.namespace.clone(),
+        package: PackageInfo {
+            name: spec.name.clone(),
+            version: spec.version,
+            entrypoint: Default::default(),
+            authors: Default::default(),
+            license: Default::default(),
+            description,
+            homepage: Default::default(),
+            repository: Default::default(),
+            keywords: Default::default(),
+            categories: Default::default(),
+            disciplines: Default::default(),
+            compiler: Default::default(),
+            exclude: Default::default(),
+            unknown_fields: Default::default(),
+        },
+        template: None,
+        updated_at: UtcDateTime::from_unix_timestamp(0).unwrap(),
+    }
 }
 
 pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {

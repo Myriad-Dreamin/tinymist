@@ -1,6 +1,7 @@
 //! Completion by typst specific semantics, like `font`, `package`, `label`, or
 //! `typst::foundations::Value`.
 
+use tinymist_world::package::PackageSpec;
 use typst::foundations::Symbol;
 
 use super::*;
@@ -29,11 +30,7 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
-        let mut packages: Vec<_> = w
-            .packages()
-            .iter()
-            .map(|(spec, desc)| (spec, desc.clone()))
-            .collect();
+        let mut packages: Vec<_> = w.packages().iter().collect();
         #[cfg(feature = "http-registry")]
         {
             // local_packages to references and add them to the packages
@@ -45,16 +42,29 @@ impl CompletionPair<'_, '_, '_> {
             );
         }
 
-        packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
+        packages.sort_by_key(|entry| {
+            (
+                &entry.namespace,
+                &entry.package.name,
+                Reverse(entry.package.version),
+            )
+        });
         if !all_versions {
-            packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
+            packages.dedup_by_key(|entry| (&entry.namespace, &entry.package.name));
         }
-        for (package, description) in packages {
+        for entry in packages {
             self.value_completion(
                 None,
-                &Value::Str(format_str!("{package}")),
+                &Value::Str(format_str!(
+                    "{}",
+                    PackageSpec {
+                        namespace: entry.namespace.clone(),
+                        name: entry.package.name.clone(),
+                        version: entry.package.version,
+                    }
+                )),
                 false,
-                description.as_deref(),
+                entry.package.description.as_deref(),
             );
         }
     }

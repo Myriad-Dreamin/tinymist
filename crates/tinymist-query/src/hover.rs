@@ -1,4 +1,5 @@
 use core::fmt::{self, Write};
+use std::cmp::Reverse;
 use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
@@ -9,6 +10,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::analysis::get_link_exprs_in;
 use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
+use crate::package::list_package_by_spec;
 use crate::prelude::*;
 use crate::upstream::{Tooltip, route_of_value, truncated_repr};
 
@@ -233,7 +235,8 @@ impl HoverWorker<'_> {
             if import_str.starts_with("@")
                 && let Ok(package_spec) = PackageSpec::from_str(&import_str)
             {
-                self.add_package_hover_info(&package_spec, node);
+                self.def
+                    .push(self.get_package_hover_info(&package_spec, node));
                 return Some(());
             }
         }
@@ -241,51 +244,24 @@ impl HoverWorker<'_> {
         None
     }
 
-    /// Add package information to hover content
-    fn add_package_hover_info(&mut self, package_spec: &PackageSpec, import_str_node: &LinkedNode) {
+    /// Get package information for hover content
+    fn get_package_hover_info(
+        &self,
+        package_spec: &PackageSpec,
+        import_str_node: &LinkedNode,
+    ) -> String {
+        let versionless_spec = package_spec.versionless();
+
         let mut info = String::new();
 
-        // Try to get package manifest for additional information
-        let mut manifest_info = None;
-        let mut all_versions = Vec::new();
-        let mut latest_version = None;
+        let mut entries = list_package_by_spec(&self.ctx.world().registry, &versionless_spec);
+        // Sort by version descending
+        entries.sort_by_key(|entry| Reverse(entry.package.version));
 
-        if package_spec.namespace == "preview" {
-            // Try to get package information from registry
-            let world = self.ctx.world();
-            let registry = &world.registry;
-
-            // Get all versions of the package
-            let index = registry.packages();
-            let package_entries: Vec<_> = index
-                .iter()
-                .filter(|(spec, _)| spec.name == package_spec.name)
-                .collect();
-
-            // Extract and sort versions
-            all_versions = package_entries
-                .iter()
-                .map(|(spec, _)| spec.version)
-                .sorted()
-                .rev()
-                .collect(); // Show newest first
-
-            latest_version = registry
-                .determine_latest_version(&package_spec.versionless())
-                .ok();
-
-            // Try to get package manifest if package is locally available
-            // todo: use package info from registry directly
-            if let Ok(_package_path) = registry.resolve(package_spec) {
-                let manifest_id = typst::syntax::FileId::new(
-                    Some(package_spec.clone()),
-                    typst::syntax::VirtualPath::new("typst.toml"),
-                );
-                if let Ok(manifest) = crate::package::get_manifest(world, manifest_id) {
-                    manifest_info = Some(manifest);
-                }
-            }
-        }
+        let current_entry = entries
+            .iter()
+            .find(|entry| entry.package.version == package_spec.version)
+            .cloned();
 
         {
             // Add links
@@ -299,14 +275,14 @@ impl HoverWorker<'_> {
                 links_line.push(format!("🌌 [Universe]({universe_url})"));
             }
 
-            if let Some(ref manifest_info) = manifest_info {
+            if let Some(current_entry) = current_entry {
                 // Repository URL
-                if let Some(ref repo) = manifest_info.package.repository {
+                if let Some(ref repo) = current_entry.package.repository {
                     links_line.push(format!("🔗 [Repository]({repo})"));
                 }
 
                 // Homepage URL
-                if let Some(ref homepage) = manifest_info.package.homepage {
+                if let Some(ref homepage) = current_entry.package.homepage {
                     links_line.push(format!("🏠 [Homepage]({homepage})"));
                 }
             }
@@ -324,8 +300,9 @@ impl HoverWorker<'_> {
 
         info.push_str(&format!("**Package:** `{package_spec}`\n"));
         // Check version information and show status
-        if let Some(latest_version) = latest_version {
-            if latest_version != package_spec.version {
+        if let Some(latest) = entries.first() {
+            let latest_version = &latest.package.version;
+            if *latest_version != package_spec.version {
                 info.push_str(&format!(
                     "⚠️  **Newer version available:** {latest_version}\n"
                 ));
@@ -336,8 +313,8 @@ impl HoverWorker<'_> {
         info.push('\n');
 
         // Add manifest information if available
-        if let Some(ref manifest) = manifest_info {
-            let pkg_info = &manifest.package;
+        if let Some(current_entry) = current_entry {
+            let pkg_info = &current_entry.package;
 
             if !pkg_info.authors.is_empty() {
                 info.push_str(&format!("**Authors:** {}\n\n", pkg_info.authors.join(", ")));
@@ -353,10 +330,11 @@ impl HoverWorker<'_> {
         }
 
         // Show version history for preview packages
-        if !all_versions.is_empty() {
+        if !entries.is_empty() {
             info.push_str("**Available Versions** (click to replace):\n");
-            for version in &all_versions {
-                if version == &package_spec.version {
+            for entry in &entries {
+                let version = &entry.package.version;
+                if *version == package_spec.version {
                     // Current version
                     info.push_str(&format!("- **{version}**\n"));
                 } else {
@@ -381,7 +359,7 @@ impl HoverWorker<'_> {
             info.push('\n');
         }
 
-        self.def.push(info);
+        info
     }
 
     fn link(&mut self, mut node: &LinkedNode) -> Option<()> {

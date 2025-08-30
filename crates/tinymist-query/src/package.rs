@@ -5,10 +5,11 @@ use std::path::PathBuf;
 use ecow::eco_format;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::PackageSpec;
+use tinymist_world::package::registry::PackageIndexEntry;
+use tinymist_world::package::{PackageRegistry, PackageSpec};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
-use typst::syntax::package::PackageManifest;
+use typst::syntax::package::{PackageManifest, VersionlessPackageSpec};
 use typst::syntax::{FileId, VirtualPath};
 
 use crate::LocalContext;
@@ -71,6 +72,21 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 
     ctx.shared_().preload_package(entry_point);
     Ok(())
+}
+
+/// Get all the packages in the registry that match the spec.
+pub fn list_package_by_spec<'a>(
+    registry: &'a tinymist_world::package::registry::HttpRegistry,
+    spec: &'a VersionlessPackageSpec,
+) -> Vec<&'a PackageIndexEntry> {
+    if spec.namespace == "preview" {
+        return registry
+            .packages()
+            .iter()
+            .filter(|entry| entry.namespace == spec.namespace && entry.package.name == spec.name)
+            .collect();
+    }
+    vec![] // todo: support local packages
 }
 
 #[cfg(feature = "local-registry")]

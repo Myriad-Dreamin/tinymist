@@ -18,6 +18,8 @@ use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
+#[cfg(test)]
+use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
@@ -322,7 +324,7 @@ impl DerefMut for LocalContext {
 impl LocalContext {
     /// Set list of packages for LSP-based completion.
     #[cfg(test)]
-    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<(PackageSpec, Option<EcoString>)>) {
+    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<PackageIndexEntry>) {
         self.world.registry.test_package_list(f);
     }
 
