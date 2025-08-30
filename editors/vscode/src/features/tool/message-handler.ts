@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { extensionState } from "../../state";
 import type { EditorToolContext } from "../../tools";
 import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
+import { tinymist } from "../../lsp";
 
 export interface WebviewMessage {
   type: string;
@@ -71,6 +72,32 @@ interface InitTemplateMessage {
 
 interface StopServerProfilingMessage {
   type: "stopServerProfiling";
+}
+
+interface CreateExportTaskMessage {
+  type: "createExportTask";
+  taskDefinition: {
+    label: string;
+    type: string;
+    command: string;
+    args?: string[];
+    group?: string;
+    problemMatcher?: string[];
+    options?: Record<string, unknown>;
+    export?: Record<string, unknown>;
+  };
+}
+
+interface ExportDocumentMessage {
+  type: "exportDocument";
+  format: string;
+  config: Record<string, unknown>;
+}
+
+interface GeneratePreviewMessage {
+  type: "generatePreview";
+  format: string;
+  pages?: number;
 }
 
 export const messageHandlers: Record<string, MessageHandler> = {
@@ -220,5 +247,135 @@ export const messageHandlers: Record<string, MessageHandler> = {
     const traceData = await traceDataTask;
 
     postMessage({ type: "traceData", data: traceData });
+  },
+
+  createExportTask: async ({ taskDefinition }: CreateExportTaskMessage) => {
+    try {
+      // Get the current workspace folder
+      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+      if (!workspaceFolder) {
+        await vscode.window.showErrorMessage("No workspace folder found");
+        return;
+      }
+
+      // Create tasks.json in .vscode folder if it doesn't exist
+      const vscodeFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ".vscode");
+      const tasksFileUri = vscode.Uri.joinPath(vscodeFolderUri, "tasks.json");
+
+      let tasksConfig: { version: string; tasks: Record<string, unknown>[] } = {
+        version: "2.0.0",
+        tasks: []
+      };
+
+      try {
+        // Try to read existing tasks.json
+        const tasksFileContent = await vscode.workspace.fs.readFile(tasksFileUri);
+        tasksConfig = JSON.parse(Buffer.from(tasksFileContent).toString());
+      } catch {
+        // File doesn't exist, use default config
+        await vscode.workspace.fs.createDirectory(vscodeFolderUri);
+      }
+
+      // Add the new task
+      tasksConfig.tasks.push(taskDefinition);
+
+      // Write back to tasks.json
+      const tasksJsonContent = JSON.stringify(tasksConfig, null, 2);
+      await vscode.workspace.fs.writeFile(tasksFileUri, Buffer.from(tasksJsonContent));
+
+      await vscode.window.showInformationMessage(`Task "${taskDefinition.label}" created successfully`);
+    } catch (error) {
+      await vscode.window.showErrorMessage(`Failed to create task: ${error}`);
+    }
+  },
+
+  exportDocument: async ({ format, config }: ExportDocumentMessage) => {
+    try {
+      // Get the active document
+      const uri = extensionState.getFocusingFile();
+      if (!uri) {
+        await vscode.window.showErrorMessage("No active document found");
+        return;
+      }
+
+      // Map format to export function
+      const exportFunctions: Record<string, (uri: string, opts?: Record<string, unknown>) => Promise<string>> = {
+        pdf: tinymist.exportPdf,
+        png: tinymist.exportPng,
+        svg: tinymist.exportSvg,
+        html: tinymist.exportHtml,
+        markdown: tinymist.exportMarkdown,
+        tex: tinymist.exportTeX,
+        text: tinymist.exportText,
+        query: tinymist.exportQuery,
+      };
+
+      const exportFunction = exportFunctions[format];
+      if (!exportFunction) {
+        await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
+        return;
+      }
+
+      // Execute export with configuration
+      const resultPath = await exportFunction(uri, config);
+
+      await vscode.window.showInformationMessage(`Exported successfully to: ${resultPath}`);
+    } catch (error) {
+      await vscode.window.showErrorMessage(`Export failed: ${error}`);
+    }
+  },
+
+  generatePreview: async ({ format, pages }: GeneratePreviewMessage, { postMessage }) => {
+    try {
+      // Get the active document
+      const activeDocument = extensionState.getFocusingDoc();
+      if (!activeDocument) {
+        postMessage({
+          type: "previewError",
+          error: "No active document found"
+        });
+        return;
+      }
+
+      const uri = activeDocument.uri.toString();
+
+      // For visual formats, we'll use PNG export to generate previews
+      if (format === "pdf" || format === "png" || format === "svg") {
+        const exportFunction = format === "svg" ? tinymist.exportSvg : tinymist.exportPng;
+
+        // Generate preview with appropriate options
+        const previewOptions = {
+          ppi: 96, // Lower resolution for preview
+          page: pages ? { count: pages } : "first",
+        };
+
+        const previewPath = await exportFunction(uri, previewOptions);
+
+        // Read the generated file and convert to base64
+        const fs = await import("node:fs/promises");
+        const fileContent = await fs.readFile(previewPath);
+        const base64Content = fileContent.toString("base64");
+
+        postMessage({
+          type: "previewGenerated",
+          format,
+          content: base64Content,
+          mimeType: format === "svg" ? "image/svg+xml" : "image/png"
+        });
+      } else {
+        // For text-based formats, just return the format info
+        postMessage({
+          type: "previewGenerated",
+          format,
+          content: `Preview not available for ${format} format`,
+          mimeType: "text/plain"
+        });
+      }
+    } catch (error) {
+      postMessage({
+        type: "previewError",
+        error: `Preview generation failed: ${error}`
+      });
+    }
   },
 };

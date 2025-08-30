@@ -1,5 +1,6 @@
 import van from "vanjs-core";
 import type { fontsExportConfigure } from "./features/summary";
+import type { TaskDefinition } from "./features/export/types";
 
 const vscodeAPI = typeof acquireVsCodeApi !== "undefined" && acquireVsCodeApi();
 
@@ -87,13 +88,29 @@ export function setupVscodeChannel() {
         }
         case "styleAtCursor": {
           styleAtCursor.val = event.data.data;
+          break;
+        }
+        case "previewGenerated": {
+          // Handle preview generation response
+          // You can dispatch this to the export tool if needed
+          window.dispatchEvent(new CustomEvent('exportPreviewGenerated', {
+            detail: event.data
+          }));
+          break;
+        }
+        case "previewError": {
+          // Handle preview generation error
+          window.dispatchEvent(new CustomEvent('exportPreviewError', {
+            detail: event.data
+          }));
+          break;
         }
       }
     });
   }
 }
 
-export function requestSavePackageData(data: any) {
+export function requestSavePackageData(data: unknown) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "savePackageData", data });
   }
@@ -168,9 +185,27 @@ export function saveDataToFile({
 }: {
   data: string;
   path?: string;
-  option?: any;
+  option?: Record<string, unknown>;
 }) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "saveDataToFile", data, path, option });
+  }
+}
+
+export function requestGeneratePreview(format: string, pages?: number) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "generatePreview", format, pages });
+  }
+}
+
+export function requestExportDocument(format: string, config: Record<string, unknown>) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "exportDocument", format, config });
+  }
+}
+
+export function requestCreateExportTask(taskDefinition: TaskDefinition) {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "createExportTask", taskDefinition });
   }
 }
