@@ -18,7 +18,6 @@ use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
-#[cfg(test)]
 use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
@@ -27,7 +26,7 @@ use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
 use typst::model::BibliographyElem;
-use typst::syntax::package::{PackageManifest, PackageSpec};
+use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
 
@@ -670,19 +669,16 @@ impl SharedContext {
         self.world.font_resolver.describe_font(&font)
     }
 
-    /// Get the local packages and their descriptions.
-    #[cfg(feature = "local-registry")]
-    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
-        crate::package::list_package_by_namespace(&self.world, eco_format!("local"))
-            .into_iter()
-            .map(|entry| entry.spec())
-            .collect()
-    }
-
-    /// Get the local packages and their descriptions.
-    #[cfg(not(feature = "local-registry"))]
-    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
-        eco_vec![]
+    /// Get the local packages.
+    pub fn local_packages(&self) -> EcoVec<PackageIndexEntry> {
+        #[cfg(feature = "local-registry")]
+        {
+            crate::package::list_package_by_namespace(&self.world, eco_format!("local"))
+        }
+        #[cfg(not(feature = "local-registry"))]
+        {
+            eco_vec![]
+        }
     }
 
     pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {
