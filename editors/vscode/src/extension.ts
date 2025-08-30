@@ -32,12 +32,18 @@ import { toolActivate } from "./features/tool";
 import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste";
 import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
-import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
+import {
+  FeatureEntry,
+  statusBarFormatString,
+  tinymistActivate,
+  tinymistDeactivate,
+} from "./extension.shared";
 import { commandShow, exportActivate, quickExports } from "./features/export";
 import { resolveCodeAction } from "./lsp.code-action";
 import { HoverTmpStorage } from "./features/hover-storage.tmp";
+import { createSystemLanguageClient } from "./lsp.system";
 
-LanguageState.Client = LanguageClient;
+LanguageState.Client = createSystemLanguageClient;
 LanguageState.HoverTmpStorage = HoverTmpStorage;
 
 const systemActivateTable = (): FeatureEntry[] => [
@@ -631,12 +637,4 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
-}
-
-export function statusBarFormatString() {
-  const formatter = (
-    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
-  ).trim();
-
-  return formatter;
 }

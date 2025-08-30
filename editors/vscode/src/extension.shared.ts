@@ -107,16 +107,14 @@ export async function tinymistActivate(
 
   // Initializes language client
   if (extensionState.features.lsp) {
-    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
-    config.probedServerPath = executable;
-    // todo: guide installation?
-
-    if (config.probedServerPath) {
-      tinymist.initClient(config);
+    if (extensionState.features.lspSystem) {
+      const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+      config.probedServerPath = executable;
+      contextExt.tinymistExecutable = executable;
+      contextExt.tinymistExec = makeExecCommand(contextExt, executable);
     }
 
-    contextExt.tinymistExecutable = executable;
-    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
+    await tinymist.initClient(config);
   }
   // Register Shared commands
   context.subscriptions.push(
@@ -219,4 +217,12 @@ function makeExecCommand(
       });
     },
   };
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }
