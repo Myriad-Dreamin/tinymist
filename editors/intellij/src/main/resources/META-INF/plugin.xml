@@ -1,0 +1,88 @@
+<!-- Basic plugin configuration -->
+<idea-plugin>
+    <!-- Unique id for the plugin. Must stay constant for the lifetime of the plugin. -->
+    <id>org.tinymist.intellij</id>
+
+    <!-- Text to display as name on Settings | Plugins page -->
+    <name>Tinymist Typst</name>
+    <version>0.1.0</version>
+
+    <!-- Text to display as company information on Settings | Plugins page -->
+    <vendor email="your.email@example.com" url="example.com"> &amp; Contributors</vendor>
+
+    <!-- Description of the plugin -->
+    <description><![CDATA[
+    Provides <a href="https://typst.app/">Typst</a> language support for IntelliJ-based IDEs using the <a href="https://github.com/Myzel394/tinymist">tinymist</a> language server.
+    <br/>
+    Features include:
+    <ul>
+        <li>Syntax Highlighting (via LSP semantic tokens)</li>
+        <li>Error Diagnostics</li>
+        <li>Completions</li>
+        <li>Hover Information</li>
+        <li>Go to Definition</li>
+    </ul>
+    Requires the tinymist LSP executable to be installed and available on PATH.
+    ]]></description>
+
+    <!-- Change notes for the plugin -->
+    <change-notes><![CDATA[
+    Initial release.
+    ]]></change-notes>
+
+    <!-- Minimum and maximum supported IntelliJ platform versions. -->
+    <idea-version since-build="233" until-build="241.*"/>
+
+    <!-- Declare dependencies on other plugins or modules -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends> <!-- Added dependency for LSP4IJ -->
+
+    <!-- Extension points defined by the plugin. -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Basic language support -->
+        <fileType name="Typst file" implementationClass="org.tinymist.intellij.TypstFileType" fieldName="INSTANCE" language="Typst" extensions="typ"/>
+
+        <!-- File editor provider for Text + Preview -->
+        <fileEditorProvider implementation="org.tinymist.intellij.preview.TypstTextEditorWithPreviewProvider"/>
+
+        <!-- Register the Folding Builder of LSP4IJ to Typst -->
+        <lang.foldingBuilder language="Typst"
+                             implementationClass="com.redhat.devtools.lsp4ij.features.foldingRange.LSPFoldingRangeBuilder"
+                             order="first"/>
+        <!-- LSP textDocument/signatureHelp -->
+        <codeInsight.parameterInfo
+                language="Typst"
+                implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
+        <!-- LSP textDocument/documentSymbol -->
+        <lang.psiStructureViewFactory
+                language="Typst"
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+
+        <!-- Settings -->
+        <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
+        <applicationConfigurable parentId="tools" instance="org.tinymist.intellij.settings.TinymistSettingsConfigurable" id="org.tinymist.intellij.settings.TinymistSettingsConfigurable" displayName="Tinymist LSP"/>
+
+    </extensions>
+
+    <!-- LSP4IJ specific extensions -->
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server id="tinymistServer"
+                name="Tinymist Language Server" 
+                factoryClass="org.tinymist.intellij.lsp.TinymistLanguageServerFactory">
+            <description><![CDATA[
+            Provides Typst language intelligence via the tinymist LSP.
+            ]]></description>
+        </server>
+        <languageMapping language="Typst"
+                         serverId="tinymistServer"
+                         languageId="typst"/>
+
+        <fileNamePatternMapping patterns="*.typ"
+                                serverId="tinymistServer"
+                                languageId="typst"/>
+    </extensions>
+
+    <actions>
+    </actions>
+
+</idea-plugin> 

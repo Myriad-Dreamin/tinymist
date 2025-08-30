@@ -1,0 +1,34 @@
+# IntelliJ Platform Plugin SDK specific
+# Read more: https://plugins.jetbrains.com/docs/intellij/build-script.html#gitignore
+
+# IntelliJ IDEA Project files
+.idea/
+*.iml
+
+# Gradle files
+.gradle/
+build/
+gradle-sandbox/
+
+# IDE system files
+*.iws
+
+# Local *.properties files (if any, e.g., for local secrets)
+local.properties
+
+# Build artifacts
+out/
+
+# Log files
+*.log
+
+# Other generated files
+*~
+*.swp
+*.bak
+.intellijPlatform
+intellij-community
+.Kotlin
+
+./lsp4ij/
+./lsp4j/
