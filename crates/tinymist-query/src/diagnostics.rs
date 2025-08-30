@@ -46,16 +46,8 @@ impl<'w> DiagWorker<'w> {
         }
     }
 
-    /// Runs code check on the given document.
-    pub fn check(mut self, source: &Source) -> Self {
-        for diag in self.ctx.lint(&source) {
-            self.handle(&diag);
-        }
-        self
-    }
-
     /// Runs code check on the main document and all its dependencies.
-    pub fn full_check(mut self) -> Self {
+    pub fn check(mut self) -> Self {
         for dep in self.ctx.world.depended_files() {
             if WorkspaceResolver::is_package_file(dep) {
                 continue;
