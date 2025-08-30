@@ -300,7 +300,15 @@ impl HoverWorker<'_> {
 
         info.push_str(&format!("**Package:** `{package_spec}`\n"));
         // Check version information and show status
-        if let Some(latest) = entries.first() {
+        if !entries
+            .iter()
+            .any(|entry| entry.package.version == package_spec.version)
+        {
+            info.push_str(&format!(
+                "‼️ **Version {} not found**\n\n",
+                package_spec.version
+            ));
+        } else if let Some(latest) = entries.first() {
             let latest_version = &latest.package.version;
             if *latest_version != package_spec.version {
                 info.push_str(&format!(
