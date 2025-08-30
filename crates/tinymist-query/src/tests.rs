@@ -13,7 +13,6 @@ use regex::{Regex, Replacer};
 use serde_json::{Serializer, Value, ser::PrettyFormatter};
 use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
 use tinymist_std::path::unix_slash;
-use tinymist_std::time::UtcDateTime;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
 use tinymist_world::package::PackageSpec;
@@ -116,7 +115,8 @@ fn dummy_package_from_spec(
             unknown_fields: Default::default(),
         },
         template: None,
-        updated_at: UtcDateTime::from_unix_timestamp(0).unwrap(),
+        updated_at: None,
+        path: None,
     }
 }
 

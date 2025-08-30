@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
-use tinymist_world::package::{PackageRegistry, PackageSpec};
+use tinymist_world::package::PackageSpec;
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -254,7 +254,7 @@ impl HoverWorker<'_> {
 
         let mut info = String::new();
 
-        let mut entries = list_package_by_spec(&self.ctx.world().registry, &versionless_spec);
+        let mut entries = list_package_by_spec(self.ctx.world(), &versionless_spec);
         // Sort by version descending
         entries.sort_by_key(|entry| Reverse(entry.package.version));
 
@@ -275,7 +275,7 @@ impl HoverWorker<'_> {
                 links_line.push(format!("🌌 [Universe]({universe_url})"));
             }
 
-            if let Some(current_entry) = current_entry {
+            if let Some(ref current_entry) = current_entry {
                 // Repository URL
                 if let Some(ref repo) = current_entry.package.repository {
                     links_line.push(format!("🔗 [Repository]({repo})"));
@@ -295,7 +295,7 @@ impl HoverWorker<'_> {
 
         // Package header
         if package_spec.namespace == "local" {
-            info.push_str("ℹ️  This is a local package");
+            info.push_str("ℹ️ This is a local package\n\n");
         }
 
         info.push_str(&format!("**Package:** `{package_spec}`\n"));
@@ -321,7 +321,7 @@ impl HoverWorker<'_> {
         info.push('\n');
 
         // Add manifest information if available
-        if let Some(current_entry) = current_entry {
+        if let Some(ref current_entry) = current_entry {
             let pkg_info = &current_entry.package;
 
             if !pkg_info.authors.is_empty() {

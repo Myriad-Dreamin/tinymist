@@ -673,9 +673,9 @@ impl SharedContext {
     /// Get the local packages and their descriptions.
     #[cfg(feature = "local-registry")]
     pub fn local_packages(&self) -> EcoVec<PackageSpec> {
-        crate::package::list_package_by_namespace(&self.world.registry, eco_format!("local"))
+        crate::package::list_package_by_namespace(&self.world, eco_format!("local"))
             .into_iter()
-            .map(|(_, spec)| spec)
+            .map(|entry| entry.spec())
             .collect()
     }
 

@@ -1,7 +1,6 @@
 //! Completion by typst specific semantics, like `font`, `package`, `label`, or
 //! `typst::foundations::Value`.
 
-use tinymist_world::package::PackageSpec;
 use typst::foundations::Symbol;
 
 use super::*;
@@ -55,14 +54,7 @@ impl CompletionPair<'_, '_, '_> {
         for entry in packages {
             self.value_completion(
                 None,
-                &Value::Str(format_str!(
-                    "{}",
-                    PackageSpec {
-                        namespace: entry.namespace.clone(),
-                        name: entry.package.name.clone(),
-                        version: entry.package.version,
-                    }
-                )),
+                &Value::Str(format_str!("{}", entry.spec())),
                 false,
                 entry.package.description.as_deref(),
             );

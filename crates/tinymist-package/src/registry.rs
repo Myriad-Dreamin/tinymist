@@ -1,6 +1,7 @@
 //! Package Registry.
 
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::{path::Path, sync::Arc};
 
 use ecow::EcoString;
@@ -69,17 +70,31 @@ pub struct PackageIndexEntry {
     pub template: Option<TemplateInfo>,
     /// The timestamp when the package was last updated.
     #[serde(rename = "updatedAt", deserialize_with = "deserialize_timestamp")]
-    pub updated_at: UtcDateTime,
+    pub updated_at: Option<UtcDateTime>,
+    /// The local path of the package, if available.
+    #[serde(default)]
+    pub path: Option<PathBuf>,
 }
 
-fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<UtcDateTime, D::Error>
+impl PackageIndexEntry {
+    /// Get the package specification for this entry.
+    pub fn spec(&self) -> PackageSpec {
+        PackageSpec {
+            namespace: self.namespace.clone(),
+            name: self.package.name.clone(),
+            version: self.package.version,
+        }
+    }
+}
+
+fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<Option<UtcDateTime>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let timestamp = i64::deserialize(deserializer)?;
     // Assuming UtcDateTime can be created from a Unix timestamp
     // Adjust this based on the actual UtcDateTime API (e.g., if it's chrono::DateTime<Utc>)
-    Ok(UtcDateTime::from_unix_timestamp(timestamp).unwrap())
+    Ok(UtcDateTime::from_unix_timestamp(timestamp).ok())
 }
 
 /// A trait for package registries that can be notified.
