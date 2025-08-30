@@ -1,3 +1,4 @@
+import "./styles/index.css";
 import "./style.css";
 import van, { ChildDom } from "vanjs-core";
 import { setupVscodeChannel } from "./vscode";
