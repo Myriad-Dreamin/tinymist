@@ -614,7 +614,8 @@ enum AutofixKind {
 
 fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
     static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable),
+        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
+        ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
         ("file not found", AutofixKind::FileNotFound),
     ];
 
