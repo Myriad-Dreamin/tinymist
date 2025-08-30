@@ -1547,7 +1547,7 @@ async function installLanguage(id: string): Promise<void> {
  * Installs all languages to the vscode extension
  */
 export async function install() {
-  await fs.mkdir(path.join(import.meta.dirname, `../../editors/vscode/out`));
+  await fs.mkdir(path.join(import.meta.dirname, `../../editors/vscode/out`), { recursive: true });
   await Promise.all([installLanguage("typst"), installLanguage("typst-code")]);
 }
 
