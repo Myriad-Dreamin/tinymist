@@ -596,8 +596,8 @@ export function provideSvgDoc<
         outerRect.setAttribute("height", rectHeight);
         outerRect.setAttribute("x", "0");
         outerRect.setAttribute("y", "0");
-        // white background
-        outerRect.setAttribute("fill", this.backgroundColor);
+        // #typst-app already has background
+        outerRect.setAttribute("fill", "none");
         svg.insertBefore(outerRect, firstRect);
       }
 

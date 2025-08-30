@@ -45,6 +45,10 @@
   text-rendering: optimizeSpeed;
 }
 
+#typst-container .typst-doc {
+  display: block;
+}
+
 #typst-container.mode-doc #typst-top-toolbar {
   display: none;
 }
