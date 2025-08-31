@@ -10,7 +10,8 @@ We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redh
 ## Development Instructions
 
 1.  **Prerequisites:**
-    *   **IntelliJ IDEA:** For developing IntelliJ plugins, this is the most convenient IDE.
+    *   **IntelliJ IDEA:** Other IDEs will also work, but given developing a plugin for IntelliJ, the best support for that  is provided by IntelliJ.
+    *   **JDK 21**
 
 
 2.  **Clone the Repository:**
