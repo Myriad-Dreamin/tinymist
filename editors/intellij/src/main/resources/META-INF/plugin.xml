@@ -57,6 +57,10 @@
         <!-- lang.psiStructureViewFactory
                 language="Typst"
                 implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/ -->
+        <!-- this is not supported by tinymist -->
+        <!-- callHierarchyProvider
+                language="Typst"
+                implementationClass="com.redhat.devtools.lsp4ij.features.callHierarchy.LSPCallHierarchyProvider" / -->
 
         <!-- Settings -->
         <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
