@@ -1,4 +1,3 @@
-import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
@@ -22,7 +21,6 @@ kotlin {
 // Configure project's dependencies
 repositories {
     mavenCentral()
-    // maven("https://www.jetbrains.com/intellij-repository/releases") // Explicitly add JetBrains releases repository - REMOVING THIS
 
     // IntelliJ Platform Gradle Plugin Repositories Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html
     intellijPlatform {
@@ -35,10 +33,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.opentest4j)
 
-    // Add explicit dependency on platform-impl using standard implementation scope
-    // The repositories configured by the intellijPlatform plugin should contain this.
-    // implementation("com.intellij.modules:platform-impl")
-
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
         intellijIdeaUltimate("2025.1")
@@ -46,7 +40,6 @@ dependencies {
         plugins(listOf("com.redhat.devtools.lsp4ij:0.15.0"))
     }
 }
-
 
 // Configure IntelliJ Platform Gradle Plugin - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html
 intellijPlatform {
@@ -68,17 +61,6 @@ intellijPlatform {
         }
 
         val changelog = project.changelog // local variable for configuration cache compatibility
-        // Get the latest available change notes from the changelog file
-        /* changeNotes = providers.gradleProperty("pluginVersion").map { pluginVersion ->
-            with(changelog) {
-                renderItem(
-                    (getOrNull(pluginVersion) ?: getUnreleased())
-                        .withHeader(false)
-                        .withEmptySections(false),
-                    Changelog.OutputType.HTML,
-                )
-            }
-        }*/
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
@@ -131,26 +113,5 @@ tasks {
 
     publishPlugin {
         dependsOn(patchChangelog)
-    }
-}
-
-intellijPlatformTesting {
-    runIde {
-        register("runIdeForUiTests") {
-            task {
-                jvmArgumentProviders += CommandLineArgumentProvider {
-                    listOf(
-                        "-Drobot-server.port=8082",
-                        "-Dide.mac.message.dialogs.as.sheets=false",
-                        "-Djb.privacy.policy.text=<!--999.999-->",
-                        "-Djb.consents.confirmation.enabled=false",
-                    )
-                }
-            }
-
-            plugins {
-                robotServerPlugin()
-            }
-        }
     }
 }
