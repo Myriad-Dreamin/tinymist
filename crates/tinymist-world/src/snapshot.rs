@@ -131,15 +131,15 @@ impl<F: CompilerFeat + 'static> CompileSnapshot<F> {
     /// tasks break this assumption.
     pub fn task(mut self, inputs: TaskInputs) -> Self {
         'check_changed: {
-            if let Some(entry) = &inputs.entry {
-                if *entry != self.world.entry_state() {
-                    break 'check_changed;
-                }
+            if let Some(entry) = &inputs.entry
+                && *entry != self.world.entry_state()
+            {
+                break 'check_changed;
             }
-            if let Some(inputs) = &inputs.inputs {
-                if inputs.clone() != self.world.inputs() {
-                    break 'check_changed;
-                }
+            if let Some(inputs) = &inputs.inputs
+                && inputs.clone() != self.world.inputs()
+            {
+                break 'check_changed;
             }
 
             return self;

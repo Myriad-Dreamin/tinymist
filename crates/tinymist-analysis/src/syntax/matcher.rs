@@ -228,10 +228,10 @@ pub fn previous_decls<T>(
                     if let Some(t) = recv(PreviousDecl::Ident(new_name)) {
                         return Some(t);
                     }
-                } else if import.imports().is_none() {
-                    if let Some(t) = recv(PreviousDecl::ImportSource(import.source())) {
-                        return Some(t);
-                    }
+                } else if import.imports().is_none()
+                    && let Some(t) = recv(PreviousDecl::ImportSource(import.source()))
+                {
+                    return Some(t);
                 }
             }
             (PreviousItem::Parent(parent, child), ast::Expr::For(for_expr)) => {
@@ -269,10 +269,10 @@ pub fn previous_decls<T>(
                             }
                         }
                         ast::Param::Spread(spread) => {
-                            if let Some(sink_ident) = spread.sink_ident() {
-                                if let Some(t) = recv(PreviousDecl::Ident(sink_ident)) {
-                                    return Some(t);
-                                }
+                            if let Some(sink_ident) = spread.sink_ident()
+                                && let Some(t) = recv(PreviousDecl::Ident(sink_ident))
+                            {
+                                return Some(t);
                             }
                         }
                     }
@@ -506,12 +506,11 @@ pub fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
     while let Some(paren_expr) = node.cast::<ast::Parenthesized>() {
         node = node.find(paren_expr.expr().span())?;
     }
-    if let Some(parent) = node.parent() {
-        if let Some(field_access) = parent.cast::<ast::FieldAccess>() {
-            if node.span() == field_access.field().span() {
-                return Some(parent.clone());
-            }
-        }
+    if let Some(parent) = node.parent()
+        && let Some(field_access) = parent.cast::<ast::FieldAccess>()
+        && node.span() == field_access.field().span()
+    {
+        return Some(parent.clone());
     }
     Some(node)
 }
@@ -789,26 +788,26 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         None
     }
 
-    if node.offset() + 1 == cursor && {
-        // Check if the cursor is exactly after single dot.
-        matches!(node.kind(), SyntaxKind::Dot)
-            || (matches!(
-                node.kind(),
-                SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
-            ) && node.text().starts_with("."))
-    } {
-        if let Some(dot_access) = classify_dot_access(&node) {
-            return Some(dot_access);
+    if node.offset() + 1 == cursor
+        && {
+            // Check if the cursor is exactly after single dot.
+            matches!(node.kind(), SyntaxKind::Dot)
+                || (matches!(
+                    node.kind(),
+                    SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
+                ) && node.text().starts_with("."))
         }
+        && let Some(dot_access) = classify_dot_access(&node)
+    {
+        return Some(dot_access);
     }
 
     if node.offset() + 1 == cursor
         && matches!(node.kind(), SyntaxKind::Dots)
         && matches!(node.parent_kind(), Some(SyntaxKind::Spread))
+        && let Some(dot_access) = classify_dot_access(&node)
     {
-        if let Some(dot_access) = classify_dot_access(&node) {
-            return Some(dot_access);
-        }
+        return Some(dot_access);
     }
 
     /// Matches ref parsing broken by a colon.
@@ -830,17 +829,18 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         None
     }
 
-    if node.offset() + 1 == cursor && {
-        // Check if the cursor is exactly after single dot.
-        matches!(node.kind(), SyntaxKind::Colon)
-            || (matches!(
-                node.kind(),
-                SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
-            ) && node.text().starts_with(":"))
-    } {
-        if let Some(ref_syntax) = classify_ref(&node) {
-            return Some(ref_syntax);
+    if node.offset() + 1 == cursor
+        && {
+            // Check if the cursor is exactly after single dot.
+            matches!(node.kind(), SyntaxKind::Colon)
+                || (matches!(
+                    node.kind(),
+                    SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
+                ) && node.text().starts_with(":"))
         }
+        && let Some(ref_syntax) = classify_ref(&node)
+    {
+        return Some(ref_syntax);
     }
 
     // todo: check if we can remove Text here
@@ -1385,16 +1385,16 @@ fn arg_context<'a>(
         }
         _ => {
             let parent = node.parent();
-            if let Some(parent) = parent {
-                if parent.kind() == SyntaxKind::Named {
-                    let param_ident = parent.cast::<ast::Named>()?;
-                    let name = param_ident.name();
-                    let init = param_ident.expr();
-                    let init = parent.find(init.span())?;
-                    if init.range().contains(&node.offset()) {
-                        let name = args_node.find(name.span())?;
-                        return Some(ArgClass::Named(name));
-                    }
+            if let Some(parent) = parent
+                && parent.kind() == SyntaxKind::Named
+            {
+                let param_ident = parent.cast::<ast::Named>()?;
+                let name = param_ident.name();
+                let init = param_ident.expr();
+                let init = parent.find(init.span())?;
+                if init.range().contains(&node.offset()) {
+                    let name = args_node.find(name.span())?;
+                    return Some(ArgClass::Named(name));
                 }
             }
 

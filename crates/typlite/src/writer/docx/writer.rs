@@ -397,13 +397,13 @@ impl DocxWriter {
                 block_type: _,
             } => {
                 // Add language information
-                if let Some(lang) = language {
-                    if !lang.is_empty() {
-                        let lang_para = Paragraph::new()
-                            .style("CodeBlock")
-                            .add_run(Run::new().add_text(lang));
-                        docx = docx.add_paragraph(lang_para);
-                    }
+                if let Some(lang) = language
+                    && !lang.is_empty()
+                {
+                    let lang_para = Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(Run::new().add_text(lang));
+                    docx = docx.add_paragraph(lang_para);
                 }
 
                 // Process code line by line, preserving line breaks

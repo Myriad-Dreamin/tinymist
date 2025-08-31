@@ -226,16 +226,18 @@ impl CompletionPair<'_, '_, '_> {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
             let apply_label = &mut label.as_str();
-            if apply_label.ends_with('"') && self.cursor.after.starts_with('"') {
-                if let Some(trimmed) = apply_label.strip_suffix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.ends_with('"')
+                && self.cursor.after.starts_with('"')
+                && let Some(trimmed) = apply_label.strip_suffix('"')
+            {
+                *apply_label = trimmed;
             }
             let from_before = slice_at(self.cursor.text, 0..self.cursor.from);
-            if apply_label.starts_with('"') && from_before.ends_with('"') {
-                if let Some(trimmed) = apply_label.strip_prefix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.starts_with('"')
+                && from_before.ends_with('"')
+                && let Some(trimmed) = apply_label.strip_prefix('"')
+            {
+                *apply_label = trimmed;
             }
 
             if apply_label.len() != label.len() {

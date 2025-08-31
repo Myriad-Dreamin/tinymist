@@ -130,31 +130,30 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                     eco_format!("symbol-{}-{}", child.kind, child.name)
                 };
 
-                if child.is_external {
-                    if let Some(fid) = child_fid {
-                        let lnk = if fid.package() == Some(for_spec) {
-                            let sub_aka = akas(fid);
-                            let sub_primary = sub_aka.first().cloned().unwrap_or_default();
-                            child.external_link = Some(format!(
-                                "#symbol-{}-{sub_primary}.{}",
-                                child.kind, child.name
-                            ));
-                            format!("#{}-{}-in-{sub_primary}", child.kind, child.name)
-                                .replace(".", "")
-                        } else if let Some(spec) = fid.package() {
-                            let lnk = format!(
-                                "https://typst.app/universe/package/{}/{}",
-                                spec.name, spec.version
-                            );
-                            child.external_link = Some(lnk.clone());
-                            lnk
-                        } else {
-                            let lnk: String = "https://typst.app/docs".into();
-                            child.external_link = Some(lnk.clone());
-                            lnk
-                        };
-                        child.symbol_link = Some(lnk);
-                    }
+                if child.is_external
+                    && let Some(fid) = child_fid
+                {
+                    let lnk = if fid.package() == Some(for_spec) {
+                        let sub_aka = akas(fid);
+                        let sub_primary = sub_aka.first().cloned().unwrap_or_default();
+                        child.external_link = Some(format!(
+                            "#symbol-{}-{sub_primary}.{}",
+                            child.kind, child.name
+                        ));
+                        format!("#{}-{}-in-{sub_primary}", child.kind, child.name).replace(".", "")
+                    } else if let Some(spec) = fid.package() {
+                        let lnk = format!(
+                            "https://typst.app/universe/package/{}/{}",
+                            spec.name, spec.version
+                        );
+                        child.external_link = Some(lnk.clone());
+                        lnk
+                    } else {
+                        let lnk: String = "https://typst.app/docs".into();
+                        child.external_link = Some(lnk.clone());
+                        lnk
+                    };
+                    child.symbol_link = Some(lnk);
                 }
 
                 let child_children = std::mem::take(&mut child.children);

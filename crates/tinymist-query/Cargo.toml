@@ -22,7 +22,6 @@ dirs.workspace = true
 ena.workspace = true
 ecow.workspace = true
 hayagriva.workspace = true
-if_chain.workspace = true
 itertools.workspace = true
 indexmap.workspace = true
 log.workspace = true

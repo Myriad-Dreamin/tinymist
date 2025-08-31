@@ -62,14 +62,13 @@ impl<'a> CodeActionWorker<'a> {
         range: &Range<usize>,
         context: &lsp_types::CodeActionContext,
     ) -> Option<()> {
-        if let Some(only) = &context.only {
-            if !only.is_empty()
-                && !only
-                    .iter()
-                    .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
-            {
-                return None;
-            }
+        if let Some(only) = &context.only
+            && !only.is_empty()
+            && !only
+                .iter()
+                .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
+        {
+            return None;
         }
 
         for diag in &context.diagnostics {
@@ -546,10 +545,10 @@ impl<'a> CodeActionWorker<'a> {
                 ),
             ];
 
-            if !new_text.is_empty() {
-                if let Some((_, edit)) = &punc_modify {
-                    edits.push(edit.clone());
-                }
+            if !new_text.is_empty()
+                && let Some((_, edit)) = &punc_modify
+            {
+                edits.push(edit.clone());
             }
 
             Some(CodeAction {
