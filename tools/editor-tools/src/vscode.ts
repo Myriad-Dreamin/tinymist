@@ -192,7 +192,7 @@ export function saveDataToFile({
   }
 }
 
-export function requestGeneratePreview(format: string, pages?: number) {
+export function requestGeneratePreview(format: string, pages?: string) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "generatePreview", format, pages });
   }

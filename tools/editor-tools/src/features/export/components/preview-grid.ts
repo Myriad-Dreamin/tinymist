@@ -1,6 +1,6 @@
 import van, { type State } from "vanjs-core";
 import type { ExportConfig, PreviewPage } from "../types";
-// import { requestGeneratePreview } from "@/vscode";
+import { requestGeneratePreview } from "../../../vscode";
 
 const { div, h3, img, span, button } = van.tags;
 
@@ -26,20 +26,42 @@ export const PreviewGrid = ({ exportConfig, previewPages }: PreviewGridProps) =>
 
     try {
       // Request preview generation from VSCode extension
-      // requestGeneratePreview(format.id, exportConfig.val.options);
+      requestGeneratePreview(format.id, "-");
 
-      // In a real implementation, we would receive the response via VSCode channel
-      // For now, we'll simulate with mock data after a delay
-      setTimeout(() => {
-        isLoading.val = false;
-        // previewPages would be updated via VSCode channel
-      }, 2000);
-
+      // Response will be handled via VSCode channel in setupPreviewListeners
     } catch (err) {
       error.val = err instanceof Error ? err.message : "Failed to generate preview";
       isLoading.val = false;
     }
   };
+
+  // Set up listeners for preview responses
+  const setupPreviewListeners = () => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === "previewGenerated") {
+        if (event.data.format === format.id) {
+          previewPages.val = event.data.pages || [];
+          isLoading.val = false;
+        }
+      } else if (event.data.type === "previewError") {
+        error.val = event.data.error;
+        isLoading.val = false;
+      }
+    };
+
+    // Add event listener when component is rendered
+    if (typeof window !== 'undefined') {
+      window.addEventListener("message", handleMessage);
+
+      // Cleanup function would be called when component is destroyed
+      // In VanJS, we can use the reactive pattern for cleanup
+    }
+  };
+
+  // Set up listeners when component is first created
+  van.derive(() => {
+    setupPreviewListeners();
+  });
 
   const adjustZoom = (delta: number) => {
     const newZoom = Math.max(25, Math.min(400, zoomLevel.val + delta));
