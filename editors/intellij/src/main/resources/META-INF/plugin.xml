@@ -53,10 +53,10 @@
         <codeInsight.parameterInfo
                 language="Typst"
                 implementationClass="com.redhat.devtools.lsp4ij.features.signatureHelp.LSPParameterInfoHandler"/>
-        <!-- LSP textDocument/documentSymbol -->
-        <lang.psiStructureViewFactory
+        <!-- This seems to interfere with textDocument/foldingRange -> disable it for now -->
+        <!-- lang.psiStructureViewFactory
                 language="Typst"
-                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+                implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/ -->
 
         <!-- Settings -->
         <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
