@@ -146,8 +146,8 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
             match config.as_ref() {
                 Preview(..) => todo!(),
                 ExportPdf(config) => Self::export_bytes::<_, PdfExport>(graph, when, config),
-                ExportPng(config) => Self::export_bytes::<_, PngExport>(graph, when, config),
-                ExportSvg(config) => Self::export_string::<_, SvgExport>(graph, when, config),
+                ExportPng(_config) => todo!(),
+                ExportSvg(_config) => todo!(),
                 ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
                 // todo: configuration
                 ExportSvgHtml(_config) => Self::export_string::<

@@ -560,6 +560,7 @@ impl Config {
             // },
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export,
+                pages: None, // todo: set pages
                 pdf_standards: self.pdf_standards().unwrap_or_default(),
                 creation_timestamp: self.creation_timestamp(),
             }),

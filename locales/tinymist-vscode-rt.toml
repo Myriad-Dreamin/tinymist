@@ -17,6 +17,9 @@ zh = "导出为 HTML"
 en = "Export as Markdown"
 zh = "导出为 Markdown"
 
+["Export as PDF with specified pages"]
+en = "Export as PDF with specified pages"
+
 ["Export as PDF"]
 en = "Export as PDF"
 zh = "导出为 PDF"
@@ -52,9 +55,18 @@ zh = "导出首页为单个 PNG"
 en = "Export the first page as a single SVG"
 zh = "导出首页为单个 SVG"
 
+["Export the specified pages as multiple PNGs"]
+en = "Export the specified pages as multiple PNGs"
+
+["Export the specified pages as multiple SVGs"]
+en = "Export the specified pages as multiple SVGs"
+
 ["Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."]
 en = "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."
 zh = "提示：您可以在侧边栏中创建和查找本地包。有关更多信息，请参见 https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper。"
+
+["PDF (Specific Pages)"]
+en = "PDF (Specific Pages)"
 
 ["PNG (First Page)"]
 en = "PNG (First Page)"
@@ -64,9 +76,15 @@ zh = "PNG (首页)"
 en = "PNG (Merged)"
 zh = "PNG (合并)"
 
+["PNG (Specific Pages)"]
+en = "PNG (Specific Pages)"
+
 ["PNG (Task)"]
 en = "PNG (Task)"
 zh = "PNG (任务)"
+
+["Pages to export"]
+en = "Pages to export"
 
 ["Pick a method to export and show"]
 en = "Pick a method to export and show"
@@ -95,10 +113,25 @@ zh = "SVG (首页)"
 en = "SVG (Merged)"
 zh = "SVG (合并)"
 
+["SVG (Specific Pages)"]
+en = "SVG (Specific Pages)"
+
 ["SVG (Task)"]
 en = "SVG (Task)"
 zh = "SVG (任务)"
 
+["Specify the pages you want to export"]
+en = "Specify the pages you want to export"
+
 ["TeX processor"]
 en = "TeX processor"
 zh = "TeX 导出的处理脚本"
+
+["a page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count."]
+en = "a page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count."
+
+["e.g. `1-3,5,7-9`, leave empty for all pages"]
+en = "e.g. `1-3,5,7-9`, leave empty for all pages"
+
+["e.g., `page-{0p}-of-{t}.png`"]
+en = "e.g., `page-{0p}-of-{t}.png`"

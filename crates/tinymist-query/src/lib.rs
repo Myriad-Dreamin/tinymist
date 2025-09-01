@@ -146,6 +146,29 @@ mod polymorphic {
         pub task: ProjectTask,
         /// Whether to open the exported file(s) after the export is done.
         pub open: bool,
+        /// Whether to write to file.
+        pub write: bool,
+    }
+
+    /// The response to an export request.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum OnExportResponse {
+        Failed {
+            message: String,
+        },
+        Single {
+            path: Option<PathBuf>,
+            data: Option<String>,
+        },
+        Multiple(Vec<PagedExportResponse>),
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct PagedExportResponse {
+        pub page: usize,
+        pub path: Option<PathBuf>,
+        pub data: Option<String>,
     }
 
     /// A request to format the document.
@@ -333,7 +356,7 @@ mod polymorphic {
     #[serde(untagged)]
     pub enum CompilerQueryResponse {
         /// The response to the on export request.
-        OnExport(Option<PathBuf>),
+        OnExport(Option<OnExportResponse>),
         /// The response to the hover request.
         Hover(Option<Hover>),
         /// The response to the goto definition request.

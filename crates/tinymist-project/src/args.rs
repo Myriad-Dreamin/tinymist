@@ -227,16 +227,25 @@ impl TaskCompileArgs {
         let config = match output_format {
             OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
                 export,
+                pages: self.pages.clone(),
                 pdf_standards: self.pdf.pdf_standard.clone(),
                 creation_timestamp: None,
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
                 export,
+                pages: self.pages.clone(),
+                page_number_template: None,
+                merge: None,
                 ppi: self.png.ppi.try_into().unwrap(),
                 fill: None,
             }),
-            OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
-            OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
+            OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask {
+                export,
+                pages: self.pages.clone(),
+                page_number_template: None,
+                merge: None,
+            }),
+            OutputFormat::Html => ProjectTask::ExportHtml(ExportHtmlTask { export }),
         };
 
         Ok(ApplyProjectTask {
