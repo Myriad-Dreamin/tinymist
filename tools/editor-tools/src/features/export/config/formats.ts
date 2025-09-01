@@ -21,6 +21,7 @@ const MERGE_OPTS: OptionSchema[] = [
     label: "Gap Between Pages",
     description: 'Space between pages when merged (e.g., "10pt", "5mm")',
     default: "0pt",
+    dependsOn: "merged", // Only show when merged is true
   },
 ];
 

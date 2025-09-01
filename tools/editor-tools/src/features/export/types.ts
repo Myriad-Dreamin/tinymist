@@ -9,6 +9,7 @@ export interface OptionSchema {
   options?: Array<{ value: string | number | boolean; label: string }>;
   min?: number;
   max?: number;
+  dependsOn?: string; // Key of another option that this option depends on
 }
 
 export interface ExportFormat {

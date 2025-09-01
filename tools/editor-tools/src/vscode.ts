@@ -71,6 +71,15 @@ export const didStartServerProfiling = van.state<boolean>(false);
 
 export const styleAtCursor = van.state<StyleAtCursor | undefined>(undefined);
 
+// Document URI state with versioning
+export interface VersionedDocUri {
+  version: number;
+  uri: string;
+}
+
+export const focusedDocUri = van.state<VersionedDocUri | undefined>(undefined);
+export const isDocUriLocked = van.state<boolean>(false);
+
 /// A frontend will try to setup a vscode channel if it is running
 /// in vscode.
 export function setupVscodeChannel() {
@@ -88,6 +97,17 @@ export function setupVscodeChannel() {
         }
         case "styleAtCursor": {
           styleAtCursor.val = event.data.data;
+          break;
+        }
+        case "focusedDocUri": {
+          const incomingData = event.data.data as VersionedDocUri;
+          // Only update if not locked and version is newer (or no current version)
+          if (!isDocUriLocked.val &&
+              incomingData &&
+              incomingData.uri &&
+              (!focusedDocUri.val || incomingData.version > focusedDocUri.val.version)) {
+            focusedDocUri.val = incomingData;
+          }
           break;
         }
         case "previewGenerated": {

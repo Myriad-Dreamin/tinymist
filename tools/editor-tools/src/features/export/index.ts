@@ -7,7 +7,7 @@ import "./styles.css";
 // Components
 import { Header } from "./components/header";
 import { FormatSelector } from "./components/format-selector";
-import { OptionsPanel } from "./components/options-panel";
+import { OptionsPanel, DocumentUriSection } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
 import { ActionButtons } from "./components/action-buttons";
 
@@ -54,6 +54,18 @@ const ExportTool = () => {
       title: "Export Tool",
       description: "Configure and export your Typst documents to various formats"
     }),
+
+    // Input Document Section
+    div(
+      { style: "margin-bottom: 1.5rem;" },
+      div(
+        {
+          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
+        },
+        "Input Document"
+      ),
+      DocumentUriSection()
+    ),
 
     // Format Selection
     div(
