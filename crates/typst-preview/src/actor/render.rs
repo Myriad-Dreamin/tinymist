@@ -225,12 +225,11 @@ impl RenderActor {
         // order
         let range_res = {
             let mut range_res = range_res;
-            if let Some(info) = &mut range_res {
-                if let Some((x, y)) = info.start.zip(info.end) {
-                    if y <= x {
-                        std::mem::swap(&mut info.start, &mut info.end);
-                    }
-                }
+            if let Some(info) = &mut range_res
+                && let Some((x, y)) = info.start.zip(info.end)
+                && y <= x
+            {
+                std::mem::swap(&mut info.start, &mut info.end);
             }
 
             range_res

@@ -59,15 +59,15 @@ impl TableParser {
 
     fn find_table_in_grid(grid_element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &grid_element.children {
-            if let HtmlNode::Element(table_elem) = child {
-                if table_elem.tag == md_tag::table {
-                    // Find table tag within m1table
-                    for inner_child in &table_elem.children {
-                        if let HtmlNode::Element(inner) = inner_child {
-                            if inner.tag == tag::table {
-                                return Some(inner);
-                            }
-                        }
+            if let HtmlNode::Element(table_elem) = child
+                && table_elem.tag == md_tag::table
+            {
+                // Find table tag within m1table
+                for inner_child in &table_elem.children {
+                    if let HtmlNode::Element(inner) = inner_child
+                        && inner.tag == tag::table
+                    {
+                        return Some(inner);
                     }
                 }
             }
@@ -77,10 +77,10 @@ impl TableParser {
 
     fn find_table_direct(element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &element.children {
-            if let HtmlNode::Element(table_elem) = child {
-                if table_elem.tag == tag::table {
-                    return Some(table_elem);
-                }
+            if let HtmlNode::Element(table_elem) = child
+                && table_elem.tag == tag::table
+            {
+                return Some(table_elem);
             }
         }
         None
@@ -134,14 +134,14 @@ impl TableParser {
         is_header_section: bool,
     ) -> Result<()> {
         for row_node in &section.children {
-            if let HtmlNode::Element(row_elem) = row_node {
-                if row_elem.tag == tag::tr {
-                    let current_row =
-                        Self::process_table_row(parser, row_elem, is_header_section, headers)?;
+            if let HtmlNode::Element(row_elem) = row_node
+                && row_elem.tag == tag::tr
+            {
+                let current_row =
+                    Self::process_table_row(parser, row_elem, is_header_section, headers)?;
 
-                    if !is_header_section && !current_row.is_empty() {
-                        rows.push(current_row);
-                    }
+                if !is_header_section && !current_row.is_empty() {
+                    rows.push(current_row);
                 }
             }
         }
@@ -158,20 +158,20 @@ impl TableParser {
 
         // Process cells in this row
         for cell_node in &row_elem.children {
-            if let HtmlNode::Element(cell) = cell_node {
-                if cell.tag == tag::td || cell.tag == tag::th {
-                    let mut cell_content = Vec::new();
-                    parser.convert_children_into(&mut cell_content, cell)?;
+            if let HtmlNode::Element(cell) = cell_node
+                && (cell.tag == tag::td || cell.tag == tag::th)
+            {
+                let mut cell_content = Vec::new();
+                parser.convert_children_into(&mut cell_content, cell)?;
 
-                    // Merge cell content into a single node
-                    let merged_cell = Self::merge_cell_content(cell_content);
+                // Merge cell content into a single node
+                let merged_cell = Self::merge_cell_content(cell_content);
 
-                    // Add to appropriate section
-                    if is_header || cell.tag == tag::th {
-                        headers.push(merged_cell);
-                    } else {
-                        current_row.push(merged_cell);
-                    }
+                // Add to appropriate section
+                if is_header || cell.tag == tag::th {
+                    headers.push(merged_cell);
+                } else {
+                    current_row.push(merged_cell);
                 }
             }
         }
@@ -214,10 +214,11 @@ impl TableParser {
 
     fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
         for row_node in &section.children {
-            if let HtmlNode::Element(row_elem) = row_node {
-                if row_elem.tag == tag::tr && Self::check_row_for_complex_cells(row_elem) {
-                    return true;
-                }
+            if let HtmlNode::Element(row_elem) = row_node
+                && row_elem.tag == tag::tr
+                && Self::check_row_for_complex_cells(row_elem)
+            {
+                return true;
             }
         }
         false
@@ -225,15 +226,14 @@ impl TableParser {
 
     fn check_row_for_complex_cells(row_elem: &HtmlElement) -> bool {
         for cell_node in &row_elem.children {
-            if let HtmlNode::Element(cell) = cell_node {
-                if (cell.tag == tag::td || cell.tag == tag::th)
-                    && cell.attrs.0.iter().any(|(name, _)| {
-                        let name = name.into_inner();
-                        name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
-                    })
-                {
-                    return true;
-                }
+            if let HtmlNode::Element(cell) = cell_node
+                && (cell.tag == tag::td || cell.tag == tag::th)
+                && cell.attrs.0.iter().any(|(name, _)| {
+                    let name = name.into_inner();
+                    name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
+                })
+            {
+                return true;
             }
         }
         false

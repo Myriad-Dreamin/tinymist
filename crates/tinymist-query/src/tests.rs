@@ -251,20 +251,20 @@ fn match_by_pos(mut n: LinkedNode, prev: bool, ident: bool) -> usize {
             match n.kind() {
                 SyntaxKind::Closure => {
                     let closure = n.cast::<ast::Closure>().unwrap();
-                    if let Some(name) = closure.name() {
-                        if let Some(m) = n.find(name.span()) {
-                            n = m;
-                            break 'match_loop;
-                        }
+                    if let Some(name) = closure.name()
+                        && let Some(m) = n.find(name.span())
+                    {
+                        n = m;
+                        break 'match_loop;
                     }
                 }
                 SyntaxKind::LetBinding => {
                     let let_binding = n.cast::<ast::LetBinding>().unwrap();
-                    if let Some(name) = let_binding.kind().bindings().first() {
-                        if let Some(m) = n.find(name.span()) {
-                            n = m;
-                            break 'match_loop;
-                        }
+                    if let Some(name) = let_binding.kind().bindings().first()
+                        && let Some(m) = n.find(name.span())
+                    {
+                        n = m;
+                        break 'match_loop;
                     }
                 }
                 _ => {}

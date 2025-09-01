@@ -218,13 +218,13 @@ impl<'w> Linter<'w> {
 
     fn check_variable_font<'a>(&mut self, args: impl IntoIterator<Item = ast::Arg<'a>>) {
         for arg in args {
-            if let ast::Arg::Named(arg) = arg {
-                if arg.name().as_str() == "font" {
-                    self.check_variable_font_object(arg.expr().to_untyped());
-                    if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
-                        for item in array.items() {
-                            self.check_variable_font_object(item.to_untyped());
-                        }
+            if let ast::Arg::Named(arg) = arg
+                && arg.name().as_str() == "font"
+            {
+                self.check_variable_font_object(arg.expr().to_untyped());
+                if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
+                    for item in array.items() {
+                        self.check_variable_font_object(item.to_untyped());
                     }
                 }
             }
@@ -234,10 +234,10 @@ impl<'w> Linter<'w> {
     fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
         if let Some(font_dict) = expr.cast::<ast::Dict>() {
             for item in font_dict.items() {
-                if let ast::DictItem::Named(arg) = item {
-                    if arg.name().as_str() == "name" {
-                        self.check_variable_font_str(arg.expr().to_untyped());
-                    }
+                if let ast::DictItem::Named(arg) = item
+                    && arg.name().as_str() == "name"
+                {
+                    self.check_variable_font_str(arg.expr().to_untyped());
                 }
             }
         }

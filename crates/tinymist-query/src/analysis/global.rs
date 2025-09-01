@@ -653,10 +653,10 @@ impl SharedContext {
         // e.g. `f(x|)`, we will select the `x`
         if cursor == node.offset() + 1 && is_mark(node.kind()) {
             let prev_leaf = node.prev_leaf();
-            if let Some(prev_leaf) = prev_leaf {
-                if prev_leaf.range().end == node.offset() {
-                    node = prev_leaf;
-                }
+            if let Some(prev_leaf) = prev_leaf
+                && prev_leaf.range().end == node.offset()
+            {
+                node = prev_leaf;
             }
         }
 

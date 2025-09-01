@@ -349,18 +349,19 @@ impl Tokenizer {
             .map(|token_type| Token::new(token_type, modifiers, range.clone()));
 
         // Push start
-        if let Some(prev_token) = self.token.as_mut() {
-            if !prev_token.range.is_empty() && prev_token.range.start < range.start {
-                let end = prev_token.range.end.min(range.start);
-                let sliced = Token {
-                    token_type: prev_token.token_type,
-                    modifiers: prev_token.modifiers,
-                    range: prev_token.range.start..end,
-                };
-                // Slice the previous token
-                prev_token.range.start = end;
-                self.push(sliced);
-            }
+        if let Some(prev_token) = self.token.as_mut()
+            && !prev_token.range.is_empty()
+            && prev_token.range.start < range.start
+        {
+            let end = prev_token.range.end.min(range.start);
+            let sliced = Token {
+                token_type: prev_token.token_type,
+                modifiers: prev_token.modifiers,
+                range: prev_token.range.start..end,
+            };
+            // Slice the previous token
+            prev_token.range.start = end;
+            self.push(sliced);
         }
 
         if !is_leaf {
@@ -372,14 +373,14 @@ impl Tokenizer {
         }
 
         // Push end
-        if let Some(token) = token.clone() {
-            if !token.range.is_empty() {
-                // Slice the previous token
-                if let Some(prev_token) = self.token.as_mut() {
-                    prev_token.range.start = token.range.end;
-                }
-                self.push(token);
+        if let Some(token) = token.clone()
+            && !token.range.is_empty()
+        {
+            // Slice the previous token
+            if let Some(prev_token) = self.token.as_mut() {
+                prev_token.range.start = token.range.end;
             }
+            self.push(token);
         }
     }
 

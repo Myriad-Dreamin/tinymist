@@ -6,67 +6,63 @@ impl CompletionPair<'_, '_, '_> {
     pub fn complete_comments(&mut self) -> bool {
         let text = self.cursor.leaf.get().text();
         // check if next line defines a function
-        if_chain! {
-            if text == "///" || text == "/// ";
+        if (text == "///" || text == "/// ")
             // hash node
-            if let Some(hash_node) = self.cursor.leaf.next_leaf();
+            && let Some(hash_node) = self.cursor.leaf.next_leaf()
             // let node
-            if let Some(let_node) = hash_node.next_leaf();
-            if let Some(let_closure) = let_node.next_leaf();
-            if matches!(let_closure.parent_kind(), Some(SyntaxKind::Closure));
-            if let Some(closure) = let_closure.parent();
-            if let Some(closure) = closure.cast::<ast::Expr>();
-            if let ast::Expr::Closure(c) = closure;
-            then {
-                // Only completes if the next line is a function definition
-                let rng = self.cursor.leaf.offset()..hash_node.offset();
-                let text_between = &self.cursor.source.text()[rng];
-                let mut line_count = 0;
-                for ch in text_between.chars() {
-                    if ch == '\n' {
-                        line_count += 1;
-                    }
-                    if line_count > 1 {
-                        return false;
-                    }
+            && let Some(let_node) = hash_node.next_leaf()
+            && let Some(let_closure) = let_node.next_leaf()
+            && matches!(let_closure.parent_kind(), Some(SyntaxKind::Closure))
+            && let Some(closure) = let_closure.parent()
+            && let Some(closure) = closure.cast::<ast::Expr>()
+            && let ast::Expr::Closure(c) = closure
+        {
+            // Only completes if the next line is a function definition
+            let rng = self.cursor.leaf.offset()..hash_node.offset();
+            let text_between = &self.cursor.source.text()[rng];
+            let mut line_count = 0;
+            for ch in text_between.chars() {
+                if ch == '\n' {
+                    line_count += 1;
                 }
-
-                let mut doc_snippet: String = if text == "///" {
-                    " $0\n///".to_string()
-                } else {
-                    "$0\n///".to_string()
-                };
-                let mut i = 0;
-                for param in c.params().children() {
-                    // TODO: Properly handle Pos and Spread argument
-                    let param: &EcoString = match param {
-                        Param::Pos(p) => {
-                            match p {
-                                ast::Pattern::Normal(ast::Expr::Ident(ident)) => ident.get(),
-                                _ => &"_".into()
-                            }
-                        }
-                        Param::Named(n) => n.name().get(),
-                        Param::Spread(s) => {
-                            if let Some(ident) = s.sink_ident() {
-                                &eco_format!("{}", ident.get())
-                            } else {
-                                &EcoString::new()
-                            }
-                        }
-                    };
-                    log::info!("param: {param}, index: {i}");
-                    doc_snippet += &format!("\n/// - {param} (${}): ${}", i + 1, i + 2);
-                    i += 2;
+                if line_count > 1 {
+                    return false;
                 }
-                doc_snippet += &format!("\n/// -> ${}", i + 1);
-                self.push_completion(Completion {
-                    label: "Document function".into(),
-                    apply: Some(doc_snippet.into()),
-                    ..Completion::default()
-                });
             }
-        };
+
+            let mut doc_snippet: String = if text == "///" {
+                " $0\n///".to_string()
+            } else {
+                "$0\n///".to_string()
+            };
+            let mut i = 0;
+            for param in c.params().children() {
+                // TODO: Properly handle Pos and Spread argument
+                let param: &EcoString = match param {
+                    Param::Pos(p) => match p {
+                        ast::Pattern::Normal(ast::Expr::Ident(ident)) => ident.get(),
+                        _ => &"_".into(),
+                    },
+                    Param::Named(n) => n.name().get(),
+                    Param::Spread(s) => {
+                        if let Some(ident) = s.sink_ident() {
+                            &eco_format!("{}", ident.get())
+                        } else {
+                            &EcoString::new()
+                        }
+                    }
+                };
+                log::info!("param: {param}, index: {i}");
+                doc_snippet += &format!("\n/// - {param} (${}): ${}", i + 1, i + 2);
+                i += 2;
+            }
+            doc_snippet += &format!("\n/// -> ${}", i + 1);
+            self.push_completion(Completion {
+                label: "Document function".into(),
+                apply: Some(doc_snippet.into()),
+                ..Completion::default()
+            });
+        }
 
         true
     }
@@ -77,26 +73,25 @@ impl CompletionPair<'_, '_, '_> {
             node_ancestors(&self.cursor.leaf).find(|node| matches!(node.kind(), SyntaxKind::Raw));
 
         // Behind a half-completed binding: "#let x = |" or `#let f(x) = |`.
-        if_chain! {
-            if let Some(prev) = self.cursor.leaf.prev_leaf();
-            if matches!(prev.kind(), SyntaxKind::Eq | SyntaxKind::Arrow);
-            if matches!( prev.parent_kind(), Some(SyntaxKind::LetBinding | SyntaxKind::Closure));
-            then {
-                self.cursor.from = self.cursor.cursor;
-                self.code_completions( false);
-                return true;
-            }
+        if let Some(prev) = self.cursor.leaf.prev_leaf()
+            && matches!(prev.kind(), SyntaxKind::Eq | SyntaxKind::Arrow)
+            && matches!(
+                prev.parent_kind(),
+                Some(SyntaxKind::LetBinding | SyntaxKind::Closure)
+            )
+        {
+            self.cursor.from = self.cursor.cursor;
+            self.code_completions(false);
+            return true;
         }
 
         // Behind a half-completed context block: "#context |".
-        if_chain! {
-            if let Some(prev) = self.cursor.leaf.prev_leaf();
-            if prev.kind() == SyntaxKind::Context;
-            then {
-                self.cursor.from = self.cursor.cursor;
-                self.code_completions(false);
-                return true;
-            }
+        if let Some(prev) = self.cursor.leaf.prev_leaf()
+            && prev.kind() == SyntaxKind::Context
+        {
+            self.cursor.from = self.cursor.cursor;
+            self.code_completions(false);
+            return true;
         }
 
         // Directly after a raw block.
@@ -171,14 +166,12 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         // Behind a half-completed context block: "context |".
-        if_chain! {
-            if let Some(prev) = self.cursor.leaf.prev_leaf();
-            if prev.kind() == SyntaxKind::Context;
-            then {
-                self.cursor.from = self.cursor.cursor;
-                self.code_completions(false);
-                return true;
-            }
+        if let Some(prev) = self.cursor.leaf.prev_leaf()
+            && prev.kind() == SyntaxKind::Context
+        {
+            self.cursor.from = self.cursor.cursor;
+            self.code_completions(false);
+            return true;
         }
 
         // An existing identifier: "{ pa| }".

@@ -327,10 +327,10 @@ impl ExternalDocLink {
     fn get(def: &Definition) -> Option<CommandLink> {
         let value = def.value();
 
-        if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def) {
-                return Some(builtin);
-            }
+        if matches!(value, Some(Value::Func(..)))
+            && let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def)
+        {
+            return Some(builtin);
         };
 
         value.and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", &value))

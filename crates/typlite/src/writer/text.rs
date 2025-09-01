@@ -155,10 +155,10 @@ impl TextWriter {
                 }
             }
             node if node.is_custom_type::<ExternalFrameNode>() => {
-                if let Some(external_frame) = node.as_custom_type::<ExternalFrameNode>() {
-                    if !external_frame.alt_text.is_empty() {
-                        output.push_str(&external_frame.alt_text);
-                    }
+                if let Some(external_frame) = node.as_custom_type::<ExternalFrameNode>()
+                    && !external_frame.alt_text.is_empty()
+                {
+                    output.push_str(&external_frame.alt_text);
                 }
             }
             node if node.is_custom_type::<crate::common::HighlightNode>() => {
