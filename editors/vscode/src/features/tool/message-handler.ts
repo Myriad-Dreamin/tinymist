@@ -366,7 +366,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
 
       // Execute export with configuration (file export by default)
-      const response = await provider.export(uri, provider.opts());
+      const response = await provider.export(uri, provider.opts(), true);
       console.log("Preview generation response:", response);
       if (!response) {
         await vscode.window.showErrorMessage("Failed to generate preview data");

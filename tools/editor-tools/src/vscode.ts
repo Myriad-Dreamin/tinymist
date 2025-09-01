@@ -93,16 +93,20 @@ export function setupVscodeChannel() {
         case "previewGenerated": {
           // Handle preview generation response
           // You can dispatch this to the export tool if needed
-          window.dispatchEvent(new CustomEvent('exportPreviewGenerated', {
-            detail: event.data
-          }));
+          window.dispatchEvent(
+            new CustomEvent("exportPreviewGenerated", {
+              detail: event.data,
+            }),
+          );
           break;
         }
         case "previewError": {
           // Handle preview generation error
-          window.dispatchEvent(new CustomEvent('exportPreviewError', {
-            detail: event.data
-          }));
+          window.dispatchEvent(
+            new CustomEvent("exportPreviewError", {
+              detail: event.data,
+            }),
+          );
           break;
         }
       }
@@ -192,20 +196,15 @@ export function saveDataToFile({
   }
 }
 
-export function requestGeneratePreview(format: string, pages?: string) {
-  if (vscodeAPI?.postMessage) {
-    vscodeAPI.postMessage({ type: "generatePreview", format, pages });
-  }
+export function requestGeneratePreview(format: string, extraArgs: Record<string, unknown>) {
+  console.log("requestGeneratePreview", format, extraArgs);
+  vscodeAPI?.postMessage?.({ type: "generatePreview", format, extraArgs: extraArgs ?? {} });
 }
 
-export function requestExportDocument(format: string, config: Record<string, unknown>) {
-  if (vscodeAPI?.postMessage) {
-    vscodeAPI.postMessage({ type: "exportDocument", format, config });
-  }
+export function requestExportDocument(format: string, extraArgs: Record<string, unknown>) {
+  vscodeAPI?.postMessage?.({ type: "exportDocument", format, extraArgs: extraArgs ?? {} });
 }
 
 export function requestCreateExportTask(taskDefinition: TaskDefinition) {
-  if (vscodeAPI?.postMessage) {
-    vscodeAPI.postMessage({ type: "createExportTask", taskDefinition });
-  }
+  vscodeAPI?.postMessage?.({ type: "createExportTask", taskDefinition });
 }
