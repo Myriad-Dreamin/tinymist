@@ -3,6 +3,7 @@ import { extensionState } from "../../state";
 import type { EditorToolContext } from "../../tools";
 import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
 import { tinymist, type OnExportResponse } from "../../lsp";
+import { ExportArgs, ExportFormat, exportOps, provideFormats } from "../tasks.export";
 
 export interface WebviewMessage {
   type: string;
@@ -91,14 +92,14 @@ interface CreateExportTaskMessage {
 
 interface ExportDocumentMessage {
   type: "exportDocument";
-  format: string;
-  config: Record<string, unknown>;
+  format: ExportFormat;
+  extraArgs: ExportArgs;
 }
 
 interface GeneratePreviewMessage {
   type: "generatePreview";
-  format: string;
-  pages?: string;
+  format: ExportFormat;
+  extraArgs: ExportArgs;
 }
 
 export const messageHandlers: Record<string, MessageHandler> = {
@@ -292,51 +293,48 @@ export const messageHandlers: Record<string, MessageHandler> = {
     }
   },
 
-  exportDocument: async ({ format, config }: ExportDocumentMessage) => {
+  exportDocument: async ({ format, extraArgs }: ExportDocumentMessage) => {
     try {
+      const ops = exportOps(extraArgs);
+      const formatProvider = provideFormats(extraArgs);
+
       // Get the active document
-      const uri = extensionState.getFocusingFile();
+      const uri = ops.resolveInputPath();
       if (!uri) {
         await vscode.window.showErrorMessage("No active document found");
         return;
       }
 
-      // Map format to export function
-      const exportFunctions: Record<
-        string,
-        (
-          uri: string,
-          opts?: Record<string, unknown>,
-          inMemory?: boolean,
-        ) => Promise<OnExportResponse>
-      > = {
-        pdf: tinymist.exportPdf,
-        png: tinymist.exportPng,
-        svg: tinymist.exportSvg,
-        html: tinymist.exportHtml,
-        markdown: tinymist.exportMarkdown,
-        tex: tinymist.exportTeX,
-        text: tinymist.exportText,
-        query: tinymist.exportQuery,
-      };
-
-      const exportFunction = exportFunctions[format];
-      if (!exportFunction) {
+      const provider = formatProvider[format];
+      if (!provider) {
         await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
         return;
       }
 
       // Execute export with configuration (file export by default)
-      const result = await exportFunction(uri, config, false);
+      const result = await provider.export(uri, provider.opts());
 
-      if (result) {
-        const resultPath =
-          typeof result === "string"
-            ? result
-            : Array.isArray(result)
-              ? result.join(", ")
-              : "Unknown";
-        await vscode.window.showInformationMessage(`Exported successfully to: ${resultPath}`);
+      // Handle the response based on the new OnExportResponse format
+      if ("message" in result) {
+        // Error case - Failed { message: String }
+        await vscode.window.showErrorMessage(`Export failed: ${result.message}`);
+      } else if ("path" in result) {
+        // Success case - Single { path: Option<PathBuf>, data: Option<String> }
+        if (result.path) {
+          await vscode.window.showInformationMessage(`Exported successfully to: ${result.path}`);
+        } else {
+          await vscode.window.showInformationMessage("Export completed");
+        }
+      } else if (Array.isArray(result)) {
+        // Multiple files - Multiple(Vec<PagedExportResponse>)
+        const paths = result.map((item) => item.path).filter(Boolean);
+        if (paths.length > 0) {
+          await vscode.window.showInformationMessage(
+            `Exported successfully to: ${paths.join(", ")}`,
+          );
+        } else {
+          await vscode.window.showInformationMessage("Export completed");
+        }
       } else {
         await vscode.window.showInformationMessage("Export completed");
       }
@@ -345,96 +343,68 @@ export const messageHandlers: Record<string, MessageHandler> = {
     }
   },
 
-  generatePreview: async ({ format, pages }: GeneratePreviewMessage, { postMessage }) => {
-      console.log(`Generating preview for format=${format}, pages=${pages}`);
+  generatePreview: async ({ format, extraArgs }: GeneratePreviewMessage, { postMessage }) => {
+    console.log(`Generating preview for format=${format}, extraArgs=${extraArgs}`);
     try {
+      const ops = exportOps(extraArgs);
+      const formatProvider = provideFormats(extraArgs);
+
       // Get the active document
-      const uri = extensionState.getFocusingFile();
+      const uri = ops.resolveInputPath();
       if (!uri) {
+        await vscode.window.showErrorMessage("No active document found");
+        return;
+      }
+
+      // Use PNG for both PDF and PNG preview (PNG is better for web display)
+      const actualFormat = format === "pdf" ? "png" : format;
+
+      const provider = formatProvider[actualFormat];
+      if (!provider) {
+        await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
+        return;
+      }
+
+      // Execute export with configuration (file export by default)
+      const response = await provider.export(uri, provider.opts());
+      console.log("Preview generation response:", response);
+      if (!response) {
+        await vscode.window.showErrorMessage("Failed to generate preview data");
+        return;
+      }
+
+      // Handle error case
+      if ("message" in response) {
         postMessage({
           type: "previewError",
-          error: "No active document found",
+          error: response.message,
         });
         return;
       }
-      console.log(`Generating preview for format=${format}, pages=${pages}, uri=${uri}`);
+
+      console.log(`Generating preview for format=${format}, extraArgs=${extraArgs}, uri=${uri}`);
       // For visual formats, generate PNG/SVG previews
       if (format === "pdf" || format === "png" || format === "svg") {
-        let previewOptions: Record<string, unknown>;
-        let actualFormat: string;
-
-        const pageSelection = pages ? { range: `1-` } : "first";
-        if (format === "svg") {
-          actualFormat = "svg";
-          previewOptions = {
-            page: pageSelection,
-          };
-        } else {
-          // Use PNG for both PDF and PNG preview (PNG is better for web display)
-          actualFormat = "png";
-          previewOptions = {
-            ppi: 36, // Lower resolution for faster preview generation
-            page: pageSelection,
-          };
-        }
-
-        // Use the export command with inMemory=true instead of renderToMemory
-        const exportFunction = actualFormat === "svg" ? tinymist.exportSvg : tinymist.exportPng;
-        console.log(`Generating preview using ${actualFormat}...`, previewOptions);
-        const response = await exportFunction(uri, previewOptions, true);
-        console.log("Preview generation response:", response);
-        if (!response) {
-          postMessage({
-            type: "previewError",
-            error: "Failed to generate preview data",
-          });
-          return;
-        }
+        // Extract base64 data from the response
+        const renderedPages = "data" in response ? [{ page: 1, ...response }] : response;
 
         // Determine MIME type
         const mimeType = actualFormat === "svg" ? "image/svg+xml" : "image/png";
 
-        // Handle both single and multiple pages
-        if (typeof response === "string") {
-          // Single page
-          postMessage({
-            type: "previewGenerated",
-            format,
-            pages: [
-              {
-                pageNumber: 1,
-                imageData: `data:${mimeType};base64,${response}`,
-                width: 0, // Will be determined by the frontend
-                height: 0,
-              },
-            ],
-          });
-        } else {
-          // Multiple pages
-          postMessage({
-            type: "previewGenerated",
-            format,
-            pages: response.map((data: string, index: number) => ({
-              pageNumber: index + 1,
-              imageData: `data:${mimeType};base64,${data}`,
-              width: 0, // Will be determined by the frontend
-              height: 0,
-            })),
-          });
-        }
-      } else {
-        // For text-based formats, generate a simple text preview
+        // Multiple pages
         postMessage({
           type: "previewGenerated",
           format,
-          pages: [
-            {
-              pageNumber: 1,
-              imageData: `Preview not available for ${format} format`,
-              width: 0,
-              height: 0,
-            },
-          ],
+          pages: renderedPages.map((page) => ({
+            pageNumber: page.page,
+            imageData: `data:${mimeType};base64,${page.data}`,
+          })),
+        });
+      } else {
+        postMessage({
+          type: "previewGenerated",
+          format,
+          text: "data" in response ? response.data : response[0].data,
         });
       }
     } catch (error) {
