@@ -3,7 +3,7 @@ import { genVscodeExt } from "./build-l10n.mjs";
 import { spawn } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { rimraf } from "rimraf";
+import copyDirSync from "cpr";
 
 import {
   generate as generateTextmate,
@@ -50,9 +50,16 @@ export function spawnAsync(id, cmd, options = { cwd }) {
   });
 }
 
+const _copyDirOpts = { deleteFirst: true, overwrite: true, confirm: true };
+const copyDir = (fr, to) =>
+  new Promise((resolve, reject) =>
+    copyDirSync(fr, to, _copyDirOpts, (err) => (err ? reject(err) : resolve())),
+  );
+
 const cwd = path.resolve(import.meta.dirname, "..");
 const vscodeDir = path.resolve(cwd, "editors/vscode");
-const editorToolsDir = path.resolve(cwd, "editors/editor-tools");
+const previewDir = path.resolve(cwd, "tools/typst-preview-frontend");
+const editorToolsDir = path.resolve(cwd, "tools/editor-tools");
 
 export async function extractL10nTs() {
   await spawnAsync(
@@ -83,30 +90,28 @@ export async function buildSyntax() {
 }
 
 export async function buildPreview() {
-  await Promise.all([
-    spawnAsync("build:preview:tsc", "cd tools/typst-preview-frontend && npx tsc"),
-    spawnAsync("build:preview:vite", "cd tools/typst-preview-frontend && npx vite build"),
-  ]);
+  const run = (id, cmd) => spawnAsync(`build:preview:${id}`, cmd, { cwd: previewDir });
+
+  await Promise.all([run("tsc", "npx tsc"), run("vite", "npx vite build")]);
 
   await fs.copyFile(
-    path.resolve(cwd, "tools/typst-preview-frontend/dist/index.html"),
+    path.resolve(previewDir, "dist/index.html"),
     path.resolve(cwd, "crates/tinymist-assets/src/typst-preview.html"),
   );
 }
 
 export async function buildEditorTools() {
-  await spawnAsync("build:editor-tools:tsc", "cd tools/editor-tools && npx tsc");
-  await spawnAsync(
-    "build:editor-tools:vite",
-    "cd tools/editor-tools && npx vite build -- --component=symbol-view",
-  );
-  await spawnAsync("build:editor-tools:vite", "cd tools/editor-tools && npx vite build");
+  const run = (id, cmd) => spawnAsync(`build:editor-tools:${id}`, cmd, { cwd: editorToolsDir });
+
+  await run("tsc", "npx tsc");
+  await run("vite", "npx vite build -- --component=symbol-view");
+  await run("vite", "npx vite build");
+
+  await installEditorTools();
 }
 
 export async function installEditorTools() {
-  await rimraf(path.join(vscodeDir, "out/editor-tools/"));
-  await fs.mkdir(path.join(vscodeDir, "out/editor-tools/"), { recursive: true });
-  await fs.copyFile(path.join(editorToolsDir, "dist"), path.join(vscodeDir, "out/editor-tools/"));
+  await copyDir(path.join(editorToolsDir, "dist"), path.join(vscodeDir, "out/editor-tools/"));
 }
 
 export async function checkVersion() {
