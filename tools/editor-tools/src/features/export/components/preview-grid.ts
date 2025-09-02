@@ -9,7 +9,9 @@ interface PreviewGridProps {
   previewPages: State<PreviewPage[]>;
 }
 
-export const PreviewGrid = ({ exportConfig, previewPages }: PreviewGridProps) => () => {
+export const PreviewGrid = (props: PreviewGridProps) => () => {
+  const { exportConfig, previewPages } = props;
+
   const { format } = exportConfig.val;
   const isLoading = van.state<boolean>(false);
   const error = van.state<string | null>(null);
@@ -65,7 +67,7 @@ export const PreviewGrid = ({ exportConfig, previewPages }: PreviewGridProps) =>
     };
 
     // Add event listener when component is rendered
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       window.addEventListener("message", handleMessage);
 
       // Cleanup function would be called when component is destroyed
@@ -84,58 +86,64 @@ export const PreviewGrid = ({ exportConfig, previewPages }: PreviewGridProps) =>
   };
 
   return div(
-    { class: "preview-section" },
-
     // Preview Header
     div(
-      { class: "preview-header" },
-      h3({ class: "preview-title" }, `Preview (${format.label})`),
+      { class: "flex justify-between items-center mb-md" },
+      h3({ class: "text-lg font-semibold" }, `Preview (${format.label})`),
       div(
-        { class: "preview-controls" },
+        { class: "flex items-center gap-sm" },
         button(
           {
             class: "btn btn-secondary",
             onclick: generatePreview,
-            disabled: isLoading.val
+            disabled: isLoading.val,
           },
-          isLoading.val ? "Generating..." : "Generate Preview"
+          isLoading.val ? "Generating..." : "Generate Preview",
         ),
         // Only show zoom controls for image content (thumbnails)
-        previewPages.val.length > 0 ? div(
-          { class: "zoom-control", style: "display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--vscode-widget-background); border-radius: 4px; border: 1px solid var(--vscode-widget-border);" },
-          span({ class: "zoom-label", style: "margin-right: 8px; font-size: 12px; color: var(--vscode-descriptionForeground); font-weight: 500;" }, "Thumbnails:"),
-          button(
-            {
-              class: "zoom-button",
-              style: "width: 24px; height: 24px; border: 1px solid var(--vscode-widget-border); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border-radius: 4px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;",
-              onclick: () => adjustThumbnailZoom(-25),
-              disabled: thumbnailZoom.val <= 50,
-              title: "Smaller thumbnails"
-            },
-            "−"
-          ),
-          span({ class: "zoom-label", style: "min-width: 40px; text-align: center; font-size: 12px; font-weight: 500; color: var(--vscode-foreground);" }, () => `${thumbnailZoom.val}%`),
-          button(
-            {
-              class: "zoom-button",
-              style: "width: 24px; height: 24px; border: 1px solid var(--vscode-widget-border); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border-radius: 4px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;",
-              onclick: () => adjustThumbnailZoom(25),
-              disabled: thumbnailZoom.val >= 300,
-              title: "Larger thumbnails"
-            },
-            "+"
-          ),
-          button(
-            {
-              class: "zoom-button",
-              style: "padding: 2px 6px; border: 1px solid var(--vscode-widget-border); background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border-radius: 4px; font-size: 11px; cursor: pointer; margin-left: 4px;",
-              onclick: () => { thumbnailZoom.val = 100; },
-              title: "Reset thumbnail size"
-            },
-            "100%"
-          )
-        ) : null
-      )
+        previewPages.val.length > 0
+          ? div(
+              { class: "zoom-control flex items-center gap-xs" },
+              span(
+                {
+                  class: "zoom-label",
+                  style:
+                    "margin-right: 8px; font-size: 12px; color: var(--vscode-descriptionForeground); font-weight: 500;",
+                },
+                "Thumbnails:",
+              ),
+              button(
+                {
+                  class: "btn btn-secondary",
+                  onclick: () => adjustThumbnailZoom(-25),
+                  disabled: thumbnailZoom.val <= 50,
+                  title: "Smaller thumbnails",
+                },
+                "−",
+              ),
+              span({ class: "text-xs font-medium" }, () => `${thumbnailZoom.val}%`),
+              button(
+                {
+                  class: "btn btn-secondary",
+                  onclick: () => adjustThumbnailZoom(25),
+                  disabled: thumbnailZoom.val >= 300,
+                  title: "Larger thumbnails",
+                },
+                "+",
+              ),
+              button(
+                {
+                  class: "btn btn-secondary",
+                  onclick: () => {
+                    thumbnailZoom.val = 100;
+                  },
+                  title: "Reset thumbnail size",
+                },
+                "100%",
+              ),
+            )
+          : null,
+      ),
     ),
 
     // Preview Content
@@ -164,7 +172,11 @@ export const PreviewGrid = ({ exportConfig, previewPages }: PreviewGridProps) =>
     })(),
 
     // Image Modal
-    selectedImage.val ? ImageModal(selectedImage.val, () => { selectedImage.val = null; }) : null
+    selectedImage.val
+      ? ImageModal(selectedImage.val, () => {
+          selectedImage.val = null;
+        })
+      : null,
   );
 };
 
@@ -172,7 +184,7 @@ const PreviewLoading = () => {
   return div(
     { class: "preview-loading" },
     div({ class: "action-spinner" }),
-    "Generating preview..."
+    "Generating preview...",
   );
 };
 
@@ -185,10 +197,10 @@ const PreviewError = (errorMessage: string, onRetry: () => void) => {
       {
         class: "btn btn-secondary",
         style: "margin-top: 0.5rem;",
-        onclick: onRetry
+        onclick: onRetry,
       },
-      "Retry"
-    )
+      "Retry",
+    ),
   );
 };
 
@@ -201,28 +213,36 @@ const PreviewEmpty = (onGenerate: () => void) => {
       button(
         {
           class: "btn",
-          onclick: onGenerate
+          onclick: onGenerate,
         },
-        "Generate Preview"
-      )
-    )
+        "Generate Preview",
+      ),
+    ),
   );
 };
 
-const PreviewPagesGrid = (pages: PreviewPage[], thumbnailZoom: number, onImageClick: (page: PreviewPage) => void) => {
+const PreviewPagesGrid = (
+  pages: PreviewPage[],
+  thumbnailZoom: number,
+  onImageClick: (page: PreviewPage) => void,
+) => {
   const baseSize = 200; // Base thumbnail size
   const scaledSize = Math.round(baseSize * (thumbnailZoom / 100));
 
   return div(
     {
       class: "preview-grid",
-      style: `display: grid; grid-template-columns: repeat(auto-fill, minmax(${scaledSize}px, 1fr)); gap: 16px; padding: 16px;`
+      style: `display: grid; grid-template-columns: repeat(auto-fill, minmax(${scaledSize}px, 1fr)); gap: 16px; padding: 16px;`,
     },
-    ...pages.map(page => PreviewPageCard(page, scaledSize, onImageClick))
+    ...pages.map((page) => PreviewPageCard(page, scaledSize, onImageClick)),
   );
 };
 
-const PreviewPageCard = (page: PreviewPage, thumbnailSize: number, onImageClick: (page: PreviewPage) => void) => {
+const PreviewPageCard = (
+  page: PreviewPage,
+  thumbnailSize: number,
+  onImageClick: (page: PreviewPage) => void,
+) => {
   // Calculate responsive thumbnail dimensions based on zoom
   const maxThumbnailHeight = Math.round(thumbnailSize * 1.4); // Maintain aspect ratio expectation
 
@@ -252,9 +272,9 @@ const PreviewPageCard = (page: PreviewPage, thumbnailSize: number, onImageClick:
   `;
 
   const pageNumberStyle = `
-    margin-top: 8px; 
-    font-size: 12px; 
-    color: var(--vscode-descriptionForeground); 
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
     font-weight: 500;
     pointer-events: none;
   `;
@@ -263,7 +283,6 @@ const PreviewPageCard = (page: PreviewPage, thumbnailSize: number, onImageClick:
     {
       class: "preview-page",
       style: containerStyle,
-      title: `Page ${page.pageNumber} (${page.width}×${page.height}) - Click to enlarge`,
       onclick: () => onImageClick(page),
       onmouseover: (e: Event) => {
         const target = e.currentTarget as HTMLElement;
@@ -272,19 +291,22 @@ const PreviewPageCard = (page: PreviewPage, thumbnailSize: number, onImageClick:
       onmouseout: (e: Event) => {
         const target = e.currentTarget as HTMLElement;
         target.style.background = "var(--vscode-editor-background)";
-      }
+      },
     },
     img({
       class: "preview-page-image",
       src: page.imageData,
       alt: `Page ${page.pageNumber}`,
       loading: "lazy",
-      style: thumbnailStyle
+      style: thumbnailStyle,
     }),
-    span({
-      class: "preview-page-number",
-      style: pageNumberStyle
-    }, `Page ${page.pageNumber}`)
+    span(
+      {
+        class: "preview-page-number",
+        style: pageNumberStyle,
+      },
+      `${page.pageNumber}`,
+    ),
   );
 };
 
@@ -308,10 +330,10 @@ const PreviewTextContent = (text: string) => {
           white-space: pre-wrap;
           word-wrap: break-word;
           margin: 8px 0;
-        `
+        `,
       },
-      text || "No text content available"
-    )
+      text || "No text content available",
+    ),
   );
 };
 
@@ -371,14 +393,14 @@ const ImageModal = (page: PreviewPage, onClose: () => void) => {
 
   // Add keyboard event listener for ESC key
   const handleKeydown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       onClose();
     }
   };
 
   // Add event listener when modal is created
-  if (typeof window !== 'undefined') {
-    window.addEventListener('keydown', handleKeydown);
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", handleKeydown);
     // Note: In a real app, you'd want to clean this up when the modal is destroyed
   }
 
@@ -386,7 +408,7 @@ const ImageModal = (page: PreviewPage, onClose: () => void) => {
     {
       class: "image-modal",
       style: modalStyle,
-      onclick: onClose
+      onclick: onClose,
     },
     button(
       {
@@ -402,21 +424,21 @@ const ImageModal = (page: PreviewPage, onClose: () => void) => {
         onmouseout: (e: Event) => {
           const target = e.currentTarget as HTMLElement;
           target.style.background = "rgba(255, 255, 255, 0.9)";
-        }
+        },
       },
-      "×"
+      "×",
     ),
     img({
       src: page.imageData,
       alt: `Page ${page.pageNumber} - Large View`,
       style: imageStyle,
-      onclick: (e: Event) => e.stopPropagation()
+      onclick: (e: Event) => e.stopPropagation(),
     }),
     div(
       {
-        style: infoStyle
+        style: infoStyle,
       },
-      `Page ${page.pageNumber} (${page.width}×${page.height})`
-    )
+      `Page ${page.pageNumber} (${page.width}×${page.height})`,
+    ),
   );
 };

@@ -5,7 +5,7 @@ import { Summary } from "./features/summary";
 import { Diagnostics } from "./features/diagnostics";
 import { Docs } from "./features/docs";
 import FontView from "./features/font-view";
-import ExportTool from "./features/export";
+import Exporter from "./features/export";
 
 mainHarness({
   "template-gallery": TemplateGallery,
@@ -15,5 +15,5 @@ mainHarness({
   diagnostics: Diagnostics,
   "font-view": FontView,
   docs: Docs,
-  export: ExportTool,
+  exporter: Exporter,
 });

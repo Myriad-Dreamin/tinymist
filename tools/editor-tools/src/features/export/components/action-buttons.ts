@@ -75,28 +75,23 @@ export const ActionButtons =
     };
 
     return div(
-      { class: "action-section" },
+      { class: "flex flex-col gap-sm" },
 
-      h3(
-        {
-          style: "margin: 0 0 1rem 0; font-size: 1.125rem; font-weight: 600;",
-        },
-        "Export Actions",
-      ),
+      h3("Export Actions"),
 
       // Task Label Input
       div(
-        { class: "card", style: "margin-bottom: 1rem; padding: 1rem;" },
+        { class: "card flex flex-col gap-xs" },
         label(
           {
-            class: "option-label",
+            class: "text-sm font-medium",
             for: "task-label",
             style: "margin-bottom: 0.5rem; display: block;",
           },
           "Custom Task Label (Optional)",
         ),
         input({
-          class: "option-input",
+          class: "input",
           type: "text",
           id: "task-label",
           placeholder: `Export to ${exportConfig.val.format.label}`,
@@ -107,23 +102,20 @@ export const ActionButtons =
           },
         }),
         div(
-          {
-            class: "option-description",
-            style: "margin-top: 0.25rem;",
-          },
+          { class: "text-xs text-desc" },
           "This will be used as the task name in tasks.json. Leave empty for default naming.",
         ),
       ),
 
       // Action Buttons
       div(
-        { class: "action-buttons" },
+        { class: "action-buttons flex items-center gap-md" },
 
         // Direct Export Button
         button(
           {
             title: "Immediately export the current document with these settings",
-            class: "action-button action-button-primary",
+            class: "btn action-button",
             onclick: handleDirectExport,
             disabled: isExporting.val,
           },
@@ -135,7 +127,7 @@ export const ActionButtons =
         button(
           {
             title: "Add this export configuration to .vscode/tasks.json for reuse",
-            class: "action-button action-button-secondary",
+            class: "btn btn-secondary action-button",
             onclick: handleCreateTask,
             disabled: isExporting.val,
           },
@@ -187,30 +179,5 @@ export const ActionButtons =
 
         return div();
       })(),
-
-      // Export Information
-      div(
-        {
-          class: "card",
-          style:
-            "margin-top: 1rem; padding: 1rem; background: var(--vscode-textCodeBlock-background);",
-        },
-        div({ style: "font-weight: 500; margin-bottom: 0.5rem;" }, "Export Configuration"),
-        div(
-          {
-            style:
-              "font-size: 0.875rem; color: var(--vscode-descriptionForeground); line-height: 1.4;",
-          },
-          `Format: ${exportConfig.val.format.label} (.${exportConfig.val.format.fileExtension})`,
-          div(
-            { style: "margin-top: 0.25rem;" },
-            `Options: ${Object.keys(exportConfig.val.options).length} configured`,
-          ),
-          div(
-            { style: "margin-top: 0.25rem;" },
-            `Output: \${fileDirname}/\${fileBasenameNoExtension}.${exportConfig.val.format.fileExtension}`,
-          ),
-        ),
-      ),
     );
   };

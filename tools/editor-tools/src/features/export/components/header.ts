@@ -16,7 +16,7 @@ export const Header = (props: HeaderProps = {}) => () => {
   } = props;
 
   return div(
-    { class: "card flex flex-col gap-sm", style: "margin-bottom: 1.5rem" },
+    { class: "card flex flex-col gap-sm" },
     div(
       { class: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-sm" },
       div(

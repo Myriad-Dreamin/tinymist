@@ -14,7 +14,7 @@ type PageComponent =
   | "symbol-view"
   | "font-view"
   | "docs"
-  | "export";
+  | "exporter";
 
 /// The frontend arguments that are passed from the backend.
 interface Arguments {
@@ -31,7 +31,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "export"}`;
+  let mode = `editor-tools-args:{"page": "exporter"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 

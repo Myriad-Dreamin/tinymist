@@ -36,9 +36,9 @@ const FormatCard = (format: ExportFormat, isSelected: boolean, onSelect: () => v
       onclick: onSelect,
     },
     div(
-      { class: "format-card-header items-center" },
-      span({ class: "format-title" }, format.label),
-      span({ class: "format-extension" }, `.${format.fileExtension}`),
+      { class: "flex justify-between items-center" },
+      span({ class: "font-semibold" }, format.label),
+      span({ class: "badge font-mono" }, `.${format.fileExtension}`),
     ),
   );
 };

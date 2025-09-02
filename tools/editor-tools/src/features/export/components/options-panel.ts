@@ -15,15 +15,12 @@ export const OptionsPanel =
 
     if (format.options.length === 0) {
       return div(
-        { class: "options-panel" },
+        { class: "card" },
         div(
           { class: "text-center", style: "padding: 2rem;" },
-          h3(
-            { style: "margin: 0 0 0.5rem 0; color: var(--vscode-foreground)" },
-            "No Configuration Needed",
-          ),
+          h3({ class: "mb-sm" }, "No Configuration Needed"),
           p(
-            { class: "text-desc", style: "margin: 0;" },
+            { class: "text-desc" },
             `${format.label} export doesn't require additional configuration.`,
           ),
         ),
@@ -41,12 +38,9 @@ export const OptionsPanel =
     };
 
     return div(
-      { class: "options-panel" },
+      { class: "card" },
 
-      h3(
-        { style: "margin: 0 0 1rem 0; color: var(--vscode-foreground)" },
-        `${format.label} Options`,
-      ),
+      h3({ class: "mb-sm" }, `${format.label} Options`),
       div(
         { class: "options-grid" },
         ...format.options
@@ -65,54 +59,6 @@ export const OptionsPanel =
       ),
     );
   };
-
-export const DocumentUriSection = () => {
-  const updateDocUri = (newUri: string) => {
-    if (focusedDocUri.val) {
-      focusedDocUri.val = { ...focusedDocUri.val, uri: newUri };
-    } else {
-      focusedDocUri.val = { version: 0, uri: newUri };
-    }
-  };
-
-  const toggleLock = () => {
-    isDocUriLocked.val = !isDocUriLocked.val;
-  };
-
-  return div(
-    { class: "document-uri-section", style: "margin-bottom: 1.5rem;" },
-    h3(
-      { style: "margin: 0 0 0.5rem 0; color: var(--vscode-foreground); font-size: 1rem;" },
-      "Input Document"
-    ),
-    div(
-      { style: "display: flex; gap: 0.5rem; align-items: center;" },
-      input({
-        class: "option-input",
-        type: "text",
-        placeholder: "Document URI (auto-detected)",
-        value: () => focusedDocUri.val?.uri || "",
-        oninput: (e: Event) => {
-          const target = e.target as HTMLInputElement;
-          updateDocUri(target.value);
-        },
-        style: "flex: 1;"
-      }),
-      button({
-        class: () => `btn btn-sm ${isDocUriLocked.val ? 'btn-active' : 'btn-secondary'}`,
-        onclick: toggleLock,
-        title: () => isDocUriLocked.val ? "Unlock (auto-update)" : "Lock (manual input)",
-        style: "padding: 0.25rem 0.5rem; font-size: 0.75rem;"
-      }, () => isDocUriLocked.val ? "🔒" : "🔓")
-    ),
-    p(
-      { class: "option-description", style: "margin: 0.25rem 0 0 0; font-size: 0.75rem;" },
-      () => isDocUriLocked.val
-        ? "Input locked for manual editing"
-        : "Auto-updates when document focus changes"
-    )
-  );
-};
 
 const OptionField = (
   schema: OptionSchema,
@@ -133,10 +79,10 @@ const OptionField = (
   const value = currentValue !== undefined ? currentValue : defaultValue;
 
   return div(
-    { class: "option-group" },
-    label({ class: "option-label", for: key }, optionLabel),
+    { class: "flex flex-col gap-xs" },
+    label({ class: "text-sm font-medium", for: key }, optionLabel),
     renderInput(type, key, value, onChange, { selectOptions, min, max }),
-    description ? p({ class: "option-description" }, description) : null,
+    description ? p({ class: "text-xs text-desc" }, description) : null,
   );
 };
 
@@ -156,7 +102,7 @@ const renderInput = (
   switch (type) {
     case "string":
       return input({
-        class: "option-input",
+        class: "input",
         type: "text",
         id: key,
         value: String(value || ""),
@@ -172,7 +118,7 @@ const renderInput = (
 
     case "number":
       return input({
-        class: "option-input",
+        class: "input",
         type: "number",
         id: key,
         value: String(value || ""),
@@ -192,7 +138,7 @@ const renderInput = (
       return label(
         { style: "display: flex; align-items: center; cursor: pointer;" },
         input({
-          class: "option-input",
+          class: "input",
           type: "checkbox",
           id: key,
           checked: !!value,
@@ -209,7 +155,7 @@ const renderInput = (
 
     case "color":
       return input({
-        class: "option-input",
+        class: "input",
         type: "color",
         id: key,
         value: String(value || "#ffffff"),
@@ -226,7 +172,7 @@ const renderInput = (
       if (!selectOptions) return span("No options available");
       return select(
         {
-          class: "option-select",
+          class: "select",
           id: key,
           onchange: (e: Event) => {
             const target = e.target as HTMLSelectElement;
@@ -253,4 +199,53 @@ const renderInput = (
     default:
       return span("Unsupported option type");
   }
+};
+
+export const DocumentUriSection = () => {
+  const updateDocUri = (newUri: string) => {
+    if (focusedDocUri.val) {
+      focusedDocUri.val = { ...focusedDocUri.val, uri: newUri };
+    } else {
+      focusedDocUri.val = { version: 0, uri: newUri };
+    }
+  };
+
+  const toggleLock = () => {
+    isDocUriLocked.val = !isDocUriLocked.val;
+  };
+
+  return div(
+    { class: "document-uri-section" },
+    h3({ class: "mb-sm" }, "Input Document"),
+    div(
+      { class: "flex flex-col gap-xs" },
+      div(
+        { class: "flex items-center gap-sm" },
+        input({
+          class: "input flex-1",
+          type: "text",
+          placeholder: "Document URI (auto-detected)",
+          value: () => focusedDocUri.val?.uri || "",
+          oninput: (e: Event) => {
+            const target = e.target as HTMLInputElement;
+            updateDocUri(target.value);
+          },
+        }),
+        button(
+          {
+            class: () => `btn btn-sm ${isDocUriLocked.val ? "btn-active" : "btn-secondary"}`,
+            onclick: toggleLock,
+            title: () => (isDocUriLocked.val ? "Unlock (auto-update)" : "Lock (manual input)"),
+            style: "padding: 0.25rem",
+          },
+          () => (isDocUriLocked.val ? "🔒" : "🔓"),
+        ),
+      ),
+      p({ class: "text-xs text-desc" }, () =>
+        isDocUriLocked.val
+          ? "Input locked for manual editing"
+          : "Auto-updates when document focus changes",
+      ),
+    ),
+  );
 };

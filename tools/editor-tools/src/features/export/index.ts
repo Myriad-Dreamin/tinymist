@@ -11,15 +11,13 @@ import { OptionsPanel, DocumentUriSection } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
 import { ActionButtons } from "./components/action-buttons";
 
-const { div } = van.tags;
+const { div, h2 } = van.tags;
 
 function useExportConfig(): State<ExportConfig> {
   const stub = `:[[preview:ExportConfig]]:`;
 
   const exportConfig = van.state<ExportConfig>(
-    stub.startsWith(":") ?
-      MOCK_EXPORT_CONFIG :
-      JSON.parse(base64Decode(stub))
+    stub.startsWith(":") ? MOCK_EXPORT_CONFIG : JSON.parse(base64Decode(stub)),
   );
 
   return exportConfig;
@@ -29,9 +27,7 @@ function usePreviewPages(): State<PreviewPage[]> {
   const stub = `:[[preview:PreviewPages]]:`;
 
   const previewPages = van.state<PreviewPage[]>(
-    stub.startsWith(":") ?
-      MOCK_PREVIEW_PAGES :
-      JSON.parse(base64Decode(stub))
+    stub.startsWith(":") ? MOCK_PREVIEW_PAGES : JSON.parse(base64Decode(stub)),
   );
 
   return previewPages;
@@ -49,71 +45,26 @@ const ExportTool = () => {
   console.log("Preview pages:", previewPages.val);
 
   return div(
-    { class: "export-tool-container text-base-content" },
+    { class: "export-tool-container flex flex-col gap-lg text-base-content" },
     Header({
       title: "Export Tool",
-      description: "Configure and export your Typst documents to various formats"
+      description: "Configure and export your Typst documents to various formats",
     }),
 
     // Input Document Section
-    div(
-      { style: "margin-bottom: 1.5rem;" },
-      div(
-        {
-          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
-        },
-        "Input Document"
-      ),
-      DocumentUriSection()
-    ),
+    DocumentUriSection(),
 
     // Format Selection
-    div(
-      { style: "margin-bottom: 1.5rem;" },
-      div(
-        {
-          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
-        },
-        "1. Choose Export Format"
-      ),
-      FormatSelector({ exportConfig })
-    ),
+    FormatSelector({ exportConfig }),
 
     // Options Configuration
-    div(
-      { style: "margin-bottom: 1.5rem;" },
-      div(
-        {
-          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
-        },
-        "2. Configure Options"
-      ),
-      OptionsPanel({ exportConfig })
-    ),
+    OptionsPanel({ exportConfig }),
 
     // Preview Section
-    exportConfig.val.format.supportsPreview ? div(
-      { style: "margin-bottom: 1.5rem;" },
-      div(
-        {
-          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
-        },
-        "3. Preview"
-      ),
-      PreviewGrid({ exportConfig, previewPages })
-    ) : null,
+    exportConfig.val.format.supportsPreview ? PreviewGrid({ exportConfig, previewPages }) : null,
 
     // Export Actions
-    div(
-      { style: "margin-bottom: 1.5rem;" },
-      div(
-        {
-          style: "margin-bottom: 1rem; font-size: 1.125rem; font-weight: 600;"
-        },
-        exportConfig.val.format.supportsPreview ? "4. Export Actions" : "3. Export Actions"
-      ),
-      ActionButtons({ exportConfig })
-    )
+    ActionButtons({ exportConfig }),
   );
 };
 

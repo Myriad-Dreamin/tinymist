@@ -18,8 +18,14 @@
   font-size: 1.5rem;
 }
 
+.font-medium {
+  font-weight: 500;
+}
+.font-semibold {
+  font-weight: 600;
+}
 .font-bold {
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .italic {
@@ -87,6 +93,7 @@
 
 .p-sm {
   padding: 0.5rem;
+  margin-bottom: 1.0rem;
 }
 
 .gap-xs {
@@ -97,6 +104,9 @@
 }
 .gap-md {
   gap: 1rem;
+}
+.gap-lg {
+  gap: 1.5rem;
 }
 
 /* Interaction */
