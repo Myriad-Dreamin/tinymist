@@ -1,18 +1,3 @@
-html,
-body {
-  margin: 0;
-}
-
-.flex-row {
-    display: flex;
-    flex-direction: row;
-}
-
-.flex-col {
-    display: flex;
-    flex-direction: column;
-}
-
 .tinymist-card {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 0.75rem;
@@ -182,13 +167,4 @@ body.typst-preview-light .tinymist-button.warning.activated {
 .tinymist-icon :is(path, rect).stroke-based {
   fill: none;
   stroke: currentColor;
-}
-
-.hidden {
-  display: none;
-}
-
-/* aria-hidden */
-span[aria-hidden="true"] {
-  display: none;
 }
