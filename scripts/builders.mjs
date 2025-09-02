@@ -10,6 +10,12 @@ import {
   install as installTextmate,
 } from "../syntaxes/textmate/main.ts";
 
+/// The default working directory is the root of the project
+const cwd = path.resolve(import.meta.dirname, "..");
+const vscodeDir = path.resolve(cwd, "editors/vscode");
+const previewDir = path.resolve(cwd, "tools/typst-preview-frontend");
+const editorToolsDir = path.resolve(cwd, "tools/editor-tools");
+
 /**
  * Spawns a command and return a promise that resolves to the code. The id is used to identify the command in the output and prepended to each line.
  * The line will be buffered and printed to avoid line crossing.
@@ -55,11 +61,6 @@ const copyDir = (fr, to) =>
   new Promise((resolve, reject) =>
     copyDirSync(fr, to, _copyDirOpts, (err) => (err ? reject(err) : resolve())),
   );
-
-const cwd = path.resolve(import.meta.dirname, "..");
-const vscodeDir = path.resolve(cwd, "editors/vscode");
-const previewDir = path.resolve(cwd, "tools/typst-preview-frontend");
-const editorToolsDir = path.resolve(cwd, "tools/editor-tools");
 
 export async function extractL10nTs() {
   await spawnAsync(
