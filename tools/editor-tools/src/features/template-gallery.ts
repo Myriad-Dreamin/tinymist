@@ -13,7 +13,7 @@ const { div, input, button, a, span } = van.tags;
 // https://packages.typst.org/preview/thumbnails/charged-ieee-0.1.0-small.webp
 
 const Card = (cls: string, ...content: any) => {
-  return div({ class: `tinymist-card ${cls}` }, ...content);
+  return div({ class: `card ${cls}` }, ...content);
 };
 
 interface PackageMeta {
@@ -88,7 +88,7 @@ const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => 
     const TemplateAction = (icon: ChildDom, title: string, onclick: () => void) =>
       button(
         {
-          class: "tinymist-button tinymist-template-action",
+          class: "btn tinymist-template-action",
           title,
           onclick,
         },
@@ -108,7 +108,7 @@ const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => 
       ),
       div(
         {
-          style: "display: flex; align-items: center; gap: 0.25em; margin-top: 0.4em;",
+          style: "display: flex; align-items: stretch; gap: 0.25em; margin-top: 0.4em;",
           class: "tinymist-template-actions",
         },
         button(
@@ -117,7 +117,7 @@ const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => 
               const activatingCls = catState.getIsFavorite("preview", item.name)
                 ? " activated"
                 : "";
-              return "tinymist-button tinymist-template-action" + activatingCls;
+              return "btn tinymist-template-action" + activatingCls;
             }),
             title: van.derive(() =>
               catState.getIsFavorite("preview", item.name)
@@ -269,17 +269,12 @@ const CategoryButton = (catState: FilterState) => (category: Category) => {
     {
       class: van.derive(() => {
         const activatingCls = category.value === catState.activating.val ? " activated" : "";
-        return "tinymist-button" + activatingCls;
+        return "btn" + activatingCls;
       }),
       title: "Filter by category: " + category.value,
       onclick: () => catState.setCategory(category.value),
     },
-    div(
-      {
-        style: "height: 16px;",
-      },
-      category.display || category.value,
-    ),
+    div(category.display || category.value),
   );
 };
 
@@ -288,7 +283,7 @@ const FilterRow = (catState: FilterState) => {
     {
       class: van.derive(() => {
         const activatingCls = catState.filterFavorite.val ? " activated" : "";
-        return "tinymist-button" + activatingCls;
+        return "btn" + activatingCls;
       }),
       title: "Filter by favorite state",
       onclick: () => (catState.filterFavorite.val = !catState.filterFavorite.val),

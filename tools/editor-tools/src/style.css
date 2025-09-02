@@ -1,7 +1,3 @@
-.tinymist-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 0.75rem;
-}
 
 .template-card {
   padding: 18px 24px;
@@ -36,26 +32,6 @@
   display: flex;
   margin-top: 6px;
   gap: 0.5rem;
-}
-
-.tinymist-template-actions .tinymist-button div {
-  height: 16px;
-}
-
-.tinymist-button {
-  background: rgba(129, 60, 133, 0.6);
-  border: none;
-  border-radius: 0.2rem;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.tinymist-button:hover {
-  background: rgba(129, 60, 133, 0.9);
-}
-
-.tinymist-button.activated {
-  background: rgba(129, 60, 133, 0.9);
 }
 
 .tinymist-canvas-panel {
@@ -110,54 +86,12 @@ body.typst-preview-light {
   --modal-background: rgba(255, 255, 255, 0.8);
 }
 
-body.typst-preview-dark .tinymist-card {
-  background: rgba(193, 108, 108, 0.05);
-}
 body.typst-preview-dark .tinymist-category {
   background: rgba(255, 255, 255, 0.05);
 }
-body.typst-preview-dark .tinymist-button {
-  background: rgba(129, 60, 133, 0.6);
-}
-body.typst-preview-dark .tinymist-button:hover {
-  background: rgba(129, 60, 133, 0.9);
-}
-body.typst-preview-dark .tinymist-button.activated {
-  background: rgba(129, 60, 133, 0.9);
-}
-body.typst-preview-dark .tinymist-button.warning {
-  background: rgba(252, 211, 55, 0.6);
-}
-body.typst-preview-dark .tinymist-button.warning:hover {
-  background: rgba(252, 211, 55, 0.9);
-}
-body.typst-preview-dark .tinymist-button.warning.activated {
-  background: rgba(252, 211, 55, 0.9);
-}
 
-body.typst-preview-light .tinymist-card {
-  background: rgba(0, 0, 0, 0.05);
-}
 body.typst-preview-light .tinymist-category {
   background: rgba(0, 0, 0, 0.05);
-}
-body.typst-preview-light .tinymist-button {
-  background: rgba(186, 204, 217, 0.6);
-}
-body.typst-preview-light .tinymist-button:hover {
-  background: rgba(186, 204, 217, 0.9);
-}
-body.typst-preview-light .tinymist-button.activated {
-  background: rgba(186, 204, 217, 0.9);
-}
-body.typst-preview-light .tinymist-button.warning {
-  background: rgba(243, 202, 99, 0.6);
-}
-body.typst-preview-light .tinymist-button.warning:hover {
-  background: rgba(243, 202, 99, 0.9);
-}
-body.typst-preview-light .tinymist-button.warning.activated {
-  background: rgba(243, 202, 99, 0.9);
 }
 
 .tinymist-icon :is(path, rect) {
