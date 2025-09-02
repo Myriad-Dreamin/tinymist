@@ -8,6 +8,7 @@ macro_rules! apply_common_filters {
         // Env redaction
         // [env: key=value]
         settings.add_filter(r"\[env:\s*([^=]+)=[^\]]*\]", "[env: $1=REDACTED]");
+        settings.add_filter(r"tinymist.exe", "tinymist");
         let _bound = settings.bind_to_scope();
     }
 }
