@@ -5,7 +5,7 @@ import { CopyIcon } from "../icons";
 import { startModal } from "../components/modal";
 import { base64Decode, base64Encode } from "../utils";
 import type { FontSource } from "../types";
-import {  humanStretch, humanStyle, humanWeight } from "../utils/font-format";
+import { humanStretch, humanStyle, humanWeight } from "../utils/font-format";
 const { div, a, span, code, br, button, form, textarea, label, input } = van.tags;
 
 interface ServerInfo {
@@ -155,17 +155,17 @@ export const Summary = () => {
       style: "justify-content: center; align-items: center; gap: 10px;",
     },
     div(
-      { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
+      { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(van.derive(() => `This document is compiled with following arguments.`)),
       div({ style: "margin: 1.2em; margin-left: 0.5em" }, ...ArgSlots()),
     ),
     div(
-      { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
+      { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(
         { style: "position: relative; width: 100%; height: 0px" },
         button(
           {
-            class: "tinymist-button",
+            class: "btn",
             style: "position: absolute; top: 0px; right: 0px",
             onclick: () => {
               startModal(
@@ -209,7 +209,7 @@ export const Summary = () => {
     ),
     div(
       {
-        class: `tinymist-card hidden`,
+        class: `card hidden`,
         style: "flex: 1; width: 100%; padding: 10px",
       },
       div(`The Tinymist service.`),
@@ -226,7 +226,7 @@ export const Summary = () => {
     ),
     div(
       {
-        class: `tinymist-card hidden`,
+        class: `card hidden`,
         style: "flex: 1; width: 100%; padding: 10px",
       },
       div(`The Typst compiler.`),
@@ -238,7 +238,7 @@ export const Summary = () => {
     ),
     div(
       {
-        class: `tinymist-card hidden`,
+        class: `card hidden`,
         style: "flex: 1; width: 100%; padding: 10px",
       },
       div(`The Typst formatters.`),
@@ -688,7 +688,7 @@ const fontsExportPanel = ({ fonts, sources }: fontsExportPanelProps) => {
       { style: `display: flex; align-items: center; column-gap:${itemGap}px` },
       button(
         {
-          class: "tinymist-button",
+          class: "btn",
           style: "flex: 1",
           onclick: () => {
             const filterName = `${exportFormat.val.toLocaleUpperCase()} file`;
@@ -706,7 +706,7 @@ const fontsExportPanel = ({ fonts, sources }: fontsExportPanelProps) => {
       ),
       button(
         {
-          class: "tinymist-button",
+          class: "btn",
           style: "flex: 1",
           onclick: () => navigator.clipboard.writeText(exportText.val),
         },
