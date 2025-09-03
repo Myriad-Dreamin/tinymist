@@ -76,8 +76,7 @@
   transition: all 0.15s;
 }
 
-.btn:hover,
-.btn.activated {
+.btn:hover {
   --btn-color: var(--vscode-button-hoverBackground, #1177bb);
 }
 
@@ -88,16 +87,10 @@ body.typst-preview-dark .btn.warning {
 body.typst-preview-dark .btn.warning:hover {
   background: rgba(252, 211, 55, 0.9);
 }
-body.typst-preview-dark .btn.warning.activated {
-  background: rgba(252, 211, 55, 0.9);
-}
 body.typst-preview-light .btn.warning {
   background: rgba(243, 202, 99, 0.6);
 }
 body.typst-preview-light .btn.warning:hover {
-  background: rgba(243, 202, 99, 0.9);
-}
-body.typst-preview-light .btn.warning.activated {
   background: rgba(243, 202, 99, 0.9);
 }
 
