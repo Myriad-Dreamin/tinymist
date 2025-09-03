@@ -14,6 +14,7 @@ use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
+use typst::layout::PageRanges;
 use typst::syntax::FileId;
 
 /// A scalar that is not NaN.
@@ -199,7 +200,7 @@ pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
 impl Pages {
     /// Selects the first page.
-    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=None);
+    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=NonZeroUsize::new(1));
 }
 
 impl FromStr for Pages {
@@ -232,6 +233,11 @@ impl FromStr for Pages {
             [_, _, _, ..] => Err("page export range must have a single hyphen"),
         }
     }
+}
+
+/// The ranges of the pages to be exported as specified by the user.
+pub fn exported_page_ranges(pages: &[Pages]) -> PageRanges {
+    PageRanges::new(pages.iter().map(|p| p.0.clone()).collect())
 }
 
 impl fmt::Display for Pages {
@@ -402,6 +408,36 @@ impl ResourcePath {
         } else {
             None
         }
+    }
+}
+
+pub mod output_template {
+    const INDEXABLE: [&str; 3] = ["{p}", "{0p}", "{n}"];
+
+    pub fn has_indexable_template(output: &str) -> bool {
+        INDEXABLE.iter().any(|template| output.contains(template))
+    }
+
+    /// Note: `this_page` is 1-based.
+    pub fn format(output: &str, this_page: usize, total_pages: usize) -> String {
+        // Find the base 10 width of number `i`
+        fn width(i: usize) -> usize {
+            1 + i.checked_ilog10().unwrap_or(0) as usize
+        }
+
+        let other_templates = ["{t}"];
+        INDEXABLE
+            .iter()
+            .chain(other_templates.iter())
+            .fold(output.to_string(), |out, template| {
+                let replacement = match *template {
+                    "{p}" => format!("{this_page}"),
+                    "{0p}" | "{n}" => format!("{:01$}", this_page, width(total_pages)),
+                    "{t}" => format!("{total_pages}"),
+                    _ => unreachable!("unhandled template placeholder {template}"),
+                };
+                out.replace(template, replacement.as_str())
+            })
     }
 }
 

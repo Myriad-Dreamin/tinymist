@@ -16,12 +16,12 @@ import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import {
-  base64Encode,
   bytesBase64Encode,
   DisposeList,
   getSensibleTextEditorColumn,
   typstDocumentSelector,
 } from "./util";
+import type { ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
@@ -749,9 +749,19 @@ export class LanguageState {
 
 export const tinymist = new LanguageState();
 
+// Type definitions for export responses (matches Rust OnExportResponse)
+export type OnExportResponse =
+  | { message: string } // Failed { message: String }
+  | { path: string | null; data: string | null } // Single { path: Option<PathBuf>, data: Option<String> }
+  | Array<{ page: number; path: string | null; data: string | null }>; // Multiple(Vec<PagedExportResponse>)
+
 function exportCommand(command: string) {
-  return (uri: string, extraOpts?: any) => {
-    return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+  return (uri: string, extraOpts?: ExportOpts, inMemory?: boolean): Promise<OnExportResponse> => {
+    return tinymist.executeCommand<OnExportResponse>(command, [
+      uri,
+      extraOpts ?? {},
+      inMemory ?? false,
+    ]);
   };
 }
 

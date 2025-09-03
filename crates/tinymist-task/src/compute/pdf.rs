@@ -48,6 +48,10 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
         Ok(Bytes::new(typst_pdf::pdf(
             doc,
             &PdfOptions {
+                page_ranges: config
+                    .pages
+                    .as_ref()
+                    .map(|pages| exported_page_ranges(pages)),
                 timestamp: Some(timestamp),
                 standards,
                 ..Default::default()
