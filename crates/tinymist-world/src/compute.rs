@@ -412,7 +412,7 @@ impl DiagnosticsTask {
     }
 
     /// Gets the diagnostics.
-    pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
+    pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> + Clone {
         self.paged
             .errors
             .iter()

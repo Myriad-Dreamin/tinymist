@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use tinymist_lint::KnownLintIssues;
 use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
@@ -47,7 +48,7 @@ impl<'w> DiagWorker<'w> {
     }
 
     /// Runs code check on the main document and all its dependencies.
-    pub fn check(mut self) -> Self {
+    pub fn check(mut self, known_issues: &KnownLintIssues) -> Self {
         for dep in self.ctx.world.depended_files() {
             if WorkspaceResolver::is_package_file(dep) {
                 continue;
@@ -57,7 +58,7 @@ impl<'w> DiagWorker<'w> {
                 continue;
             };
 
-            for diag in self.ctx.lint(&source) {
+            for diag in self.ctx.lint(&source, known_issues) {
                 self.handle(&diag);
             }
         }
