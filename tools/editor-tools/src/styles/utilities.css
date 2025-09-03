@@ -43,6 +43,17 @@
   flex-direction: column;
 }
 
+.relative {
+  position: relative;
+}
+.absolute {
+  position: absolute;
+}
+
+.w-full {
+  width: 100%;
+}
+
 .hidden {
   display: none;
 }
@@ -67,6 +78,17 @@
 }
 
 /* Spacing */
+.mb-sm {
+  margin-bottom: 0.5rem;
+}
+.mb-md {
+  margin-bottom: 1rem;
+}
+
+.p-sm {
+  padding: 0.5rem;
+}
+
 .gap-xs {
   gap: 0.25rem;
 }

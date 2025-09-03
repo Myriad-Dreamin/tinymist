@@ -34,29 +34,6 @@
   gap: 0.5rem;
 }
 
-.tinymist-canvas-panel {
-  background: rgba(201, 209, 217, 0.15);
-  border-radius: 3px;
-  width: 160px;
-}
-
-.tinymist-symbol-cell {
-  background: rgba(201, 209, 217, 0.15);
-  border-radius: 3px;
-
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.tinymist-symbol-cell:hover {
-  color: rgba(68, 147, 248, 0.9);
-}
-
-.tinymist-symbol-cell.active {
-  color: rgba(249, 189, 16, 0.9);
-  transition: color 0.05s;
-}
-
 .tinymist-highlight {
   background: rgba(255, 255, 0, 0.15);
 }
@@ -66,7 +43,7 @@
 }
 
 #tinymist-app, .tinymist-main-window {
-  margin: 24px 28px;
+  margin: 1rem;
 }
 
 #tinymist-app code, .tinymist-main-window code, .tinymist-window code {

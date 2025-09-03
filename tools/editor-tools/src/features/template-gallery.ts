@@ -115,9 +115,9 @@ const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => 
           {
             class: van.derive(() => {
               const activatingCls = catState.getIsFavorite("preview", item.name)
-                ? " activated"
+                ? " active"
                 : "";
-              return "btn tinymist-template-action" + activatingCls;
+              return "toggle-btn tinymist-template-action" + activatingCls;
             }),
             title: van.derive(() =>
               catState.getIsFavorite("preview", item.name)
@@ -268,8 +268,8 @@ const CategoryButton = (catState: FilterState) => (category: Category) => {
   return button(
     {
       class: van.derive(() => {
-        const activatingCls = category.value === catState.activating.val ? " activated" : "";
-        return "btn" + activatingCls;
+        const activatingCls = category.value === catState.activating.val ? " active" : "";
+        return "toggle-btn" + activatingCls;
       }),
       title: "Filter by category: " + category.value,
       onclick: () => catState.setCategory(category.value),
@@ -282,8 +282,8 @@ const FilterRow = (catState: FilterState) => {
   const favButton = button(
     {
       class: van.derive(() => {
-        const activatingCls = catState.filterFavorite.val ? " activated" : "";
-        return "btn" + activatingCls;
+        const activatingCls = catState.filterFavorite.val ? " active" : "";
+        return "toggle-btn" + activatingCls;
       }),
       title: "Filter by favorite state",
       onclick: () => (catState.filterFavorite.val = !catState.filterFavorite.val),

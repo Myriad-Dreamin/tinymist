@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
+use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
@@ -17,7 +18,7 @@ use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 struct ResourceSymbolResponse {
     symbols: BTreeMap<String, ResourceSymbolItem>,
     font_selects: Vec<FontItem>,
-    glyph_defs: String,
+    glyph_defs: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1014,7 +1015,7 @@ impl ServerState {
             ))
         };
 
-        let mut glyph_def = String::new();
+        let mut glyph_defs = HashMap::new();
 
         let mut collected_fonts = None;
 
@@ -1023,7 +1024,6 @@ impl ServerState {
             let glyph_pass =
                 reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
 
-            let mut glyph_renderer = Svg::default();
             let mut glyphs = vec![];
 
             let font_collected = glyph_mapping
@@ -1071,14 +1071,15 @@ impl ServerState {
                 v.glyphs.push(desc);
             }
 
-            let mut svg = vec![];
-
-            // attach the glyph defs
-            svg.push(r#"<defs class="glyph">"#.into());
-            svg.extend(glyph_renderer.render_glyphs(glyphs.iter().map(|(id, item)| (*id, item))));
-            svg.push("</defs>".into());
-
-            glyph_def = SvgText::join(svg);
+            let mut builder = SvgGlyphBuilder::new();
+            glyph_defs = glyphs
+                .iter()
+                .map(|(id, item)| {
+                    let glyph_id = id.as_svg_id("g");
+                    let rendered = builder.render_glyph("", item).unwrap_or_default();
+                    (glyph_id, rendered)
+                })
+                .collect();
 
             collected_fonts = Some(font_collected);
         }
@@ -1097,7 +1098,7 @@ impl ServerState {
                     units_per_em: e.metrics().units_per_em as f32,
                 })
                 .collect::<Vec<_>>(),
-            glyph_defs: glyph_def,
+            glyph_defs,
         };
 
         serde_json::to_value(resp)
