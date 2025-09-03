@@ -181,7 +181,7 @@ vergen = { version = "8.3.1", features = [
 # Testing
 dhat = "0.3.3"
 divan = "0.1.14"
-insta = { version = "1.43", features = ["glob"] }
+insta = { version = "1.43", features = ["glob", "filters"] }
 insta-cmd = "0.6.0"
 
 
