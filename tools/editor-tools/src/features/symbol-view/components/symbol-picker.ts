@@ -5,7 +5,13 @@ import { NOPRINT_SYMBOLS, type SymbolItem, stripSymPrefix } from "../symbols";
 
 const { div, span } = van.tags;
 
+const cachedCells = new Map<string, HTMLElement>();
+
 export const SymbolCell = (sym: SymbolItem) => {
+  if (cachedCells.has(sym.id)) {
+    return cachedCells.get(sym.id);
+  }
+
   const handleClick = () => {
     const code = sym.id;
     requestTextEdit({
@@ -38,7 +44,7 @@ export const SymbolCell = (sym: SymbolItem) => {
   const symbolName = stripSymPrefix(sym.id);
   const unicode = `\\u{${sym.unicode.toString(16).toUpperCase().padStart(4, "0")}}`;
 
-  return div(
+  const elem = div(
     {
       class: "symbol-cell",
       title: `Click to insert: ${symbolName}`,
@@ -65,6 +71,8 @@ export const SymbolCell = (sym: SymbolItem) => {
       ),
     ),
   );
+  cachedCells.set(sym.id, elem);
+  return elem;
 };
 
 export const CategoryPicker = (cat: CategorizedSymbols) => {
@@ -78,7 +86,7 @@ export const CategoryPicker = (cat: CategorizedSymbols) => {
     ),
     div(
       { class: "symbol-grid flex-row flex-wrap gap-xs" },
-      ...(cat.symbols ?? []).map((sym) => SymbolCell(sym)),
+      ...cat.symbols.map((sym) => SymbolCell(sym)),
     ),
   );
 };
