@@ -3,6 +3,7 @@ import { TypstPreviewDocument as TypstDocument } from "typst-dom/index.preview.m
 import {
   rendererBuildInfo,
   createTypstRenderer,
+  TypstWorker,
 } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm?url";
 // @ts-ignore
@@ -11,6 +12,7 @@ import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
 export { PreviewMode } from "typst-dom/typst-doc.mjs";
+import PreviewWorker from "./worker.js?worker&inline";
 
 // for debug propose
 // queryObjects((window as any).TypstRenderSession);
@@ -40,7 +42,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
   let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
   const subsribes: Subscription[] = [];
 
-  function createSvgDocument(kModule: RenderSession) {
+  function createSvgDocument(kModule: RenderSession, kWorker: TypstWorker) {
     const hookedElem = document.getElementById("typst-app")!;
     if (hookedElem.firstElementChild?.tagName !== "svg") {
       hookedElem.innerHTML = "";
@@ -50,13 +52,19 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     const svgDoc = new TypstDocument({
       hookedElem,
       kModule,
+      kWorker,
       previewMode,
       isContentPreview,
+      renderMode: "canvas",
       // set rescale target to `body`
       retrieveDOMState() {
         return {
           // reserving 1px to hide width border
           width: resizeTarget.clientWidth + 1,
+          window: {
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+          },
           // reserving 1px to hide width border
           height: resizeTarget.offsetHeight,
           boundingRect: resizeTarget.getBoundingClientRect(),
@@ -421,13 +429,14 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
   let plugin = createTypstRenderer();
   await plugin.init({ getModule: () => renderModule });
+  const kWorker = await plugin.createWorkerV0(new PreviewWorker());
 
   return new Promise<() => void>((resolveDispose) =>
     plugin.runWithSession((kModule) /* module kernel from wasm */ => {
       return new Promise(async (kernelDispose) => {
         console.log("plugin initialized, build info:", await rendererBuildInfo());
 
-        const wsDispose = setupSocket(createSvgDocument(kModule));
+        const wsDispose = setupSocket(createSvgDocument(kModule, kWorker));
 
         // todo: plugin init and setup socket at the same time
         resolveDispose(() => {
