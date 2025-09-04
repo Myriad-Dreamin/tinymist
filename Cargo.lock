@@ -4454,6 +4454,7 @@ dependencies = [
  "comemo",
  "dirs",
  "ecow",
+ "js-sys",
  "log",
  "notify",
  "parking_lot",
@@ -4471,6 +4472,7 @@ dependencies = [
  "toml",
  "typst",
  "typst-assets",
+ "wasm-bindgen",
 ]
 
 [[package]]

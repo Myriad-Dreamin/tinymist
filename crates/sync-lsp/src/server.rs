@@ -237,15 +237,27 @@ impl LspClientRoot {
 type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, LspOrDapResponse) + Send + Sync>;
 type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
 
+/// Different transport mechanisms for communication.
 #[derive(Debug, Clone)]
-enum TransportHost {
+pub enum TransportHost {
+    /// System-level transport using native OS capabilities.
     System(SystemTransportSender),
+    /// JavaScript/WebAssembly transport for web environments.
     #[cfg(feature = "web")]
-    Js(JsTransportSender),
+    Js {
+        /// Atomic counter for generating unique event identifiers.
+        event_id: Arc<AtomicU32>,
+        /// Thread-safe storage for pending events indexed by their IDs.
+        events: Arc<Mutex<HashMap<u32, Event>>>,
+        /// The actual sender implementation for JavaScript environments.
+        sender: JsTransportSender,
+    },
 }
 
+/// A sender implementation for system-level transport operations.
 #[derive(Debug, Clone)]
-struct SystemTransportSender {
+pub struct SystemTransportSender {
+    /// Weak reference to the connection transmitter.
     pub(crate) sender: Weak<ConnectionTx>,
 }
 
@@ -253,29 +265,17 @@ struct SystemTransportSender {
 #[cfg(feature = "web")]
 #[derive(Debug, Clone)]
 pub struct JsTransportSender {
-    event_id: Arc<AtomicU32>,
-    events: Arc<Mutex<HashMap<u32, Event>>>,
-    pub(crate) sender_event: js_sys::Function,
-    pub(crate) sender_request: js_sys::Function,
-    pub(crate) sender_notification: js_sys::Function,
-}
-
-#[cfg(feature = "web")]
-impl JsTransportSender {
-    /// Creates a new JS transport host.
-    pub fn new(
-        sender_event: js_sys::Function,
-        sender_request: js_sys::Function,
-        sender_notification: js_sys::Function,
-    ) -> Self {
-        Self {
-            event_id: Arc::new(AtomicU32::new(0)),
-            events: Arc::new(Mutex::new(HashMap::new())),
-            sender_event,
-            sender_request,
-            sender_notification,
-        }
-    }
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_event: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_request: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) fs_content: js_sys::Function,
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub(crate) send_notification: js_sys::Function,
+    /// The acutal resolving function in JavaScript
+    #[serde(with = "serde_wasm_bindgen::preserve")]
+    pub resolve_fn: js_sys::Function,
 }
 
 #[cfg(feature = "web")]
@@ -322,6 +322,7 @@ impl TransportHost {
         }
     }
 
+    /// Sends a message.
     pub fn send_message(&self, response: Message) {
         match self {
             TransportHost::System(host) => {
@@ -404,7 +405,8 @@ pub struct LspClient {
     pub handle: tokio::runtime::Handle,
 
     pub(crate) msg_kind: MessageKind,
-    sender: TransportHost,
+    /// The TransportHost between LspClient and LspServer
+    pub sender: TransportHost,
     pub(crate) req_queue: Arc<Mutex<ReqQueue>>,
 
     pub(crate) hook: Arc<dyn LsHook>,
