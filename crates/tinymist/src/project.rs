@@ -221,11 +221,11 @@ impl ServerState {
 
         let fonts = config.fonts();
 
-        #[cfg(feature = "web")]
+        #[cfg(not(feature = "system"))]
         let packages =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
 
-        #[cfg(not(feature = "web"))]
+        #[cfg(feature = "system")]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
 
         let creation_timestamp = config.creation_timestamp();
