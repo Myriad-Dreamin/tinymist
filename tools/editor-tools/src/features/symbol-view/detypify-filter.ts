@@ -26,5 +26,7 @@ export function useDetypifyFilter() {
       detypify.val && strokes.val && (await detypify.val.candidates(strokes.val, 5));
   });
 
-  return { strokes, drawCandidates };
+  const detypifyAvailable = van.derive(() => !!detypify.val);
+
+  return { detypifyAvailable, strokes, drawCandidates };
 }

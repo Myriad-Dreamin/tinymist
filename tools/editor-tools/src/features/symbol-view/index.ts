@@ -37,7 +37,7 @@ function useSymbolResource() {
 export const SymbolView = () => {
   const symbols = useSymbolResource();
 
-  const { strokes: detypifyStrokes, drawCandidates } = useDetypifyFilter();
+  const { detypifyAvailable, strokes: detypifyStrokes, drawCandidates } = useDetypifyFilter();
   const { filteredSymbols, updateFilter } = useSymbolSearch(symbols);
   const { categorizedSymbols } = useCategorizedSymbols(symbols, filteredSymbols, drawCandidates);
 
@@ -45,12 +45,13 @@ export const SymbolView = () => {
 
   return div(
     { class: "tinymist-symbol-view flex gap-md text-base-content" },
-    div(
-      { class: "symbol-toolbox card flex flex-col items-center gap-sm" },
-      SearchBar(updateFilter),
-      CanvasPanel(detypifyStrokes),
-      ViewModeToggle(showSymbolDetails),
-    ),
+    () =>
+      div(
+        { class: "symbol-toolbox card flex flex-col items-center gap-sm" },
+        SearchBar(updateFilter),
+        detypifyAvailable.val ? CanvasPanel(detypifyStrokes) : undefined,
+        ViewModeToggle(showSymbolDetails),
+      ),
     SymbolPicker(categorizedSymbols, showSymbolDetails),
   );
 };
