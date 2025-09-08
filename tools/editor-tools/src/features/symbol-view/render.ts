@@ -41,24 +41,46 @@ function renderSymbol(
 }
 
 export function prerenderSymbols(symRes: SymbolResource): SymbolItem[] {
-  return Object.entries(symRes.symbols).map(([id, sym]) => {
+  const tasks: (() => void)[] = [];
+
+  const items = Object.entries(symRes.symbols).map(([id, sym]) => {
     const primaryGlyph = sym.glyphs[0];
     const mask = div();
+
     const renderedSym: SymbolItem = {
       id,
       category: sym.category,
       unicode: sym.unicode,
       rendered: primaryGlyph ? mask : undefined,
     };
+
     if (primaryGlyph?.fontIndex && primaryGlyph?.shape) {
       const fontSelected = symRes.fontSelects[primaryGlyph.fontIndex];
       if (fontSelected) {
         const glyphPath = (primaryGlyph.shape && symRes.glyphDefs[primaryGlyph.shape]) ?? "";
-        setTimeout(() => {
+
+        // push a deferred render task into the queue
+        tasks.push(() => {
           renderSymbol(mask, sym.glyphs[0], fontSelected, glyphPath);
         });
       }
     }
+
     return renderedSym;
   });
+
+  // idle loop: process as many tasks as time allows
+  function runTasks(deadline: IdleDeadline) {
+    while ((deadline.timeRemaining() > 0 || deadline.didTimeout) && tasks.length > 0) {
+      const task = tasks.shift();
+      task?.();
+    }
+    if (tasks.length > 0) {
+      requestIdleCallback(runTasks);
+    }
+  }
+
+  requestIdleCallback(runTasks);
+
+  return items;
 }
