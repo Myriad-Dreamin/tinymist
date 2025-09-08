@@ -276,14 +276,14 @@ typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "dd484911603cb29648a2cf2eb1639afdf0dfd5f1" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "52985890727cc39e1adb94ba433f624b81993f46" }
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
+# reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
+# reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
+# reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
 
 # These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 
 typst-shim = { path = "crates/typst-shim" }
 tinymist-analysis = { path = "crates/tinymist-analysis" }
