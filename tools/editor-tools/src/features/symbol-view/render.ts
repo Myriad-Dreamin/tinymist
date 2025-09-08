@@ -3,8 +3,6 @@ import type { FontItem, GlyphDesc, SymbolItem, SymbolResource } from "./symbols"
 
 const { div } = van.tags;
 
-const SYM_SIZE = 1.75; // in rem
-
 function renderSymbol(
   mask: HTMLElement,
   primaryGlyph: GlyphDesc,
@@ -22,10 +20,8 @@ function renderSymbol(
   const yGlobal = primaryGlyph.yAdvance ?? fontSelected.unitsPerEm;
   const yWidth = Math.max(yReal, yGlobal);
 
-  // Calculate uniform scaling factor based on the maximum dimension to fit within SYM_SIZE
-  const scale = SYM_SIZE / Math.max(xWidth, yWidth);
-  const symWidth = `${xWidth * scale}rem`;
-  const symHeight = `${yWidth * scale}rem`;
+  // keep viewBox in glyph units
+  const viewBox = `0 0 ${xWidth} ${yWidth}`;
 
   const yShift =
     yReal >= yGlobal
@@ -35,17 +31,11 @@ function renderSymbol(
   // Center the symbol horizontally
   const xShift = -(primaryGlyph.xMin ?? 0) + (xWidth - bboxXWidth) / 2;
 
-  const imageData = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="${symWidth}" height="${symHeight}" viewBox="0 0 ${xWidth} ${yWidth}" xmlns="http://www.w3.org/2000/svg">
+  const imageData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" preserveAspectRatio="xMidYMid meet">
 <g transform="translate(${xShift}, ${yShift}) scale(1, -1)">${path}</g>
 </svg>`;
 
-  mask.setAttribute(
-    "style",
-    `width: ${symWidth};` +
-      `height: ${symHeight};` +
-      `-webkit-mask-image: url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}');` +
-      `-webkit-mask-size: auto ${symHeight}`,
-  );
+  mask.style.maskImage = `url('data:image/svg+xml;utf8,${encodeURIComponent(imageData)}')`;
 
   return mask;
 }

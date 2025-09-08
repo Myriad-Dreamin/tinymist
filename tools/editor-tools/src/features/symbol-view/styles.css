@@ -61,13 +61,16 @@
   align-items: center;
 }
 
+/* Symbol glyph mask */
 .symbol-glyph > div {
-  -webkit-mask-repeat: no-repeat;
+  width: 1.75rem;
+  height: 1.75rem;
   mask-repeat: no-repeat;
-  transition: background-color 200ms;
+  mask-position: center;
   background-color: currentColor;
 }
 
+/* Symbol glyph fallback text */
 .symbol-glyph > span {
   font-size: 0.75rem;
   font-style: italic;
