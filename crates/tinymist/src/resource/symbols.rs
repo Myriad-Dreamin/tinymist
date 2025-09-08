@@ -951,145 +951,16 @@ static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
 impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: LspComputeGraph) -> LspResult<JsonValue> {
-        let mut symbols = ResourceSymbolMap::new();
+        let mut symbols = collect_symbols(&snap)?;
 
-        let std = snap
-            .library()
-            .std
-            .read()
-            .scope()
-            .ok_or_else(|| internal_error("cannot get std scope"))?;
-        let sym = std
-            .get("sym")
-            .ok_or_else(|| internal_error("cannot get sym"))?;
+        let glyph_mapping = render_symbols(&snap, &symbols)?;
 
-        if let Some(scope) = sym.read().scope() {
-            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
-        }
-        // todo: disabling emoji module, as there is performant issue on emojis
-        // let _ = emoji;
-        // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
-
-        const PRELUDE: &str = r#"#show math.equation: set text(font: (
-  "New Computer Modern Math",
-  "Latin Modern Math",
-  "STIX Two Math",
-  "Cambria Math",
-  "New Computer Modern",
-  "Cambria",
-))
-"#;
-
-        let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
-            use std::fmt::Write;
-            writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
-            o
-        });
-        log::debug!("math shaping text: {math_shaping_text}");
-
-        let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
-
-        let font = {
-            let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
-
-            let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
-
-            let mut forked = snap.world().task(TaskInputs {
-                entry: Some(new_entry),
-                ..TaskInputs::default()
-            });
-            forked
-                .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
-                .map_err(|e| error_once!("cannot map shadow", err: e))
-                .map_err(internal_error)?;
-
-            let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
-                .output
-                .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
-                .map_err(internal_error)?;
-
-            log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(
-                &TypstDocument::Paged(Arc::new(sym_doc)),
-                &symbols_ref,
-            ))
-        };
-
-        let mut glyph_defs = HashMap::new();
-
-        let mut collected_fonts = None;
-
-        if let Some(glyph_mapping) = font.clone() {
-            let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
-            let glyph_pass =
-                reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
-
-            let mut glyphs = vec![];
-
-            let font_collected = glyph_mapping
-                .values()
-                .map(|e| e.0.clone())
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            let mut render_sym = |u| {
-                let (font, id) = glyph_mapping.get(u)?.clone();
-                let font_index = font_collected.iter().position(|e| e == &font).unwrap() as u32;
-
-                let width = font.ttf().glyph_hor_advance(id);
-                let height = font.ttf().glyph_ver_advance(id);
-                let bbox = font.ttf().glyph_bounding_box(id);
-
-                let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
-
-                let g_ref = GlyphRef {
-                    font_hash: font_index,
-                    glyph_idx: id.0 as u32,
-                };
-
-                glyphs.push((g_ref, glyph));
-
-                Some(ResourceGlyphDesc {
-                    font_index,
-                    x_advance: width,
-                    y_advance: height,
-                    x_min: bbox.map(|e| e.x_min),
-                    x_max: bbox.map(|e| e.x_max),
-                    y_min: bbox.map(|e| e.y_min),
-                    y_max: bbox.map(|e| e.y_max),
-                    name: font.ttf().glyph_name(id).map(|e| e.to_owned()),
-                    shape: Some(g_ref.as_svg_id("g")),
-                })
-            };
-
-            for (k, v) in symbols.iter_mut() {
-                let Some(desc) = render_sym(k) else {
-                    continue;
-                };
-
-                v.glyphs.push(desc);
-            }
-
-            let mut builder = SvgGlyphBuilder::new();
-            glyph_defs = glyphs
-                .iter()
-                .map(|(id, item)| {
-                    let glyph_id = id.as_svg_id("g");
-                    let rendered = builder.render_glyph("", item).unwrap_or_default();
-                    (glyph_id, rendered)
-                })
-                .collect();
-
-            collected_fonts = Some(font_collected);
-        }
+        let (glyph_defs, collected_fonts) = render_glyphs(&mut symbols, glyph_mapping)?;
 
         let resp = ResourceSymbolResponse {
             symbols,
             font_selects: collected_fonts
-                .map(|e| e.into_iter())
                 .into_iter()
-                .flatten()
                 .map(|e| FontItem {
                     family: e.info().family.clone(),
                     cap_height: e.metrics().cap_height.get() as f32,
@@ -1105,6 +976,124 @@ impl ServerState {
             .context("cannot serialize response")
             .map_err(internal_error)
     }
+}
+
+fn collect_symbols(snap: &LspComputeGraph) -> LspResult<BTreeMap<String, ResourceSymbolItem>> {
+    let mut symbols = ResourceSymbolMap::new();
+
+    let std = snap
+        .library()
+        .std
+        .read()
+        .scope()
+        .ok_or_else(|| internal_error("cannot get std scope"))?;
+    let sym = std
+        .get("sym")
+        .ok_or_else(|| internal_error("cannot get sym"))?;
+
+    if let Some(scope) = sym.read().scope() {
+        populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
+    }
+    // todo: disabling emoji module, as there is performant issue on emojis
+    // let _ = emoji;
+    // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
+
+    Ok(symbols)
+}
+
+fn populate_scope(
+    sym: &Scope,
+    mod_name: &str,
+    fallback_cat: SymCategory,
+    out: &mut ResourceSymbolMap,
+) {
+    for (k, b) in sym.iter() {
+        let Value::Symbol(sym) = b.read() else {
+            continue;
+        };
+
+        populate(sym, mod_name, k, fallback_cat, out)
+    }
+}
+
+fn populate(
+    sym: &Symbol,
+    mod_name: &str,
+    sym_name: &str,
+    fallback_cat: SymCategory,
+    out: &mut ResourceSymbolMap,
+) {
+    for (modifier_name, ch) in sym.variants() {
+        let mut name =
+            String::with_capacity(mod_name.len() + sym_name.len() + modifier_name.len() + 2);
+
+        name.push_str(mod_name);
+        name.push('.');
+        name.push_str(sym_name);
+
+        if !modifier_name.is_empty() {
+            name.push('.');
+            name.push_str(modifier_name);
+        }
+
+        let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
+        out.insert(
+            name,
+            ResourceSymbolItem {
+                category,
+                unicode: ch as u32,
+                glyphs: vec![],
+            },
+        );
+    }
+}
+
+fn render_symbols(
+    snap: &LspComputeGraph,
+    symbols: &BTreeMap<String, ResourceSymbolItem>,
+) -> LspResult<HashMap<String, (TypstFont, GlyphId)>> {
+    const PRELUDE: &str = r#"#show math.equation: set text(font: (
+  "New Computer Modern Math",
+  "Latin Modern Math",
+  "STIX Two Math",
+  "Cambria Math",
+  "New Computer Modern",
+  "Cambria",
+))
+"#;
+
+    let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
+        use std::fmt::Write;
+        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+        o
+    });
+    log::debug!("math shaping text: {math_shaping_text}");
+
+    let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
+
+    let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
+
+    let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
+
+    let mut forked = snap.world().task(TaskInputs {
+        entry: Some(new_entry),
+        ..TaskInputs::default()
+    });
+    forked
+        .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
+        .map_err(|e| error_once!("cannot map shadow", err: e))
+        .map_err(internal_error)?;
+
+    let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
+        .output
+        .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
+        .map_err(internal_error)?;
+
+    log::debug!("sym doc: {sym_doc:?}");
+    Ok(trait_symbol_fonts(
+        &TypstDocument::Paged(Arc::new(sym_doc)),
+        &symbols_ref,
+    ))
 }
 
 fn trait_symbol_fonts(
@@ -1185,49 +1174,69 @@ fn trait_symbol_fonts(
     res
 }
 
-fn populate(
-    sym: &Symbol,
-    mod_name: &str,
-    sym_name: &str,
-    fallback_cat: SymCategory,
-    out: &mut ResourceSymbolMap,
-) {
-    for (modifier_name, ch) in sym.variants() {
-        let mut name =
-            String::with_capacity(mod_name.len() + sym_name.len() + modifier_name.len() + 2);
+fn render_glyphs(
+    symbols: &mut BTreeMap<String, ResourceSymbolItem>,
+    glyph_mapping: HashMap<String, (TypstFont, GlyphId)>,
+) -> LspResult<(HashMap<String, String>, Vec<TypstFont>)> {
+    let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
+    let glyph_pass = reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
 
-        name.push_str(mod_name);
-        name.push('.');
-        name.push_str(sym_name);
+    let mut glyphs = vec![];
 
-        if !modifier_name.is_empty() {
-            name.push('.');
-            name.push_str(modifier_name);
-        }
+    let font_collected = glyph_mapping
+        .values()
+        .map(|e| e.0.clone())
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
 
-        let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
-        out.insert(
-            name,
-            ResourceSymbolItem {
-                category,
-                unicode: ch as u32,
-                glyphs: vec![],
-            },
-        );
-    }
-}
+    let mut render_sym = |u| {
+        let (font, id) = glyph_mapping.get(u)?.clone();
+        let font_index = font_collected.iter().position(|e| e == &font).unwrap() as u32;
 
-fn populate_scope(
-    sym: &Scope,
-    mod_name: &str,
-    fallback_cat: SymCategory,
-    out: &mut ResourceSymbolMap,
-) {
-    for (k, b) in sym.iter() {
-        let Value::Symbol(sym) = b.read() else {
+        let width = font.ttf().glyph_hor_advance(id);
+        let height = font.ttf().glyph_ver_advance(id);
+        let bbox = font.ttf().glyph_bounding_box(id);
+
+        let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
+
+        let g_ref = GlyphRef {
+            font_hash: font_index,
+            glyph_idx: id.0 as u32,
+        };
+
+        glyphs.push((g_ref, glyph));
+
+        Some(ResourceGlyphDesc {
+            font_index,
+            x_advance: width,
+            y_advance: height,
+            x_min: bbox.map(|e| e.x_min),
+            x_max: bbox.map(|e| e.x_max),
+            y_min: bbox.map(|e| e.y_min),
+            y_max: bbox.map(|e| e.y_max),
+            name: font.ttf().glyph_name(id).map(|e| e.to_owned()),
+            shape: Some(g_ref.as_svg_id("g")),
+        })
+    };
+
+    for (k, v) in symbols.iter_mut() {
+        let Some(desc) = render_sym(k) else {
             continue;
         };
 
-        populate(sym, mod_name, k, fallback_cat, out)
+        v.glyphs.push(desc);
     }
+
+    let mut builder = SvgGlyphBuilder::new();
+    let glyph_defs = glyphs
+        .iter()
+        .map(|(id, item)| {
+            let glyph_id = id.as_svg_id("g");
+            let rendered = builder.render_glyph("", item).unwrap_or_default();
+            (glyph_id, rendered)
+        })
+        .collect::<HashMap<_, _>>();
+
+    Ok((glyph_defs, font_collected))
 }
