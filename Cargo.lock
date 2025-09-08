@@ -4156,7 +4156,6 @@ dependencies = [
  "open",
  "parking_lot",
  "paste",
- "percent-encoding",
  "rayon",
  "reflexo",
  "reflexo-typst",

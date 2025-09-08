@@ -62,16 +62,19 @@
 }
 
 /* Symbol glyph mask */
-.symbol-glyph > div {
+div.symbol-glyph svg {
   width: 1.75rem;
   height: 1.75rem;
-  mask-repeat: no-repeat;
-  mask-position: center;
-  background-color: currentColor;
+  fill: currentColor;
+  transition: fill 200ms;
+}
+
+.symbol-cell:hover div.symbol-glyph svg {
+  fill: var(--vscode-accent, #007acc); /* fixme: no --vscode-accent */
 }
 
 /* Symbol glyph fallback text */
-.symbol-glyph > span {
+span.symbol-glyph {
   font-size: 0.75rem;
   font-style: italic;
   font-weight: 500;

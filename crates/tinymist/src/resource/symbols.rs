@@ -1265,14 +1265,9 @@ fn create_display_svg(
 
     let svg_content = format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
-    <g transform="translate({x_shift} {y_shift}) scale(1 -1)">{svg_path}</g>
+<g transform="translate({x_shift} {y_shift}) scale(1 -1)">{svg_path}</g>
 </svg>"#
     );
 
-    let encoded = format!(
-        "url('data:image/svg+xml;utf8,{}')",
-        percent_encoding::utf8_percent_encode(&svg_content, percent_encoding::NON_ALPHANUMERIC)
-    );
-
-    encoded
+    svg_content
 }
