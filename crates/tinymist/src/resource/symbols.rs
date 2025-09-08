@@ -16,9 +16,7 @@ use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResourceSymbolResponse {
-    symbols: BTreeMap<String, ResourceSymbolItem>,
-    font_selects: Vec<FontItem>,
-    glyph_defs: HashMap<String, String>,
+    symbols: Vec<ResourceSymbolItemRendered>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,6 +24,14 @@ struct ResourceSymbolItem {
     category: SymCategory,
     unicode: u32,
     glyphs: Vec<ResourceGlyphDesc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ResourceSymbolItemRendered {
+    id: String,
+    category: SymCategory,
+    unicode: u32,
+    glyph: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -63,7 +69,6 @@ enum SymCategory {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResourceGlyphDesc {
-    font_index: u32,
     x_advance: Option<u16>,
     y_advance: Option<u16>,
     x_min: Option<i16>,
@@ -71,7 +76,6 @@ struct ResourceGlyphDesc {
     y_min: Option<i16>,
     y_max: Option<i16>,
     name: Option<String>,
-    shape: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -951,26 +955,13 @@ static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
 impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: LspComputeGraph) -> LspResult<JsonValue> {
-        let mut symbols = collect_symbols(&snap)?;
+        let symbols = collect_symbols(&snap)?;
 
         let glyph_mapping = render_symbols(&snap, &symbols)?;
 
-        let (glyph_defs, collected_fonts) = render_glyphs(&mut symbols, glyph_mapping)?;
+        let symbols = render_glyphs(&symbols, &glyph_mapping)?;
 
-        let resp = ResourceSymbolResponse {
-            symbols,
-            font_selects: collected_fonts
-                .into_iter()
-                .map(|e| FontItem {
-                    family: e.info().family.clone(),
-                    cap_height: e.metrics().cap_height.get() as f32,
-                    ascender: e.metrics().ascender.get() as f32,
-                    descender: e.metrics().descender.get() as f32,
-                    units_per_em: e.metrics().units_per_em as f32,
-                })
-                .collect::<Vec<_>>(),
-            glyph_defs,
-        };
+        let resp = ResourceSymbolResponse { symbols };
 
         serde_json::to_value(resp)
             .context("cannot serialize response")
@@ -1069,8 +1060,6 @@ fn render_symbols(
     });
     log::debug!("math shaping text: {math_shaping_text}");
 
-    let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
-
     let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
     let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
@@ -1090,10 +1079,11 @@ fn render_symbols(
         .map_err(internal_error)?;
 
     log::debug!("sym doc: {sym_doc:?}");
-    Ok(trait_symbol_fonts(
-        &TypstDocument::Paged(Arc::new(sym_doc)),
-        &symbols_ref,
-    ))
+
+    let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
+    let res = trait_symbol_fonts(&TypstDocument::Paged(Arc::new(sym_doc)), &symbols_ref);
+
+    Ok(res)
 }
 
 fn trait_symbol_fonts(
@@ -1175,13 +1165,11 @@ fn trait_symbol_fonts(
 }
 
 fn render_glyphs(
-    symbols: &mut BTreeMap<String, ResourceSymbolItem>,
-    glyph_mapping: HashMap<String, (TypstFont, GlyphId)>,
-) -> LspResult<(HashMap<String, String>, Vec<TypstFont>)> {
+    symbols: &BTreeMap<String, ResourceSymbolItem>,
+    glyph_mapping: &HashMap<String, (TypstFont, GlyphId)>,
+) -> LspResult<Vec<ResourceSymbolItemRendered>> {
     let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
     let glyph_pass = reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
-
-    let mut glyphs = vec![];
 
     let font_collected = glyph_mapping
         .values()
@@ -1189,26 +1177,28 @@ fn render_glyphs(
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
+    let font_selects = font_collected
+        .iter()
+        .map(|e| FontItem {
+            family: e.info().family.clone(),
+            cap_height: e.metrics().cap_height.get() as f32,
+            ascender: e.metrics().ascender.get() as f32,
+            descender: e.metrics().descender.get() as f32,
+            units_per_em: e.metrics().units_per_em as f32,
+        })
+        .collect::<Vec<_>>();
+
+    let mut builder = SvgGlyphBuilder::new();
 
     let mut render_sym = |u| {
         let (font, id) = glyph_mapping.get(u)?.clone();
-        let font_index = font_collected.iter().position(|e| e == &font).unwrap() as u32;
+        let font_index = font_collected.iter().position(|e| e == &font).unwrap();
 
         let width = font.ttf().glyph_hor_advance(id);
         let height = font.ttf().glyph_ver_advance(id);
         let bbox = font.ttf().glyph_bounding_box(id);
 
-        let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
-
-        let g_ref = GlyphRef {
-            font_hash: font_index,
-            glyph_idx: id.0 as u32,
-        };
-
-        glyphs.push((g_ref, glyph));
-
-        Some(ResourceGlyphDesc {
-            font_index,
+        let desc = ResourceGlyphDesc {
             x_advance: width,
             y_advance: height,
             x_min: bbox.map(|e| e.x_min),
@@ -1216,27 +1206,73 @@ fn render_glyphs(
             y_min: bbox.map(|e| e.y_min),
             y_max: bbox.map(|e| e.y_max),
             name: font.ttf().glyph_name(id).map(|e| e.to_owned()),
-            shape: Some(g_ref.as_svg_id("g")),
-        })
-    };
-
-    for (k, v) in symbols.iter_mut() {
-        let Some(desc) = render_sym(k) else {
-            continue;
         };
 
-        v.glyphs.push(desc);
+        let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
+
+        let rendered = builder.render_glyph("", &glyph); // the glyph_id does not matter here
+
+        rendered.map(|rendered| create_display_svg(&desc, &font_selects[font_index], &rendered))
+    };
+
+    let rendered_symbols = symbols
+        .iter()
+        .map(|(k, v)| ResourceSymbolItemRendered {
+            id: k.clone(),
+            category: v.category,
+            unicode: v.unicode,
+            glyph: render_sym(k),
+        })
+        .collect();
+
+    Ok(rendered_symbols)
+}
+
+fn create_display_svg(
+    primary_glyph: &ResourceGlyphDesc,
+    font_selected: &FontItem,
+    svg_path: &str,
+) -> String {
+    fn diff(min: Option<i16>, max: Option<i16>) -> i16 {
+        match (min, max) {
+            (Some(a), Some(b)) => b - a,
+            _ => 0,
+        }
     }
 
-    let mut builder = SvgGlyphBuilder::new();
-    let glyph_defs = glyphs
-        .iter()
-        .map(|(id, item)| {
-            let glyph_id = id.as_svg_id("g");
-            let rendered = builder.render_glyph("", item).unwrap_or_default();
-            (glyph_id, rendered)
-        })
-        .collect::<HashMap<_, _>>();
+    let bbox_width = diff(primary_glyph.x_min, primary_glyph.x_max) as f32;
+    let width = bbox_width.max(
+        primary_glyph
+            .x_advance
+            .map(f32::from)
+            .unwrap_or(font_selected.units_per_em),
+    );
 
-    Ok((glyph_defs, font_collected))
+    let bbox_height = diff(primary_glyph.y_min, primary_glyph.y_max) as f32;
+    let y_global = primary_glyph
+        .y_advance
+        .map(f32::from)
+        .unwrap_or(font_selected.units_per_em);
+    let height = bbox_height.max(y_global);
+
+    let y_shift = if bbox_height >= y_global {
+        primary_glyph.y_max.unwrap_or_default().abs() as f32
+    } else {
+        (primary_glyph.y_max.unwrap_or_default() as f32 + height) / 2.0
+    };
+
+    let x_shift = -(primary_glyph.x_min.unwrap_or_default()) as f32 + (width - bbox_width) / 2.0;
+
+    let svg_content = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
+    <g transform="translate({x_shift} {y_shift}) scale(1 -1)">{svg_path}</g>
+</svg>"#
+    );
+
+    let encoded = format!(
+        "url('data:image/svg+xml;utf8,{}')",
+        percent_encoding::utf8_percent_encode(&svg_content, percent_encoding::NON_ALPHANUMERIC)
+    );
+
+    encoded
 }

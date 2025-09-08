@@ -21,6 +21,7 @@ function useSymbolResource() {
       : prerenderSymbols(JSON.parse(base64Decode(symbolInformationData))),
   );
 
+  console.log("symbols", symbols.val);
   if (import.meta.env.DEV) {
     // Dynamically import mock data in development mode if no real data is present
     import("./mock-data.json").then((json) => {
