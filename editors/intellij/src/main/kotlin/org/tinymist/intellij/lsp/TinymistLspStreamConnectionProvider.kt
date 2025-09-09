@@ -64,28 +64,4 @@ class TinymistLspStreamConnectionProvider(@Suppress("unused") private val projec
             null
         }
     }
-
-    // TODO use initializeParams instead?
-    //override fun getInitializationOptions(uri: VirtualFile?): Any {
-    //    // Construct the nested Map structure directly
-    //    val backgroundPreviewOpts = mapOf(
-    //        "enabled" to true
-    //        // "args" to listOf("--data-plane-host=127.0.0.1:23635", "--invert-colors=auto") // Example if needed
-    //    )
-    //    val previewOpts = mapOf(
-    //        "background" to backgroundPreviewOpts
-    //    )
-//
-    //    // Build the final options map
-    //    // Add other top-level options expected by tinymist
-    //    val options = mutableMapOf<String, Any>(
-    //        "preview" to previewOpts,
-    //        "semanticTokens" to mapOf<String, Any>(),
-    //        "completion" to mapOf<String, Any>(),
-    //        "lint" to mapOf<String, Any>()
-    //        // Add other key-value pairs as needed
-    //    )
-//
-    //    return options // Return the Map directly
-    //}
 }
