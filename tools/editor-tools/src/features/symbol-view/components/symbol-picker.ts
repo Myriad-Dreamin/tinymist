@@ -50,7 +50,7 @@ export const SymbolCell = (sym: SymbolItem) => {
       title: `Click to insert: ${symbolName}`,
       onclick: handleClick,
     },
-    sym.rendered ?? fallback(),
+    (sym.glyph && div({ class: "symbol-glyph", innerHTML: sym.glyph })) ?? fallback(),
     div(
       { class: "symbol-details" },
       div(

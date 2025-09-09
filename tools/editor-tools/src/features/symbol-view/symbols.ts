@@ -56,18 +56,11 @@ export interface SymbolItem {
   id: SymbolId;
   category: SymbolCategory;
   unicode: number;
-  rendered?: HTMLElement;
-}
-
-export interface RawSymbolItem {
-  id: SymbolId;
-  category: SymbolCategory;
-  unicode: number;
-  glyph: string;
+  glyph: string | null;
 }
 
 export interface SymbolResource {
-  symbols: RawSymbolItem[];
+  symbols: SymbolItem[];
 }
 
 export function stripSymPrefix(name: string): string {
