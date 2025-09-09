@@ -2,7 +2,7 @@
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
 version = "0.13.27"
-edition = "2021"
+edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
@@ -140,8 +140,8 @@ log = "0.4"
 reflexo = { version = "=0.6.1-rc3", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.6.1-rc2", default-features = false }
-reflexo-vec2svg = { version = "=0.6.1-rc2" }
+reflexo-typst = { version = "=0.6.1-rc3", default-features = false }
+reflexo-vec2svg = { version = "=0.6.1-rc3" }
 typst = "0.14.0"
 typst-html = "0.14.0"
 typst-library = "0.14.0"
@@ -200,7 +200,7 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.17" }
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
 sync-ls = { path = "./crates/sync-lsp", version = "0.13.27" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.27" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.27", default-features = false }
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.27" }
 tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.27", default-features = false }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.27" }
@@ -264,6 +264,9 @@ ignore-hidden = false
 extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
+
+tinymist-assets = { path = "crates/tinymist-assets" }
+
 typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
 typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
 typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
@@ -285,16 +288,6 @@ reflexo = { path = "../typst.ts/crates/reflexo/" }
 reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
 reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 
-typst-shim = { path = "crates/typst-shim" }
-tinymist-analysis = { path = "crates/tinymist-analysis" }
-tinymist-std = { path = "crates/tinymist-std" }
-tinymist-vfs = { path = "crates/tinymist-vfs" }
-tinymist-world = { path = "crates/tinymist-world" }
-tinymist-project = { path = "crates/tinymist-project" }
-tinymist-task = { path = "crates/tinymist-task" }
-
-# If reflexo use the tinymist from git, you should use the following patch.
-# [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
 # typst-shim = { path = "crates/typst-shim" }
 # tinymist-analysis = { path = "crates/tinymist-analysis" }
 # tinymist-std = { path = "crates/tinymist-std" }
@@ -302,3 +295,13 @@ tinymist-task = { path = "crates/tinymist-task" }
 # tinymist-world = { path = "crates/tinymist-world" }
 # tinymist-project = { path = "crates/tinymist-project" }
 # tinymist-task = { path = "crates/tinymist-task" }
+
+# If reflexo use the tinymist from git, you should use the following patch.
+[patch."https://github.com/ParaN3xus/tinymist.git"]
+typst-shim = { path = "crates/typst-shim" }
+tinymist-analysis = { path = "crates/tinymist-analysis" }
+tinymist-std = { path = "crates/tinymist-std" }
+tinymist-vfs = { path = "crates/tinymist-vfs" }
+tinymist-world = { path = "crates/tinymist-world" }
+tinymist-project = { path = "crates/tinymist-project" }
+tinymist-task = { path = "crates/tinymist-task" }

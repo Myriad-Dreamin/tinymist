@@ -1,5 +1,9 @@
 //! Functions from typst-ide
 
+mod tooltip;
+
+pub use tooltip::{Tooltip, tooltip_};
+
 use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
@@ -13,7 +17,7 @@ use typst::{
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
-mod tooltip;
+};
 
 /// Extract the first sentence of plain text of a piece of documentation.
 ///

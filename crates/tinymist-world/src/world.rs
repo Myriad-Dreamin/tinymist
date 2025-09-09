@@ -26,7 +26,7 @@ use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };
 use typst::{
-    Features, Library, World, WorldExt,
+    Features, Library, LibraryExt, World, WorldExt,
     diag::{At, EcoString, FileError, FileResult, SourceResult, eco_format},
     foundations::{Bytes, Datetime, Dict},
     syntax::{Source, Span, VirtualPath},
