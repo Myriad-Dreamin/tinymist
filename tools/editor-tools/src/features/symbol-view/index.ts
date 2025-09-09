@@ -8,7 +8,7 @@ import { SearchBar, ViewModeToggle } from "./components/toolbox";
 import { useDetypifyFilter } from "./detypify-filter";
 import { prerenderSymbols } from "./render";
 import { useSymbolSearch } from "./search-filter";
-import type { SymbolItem } from "./symbols";
+import type { SymbolItem, SymbolResource } from "./symbols";
 
 const { div } = van.tags;
 
@@ -23,8 +23,9 @@ function useSymbolResource() {
 
   if (import.meta.env.DEV) {
     // Dynamically import mock data in development mode if no real data is present
-    import("./mock-data").then((module) => {
-      symbols.val = prerenderSymbols(module.default);
+    import("./mock-data.json").then((json) => {
+      const symbolResource = json as SymbolResource;
+      symbols.val = prerenderSymbols(symbolResource);
       console.log("symbols", symbols.val);
     });
   }
