@@ -22,16 +22,20 @@ import com.intellij.ui.jcef.JCEFHtmlPanel
 import javax.swing.JLabel
 import org.cef.handler.CefLoadHandlerAdapter
 import org.cef.handler.CefLoadHandler
+import org.tinymist.intellij.settings.TinymistSettingsService
 
 class TypstPreviewFileEditor(
     private val project: Project,
     private val virtualFile: VirtualFile
 ) : JCEFHtmlPanel(false, null, null), FileEditor {
 
-    // Defines the Tinymist preview URL (default background port)
+    // Defines the Tinymist preview URL using dynamic port
     private val previewHost = "127.0.0.1"
-    private val previewPort = 23635
-    private val tinymistPreviewUrl = "http://$previewHost:$previewPort"
+    private val settingsService = TinymistSettingsService.instance
+    
+    // Get the dynamic preview port and construct URL
+    private fun getPreviewPort(): Int = settingsService.getOrDiscoverPreviewPort()
+    private fun getTinymistPreviewUrl(): String = "http://$previewHost:${getPreviewPort()}"
 
     // Flag to track if the server check is complete and successful
     @Volatile
@@ -68,15 +72,17 @@ class TypstPreviewFileEditor(
                 while (attempts < maxAttempts && !serverFound && JBCefApp.isSupported()) {
                     indicator.checkCanceled()
                     try {
+                        val currentPort = getPreviewPort()
                         Socket().use { socket ->
-                            socket.connect(InetSocketAddress(previewHost, previewPort), 500)
+                            socket.connect(InetSocketAddress(previewHost, currentPort), 500)
                             isServerReady = true
-                            println("TypstPreviewFileEditor: Tinymist server is ready at $previewHost:$previewPort.")
+                            println("TypstPreviewFileEditor: Tinymist server is ready at $previewHost:$currentPort.")
                             serverFound = true
                         }
                     } catch (_: IOException) {
                         attempts++
-                        indicator.text2 = "Attempt $attempts/$maxAttempts to connect to $previewHost:$previewPort"
+                        val currentPort = getPreviewPort()
+                        indicator.text2 = "Attempt $attempts/$maxAttempts to connect to $previewHost:$currentPort"
                         Thread.sleep(500)
                     }
                 }
@@ -92,12 +98,14 @@ class TypstPreviewFileEditor(
                 }
 
                 if (isServerReady) {
-                    println("TypstPreviewFileEditor: Server ready, loading URL: $tinymistPreviewUrl")
-                    this@TypstPreviewFileEditor.loadURL(tinymistPreviewUrl)
+                    val previewUrl = getTinymistPreviewUrl()
+                    println("TypstPreviewFileEditor: Server ready, loading URL: $previewUrl")
+                    this@TypstPreviewFileEditor.loadURL(previewUrl)
                 } else {
                     println("TypstPreviewFileEditor: Server not ready. Displaying error.")
+                    val currentPort = getPreviewPort()
                     ApplicationManager.getApplication().invokeLater {
-                        this@TypstPreviewFileEditor.loadHTML("<html><body>Error: Tinymist server not available at $previewHost:$previewPort. Please check if tinymist is running.</body></html>")
+                        this@TypstPreviewFileEditor.loadHTML("<html><body>Error: Tinymist server not available at $previewHost:$currentPort. Please check if tinymist is running.</body></html>")
                     }
                 }
             }
@@ -126,7 +134,7 @@ class TypstPreviewFileEditor(
         return super.getComponent()
     }
 
-    override fun getPreferredFocusedComponent(): JComponent? {
+    override fun getPreferredFocusedComponent(): JComponent {
         if (jcefUnsupportedLabel != null) {
             return jcefUnsupportedLabel!!
         }
@@ -162,8 +170,9 @@ class TypstPreviewFileEditor(
         // Reloads the content when the editor is selected, if the server is ready
         // and the JCEF component is supported and initialized.
         if (JBCefApp.isSupported() && isServerReady && !isDisposed) {
-            println("TypstPreviewFileEditor: selectNotify - Server ready, reloading URL: $tinymistPreviewUrl")
-            this.loadURL(tinymistPreviewUrl)
+            val previewUrl = getTinymistPreviewUrl()
+            println("TypstPreviewFileEditor: selectNotify - Server ready, reloading URL: $previewUrl")
+            this.loadURL(previewUrl)
         } else {
             if (!isServerReady) println("TypstPreviewFileEditor: selectNotify - Server not ready, not reloading.")
             if (isDisposed) println("TypstPreviewFileEditor: selectNotify - Editor disposed, not reloading.")
