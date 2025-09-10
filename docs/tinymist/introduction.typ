@@ -16,8 +16,8 @@
     "https://github.com/Myriad-Dreamin/tinymist/blob/main/LICENSE",
     image("https://img.shields.io/github/license/Myriad-Dreamin/tinymist", alt: "GitHub license"),
   )
-  link("https://github.com/Myriad-Dreamin/tinymist/actions", image(
-    "https://github.com/Myriad-Dreamin/tinymist/workflows/CI/badge.svg",
+  link("https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml", image(
+    "https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml/badge.svg?event=push",
     alt: "Actions status",
   ))
   link("https://myriad-dreamin.github.io/tinymist/", image(
