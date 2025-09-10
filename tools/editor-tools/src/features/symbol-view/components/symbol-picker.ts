@@ -38,7 +38,7 @@ export const SymbolCell = (sym: SymbolItem) => {
 
   const fallback = () => {
     const key = stripSymPrefix(sym.id);
-    return span(NOPRINT_SYMBOLS[key] ?? key);
+    return span({ class: "symbol-glyph" }, NOPRINT_SYMBOLS[key] ?? key);
   };
 
   const symbolName = stripSymPrefix(sym.id);
@@ -50,7 +50,7 @@ export const SymbolCell = (sym: SymbolItem) => {
       title: `Click to insert: ${symbolName}`,
       onclick: handleClick,
     },
-    div({ class: "symbol-glyph" }, sym.rendered ?? fallback()),
+    (sym.glyph && div({ class: "symbol-glyph", innerHTML: sym.glyph })) ?? fallback(),
     div(
       { class: "symbol-details" },
       div(

@@ -6,7 +6,6 @@ import { CanvasPanel } from "./components/canvas-panel";
 import { SymbolPicker } from "./components/symbol-picker";
 import { SearchBar, ViewModeToggle } from "./components/toolbox";
 import { useDetypifyFilter } from "./detypify-filter";
-import { prerenderSymbols } from "./render";
 import { useSymbolSearch } from "./search-filter";
 import type { SymbolItem, SymbolResource } from "./symbols";
 
@@ -18,15 +17,14 @@ function useSymbolResource() {
   const symbols = van.state<SymbolItem[]>(
     symbolInformationData.startsWith(":")
       ? []
-      : prerenderSymbols(JSON.parse(base64Decode(symbolInformationData))),
+      : (JSON.parse(base64Decode(symbolInformationData)) as SymbolResource).symbols,
   );
 
   if (import.meta.env.DEV) {
     // Dynamically import mock data in development mode if no real data is present
     import("./mock-data.json").then((json) => {
       const symbolResource = json as SymbolResource;
-      symbols.val = prerenderSymbols(symbolResource);
-      console.log("symbols", symbols.val);
+      symbols.val = symbolResource.symbols;
     });
   }
 

@@ -5,7 +5,7 @@ mod prelude {
 
     pub use std::collections::HashMap;
 
-    pub use reflexo_vec2svg::ir::{GlyphItem, GlyphRef};
+    pub use reflexo_vec2svg::ir::GlyphItem;
     pub use serde::{Deserialize, Serialize};
     pub use serde_json::Value as JsonValue;
     pub use sync_ls::*;

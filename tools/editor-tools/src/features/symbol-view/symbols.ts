@@ -33,7 +33,7 @@ export const CATEGORY_NAMES = {
 
 export type SymbolCategory = keyof typeof CATEGORY_NAMES;
 
-export const NOPRINT_SYMBOLS: { [key: string]: string } = {
+export const NOPRINT_SYMBOLS: Record<string, string> = {
   space: "␣",
   "space.en": "ensp",
   "space.quad": "emsp",
@@ -50,45 +50,17 @@ export const NOPRINT_SYMBOLS: { [key: string]: string } = {
   zws: "zwsp",
 };
 
-export interface GlyphDesc {
-  fontIndex: number | null;
-  xAdvance?: number | null;
-  yAdvance?: number | null;
-  xMin?: number | null;
-  yMin?: number | null;
-  xMax?: number | null;
-  yMax?: number | null;
-  name?: string | null;
-  shape?: string | null;
-}
-
 export type SymbolId = string;
 
 export interface SymbolItem {
   id: SymbolId;
   category: SymbolCategory;
   unicode: number;
-  rendered?: HTMLElement;
-}
-
-export interface FontItem {
-  family: string;
-  capHeight: number;
-  ascender: number;
-  descender: number;
-  unitsPerEm: number;
-}
-
-export interface RawSymbolItem {
-  category: SymbolCategory;
-  unicode: number;
-  glyphs: GlyphDesc[];
+  glyph?: string;
 }
 
 export interface SymbolResource {
-  symbols: Record<string, RawSymbolItem>;
-  fontSelects: FontItem[];
-  glyphDefs: Record<string, string>;
+  symbols: SymbolItem[];
 }
 
 export function stripSymPrefix(name: string): string {
