@@ -5,12 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/hover/package_import.typ
 ---
 Range: 0:29:0:52
 
-🌌 [Universe](https://typst.app/universe/package/shiroa) | 🔗 [Repository](https://github.com/Myriad-Dreamin/shiroa) | 🏠 [Homepage](https://myriad-dreamin.github.io/shiroa)
+🌌 [Universe](https://typst.app/universe/package/shiroa)
 
 **Package:** `@preview/shiroa:0.2.3`
-
-**Authors:** Myriad-Dreamin <https://github.com/Myriad-Dreamin>
-
-**Description:** A simple tool for creating modern online books in pure typst.
-
-**License:** Apache-2.0
+‼️ **Version 0.2.3 not found**

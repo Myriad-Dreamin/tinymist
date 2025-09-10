@@ -320,6 +320,8 @@ impl HoverWorker<'_> {
         }
         info.push('\n');
 
+        let date_format = time::format_description::parse("[year]-[month]-[day]").unwrap();
+
         // Add manifest information if available
         if let Some(ref current_entry) = current_entry {
             let pkg_info = &current_entry.package;
@@ -335,6 +337,15 @@ impl HoverWorker<'_> {
             if let Some(license) = &pkg_info.license {
                 info.push_str(&format!("**License:** {license}\n\n"));
             }
+
+            if let Some(updated_at) = &current_entry.updated_at {
+                info.push_str(&format!(
+                    "**Updated:** {}\n\n",
+                    updated_at
+                        .format(&date_format)
+                        .unwrap_or_else(|_| "unknown".to_string())
+                ));
+            }
         }
 
         // Show version history for preview packages
@@ -342,9 +353,13 @@ impl HoverWorker<'_> {
             info.push_str("**Available Versions** (click to replace):\n");
             for entry in &entries {
                 let version = &entry.package.version;
+                let release_date = entry
+                    .updated_at
+                    .and_then(|time| time.format(&date_format).ok())
+                    .unwrap_or_default();
                 if *version == package_spec.version {
                     // Current version
-                    info.push_str(&format!("- **{version}**\n"));
+                    info.push_str(&format!("- **{version}** / {release_date}\n"));
                 } else {
                     // Other versions
                     let lsp_range = self.ctx.to_lsp_range(import_str_node.range(), &self.source);
@@ -361,7 +376,7 @@ impl HoverWorker<'_> {
                         percent_encoding::NON_ALPHANUMERIC,
                     );
                     let version_url = format!("command:tinymist.replaceText?{encoded}");
-                    info.push_str(&format!("- [{version}]({version_url})\n"));
+                    info.push_str(&format!("- [{version}]({version_url}) / {release_date}\n"));
                 }
             }
             info.push('\n');
