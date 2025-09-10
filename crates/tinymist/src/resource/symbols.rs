@@ -31,6 +31,7 @@ struct ResourceSymbolItemRendered {
     id: String,
     category: SymCategory,
     unicode: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
     glyph: Option<String>,
 }
 

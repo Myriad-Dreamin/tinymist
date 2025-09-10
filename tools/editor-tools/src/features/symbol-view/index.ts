@@ -20,13 +20,11 @@ function useSymbolResource() {
       : (JSON.parse(base64Decode(symbolInformationData)) as SymbolResource).symbols,
   );
 
-  console.log("symbols", symbols.val);
   if (import.meta.env.DEV) {
     // Dynamically import mock data in development mode if no real data is present
     import("./mock-data.json").then((json) => {
       const symbolResource = json as SymbolResource;
       symbols.val = symbolResource.symbols;
-      console.log("symbols", symbols.val);
     });
   }
 
