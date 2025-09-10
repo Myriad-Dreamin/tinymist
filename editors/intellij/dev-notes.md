@@ -30,13 +30,13 @@ We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redh
     *   Wait for Gradle sync to complete and download all dependencies.
     *   You can build the plugin using the Gradle tool window in IntelliJ (Tasks > intellij > buildPlugin) or via the terminal:
         ```bash
-        ./gradlew buildPlugin
+        ./gradlew :intellij:buildPlugin
         ```
 
 5.  **Run/Debug:**
     *   Use the Gradle task `runIde` (Tasks > intellij > runIde) from the Gradle tool window or terminal:
         ```bash
-        ./gradlew runIde
+        ./gradlew :intellij:runIde
         ```
     *   This will launch a blank IntelliJ IDEA instance with the Tinymist plugin installed.
     *   You can then create or open a Typst project/file in this sandbox environment to test the plugin's features.
