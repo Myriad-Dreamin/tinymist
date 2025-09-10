@@ -120,10 +120,10 @@ async function tryFindWorkflowRunId(workflowId, branch) {
 }
 
 async function createReleaseAsset() {
-  // await spawn(
-  //   `workflow-run`,
-  //   `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
-  // );
+  await spawn(
+    `workflow-run`,
+    `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
+  );
 
   // get and wait last run id
   const runId = await tryFindWorkflowRunId(releaseAssetId, currentBranch);
@@ -133,10 +133,10 @@ async function createReleaseAsset() {
   await spawn(`workflow-run-watch`, `gh run watch ${runId}`);
 }
 
-// await spawn(
-//   "pr-create",
-//   `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
-// );
+await spawn(
+  "pr-create",
+  `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
+);
 await createReleaseAsset();
 const cargoToml = await fs.readFile("Cargo.toml", "utf-8");
 const newCargoToml = cargoToml.replace(
@@ -145,9 +145,9 @@ const newCargoToml = cargoToml.replace(
 );
 await fs.writeFile("Cargo.toml", newCargoToml);
 // sleep 10 seconds to wait for cargo.lock to be updated
-await new Promise((resolve) => setTimeout(resolve, 10000));
+await new Promise((resolve) => setTimeout(resolve, 20000));
 
 // add, commit and push
 await spawn("add", "git add Cargo.toml Cargo.lock");
-await spawn("commit", "git commit -am 'build: bump assets to ${tag}'");
+await spawn("commit", `git commit -am 'build: bump assets to ${tag}'`);
 await spawn("push", "git push");
