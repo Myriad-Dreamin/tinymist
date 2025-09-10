@@ -35,7 +35,8 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        intellijIdeaUltimate("2025.1")
+        intellijIdeaCommunity("2025.1")
+        // todo: intellijIdeaUltimate("2025.1")
         testFramework(TestFrameworkType.Platform)
         plugins(listOf("com.redhat.devtools.lsp4ij:0.15.1-20250829-070912@nightly"))
     }
