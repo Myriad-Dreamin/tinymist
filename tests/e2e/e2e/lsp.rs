@@ -400,7 +400,10 @@ fn sort_and_redact_value(v: Value) -> Value {
                                 // Redact server info to avoid unstable version information
                                 Value::Object(serde_json::Map::from_iter([
                                     ("name".to_string(), Value::String("tinymist".to_string())),
-                                    ("version".to_string(), Value::String("<redacted>".to_string())),
+                                    (
+                                        "version".to_string(),
+                                        Value::String("<redacted>".to_string()),
+                                    ),
                                 ]))
                             } else {
                                 sort_and_redact_value(v.clone())
