@@ -144,7 +144,8 @@ const newCargoToml = cargoToml.replace(
   `tinymist-assets = { version = "=${tag}" }`,
 );
 await fs.writeFile("Cargo.toml", newCargoToml);
-// sleep 10 seconds to wait for cargo.lock to be updated
+await spawn("upate-lock", "cargo update tinymist");
+// sleep 20 seconds to wait for cargo.lock to be updated
 await new Promise((resolve) => setTimeout(resolve, 20000));
 
 // add, commit and push
