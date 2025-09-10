@@ -25,14 +25,18 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border: 1px solid transparent;
   border-radius: 0.25rem;
   background: var(--vscode-list-inactiveSelectionBackground, rgba(201, 209, 217, 0.15));
   overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.symbol-cell:hover {
+  overflow: visible
 }
 
 .symbol-picker.detailed .symbol-cell {
@@ -63,14 +67,14 @@
 
 /* Symbol glyph mask */
 div.symbol-glyph svg {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2rem;
+  height: 2rem;
   fill: currentColor;
   transition: fill 200ms;
 }
 
 .symbol-cell:hover div.symbol-glyph svg {
-  fill: var(--vscode-accent, #007acc); /* fixme: no --vscode-accent */
+  fill: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 /* Symbol glyph fallback text */
@@ -78,6 +82,10 @@ span.symbol-glyph {
   font-size: 0.75rem;
   font-style: italic;
   font-weight: 500;
+}
+
+.symbol-cell:hover span.symbol-glyph {
+  color: var(--vscode-button-hoverBackground, #1177bb);
 }
 
 /* Symbol details */
