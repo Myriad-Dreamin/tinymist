@@ -88,10 +88,10 @@ impl<T> RevisionManager<T> {
             .filter(|slot| slot.revision <= revision.get())
             .reduce(|x, y| if x.revision > y.revision { x } else { y });
 
-        if let Some(slot) = slot_base {
-            if slot.revision == revision.get() {
-                return slot.clone();
-            }
+        if let Some(slot) = slot_base
+            && slot.revision == revision.get()
+        {
+            return slot.clone();
         }
 
         let slot = Arc::new(RevisionSlot {

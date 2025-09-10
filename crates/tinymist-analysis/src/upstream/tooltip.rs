@@ -1,7 +1,6 @@
 use std::fmt::Write;
 
 use ecow::{EcoString, eco_format};
-use if_chain::if_chain;
 use typst::World;
 use typst::engine::Sink;
 use typst::foundations::{Capturer, Value, repr};
@@ -55,10 +54,10 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
 
     let values = analyze_expr(world, ancestor);
 
-    if let [(Value::Length(length), _)] = values.as_slice() {
-        if let Some(tooltip) = length_tooltip(*length) {
-            return Some(tooltip);
-        }
+    if let [(Value::Length(length), _)] = values.as_slice()
+        && let Some(tooltip) = length_tooltip(*length)
+    {
+        return Some(tooltip);
     }
 
     if expr.is_literal() {
@@ -105,10 +104,10 @@ pub fn expr_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
         return None;
     }
 
-    if let Some((_, count)) = last {
-        if count > 1 {
-            write!(pieces.last_mut().unwrap(), " (x{count})").unwrap();
-        }
+    if let Some((_, count)) = last
+        && count > 1
+    {
+        write!(pieces.last_mut().unwrap(), " (x{count})").unwrap();
     }
 
     if iter.next().is_some() {
@@ -170,27 +169,24 @@ fn length_tooltip(length: Length) -> Option<Tooltip> {
 
 /// Tooltip for font.
 fn font_tooltip(world: &dyn World, leaf: &LinkedNode) -> Option<Tooltip> {
-    if_chain! {
-        // Ensure that we are on top of a string.
-        if let Some(string) = leaf.cast::<ast::Str>();
-        let lower = string.get().to_lowercase();
+    // Ensure that we are on top of a string.
+    if let Some(string) = leaf.cast::<ast::Str>()
+        &&let lower = string.get().to_lowercase()
 
         // Ensure that we are in the arguments to the text function.
-        if let Some(parent) = leaf.parent();
-        if let Some(named) = parent.cast::<ast::Named>();
-        if named.name().as_str() == "font";
+        && let Some(parent) = leaf.parent()
+        && let Some(named) = parent.cast::<ast::Named>()
+        && named.name().as_str() == "font"
 
         // Find the font family.
-        if let Some((_, iter)) = world
+        && let Some((_, iter)) = world
             .book()
             .families()
-            .find(|&(family, _)| family.to_lowercase().as_str() == lower.as_str());
-
-        then {
-            let detail = summarize_font_family(iter);
-            return Some(Tooltip::Text(detail));
-        }
-    };
+            .find(|&(family, _)| family.to_lowercase().as_str() == lower.as_str())
+    {
+        let detail = summarize_font_family(iter);
+        return Some(Tooltip::Text(detail));
+    }
 
     None
 }

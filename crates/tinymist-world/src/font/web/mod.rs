@@ -188,11 +188,11 @@ fn infer_info_from_web_font(
                             _ => None,
                         };
 
-                        if let Some(guess_stretch) = guess_stretch {
-                            if idx == 0 {
-                                stretch = Some(guess_stretch);
-                                break 'searchLoop;
-                            }
+                        if let Some(guess_stretch) = guess_stretch
+                            && idx == 0
+                        {
+                            stretch = Some(guess_stretch);
+                            break 'searchLoop;
                         }
                     }
                 }

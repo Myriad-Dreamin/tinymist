@@ -384,10 +384,10 @@ impl LexicalHierarchyWorker {
                 SyntaxKind::Closure => {
                     let first_child = node.children().next();
                     let current = self.stack.last_mut().unwrap().1.len();
-                    if let Some(first_child) = first_child {
-                        if first_child.kind() == SyntaxKind::Ident {
-                            self.check_node_with(first_child, IdentContext::Func)?;
-                        }
+                    if let Some(first_child) = first_child
+                        && first_child.kind() == SyntaxKind::Ident
+                    {
+                        self.check_node_with(first_child, IdentContext::Func)?;
                     }
                     let body = node
                         .children()

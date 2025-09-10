@@ -13,7 +13,7 @@ export const Diagnostics = () => {
       style: "justify-content: center; align-items: center; gap: 10px;",
     },
     div(
-      { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
+      { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       code(
         { width: "100%" },
         `cannot add integer and alignment`,
@@ -26,7 +26,7 @@ export const Diagnostics = () => {
       ),
     ),
     div(
-      { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
+      { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       "Expression explained.",
       div(
         {

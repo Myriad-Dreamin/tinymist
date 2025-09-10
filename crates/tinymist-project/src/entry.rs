@@ -169,25 +169,25 @@ impl EntryResolver {
     pub fn resolve_default(&self) -> Option<ImmutPath> {
         let entry = self.entry.as_ref();
         // todo: pre-compute this when updating config
-        if let Some(entry) = entry {
-            if entry.is_relative() {
-                let root = self.root(None)?;
-                return Some(root.join(entry).as_path().into());
-            }
+        if let Some(entry) = entry
+            && entry.is_relative()
+        {
+            let root = self.root(None)?;
+            return Some(root.join(entry).as_path().into());
         }
         entry.cloned()
     }
 
     /// Validates the configuration.
     pub fn validate(&self) -> Result<()> {
-        if let Some(root) = &self.root_path {
-            if !root.is_absolute() {
-                tinymist_l10n::bail!(
-                    "tinymist-project.validate-error.root-path-not-absolute",
-                    "rootPath or typstExtraArgs.root must be an absolute path: {root:?}",
-                    root = root.debug_l10n()
-                );
-            }
+        if let Some(root) = &self.root_path
+            && !root.is_absolute()
+        {
+            tinymist_l10n::bail!(
+                "tinymist-project.validate-error.root-path-not-absolute",
+                "rootPath or typstExtraArgs.root must be an absolute path: {root:?}",
+                root = root.debug_l10n()
+            );
         }
 
         Ok(())

@@ -1,4 +1,7 @@
-import { ANNOTATE_META } from "./feature.mjs";
+import fs from "fs/promises";
+import path from "path";
+
+import { ANNOTATE_META } from "./feature.ts";
 
 export interface Grammar {
   patterns?: Pattern[];
@@ -8,10 +11,8 @@ export type Repository = Record<string, Pattern>;
 type MaybeRegExp = RegExp | string;
 
 export type PatternCommon = Pick<PatternAny, "comment" | "disabled" | "name">;
-export type PatternInclude = PatternCommon &
-  Pick<PatternAny, "include" | "patterns">;
-export type PatternMatch = PatternCommon &
-  Pick<PatternAny, "match" | "captures">;
+export type PatternInclude = PatternCommon & Pick<PatternAny, "include" | "patterns">;
+export type PatternMatch = PatternCommon & Pick<PatternAny, "match" | "captures">;
 export type PatternBeginEnd = PatternCommon &
   Pick<
     PatternAny,
@@ -26,18 +27,9 @@ export type PatternBeginEnd = PatternCommon &
 export type PatternBeginWhile = PatternCommon &
   Pick<
     PatternAny,
-    | "begin"
-    | "while"
-    | "contentName"
-    | "beginCaptures"
-    | "whileCaptures"
-    | "patterns"
+    "begin" | "while" | "contentName" | "beginCaptures" | "whileCaptures" | "patterns"
   >;
-export type Pattern =
-  | PatternInclude
-  | PatternMatch
-  | PatternBeginEnd
-  | PatternBeginWhile;
+export type Pattern = PatternInclude | PatternMatch | PatternBeginEnd | PatternBeginWhile;
 
 interface PatternAny {
   /**
@@ -135,17 +127,7 @@ interface PatternAny {
   applyEndPatternLast?: number;
 }
 
-export type NumberStrings =
-  | "0"
-  | "1"
-  | "2"
-  | "3"
-  | "4"
-  | "5"
-  | "6"
-  | "7"
-  | "8"
-  | "9";
+export type NumberStrings = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
 
 export type Captures = Partial<Record<NumberStrings, Capture>>;
 export interface Capture {
@@ -180,7 +162,7 @@ export function oneOf(...patterns: RegExp[]) {
 
         return `(?:${src})`;
       })
-      .join("|")
+      .join("|"),
   );
 }
 
@@ -214,6 +196,6 @@ export function compile(s: Grammar): string {
       }
       return v;
     },
-    2
+    2,
   );
 }

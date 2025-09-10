@@ -38,7 +38,7 @@ body {
   background-color: #fff;
 }
 
-#typst-app.invert-colors {
+#typst-app.invert-colors .typst-doc {
   filter: invert(0.933333) hue-rotate(180deg);
 }
 

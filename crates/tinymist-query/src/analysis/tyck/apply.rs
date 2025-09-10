@@ -21,20 +21,18 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
             sig => (sig, false),
         };
 
-        if !is_partialize {
-            if let Some(ty) = sig.call(args, pol, self.base) {
-                self.resultant.push(ty);
-            }
+        if !is_partialize && let Some(ty) = sig.call(args, pol, self.base) {
+            self.resultant.push(ty);
         }
 
         // todo: remove this after we implemented dependent types
         match sig {
             Sig::TypeCons { val, .. } => {
-                if *val == typst::foundations::Type::of::<typst::foundations::Type>() {
-                    if let Some(p0) = args.pos(0) {
-                        self.resultant
-                            .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.clone())));
-                    }
+                if *val == typst::foundations::Type::of::<typst::foundations::Type>()
+                    && let Some(p0) = args.pos(0)
+                {
+                    self.resultant
+                        .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.clone())));
                 }
             }
             Sig::Builtin(BuiltinSig::TupleMap(this)) => {

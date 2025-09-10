@@ -25,16 +25,16 @@ impl TypeChecker<'_> {
         };
         let mut vars = vars;
         for (_name, doc) in vars.iter_mut() {
-            if let Some(ty) = &mut doc.ty {
-                if let Some(mutated) = ty.mutate(true, &mut renamer) {
-                    *ty = mutated;
-                }
-            }
-        }
-        if let Some(ty) = res_ty.as_mut() {
-            if let Some(mutated) = ty.mutate(true, &mut renamer) {
+            if let Some(ty) = &mut doc.ty
+                && let Some(mutated) = ty.mutate(true, &mut renamer)
+            {
                 *ty = mutated;
             }
+        }
+        if let Some(ty) = res_ty.as_mut()
+            && let Some(mutated) = ty.mutate(true, &mut renamer)
+        {
+            *ty = mutated;
         }
         DocString {
             docs,

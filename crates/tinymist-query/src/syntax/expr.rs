@@ -55,12 +55,11 @@ pub(crate) fn expr_of(
 
             // If there is a cycle, the expression will be stable as the source is
             // unchanged.
-            if let Some(exports) = ei {
-                if prev_exports.size() != exports.size()
-                    || hash128(&prev_exports) != hash128(&exports)
-                {
-                    return None;
-                }
+            if let Some(exports) = ei
+                && (prev_exports.size() != exports.size()
+                    || hash128(&prev_exports) != hash128(&exports))
+            {
+                return None;
             }
         }
 

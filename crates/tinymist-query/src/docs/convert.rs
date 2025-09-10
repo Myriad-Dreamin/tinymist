@@ -34,12 +34,12 @@ pub(crate) fn convert_docs(
         }
 
         let mut imports = Vec::new();
-        if WorkspaceResolver::is_package_file(fid) {
-            if let Some(pkg) = fid.package() {
-                let pkg_spec = pkg.to_string();
-                imports.push(format!("#import {pkg_spec:?}"));
-                imports.push(format!("#import {pkg_spec:?}: *"));
-            }
+        if WorkspaceResolver::is_package_file(fid)
+            && let Some(pkg) = fid.package()
+        {
+            let pkg_spec = pkg.to_string();
+            imports.push(format!("#import {pkg_spec:?}"));
+            imports.push(format!("#import {pkg_spec:?}: *"));
         }
         imports.push(format!(
             "#import {:?}: *",

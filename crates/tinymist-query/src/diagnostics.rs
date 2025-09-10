@@ -46,7 +46,7 @@ impl<'w> DiagWorker<'w> {
         }
     }
 
-    /// Runs code check on the document.
+    /// Runs code check on the main document and all its dependencies.
     pub fn check(mut self) -> Self {
         for dep in self.ctx.world.depended_files() {
             if WorkspaceResolver::is_package_file(dep) {

@@ -229,12 +229,11 @@ impl ScanDefCtx<'_> {
         };
 
         if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|decl| decl.file_id()).zip(site)
+            && span != *mod_fid
         {
-            if span != *mod_fid {
-                head.is_external = true;
-                head.oneliner = head.docs.map(|docs| oneliner(&docs).to_owned());
-                head.docs = None;
-            }
+            head.is_external = true;
+            head.oneliner = head.docs.map(|docs| oneliner(&docs).to_owned());
+            head.docs = None;
         }
 
         // Insert module that is not exported

@@ -81,10 +81,10 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
         _ => Format::Md,
     };
 
-    if let Some(assets_path) = args.assets_path.as_ref() {
-        if !assets_path.exists() {
-            std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
-        }
+    if let Some(assets_path) = args.assets_path.as_ref()
+        && !assets_path.exists()
+    {
+        std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
     }
 
     let doc = Typlite::new(world.clone())

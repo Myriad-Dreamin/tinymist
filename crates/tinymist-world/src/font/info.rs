@@ -56,10 +56,10 @@ pub fn typst_typographic_family(mut family: &str) -> &str {
 
         // Also allow an extra modifier, but apply it only if it is separated it
         // from the text before it (to prevent false positives).
-        if let Some(t) = MODIFIERS.iter().find_map(|s| t.strip_suffix(s)) {
-            if let Some(stripped) = t.strip_suffix(SEPARATORS) {
-                trimmed = stripped;
-            }
+        if let Some(t) = MODIFIERS.iter().find_map(|s| t.strip_suffix(s))
+            && let Some(stripped) = t.strip_suffix(SEPARATORS)
+        {
+            trimmed = stripped;
         }
     }
 
