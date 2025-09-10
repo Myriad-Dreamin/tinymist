@@ -69,39 +69,39 @@ struct Args {
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "kebab-case")]
 enum Commands {
-    /// Probes existence (Nop run)
+    /// Probe existence (Nop run)
     Probe,
 
-    /// Runs language server
+    /// Run language server
     Lsp(crate::lsp::LspArgs),
-    /// Runs debug adapter
+    /// Run debug adapter
     #[cfg(feature = "dap")]
     Dap(crate::dap::DapArgs),
-    /// Runs language server for tracing some typst program.
+    /// Run language server for tracing some typst program.
     #[clap(hide(true))]
     TraceLsp(crate::trace_lsp::TraceLspArgs),
 
-    /// Runs language query
+    /// Run language query
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
     Query(crate::query::QueryCommands),
-    /// Runs preview server
+    /// Run preview server
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
-    /// Runs compile command like `typst-cli compile`
+    /// Run compile command like `typst-cli compile`
     Compile(CompileArgs),
 
-    /// Generates completion script to stdout
+    /// Generate completion script to stdout
     Completion(crate::completion::ShellCompletionArgs),
-    /// Generates build script for compilation
+    /// Generate build script for compilation
     #[clap(hide(true))] // still in development
     GenerateScript(crate::generate_script::GenerateScriptArgs),
 
-    /// Runs documents
+    /// Run documents
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
     Doc(tinymist::project::DocCommands),
-    /// Runs tasks
+    /// Run tasks
     #[cfg(feature = "lock")]
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
@@ -110,7 +110,7 @@ enum Commands {
     /// Execute a document and collect coverage
     #[clap(hide(true))] // still in development
     Cov(crate::cov::CovArgs),
-    /// Test a document and gives summary
+    /// Test a document and give summary
     Test(crate::test::TestArgs),
 }
 

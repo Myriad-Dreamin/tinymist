@@ -94,18 +94,43 @@ function spawn(id, cmd, options = {}) {
 }
 
 const releaseAssetId = "release-asset-crate.yml";
+const currentBranch = (await spawn("current-branch", "git rev-parse --abbrev-ref HEAD"))
+  .toString()
+  .trim();
+
+async function findWorkflowRunId(workflowId, branch) {
+  const runs = JSON.parse(
+    await spawn("workflow-run-list", `gh run list -w ${workflowId} --json headBranch,databaseId`),
+  );
+
+  console.log(runs, branch);
+  const run = runs.find((run) => run.headBranch === branch);
+  return run.databaseId;
+}
+
+async function tryFindWorkflowRunId(workflowId, branch) {
+  for (let i = 0; i < 10; i++) {
+    const runId = await findWorkflowRunId(workflowId, branch);
+    if (runId) {
+      return runId;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  throw new Error(`Workflow run ${workflowId} for branch ${branch} not found`);
+}
 
 async function createReleaseAsset() {
-  const currentBranch = await spawn("current-branch", "git rev-parse --abbrev-ref HEAD");
-  const run = await spawn(
+  await spawn(
     `workflow-run`,
     `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
   );
-  const runId = run.toString().trim();
-  console.log(`Workflow run ${runId} started`);
 
+  // get and wait last run id
+  const runId = await tryFindWorkflowRunId(releaseAssetId, currentBranch);
+
+  console.log(`Workflow run ${runId} started`);
   // watch and print runs
-  await spawn(`workflow-run-watch`, `gh workflow run watch ${runId}`);
+  await spawn(`workflow-run-watch`, `gh run watch ${runId}`);
 }
 
 await spawn(
@@ -119,10 +144,11 @@ const newCargoToml = cargoToml.replace(
   `tinymist-assets = { version = "=${tag}" }`,
 );
 await fs.writeFile("Cargo.toml", newCargoToml);
-// sleep 10 seconds to wait for cargo.lock to be updated
-await new Promise((resolve) => setTimeout(resolve, 10000));
+await spawn("upate-lock", "cargo update tinymist");
+// sleep 20 seconds to wait for cargo.lock to be updated
+await new Promise((resolve) => setTimeout(resolve, 20000));
 
 // add, commit and push
 await spawn("add", "git add Cargo.toml Cargo.lock");
-await spawn("commit", "git commit -am 'build: bump assets to ${tag}'");
+await spawn("commit", `git commit -am 'build: bump assets to ${tag}'`);
 await spawn("push", "git push");

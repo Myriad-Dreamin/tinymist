@@ -1,0 +1,199 @@
+/* ===== Theme Variables ===== */
+:root {
+  --color-base-content: var(--vscode-foreground, #cccccc);
+}
+
+/* ===== Typography & Text Utilities ===== */
+.text-base-content {
+  color: var(--color-base-content);
+}
+
+.font-mono {
+  font-family: var(--vscode-editor-font-family, monospace, "Courier New");
+}
+
+.text-desc {
+  color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+}
+
+/* ===== Badges ===== */
+.badge {
+  font-size: 0.75rem;
+  color: var(--vscode-badge-foreground, #ffffff);
+  background: var(--vscode-badge-background, #4d4d4d);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ===== Cards ===== */
+.card {
+  padding: 1rem;
+  background: var(--vscode-panel-background, #1e1e1e);
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-radius: 0.375rem;
+}
+
+/* ===== Dividers ===== */
+
+.divider {
+  white-space: nowrap;
+  margin: 0.5rem 0;
+  flex-direction: row;
+  align-self: stretch;
+  align-items: center;
+  display: flex;
+  border-top: 1px solid var(--vscode-panel-border, rgba(255, 255, 255, 0.1));
+}
+
+.divider:not(:empty) {
+  gap: 1rem;
+}
+
+/* ===== Lists ===== */
+.list-highlight > * {
+  transition: all 0.2s ease;
+}
+
+.list-highlight > *:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+}
+
+/* ===== Buttons ===== */
+.btn {
+  --btn-color: var(--vscode-button-background, #0e639c);
+  --btn-fg: var(--vscode-button-foreground, #ffffff);
+
+  padding: 0.25rem 0.375rem;
+  font-size: var(--fontsize, 0.75rem);
+  white-space: nowrap;
+  background: var(--btn-color);
+  color: var(--btn-fg);
+
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn:hover {
+  --btn-color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* todo: warning style */
+body.typst-preview-dark .btn.warning {
+  background: rgba(252, 211, 55, 0.6);
+}
+body.typst-preview-dark .btn.warning:hover {
+  background: rgba(252, 211, 55, 0.9);
+}
+body.typst-preview-light .btn.warning {
+  background: rgba(243, 202, 99, 0.6);
+}
+body.typst-preview-light .btn.warning:hover {
+  background: rgba(243, 202, 99, 0.9);
+}
+
+.btn:active {
+  scale: 0.95;
+}
+
+/* Button variants */
+.btn-secondary {
+  --btn-color: var(--vscode-button-secondaryBackground, #3a3d41);
+  --btn-fg: var(--color-base-secondaryForeground, #ffffff);
+}
+
+.btn-secondary:hover {
+  --btn-color: var(--vscode-button-secondaryHoverBackground, #45494e);
+}
+
+/* ===== Toggle Button ===== */
+.toggle-btn {
+  --btn-color: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.1));
+  --btn-fg: var(--vscode-button-secondaryForeground, #ffffff);
+
+  padding: 0.25rem 0.375rem;
+  font-size: 0.75rem;
+  background: var(--btn-color);
+  color: var(--btn-fg);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  outline: none;
+}
+
+.toggle-btn:hover {
+  --btn-color: var(--vscode-button-secondaryHoverBackground, rgba(255, 255, 255, 0.15));
+}
+
+.toggle-btn:active {
+  scale: 0.95;
+}
+
+.toggle-btn.active {
+  --btn-color: var(--vscode-inputOption-activeBackground, #094771);
+  --btn-fg: var(--vscode-inputOption-activeForeground, #ffffff);
+}
+
+.toggle-btn.active:hover {
+  --btn-color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 2rem;
+  height: 1rem;
+  background-color: var(--vscode-input-background, #2d2d30);
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 1rem;
+  transition: background-color 0.2s;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+}
+
+.toggle:checked {
+  background-color: var(--vscode-button-background, #0e639c);
+  border-color: var(--vscode-button-background, #0e639c);
+}
+
+.toggle::before {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 0.75rem;
+  height: 0.75rem;
+  background-color: var(--vscode-foreground, #cccccc);
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.toggle:checked::before {
+  transform: translateX(1rem);
+}
+
+/* ===== Form Inputs ===== */
+.input {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  background: var(--vscode-input-background, #2d2d30);
+  color: var(--vscode-input-foreground, #cccccc);
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 4px;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--vscode-focusBorder, #007acc);
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
+}
+
+.input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #767676);
+}
