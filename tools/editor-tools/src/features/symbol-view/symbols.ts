@@ -56,7 +56,7 @@ export interface SymbolItem {
   id: SymbolId;
   category: SymbolCategory;
   unicode: number;
-  glyph: string | null;
+  glyph?: string;
 }
 
 export interface SymbolResource {
