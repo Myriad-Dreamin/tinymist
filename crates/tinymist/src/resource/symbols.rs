@@ -5,7 +5,6 @@ use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
-use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
@@ -16,23 +15,23 @@ use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResourceSymbolResponse {
-    symbols: Vec<ResourceSymbolItemRendered>,
+    symbols: Vec<ResourceSymbolItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ResourceSymbolItem {
-    category: SymCategory,
-    unicode: u32,
-    glyphs: Vec<ResourceGlyphDesc>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct ResourceSymbolItemRendered {
     id: String,
     category: SymCategory,
     unicode: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     glyph: Option<String>,
+}
+
+#[derive(Debug)]
+struct SymbolItem {
+    category: SymCategory,
+    unicode: u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -67,30 +66,7 @@ enum SymCategory {
     DoubleStruck,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResourceGlyphDesc {
-    x_advance: Option<u16>,
-    y_advance: Option<u16>,
-    x_min: Option<i16>,
-    x_max: Option<i16>,
-    y_min: Option<i16>,
-    y_max: Option<i16>,
-    name: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FontItem {
-    family: String,
-    cap_height: f32,
-    ascender: f32,
-    descender: f32,
-    units_per_em: f32,
-    // vertical: bool,
-}
-
-type ResourceSymbolMap = BTreeMap<String, ResourceSymbolItem>;
+type ResourceSymbolMap = BTreeMap<String, SymbolItem>;
 
 static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
     use SymCategory::*;
@@ -970,7 +946,7 @@ impl ServerState {
     }
 }
 
-fn collect_symbols(snap: &LspComputeGraph) -> LspResult<BTreeMap<String, ResourceSymbolItem>> {
+fn collect_symbols(snap: &LspComputeGraph) -> LspResult<BTreeMap<String, SymbolItem>> {
     let mut symbols = ResourceSymbolMap::new();
 
     let std = snap
@@ -1031,10 +1007,9 @@ fn populate(
         let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
         out.insert(
             name,
-            ResourceSymbolItem {
+            SymbolItem {
                 category,
                 unicode: ch as u32,
-                glyphs: vec![],
             },
         );
     }
@@ -1042,7 +1017,7 @@ fn populate(
 
 fn render_symbols(
     snap: &LspComputeGraph,
-    symbols: &BTreeMap<String, ResourceSymbolItem>,
+    symbols: &BTreeMap<String, SymbolItem>,
 ) -> LspResult<HashMap<String, (TypstFont, GlyphId)>> {
     const PRELUDE: &str = r#"#show math.equation: set text(font: (
   "New Computer Modern Math",
@@ -1081,59 +1056,42 @@ fn render_symbols(
 
     log::debug!("sym doc: {sym_doc:?}");
 
-    let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
-    let res = trait_symbol_fonts(&TypstDocument::Paged(Arc::new(sym_doc)), &symbols_ref);
+    let res = extract_rendered_symbols(&sym_doc, symbols.keys());
 
     Ok(res)
 }
 
-fn trait_symbol_fonts(
-    doc: &TypstDocument,
-    symbols: &[String],
+fn extract_rendered_symbols<'a>(
+    doc: &TypstPagedDocument,
+    symbols: impl Iterator<Item = &'a String>,
 ) -> HashMap<String, (TypstFont, GlyphId)> {
     use typst::layout::Frame;
     use typst::layout::FrameItem;
 
-    let mut worker = Worker {
-        symbols,
-        active: "",
-        res: HashMap::new(),
-    };
-    worker.work(doc);
-    let res = worker.res;
-
-    struct Worker<'a> {
-        symbols: &'a [String],
-        active: &'a str,
+    struct Worker {
         res: HashMap<String, (TypstFont, GlyphId)>,
     }
 
-    impl Worker<'_> {
-        fn work(&mut self, doc: &TypstDocument) {
-            match doc {
-                TypstDocument::Paged(paged_doc) => {
-                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
-                        self.active = s;
-                        self.work_frame(&pg.frame);
-                    }
-                }
-                // todo: handle html
-                TypstDocument::Html(..) => {}
+    impl Worker {
+        fn work<'a>(
+            &mut self,
+            paged_doc: &TypstPagedDocument,
+            symbols: impl Iterator<Item = &'a String>,
+        ) {
+            for (pg, s) in paged_doc.pages.iter().zip(symbols) {
+                self.work_frame(&pg.frame, s);
             }
         }
 
-        fn work_frame(&mut self, k: &Frame) {
+        fn work_frame(&mut self, k: &Frame, active: &str) {
             for (_, item) in k.items() {
                 let text = match item {
                     FrameItem::Group(g) => {
-                        self.work_frame(&g.frame);
+                        self.work_frame(&g.frame, active);
                         continue;
                     }
                     FrameItem::Text(text) => text,
-                    FrameItem::Shape(_, _)
-                    | FrameItem::Image(_, _, _)
-                    | FrameItem::Link(_, _)
-                    | FrameItem::Tag(_) => continue,
+                    _ => continue,
                 };
 
                 let font = text.font.clone();
@@ -1150,75 +1108,43 @@ fn trait_symbol_fonts(
                     if ch.is_whitespace() {
                         continue;
                     }
-                    log::debug!(
-                        "glyph: {active} => {ch} ({chc:x})",
-                        active = self.active,
-                        chc = ch as u32
-                    );
+                    log::debug!("glyph: {active} => {ch} ({chc:x})", chc = ch as u32);
                     self.res
-                        .insert(self.active.to_owned(), (font.clone(), GlyphId(g.id)));
+                        .insert(active.to_owned(), (font.clone(), GlyphId(g.id)));
                 }
             }
         }
     }
 
-    res
+    let mut worker = Worker {
+        res: HashMap::new(),
+    };
+    worker.work(doc, symbols);
+    worker.res
 }
 
 fn render_glyphs(
-    symbols: &BTreeMap<String, ResourceSymbolItem>,
+    symbols: &BTreeMap<String, SymbolItem>,
     glyph_mapping: &HashMap<String, (TypstFont, GlyphId)>,
-) -> LspResult<Vec<ResourceSymbolItemRendered>> {
+) -> LspResult<Vec<ResourceSymbolItem>> {
     let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
     let glyph_pass = reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
-
-    let font_collected = glyph_mapping
-        .values()
-        .map(|e| e.0.clone())
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect::<Vec<_>>();
-    let font_selects = font_collected
-        .iter()
-        .map(|e| FontItem {
-            family: e.info().family.clone(),
-            cap_height: e.metrics().cap_height.get() as f32,
-            ascender: e.metrics().ascender.get() as f32,
-            descender: e.metrics().descender.get() as f32,
-            units_per_em: e.metrics().units_per_em as f32,
-        })
-        .collect::<Vec<_>>();
 
     let mut builder = SvgGlyphBuilder::new();
 
     let mut render_sym = |u| {
         let (font, id) = glyph_mapping.get(u)?.clone();
-        let font_index = font_collected.iter().position(|e| e == &font).unwrap();
-
-        let width = font.ttf().glyph_hor_advance(id);
-        let height = font.ttf().glyph_ver_advance(id);
-        let bbox = font.ttf().glyph_bounding_box(id);
-
-        let desc = ResourceGlyphDesc {
-            x_advance: width,
-            y_advance: height,
-            x_min: bbox.map(|e| e.x_min),
-            x_max: bbox.map(|e| e.x_max),
-            y_min: bbox.map(|e| e.y_min),
-            y_max: bbox.map(|e| e.y_max),
-            name: font.ttf().glyph_name(id).map(|e| e.to_owned()),
-        };
 
         let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
 
-        let rendered = builder.render_glyph("", &glyph); // the glyph_id does not matter here
+        let rendered = builder.render_glyph("", &glyph)?; // the glyph_id does not matter here
 
-        rendered.map(|rendered| create_display_svg(&desc, &font_selects[font_index], &rendered))
+        Some(create_display_svg(&font, id, &rendered))
     };
 
     let rendered_symbols = symbols
         .iter()
-        .map(|(k, v)| ResourceSymbolItemRendered {
+        .map(|(k, v)| ResourceSymbolItem {
             id: k.clone(),
             category: v.category,
             unicode: v.unicode,
@@ -1229,44 +1155,38 @@ fn render_glyphs(
     Ok(rendered_symbols)
 }
 
-fn create_display_svg(
-    primary_glyph: &ResourceGlyphDesc,
-    font_selected: &FontItem,
-    svg_path: &str,
-) -> String {
-    fn diff(min: Option<i16>, max: Option<i16>) -> i16 {
-        match (min, max) {
-            (Some(a), Some(b)) => b - a,
-            _ => 0,
-        }
-    }
+fn create_display_svg(font: &TypstFont, gid: GlyphId, svg_path: &str) -> String {
+    let face = font.ttf();
 
-    let bbox_width = diff(primary_glyph.x_min, primary_glyph.x_max) as f32;
-    let width = bbox_width.max(
-        primary_glyph
-            .x_advance
-            .map(f32::from)
-            .unwrap_or(font_selected.units_per_em),
-    );
+    let (x_min, x_max) = face
+        .glyph_bounding_box(gid)
+        .map(|bbox| (bbox.x_min as f32, bbox.x_max as f32))
+        .unwrap_or_default();
 
-    let bbox_height = diff(primary_glyph.y_min, primary_glyph.y_max) as f32;
-    let y_global = primary_glyph
-        .y_advance
+    // Font-wide metrics
+    let units_per_em = font.metrics().units_per_em as f32;
+    let ascender = font.metrics().ascender.get() as f32 * units_per_em;
+    let descender = font.metrics().descender.get() as f32 * units_per_em; // usually negative
+
+    // Horizontal advance (fallback to em)
+    let x_advance = face
+        .glyph_hor_advance(gid)
         .map(f32::from)
-        .unwrap_or(font_selected.units_per_em);
-    let height = bbox_height.max(y_global);
+        .unwrap_or(units_per_em);
 
-    let y_shift = if bbox_height >= y_global {
-        primary_glyph.y_max.unwrap_or_default().abs() as f32
-    } else {
-        (primary_glyph.y_max.unwrap_or_default() as f32 + height) / 2.0
-    };
+    // Start viewBox.x at left-most ink or 0, whichever is smaller (to include left overhang)
+    let view_x = x_min.min(0.0);
 
-    let x_shift = -(primary_glyph.x_min.unwrap_or_default()) as f32 + (width - bbox_width) / 2.0;
+    // Start view width as the advance; enlarge if ink extends past that
+    let view_w = x_advance.max(x_max - view_x);
+
+    // Vertical viewBox uses font ascender/descent so baseline is at y=0
+    let view_y = -ascender;
+    let view_h = ascender - descender; // ascender - (negative descender) -> total height
 
     let svg_content = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
-<g transform="translate({x_shift} {y_shift}) scale(1 -1)">{svg_path}</g>
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_x} {view_y} {view_w} {view_h}" preserveAspectRatio="xMidYMid meet">
+<g transform="scale(1 -1)">{svg_path}</g>
 </svg>"#
     );
 
