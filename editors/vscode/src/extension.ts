@@ -232,17 +232,12 @@ async function languageActivate(context: IContext) {
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
+
+    commands.registerTextEditorCommand("tinymist.replaceText", commandReplaceText),
   );
-  // context.subscriptions.push
   const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
-  );
-  context.subscriptions.push(
-    commands.registerTextEditorCommand(
-      "tinymist.replaceImportVersion",
-      commandReplaceImportVersion,
-    ),
   );
 }
 
@@ -647,7 +642,7 @@ export function statusBarFormatString() {
   return formatter;
 }
 
-async function commandReplaceImportVersion(
+async function commandReplaceText(
   editor: TextEditor,
   edit: vscode.TextEditorEdit,
   args?: { range: vscode.Range; replace: string },

@@ -360,7 +360,7 @@ impl HoverWorker<'_> {
                         &json_str,
                         percent_encoding::NON_ALPHANUMERIC,
                     );
-                    let version_url = format!("command:tinymist.replaceImportVersion?{encoded}");
+                    let version_url = format!("command:tinymist.replaceText?{encoded}");
                     info.push_str(&format!("- [{version}]({version_url})\n"));
                 }
             }
