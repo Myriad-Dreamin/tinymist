@@ -23,7 +23,7 @@ export const ViewModeToggle = (showSymbolDetails: State<boolean>) => {
           showSymbolDetails.val = (e.target as HTMLInputElement).checked;
         },
       }),
-      span({ class: "text-sm" }, "Show symbol details"),
+      span({ class: "text-sm", title: "Show symbol details" }, "Details"),
     ),
   );
 };
