@@ -94,27 +94,49 @@ function spawn(id, cmd, options = {}) {
 }
 
 const releaseAssetId = "release-asset-crate.yml";
-const currentBranch = await spawn("current-branch", "git rev-parse --abbrev-ref HEAD");
+const currentBranch = (await spawn("current-branch", "git rev-parse --abbrev-ref HEAD"))
+  .toString()
+  .trim();
 
-async function createReleaseAsset() {
-  await spawn(
-    `workflow-run`,
-    `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
+async function findWorkflowRunId(workflowId, branch) {
+  const runs = JSON.parse(
+    await spawn("workflow-run-list", `gh run list -w ${workflowId} --json headBranch,databaseId`),
   );
 
-  // get and wait last run id
-  const runId = findRunId(releaseAssetId, currentBranch);
-
-  console.log(`Workflow run ${runId} started`);
-
-  // watch and print runs
-  await spawn(`workflow-run-watch`, `gh workflow run watch ${runId}`);
+  console.log(runs, branch);
+  const run = runs.find((run) => run.headBranch === branch);
+  return run.databaseId;
 }
 
-await spawn(
-  "pr-create",
-  `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
-);
+async function tryFindWorkflowRunId(workflowId, branch) {
+  for (let i = 0; i < 10; i++) {
+    const runId = await findWorkflowRunId(workflowId, branch);
+    if (runId) {
+      return runId;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  }
+  throw new Error(`Workflow run ${workflowId} for branch ${branch} not found`);
+}
+
+async function createReleaseAsset() {
+  // await spawn(
+  //   `workflow-run`,
+  //   `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
+  // );
+
+  // get and wait last run id
+  const runId = await tryFindWorkflowRunId(releaseAssetId, currentBranch);
+
+  console.log(`Workflow run ${runId} started`);
+  // watch and print runs
+  await spawn(`workflow-run-watch`, `gh run watch ${runId}`);
+}
+
+// await spawn(
+//   "pr-create",
+//   `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
+// );
 await createReleaseAsset();
 const cargoToml = await fs.readFile("Cargo.toml", "utf-8");
 const newCargoToml = cargoToml.replace(
