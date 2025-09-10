@@ -94,14 +94,17 @@ function spawn(id, cmd, options = {}) {
 }
 
 const releaseAssetId = "release-asset-crate.yml";
+const currentBranch = await spawn("current-branch", "git rev-parse --abbrev-ref HEAD");
 
 async function createReleaseAsset() {
-  const currentBranch = await spawn("current-branch", "git rev-parse --abbrev-ref HEAD");
-  const run = await spawn(
+  await spawn(
     `workflow-run`,
     `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
   );
-  const runId = run.toString().trim();
+
+  // get and wait last run id
+  const runId = findRunId(releaseAssetId, currentBranch);
+
   console.log(`Workflow run ${runId} started`);
 
   // watch and print runs
