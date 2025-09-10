@@ -28,7 +28,7 @@ To contribute to tinymist, you need to install the following tools:
 
 You don't have to configure anything to start developing tinymist. However, here we provide some tips to make your development experience better.
 
-- [@Myriad-Dreamin's VS Code Settings](./dev-guide/vscode-extension#appendix-myriad-dreamins-vs-code-settings)
+- [@Myriad-Dreamin's VS Code Settings](./dev-guide/vscode-extension.md#appendix-myriad-dreamins-vs-code-settings)
 
 ## Building and Running
 
