@@ -1,53 +1,44 @@
-# Tinymist IntelliJ Plugin Development Notes
+# Tinymist IntelliJ Plugin
 > Last Updated: August 31, 2025
-
-
-## Project Scope
 
 The goal of this project is to provide comprehensive Typst language support for IntelliJ-based IDEs.
 We are using the `lsp4ij` library developed by Red Hat ([https://github.com/redhat-developer/lsp4ij](https://github.com/redhat-developer/lsp4ij)).
 
-## Development Instructions
+## Prerequisites
 
-1.  **Prerequisites:**
-    *   **IntelliJ IDEA:** Other IDEs will also work, but given developing a plugin for IntelliJ, the best support for that  is provided by IntelliJ.
-    *   **JDK 21**
+-   **IntelliJ IDEA:** Other IDEs will also work, but given developing a plugin for IntelliJ, the best support for that is provided by IntelliJ.
+-   **JDK 21** You must choose JDK 21 in the IntelliJ IDEA settings.
+
+## Core Directory Structure
+
+*   **`editors/intellij/`**: Root directory for the IntelliJ plugin.
+    *   **`build.gradle.kts`**: Gradle build script for managing dependencies (like `lsp4ij`, IntelliJ Platform SDK) and plugin packaging.
+    *   **`src/main/kotlin/org/tinymist/intellij/`**: Contains the core Kotlin source code for the plugin. This is further structured into sub-packages like `lsp`, `preview`, and `structure`.
+    *   **`src/main/resources/META-INF/plugin.xml`**: The plugin descriptor file, essential for IntelliJ to load and recognize the plugin and its components (e.g., language support, LSP integration, preview editors, structure view).
+
+## Build the Plugin
+
+You can build the plugin using the Gradle tool window in IntelliJ (Tasks > intellij > buildPlugin) or via the terminal:
+```bash
+./gradlew :intellij:buildPlugin
+```
+
+## Launch the Plugin
 
 
-2.  **Clone the Repository:**
-    ```bash
-    git clone https://github.com/Myriad-Dreamin/tinymist.git
-    cd tinymist/editors/intellij
-    ```
+Use the Gradle task `runIde` (Tasks > intellij > runIde) from the Gradle tool window or terminal:
+```bash
+./gradlew :intellij:runIde
+```
 
-3.  **Open in IntelliJ IDEA:**
-    *   Open IntelliJ IDEA.
-    *   Select "Open" and navigate to the `editors/intellij` directory of the cloned repository.
-    *   IntelliJ should automatically recognize it as a Gradle project. If not, you might need to import it as a Gradle project.
+### Using a custom `tinymist` Language Server Executable
 
+Ensure that `tinymist` is installed on your system and the path in `TinymistLspStreamConnectionProvider.kt` is correct for your development environment if you are modifying the LSP.
 
-4.  **Build the Plugin:**
-    *   Wait for Gradle sync to complete and download all dependencies.
-    *   You can build the plugin using the Gradle tool window in IntelliJ (Tasks > intellij > buildPlugin) or via the terminal:
-        ```bash
-        ./gradlew :intellij:buildPlugin
-        ```
+### Viewing Logs
 
-5.  **Run/Debug:**
-    *   Use the Gradle task `runIde` (Tasks > intellij > runIde) from the Gradle tool window or terminal:
-        ```bash
-        ./gradlew :intellij:runIde
-        ```
-    *   This will launch a blank IntelliJ IDEA instance with the Tinymist plugin installed.
-    *   You can then create or open a Typst project/file in this sandbox environment to test the plugin's features.
-    *   Standard debugging tools (breakpoints, etc.) can be used in your main IntelliJ IDEA instance where the plugin code is open.
-
-6.  **`tinymist` Language Server Path:**
-    *   Ensure that `tinymist` is installed on your system and the path in `TinymistLspStreamConnectionProvider.kt` is correct for your development environment if you are modifying the LSP.
-
-7.  **Viewing Logs:**
-    *   **IntelliJ Plugin Logs:** Check the `idea.log` file of the sandboxed IntelliJ instance. You can find its location via "Help" > "Show Log in Finder/Explorer" in the sandbox IDE.
-    *   **LSP Communication Logs:** `lsp4ij` provides an "LSP Consoles" view in the sandbox IDE (usually accessible from the tool window bar at the bottom left). Set its verbosity (e.g., to "verbose") via `Languages & Frameworks > Language Servers` settings to see JSON-RPC messages between the plugin and `tinymist`.
+-   **IntelliJ Plugin Logs:** Check the `idea.log` file of the sandboxed IntelliJ instance. You can find its location via "Help" > "Show Log in Finder/Explorer" in the sandbox IDE.
+-   **LSP Communication Logs:** `lsp4ij` provides an "LSP Consoles" view in the sandbox IDE (usually accessible from the tool window bar at the bottom left). Set its verbosity (e.g., to "verbose") via `Languages & Frameworks > Language Servers` settings to see JSON-RPC messages between the plugin and `tinymist`.
 
 
 ## Project Roadmap & Status
@@ -135,16 +126,9 @@ The following table shows the implementation status of LSP features as supported
 *   **Missing File Type Icon**: TODO in `TypstLanguage.kt` - need to add custom icon for .typ files.
 *   **LSP Initialization Options**: Currently commented out in `TinymistLspStreamConnectionProvider.kt` - initialization options for the LSP server (e.g., `colorTheme`, preview URL, `preview.background.enabled`) should be configurable via settings panel.
 
-## Project Architecture and File Overview
+## File Overview
 
 This section outlines the architecture of the Tinymist IntelliJ plugin, detailing the roles of key files and their interactions, particularly with the IntelliJ Platform and LSP4IJ APIs.
-
-### Core Directory Structure
-
-*   **`editors/intellij/`**: Root directory for the IntelliJ plugin.
-    *   **`build.gradle.kts`**: Gradle build script for managing dependencies (like `lsp4ij`, IntelliJ Platform SDK) and plugin packaging.
-    *   **`src/main/kotlin/org/tinymist/intellij/`**: Contains the core Kotlin source code for the plugin. This is further structured into sub-packages like `lsp`, `preview`, and `structure`.
-    *   **`src/main/resources/META-INF/plugin.xml`**: The plugin descriptor file, essential for IntelliJ to load and recognize the plugin and its components (e.g., language support, LSP integration, preview editors, structure view).
 
 ### Kotlin Source Files (`src/main/kotlin/org/tinymist/intellij/`)
 
