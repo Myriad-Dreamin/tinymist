@@ -30,7 +30,7 @@ export interface QuickExportFormatMeta {
   description: string;
   exportKind: ExportKind;
   extraOpts?: ExportOpts;
-  selectPages?: boolean;
+  selectPages?: boolean | "first" | "merged";
 }
 
 export const quickExports: QuickExportFormatMeta[] = [
@@ -49,11 +49,37 @@ export const quickExports: QuickExportFormatMeta[] = [
     label: l10nMsg("PNG (Merged)"),
     description: l10nMsg("Export as a single PNG by merging pages"),
     exportKind: "Png",
+    selectPages: "merged",
+  },
+  {
+    label: l10nMsg("PNG (First Page)"),
+    description: l10nMsg("Export the first page as a single PNG"),
+    exportKind: "Png",
+    selectPages: "first",
+  },
+  {
+    label: l10nMsg("PNG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple PNGs"),
+    exportKind: "Png",
+    selectPages: true,
   },
   {
     label: l10nMsg("SVG (Merged)"),
     description: l10nMsg("Export as a single SVG by merging pages"),
     exportKind: "Svg",
+    selectPages: "merged",
+  },
+  {
+    label: l10nMsg("SVG (First Page)"),
+    description: l10nMsg("Export the first page as a single SVG"),
+    exportKind: "Svg",
+    selectPages: "first",
+  },
+  {
+    label: l10nMsg("SVG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple SVGs"),
+    exportKind: "Svg",
+    selectPages: true,
   },
   {
     label: "HTML",
@@ -90,33 +116,11 @@ export const quickExports: QuickExportFormatMeta[] = [
   //   description: l10nMsg("Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."),
   //   exportKind: "Query",
   // },
-  {
-    label: l10nMsg("PNG (First Page)"),
-    description: l10nMsg("Export the first page as a single PNG"),
-    exportKind: "Png",
-  },
-  {
-    label: l10nMsg("PNG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple PNGs"),
-    exportKind: "Png",
-    selectPages: true,
-  },
   // {
   //   label: l10nMsg("PNG (Task)"),
   //   description: l10nMsg("Export as PNG (and update tasks.json)"),
   //   exportKind: "Png",
   // },
-  {
-    label: l10nMsg("SVG (First Page)"),
-    description: l10nMsg("Export the first page as a single SVG"),
-    exportKind: "Svg",
-  },
-  {
-    label: l10nMsg("SVG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple SVGs"),
-    exportKind: "Svg",
-    selectPages: true,
-  },
   // {
   //   label: l10nMsg("SVG (Task)"),
   //   description: l10nMsg("Export as SVG (and update tasks.json)"),
@@ -134,8 +138,9 @@ async function askAndRun<T>(
     return;
   }
 
+  picked.extraOpts ??= {};
+
   if (picked.exportKind === "TeX") {
-    picked.extraOpts ??= {};
     const processor = await vscode.window.showInputBox({
       title: l10nMsg("TeX processor"),
       placeHolder: l10nMsg(
@@ -151,8 +156,11 @@ async function askAndRun<T>(
     }
   }
 
-  if (picked.selectPages) {
-    picked.extraOpts ??= {};
+  if (picked.selectPages === "first") {
+    (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = ["1"];
+  } else if (picked.selectPages === "merged") {
+    (picked.extraOpts as ExportPngOpts | ExportSvgOpts).merge = {};
+  } else if (picked.selectPages === true) {
     const pages = await vscode.window.showInputBox({
       title: l10nMsg("Pages to export"),
       placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
