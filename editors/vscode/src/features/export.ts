@@ -156,11 +156,23 @@ async function askAndRun<T>(
     }
   }
 
-  if (picked.selectPages === "first") {
+  await askPageSelection(picked);
+
+  return cb(picked);
+}
+
+export async function askPageSelection(picked: QuickExportFormatMeta) {
+  const selectPages = picked.selectPages;
+  if (!selectPages) {
+    return;
+  }
+
+  picked.extraOpts ??= {};
+  if (selectPages === "first") {
     (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = ["1"];
-  } else if (picked.selectPages === "merged") {
+  } else if (selectPages === "merged") {
     (picked.extraOpts as ExportPngOpts | ExportSvgOpts).merge = {};
-  } else if (picked.selectPages === true) {
+  } else if (selectPages === true) {
     const pages = await vscode.window.showInputBox({
       title: l10nMsg("Pages to export"),
       placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
@@ -176,7 +188,8 @@ async function askAndRun<T>(
         title: "Page Number Template",
         placeHolder: l10nMsg("e.g., `page-{0p}-of-{t}.png`"),
         prompt: l10nMsg(
-          "a page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.",
+          "A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\n" +
+            "Leave empty for default naming scheme.",
         ),
       });
 
@@ -185,8 +198,6 @@ async function askAndRun<T>(
       }
     }
   }
-
-  return cb(picked);
 }
 
 export async function commandAskAndExport(): Promise<OnExportResponse | undefined> {
@@ -244,24 +255,22 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
 
   // only create pdf if it does not exist yet
   const exportResponse = await commandExport(kind, extraOpts, actionOpts);
-  if (!exportResponse || !("path" in exportResponse && exportResponse.path)) {
+  if (!exportResponse || "message" in exportResponse) {
     // show error message
-    await vscode.window.showErrorMessage(`Failed to export ${kind}`);
+    await vscode.window.showErrorMessage(`Failed to export ${kind}: ${exportResponse?.message}`);
     return;
   }
 
   // PDF export is not paged. The response should be a simple object.
-  const exportPath = exportResponse.path;
+  const exportPath = "path" in exportResponse ? exportResponse.path : exportResponse[0]?.path;
+  if (!exportPath) {
+    await vscode.window.showErrorMessage(`Failed to export ${kind}: no path in response`);
+    return;
+  }
 
   switch (openIn) {
     case "systemDefault":
       break;
-    // biome-ignore lint/suspicious/noFallthroughSwitchClause: fall through
-    // biome-ignore lint/suspicious/useDefaultSwitchClauseLast: fall through
-    default:
-      vscode.window.showWarningMessage(
-        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
-      );
     case "editorTab": {
       // find and replace exportUri
       const exportUri = vscode.Uri.file(exportPath);
@@ -282,5 +291,9 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
       } as vscode.TextDocumentShowOptions);
       break;
     }
+    default:
+      vscode.window.showWarningMessage(
+        `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
+      );
   }
 }
