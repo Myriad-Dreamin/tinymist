@@ -21,7 +21,7 @@ import {
   getSensibleTextEditorColumn,
   typstDocumentSelector,
 } from "./util";
-import type { ExportOpts } from "./cmd.export";
+import type { ExportActionOpts, ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
@@ -347,8 +347,8 @@ export class LanguageState {
   exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
   exportQuery = exportCommand("tinymist.exportQuery");
-  exportAnsiHighlight = exportCommand("tinymist.exportAnsiHighlight");
-  exportAst = exportCommand("tinymist.exportAst");
+  exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
+  exportAst = exportStringCommand("tinymist.exportAst");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
@@ -756,12 +756,22 @@ export type OnExportResponse =
   | Array<{ page: number; path: string | null; data: string | null }>; // Multiple(Vec<PagedExportResponse>)
 
 function exportCommand(command: string) {
-  return (uri: string, extraOpts?: ExportOpts, inMemory?: boolean): Promise<OnExportResponse> => {
+  return (
+    uri: string,
+    extraOpts?: ExportOpts,
+    actions?: ExportActionOpts,
+  ): Promise<OnExportResponse> => {
     return tinymist.executeCommand<OnExportResponse>(command, [
       uri,
       extraOpts ?? {},
-      inMemory ?? false,
+      actions ?? {},
     ]);
+  };
+}
+
+function exportStringCommand(command: string) {
+  return (uri: string, extraOpts?: ExportOpts): Promise<string> => {
+    return tinymist.executeCommand<string>(command, [uri, extraOpts ?? {}]);
   };
 }
 

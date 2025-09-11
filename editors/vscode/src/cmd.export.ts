@@ -51,3 +51,8 @@ export type ExportOpts =
   | ExportQueryOpts
   | ExportHtmlOpts
   | ExportTextOpts;
+
+export interface ExportActionOpts {
+  write?: boolean;
+  open?: boolean;
+}

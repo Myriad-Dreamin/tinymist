@@ -1,9 +1,18 @@
 import * as vscode from "vscode";
-import { l10nMsg } from "../l10n";
-import { tinymist } from "../lsp";
-import { IContext } from "../context";
 import { commands } from "vscode";
+import type {
+  ExportActionOpts,
+  ExportOpts,
+  ExportPdfOpts,
+  ExportPngOpts,
+  ExportSvgOpts,
+  ExportTypliteOpts,
+} from "../cmd.export";
+import type { IContext } from "../context";
+import { l10nMsg } from "../l10n";
+import { type OnExportResponse, tinymist } from "../lsp";
 
+/// These are names of the export functions in the LSP client, e.g. `exportPdf`, `exportHtml`.
 export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "TeX" | "Text" | "Query";
 
 export function exportActivate(context: IContext) {
@@ -20,7 +29,8 @@ export interface QuickExportFormatMeta {
   label: string;
   description: string;
   exportKind: ExportKind;
-  extraOpts?: any;
+  extraOpts?: ExportOpts;
+  selectPages?: boolean;
 }
 
 export const quickExports: QuickExportFormatMeta[] = [
@@ -30,16 +40,20 @@ export const quickExports: QuickExportFormatMeta[] = [
     exportKind: "Pdf",
   },
   {
+    label: l10nMsg("PDF (Specific Pages)"),
+    description: l10nMsg("Export as PDF with specified pages"),
+    exportKind: "Pdf",
+    selectPages: true,
+  },
+  {
     label: l10nMsg("PNG (Merged)"),
     description: l10nMsg("Export as a single PNG by merging pages"),
     exportKind: "Png",
-    extraOpts: { page: { merged: { gap: "0pt" } } },
   },
   {
     label: l10nMsg("SVG (Merged)"),
     description: l10nMsg("Export as a single SVG by merging pages"),
     exportKind: "Svg",
-    extraOpts: { page: { merged: { gap: "0pt" } } },
   },
   {
     label: "HTML",
@@ -81,6 +95,12 @@ export const quickExports: QuickExportFormatMeta[] = [
     description: l10nMsg("Export the first page as a single PNG"),
     exportKind: "Png",
   },
+  {
+    label: l10nMsg("PNG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple PNGs"),
+    exportKind: "Png",
+    selectPages: true,
+  },
   // {
   //   label: l10nMsg("PNG (Task)"),
   //   description: l10nMsg("Export as PNG (and update tasks.json)"),
@@ -90,6 +110,12 @@ export const quickExports: QuickExportFormatMeta[] = [
     label: l10nMsg("SVG (First Page)"),
     description: l10nMsg("Export the first page as a single SVG"),
     exportKind: "Svg",
+  },
+  {
+    label: l10nMsg("SVG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple SVGs"),
+    exportKind: "Svg",
+    selectPages: true,
   },
   // {
   //   label: l10nMsg("SVG (Task)"),
@@ -109,7 +135,7 @@ async function askAndRun<T>(
   }
 
   if (picked.exportKind === "TeX") {
-    picked.extraOpts = picked.extraOpts || {};
+    picked.extraOpts ??= {};
     const processor = await vscode.window.showInputBox({
       title: l10nMsg("TeX processor"),
       placeHolder: l10nMsg(
@@ -121,14 +147,41 @@ async function askAndRun<T>(
     });
 
     if (processor) {
-      picked.extraOpts.processor = processor;
+      (picked.extraOpts as ExportTypliteOpts).processor = processor;
+    }
+  }
+
+  if (picked.selectPages) {
+    picked.extraOpts ??= {};
+    const pages = await vscode.window.showInputBox({
+      title: l10nMsg("Pages to export"),
+      placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
+      prompt: l10nMsg("Specify the pages you want to export"),
+    });
+
+    if (pages) {
+      (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = pages.split(",");
+    }
+
+    if (picked.exportKind === "Png" || picked.exportKind === "Svg") {
+      const pageNumberTemplate = await vscode.window.showInputBox({
+        title: "Page Number Template",
+        placeHolder: l10nMsg("e.g., `page-{0p}-of-{t}.png`"),
+        prompt: l10nMsg(
+          "a page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.",
+        ),
+      });
+
+      if (pageNumberTemplate) {
+        (picked.extraOpts as ExportPngOpts | ExportSvgOpts).pageNumberTemplate = pageNumberTemplate;
+      }
     }
   }
 
   return cb(picked);
 }
 
-export async function commandAskAndExport(): Promise<string | undefined> {
+export async function commandAskAndExport(): Promise<OnExportResponse | undefined> {
   return await askAndRun(l10nMsg("Pick a method to export"), (picked) => {
     return commandExport(picked.exportKind, picked.extraOpts);
   });
@@ -140,24 +193,30 @@ export async function commandAskAndShow(): Promise<void> {
   });
 }
 
-export async function commandExport(kind: ExportKind, opts?: any): Promise<string | undefined> {
+export async function commandExport(
+  kind: ExportKind,
+  opts?: ExportOpts,
+  actionOpts?: ExportActionOpts,
+): Promise<OnExportResponse | undefined> {
   const uri = vscode.window.activeTextEditor?.document.uri.fsPath;
   if (!uri) {
     return;
   }
 
-  return (await tinymist[`export${kind}`](uri, opts)) || undefined;
+  return await tinymist[`export${kind}`](uri, opts, actionOpts);
 }
 
 /**
  * Implements the functionality for the 'Show PDF' button shown in the editor title
  * if a `.typ` file is opened.
  */
-export async function commandShow(kind: ExportKind, extraOpts?: any): Promise<void> {
+export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Promise<void> {
   const activeEditor = vscode.window.activeTextEditor;
   if (activeEditor === undefined) {
     return;
   }
+
+  const actionOpts: ExportActionOpts = {};
 
   const conf = vscode.workspace.getConfiguration("tinymist");
   const openIn: string = conf.get("showExportFileIn") || "editorTab";
@@ -172,27 +231,29 @@ export async function commandShow(kind: ExportKind, extraOpts?: any): Promise<vo
   // Also see https://github.com/microsoft/vscode/issues/85930
   const openBySystemDefault = openIn === "systemDefault";
   if (openBySystemDefault) {
-    extraOpts = extraOpts || {};
-    extraOpts.open = true;
+    actionOpts.open = true;
   }
 
   // only create pdf if it does not exist yet
-  const exportPath = await commandExport(kind, extraOpts);
-
-  if (exportPath === undefined) {
+  const exportResponse = await commandExport(kind, extraOpts, actionOpts);
+  if (!exportResponse || !("path" in exportResponse && exportResponse.path)) {
     // show error message
     await vscode.window.showErrorMessage(`Failed to export ${kind}`);
     return;
   }
 
+  // PDF export is not paged. The response should be a simple object.
+  const exportPath = exportResponse.path;
+
   switch (openIn) {
     case "systemDefault":
       break;
+    // biome-ignore lint/suspicious/noFallthroughSwitchClause: fall through
+    // biome-ignore lint/suspicious/useDefaultSwitchClauseLast: fall through
     default:
       vscode.window.showWarningMessage(
         `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
       );
-    // fall through
     case "editorTab": {
       // find and replace exportUri
       const exportUri = vscode.Uri.file(exportPath);
