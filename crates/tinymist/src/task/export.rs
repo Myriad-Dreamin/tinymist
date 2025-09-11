@@ -340,7 +340,7 @@ impl ExportTask {
                     output_template::has_indexable_template(write_to.to_str().unwrap_or_default())
                 });
 
-                OnExportResponse::Multiple(
+                OnExportResponse::Paged(
                     items
                         .into_iter()
                         .map(|(page_idx, bytes)| {
@@ -468,7 +468,7 @@ impl ExportTask {
                     result.context_ut("failed to export")??;
                 }
 
-                OnExportResponse::Multiple(res_items)
+                OnExportResponse::Paged(res_items)
             }
         };
 

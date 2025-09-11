@@ -52,13 +52,19 @@ impl ExportTimings {
     }
 }
 
+/// The output of image exports, either paged or merged.
 pub enum ImageOutput<T> {
+    /// Each page exported separately.
     Paged(Vec<PagedOutput<T>>),
+    /// All pages merged into one output.
     Merged(T),
 }
 
+/// The output of a single page.
 pub struct PagedOutput<T> {
+    /// The page number (0-based).
     pub page: usize,
+    /// The value of the page.
     pub value: T,
 }
 

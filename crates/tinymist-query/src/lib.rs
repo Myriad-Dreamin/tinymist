@@ -144,30 +144,40 @@ mod polymorphic {
         pub path: PathBuf,
         /// The export task to run.
         pub task: ProjectTask,
-        /// Whether to open the exported file(s) after the export is done.
-        pub open: bool,
         /// Whether to write to file.
         pub write: bool,
+        /// Whether to open the exported file(s) after the export is done.
+        pub open: bool,
     }
 
     /// The response to an export request.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum OnExportResponse {
+        /// The export failed.
         Failed {
+            /// The error message.
             message: String,
         },
+        /// Non-page or a single page exported.
         Single {
+            /// The path of the exported file. None if not written to file.
             path: Option<PathBuf>,
+            /// The data of the exported file. None if written to file.
             data: Option<String>,
         },
-        Multiple(Vec<PagedExportResponse>),
+        /// Multiple pages exported.
+        Paged(Vec<PagedExportResponse>),
     }
 
+    /// The response to a single page export.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct PagedExportResponse {
+        /// The page number of the exported page (0-based).
         pub page: usize,
+        /// The path of the exported file. None if not written to file.
         pub path: Option<PathBuf>,
+        /// The data of the exported file. None if written to file.
         pub data: Option<String>,
     }
 

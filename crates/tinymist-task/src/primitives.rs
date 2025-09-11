@@ -411,13 +411,17 @@ impl ResourcePath {
     }
 }
 
+/// Utilities for output template processing.
+/// Copied from typst-cli.
 pub mod output_template {
     const INDEXABLE: [&str; 3] = ["{p}", "{0p}", "{n}"];
 
+    /// Checks if the output template has indexable templates.
     pub fn has_indexable_template(output: &str) -> bool {
         INDEXABLE.iter().any(|template| output.contains(template))
     }
 
+    /// Formats the output template with the given page number and total pages.
     /// Note: `this_page` is 1-based.
     pub fn format(output: &str, this_page: usize, total_pages: usize) -> String {
         // Find the base 10 width of number `i`

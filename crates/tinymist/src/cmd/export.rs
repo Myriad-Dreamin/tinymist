@@ -18,10 +18,7 @@ use crate::lsp::query::run_query;
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 #[serde(rename_all = "camelCase")]
-struct ExportOpts {
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-}
+struct ExportOpts {}
 
 /// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -33,8 +30,6 @@ struct ExportPdfOpts {
     creation_timestamp: Option<String>,
     /// A PDF standard that Typst can enforce conformance with.
     pdf_standard: Option<Vec<PdfStandard>>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -44,8 +39,6 @@ struct ExportSvgOpts {
     pages: Option<Vec<Pages>>,
     page_number_template: Option<String>,
     merge: Option<PageMerge>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -57,8 +50,6 @@ struct ExportPngOpts {
     merge: Option<PageMerge>,
     fill: Option<String>,
     ppi: Option<f32>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
 }
 
 /// See [`ProjectTask`].
@@ -69,14 +60,12 @@ struct ExportTypliteOpts {
     processor: Option<String>,
     /// The path of external assets directory.
     assets_path: Option<PathBuf>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
 }
 
 /// See [`ProjectTask`].
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-struct QueryOpts {
+struct ExportQueryOpts {
     format: String,
     output_extension: Option<String>,
     strict: Option<bool>,
@@ -84,8 +73,15 @@ struct QueryOpts {
     selector: String,
     field: Option<String>,
     one: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ExportActionOpts {
+    /// Whether to write to file.
+    write: Option<bool>,
     /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
+    open: bool,
 }
 
 /// Here are implemented the handlers for each command.
@@ -112,20 +108,15 @@ impl ServerState {
                 pdf_standards: pdf_standards.unwrap_or_default(),
                 creation_timestamp,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
 
     /// Export the current document as HTML file(s).
     pub fn export_html(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportHtml(ExportHtmlTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
+        self.export(ProjectTask::ExportHtml(ExportHtmlTask { export }), args)
     }
 
     /// Export the current document as Markdown file(s).
@@ -138,7 +129,6 @@ impl ServerState {
                 assets_path: opts.assets_path,
                 export,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
@@ -153,25 +143,20 @@ impl ServerState {
                 assets_path: opts.assets_path,
                 export,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
 
     /// Export the current document as Text file(s).
     pub fn export_text(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
+        let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportText(ExportTextTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
+        self.export(ProjectTask::ExportText(ExportTextTask { export }), args)
     }
 
     /// Query the current document and export the result as JSON file(s).
     pub fn export_query(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as QueryOpts);
+        let opts = get_arg_or_default!(args[1] as ExportQueryOpts);
         // todo: deprecate it
         let _ = opts.strict;
 
@@ -189,7 +174,6 @@ impl ServerState {
                 one: opts.one.unwrap_or(false),
                 export,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
@@ -206,7 +190,6 @@ impl ServerState {
                 page_number_template: opts.page_number_template,
                 merge: opts.merge,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
@@ -231,22 +214,18 @@ impl ServerState {
                 fill: opts.fill,
                 ppi,
             }),
-            opts.open.unwrap_or_default(),
             args,
         )
     }
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(
-        &mut self,
-        task: ProjectTask,
-        open: bool,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduleResult {
+    pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
         let path = get_arg!(args[0] as PathBuf);
-        let write = !get_arg_or_default!(args[2] as bool);
+        let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
+        let write = action_opts.write.unwrap_or(true);
+        let open = action_opts.open;
 
-        run_query!(self.OnExport(path, task, open, write))
+        run_query!(self.OnExport(path, task, write, open))
     }
 }
