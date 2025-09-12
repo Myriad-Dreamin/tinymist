@@ -73,4 +73,5 @@ riscv64gc-unknown-linux-gnu = "2.31"
 "*" = "2.17"
 
 [dist.github-custom-runners]
+global = "ubuntu-22.04"
 aarch64-pc-windows-msvc = "windows-latest"
