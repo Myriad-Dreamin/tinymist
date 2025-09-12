@@ -297,6 +297,8 @@ impl LexicalHierarchyWorker {
                             },
                             eco_vec![],
                         ));
+                        // Push the lexical node to the children of the current top of the stack.
+                        self.finish_hierarchy();
                     }
 
                     if !Self::is_plain_token(child.kind()) {
