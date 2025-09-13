@@ -105,7 +105,7 @@ async function findWorkflowRunId(workflowId, branch) {
 
   console.log(runs, branch);
   const run = runs.find((run) => run.headBranch === branch);
-  return run.databaseId;
+  return run?.databaseId;
 }
 
 async function tryFindWorkflowRunId(workflowId, branch) {
