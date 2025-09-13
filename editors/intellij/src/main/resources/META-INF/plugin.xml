@@ -66,6 +66,9 @@
         <applicationService serviceImplementation="org.tinymist.intellij.settings.TinymistSettingsService"/>
         <applicationConfigurable parentId="tools" instance="org.tinymist.intellij.settings.TinymistSettingsConfigurable" id="org.tinymist.intellij.settings.TinymistSettingsConfigurable" displayName="Tinymist LSP"/>
 
+        <!-- Startup activity for automatic preview server startup -->
+        <postStartupActivity implementation="org.tinymist.intellij.preview.PreviewServerAutoStarterStartup"/>
+
     </extensions>
 
     <!-- LSP4IJ specific extensions -->
