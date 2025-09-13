@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/package_import.typ
+---
+Range: 0:29:0:52
+
+🌌 [Universe](https://typst.app/universe/package/shiroa)
+
+**Package:** `@preview/shiroa:0.2.3`
+‼️ **Version 0.2.3 not found**
