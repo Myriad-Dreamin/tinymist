@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="EMPTY_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/benches/font-load/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/crityp/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/sync-lsp/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-analysis/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-assets/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-core/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-core/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-dap/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-debug/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-derive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-l10n/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-lint/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-package/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-project/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-query/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-render/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-std/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-task/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-tests/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-vfs/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist-world/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/tinymist/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/typlite/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/typst-preview/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/crates/typst-shim/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/target" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
