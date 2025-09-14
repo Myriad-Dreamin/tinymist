@@ -444,10 +444,8 @@ impl DataFlowVisitor for Linter<'_, '_> {
 
         if !is_defined && !self.known_issues.has_unknown_math_ident(ident) {
             let var = ident.as_str();
-            let mut warning = SourceDiagnostic::warning(
-                ident.span(),
-                eco_format!("potentially unknown variable: {var}"),
-            );
+            let mut warning =
+                SourceDiagnostic::warning(ident.span(), eco_format!("unknown variable: {var}"));
 
             // Tries to produce the same hints as the corresponding Typst compiler error.
             // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:

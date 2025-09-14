@@ -207,7 +207,8 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    /// Add spaces between letters in an unknown math identifier: `$xyz$` -> `$x y z$`.
+    /// Add spaces between letters in an unknown math identifier: `$xyz$` -> `$x
+    /// y z$`.
     fn add_spaces_to_math_unknown_variable(&mut self, node: &LinkedNode<'_>) -> Option<()> {
         let ident = node.cast::<ast::MathIdent>()?.get();
 
@@ -615,7 +616,6 @@ enum AutofixKind {
 fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
     static PATTERNS: &[(&str, AutofixKind)] = &[
         ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
-        ("potentially unknown variable", AutofixKind::UnknownVariable), // tinymist lint warning
         ("file not found", AutofixKind::FileNotFound),
     ];
 

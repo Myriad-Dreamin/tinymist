@@ -34,6 +34,7 @@ pub fn convert_diagnostics<'a>(
 pub(crate) struct DiagWorker<'a> {
     /// The world surface for Typst compiler.
     pub ctx: &'a mut LocalContext,
+    pub source: &'static str,
     /// Results
     pub results: DiagnosticsMap,
 }
@@ -43,12 +44,15 @@ impl<'w> DiagWorker<'w> {
     pub fn new(ctx: &'w mut LocalContext) -> Self {
         Self {
             ctx,
+            source: "typst",
             results: DiagnosticsMap::default(),
         }
     }
 
     /// Runs code check on the main document and all its dependencies.
     pub fn check(mut self, known_issues: &KnownIssues) -> Self {
+        let source = self.source;
+        self.source = "tinymist-lint";
         for dep in self.ctx.world.depended_files() {
             if WorkspaceResolver::is_package_file(dep) {
                 continue;
@@ -62,6 +66,7 @@ impl<'w> DiagWorker<'w> {
                 self.handle(&diag);
             }
         }
+        self.source = source;
 
         self
     }
@@ -122,7 +127,7 @@ impl<'w> DiagWorker<'w> {
             range: lsp_range,
             severity: Some(lsp_severity),
             message: lsp_message,
-            source: Some("typst".to_owned()),
+            source: Some(self.source.to_owned()),
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
                     .trace
