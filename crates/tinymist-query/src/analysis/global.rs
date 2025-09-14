@@ -798,13 +798,13 @@ impl SharedContext {
 
     /// Get the lint result of a source file.
     #[typst_macros::time(span = source.root().span())]
-    pub(crate) fn lint(self: &Arc<Self>, source: &Source, known_issues: &KnownIssues) -> LintInfo {
+    pub(crate) fn lint(self: &Arc<Self>, source: &Source, issues: &KnownIssues) -> LintInfo {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti)), |_prev| {
+        self.slot.lint.compute(hash128(&(&ei, &ti, &issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(&self.world, &ei, ti, known_issues)
+            tinymist_lint::lint_file(&self.world, &ei, ti, issues)
         })
     }
 

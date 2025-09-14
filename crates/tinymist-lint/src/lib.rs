@@ -50,7 +50,7 @@ pub fn lint_file(
 /// Information about issues the linter checks for that will already be reported
 /// to the user via other means (such as compiler diagnostics), to avoid
 /// duplicating warnings.
-#[derive(Default)]
+#[derive(Default, Hash)]
 pub struct KnownIssues {
     unknown_vars: EcoVec<Span>,
 }
@@ -60,12 +60,14 @@ impl KnownIssues {
     pub fn from_compiler_diagnostics<'a>(
         diags: impl Iterator<Item = &'a SourceDiagnostic> + Clone,
     ) -> Self {
-        let mut unknown_vars = EcoVec::default();
+        let mut unknown_vars = Vec::default();
         for diag in diags {
             if diag.message.starts_with("unknown variable") {
                 unknown_vars.push(diag.span);
             }
         }
+        unknown_vars.sort_by_key(|span| span.into_raw());
+        let unknown_vars = EcoVec::from(unknown_vars);
         Self { unknown_vars }
     }
 
