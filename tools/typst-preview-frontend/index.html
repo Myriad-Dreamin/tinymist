@@ -146,6 +146,24 @@
         "--typst-preview-toolbar-bg-color",
         previewToolbarBgColor
       );
+
+      // Add scrolling with `ijkl` vim-like motions.
+      document.addEventListener('keydown', function(event) {
+        // https://stackoverflow.com/questions/3464876/javascript-get-window-x-y-position-for-scroll
+        var doc = document.documentElement;
+        var top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
+        var scrollDelta = 50
+
+        if (event.key === "j") {
+          window.scroll({ top: top + scrollDelta, behavior: "instant" });
+        } else if (event.key === "k") {
+          window.scroll({ top: top - scrollDelta, behavior: "instant" });
+        } else if (event.key === "h") {
+          window.scroll({ top: top - scrollDelta * 10, behavior: "smooth" });
+        } else if (event.key === "l") {
+          window.scroll({ top: top + scrollDelta * 10, behavior: "smooth" });
+        }
+      })
     </script>
     <script type="module" src="/src/main.js"></script>
     <script type="module" src="/src/typst.ts"></script>
