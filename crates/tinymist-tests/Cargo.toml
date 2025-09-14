@@ -12,7 +12,7 @@ rust-version.workspace = true
 [dependencies]
 typst.workspace = true
 tinymist-analysis.workspace = true
-tinymist-project = { workspace = true, features = ["lsp"] }
+tinymist-project = { workspace = true, features = ["lsp", "system"] }
 tinymist-std.workspace = true
 comemo.workspace = true
 rayon.workspace = true

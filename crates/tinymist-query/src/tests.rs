@@ -8,7 +8,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ecow::EcoString;
 use regex::{Regex, Replacer};
 use serde_json::{Serializer, Value, ser::PrettyFormatter};
 use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
@@ -82,20 +81,17 @@ pub fn run_with_ctx<T>(
     .enter(world);
 
     ctx.test_package_list(|| {
-        vec![dummy_package_from_spec(
-            &PackageSpec::from_str("@preview/example:0.1.0").unwrap(),
-            Some("example package (mock).".into()),
-        )]
+        vec![
+            dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.0").unwrap()),
+            dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.1").unwrap()),
+        ]
     });
     ctx.test_completion_files(|| paths.clone());
     ctx.test_files(|| paths);
     f(&mut ctx, path)
 }
 
-fn dummy_package_from_spec(
-    spec: &PackageSpec,
-    description: Option<EcoString>,
-) -> PackageIndexEntry {
+fn dummy_package_from_spec(spec: &PackageSpec) -> PackageIndexEntry {
     PackageIndexEntry {
         namespace: spec.namespace.clone(),
         package: PackageInfo {
@@ -104,7 +100,7 @@ fn dummy_package_from_spec(
             entrypoint: Default::default(),
             authors: Default::default(),
             license: Default::default(),
-            description,
+            description: Some("example package (mock).".into()),
             homepage: Default::default(),
             repository: Default::default(),
             keywords: Default::default(),
