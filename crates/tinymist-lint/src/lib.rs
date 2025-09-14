@@ -9,7 +9,6 @@ use tinymist_analysis::{
     ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
-use tinymist_std::hash::FxHashSet;
 use typst::{
     diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
@@ -48,17 +47,19 @@ pub fn lint_file(
     }
 }
 
-/// Information about issues the linter checks for that will already be reported to the user via
-/// other means (such as compiler diagnostics), to avoid duplicating warnings.
+/// Information about issues the linter checks for that will already be reported
+/// to the user via other means (such as compiler diagnostics), to avoid
+/// duplicating warnings.
 pub struct KnownLintIssues {
-    unknown_vars: FxHashSet<Span>,
+    unknown_vars: EcoVec<Span>,
 }
 
 impl KnownLintIssues {
-    /// Creates an empty set of known lint issues. The linter will report all warnings.
+    /// Creates an empty set of known lint issues. The linter will report all
+    /// warnings.
     pub fn none() -> Self {
         Self {
-            unknown_vars: FxHashSet::default(),
+            unknown_vars: EcoVec::default(),
         }
     }
 
@@ -66,10 +67,10 @@ impl KnownLintIssues {
     pub fn from_compiler_diagnostics<'a>(
         diags: impl Iterator<Item = &'a SourceDiagnostic> + Clone,
     ) -> Self {
-        let mut unknown_vars = FxHashSet::default();
+        let mut unknown_vars = EcoVec::default();
         for diag in diags {
             if diag.message.starts_with("unknown variable") {
-                unknown_vars.insert(diag.span);
+                unknown_vars.push(diag.span);
             }
         }
         Self { unknown_vars }
