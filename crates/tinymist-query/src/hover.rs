@@ -320,7 +320,7 @@ impl HoverWorker<'_> {
         }
         info.push('\n');
 
-        let date_format = time::format_description::parse("[year]-[month]-[day]").unwrap();
+        let date_format = tinymist_std::time::yyyy_mm_dd();
 
         // Add manifest information if available
         if let Some(ref current_entry) = current_entry {

@@ -4505,7 +4505,6 @@ dependencies = [
  "sha2",
  "siphasher",
  "strum",
- "time",
  "tinymist-analysis",
  "tinymist-derive",
  "tinymist-l10n",
