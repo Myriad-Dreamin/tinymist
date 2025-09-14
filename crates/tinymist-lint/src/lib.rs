@@ -50,19 +50,12 @@ pub fn lint_file(
 /// Information about issues the linter checks for that will already be reported
 /// to the user via other means (such as compiler diagnostics), to avoid
 /// duplicating warnings.
+#[derive(Default)]
 pub struct KnownIssues {
     unknown_vars: EcoVec<Span>,
 }
 
 impl KnownIssues {
-    /// Creates an empty set of known lint issues. The linter will report all
-    /// warnings.
-    pub fn none() -> Self {
-        Self {
-            unknown_vars: EcoVec::default(),
-        }
-    }
-
     /// Collects known lint issues from the given compiler diagnostics.
     pub fn from_compiler_diagnostics<'a>(
         diags: impl Iterator<Item = &'a SourceDiagnostic> + Clone,

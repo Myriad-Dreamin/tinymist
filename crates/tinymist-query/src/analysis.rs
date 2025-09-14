@@ -619,7 +619,7 @@ mod lint_tests {
         snapshot_testing("lint", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ctx.lint(&source, &KnownIssues::none());
+            let result = ctx.lint(&source, &KnownIssues::default());
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
