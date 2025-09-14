@@ -4386,7 +4386,6 @@ version = "0.13.24"
 dependencies = [
  "comemo",
  "insta",
- "itertools 0.13.0",
  "rayon",
  "tinymist-analysis",
  "tinymist-project",

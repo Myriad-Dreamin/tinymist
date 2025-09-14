@@ -2,10 +2,9 @@
 
 use std::sync::Arc;
 
-use itertools::Itertools;
 use tinymist_analysis::{
     adt::interner::Interned,
-    syntax::{Decl, Expr, ExprInfo},
+    syntax::{Decl, ExprInfo},
     ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
@@ -437,10 +436,7 @@ impl DataFlowVisitor for Linter<'_> {
 
     fn math_ident(&mut self, ident: ast::MathIdent<'_>) -> Option<()> {
         let resolved = self.ei.get_def(&Interned::new(Decl::math_ident_ref(ident)));
-        let is_defined = match resolved {
-            Some(Expr::Ref(refs)) => refs.root.is_some() || refs.term.is_some(),
-            _ => false,
-        };
+        let is_defined = resolved.is_some_and(|expr| expr.is_defined());
 
         if !is_defined && !self.known_issues.has_unknown_math_ident(ident) {
             let var = ident.as_str();
@@ -451,27 +447,7 @@ impl DataFlowVisitor for Linter<'_> {
             // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:
             // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
             let in_global = self.world.library.global.scope().get(var).is_some();
-            if matches!(var, "none" | "auto" | "false" | "true") {
-                warning.hint(eco_format!(
-                    "if you meant to use a literal, \
-                     try adding a hash before it: `#{var}`",
-                ));
-            } else if in_global {
-                warning.hint(eco_format!(
-                    "`{var}` is not available directly in math, \
-                     try adding a hash before it: `#{var}`",
-                ));
-            } else {
-                warning.hint(eco_format!(
-                    "if you meant to display multiple letters as is, \
-                     try adding spaces between each letter: `{}`",
-                    var.chars().join(" ")
-                ));
-                warning.hint(eco_format!(
-                    "or if you meant to display this as text, \
-                     try placing it in quotes: `\"{var}\"`"
-                ));
-            }
+            hint_unknown_variable_math(var, in_global, &mut warning);
             self.diag.push(warning);
         }
 
@@ -1109,4 +1085,33 @@ fn is_show_set(it: ast::Expr) -> bool {
 fn is_compare_op(op: ast::BinOp) -> bool {
     use ast::BinOp::*;
     matches!(op, Lt | Leq | Gt | Geq | Eq | Neq)
+}
+
+/// The error message when a variable wasn't found it math.
+#[cold]
+fn hint_unknown_variable_math(var: &str, in_global: bool, diag: &mut SourceDiagnostic) {
+    if matches!(var, "none" | "auto" | "false" | "true") {
+        diag.hint(eco_format!(
+            "if you meant to use a literal, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else if in_global {
+        diag.hint(eco_format!(
+            "`{var}` is not available directly in math, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else {
+        diag.hint(eco_format!(
+            "if you meant to display multiple letters as is, \
+             try adding spaces between each letter: `{}`",
+            var.chars()
+                .flat_map(|c| [' ', c])
+                .skip(1)
+                .collect::<EcoString>()
+        ));
+        diag.hint(eco_format!(
+            "or if you meant to display this as text, \
+             try placing it in quotes: `\"{var}\"`"
+        ));
+    }
 }
