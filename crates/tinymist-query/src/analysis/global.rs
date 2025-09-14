@@ -802,9 +802,9 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti, &issues)), |_| {
+        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(&self.world, &ei, ti, issues)
+            tinymist_lint::lint_file(&self.world, &ei, ti, issues.clone())
         })
     }
 

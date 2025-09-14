@@ -37,7 +37,7 @@ pub fn lint_file(
     world: &LspWorld,
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
-    known_issues: &KnownIssues,
+    known_issues: KnownIssues,
 ) -> LintInfo {
     let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
     LintInfo {
@@ -50,7 +50,7 @@ pub fn lint_file(
 /// Information about issues the linter checks for that will already be reported
 /// to the user via other means (such as compiler diagnostics), to avoid
 /// duplicating warnings.
-#[derive(Default, Hash)]
+#[derive(Default, Clone, Hash)]
 pub struct KnownIssues {
     unknown_vars: EcoVec<Span>,
 }
@@ -76,22 +76,22 @@ impl KnownIssues {
     }
 }
 
-struct Linter<'w, 'k> {
+struct Linter<'w> {
     world: &'w LspWorld,
     ei: ExprInfo,
     ti: Arc<TypeInfo>,
-    known_issues: &'k KnownIssues,
+    known_issues: KnownIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 }
 
-impl<'w, 'k> Linter<'w, 'k> {
+impl<'w> Linter<'w> {
     fn new(
         world: &'w LspWorld,
         ei: ExprInfo,
         ti: Arc<TypeInfo>,
-        known_issues: &'k KnownIssues,
+        known_issues: KnownIssues,
     ) -> Self {
         Self {
             world,
@@ -305,7 +305,7 @@ impl<'w, 'k> Linter<'w, 'k> {
     }
 }
 
-impl DataFlowVisitor for Linter<'_, '_> {
+impl DataFlowVisitor for Linter<'_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs {
             self.expr(expr);
@@ -479,14 +479,14 @@ impl DataFlowVisitor for Linter<'_, '_> {
     }
 }
 
-struct LateFuncLinter<'a, 'b, 'c> {
-    linter: &'a mut Linter<'b, 'c>,
+struct LateFuncLinter<'a, 'b> {
+    linter: &'a mut Linter<'b>,
     func_info: FuncInfo,
     return_block_info: Option<ReturnBlockInfo>,
     expr_context: ExprContext,
 }
 
-impl LateFuncLinter<'_, '_, '_> {
+impl LateFuncLinter<'_, '_> {
     fn late_closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
         if !self.func_info.has_return {
             return Some(());
@@ -534,7 +534,7 @@ impl LateFuncLinter<'_, '_, '_> {
     }
 }
 
-impl DataFlowVisitor for LateFuncLinter<'_, '_, '_> {
+impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
         for expr in exprs.rev() {
             self.expr(expr);
