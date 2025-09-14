@@ -37,7 +37,7 @@ pub fn lint_file(
     world: &LspWorld,
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
-    known_issues: &KnownLintIssues,
+    known_issues: &KnownIssues,
 ) -> LintInfo {
     let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
     LintInfo {
@@ -50,11 +50,11 @@ pub fn lint_file(
 /// Information about issues the linter checks for that will already be reported
 /// to the user via other means (such as compiler diagnostics), to avoid
 /// duplicating warnings.
-pub struct KnownLintIssues {
+pub struct KnownIssues {
     unknown_vars: EcoVec<Span>,
 }
 
-impl KnownLintIssues {
+impl KnownIssues {
     /// Creates an empty set of known lint issues. The linter will report all
     /// warnings.
     pub fn none() -> Self {
@@ -85,7 +85,7 @@ struct Linter<'w, 'k> {
     world: &'w LspWorld,
     ei: ExprInfo,
     ti: Arc<TypeInfo>,
-    known_issues: &'k KnownLintIssues,
+    known_issues: &'k KnownIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
@@ -96,7 +96,7 @@ impl<'w, 'k> Linter<'w, 'k> {
         world: &'w LspWorld,
         ei: ExprInfo,
         ti: Arc<TypeInfo>,
-        known_issues: &'k KnownLintIssues,
+        known_issues: &'k KnownIssues,
     ) -> Self {
         Self {
             world,
