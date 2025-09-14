@@ -93,6 +93,7 @@ impl SemanticRequest for CodeActionRequest {
 
 #[cfg(test)]
 mod tests {
+    use tinymist_lint::KnownIssues;
     use typst::{diag::Warned, layout::PagedDocument};
 
     use super::*;
@@ -131,18 +132,15 @@ mod tests {
             warnings: compiler_warnings,
         } = typst::compile::<PagedDocument>(&ctx.world);
         let compiler_errors = output.err().unwrap_or_default();
+        let compiler_diags = compiler_warnings.iter().chain(compiler_errors.iter());
 
-        let lint_warnings = ctx.lint(source);
+        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
+        let lint_warnings = ctx.lint(source, &known_issues);
+
         let diagnostics = DiagWorker::new(ctx)
-            .convert_all(
-                compiler_errors
-                    .iter()
-                    .chain(compiler_warnings.iter())
-                    .chain(lint_warnings.iter()),
-            )
+            .convert_all(compiler_diags.chain(lint_warnings.iter()))
             .into_values()
             .flatten();
-
         CodeActionContext {
             // The filtering here matches the LSP specification and VS Code behavior;
             // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
