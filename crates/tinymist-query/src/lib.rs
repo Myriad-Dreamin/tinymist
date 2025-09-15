@@ -152,13 +152,8 @@ mod polymorphic {
 
     /// The response to an export request.
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    #[serde(untagged)]
+    #[serde(untagged, rename_all = "camelCase")]
     pub enum OnExportResponse {
-        /// The export failed.
-        Failed {
-            /// The error message.
-            message: String,
-        },
         /// Non-page or a single page exported.
         Single {
             /// The path of the exported file. None if not written to file.
@@ -167,11 +162,17 @@ mod polymorphic {
             data: Option<String>,
         },
         /// Multiple pages exported.
-        Paged(Vec<PagedExportResponse>),
+        Paged {
+            /// The total number of pages of the document.
+            total_pages: usize,
+            /// The exported pages.
+            items: Vec<PagedExportResponse>,
+        },
     }
 
     /// The response to a single page export.
     #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     pub struct PagedExportResponse {
         /// The page number of the exported page (0-based).
         pub page: usize,

@@ -750,18 +750,19 @@ export class LanguageState {
 export const tinymist = new LanguageState();
 
 // Type definitions for export responses (matches Rust OnExportResponse)
-export type OnExportResponse =
-  | { message: string } // Failed { message: String }
-  | { path: string | null; data: string | null } // Single { path: Option<PathBuf>, data: Option<String> }
-  | Array<{ page: number; path: string | null; data: string | null }>; // Multiple(Vec<PagedExportResponse>)
+export type ExportResponse =
+  | { path: string | null; data: string | null } // Single
+  | { totalPages: number; items: ExportedPage[] }; // Multiple
+
+type ExportedPage = { page: number; path: string | null; data: string | null };
 
 function exportCommand(command: string) {
   return (
     uri: string,
     extraOpts?: ExportOpts,
     actions?: ExportActionOpts,
-  ): Promise<OnExportResponse> => {
-    return tinymist.executeCommand<OnExportResponse>(command, [
+  ): Promise<ExportResponse | null> => {
+    return tinymist.executeCommand<ExportResponse | null>(command, [
       uri,
       extraOpts ?? {},
       actions ?? {},

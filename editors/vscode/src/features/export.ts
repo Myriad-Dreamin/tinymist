@@ -10,7 +10,7 @@ import type {
 } from "../cmd.export";
 import type { IContext } from "../context";
 import { l10nMsg } from "../l10n";
-import { type OnExportResponse, tinymist } from "../lsp";
+import { type ExportResponse, tinymist } from "../lsp";
 
 /// These are names of the export functions in the LSP client, e.g. `exportPdf`, `exportHtml`.
 export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "TeX" | "Text" | "Query";
@@ -200,10 +200,12 @@ export async function askPageSelection(picked: QuickExportFormatMeta) {
   }
 }
 
-export async function commandAskAndExport(): Promise<OnExportResponse | undefined> {
-  return await askAndRun(l10nMsg("Pick a method to export"), (picked) => {
-    return commandExport(picked.exportKind, picked.extraOpts);
-  });
+export async function commandAskAndExport(): Promise<ExportResponse | null> {
+  return (
+    (await askAndRun(l10nMsg("Pick a method to export"), (picked) => {
+      return commandExport(picked.exportKind, picked.extraOpts);
+    })) ?? null
+  );
 }
 
 export async function commandAskAndShow(): Promise<void> {
@@ -216,10 +218,10 @@ export async function commandExport(
   kind: ExportKind,
   opts?: ExportOpts,
   actionOpts?: ExportActionOpts,
-): Promise<OnExportResponse | undefined> {
+): Promise<ExportResponse | null> {
   const uri = vscode.window.activeTextEditor?.document.uri.fsPath;
   if (!uri) {
-    return;
+    return null;
   }
 
   return await tinymist[`export${kind}`](uri, opts, actionOpts);
@@ -261,11 +263,19 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
     return;
   }
 
-  // PDF export is not paged. The response should be a simple object.
-  const exportPath = "path" in exportResponse ? exportResponse.path : exportResponse[0]?.path;
-  if (!exportPath) {
+  const showRes = await showExportFileIn(exportResponse, openIn);
+  if (!showRes) {
     await vscode.window.showErrorMessage(`Failed to export ${kind}: no path in response`);
-    return;
+  }
+}
+
+async function showExportFileIn(exportResponse: ExportResponse, openIn: string): Promise<boolean> {
+  // PDF export is not paged. The response should be a simple object.
+  // For other formats, we just open the first page.
+  const exportPath =
+    "items" in exportResponse ? exportResponse.items[0]?.path : exportResponse.path;
+  if (!exportPath) {
+    return false;
   }
 
   switch (openIn) {
@@ -296,4 +306,6 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
         `Unknown value of "tinymist.showExportFileIn", expected "systemDefault" or "editorTab", got "${openIn}"`,
       );
   }
+
+  return true;
 }

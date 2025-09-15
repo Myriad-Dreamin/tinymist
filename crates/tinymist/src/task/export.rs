@@ -1,6 +1,6 @@
 //! The actor that handles various document export, like PDF and SVG export.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
@@ -85,43 +85,34 @@ impl ServerState {
                     .map_err(internal_error)?
             } else {
                 // Export to memory and return base64-encoded data
-                Some(
-                    ExportTask::do_export_to_memory(task, artifact)
-                        .await
-                        .map_err(internal_error)?,
-                )
+                ExportTask::do_export_to_memory(task, artifact)
+                    .await
+                    .map_err(internal_error)?
             };
 
             if let Some(update_dep) = update_dep {
                 tokio::spawn(update_dep(snap));
             }
 
-            #[cfg(not(feature = "open"))]
+            // Only open the first page if multiple pages are exported
             if open {
-                log::warn!("open is not supported in this build, ignoring");
-            }
-
-            #[cfg(feature = "open")]
-            {
-                // See https://github.com/Myriad-Dreamin/tinymist/issues/837
-                // Also see https://github.com/Byron/open-rs/issues/105
-                #[cfg(not(target_os = "windows"))]
-                let do_open = ::open::that_detached;
-                #[cfg(target_os = "windows")]
-                fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
-                    ::open::with_detached(path, "explorer")
-                }
-
-                // Only open for file exports
-                if let (
-                    true,
+                match &res {
                     Some(OnExportResponse::Single {
                         path: Some(path), ..
-                    }),
-                ) = (open, &res)
-                {
-                    log::trace!("open with system default apps: {path:?}");
-                    do_open(path).log_error("failed to open with system default apps");
+                    }) => {
+                        open_external(path);
+                    }
+                    Some(OnExportResponse::Paged { items, .. }) => {
+                        if let Some(first_page) = items.first() {
+                            if let Some(path) = &first_page.path {
+                                open_external(path);
+                            }
+                        }
+                    }
+                    None => {
+                        log::warn!("CompileActor: on export end: no export result to open");
+                    }
+                    _ => {}
                 }
             }
 
@@ -314,19 +305,12 @@ impl ExportTask {
     pub async fn do_export_to_memory(
         task: ProjectTask,
         artifact: LspCompiledArtifact,
-    ) -> Result<OnExportResponse> {
+    ) -> Result<Option<OnExportResponse>> {
         use base64::prelude::*;
 
         let CompiledArtifact { graph, .. } = &artifact;
 
-        let write_to = match Self::prepare_output_path(&task, graph) {
-            Ok(write_to) => write_to,
-            Err(err) => {
-                return Ok(OnExportResponse::Failed {
-                    message: err.to_string(),
-                })
-            }
-        };
+        let write_to = Self::prepare_output_path(&task, graph)?;
 
         let artifact = Self::do_export_bytes(task, artifact, 0).await?;
 
@@ -340,8 +324,9 @@ impl ExportTask {
                     output_template::has_indexable_template(write_to.to_str().unwrap_or_default())
                 });
 
-                OnExportResponse::Paged(
-                    items
+                OnExportResponse::Paged {
+                    total_pages,
+                    items: items
                         .into_iter()
                         .map(|(page_idx, bytes)| {
                             let to = write_to.as_ref().map(|write_to| {
@@ -364,11 +349,11 @@ impl ExportTask {
                             }
                         })
                         .collect(),
-                )
+                }
             }
         };
 
-        Ok(res)
+        Ok(Some(res))
     }
 
     /// Exports a document.
@@ -468,7 +453,10 @@ impl ExportTask {
                     result.context_ut("failed to export")??;
                 }
 
-                OnExportResponse::Paged(res_items)
+                OnExportResponse::Paged {
+                    total_pages,
+                    items: res_items,
+                }
             }
         };
 
@@ -753,6 +741,28 @@ impl FutureFolder {
                 fut.await;
             }
         })
+    }
+}
+
+fn open_external(path: &Path) {
+    #[cfg(not(feature = "open"))]
+    if open {
+        log::warn!("open is not supported in this build, ignoring");
+    }
+
+    #[cfg(feature = "open")]
+    {
+        // See https://github.com/Myriad-Dreamin/tinymist/issues/837
+        // Also see https://github.com/Byron/open-rs/issues/105
+        #[cfg(not(target_os = "windows"))]
+        let do_open = ::open::that_detached;
+        #[cfg(target_os = "windows")]
+        fn do_open(path: impl AsRef<std::ffi::OsStr>) -> std::io::Result<()> {
+            ::open::with_detached(path, "explorer")
+        }
+
+        log::trace!("open with system default apps: {path:?}");
+        do_open(path).log_error("failed to open with system default apps");
     }
 }
 
