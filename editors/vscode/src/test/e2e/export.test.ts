@@ -68,12 +68,12 @@ export async function getTests(ctx: Context) {
         throw new Error("Expected multi-page export, got single");
       }
 
-      return ctx.expect(
-        response.items.map((item) => ({
-          page: item.page,
-          hash: getFileHash(item.path).slice(0, 8),
-        })),
-      );
+      const expected = response.items.map((item) => ({
+        page: item.page,
+        hash: getFileHash(item.path).slice(0, 8),
+      }));
+
+      return ctx.expect(expected, `sha256:${expected.map((e) => e.hash).join(",")}`).to.deep;
     };
 
     suite.addTest("export current pdf", async () => {
@@ -115,11 +115,64 @@ export async function getTests(ctx: Context) {
       expectSingleHash(resp).eq("a08f208d");
     });
 
-    /* suite.addTest("export png", async () => {
+    suite.addTest("export png", async () => {
       const resp = await exportDoc("main.typ", "Png");
-      expectSingleHash(resp).eq("8ae8f637");
+      expectPaged(resp).eq([{ page: 0, hash: "a3987ce8" }]);
+    });
 
-      // expectPaged(resp).eq([{ page: 1, hash: "4523673a" }]);
-    });*/
+    suite.addTest("export svg", async () => {
+      const resp = await exportDoc("main.typ", "Svg");
+      expectPaged(resp).eq([{ page: 0, hash: "9c575754" }]);
+    });
+
+    suite.addTest("export png paged all", async () => {
+      const resp = await exportDoc("paged.typ", "Png", { pageNumberTemplate: "paged-{p}" });
+      expectPaged(resp).eq([
+        { page: 0, hash: "27d34da8" },
+        { page: 1, hash: "a97c7cc8" },
+        { page: 2, hash: "08dfb2df" },
+      ]);
+    });
+
+    suite.addTest("export png paged partial", async () => {
+      const resp = await exportDoc("paged.typ", "Png", {
+        pages: ["1"],
+        pageNumberTemplate: "paged-partial-{p}",
+      });
+      expectPaged(resp).eq([{ page: 0, hash: "27d34da8" }]);
+    });
+
+    suite.addTest("export png paged merged", async () => {
+      const resp = await exportDoc("paged.typ", "Png", {
+        pages: ["2-3"],
+        merge: {},
+      });
+      expectSingleHash(resp).eq("9b87f1ce");
+    });
+
+    suite.addTest("export svg paged all", async () => {
+      const resp = await exportDoc("paged.typ", "Svg", { pageNumberTemplate: "paged-{p}" });
+      expectPaged(resp).eq([
+        { page: 0, hash: "4da72262" },
+        { page: 1, hash: "c423c3e5" },
+        { page: 2, hash: "7cfe2b25" },
+      ]);
+    });
+
+    suite.addTest("export svg paged partial", async () => {
+      const resp = await exportDoc("paged.typ", "Svg", {
+        pages: ["2"],
+        pageNumberTemplate: "paged-partial-{p}",
+      });
+      expectPaged(resp).eq([{ page: 1, hash: "c423c3e5" }]);
+    });
+
+    suite.addTest("export svg paged merged", async () => {
+      const resp = await exportDoc("paged.typ", "Svg", {
+        pages: ["1-2"],
+        merge: {},
+      });
+      expectSingleHash(resp).eq("64abf432");
+    });
   });
 }
