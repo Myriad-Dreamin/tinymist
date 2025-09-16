@@ -8,30 +8,7 @@
     <version>0.1.0</version>
 
     <!-- Text to display as company information on Settings | Plugins page -->
-    <vendor email="your.email@example.com" url="example.com"> &amp; Contributors</vendor>
-
-    <!-- Description of the plugin -->
-    <description><![CDATA[
-    Provides <a href="https://typst.app/">Typst</a> language support for IntelliJ-based IDEs using the <a href="https://github.com/Myzel394/tinymist">tinymist</a> language server.
-    <br/>
-    Features include:
-    <ul>
-        <li>Syntax Highlighting (via LSP semantic tokens)</li>
-        <li>Error Diagnostics</li>
-        <li>Completions</li>
-        <li>Hover Information</li>
-        <li>Go to Definition</li>
-    </ul>
-    Requires the tinymist LSP executable to be installed and available on PATH.
-    ]]></description>
-
-    <!-- Change notes for the plugin -->
-    <change-notes><![CDATA[
-    Initial release.
-    ]]></change-notes>
-
-    <!-- Minimum and maximum supported IntelliJ platform versions. -->
-    <idea-version since-build="233" until-build="241.*"/>
+    <vendor email="tinymist-ij-plugin@jsch.in" url="https://github.com/Myriad-Dreamin/tinymist"> Myriad-Dreamin &amp; Contributors</vendor>
 
     <!-- Declare dependencies on other plugins or modules -->
     <depends>com.intellij.modules.platform</depends>
