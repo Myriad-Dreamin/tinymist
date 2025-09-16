@@ -63,7 +63,7 @@ jobs:
         id: artifact
         shell: bash
         run: |
-          cd ${{ github.workspace }}/intellij/build/distributions
+          cd ${{ github.workspace }}/editors/intellij/build/distributions
           FILENAME=`ls *.zip`
           unzip "$FILENAME" -d content
 
