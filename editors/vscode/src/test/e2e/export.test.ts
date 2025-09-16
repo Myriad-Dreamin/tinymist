@@ -4,13 +4,72 @@
 import { hash } from "node:crypto";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
-import type { ExportOpts } from "../../cmd.export";
+import type { ExportActionOpts, ExportOpts } from "../../cmd.export";
 import type { ExportKind } from "../../features/export";
 import type { ExportResponse } from "../../lsp";
+import { base64DecodeToBytes } from "../../util";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
+  const dirPat = /target[\\/]typst[\\/]/;
+
+  const getFileHash = (path?: string | null) => {
+    if (!path || !fs.existsSync(path)) {
+      throw new Error(`File ${path} does not exist`);
+    }
+    ctx.expect(!!dirPat.exec(path), `${path} is not under correct directory`).eq(true);
+    return hash("sha256", fs.readFileSync(path), "hex");
+  };
+
+  const expectSingleHash = (response: ExportResponse | null) => {
+    if (!response) {
+      throw new Error("No response from export command");
+    }
+    if ("items" in response) {
+      throw new Error("Expected single export, got multiple");
+    }
+    const sha256 = getFileHash(response.path);
+    return ctx.expect(sha256.slice(0, 8), `sha256:${sha256}`);
+  };
+
+  const expectPaged = (response: ExportResponse | null) => {
+    if (!response) {
+      throw new Error("No response from export command");
+    }
+    if (!("items" in response)) {
+      throw new Error("Expected multi-page export, got single");
+    }
+
+    const expected = response.items.map((item) => ({
+      page: item.page,
+      hash: getFileHash(item.path).slice(0, 8),
+    }));
+
+    return ctx.expect(expected, `sha256:${expected.map((e) => e.hash).join(",")}`).to.deep;
+  };
+
+  const expectPagedData = (response: ExportResponse | null) => {
+    if (!response) {
+      throw new Error("No response from export command");
+    }
+    if (!("items" in response)) {
+      throw new Error("Expected multi-page export, got single");
+    }
+
+    for (const item of response.items) {
+      ctx.expect(item.data).to.be.a("string");
+    }
+
+    const expected = response.items.map((item) => ({
+      page: item.page,
+      hash: hash("sha256", base64DecodeToBytes(item.data as string), "hex").slice(0, 8),
+    }));
+
+    return ctx.expect(expected, `sha256:${expected.map((e) => e.hash).join(",")}`).to.deep;
+  };
+
   const workspaceCtx = ctx.workspaceCtx("export");
+
   await workspaceCtx.suite("export", async (suite) => {
     // const uri = workspaceCtx.workspaceUri();
     const baseUri = workspaceCtx.getWorkspace("export");
@@ -23,7 +82,6 @@ export async function getTests(ctx: Context) {
     if (fs.existsSync(targetDir.fsPath)) {
       fs.rmdirSync(targetDir.fsPath, { recursive: true });
     }
-    const dirPat = /target[\\/]typst[\\/]/;
 
     const prepareMain = async (mainPath: string) => {
       const mainUrl = vscode.Uri.joinPath(baseUri, mainPath);
@@ -31,49 +89,20 @@ export async function getTests(ctx: Context) {
       await ctx.openDocument(mainUrl);
     };
 
-    const exportDoc = async (mainPath: string, kind: ExportKind, opts?: ExportOpts) => {
+    const exportDoc = async (
+      mainPath: string,
+      kind: ExportKind,
+      opts?: ExportOpts,
+      actionOpts?: ExportActionOpts,
+    ) => {
       await prepareMain(mainPath);
 
       return await vscode.commands.executeCommand<ExportResponse | null>(
         "tinymist.export",
         kind,
         opts,
+        actionOpts,
       );
-    };
-
-    const getFileHash = (path?: string | null) => {
-      if (!path || !fs.existsSync(path)) {
-        throw new Error(`File ${path} does not exist`);
-      }
-      ctx.expect(!!dirPat.exec(path), `${path} is not under correct directory`).eq(true);
-      return hash("sha256", fs.readFileSync(path), "hex");
-    };
-
-    const expectSingleHash = (response: ExportResponse | null) => {
-      if (!response) {
-        throw new Error("No response from export command");
-      }
-      if ("items" in response) {
-        throw new Error("Expected single export, got multiple");
-      }
-      const sha256 = getFileHash(response.path);
-      return ctx.expect(sha256.slice(0, 8), `sha256:${sha256}`);
-    };
-
-    const expectPaged = (response: ExportResponse | null) => {
-      if (!response) {
-        throw new Error("No response from export command");
-      }
-      if (!("items" in response)) {
-        throw new Error("Expected multi-page export, got single");
-      }
-
-      const expected = response.items.map((item) => ({
-        page: item.page,
-        hash: getFileHash(item.path).slice(0, 8),
-      }));
-
-      return ctx.expect(expected, `sha256:${expected.map((e) => e.hash).join(",")}`).to.deep;
     };
 
     suite.addTest("export current pdf", async () => {
@@ -173,6 +202,20 @@ export async function getTests(ctx: Context) {
         merge: {},
       });
       expectSingleHash(resp).eq("64abf432");
+    });
+
+    suite.addTest("export png paged all no-write", async () => {
+      const resp = await exportDoc(
+        "paged.typ",
+        "Png",
+        { pageNumberTemplate: "paged-{p}" },
+        { write: false },
+      );
+      expectPagedData(resp).eq([
+        { page: 0, hash: "27d34da8" },
+        { page: 1, hash: "a97c7cc8" },
+        { page: 2, hash: "08dfb2df" },
+      ]); // this should be same as "export png paged all"
     });
   });
 }
