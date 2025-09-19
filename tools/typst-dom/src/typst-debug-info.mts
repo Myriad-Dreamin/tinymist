@@ -1,5 +1,5 @@
 import { triggerRipple } from "./typst-animation.mjs";
-import { PreviewMode, type GConstructor, type TypstDocumentContext } from "./typst-doc.mjs";
+import { PreviewMode, TypstDomHookedElement, TypstDomWindowElement, type GConstructor, type TypstDocumentContext } from "./typst-doc.mjs";
 
 const enum SourceMappingType {
   Text = 0,
@@ -105,7 +105,9 @@ export function resolveSourceLeaf(
   return [curElem, 0];
 }
 
-export function installEditorJumpToHandler(docRoot: HTMLElement) {
+export function installEditorJumpToHandler(
+  windowElem: TypstDomWindowElement,
+  docRoot: TypstDomHookedElement) {
   const getNthBackgroundRect = (elem: Element, pageNumber: string) => {
     let curElem: Element | null = elem;
     while (curElem) {
@@ -185,7 +187,7 @@ export function installEditorJumpToHandler(docRoot: HTMLElement) {
       return;
     }
     console.log("frameLoc", frameLoc);
-    window.typstWebsocket.send(`src-point ${JSON.stringify(frameLoc)}`);
+    windowElem.typstWebsocket.send(`src-point ${JSON.stringify(frameLoc)}`);
 
     const triggerWindow = document.body || document.firstElementChild;
     const basePos = triggerWindow.getBoundingClientRect();
@@ -208,7 +210,7 @@ export function installEditorJumpToHandler(docRoot: HTMLElement) {
   docRoot.addEventListener("click", sourceMappingHandler);
 }
 
-export interface TypstDebugJumpDocument {}
+export interface TypstDebugJumpDocument { }
 
 export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentContext>>(
   Base: TBase,
@@ -217,7 +219,7 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
     constructor(...args: any[]) {
       super(...args);
       if (this.opts.sourceMapping !== false) {
-        installEditorJumpToHandler(this.hookedElem);
+        installEditorJumpToHandler(this.windowElem, this.hookedElem);
         this.disposeList.push(() => {
           if (this.hookedElem) {
             removeSourceMappingHandler(this.hookedElem);
@@ -226,7 +228,12 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       }
     }
 
-    scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number) {
+    scrollTo(
+      pageRect: ScrollRect,
+      pageNo: number,
+      innerLeft: number,
+      innerTop: number,
+    ) {
       if (this.previewMode === PreviewMode.Slide) {
         this.setPartialPageNumber(pageNo);
         return;
@@ -239,8 +246,8 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       const top = innerTop - basePos.top;
 
       // evaluate window viewport 1vw
-      const pw = window.innerWidth * 0.01;
-      const ph = window.innerHeight * 0.01;
+      const pw = this.windowElem.clientWidth * 0.01;
+      const ph = this.windowElem.clientHeight * 0.01;
 
       const xOffsetInnerFix = 7 * pw;
       const yOffsetInnerFix = 38.2 * ph;
@@ -251,18 +258,28 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       const widthOccupied = (100 * 100 * pw) / pageRect.width;
 
       const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
-      const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
+      const pageAdjust =
+        pageRect.left - basePos.left + pageRect.width - 95 * pw;
 
       // default single-column or multi-column layout
       if (widthOccupied >= 90 || widthOccupied < 50) {
-        window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
+        this.windowElem.scrollTo({
+          behavior: "smooth",
+          left: xOffset,
+          top: yOffset,
+        });
       } else {
         // for double-column layout
         // console.log('occupied adjustment', widthOccupied, page);
 
-        const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
+        const xOffsetAdjsut =
+          xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
 
-        window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+        this.windowElem.scrollTo({
+          behavior: "smooth",
+          left: xOffsetAdjsut,
+          top: yOffset,
+        });
       }
 
       // grid ripple for debug vw

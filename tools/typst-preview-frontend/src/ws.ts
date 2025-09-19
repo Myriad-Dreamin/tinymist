@@ -1,5 +1,5 @@
 import { PreviewMode } from "typst-dom/typst-doc.mjs";
-import { TypstPreviewDocument as TypstDocument } from "typst-dom/index.preview.mjs";
+import { TypstPreviewDocument as TypstDocument, TypstDomHookedElement, TypstDomWindowElement } from "typst-dom/index.preview.mjs";
 import {
   rendererBuildInfo,
   createTypstRenderer,
@@ -33,21 +33,23 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (hookedElem) {
       hookedElem.innerHTML = "";
     }
-    return () => {};
+    return () => { };
   }
+  const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
 
   let disposed = false;
   let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
   const subsribes: Subscription[] = [];
 
   function createSvgDocument(kModule: RenderSession) {
-    const hookedElem = document.getElementById("typst-app")!;
+    const hookedElem = document.getElementById("typst-app")! as TypstDomHookedElement;
     if (hookedElem.firstElementChild?.tagName !== "svg") {
       hookedElem.innerHTML = "";
     }
     const resizeTarget = document.getElementById("typst-container-main")!;
 
     const svgDoc = new TypstDocument({
+      windowElem,
       hookedElem,
       kModule,
       previewMode,
@@ -218,7 +220,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
   }
 
   function setupSocket(svgDoc: TypstDocument): () => void {
-    window.documents.push(svgDoc);
+    windowElem.documents.push(svgDoc);
 
     // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
     $ws = webSocket<ArrayBuffer>({
@@ -230,9 +232,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         next: (e) => {
           const sock = e.target;
           console.log("WebSocket connection opened", sock);
-          window.typstWebsocket = sock as any;
+          windowElem.typstWebsocket = sock as any;
           svgDoc.reset();
-          window.typstWebsocket.send("current");
+          windowElem.typstWebsocket.send("current");
         },
       },
       closeObserver: {
@@ -251,9 +253,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     const dispose = () => {
       disposed = true;
       svgDoc.dispose();
-      const index = window.documents.indexOf(svgDoc);
+      const index = windowElem.documents.indexOf(svgDoc);
       if (index >= 0) {
-        window.documents.splice(index, 1);
+        windowElem.documents.splice(index, 1);
       }
       for (const sub of subsribes.splice(0, subsribes.length)) {
         sub.unsubscribe();
@@ -329,7 +331,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         if (previewMode === PreviewMode.Slide) {
           currentPageNumber = svgDoc.getPartialPageNumber();
         } else if (rootElem) {
-          currentPageNumber = window.currentPosition(rootElem)?.page || 1;
+          currentPageNumber = windowElem.currentPosition(rootElem)?.page || 1;
         }
 
         let positions = dec
@@ -377,7 +379,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         if (rootElem) {
           /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
           /// via `window.onscroll` event
-          window.handleTypstLocation(rootElem, pageToJump, x, y);
+          windowElem.handleTypstLocation(rootElem, pageToJump, x, y);
         }
         return;
       } else if (message[0] === "cursor") {

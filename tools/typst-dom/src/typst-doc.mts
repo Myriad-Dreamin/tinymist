@@ -1,4 +1,5 @@
 import type { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+import { TypstPreviewDocument } from "./index.preview.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
@@ -21,7 +22,8 @@ export enum PreviewMode {
 }
 
 export interface Options {
-  hookedElem: HTMLElement;
+  windowElem: TypstDomWindowElement;
+  hookedElem: TypstDomHookedElement;
   kModule: RenderSession;
   renderMode?: RenderMode;
   previewMode?: PreviewMode;
@@ -38,8 +40,32 @@ interface TypstDocumentFacade {
   postRender(): void;
 }
 
+export interface Sendable {
+  send: (data: string | ArrayBuffer) => Promise<void>;
+}
+
+interface TypstPosition {
+  page: number;
+  x: number;
+  y: number;
+}
+
+export interface TypstDomWindowElement extends HTMLElement {
+  initTypstSvg(docRoot: SVGElement): void;
+  currentPosition(elem: Element): TypstPosition | undefined;
+  handleTypstLocation(elem: Element, page: number, x: number, y: number): void;
+  documents: any[];
+  typstWebsocket: Sendable;
+}
+
+export interface TypstDomHookedElement extends HTMLElement {
+  document: TypstPreviewDocument;
+  sourceMappingHandler?: (event: MouseEvent) => Promise<void>;
+}
+
 export class TypstDocumentContext<O = any> {
-  public hookedElem: HTMLElement;
+  public hookedElem: TypstDomHookedElement;
+  public windowElem: TypstDomWindowElement;
   public kModule: RenderSession;
   public opts: O;
   modes: [string, TypstDocumentFacade][] = [];
@@ -112,6 +138,7 @@ export class TypstDocumentContext<O = any> {
   };
 
   constructor(opts: Options & O) {
+    this.windowElem = opts.windowElem;
     this.hookedElem = opts.hookedElem;
     this.kModule = opts.kModule;
     this.opts = opts || {};
@@ -248,7 +275,7 @@ export class TypstDocumentContext<O = any> {
       if (pageX !== undefined && pageY !== undefined) {
         const scrollX = pageX * (scrollFactor - 1);
         const scrollY = pageY * (scrollFactor - 1);
-        window.scrollBy(scrollX, scrollY);
+        this.windowElem.scrollBy(scrollX, scrollY);
       }
       // toggle scale change event
       this.addViewportChange();
@@ -281,9 +308,9 @@ export class TypstDocumentContext<O = any> {
         // retrieve dom state before any operation
         this.cachedDOMState = this.retrieveDOMState();
 
-        if (window.onresize !== null) {
+        if (this.windowElem.onresize !== null) {
           // is auto resizing
-          window.onresize = null;
+          this.windowElem.onresize = null;
         }
         // accumulate delta distance
         const pixels = event.deltaMode === 0 ? event.deltaY : event.deltaY * pixelPerLine;

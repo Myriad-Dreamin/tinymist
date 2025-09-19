@@ -4,6 +4,9 @@
 // @param (delay): integer in milliseconds
 // @param (id): string value of a unique event id
 // @doc (event.timeStamp): http://api.jquery.com/event.timeStamp/
+
+import { TypstDomWindowElement } from "typst-dom";
+
 // @bug (event.currentTime): https://bugzilla.mozilla.org/show_bug.cgi?id=238041
 let ignoredEvent = (function () {
   let last: Record<string, any> = {},
@@ -35,11 +38,11 @@ var overLapping = function (a: Element, b: Element) {
     ) &&
     /// determine overlapping by area
     (Math.abs(aRect.left - bRect.left) + Math.abs(aRect.right - bRect.right)) /
-      Math.max(aRect.width, bRect.width) <
-      0.5 &&
+    Math.max(aRect.width, bRect.width) <
+    0.5 &&
     (Math.abs(aRect.bottom - bRect.bottom) + Math.abs(aRect.top - bRect.top)) /
-      Math.max(aRect.height, bRect.height) <
-      0.5
+    Math.max(aRect.height, bRect.height) <
+    0.5
   );
 };
 
@@ -89,7 +92,9 @@ function findAncestor(el: Element, cls: string) {
   return el;
 }
 
-window.initTypstSvg = function (docRoot: SVGElement) {
+const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
+
+windowElem.initTypstSvg = function (docRoot: SVGElement) {
   /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
   for (var i = 0; i < elements.length; i++) {
@@ -178,7 +183,7 @@ function layoutText(svg: SVGElement) {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 }
 
-window.currentPosition = function (elem: Element) {
+windowElem.currentPosition = function (elem: Element) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
@@ -239,7 +244,7 @@ window.currentPosition = function (elem: Element) {
 };
 
 type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
-window.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
+windowElem.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
@@ -249,7 +254,7 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
   // scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number)
 
   const scrollTo = (pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number) => {
-    for (const doc of window.documents) {
+    for (const doc of windowElem.documents) {
       doc.impl.scrollTo(pageRect, pageNo, innerLeft, innerTop);
     }
   };
