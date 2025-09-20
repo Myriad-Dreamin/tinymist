@@ -45,7 +45,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@rainbowatcher/toml-edit-js": "^0.5.1",
+    "@rainbowatcher/toml-edit-js": "^0.6.2",
     "@typescript-eslint/eslint-plugin": "^8.24.1",
     "@typescript-eslint/parser": "^8.24.1",
     "cpr": "^3.0.1",
