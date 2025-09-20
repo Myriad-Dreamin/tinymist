@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{eco_vec, EcoVec};
+use ecow::{EcoVec, eco_vec};
 use tinymist_std::error::prelude::Result;
-use tinymist_std::{typst::TypstDocument, ImmutPath};
+use tinymist_std::{ImmutPath, typst::TypstDocument};
 use tinymist_task::ExportTarget;
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,
@@ -190,7 +190,7 @@ impl fmt::Display for CompileReportMsg<'_> {
             Suspend => return f.write_str("suspended"),
             Compiling => return f.write_str("compiling"),
             CompileSuccess(Res { diag: 0, elapsed }) => {
-                return write!(f, "{input:?}: compilation succeeded in {elapsed:?}")
+                return write!(f, "{input:?}: compilation succeeded in {elapsed:?}");
             }
             CompileSuccess(res) => ("compilation succeeded", res),
             CompileError(res) => ("compilation failed", res),
@@ -786,10 +786,13 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Compile the document once if there is any reason and the entry is
     /// active. (this is used for experimenting typst.node compilations)
     #[must_use]
-    pub fn may_compile2(
+    pub fn may_compile2<C>(
         &mut self,
-        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>),
-    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>>> {
+        compute: C,
+    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>> + use<F, Ext, C>>
+    where
+        C: FnOnce(&Arc<WorldComputeGraph<F>>),
+    {
         if !self.reason.any() || self.verse.entry_state().is_inactive() {
             return None;
         }
