@@ -12,7 +12,6 @@ use crate::{
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{EcoString, eco_format};
-use log::debug;
 use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowApi};
 use typst::{
@@ -216,7 +215,7 @@ impl HtmlToAstParser {
         });
 
         if self.feat.remove_html {
-            debug!("remove_html feature active, dropping inline document element");
+            log::debug!("remove_html feature active, dropping inline document element");
             // todo: make error silent is not good.
             return Node::Text(EcoString::new());
         }

@@ -3,7 +3,6 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
-use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
@@ -23,7 +22,7 @@ struct ResourceSymbolResponse {
 struct ResourceSymbolItem {
     id: String,
     category: SymCategory,
-    unicode: u32,
+    symbol: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     glyph: Option<String>,
 }
@@ -31,7 +30,7 @@ struct ResourceSymbolItem {
 #[derive(Debug)]
 struct SymbolItem {
     category: SymCategory,
-    unicode: u32,
+    symbol: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -1010,7 +1009,7 @@ fn populate(
             name,
             SymbolItem {
                 category,
-                unicode: ch as u32,
+                symbol: ch.into(),
             },
         );
     }
@@ -1032,7 +1031,7 @@ fn render_symbols(
 
     let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
         use std::fmt::Write;
-        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.symbol).ok();
         o
     });
     log::debug!("math shaping text: {math_shaping_text}");
@@ -1148,7 +1147,7 @@ fn render_glyphs(
         .map(|(k, v)| ResourceSymbolItem {
             id: k.clone(),
             category: v.category,
-            unicode: v.unicode,
+            symbol: v.symbol,
             glyph: render_sym(k),
         })
         .collect();
