@@ -29,12 +29,12 @@ A table of items.
 Tables are used to arrange content in cells. Cells can contain arbitrary
 content, including multiple paragraphs and are specified in row-major order.
 For a hands-on explanation of all the ways you can use and customize tables
-in Typst, check out the [table guide](https://typst.app/docs/guides/table-guide/).
+in Typst, check out the [Table Guide](https://typst.app/docs/guides/table-guide/).
 
 Because tables are just grids with different defaults for some cell
 properties (notably `stroke` and `inset`), refer to the [grid
-documentation](https://typst.app/docs/reference/layout/grid/) for more information on how to size the table tracks
-and specify the cell appearance properties.
+documentation](https://typst.app/docs/reference/layout/grid/#track-size) for more information on how to size the
+table tracks and specify the cell appearance properties.
 
 If you are unsure whether you should be using a table or a grid, consider
 whether the content you are arranging semantically belongs together as a set
@@ -47,11 +47,14 @@ grid's content will be announced no different than multiple content blocks
 in the document flow.
 
 Note that, to override a particular cell's properties or apply show rules on
-table cells, you can use the [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) element. See its
-documentation for more information.
+table cells, you can use the [`table.cell`] element. See its documentation
+for more information.
 
 Although the `table` and the `grid` share most properties, set and show
-rules on one of them do not affect the other.
+rules on one of them do not affect the other. Locating most of your styling
+in set and show rules is recommended, as it keeps the table's actual usages
+clean and easy to read. It also allows you to easily change the appearance
+of all tables in one place.
 
 To give a table a caption and make it [referenceable](https://typst.app/docs/reference/model/ref/), put it into a
 [figure].
@@ -80,8 +83,8 @@ The example below demonstrates some of the most common table options.
 )
 ```
 
-Much like with grids, you can use [`table.cell`](https://typst.app/docs/reference/model/table/#definitions-cell) to customize
-the appearance and the position of each cell.
+Much like with grids, you can use [`table.cell`] to customize the appearance
+and the position of each cell.
 
 ```typ
 >>> #set page(width: auto)
@@ -134,8 +137,7 @@ type: content
 ```
 
 The contents of the table cells, plus any extra table lines specified
-with the [`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and
-[`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline) elements.
+with the [`table.hline`] and [`table.vline`] elements.
 
 # Named Parameters
 
@@ -147,10 +149,15 @@ type: alignment | array | auto | function
 
 How to align the cells' content.
 
-This can either be a single alignment, an array of alignments
-(corresponding to each column) or a function that returns an alignment.
-The function receives the cells' column and row indices, starting from
-zero. If set to `auto`, the outer alignment is used.
+If set to `auto`, the outer alignment is used.
+
+You can specify the alignment in any of the following fashions:
+- use a single alignment for all cells
+- use an array of alignments corresponding to each column
+- use a function that maps a cell's X/Y position (both starting from
+  zero) to its alignment
+
+See the [Table Guide](https://typst.app/docs/guides/table-guide/#alignment) for details.
 
 ```typ
 #table(
@@ -168,7 +175,7 @@ type: array | auto | length | type
 ```
 
 The gaps between columns. Takes precedence over `gutter`. See the
-[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+[grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-gutter) for more information on gutters.
 
 ## columns (named)
 
@@ -176,8 +183,8 @@ The gaps between columns. Takes precedence over `gutter`. See the
 type: array | auto | length | type
 ```
 
-The column sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more
-information on track sizing.
+The column sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/#track-size) for
+more information on track sizing.
 
 ## fill (named)
 
@@ -187,9 +194,14 @@ type: color
 
 How to fill the cells.
 
-This can be a color or a function that returns a color. The function
-receives the cells' column and row indices, starting from zero. This can
-be used to implement striped tables.
+This can be:
+- a single fill for all cells
+- an array of fill corresponding to each column
+- a function that maps a cell's position to its fill
+
+Most notably, arrays and functions are useful for creating striped
+tables. See the [Table Guide](https://typst.app/docs/guides/table-guide/#fills) for more
+details.
 
 ```typ
 #table(
@@ -216,7 +228,7 @@ type: array | auto | length | type
 
 The gaps between rows and columns. This is a shorthand for setting
 `column-gutter` and `row-gutter` to the same value. See the [grid
-documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+documentation](https://typst.app/docs/reference/layout/grid/#parameters-gutter) for more information on gutters.
 
 ## inset (named)
 
@@ -226,8 +238,21 @@ type: inset
 
 How much to pad the cells' content.
 
+To specify the same inset for all cells, use a single length for all
+sides, or a dictionary of lengths for individual sides. See the
+[box's documentation](https://typst.app/docs/reference/layout/box/#parameters-inset) for more details.
+
+To specify a varying inset for different cells, you can:
+- use a single, uniform inset for all cells
+- use an array of insets for each column
+- use a function that maps a cell's X/Y position (both starting from
+  zero) to its inset
+
+See the [grid documentation](https://typst.app/docs/reference/layout/grid/#styling) for more details.
+
 ```typ
 #table(
+  columns: 2,
   inset: 10pt,
   [Hello],
   [World],
@@ -235,10 +260,7 @@ How much to pad the cells' content.
 
 #table(
   columns: 2,
-  inset: (
-    x: 20pt,
-    y: 10pt,
-  ),
+  inset: (x: 20pt, y: 10pt),
   [Hello],
   [World],
 )
@@ -251,7 +273,7 @@ type: array | auto | length | type
 ```
 
 The gaps between rows. Takes precedence over `gutter`. See the
-[grid documentation](https://typst.app/docs/reference/layout/grid/) for more information on gutters.
+[grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-gutter) for more information on gutters.
 
 ## rows (named)
 
@@ -259,8 +281,8 @@ The gaps between rows. Takes precedence over `gutter`. See the
 type: array | auto | length | type
 ```
 
-The row sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/) for more information
-on track sizing.
+The row sizes. See the [grid documentation](https://typst.app/docs/reference/layout/grid/#track-size) for more
+information on track sizing.
 
 ## stroke (named)
 
@@ -273,13 +295,20 @@ How to [stroke] the cells.
 Strokes can be disabled by setting this to `none`.
 
 If it is necessary to place lines which can cross spacing between cells
-produced by the `gutter` option, or to override the stroke between
-multiple specific cells, consider specifying one or more of
-[`table.hline`](https://typst.app/docs/reference/model/table/#definitions-hline) and [`table.vline`](https://typst.app/docs/reference/model/table/#definitions-vline)
-alongside your table cells.
+produced by the [`gutter`](https://typst.app/docs/reference/model/table/#parameters-gutter) option, or to override the
+stroke between multiple specific cells, consider specifying one or more
+of [`table.hline`] and [`table.vline`] alongside your table cells.
 
-See the [grid documentation](https://typst.app/docs/reference/layout/grid/#parameters-stroke) for more information on
-strokes.
+To specify the same stroke for all cells, use a single [stroke] for all
+sides, or a dictionary of [strokes](https://typst.app/docs/reference/visualize/stroke/) for individual sides. See
+the [rectangle's documentation](https://typst.app/docs/reference/visualize/rect/#parameters-stroke) for more details.
+
+To specify varying strokes for different cells, you can:
+- use a single stroke for all cells
+- use an array of strokes corresponding to each column
+- use a function that maps a cell's position to its stroke
+
+See the [Table Guide](https://typst.app/docs/guides/table-guide/#strokes) for more details.
 
 
 ======

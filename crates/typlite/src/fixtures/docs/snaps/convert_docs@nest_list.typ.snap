@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/docs/nest_list.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><p>These again are dictionaries with the keys</p><ul><li><span><m1raw lang block="false" text="description"></m1raw></span> (optional): The description for the argument.</li></ul><m1parbreak></m1parbreak><p>See show-module() for outputting the results of this function.</p><m1parbreak></m1parbreak><ul><li>name (string): The name for the module.</li><li><p>label-prefix (auto, string): The label-prefix for internal function references. If <span><m1raw lang block="false" text="auto"></m1raw></span>, the label-prefix name will be the module name.</p><ul><li>nested something</li><li>nested something 2</li></ul></li></ul><p>-> string</p></m1document></body>
+  <body><m1document><p>These again are dictionaries with the keys</p><ul><li><span><m1raw lang block="false" text="description"></m1raw></span><span style="white-space: pre-wrap">&#x20;</span>(optional): The description for the argument.</li></ul><m1parbreak></m1parbreak><p>See show-module() for outputting the results of this function.</p><m1parbreak></m1parbreak><ul><li>name (string): The name for the module.</li><li><p>label-prefix (auto, string): The label-prefix for internal function references. If <span><m1raw lang block="false" text="auto"></m1raw></span>, the label-prefix name will be the module name.</p><ul><li>nested something</li><li>nested something 2</li></ul></li></ul><p>-> string</p></m1document></body>
 </html>
 
 =====
