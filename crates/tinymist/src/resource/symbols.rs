@@ -2,15 +2,15 @@ use std::sync::LazyLock;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
-use reflexo_typst::{vector::font::GlyphId, TypstFont};
+use reflexo_typst::{TypstFont, vector::font::GlyphId};
 use sync_ls::LspResult;
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
-use typst::{syntax::VirtualPath, World};
+use typst::{World, syntax::VirtualPath};
 
 use super::prelude::*;
 use crate::project::LspComputeGraph;
-use crate::world::{base::ShadowApi, EntryState, TaskInputs};
+use crate::world::{EntryState, TaskInputs, base::ShadowApi};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,7 +23,7 @@ struct ResourceSymbolResponse {
 #[derive(Debug, Serialize, Deserialize)]
 struct ResourceSymbolItem {
     category: SymCategory,
-    unicode: u32,
+    symbol: String,
     glyphs: Vec<ResourceGlyphDesc>,
 }
 
@@ -981,7 +981,7 @@ impl ServerState {
 
         let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
             use std::fmt::Write;
-            writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+            writeln!(o, "$#{k}$/* {} */#pagebreak()", e.symbol).ok();
             o
         });
         log::debug!("math shaping text: {math_shaping_text}");
@@ -1191,7 +1191,7 @@ fn populate(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (modifier_name, ch, _) in sym.variants() {
+    for (modifier_name, sym, _) in sym.variants() {
         let mut name = String::with_capacity(
             mod_name.len() + sym_name.len() + modifier_name.as_str().len() + 2,
         );
@@ -1210,7 +1210,7 @@ fn populate(
             name,
             ResourceSymbolItem {
                 category,
-                unicode: ch as u32,
+                symbol: sym.into(),
                 glyphs: vec![],
             },
         );

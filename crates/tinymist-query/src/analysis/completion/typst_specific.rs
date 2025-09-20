@@ -252,7 +252,7 @@ impl CompletionPair<'_, '_, '_> {
 
     pub fn symbol_completions(&mut self, label: EcoString, symbol: &Symbol) {
         let ch = symbol.get();
-        let kind = CompletionKind::Symbol(ch);
+        let kind = CompletionKind::Symbol(ch.into());
         self.push_completion(Completion {
             kind,
             label: label.clone(),

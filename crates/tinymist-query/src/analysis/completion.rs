@@ -4,26 +4,26 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
-use tinymist_analysis::{analyze_labels, func_signature, DynLabel};
+use tinymist_analysis::syntax::{BadCompletionCursor, bad_completion_cursor};
+use tinymist_analysis::{DynLabel, analyze_labels, func_signature};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
+use typst::World;
 use typst::foundations::{
-    fields_on, format_str, repr, AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type,
-    Value,
+    AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str,
+    repr,
 };
 use typst::syntax::ast::{self, AstNode, Param};
 use typst::syntax::{is_id_continue, is_id_start, is_ident};
 use typst::text::RawElem;
 use typst::visualize::Color;
-use typst::World;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
@@ -31,14 +31,14 @@ use crate::adt::interner::Interned;
 use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
-    EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,
-    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
+    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoTextEdit, ParsedSnippet, PostfixSnippet,
+    PostfixSnippetScope, PrefixSnippet,
 };
 use crate::prelude::*;
 use crate::syntax::{
+    InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext, VarClass,
     classify_context, interpret_mode_at, is_ident_like, node_ancestors, previous_decls,
-    surrounding_syntax, InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext,
-    VarClass,
+    surrounding_syntax,
 };
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
@@ -358,7 +358,7 @@ impl<'a> CompletionCursor<'a> {
 
         LspCompletion {
             label: item.label.clone(),
-            kind: item.kind,
+            kind: item.kind.clone(),
             detail: item.detail.clone(),
             sort_text: item.sort_text.clone(),
             filter_text: item.filter_text.clone(),
@@ -854,17 +854,47 @@ impl CompletionPair<'_, '_, '_> {
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode detailed description.
-pub fn symbol_detail(ch: char) -> EcoString {
-    let ld = symbol_label_detail(ch);
+pub fn symbol_detail(s: &str) -> EcoString {
+    let ld = symbol_label_detail(s);
     if ld.starts_with("\\u") {
         return ld;
     }
-    format!("{}, unicode: `\\u{{{:04x}}}`", ld, ch as u32).into()
+
+    let unicode_repr = if s.chars().count() == 1 {
+        let ch = s.chars().next().unwrap();
+        format!("\\u{{{:04x}}}", ch as u32)
+    } else {
+        let codes: Vec<String> = s
+            .chars()
+            .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+            .collect();
+        codes.join(" + ")
+    };
+
+    format!("{}, unicode: `{}`", ld, unicode_repr).into()
 }
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode description.
-pub fn symbol_label_detail(ch: char) -> EcoString {
+pub fn symbol_label_detail(s: &str) -> EcoString {
+    if let Some(ch) = s.chars().next() {
+        if s.chars().count() == 1 {
+            return symbol_label_detail_single_char(ch);
+        }
+    }
+
+    if s.chars().all(|ch| !ch.is_whitespace() && !ch.is_control()) {
+        return s.into();
+    }
+
+    let codes: Vec<String> = s
+        .chars()
+        .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+        .collect();
+    codes.join(" + ").into()
+}
+
+fn symbol_label_detail_single_char(ch: char) -> EcoString {
     if !ch.is_whitespace() && !ch.is_control() {
         return ch.into();
     }
@@ -873,12 +903,10 @@ pub fn symbol_label_detail(ch: char) -> EcoString {
         '\t' => "tab".into(),
         '\n' => "newline".into(),
         '\r' => "carriage return".into(),
-        // replacer
         '\u{200D}' => "zero width joiner".into(),
         '\u{200C}' => "zero width non-joiner".into(),
         '\u{200B}' => "zero width space".into(),
         '\u{2060}' => "word joiner".into(),
-        // spaces
         '\u{00A0}' => "non-breaking space".into(),
         '\u{202F}' => "narrow no-break space".into(),
         '\u{2002}' => "en space".into(),
