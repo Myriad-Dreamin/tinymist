@@ -449,10 +449,10 @@
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
-"@rainbowatcher/toml-edit-js@^0.5.1":
-  version "0.5.1"
-  resolved "https://registry.yarnpkg.com/@rainbowatcher/toml-edit-js/-/toml-edit-js-0.5.1.tgz#1c205eede4f9ac7b955402b755126ebe60c83509"
-  integrity sha512-9Q7CGm24nvJyDy4STQvrPrA09U7zgLJ7GaLHBiJhA8vVoRjmfsCG9R0PjJtzytU4FUD2FiZvBlN5KCTOux/gFQ==
+"@rainbowatcher/toml-edit-js@^0.6.2":
+  version "0.6.2"
+  resolved "https://registry.yarnpkg.com/@rainbowatcher/toml-edit-js/-/toml-edit-js-0.6.2.tgz#7aa7238810884e8754fbf11853ee439a91dee8f3"
+  integrity sha512-ETHF23UpIJQ+ufbVLVacET5JnG4HDmYoAoWBQQnEROSbj3BqxFZI5JZEJmfoOc2VIVQfAFa/lEYDEGYv2DjByQ==
 
 "@rollup/rollup-android-arm-eabi@4.34.8":
   version "4.34.8"
