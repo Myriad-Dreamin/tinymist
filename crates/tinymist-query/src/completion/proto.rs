@@ -60,7 +60,7 @@ impl serde::Serialize for CompletionKind {
     where
         S: serde::Serializer,
     {
-        <Self as Into<lsp_types::CompletionItemKind>>::into(*self).serialize(serializer)
+        <Self as Into<lsp_types::CompletionItemKind>>::into(self.clone()).serialize(serializer)
     }
 }
 

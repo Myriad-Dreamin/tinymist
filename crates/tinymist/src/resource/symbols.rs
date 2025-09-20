@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
+use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
@@ -1147,7 +1148,7 @@ fn render_glyphs(
         .map(|(k, v)| ResourceSymbolItem {
             id: k.clone(),
             category: v.category,
-            symbol: v.symbol,
+            symbol: v.symbol.clone(),
             glyph: render_sym(k),
         })
         .collect();
