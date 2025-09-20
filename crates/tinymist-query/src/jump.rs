@@ -6,10 +6,10 @@ use tinymist_project::LspWorld;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::SourceSpanOffset;
 use typst::{
+    World,
     layout::{Frame, FrameItem, Point, Position, Size},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
     visualize::Geometry,
-    World,
 };
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -31,7 +31,7 @@ pub fn jump_from_click(
     }
 
     // If there's no link, search for a jump target.
-    for (mut pos, item) in frame.items().rev() {
+    for &(mut pos, ref item) in frame.items().rev() {
         match item {
             FrameItem::Group(group) => {
                 // TODO: Handle transformation.
@@ -168,7 +168,7 @@ fn jump_from_cursor_(
 
 /// Finds the position of a span in a frame.
 fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) -> Option<Point> {
-    for (mut pos, item) in frame.items() {
+    for &(mut pos, ref item) in frame.items() {
         if let FrameItem::Group(group) = item {
             // TODO: Handle transformation.
             if let Some(point) = find_in_frame(&group.frame, span, min_dis, res) {

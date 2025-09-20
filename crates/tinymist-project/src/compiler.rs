@@ -811,7 +811,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     pub fn may_compile(
         &mut self,
         handler: &Arc<dyn CompileHandler<F, Ext>>,
-    ) -> Option<impl FnOnce() -> CompiledArtifact<F>> {
+    ) -> Option<impl FnOnce() -> CompiledArtifact<F> + use<F, Ext>> {
         if !self.reason.any() || self.verse.entry_state().is_inactive() {
             return None;
         }
