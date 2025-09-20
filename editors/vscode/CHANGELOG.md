@@ -9,6 +9,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.29-rc1 - [2025-09-20]
+
+Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev c0cf675](https://github.com/ParaN3xus/typst/commit/c0cf67526844cc6a8810a2491d79a12780d28b02), a.k.a. [typst/typst Add an illustration for `par.{leading,spacing}` in docs (#6915)](https://github.com/typst/typst/commit/586b049487bfe696eb765a51403e6215d7f91315).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.27...v0.13.29-rc1
+
 ## v0.13.27 - [2025-08-11]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 1aaf4f4](https://github.com/ParaN3xus/typst/commit/1aaf4f4b154a07b4281886680cbb552241593a02), a.k.a. [typst/typst Encoding fixes for HTML raw text elements (#6720)](https://github.com/typst/typst/commit/bcc71ddb9b5146b97cb3078ecdb5406f31781ea2).
