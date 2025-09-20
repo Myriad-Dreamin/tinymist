@@ -505,19 +505,9 @@ dependencies = [
 [[package]]
 name = "citationberg"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4595e03beafb40235070080b5286d3662525efc622cca599585ff1d63f844fa"
-dependencies = [
- "quick-xml 0.36.2",
- "serde",
-]
-
-[[package]]
-name = "citationberg"
-version = "0.5.0"
 source = "git+https://github.com/typst/citationberg.git?rev=35cc83fb325d22c9b5bd5c7fc1d8e79897308076#35cc83fb325d22c9b5bd5c7fc1d8e79897308076"
 dependencies = [
- "quick-xml 0.38.3",
+ "quick-xml",
  "serde",
 ]
 
@@ -1629,32 +1619,11 @@ dependencies = [
 [[package]]
 name = "hayagriva"
 version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "954907554bb7fcba29a4f917c2d43e289ec21b69d872ccf97db160eca6caeed8"
-dependencies = [
- "biblatex 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ciborium",
- "citationberg 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "indexmap 2.11.4",
- "numerals",
- "paste",
- "serde",
- "serde_yaml",
- "thiserror 1.0.69",
- "unic-langid",
- "unicode-segmentation",
- "unscanny",
- "url",
-]
-
-[[package]]
-name = "hayagriva"
-version = "0.8.1"
 source = "git+https://github.com/typst/hayagriva?rev=03ae2acf#03ae2acf168e65604e74f0361e74ba4ef7689f16"
 dependencies = [
  "biblatex 0.10.0 (git+https://github.com/typst/biblatex.git)",
  "ciborium",
- "citationberg 0.5.0 (git+https://github.com/typst/citationberg.git?rev=35cc83fb325d22c9b5bd5c7fc1d8e79897308076)",
+ "citationberg",
  "indexmap 2.11.4",
  "numerals",
  "paste",
@@ -3013,7 +2982,7 @@ checksum = "740ebea15c5d1428f910cd1a5f52cebf8d25006245ed8ade92702f4943d91e07"
 dependencies = [
  "base64",
  "indexmap 2.11.4",
- "quick-xml 0.38.3",
+ "quick-xml",
  "serde",
  "time",
 ]
@@ -3211,16 +3180,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quick-xml"
-version = "0.36.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7649a7b4df05aed9ea7ec6f628c67c9953a43869b8bc50929569b2999d443fe"
-dependencies = [
- "memchr",
- "serde",
-]
 
 [[package]]
 name = "quick-xml"
@@ -4912,7 +4871,7 @@ dependencies = [
  "dirs",
  "ecow",
  "ena",
- "hayagriva 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hayagriva",
  "hex",
  "if_chain",
  "indexmap 2.11.4",
@@ -5564,7 +5523,7 @@ dependencies = [
  "flate2",
  "fontdb 0.23.0",
  "glidesort",
- "hayagriva 0.8.1 (git+https://github.com/typst/hayagriva?rev=03ae2acf)",
+ "hayagriva",
  "hayro-syntax",
  "icu_properties 1.5.1",
  "icu_provider 1.5.0",
