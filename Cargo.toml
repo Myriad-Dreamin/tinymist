@@ -264,16 +264,16 @@ ignore-hidden = false
 extend-exclude = ["/.git", "fixtures"]
 
 [patch.crates-io]
-typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "1aaf4f4b154a07b4281886680cbb552241593a02" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "c0cf67526844cc6a8810a2491d79a12780d28b02" }
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "dd484911603cb29648a2cf2eb1639afdf0dfd5f1" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "52985890727cc39e1adb94ba433f624b81993f46" }
 reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "1aee454cba729caa6b34c3d8eaa79ba7d649ea79" }
