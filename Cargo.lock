@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "anyhow",
  "base64",
@@ -3420,7 +3420,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#9596eaba231a47c9854dcd643dc3b537fd568f9e"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#b6593f438bb51ec13f7f0cee2caa76d4e6ad53c5"
 dependencies = [
  "base64",
  "bitvec",
@@ -3446,7 +3446,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#9596eaba231a47c9854dcd643dc3b537fd568f9e"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#b6593f438bb51ec13f7f0cee2caa76d4e6ad53c5"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -3478,7 +3478,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#9596eaba231a47c9854dcd643dc3b537fd568f9e"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#b6593f438bb51ec13f7f0cee2caa76d4e6ad53c5"
 dependencies = [
  "bitvec",
  "comemo",
@@ -3506,7 +3506,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#9596eaba231a47c9854dcd643dc3b537fd568f9e"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#b6593f438bb51ec13f7f0cee2caa76d4e6ad53c5"
 dependencies = [
  "base64",
  "comemo",
@@ -3922,9 +3922,9 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6c24dee235d0da097043389623fb913daddf92c76e9f5a1db88607a0bcbd1d"
+checksum = "0dca6411025b24b60bfa7ec1fe1f8e710ac09782dca409ee8237ba74b51295fd"
 dependencies = [
  "serde_core",
  "serde_derive",
@@ -3943,18 +3943,18 @@ dependencies = [
 
 [[package]]
 name = "serde_core"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "659356f9a0cb1e529b24c01e43ad2bdf520ec4ceaf83047b83ddcc2251f96383"
+checksum = "ba2ba63999edb9dac981fb34b3e5c0d111a69b0924e253ed29d83f7c99e966a4"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.225"
+version = "1.0.226"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea936adf78b1f766949a4977b91d2f5595825bd6ec079aa9543ad2685fc4516"
+checksum = "8db53ae22f34573731bafa1db20f04027b2d25e02d8205921b569171699cdb33"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4317,7 +4317,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "anyhow",
  "clap",
@@ -4446,7 +4446,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -4570,7 +4570,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4644,7 +4644,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "comemo",
  "dashmap",
@@ -4683,11 +4683,11 @@ checksum = "67f57fcd7639be764c7493e02c7119208982057bf313f64b3595814ec99d0431"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.27"
+version = "0.13.29"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "divan",
  "tinymist",
@@ -4695,7 +4695,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-core"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4709,7 +4709,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "base64",
  "comemo",
@@ -4728,7 +4728,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "base64",
  "comemo",
@@ -4768,7 +4768,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "comemo",
  "insta",
@@ -4809,7 +4809,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "clap",
  "comemo",
@@ -4861,7 +4861,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "anyhow",
  "base64",
@@ -4915,7 +4915,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "base64",
  "log",
@@ -4999,7 +4999,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "comemo",
  "insta",
@@ -5369,7 +5369,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.13.27"
+version = "0.13.29"
 dependencies = [
  "base64",
  "clap",
@@ -5413,7 +5413,7 @@ dependencies = [
 [[package]]
 name = "typst-ansi-hl"
 version = "0.4.0"
-source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?branch=nightly#dd484911603cb29648a2cf2eb1639afdf0dfd5f1"
+source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?branch=nightly#2bdd10812e38a63d0a0956e43a0f77b07f4eae98"
 dependencies = [
  "ansi_colours",
  "syntect",
@@ -5776,7 +5776,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.13.17"
-source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#52985890727cc39e1adb94ba433f624b81993f46"
+source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#a1ff779381efa7ee97102b177c54fcc6efa8da3e"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
@@ -6646,9 +6646,9 @@ dependencies = [
 
 [[package]]
 name = "xattr"
-version = "1.5.1"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af3a19837351dc82ba89f8a125e22a3c475f05aba604acc023d62b2739ae2909"
+checksum = "32e45ad4206f6d2479085147f02bc2ef834ac85886624a23575ae137c8aa8156"
 dependencies = [
  "libc",
  "rustix",

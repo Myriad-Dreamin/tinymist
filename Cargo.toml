@@ -1,8 +1,8 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.27"
-edition = "2024"
+version = "0.13.29"
+edition = "2021"
 readme = "README.md"
 license = "Apache-2.0"
 homepage = "https://github.com/Myriad-Dreamin/tinymist"
@@ -199,16 +199,16 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.17" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.13.27" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.27", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.27" }
-tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.27", default-features = false }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.27" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.27" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.27" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.27" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.13.27" }
-typlite = { path = "./crates/typlite", version = "0.13.27", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.13.29" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.29" }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.29" }
+tinymist-core = { path = "./crates/tinymist-core/", version = "0.13.29", default-features = false }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.29" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.29" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.29" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.29" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.13.29" }
+typlite = { path = "./crates/typlite", version = "0.13.29", default-features = false }
 
 [profile.dev.package.insta]
 opt-level = 3
@@ -270,7 +270,7 @@ extend-exclude = ["/.git", "fixtures"]
 # However, it is not suggested to install it in that way. The suggested ways are:
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
 # - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
-tinymist-assets = { path = "./crates/tinymist-assets/" }
+# tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
