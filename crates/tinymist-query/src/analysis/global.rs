@@ -13,7 +13,7 @@ use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::term_value;
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::LintInfo;
+use tinymist_lint::{KnownIssues, LintInfo};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -475,8 +475,12 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
-    pub(crate) fn lint(&mut self, source: &Source) -> EcoVec<SourceDiagnostic> {
-        self.shared.lint(source).diagnostics
+    pub(crate) fn lint(
+        &mut self,
+        source: &Source,
+        known_issues: &KnownIssues,
+    ) -> EcoVec<SourceDiagnostic> {
+        self.shared.lint(source, known_issues).diagnostics
     }
 
     /// Get the type check information of a source file.
@@ -794,13 +798,13 @@ impl SharedContext {
 
     /// Get the lint result of a source file.
     #[typst_macros::time(span = source.root().span())]
-    pub(crate) fn lint(self: &Arc<Self>, source: &Source) -> LintInfo {
+    pub(crate) fn lint(self: &Arc<Self>, source: &Source, issues: &KnownIssues) -> LintInfo {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti)), |_prev| {
+        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(&self.world, &ei, ti)
+            tinymist_lint::lint_file(&self.world, &ei, ti, issues.clone())
         })
     }
 
