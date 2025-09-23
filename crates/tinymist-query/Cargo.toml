@@ -69,6 +69,7 @@ hex = { version = "0.4" }
 
 [features]
 local-registry = ["tinymist-world/system"]
+system = ["tinymist-project/system"]
 
 [lints]
 workspace = true
