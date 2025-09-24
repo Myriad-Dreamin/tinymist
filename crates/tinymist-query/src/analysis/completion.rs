@@ -871,7 +871,7 @@ pub fn symbol_detail(s: &str) -> EcoString {
         codes.join(" + ")
     };
 
-    format!("{}, unicode: `{}`", ld, unicode_repr).into()
+    format!("{ld}, unicode: `{unicode_repr}`").into()
 }
 
 /// If is printable, return the symbol itself.
