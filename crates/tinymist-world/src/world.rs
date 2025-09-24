@@ -7,33 +7,33 @@ use std::{
 };
 
 use crate::{
-    CompileSnapshot, MEMORY_MAIN_ENTRY,
     package::{PackageRegistry, PackageSpec},
     source::SourceDb,
+    CompileSnapshot, MEMORY_MAIN_ENTRY,
 };
 use crate::{
-    WorldComputeGraph,
     parser::{
-        OffsetEncoding, SemanticToken, SemanticTokensLegend, get_semantic_tokens_full,
-        get_semantic_tokens_legend,
+        get_semantic_tokens_full, get_semantic_tokens_legend, OffsetEncoding, SemanticToken,
+        SemanticTokensLegend,
     },
+    WorldComputeGraph,
 };
 use ecow::EcoVec;
-use tinymist_std::{ImmutPath, error::prelude::*};
+use tinymist_std::{error::prelude::*, ImmutPath};
 use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };
 use typst::{
-    Features, Library, LibraryExt, World, WorldExt,
-    diag::{At, EcoString, FileError, FileResult, SourceResult, eco_format},
+    diag::{eco_format, At, EcoString, FileError, FileResult, SourceResult},
     foundations::{Bytes, Datetime, Dict},
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
+    Features, Library, LibraryExt, World, WorldExt,
 };
 // use crate::source::{SharedState, SourceCache, SourceDb};
-use crate::entry::{DETACHED_ENTRY, EntryManager, EntryReader, EntryState};
-use crate::{CompilerFeat, ShadowApi, WorldDeps, font::FontResolver};
+use crate::entry::{EntryManager, EntryReader, EntryState, DETACHED_ENTRY};
+use crate::{font::FontResolver, CompilerFeat, ShadowApi, WorldDeps};
 
 type CodespanResult<T> = Result<T, CodespanError>;
 type CodespanError = codespan_reporting::files::Error;
@@ -807,7 +807,7 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// return an error.
     #[cfg(not(any(feature = "web", feature = "system")))]
     fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use tinymist_std::time::{Duration, now, to_typst_time};
+        use tinymist_std::time::{now, to_typst_time, Duration};
 
         let now = self.now.get_or_init(|| {
             if let Some(timestamp) = self.creation_timestamp {

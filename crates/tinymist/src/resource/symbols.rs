@@ -2,15 +2,15 @@ use std::sync::LazyLock;
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
-use reflexo_typst::{TypstFont, vector::font::GlyphId};
+use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use sync_ls::LspResult;
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
-use typst::{World, syntax::VirtualPath};
+use typst::{syntax::VirtualPath, World};
 
 use super::prelude::*;
 use crate::project::LspComputeGraph;
-use crate::world::{EntryState, TaskInputs, base::ShadowApi};
+use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
