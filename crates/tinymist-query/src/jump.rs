@@ -6,10 +6,10 @@ use tinymist_project::LspWorld;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::SourceSpanOffset;
 use typst::{
-    World,
     layout::{Frame, FrameItem, Point, Position, Size},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
     visualize::Geometry,
+    World,
 };
 use typst_shim::syntax::LinkedNodeExt;
 

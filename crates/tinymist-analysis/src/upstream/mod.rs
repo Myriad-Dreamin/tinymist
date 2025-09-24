@@ -2,21 +2,21 @@
 
 mod tooltip;
 
-pub use tooltip::{Tooltip, tooltip_};
+pub use tooltip::{tooltip_, Tooltip};
 
 use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
-use ecow::{EcoString, eco_format};
+use ecow::{eco_format, EcoString};
 use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
-    Category, Library, LibraryExt, World,
-    diag::{StrResult, bail},
+    diag::{bail, StrResult},
     foundations::{Binding, Content, Func, Module, Type, Value},
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
+    Category, Library, LibraryExt, World,
 };
 
 /// Extract the first sentence of plain text of a piece of documentation.

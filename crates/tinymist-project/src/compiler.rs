@@ -5,9 +5,9 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{EcoVec, eco_vec};
+use ecow::{eco_vec, EcoVec};
 use tinymist_std::error::prelude::Result;
-use tinymist_std::{ImmutPath, typst::TypstDocument};
+use tinymist_std::{typst::TypstDocument, ImmutPath};
 use tinymist_task::ExportTarget;
 use tinymist_world::vfs::notify::{
     FilesystemEvent, MemoryEvent, NotifyDeps, NotifyMessage, UpstreamUpdateEvent,

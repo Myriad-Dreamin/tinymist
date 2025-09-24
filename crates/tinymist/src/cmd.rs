@@ -17,13 +17,13 @@ use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportMarkdownTask;
-use typst::diag::{EcoString, StrResult, eco_format};
+use typst::diag::{eco_format, EcoString, StrResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst::syntax::{LinkedNode, Source};
 use world::TaskInputs;
 
 use super::*;
-use crate::lsp::query::{LspClientExt, run_query};
+use crate::lsp::query::{run_query, LspClientExt};
 use crate::tool::ast::AstRepr;
 use crate::tool::package::InitTask;
 
