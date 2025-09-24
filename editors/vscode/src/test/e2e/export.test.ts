@@ -21,7 +21,7 @@ export async function getTests(ctx: Context) {
     return hash("sha256", fs.readFileSync(path), "hex");
   };
 
-  const expectSingleHash = (response: ExportResponse | null) => {
+  const expectSingleHash = (response: ExportResponse | null, ignoreHash: boolean = false) => {
     if (!response) {
       throw new Error("No response from export command");
     }
@@ -29,10 +29,10 @@ export async function getTests(ctx: Context) {
       throw new Error("Expected single export, got multiple");
     }
     const sha256 = getFileHash(response.path);
-    return ctx.expect(sha256.slice(0, 8), `sha256:${sha256}`);
+    return ctx.expect(ignoreHash ? undefined : sha256.slice(0, 8), `sha256:${sha256}`);
   };
 
-  const expectPaged = (response: ExportResponse | null) => {
+  const expectPaged = (response: ExportResponse | null, ignoreHash: boolean = false) => {
     if (!response) {
       throw new Error("No response from export command");
     }
@@ -42,7 +42,7 @@ export async function getTests(ctx: Context) {
 
     const expected = response.items.map((item) => ({
       page: item.page,
-      hash: getFileHash(item.path).slice(0, 8),
+      hash: ignoreHash ? undefined : getFileHash(item.path).slice(0, 8),
     }));
 
     return ctx.expect(expected, `sha256:${expected.map((e) => e.hash).join(",")}`).to.deep;
@@ -105,6 +105,8 @@ export async function getTests(ctx: Context) {
       );
     };
 
+    // NOTE: For svg tests, the output (especially glyph id) may vary between different environments. So we do not check hash.
+
     suite.addTest("export current pdf", async () => {
       await prepareMain("main.typ");
 
@@ -151,7 +153,7 @@ export async function getTests(ctx: Context) {
 
     suite.addTest("export svg", async () => {
       const resp = await exportDoc("main.typ", "Svg");
-      expectPaged(resp).eq([{ page: 0, hash: "9c575754" }]);
+      expectPaged(resp, true).eq([{ page: 0, hash: undefined }]);
     });
 
     suite.addTest("export png paged all", async () => {
@@ -181,10 +183,10 @@ export async function getTests(ctx: Context) {
 
     suite.addTest("export svg paged all", async () => {
       const resp = await exportDoc("paged.typ", "Svg", { pageNumberTemplate: "paged-{p}" });
-      expectPaged(resp).eq([
-        { page: 0, hash: "4da72262" },
-        { page: 1, hash: "c423c3e5" },
-        { page: 2, hash: "7cfe2b25" },
+      expectPaged(resp, true).eq([
+        { page: 0, hash: undefined },
+        { page: 1, hash: undefined },
+        { page: 2, hash: undefined },
       ]);
     });
 
@@ -193,7 +195,7 @@ export async function getTests(ctx: Context) {
         pages: ["2"],
         pageNumberTemplate: "paged-partial-{p}",
       });
-      expectPaged(resp).eq([{ page: 1, hash: "c423c3e5" }]);
+      expectPaged(resp, true).eq([{ page: 1, hash: undefined }]);
     });
 
     suite.addTest("export svg paged merged", async () => {
@@ -201,7 +203,7 @@ export async function getTests(ctx: Context) {
         pages: ["1-2"],
         merge: {},
       });
-      expectSingleHash(resp).eq("64abf432");
+      expectSingleHash(resp, true).eq(undefined);
     });
 
     suite.addTest("export png paged all no-write", async () => {
