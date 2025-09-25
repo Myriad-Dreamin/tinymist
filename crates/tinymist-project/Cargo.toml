@@ -35,6 +35,8 @@ toml = { workspace = true, optional = true }
 typst.workspace = true
 typst-assets.workspace = true
 notify.workspace = true
+js-sys = { workspace = true }
+wasm-bindgen.workspace = true
 
 [features]
 

@@ -17,6 +17,8 @@
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
 
+#![allow(missing_docs)]
+
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -26,6 +28,8 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::hash::FxHashMap;
+#[cfg(not(feature = "system"))]
+use sync_ls::TransportHost;
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
@@ -89,6 +93,22 @@ impl ServerState {
         self.preview.stop_all();
         let editor_tx = self.editor_tx.clone();
 
+        #[cfg(not(feature = "system"))]
+        let new_project =
+            if let TransportHost::Js { sender, .. } = self.client.clone().to_untyped().sender {
+                Self::project(
+                    &self.config,
+                    editor_tx,
+                    self.client.clone(),
+                    #[cfg(feature = "preview")]
+                    self.preview.watchers.clone(),
+                    sender.resolve_fn,
+                )
+            } else {
+                panic!("Expected Js TransportHost")
+            };
+
+        #[cfg(feature = "system")]
         let new_project = Self::project(
             &self.config,
             editor_tx,
@@ -139,6 +159,7 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
+        #[cfg(not(feature = "system"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -199,7 +220,14 @@ impl ServerState {
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         let fonts = config.fonts();
+
+        #[cfg(not(feature = "system"))]
+        let packages =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
+
+        #[cfg(feature = "system")]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+
         let creation_timestamp = config.creation_timestamp();
         let verse = LspUniverseBuilder::build(
             entry,
@@ -280,6 +308,7 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
     ) -> bool {
         let Some(last_compilation) = self.last_compilation.as_ref() else {
+            log::info!("skipping emit bcuz there's no last_compilation");
             return false;
         };
 
@@ -291,6 +320,7 @@ impl ProjectInsStateExt {
 
         let pending_reasons = self.pending_reasons.exclude(self.emitted_reasons);
         if !pending_reasons.any() {
+            log::info!("skipping emit bcuz there's no reason");
             return false;
         }
         self.emitted_reasons.merge(self.pending_reasons);
