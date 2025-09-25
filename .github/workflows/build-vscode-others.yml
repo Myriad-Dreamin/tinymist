@@ -47,7 +47,7 @@ jobs:
 
       - name: Install dependencies
         # bash is required by setup-rust-toolchain
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils bash
+        run: apk add --no-cache git clang lld musl-dev nodejs-current npm yarn binutils bash
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -138,6 +138,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: jetli/wasm-pack-action@v0.4.0
         with:

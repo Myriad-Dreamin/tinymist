@@ -44,12 +44,21 @@ interface TraceReport {
   stderr: string;
 }
 
-export interface StyleAtCursor {
-  version: number;
-  textDocument: any;
-  position: any;
+export interface SelectionStyle {
+  textDocument: {
+    uri: string;
+  };
+  position: {
+    line: number;
+    character: number;
+  };
   style: string[];
   styleAt: any[];
+}
+
+export interface StyleAtCursor {
+  version: number;
+  selections: SelectionStyle[];
 }
 
 // import { traceDataMock } from "./vscode.trace.mock";

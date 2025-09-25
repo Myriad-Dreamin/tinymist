@@ -8,19 +8,20 @@ use tinymist::world::WorldComputeGraph;
 use tinymist::world::system::print_diagnostics;
 use tinymist_std::{ImmutPath, error::prelude::*};
 
-/// Arguments for project compilation.
+/// Specify the project compilation.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct CompileArgs {
-    /// Inherits the compile task arguments.
+    /// Specify the compile task related arguments.
     #[clap(flatten)]
     pub compile: TaskCompileArgs,
 
-    /// Saves the compilation arguments to the lock file.
+    /// Save the compilation arguments to the lock file. If `--lockfile` is not
+    /// set, the lock file will be saved in the cwd.
     #[clap(long)]
     pub save_lock: bool,
 
-    /// Specifies the path to the lock file. If the path is
-    /// set, the lock file will be saved.
+    /// Specify the path to the lock file. If the path is set, the lockfile will
+    /// be saved (--save-lock).
     #[clap(long)]
     pub lockfile: Option<PathBuf>,
 }

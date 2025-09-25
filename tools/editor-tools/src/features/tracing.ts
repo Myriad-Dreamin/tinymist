@@ -97,7 +97,7 @@ export const Tracing = (serverLevelProfiling: boolean) => () => {
       ? [
           button(
             {
-              class: "tinymist-button",
+              class: "btn",
               style: "flex: auto",
               onclick() {
                 stopServerProfiling();
@@ -110,7 +110,7 @@ export const Tracing = (serverLevelProfiling: boolean) => () => {
 
     button({
       id: "open-trace",
-      class: "tinymist-button",
+      class: "btn",
       style: "display: none; flex: auto",
     }),
   );

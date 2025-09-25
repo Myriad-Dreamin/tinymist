@@ -1,0 +1,25 @@
+---
+source: crates/tinymist-query/src/document_symbol.rs
+expression: "JsonRepr::new_redacted(result.unwrap(), &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/document_symbols/symbol-after-comments.typ
+---
+[
+ {
+  "kind": 13,
+  "name": "symbol_after_comment",
+  "range": "1:5:1:25",
+  "selectionRange": "1:5:1:25"
+ },
+ {
+  "kind": 13,
+  "name": "symbol_after_line_comments",
+  "range": "5:5:5:31",
+  "selectionRange": "5:5:5:31"
+ },
+ {
+  "kind": 13,
+  "name": "symbol_after_block_comment",
+  "range": "9:5:9:31",
+  "selectionRange": "9:5:9:31"
+ }
+]

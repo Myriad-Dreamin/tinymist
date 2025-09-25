@@ -22,7 +22,7 @@
     "build:preview": "node scripts/build.mjs build:preview",
     "build:syntax": "node scripts/build.mjs build:syntax",
     "build:l10n": "node scripts/build.mjs build:l10n",
-    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.24 .",
+    "build:docker": "docker build -t myriaddreamin/tinymist:0.13.26 .",
     "build:web": "node scripts/build.mjs build:web",
     "watch:web": "cd crates/tinymist && yarn watch",
     "maintainers": "typst query MAINTAINERS.typ \"<maintainer-meta>\" --pretty --one --field value --input=action=help",
@@ -47,7 +47,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@rainbowatcher/toml-edit-js": "^0.5.1",
+    "@rainbowatcher/toml-edit-js": "^0.6.2",
     "@typescript-eslint/eslint-plugin": "^8.24.1",
     "@typescript-eslint/parser": "^8.24.1",
     "cpr": "^3.0.1",

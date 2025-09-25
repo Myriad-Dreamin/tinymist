@@ -13,10 +13,11 @@ use typst_shim::eval::Vm;
 
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
-    if let Some(parent) = node.parent() {
-        if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
-            return analyze_expr(world, parent);
-        }
+    if let Some(parent) = node.parent()
+        && parent.kind() == SyntaxKind::FieldAccess
+        && node.index() > 0
+    {
+        return analyze_expr(world, parent);
     }
 
     analyze_expr_(world, node.get())
@@ -38,10 +39,10 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
         ast::Expr::Numeric(v) => Value::numeric(v.get()),
         ast::Expr::Str(v) => Value::Str(v.get().into()),
         _ => {
-            if node.kind() == SyntaxKind::Contextual {
-                if let Some(child) = node.children().last() {
-                    return analyze_expr_(world, child);
-                }
+            if node.kind() == SyntaxKind::Contextual
+                && let Some(child) = node.children().last()
+            {
+                return analyze_expr_(world, child);
             }
 
             return typst::trace::<TypstPagedDocument>(world, node.span());

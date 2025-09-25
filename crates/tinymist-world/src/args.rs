@@ -16,11 +16,14 @@ use crate::EntryOpts;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
-/// The font arguments for the world.
+/// The font arguments for the world to specify the way to search for fonts.
 #[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileFontArgs {
-    /// Font paths
+    /// Add additional directories that are recursively searched for fonts.
+    ///
+    /// If multiple paths are specified, they are separated by the system's path
+    /// separator (`:` on Unix-like systems and `;` on Windows).
     #[clap(
         long = "font-path",
         value_name = "DIR",
@@ -30,20 +33,23 @@ pub struct CompileFontArgs {
     )]
     pub font_paths: Vec<PathBuf>,
 
-    /// Ensures system fonts won't be searched, unless explicitly included via
-    /// `--font-path`
+    /// Ensure system fonts won't be searched, unless explicitly included via
+    /// `--font-path`.
     #[clap(long, default_value = "false")]
     pub ignore_system_fonts: bool,
 }
 
-/// Arguments related to where packages are stored in the system.
+/// The package arguments for the world to specify where packages are stored in
+/// the system.
 #[derive(Debug, Clone, Parser, Default, PartialEq, Eq)]
 pub struct CompilePackageArgs {
-    /// Custom path to local packages, defaults to system-dependent location
+    /// Specify a custom path to local packages, defaults to system-dependent
+    /// location.
     #[clap(long = "package-path", env = "TYPST_PACKAGE_PATH", value_name = "DIR")]
     pub package_path: Option<PathBuf>,
 
-    /// Custom path to package cache, defaults to system-dependent location
+    /// Specify a custom path to package cache, defaults to system-dependent
+    /// location.
     #[clap(
         long = "package-cache-path",
         env = "TYPST_PACKAGE_CACHE_PATH",
@@ -52,31 +58,41 @@ pub struct CompilePackageArgs {
     pub package_cache_path: Option<PathBuf>,
 }
 
-/// Common arguments of compile, watch, and query.
+/// Common arguments to create a world (environment) to run typst tasks, e.g.
+/// `compile`, `watch`, and `query`.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct CompileOnceArgs {
-    /// Path to input Typst file
+    /// Specify the path to input Typst file. If the path is relative, it will
+    /// be resolved relative to the current working directory (PWD).
     #[clap(value_name = "INPUT")]
     pub input: Option<String>,
 
-    /// Configures the project root (for absolute paths)
+    /// Configure the project root (for absolute paths).
     #[clap(long = "root", value_name = "DIR")]
     pub root: Option<PathBuf>,
 
-    /// Font related arguments.
+    /// Specify the font related arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
 
-    /// Package related arguments.
+    /// Specify the package related arguments.
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 
-    /// Enables in-development features that may be changed or removed at any
+    /// Enable in-development features that may be changed or removed at any
     /// time.
     #[arg(long = "features", value_delimiter = ',', env = "TYPST_FEATURES")]
     pub features: Vec<Feature>,
 
-    /// Add a string key-value pair visible through `sys.inputs`
+    /// Add a string key-value pair visible through `sys.inputs`.
+    ///
+    /// ### Examples
+    ///
+    /// Tell the script that `sys.inputs.foo` is `"bar"` (type: `str`).
+    ///
+    /// ```bash
+    /// tinymist compile --input foo=bar
+    /// ```
     #[clap(
         long = "input",
         value_name = "key=value",
@@ -85,7 +101,8 @@ pub struct CompileOnceArgs {
     )]
     pub inputs: Vec<(String, String)>,
 
-    /// The document's creation date formatted as a UNIX timestamp (in seconds).
+    /// Configure the document's creation date formatted as a UNIX timestamp
+    /// (in seconds).
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
     #[clap(
@@ -97,13 +114,14 @@ pub struct CompileOnceArgs {
     )]
     pub creation_timestamp: Option<i64>,
 
-    /// One (or multiple comma-separated) PDF standards that Typst will enforce
-    /// conformance with.
+    /// Specify the PDF standards that Typst will enforce conformance with.
+    ///
+    /// If multiple standards are specified, they are separated by commas.
     #[arg(long = "pdf-standard", value_delimiter = ',')]
     pub pdf_standard: Vec<PdfStandard>,
 
-    /// Path to CA certificate file for network access, especially for
-    /// downloading typst packages.
+    /// Specify the path to CA certificate file for network access, especially
+    /// for downloading typst packages.
     #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
     pub cert: Option<PathBuf>,
 }
@@ -227,7 +245,7 @@ macro_rules! display_possible_values {
     };
 }
 
-/// When to export an output file.
+/// Configure when to run a task.
 ///
 /// By default, a `tinymist compile` only provides input information and
 /// doesn't change the `when` field. However, you can still specify a `when`
@@ -269,7 +287,7 @@ impl TaskWhen {
 
 display_possible_values!(TaskWhen);
 
-/// Which format to use for the generated output file.
+/// Configure the format of the output file.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 pub enum OutputFormat {
     /// Export to PDF.
@@ -284,7 +302,7 @@ pub enum OutputFormat {
 
 display_possible_values!(OutputFormat);
 
-/// Specifies the current export target.
+/// Configure the current export target.
 ///
 /// The design of this configuration is not yet finalized and for this reason it
 /// is guarded behind the html feature. Visit the HTML documentation page for

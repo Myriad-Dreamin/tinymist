@@ -10,6 +10,26 @@
 
 #show: book-page.with(title: title)
 
+#if is-md-target {
+  let image(src, alt: none) = html.elem("img", attrs: (src: src, alt: alt))
+  link(
+    "https://github.com/Myriad-Dreamin/tinymist/blob/main/LICENSE",
+    image("https://img.shields.io/github/license/Myriad-Dreamin/tinymist", alt: "GitHub license"),
+  )
+  link("https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml", image(
+    "https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml/badge.svg?event=push",
+    alt: "Actions status",
+  ))
+  link("https://myriad-dreamin.github.io/tinymist/", image(
+    "https://img.shields.io/badge/view-documentation-blue",
+    alt: "Documentation",
+  ))
+  link("https://deepwiki.com/Myriad-Dreamin/tinymist", image(
+    "https://deepwiki.com/badge.svg",
+    alt: "Ask DeepWiki",
+  ))
+}
+
 Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it #ruby[微][wēi][霭][ǎi] in Chinese.
 
 It contains:

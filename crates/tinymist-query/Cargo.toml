@@ -22,7 +22,6 @@ dirs.workspace = true
 ena.workspace = true
 ecow.workspace = true
 hayagriva.workspace = true
-if_chain.workspace = true
 itertools.workspace = true
 indexmap.workspace = true
 log.workspace = true
@@ -70,6 +69,7 @@ hex = { version = "0.4" }
 
 [features]
 local-registry = ["tinymist-world/system"]
+system = ["tinymist-project/system"]
 
 [lints]
 workspace = true

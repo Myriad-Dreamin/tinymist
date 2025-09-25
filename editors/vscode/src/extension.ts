@@ -13,7 +13,7 @@ import * as path from "path";
 import { loadTinymistConfig } from "./config";
 import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
-import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { SymbolViewProvider } from "./features/tool/views";
 import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";

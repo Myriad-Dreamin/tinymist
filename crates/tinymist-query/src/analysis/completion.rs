@@ -5,7 +5,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
 use ecow::{EcoString, eco_format};
-use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
@@ -300,10 +299,10 @@ impl<'a> CompletionCursor<'a> {
     /// Gets the LSP range of a given range with caching.
     fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
         // self.ctx.to_lsp_range(rng, &self.source)
-        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
-            if *last_rng == rng {
-                return *last_lsp_rng;
-            }
+        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair
+            && *last_rng == rng
+        {
+            return *last_lsp_rng;
         }
 
         let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
