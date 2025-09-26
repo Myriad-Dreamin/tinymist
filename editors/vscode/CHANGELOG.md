@@ -9,6 +9,27 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.26 - [2025-09-26]
+
+### Code Analysis
+
+* (Fix) Corrected the lexical hierarchy of comment group by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2116
+* Generating lint warning for unknown math variables by @jo3-l in https://github.com/Myriad-Dreamin/tinymist/pull/2065
+
+### Folding Range
+
+* (Fix) Corrected `parent_last_loc` for heading children in folding ranges by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2123
+
+### Preview
+
+* (Fix) Extending origin check for vscode servers by @AllanChain in https://github.com/Myriad-Dreamin/tinymist/pull/2106
+
+### Misc
+
+* Updated toml-edit-js by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2125
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.26...v0.13.28
+
 ## v0.13.26 - [2025-09-13]
 
 ### CLI
