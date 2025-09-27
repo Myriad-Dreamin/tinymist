@@ -57,7 +57,7 @@ pub struct KnownIssues {
 impl KnownIssues {
     /// Collects known lint issues from the given compiler diagnostics.
     pub fn from_compiler_diagnostics<'a>(
-        diags: impl Iterator<Item = &'a SourceDiagnostic> + Clone,
+        diags: impl Iterator<Item = &'a SourceDiagnostic>,
     ) -> Self {
         let mut unknown_vars = Vec::default();
         for diag in diags {

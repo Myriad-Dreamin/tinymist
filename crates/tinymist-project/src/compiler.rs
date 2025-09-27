@@ -114,7 +114,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     }
 
     /// Returns the diagnostics.
-    pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> + Clone {
+    pub fn diagnostics(&self) -> impl Iterator<Item = &typst::diag::SourceDiagnostic> {
         self.diag.diagnostics()
     }
 
