@@ -15,9 +15,9 @@ impl SemanticRequest for CheckRequest {
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let worker = DiagWorker::new(ctx);
-        let compiler_diags = || self.snap.diagnostics();
+        let compiler_diags = self.snap.diagnostics();
 
-        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags());
-        Some(worker.check(&known_issues).convert_all(compiler_diags()))
+        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
+        Some(worker.check(&known_issues).convert_all(compiler_diags))
     }
 }
