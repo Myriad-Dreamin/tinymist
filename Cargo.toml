@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.28-rc1"
+version = "0.13.28-rc2"
 edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
@@ -200,16 +200,16 @@ typst-shim = { path = "./crates/typst-shim", version = "0.13.24" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.13.28-rc1" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.28-rc1", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.28-rc1" }
-tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.13.28-rc1" }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.28-rc1" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.28-rc1" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.28-rc1" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.28-rc1" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.13.28-rc1" }
-typlite = { path = "./crates/typlite", version = "0.13.28-rc1", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.13.28-rc2" }
+tinymist = { path = "./crates/tinymist/", version = "0.13.28-rc2", default-features = false }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.28-rc2" }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.13.28-rc2" }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.28-rc2" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.28-rc2" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.28-rc2" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.28-rc2" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.13.28-rc2" }
+typlite = { path = "./crates/typlite", version = "0.13.28-rc2", default-features = false }
 
 [profile.dev.package.insta]
 opt-level = 3
