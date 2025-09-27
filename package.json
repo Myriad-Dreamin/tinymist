@@ -17,6 +17,8 @@
     "fmt": "cargo fmt --all && npx prettier --write tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
     "fmt:check": "cargo fmt --check --all && prettier --check tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
     "prelaunch:vscode": "node scripts/build.mjs prelaunch:vscode",
+    "prelaunch:vscode-release": "node scripts/build.mjs prelaunch:vscode-release",
+    "install:vscode": "node scripts/build.mjs install:vscode",
     "build:lsp:debug": "node scripts/build.mjs build:lsp:debug",
     "build:editor-tools": "node scripts/build.mjs build:editor-tools",
     "build:preview": "node scripts/build.mjs build:preview",
