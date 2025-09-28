@@ -9,20 +9,24 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.13.28 - [2025-09-26]
+## v0.13.28 - [2025-09-29]
 
 ### Code Analysis
 
 * (Fix) Corrected the lexical hierarchy of comment group by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2116
+  * Fixed issue that "Symbols list was incomplete" (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2021).
 * Generating lint warning for unknown math variables by @jo3-l in https://github.com/Myriad-Dreamin/tinymist/pull/2065
+  * To enable quick-fixes all "add spaces separating letters in unknown math var" once (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2062).
 
 ### Folding Range
 
 * (Fix) Corrected `parent_last_loc` for heading children in folding ranges by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2123
+  * Fixed issue that "Headings before lower-level headings are not foldable" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/1796)
 
 ### Preview
 
 * (Fix) Extending origin check for vscode servers by @AllanChain in https://github.com/Myriad-Dreamin/tinymist/pull/2106
+  * Fixed issue that "Cannot connect to websocket for preview on code-servers" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/625)
 
 ### Misc
 
