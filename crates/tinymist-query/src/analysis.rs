@@ -23,6 +23,7 @@ pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
+use tinymist_std::error::WithContextUntyped;
 mod post_tyck;
 mod tyck;
 pub(crate) use crate::ty::*;
@@ -39,8 +40,8 @@ use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
 use tinymist_std::{Result, bail};
-use tinymist_world::{EntryReader, TaskInputs};
-use typst::diag::{FileError, FileResult};
+use tinymist_world::{EntryReader, EntryState, TaskInputs};
+use typst::diag::{FileError, FileResult, StrResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
@@ -130,6 +131,36 @@ impl LspQuerySnapshot {
 
         let mut ctx = self.analysis.enter_(world, self.rev_lock);
         Ok(f(&mut ctx))
+    }
+
+    /// Checks within package
+    pub fn run_within_package<T>(
+        self,
+        info: &crate::package::PackageInfo,
+        f: impl FnOnce(&mut LocalContextGuard) -> Result<T> + Send + Sync,
+    ) -> Result<T> {
+        let world = self.world();
+
+        let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
+            let toml_id = crate::package::get_manifest_id(info)?;
+            let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
+            let pkg_root = toml_path
+                .parent()
+                .ok_or_else(|| eco_format!("cannot get package root (parent of {toml_path:?})"))?;
+
+            let manifest = crate::package::get_manifest(world, toml_id)?;
+            let entry_point = toml_id.join(&manifest.package.entrypoint);
+
+            Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
+        });
+        let entry = entry.context_ut("resolve package entry")?;
+
+        let snap = self.task(TaskInputs {
+            entry: Some(entry),
+            inputs: None,
+        });
+
+        snap.run_analysis(f)?
     }
 }
 

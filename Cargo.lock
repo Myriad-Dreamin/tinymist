@@ -4367,25 +4367,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinymist-index"
-version = "0.13.22"
-dependencies = [
- "base64",
- "comemo",
- "ecow",
- "insta",
- "parking_lot",
- "serde",
- "serde_json",
- "tinymist-analysis",
- "tinymist-query",
- "tinymist-std",
- "tinymist-world",
- "typst",
- "typst-library",
-]
-
-[[package]]
 name = "tinymist-l10n"
 version = "0.13.24"
 dependencies = [
