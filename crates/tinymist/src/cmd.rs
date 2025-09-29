@@ -17,7 +17,6 @@ use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportMarkdownTask;
-use typst::diag::StrResult;
 use typst::syntax::{LinkedNode, Source};
 
 use super::*;
@@ -25,7 +24,7 @@ use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
 
 #[cfg(feature = "system")]
-use typst::diag::EcoString;
+use typst::diag::{EcoString, StrResult};
 #[cfg(feature = "system")]
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
