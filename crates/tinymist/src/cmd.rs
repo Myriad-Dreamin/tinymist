@@ -17,16 +17,14 @@ use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportMarkdownTask;
-use typst::diag::{eco_format, StrResult};
 use typst::syntax::{LinkedNode, Source};
-use world::TaskInputs;
 
 use super::*;
 use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
 
 #[cfg(feature = "system")]
-use typst::diag::EcoString;
+use typst::diag::{EcoString, StrResult};
 #[cfg(feature = "system")]
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
@@ -729,6 +727,18 @@ impl ServerState {
         just_future(async move { serde_json::to_value(fut.await?).map_err(internal_error) })
     }
 
+    /// Get the lsif for package
+    pub fn resource_lsif_(
+        &mut self,
+        info: PackageInfo,
+    ) -> LspResult<impl Future<Output = LspResult<String>>> {
+        self.within_package(info.clone(), move |a| {
+            let knowledge = tinymist_query::index::knowledge(a)
+                .map_err(map_string_err("failed to generate docs"))?;
+            Ok(knowledge.bind(a.shared()).to_string())
+        })
+    }
+
     /// Get the all symbol docs
     pub fn resource_package_docs_(
         &mut self,
@@ -736,11 +746,9 @@ impl ServerState {
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
         self.within_package(info.clone(), move |a| {
             let doc = tinymist_query::docs::package_docs(a, &info)
-                .map_err(map_string_err("failed to generate docs"))
-                .map_err(internal_error)?;
+                .map_err(map_string_err("failed to generate docs"))?;
             tinymist_query::docs::package_docs_md(&doc)
                 .map_err(map_string_err("failed to generate docs"))
-                .map_err(internal_error)
         })
     }
 
@@ -752,7 +760,6 @@ impl ServerState {
         self.within_package(info.clone(), move |a| {
             tinymist_query::package::check_package(a, &info)
                 .map_err(map_string_err("failed to check package"))
-                .map_err(internal_error)
         })
     }
 
@@ -760,34 +767,10 @@ impl ServerState {
     pub fn within_package<T>(
         &mut self,
         info: PackageInfo,
-        f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
+        f: impl FnOnce(&mut LocalContextGuard) -> Result<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let snap = self.query_snapshot().map_err(internal_error)?;
-
-        Ok(async move {
-            let world = snap.world();
-
-            let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
-                let pkg_root = toml_path.parent().ok_or_else(|| {
-                    eco_format!("cannot get package root (parent of {toml_path:?})")
-                })?;
-
-                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
-                let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-                Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
-            });
-            let entry = entry.map_err(|e| internal_error(e.to_string()))?;
-
-            let snap = snap.task(TaskInputs {
-                entry: Some(entry),
-                inputs: None,
-            });
-
-            snap.run_analysis(f).map_err(internal_error)?
-        })
+        Ok(async move { snap.run_within_package(&info, f).map_err(internal_error) })
     }
 }
 
