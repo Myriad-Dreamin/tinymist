@@ -21,24 +21,21 @@ use std::{
 };
 
 use ecow::EcoVec;
+use tinymist_package::registry::PackageIndexEntry;
 use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };
 use typst::{
     Features, Library, World, WorldExt,
-    diag::{At, EcoString, FileError, FileResult, SourceResult, eco_format},
+    diag::{At, FileError, FileResult, SourceResult, eco_format},
     foundations::{Bytes, Datetime, Dict},
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
 };
 
-use crate::{
-    CompileSnapshot, MEMORY_MAIN_ENTRY,
-    package::{PackageRegistry, PackageSpec},
-    source::SourceDb,
-};
+use crate::{CompileSnapshot, MEMORY_MAIN_ENTRY, package::PackageRegistry, source::SourceDb};
 use crate::{
     WorldComputeGraph,
     parser::{
@@ -697,7 +694,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
     /// by enabling autocompletion for packages. Details about packages from the
     /// `@preview` namespace are available from
     /// `https://packages.typst.org/preview/index.json`.
-    pub fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    pub fn packages(&self) -> &[PackageIndexEntry] {
         self.registry.packages()
     }
 
