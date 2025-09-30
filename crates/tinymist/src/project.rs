@@ -17,8 +17,6 @@
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
 
-#![allow(missing_docs)]
-
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -308,7 +306,6 @@ impl ProjectInsStateExt {
         handler: &dyn CompileHandler<LspCompilerFeat, ProjectInsStateExt>,
     ) -> bool {
         let Some(last_compilation) = self.last_compilation.as_ref() else {
-            log::info!("skipping emit bcuz there's no last_compilation");
             return false;
         };
 
@@ -320,7 +317,6 @@ impl ProjectInsStateExt {
 
         let pending_reasons = self.pending_reasons.exclude(self.emitted_reasons);
         if !pending_reasons.any() {
-            log::info!("skipping emit bcuz there's no reason");
             return false;
         }
         self.emitted_reasons.merge(self.pending_reasons);
