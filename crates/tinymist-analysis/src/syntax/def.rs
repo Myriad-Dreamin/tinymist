@@ -247,6 +247,16 @@ impl Expr {
             _ => self.span().id(),
         }
     }
+
+    /// Returns whether the expression is definitely defined.
+    pub fn is_defined(&self) -> bool {
+        match self {
+            Expr::Ref(refs) => refs.root.is_some() || refs.term.is_some(),
+            Expr::Decl(decl) => decl.is_def(),
+            // There are unsure cases, like `x.y`, which may be defined or not.
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Expr {

@@ -1,43 +1,25 @@
 import * as build from "./builders.mjs";
 
-if (process.argv.includes("build:l10n")) {
-  await build.buildL10n();
-}
+const kind = process.argv[2];
+const vector = {
+  "build:l10n": build.buildL10n,
+  "build:syntax": build.buildSyntax,
+  "build:preview": build.buildPreview,
+  "build:editor-tools": build.buildEditorTools,
+  "build:vscode:web": build.buildTinymistVscodeWeb,
+  "build:vscode:system": build.buildTinymistVscodeSystem,
+  "build:lsp:debug": () => build.buildLspBinary("debug"),
+  "prelaunch:vscode": () => build.prelaunchVscode("debug"),
+  "prelaunch:vscode-release": () => build.prelaunchVscode("release"),
+  "install:vscode": () => build.installVscode("release"),
+  "build:web:base": build.buildWebLspBinaryBase,
+  "build:web": build.buildTinymistVscodeWeb,
+};
 
-if (process.argv.includes("build:syntax")) {
-  await build.buildSyntax();
+const fn = vector[kind];
+if (fn) {
+  await fn();
+} else {
+  console.error(`Unknown command: ${kind}`);
+  process.exit(1);
 }
-
-if (process.argv.includes("build:preview")) {
-  await build.buildPreview();
-}
-
-if (process.argv.includes("build:editor-tools")) {
-  await build.buildEditorTools();
-}
-
-if (process.argv.includes("build:vscode:web")) {
-  await build.buildTinymistVscodeWeb();
-}
-
-if (process.argv.includes("build:vscode:system")) {
-  await build.buildTinymistVscodeSystem();
-}
-
-if (process.argv.includes("build:lsp:debug")) {
-  await build.buildDebugLspBinary();
-}
-
-if (process.argv.includes("prelaunch:vscode")) {
-  await build.prelaunchVscode();
-}
-
-if (process.argv.includes("build:web:base")) {
-  await build.buildWebLspBinaryBase();
-}
-
-if (process.argv.includes("build:web")) {
-  await build.buildTinymistVscodeWeb();
-}
-
-// build:editor-tools

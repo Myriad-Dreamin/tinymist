@@ -9,6 +9,60 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.28 - [2025-09-29]
+
+### Code Analysis
+
+* (Fix) Corrected the lexical hierarchy of comment group by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2116
+  * Fixed issue that "Symbols list was incomplete" (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2021).
+* Generating lint warning for unknown math variables by @jo3-l in https://github.com/Myriad-Dreamin/tinymist/pull/2065
+  * To enable quick-fixes all "add spaces separating letters in unknown math var" once (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2062).
+
+### Folding Range
+
+* (Fix) Corrected `parent_last_loc` for heading children in folding ranges by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2123
+  * Fixed issue that "Headings before lower-level headings are not foldable" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/1796)
+
+### Preview
+
+* (Fix) Extending origin check for vscode servers by @AllanChain in https://github.com/Myriad-Dreamin/tinymist/pull/2106
+  * Fixed issue that "Cannot connect to websocket for preview on code-servers" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/625)
+
+### Misc
+
+* Updated toml-edit-js by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2125
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.26...v0.13.28
+
+## v0.13.26 - [2025-09-13]
+
+### CLI
+
+* Enhanced CLI and argument documentation in https://github.com/Myriad-Dreamin/tinymist/pull/2072
+
+### Server
+
+* (Fix) Invalidated cached snapshot after compile in https://github.com/Myriad-Dreamin/tinymist/pull/2057
+* Made watch access model in https://github.com/Myriad-Dreamin/tinymist/pull/2067
+* Added missing server info in https://github.com/Myriad-Dreamin/tinymist/pull/2093
+
+### Code Action
+
+* Offered quickfix to add spaces separating letters in unknown math var in https://github.com/Myriad-Dreamin/tinymist/pull/2062 and https://github.com/Myriad-Dreamin/tinymist/pull/2096
+
+* Executed cpu tasks in place in wasm in https://github.com/Myriad-Dreamin/tinymist/pull/2086
+
+### Preview
+
+* Preview page removed extra space and did not invert background in https://github.com/Myriad-Dreamin/tinymist/pull/2094
+
+### Editor Tools
+
+* Refactored and Optimized appearance of editor tools by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2088
+* Used card/button styles from vscode themes in https://github.com/Myriad-Dreamin/tinymist/pull/2100
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.24...v0.13.26
+
 ## v0.13.24 - [2025-08-26]
 
 ### Server

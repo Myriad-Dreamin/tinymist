@@ -3,8 +3,8 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
+use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
-use tinymist_std::typst::TypstDocument;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
@@ -15,16 +15,23 @@ use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ResourceSymbolResponse {
-    symbols: BTreeMap<String, ResourceSymbolItem>,
-    font_selects: Vec<FontItem>,
-    glyph_defs: String,
+    symbols: Vec<ResourceSymbolItem>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ResourceSymbolItem {
+    id: String,
     category: SymCategory,
     unicode: u32,
-    glyphs: Vec<ResourceGlyphDesc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    glyph: Option<String>,
+}
+
+#[derive(Debug)]
+struct SymbolItem {
+    category: SymCategory,
+    unicode: u32,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -59,32 +66,7 @@ enum SymCategory {
     DoubleStruck,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ResourceGlyphDesc {
-    font_index: u32,
-    x_advance: Option<u16>,
-    y_advance: Option<u16>,
-    x_min: Option<i16>,
-    x_max: Option<i16>,
-    y_min: Option<i16>,
-    y_max: Option<i16>,
-    name: Option<String>,
-    shape: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FontItem {
-    family: String,
-    cap_height: f32,
-    ascender: f32,
-    descender: f32,
-    units_per_em: f32,
-    // vertical: bool,
-}
-
-type ResourceSymbolMap = BTreeMap<String, ResourceSymbolItem>;
+type ResourceSymbolMap = BTreeMap<String, SymbolItem>;
 
 static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
     use SymCategory::*;
@@ -950,155 +932,13 @@ static CAT_MAP: LazyLock<HashMap<&str, SymCategory>> = LazyLock::new(|| {
 impl ServerState {
     /// Get the all valid symbols
     pub async fn get_symbol_resources(snap: LspComputeGraph) -> LspResult<JsonValue> {
-        let mut symbols = ResourceSymbolMap::new();
+        let symbols = collect_symbols(&snap)?;
 
-        let std = snap
-            .library()
-            .std
-            .read()
-            .scope()
-            .ok_or_else(|| internal_error("cannot get std scope"))?;
-        let sym = std
-            .get("sym")
-            .ok_or_else(|| internal_error("cannot get sym"))?;
+        let glyph_mapping = render_symbols(&snap, &symbols)?;
 
-        if let Some(scope) = sym.read().scope() {
-            populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
-        }
-        // todo: disabling emoji module, as there is performant issue on emojis
-        // let _ = emoji;
-        // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
+        let symbols = render_glyphs(&symbols, &glyph_mapping)?;
 
-        const PRELUDE: &str = r#"#show math.equation: set text(font: (
-  "New Computer Modern Math",
-  "Latin Modern Math",
-  "STIX Two Math",
-  "Cambria Math",
-  "New Computer Modern",
-  "Cambria",
-))
-"#;
-
-        let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
-            use std::fmt::Write;
-            writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
-            o
-        });
-        log::debug!("math shaping text: {math_shaping_text}");
-
-        let symbols_ref = symbols.keys().cloned().collect::<Vec<_>>();
-
-        let font = {
-            let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
-
-            let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
-
-            let mut forked = snap.world().task(TaskInputs {
-                entry: Some(new_entry),
-                ..TaskInputs::default()
-            });
-            forked
-                .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
-                .map_err(|e| error_once!("cannot map shadow", err: e))
-                .map_err(internal_error)?;
-
-            let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
-                .output
-                .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
-                .map_err(internal_error)?;
-
-            log::debug!("sym doc: {sym_doc:?}");
-            Some(trait_symbol_fonts(
-                &TypstDocument::Paged(Arc::new(sym_doc)),
-                &symbols_ref,
-            ))
-        };
-
-        let mut glyph_def = String::new();
-
-        let mut collected_fonts = None;
-
-        if let Some(glyph_mapping) = font.clone() {
-            let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
-            let glyph_pass =
-                reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
-
-            let mut glyph_renderer = Svg::default();
-            let mut glyphs = vec![];
-
-            let font_collected = glyph_mapping
-                .values()
-                .map(|e| e.0.clone())
-                .collect::<std::collections::HashSet<_>>()
-                .into_iter()
-                .collect::<Vec<_>>();
-
-            let mut render_sym = |u| {
-                let (font, id) = glyph_mapping.get(u)?.clone();
-                let font_index = font_collected.iter().position(|e| e == &font).unwrap() as u32;
-
-                let width = font.ttf().glyph_hor_advance(id);
-                let height = font.ttf().glyph_ver_advance(id);
-                let bbox = font.ttf().glyph_bounding_box(id);
-
-                let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
-
-                let g_ref = GlyphRef {
-                    font_hash: font_index,
-                    glyph_idx: id.0 as u32,
-                };
-
-                glyphs.push((g_ref, glyph));
-
-                Some(ResourceGlyphDesc {
-                    font_index,
-                    x_advance: width,
-                    y_advance: height,
-                    x_min: bbox.map(|e| e.x_min),
-                    x_max: bbox.map(|e| e.x_max),
-                    y_min: bbox.map(|e| e.y_min),
-                    y_max: bbox.map(|e| e.y_max),
-                    name: font.ttf().glyph_name(id).map(|e| e.to_owned()),
-                    shape: Some(g_ref.as_svg_id("g")),
-                })
-            };
-
-            for (k, v) in symbols.iter_mut() {
-                let Some(desc) = render_sym(k) else {
-                    continue;
-                };
-
-                v.glyphs.push(desc);
-            }
-
-            let mut svg = vec![];
-
-            // attach the glyph defs
-            svg.push(r#"<defs class="glyph">"#.into());
-            svg.extend(glyph_renderer.render_glyphs(glyphs.iter().map(|(id, item)| (*id, item))));
-            svg.push("</defs>".into());
-
-            glyph_def = SvgText::join(svg);
-
-            collected_fonts = Some(font_collected);
-        }
-
-        let resp = ResourceSymbolResponse {
-            symbols,
-            font_selects: collected_fonts
-                .map(|e| e.into_iter())
-                .into_iter()
-                .flatten()
-                .map(|e| FontItem {
-                    family: e.info().family.clone(),
-                    cap_height: e.metrics().cap_height.get() as f32,
-                    ascender: e.metrics().ascender.get() as f32,
-                    descender: e.metrics().descender.get() as f32,
-                    units_per_em: e.metrics().units_per_em as f32,
-                })
-                .collect::<Vec<_>>(),
-            glyph_defs: glyph_def,
-        };
+        let resp = ResourceSymbolResponse { symbols };
 
         serde_json::to_value(resp)
             .context("cannot serialize response")
@@ -1106,82 +946,42 @@ impl ServerState {
     }
 }
 
-fn trait_symbol_fonts(
-    doc: &TypstDocument,
-    symbols: &[String],
-) -> HashMap<String, (TypstFont, GlyphId)> {
-    use typst::layout::Frame;
-    use typst::layout::FrameItem;
+fn collect_symbols(snap: &LspComputeGraph) -> LspResult<BTreeMap<String, SymbolItem>> {
+    let mut symbols = ResourceSymbolMap::new();
 
-    let mut worker = Worker {
-        symbols,
-        active: "",
-        res: HashMap::new(),
-    };
-    worker.work(doc);
-    let res = worker.res;
+    let std = snap
+        .library()
+        .std
+        .read()
+        .scope()
+        .ok_or_else(|| internal_error("cannot get std scope"))?;
+    let sym = std
+        .get("sym")
+        .ok_or_else(|| internal_error("cannot get sym"))?;
 
-    struct Worker<'a> {
-        symbols: &'a [String],
-        active: &'a str,
-        res: HashMap<String, (TypstFont, GlyphId)>,
+    if let Some(scope) = sym.read().scope() {
+        populate_scope(scope, "sym", SymCategory::Misc, &mut symbols);
     }
+    // todo: disabling emoji module, as there is performant issue on emojis
+    // let _ = emoji;
+    // populate_scope(emoji().scope(), "emoji", SymCategory::Emoji, &mut symbols);
 
-    impl Worker<'_> {
-        fn work(&mut self, doc: &TypstDocument) {
-            match doc {
-                TypstDocument::Paged(paged_doc) => {
-                    for (pg, s) in paged_doc.pages.iter().zip(self.symbols.iter()) {
-                        self.active = s;
-                        self.work_frame(&pg.frame);
-                    }
-                }
-                // todo: handle html
-                TypstDocument::Html(..) => {}
-            }
-        }
+    Ok(symbols)
+}
 
-        fn work_frame(&mut self, k: &Frame) {
-            for (_, item) in k.items() {
-                let text = match item {
-                    FrameItem::Group(g) => {
-                        self.work_frame(&g.frame);
-                        continue;
-                    }
-                    FrameItem::Text(text) => text,
-                    FrameItem::Shape(_, _)
-                    | FrameItem::Image(_, _, _)
-                    | FrameItem::Link(_, _)
-                    | FrameItem::Tag(_) => continue,
-                };
+fn populate_scope(
+    sym: &Scope,
+    mod_name: &str,
+    fallback_cat: SymCategory,
+    out: &mut ResourceSymbolMap,
+) {
+    for (k, b) in sym.iter() {
+        let Value::Symbol(sym) = b.read() else {
+            continue;
+        };
 
-                let font = text.font.clone();
-                for g in &text.glyphs {
-                    let g_text = &text.text[g.range()];
-                    let chars_count = g_text.chars().count();
-                    if chars_count > 1 {
-                        log::warn!("multi char glyph: {g_text}");
-                        continue;
-                    }
-                    let Some(ch) = g_text.chars().next() else {
-                        continue;
-                    };
-                    if ch.is_whitespace() {
-                        continue;
-                    }
-                    log::debug!(
-                        "glyph: {active} => {ch} ({chc:x})",
-                        active = self.active,
-                        chc = ch as u32
-                    );
-                    self.res
-                        .insert(self.active.to_owned(), (font.clone(), GlyphId(g.id)));
-                }
-            }
-        }
+        populate(sym, mod_name, k, fallback_cat, out)
     }
-
-    res
 }
 
 fn populate(
@@ -1207,26 +1007,188 @@ fn populate(
         let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
         out.insert(
             name,
-            ResourceSymbolItem {
+            SymbolItem {
                 category,
                 unicode: ch as u32,
-                glyphs: vec![],
             },
         );
     }
 }
 
-fn populate_scope(
-    sym: &Scope,
-    mod_name: &str,
-    fallback_cat: SymCategory,
-    out: &mut ResourceSymbolMap,
-) {
-    for (k, b) in sym.iter() {
-        let Value::Symbol(sym) = b.read() else {
-            continue;
-        };
+fn render_symbols(
+    snap: &LspComputeGraph,
+    symbols: &BTreeMap<String, SymbolItem>,
+) -> LspResult<HashMap<String, (TypstFont, GlyphId)>> {
+    const PRELUDE: &str = r#"#show math.equation: set text(font: (
+  "New Computer Modern Math",
+  "Latin Modern Math",
+  "STIX Two Math",
+  "Cambria Math",
+  "New Computer Modern",
+  "Cambria",
+))
+"#;
 
-        populate(sym, mod_name, k, fallback_cat, out)
+    let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
+        use std::fmt::Write;
+        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+        o
+    });
+    log::debug!("math shaping text: {math_shaping_text}");
+
+    let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
+
+    let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
+
+    let mut forked = snap.world().task(TaskInputs {
+        entry: Some(new_entry),
+        ..TaskInputs::default()
+    });
+    forked
+        .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
+        .map_err(|e| error_once!("cannot map shadow", err: e))
+        .map_err(internal_error)?;
+
+    let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
+        .output
+        .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
+        .map_err(internal_error)?;
+
+    log::debug!("sym doc: {sym_doc:?}");
+
+    let res = extract_rendered_symbols(&sym_doc, symbols.keys());
+
+    Ok(res)
+}
+
+fn extract_rendered_symbols<'a>(
+    doc: &TypstPagedDocument,
+    symbols: impl Iterator<Item = &'a String>,
+) -> HashMap<String, (TypstFont, GlyphId)> {
+    use typst::layout::Frame;
+    use typst::layout::FrameItem;
+
+    struct Worker {
+        res: HashMap<String, (TypstFont, GlyphId)>,
     }
+
+    impl Worker {
+        fn work<'a>(
+            &mut self,
+            paged_doc: &TypstPagedDocument,
+            symbols: impl Iterator<Item = &'a String>,
+        ) {
+            for (pg, s) in paged_doc.pages.iter().zip(symbols) {
+                self.work_frame(&pg.frame, s);
+            }
+        }
+
+        fn work_frame(&mut self, k: &Frame, active: &str) {
+            for (_, item) in k.items() {
+                let text = match item {
+                    FrameItem::Group(g) => {
+                        self.work_frame(&g.frame, active);
+                        continue;
+                    }
+                    FrameItem::Text(text) => text,
+                    _ => continue,
+                };
+
+                let font = text.font.clone();
+                for g in &text.glyphs {
+                    let g_text = &text.text[g.range()];
+                    let chars_count = g_text.chars().count();
+                    if chars_count > 1 {
+                        log::warn!("multi char glyph: {g_text}");
+                        continue;
+                    }
+                    let Some(ch) = g_text.chars().next() else {
+                        continue;
+                    };
+                    if ch.is_whitespace() {
+                        continue;
+                    }
+                    log::debug!("glyph: {active} => {ch} ({chc:x})", chc = ch as u32);
+                    self.res
+                        .insert(active.to_owned(), (font.clone(), GlyphId(g.id)));
+                }
+            }
+        }
+    }
+
+    let mut worker = Worker {
+        res: HashMap::new(),
+    };
+    worker.work(doc, symbols);
+    worker.res
+}
+
+fn render_glyphs(
+    symbols: &BTreeMap<String, SymbolItem>,
+    glyph_mapping: &HashMap<String, (TypstFont, GlyphId)>,
+) -> LspResult<Vec<ResourceSymbolItem>> {
+    let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
+    let glyph_pass = reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
+
+    let mut builder = SvgGlyphBuilder::new();
+
+    let mut render_sym = |u| {
+        let (font, id) = glyph_mapping.get(u)?.clone();
+
+        let glyph = glyph_pass.must_flat_glyph(&GlyphItem::Raw(font.clone(), id))?;
+
+        let rendered = builder.render_glyph("", &glyph)?; // the glyph_id does not matter here
+
+        Some(create_display_svg(&font, id, &rendered))
+    };
+
+    let rendered_symbols = symbols
+        .iter()
+        .map(|(k, v)| ResourceSymbolItem {
+            id: k.clone(),
+            category: v.category,
+            unicode: v.unicode,
+            glyph: render_sym(k),
+        })
+        .collect();
+
+    Ok(rendered_symbols)
+}
+
+fn create_display_svg(font: &TypstFont, gid: GlyphId, svg_path: &str) -> String {
+    let face = font.ttf();
+
+    let (x_min, x_max) = face
+        .glyph_bounding_box(gid)
+        .map(|bbox| (bbox.x_min as f32, bbox.x_max as f32))
+        .unwrap_or_default();
+
+    // Font-wide metrics
+    let units_per_em = font.metrics().units_per_em as f32;
+    let ascender = font.metrics().ascender.get() as f32 * units_per_em;
+    let descender = font.metrics().descender.get() as f32 * units_per_em; // usually negative
+
+    // Horizontal advance (fallback to em)
+    let x_advance = face
+        .glyph_hor_advance(gid)
+        .map(f32::from)
+        .unwrap_or(units_per_em);
+
+    // Start viewBox.x at left-most ink or 0, whichever is smaller (to include left overhang)
+    let view_x = x_min.min(0.0);
+
+    // Start view width as the advance; enlarge if ink extends past that
+    let view_w = x_advance.max(x_max - view_x);
+
+    // Vertical viewBox uses font ascender/descent so baseline is at y=0
+    let view_y = -ascender;
+    let view_h = ascender - descender; // ascender - (negative descender) -> total height
+
+    let svg_content = format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view_x} {view_y} {view_w} {view_h}" preserveAspectRatio="xMidYMid meet">
+<g transform="scale(1 -1)">{svg_path}</g>
+</svg>"#
+    );
+
+    svg_content
 }

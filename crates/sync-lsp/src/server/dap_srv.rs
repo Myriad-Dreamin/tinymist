@@ -35,7 +35,7 @@ where
 
     /// Registers a raw request handler that handlers a kind of untyped lsp
     /// request.
-    pub fn with_raw_request<R: dapts::IRequest>(
+    pub fn with_raw_request<R: IRequest>(
         mut self,
         handler: RawHandler<Args::S, JsonValue>,
     ) -> Self {
@@ -46,7 +46,7 @@ where
     // todo: unsafe typed
     /// Registers an raw request handler that handlers a kind of typed lsp
     /// request.
-    pub fn with_request_<R: dapts::IRequest>(
+    pub fn with_request_<R: IRequest>(
         mut self,
         handler: fn(&mut Args::S, R::Arguments) -> ScheduleResult,
     ) -> Self {
@@ -58,7 +58,7 @@ where
     }
 
     /// Registers a typed request handler.
-    pub fn with_request<R: dapts::IRequest>(
+    pub fn with_request<R: IRequest>(
         mut self,
         handler: AsyncHandler<Args::S, R::Arguments, R::Response>,
     ) -> Self {
@@ -70,6 +70,7 @@ where
     }
 }
 
+#[cfg(feature = "system")]
 impl<Args: Initializer> LsDriver<DapMessage, Args>
 where
     Args::S: 'static,
@@ -81,7 +82,6 @@ where
     ///
     /// See [`transport::MirrorArgs`] for information about the record-replay
     /// feature.
-    #[cfg(feature = "system")]
     pub fn start(
         &mut self,
         inbox: TConnectionRx<DapMessage>,
@@ -115,7 +115,6 @@ where
     }
 
     /// Starts the debug adaptor on the given connection.
-    #[cfg(feature = "system")]
     pub fn start_(&mut self, inbox: TConnectionRx<DapMessage>) -> anyhow::Result<()> {
         use EventOrMessage::*;
 

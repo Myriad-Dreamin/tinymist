@@ -1,0 +1,67 @@
+---
+source: crates/tinymist-query/src/folding_range.rs
+expression: "JsonRepr::new_pure(json!({ \"false\": result_false, \"true\": result_true, }))"
+input_file: crates/tinymist-query/src/fixtures/folding_range/fold-heading-with-siblings.typ
+---
+{
+ "false": [
+  {
+   "collapsedText": "",
+   "endCharacter": 57,
+   "endLine": 0,
+   "kind": "comment",
+   "startCharacter": 0,
+   "startLine": 0
+  },
+  {
+   "collapsedText": "Heading 1.a",
+   "endCharacter": 14,
+   "endLine": 4,
+   "startCharacter": 3,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "Heading 1.b",
+   "endCharacter": 14,
+   "endLine": 6,
+   "startCharacter": 3,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "Heading 1",
+   "endCharacter": 11,
+   "endLine": 6,
+   "startCharacter": 2,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "Heading 2",
+   "endCharacter": 11,
+   "endLine": 8,
+   "startCharacter": 2,
+   "startLine": 7
+  }
+ ],
+ "true": [
+  {
+   "collapsedText": "Heading 1.a",
+   "endLine": 4,
+   "startLine": 3
+  },
+  {
+   "collapsedText": "Heading 1.b",
+   "endLine": 6,
+   "startLine": 5
+  },
+  {
+   "collapsedText": "Heading 1",
+   "endLine": 6,
+   "startLine": 1
+  },
+  {
+   "collapsedText": "Heading 2",
+   "endLine": 8,
+   "startLine": 7
+  }
+ ]
+}
