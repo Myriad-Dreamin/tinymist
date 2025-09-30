@@ -26,7 +26,7 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::hash::FxHashMap;
-#[cfg(not(feature = "system"))]
+#[cfg(all(not(feature = "system"), feature = "web"))]
 use sync_ls::TransportHost;
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
@@ -91,22 +91,6 @@ impl ServerState {
         self.preview.stop_all();
         let editor_tx = self.editor_tx.clone();
 
-        #[cfg(not(feature = "system"))]
-        let new_project =
-            if let TransportHost::Js { sender, .. } = self.client.clone().to_untyped().sender {
-                Self::project(
-                    &self.config,
-                    editor_tx,
-                    self.client.clone(),
-                    #[cfg(feature = "preview")]
-                    self.preview.watchers.clone(),
-                    sender.resolve_fn,
-                )
-            } else {
-                panic!("Expected Js TransportHost")
-            };
-
-        #[cfg(feature = "system")]
         let new_project = Self::project(
             &self.config,
             editor_tx,
@@ -114,6 +98,14 @@ impl ServerState {
             self.dep_tx.clone(),
             #[cfg(feature = "preview")]
             self.preview.watchers.clone(),
+            #[cfg(all(not(feature = "system"), feature = "web"))]
+            if let sync_ls::TransportHost::Js { sender, .. } =
+                self.client.clone().to_untyped().sender
+            {
+                sender.resolve_fn
+            } else {
+                panic!("Expected Js TransportHost")
+            },
         );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
@@ -157,7 +149,7 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
-        #[cfg(not(feature = "system"))] resolve_fn: js_sys::Function,
+        #[cfg(all(not(feature = "system"), feature = "web"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -219,11 +211,10 @@ impl ServerState {
 
         let fonts = config.fonts();
 
-        #[cfg(not(feature = "system"))]
+        #[cfg(all(not(feature = "system"), feature = "web"))]
         let packages =
             LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
-
-        #[cfg(feature = "system")]
+        #[cfg(any(feature = "system", not(feature = "web")))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
 
         let creation_timestamp = config.creation_timestamp();

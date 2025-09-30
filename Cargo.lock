@@ -4162,6 +4162,7 @@ dependencies = [
  "reflexo-vec2svg",
  "rpds",
  "serde",
+ "serde-wasm-bindgen",
  "serde_json",
  "serde_yaml",
  "strum",
@@ -4195,6 +4196,7 @@ dependencies = [
  "vergen",
  "walkdir",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

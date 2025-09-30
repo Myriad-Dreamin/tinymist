@@ -4,9 +4,9 @@ use std::sync::Arc;
 use tinymist_std::ImmutPath;
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
-#[cfg(not(feature = "system"))]
-use tinymist_world::package::registry::ProxyContext;
 use tinymist_world::package::RegistryPathMapper;
+#[cfg(all(not(feature = "system"), feature = "web"))]
+use tinymist_world::package::registry::ProxyContext;
 use tinymist_world::vfs::Vfs;
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
@@ -30,12 +30,11 @@ impl CompilerFeat for LspCompilerFeat {
     type FontResolver = FontResolverImpl;
     /// It accesses a physical file system.
     type AccessModel = DynAccessModel;
-    /// It performs native HTTP requests for fetching package data.
-    #[cfg(feature = "system")]
-    type Registry = tinymist_world::package::registry::HttpRegistry;
-    // todo: registry in browser
-    #[cfg(not(feature = "system"))]
-    type Registry = tinymist_world::package::registry::JsRegistry;
+    /// It performs:
+    /// - native HTTP requests for fetching package data in system environment
+    /// - js proxied requests to browser environment
+    /// - no package registry in other environments
+    type Registry = LspRegistry;
 }
 
 /// LSP universe that spawns LSP worlds.
@@ -213,10 +212,12 @@ impl WorldProvider for (crate::ProjectInput, ImmutPath) {
     }
 }
 
-#[cfg(not(feature = "system"))]
+#[cfg(all(not(feature = "system"), feature = "web"))]
 type LspRegistry = tinymist_world::package::registry::JsRegistry;
 #[cfg(feature = "system")]
 type LspRegistry = tinymist_world::package::registry::HttpRegistry;
+#[cfg(not(any(feature = "system", feature = "web")))]
+type LspRegistry = tinymist_world::package::registry::DummyRegistry;
 
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;
@@ -320,7 +321,7 @@ impl LspUniverseBuilder {
     }
 
     /// Resolves package registry from given options.
-    #[cfg(not(feature = "system"))]
+    #[cfg(all(not(feature = "system"), feature = "web"))]
     pub fn resolve_package(
         _cert_path: Option<ImmutPath>,
         _args: Option<&CompilePackageArgs>,
@@ -330,6 +331,15 @@ impl LspUniverseBuilder {
             context: ProxyContext::new(wasm_bindgen::JsValue::NULL),
             real_resolve_fn: resolve_fn,
         }
+    }
+
+    /// Resolves package registry from given options.
+    #[cfg(not(any(feature = "system", feature = "web")))]
+    pub fn resolve_package(
+        _cert_path: Option<ImmutPath>,
+        _args: Option<&CompilePackageArgs>,
+    ) -> tinymist_world::package::registry::DummyRegistry {
+        tinymist_world::package::registry::DummyRegistry
     }
 }
 
