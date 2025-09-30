@@ -26,8 +26,6 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use parking_lot::Mutex;
 use reflexo::hash::FxHashMap;
-#[cfg(all(not(feature = "system"), feature = "web"))]
-use sync_ls::TransportHost;
 use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
