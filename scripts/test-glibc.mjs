@@ -38,6 +38,6 @@ for (const version of versions) {
 
 console.log(maxMinor);
 
-if (maxMinor >= 35) {
-  throw new Error(`GLIBC version is greater than 2.35, got GLIBC_2.${maxMinor}`);
+if (maxMinor > 28) {
+  throw new Error(`GLIBC version is greater than 2.28, got GLIBC_2.${maxMinor}`);
 }
