@@ -96,6 +96,14 @@ impl ServerState {
             self.dep_tx.clone(),
             #[cfg(feature = "preview")]
             self.preview.watchers.clone(),
+            #[cfg(all(not(feature = "system"), feature = "web"))]
+            if let sync_ls::TransportHost::Js { sender, .. } =
+                self.client.clone().to_untyped().sender
+            {
+                sender.resolve_fn
+            } else {
+                panic!("Expected Js TransportHost")
+            },
         );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
@@ -139,6 +147,7 @@ impl ServerState {
         client: TypedLspClient<ServerState>,
         dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
+        #[cfg(all(not(feature = "system"), feature = "web"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -199,7 +208,13 @@ impl ServerState {
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         let fonts = config.fonts();
+
+        #[cfg(all(not(feature = "system"), feature = "web"))]
+        let packages =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
+        #[cfg(any(feature = "system", not(feature = "web")))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+
         let creation_timestamp = config.creation_timestamp();
         let verse = LspUniverseBuilder::build(
             entry,
