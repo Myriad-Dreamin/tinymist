@@ -275,19 +275,19 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "575b4b779c29bffc439513491ffbeb4ed917bcc7" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 
-typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "e1123242c62d3ca5da7fb4e7ec0a00bf2aafb614" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "8af51a65fa3ea2b210337c126fd800ca62a5ac7d" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
@@ -303,9 +303,9 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "8af51a6
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "0272834031acd7002413bf68b166dddcc7f7cdb5" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "0272834031acd7002413bf68b166dddcc7f7cdb5" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", rev = "0272834031acd7002413bf68b166dddcc7f7cdb5" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts/", branch = "nightly" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

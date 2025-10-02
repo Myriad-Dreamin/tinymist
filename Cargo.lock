@@ -3496,7 +3496,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=0272834031acd7002413bf68b166dddcc7f7cdb5#0272834031acd7002413bf68b166dddcc7f7cdb5"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#0272834031acd7002413bf68b166dddcc7f7cdb5"
 dependencies = [
  "base64",
  "bitvec",
@@ -3522,7 +3522,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=0272834031acd7002413bf68b166dddcc7f7cdb5#0272834031acd7002413bf68b166dddcc7f7cdb5"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#0272834031acd7002413bf68b166dddcc7f7cdb5"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -3554,7 +3554,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=0272834031acd7002413bf68b166dddcc7f7cdb5#0272834031acd7002413bf68b166dddcc7f7cdb5"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#0272834031acd7002413bf68b166dddcc7f7cdb5"
 dependencies = [
  "bitvec",
  "comemo",
@@ -3582,7 +3582,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.6.1-rc3"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=0272834031acd7002413bf68b166dddcc7f7cdb5#0272834031acd7002413bf68b166dddcc7f7cdb5"
+source = "git+https://github.com/ParaN3xus/typst.ts/?branch=nightly#0272834031acd7002413bf68b166dddcc7f7cdb5"
 dependencies = [
  "base64",
  "comemo",
@@ -5465,7 +5465,7 @@ dependencies = [
 [[package]]
 name = "typst"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "comemo",
  "ecow",
@@ -5484,7 +5484,7 @@ dependencies = [
 [[package]]
 name = "typst-ansi-hl"
 version = "0.4.0"
-source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?rev=e1123242c62d3ca5da7fb4e7ec0a00bf2aafb614#e1123242c62d3ca5da7fb4e7ec0a00bf2aafb614"
+source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?branch=nightly#e1123242c62d3ca5da7fb4e7ec0a00bf2aafb614"
 dependencies = [
  "ansi_colours",
  "syntect",
@@ -5502,7 +5502,7 @@ source = "git+https://github.com/typst/typst-assets?rev=fbf00f9#fbf00f9539fdb082
 [[package]]
 name = "typst-eval"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "comemo",
  "ecow",
@@ -5521,7 +5521,7 @@ dependencies = [
 [[package]]
 name = "typst-html"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "bumpalo",
  "comemo",
@@ -5541,7 +5541,7 @@ dependencies = [
 [[package]]
 name = "typst-layout"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "az",
  "bumpalo",
@@ -5575,7 +5575,7 @@ dependencies = [
 [[package]]
 name = "typst-library"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "az",
  "bitflags 2.9.4",
@@ -5640,7 +5640,7 @@ dependencies = [
 [[package]]
 name = "typst-macros"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -5651,7 +5651,7 @@ dependencies = [
 [[package]]
 name = "typst-pdf"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "az",
  "bytemuck",
@@ -5676,7 +5676,7 @@ dependencies = [
 [[package]]
 name = "typst-realize"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -5693,7 +5693,7 @@ dependencies = [
 [[package]]
 name = "typst-render"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -5723,7 +5723,7 @@ dependencies = [
 [[package]]
 name = "typst-svg"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "base64",
  "comemo",
@@ -5763,7 +5763,7 @@ dependencies = [
 [[package]]
 name = "typst-syntax"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "ecow",
  "rustc-hash 2.1.1",
@@ -5792,7 +5792,7 @@ dependencies = [
 [[package]]
 name = "typst-timing"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "parking_lot",
  "serde",
@@ -5816,7 +5816,7 @@ dependencies = [
 [[package]]
 name = "typst-utils"
 version = "0.14.0"
-source = "git+https://github.com/ParaN3xus/typst.git?rev=575b4b779c29bffc439513491ffbeb4ed917bcc7#575b4b779c29bffc439513491ffbeb4ed917bcc7"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#575b4b779c29bffc439513491ffbeb4ed917bcc7"
 dependencies = [
  "once_cell",
  "portable-atomic",
@@ -5845,7 +5845,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.13.17"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=8af51a65fa3ea2b210337c126fd800ca62a5ac7d#8af51a65fa3ea2b210337c126fd800ca62a5ac7d"
+source = "git+https://github.com/ParaN3xus/typstyle/?branch=nightly#8af51a65fa3ea2b210337c126fd800ca62a5ac7d"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
