@@ -229,21 +229,20 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
     }
 
     scrollTo(
-      pageRect: ScrollRect,
+      pageWidth: number,
       pageNo: number,
       innerLeft: number,
       innerTop: number,
     ) {
+      const scrollElem = this.hookedElem.parentElement!;
+
       if (this.previewMode === PreviewMode.Slide) {
         this.setPartialPageNumber(pageNo);
         return;
       }
 
-      const windowRoot = document.body || document.firstElementChild;
-      const basePos = windowRoot.getBoundingClientRect();
-
-      const left = innerLeft - basePos.left;
-      const top = innerTop - basePos.top;
+      const left = innerLeft;
+      const top = innerTop;
 
       // evaluate window viewport 1vw
       const pw = this.windowElem.clientWidth * 0.01;
@@ -255,15 +254,14 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       const xOffset = left - xOffsetInnerFix;
       const yOffset = top - yOffsetInnerFix;
 
-      const widthOccupied = (100 * 100 * pw) / pageRect.width;
+      const widthOccupied = (100 * 100 * pw) / pageWidth;
 
-      const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
-      const pageAdjust =
-        pageRect.left - basePos.left + pageRect.width - 95 * pw;
+      const pageAdjustLeft = 5 * pw;
+      const pageAdjust = pageWidth - 95 * pw;
 
       // default single-column or multi-column layout
       if (widthOccupied >= 90 || widthOccupied < 50) {
-        this.windowElem.scrollTo({
+        scrollElem.scrollTo({
           behavior: "smooth",
           left: xOffset,
           top: yOffset,
@@ -275,7 +273,7 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
         const xOffsetAdjsut =
           xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
 
-        this.windowElem.scrollTo({
+        scrollElem.scrollTo({
           behavior: "smooth",
           left: xOffsetAdjsut,
           top: yOffset,
@@ -310,9 +308,11 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       //   "red",
       // );
 
+      const svgRectBase = this.hookedElem.firstElementChild!.getBoundingClientRect();
+
       triggerRipple(
-        windowRoot,
-        left,
+        scrollElem,
+        left + Math.max(svgRectBase.left, 0),
         top,
         "typst-jump-ripple",
         "typst-jump-ripple-effect .4s linear",
@@ -321,4 +321,3 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
   };
 }
 
-type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;

@@ -57,9 +57,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       // set rescale target to `body`
       retrieveDOMState() {
         return {
-          // reserving 1px to hide width border
-          width: resizeTarget.clientWidth + 1,
-          // reserving 1px to hide width border
+          width: resizeTarget.clientWidth,
           height: resizeTarget.offsetHeight,
           boundingRect: resizeTarget.getBoundingClientRect(),
         };
