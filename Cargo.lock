@@ -243,19 +243,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "biblatex"
-version = "0.11.0"
-source = "git+https://github.com/typst/biblatex.git#4ed6a780d878e76512e41ccfaa899e34f5589f04"
-dependencies = [
- "paste",
- "roman-numerals-rs",
- "strum 0.27.2",
- "unic-langid",
- "unicode-normalization",
- "unscanny",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -514,15 +501,6 @@ checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
 dependencies = [
  "ciborium-io",
  "half",
-]
-
-[[package]]
-name = "citationberg"
-version = "0.5.0"
-source = "git+https://github.com/typst/citationberg.git?rev=35cc83fb325d22c9b5bd5c7fc1d8e79897308076#35cc83fb325d22c9b5bd5c7fc1d8e79897308076"
-dependencies = [
- "quick-xml",
- "serde",
 ]
 
 [[package]]
@@ -1634,33 +1612,13 @@ dependencies = [
 
 [[package]]
 name = "hayagriva"
-version = "0.8.1"
-source = "git+https://github.com/typst/hayagriva?rev=03ae2acf#03ae2acf168e65604e74f0361e74ba4ef7689f16"
-dependencies = [
- "biblatex 0.11.0 (git+https://github.com/typst/biblatex.git)",
- "ciborium",
- "citationberg 0.5.0",
- "indexmap 2.11.4",
- "numerals",
- "paste",
- "serde",
- "serde_yaml",
- "thiserror 1.0.69",
- "unic-langid",
- "unicode-segmentation",
- "unscanny",
- "url",
-]
-
-[[package]]
-name = "hayagriva"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1cb69425736f184173b3ca6e27fcba440a61492a790c786b1c6af7e06a03e575"
 dependencies = [
- "biblatex 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "biblatex 0.11.0",
  "ciborium",
- "citationberg 0.6.1",
+ "citationberg",
  "indexmap 2.11.4",
  "paste",
  "roman-numerals-rs",
@@ -4942,7 +4900,7 @@ dependencies = [
  "dirs",
  "ecow",
  "ena",
- "hayagriva 0.8.1",
+ "hayagriva",
  "hex",
  "if_chain",
  "indexmap 2.11.4",
@@ -5589,7 +5547,7 @@ dependencies = [
  "flate2",
  "fontdb 0.23.0",
  "glidesort",
- "hayagriva 0.9.1",
+ "hayagriva",
  "hayro-syntax",
  "icu_properties 1.5.1",
  "icu_provider 1.5.0",
