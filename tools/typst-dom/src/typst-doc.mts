@@ -275,7 +275,7 @@ export class TypstDocumentContext<O = any> {
       if (pageX !== undefined && pageY !== undefined) {
         const scrollX = pageX * (scrollFactor - 1);
         const scrollY = pageY * (scrollFactor - 1);
-        this.windowElem.scrollBy(scrollX, scrollY);
+        this.hookedElem.parentElement!.scrollBy(scrollX, scrollY);
       }
       // toggle scale change event
       this.addViewportChange();
@@ -320,7 +320,9 @@ export class TypstDocumentContext<O = any> {
         }
         const scrollDirection = deltaDistance > 0 ? 1 : -1;
         deltaDistance = 0;
-        doRescale(scrollDirection, event.pageX, event.pageY);
+
+        const baseRect = this.hookedElem.getBoundingClientRect();
+        doRescale(scrollDirection, event.pageX - baseRect.x, event.pageY - baseRect.y);
         return false;
       }
     };
