@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/element_where.typ
     "labelDetails": {
      "description": "content | none"
     },
-    "sortText": "000",
+    "sortText": "001",
     "textEdit": {
      "newText": "caption: ${1:}",
      "range": {

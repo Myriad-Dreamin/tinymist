@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use ecow::{eco_format, eco_vec, EcoString, EcoVec};
-use typst::foundations::{Closure, Func};
+use typst::foundations::{Closure, ClosureNode, Func};
+use typst::syntax::ast;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, SyntaxKind};
 use typst::utils::LazyHash;
 
 // use super::{BoundChecker, Definition};
@@ -276,11 +276,18 @@ fn analyze_closure_signature(
     closure: Arc<LazyHash<Closure>>,
     add_param: &mut impl FnMut(Interned<ParamTy>),
 ) {
-    log::trace!("closure signature for: {:?}", closure.node.kind());
+    log::trace!(
+        "closure signature for: {:?}",
+        match &closure.node {
+            ClosureNode::Closure(node) => node,
+            ClosureNode::Context(node) => node,
+        }
+        .kind()
+    );
 
     let closure = &closure.node;
-    let closure_ast = match closure.kind() {
-        SyntaxKind::Closure => closure.cast::<ast::Closure>().unwrap(),
+    let closure_ast = match closure {
+        ClosureNode::Closure(node) => node.cast::<ast::Closure>().unwrap(),
         _ => return,
     };
 
