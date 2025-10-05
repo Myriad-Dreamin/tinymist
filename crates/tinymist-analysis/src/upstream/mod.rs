@@ -851,6 +851,7 @@ mod tests {
         https://typst.app/docs/reference/model/terms/
         https://typst.app/docs/reference/model/terms/#definitions-item
         https://typst.app/docs/reference/model/title/
+        https://typst.app/docs/reference/pdf/artifact/
         https://typst.app/docs/reference/pdf/attach/
         https://typst.app/docs/reference/text/highlight/
         https://typst.app/docs/reference/text/linebreak/
