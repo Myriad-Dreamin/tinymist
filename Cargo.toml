@@ -271,7 +271,7 @@ extend-exclude = ["/.git", "fixtures"]
 # However, it is not suggested to install it in that way. The suggested ways are:
 # - Installation: https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installation
 # - Installing pre-built artifacts from GitHub : https://github.com/Myriad-Dreamin/tinymist?tab=readme-ov-file#installing-regularnightly-prebuilds-from-github
-# tinymist-assets = { path = "./crates/tinymist-assets/" }
+tinymist-assets = { path = "./crates/tinymist-assets/" }
 
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
@@ -303,9 +303,9 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinym
 # reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "3eeb078e2a21caf8256585e4f533df1810c33a09" }
 
 # These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo = { path = "../typst.ts/crates/reflexo/" }
+reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
+reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
 # typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", tag = "tinymist-nightly-v0.12.21-rc1" }
 
 typst-shim = { path = "crates/typst-shim" }
