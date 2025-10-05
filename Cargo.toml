@@ -101,7 +101,7 @@ cmark-writer = { version = "=0.8.0", features = [
     "gfm",
 ], path = "crates/cmark-writer" }
 docx-rs = { version = "0.4.18-rc19", git = "https://github.com/Myriad-Dreamin/docx-rs", default-features = false, rev = "db49a729f68dbdb9e8e91857fbb1c3d414209871" }
-hayagriva = { git = "https://github.com/typst/hayagriva", rev = "03ae2acf" }
+hayagriva = "0.9.1"
 hex = "0.4.3"
 flate2 = "1"
 # typst can only support these formats.
@@ -278,16 +278,16 @@ tinymist-assets = { path = "./crates/tinymist-assets/" }
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly-content-hint" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
