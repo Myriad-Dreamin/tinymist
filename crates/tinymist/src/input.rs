@@ -1,7 +1,8 @@
 use lsp_types::*;
 use reflexo_typst::Bytes;
 use serde::{Deserialize, Serialize};
-use tinymist_query::{to_typst_range, PositionEncoding};
+use tinymist_query::ty::PathKind;
+use tinymist_query::{is_untitled_path, to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::ecow::EcoString;
@@ -248,6 +249,17 @@ impl ServerState {
         }
 
         let new_entry = new_entry();
+
+        // Don't implicit focus non source file.
+        if new_entry.as_ref().is_some_and(|entry| {
+            !is_untitled_path(entry)
+                && !PathKind::Source {
+                    allow_package: true,
+                }
+                .is_match(entry)
+        }) {
+            return;
+        }
 
         let update_result = self.focus_main_file(new_entry.clone());
         match update_result {
