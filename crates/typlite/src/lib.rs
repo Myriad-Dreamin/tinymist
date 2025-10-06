@@ -32,7 +32,7 @@ use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
 use crate::tinymist_std::typst::foundations::Value::Str;
-use crate::tinymist_std::typst::{LazyHash, TypstDict};
+use crate::tinymist_std::typst::LazyHash;
 
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
@@ -209,7 +209,10 @@ impl TypliteFeat {
             }
         };
 
-        let mut dict = TypstDict::new();
+        // Start with existing inputs from the world (CLI inputs)
+        let mut dict = (**world.inputs()).clone();
+        
+        // Add typlite-specific inputs
         dict.insert("x-target".into(), Str("md".into()));
         if format == Format::Text || self.remove_html {
             dict.insert("x-remove-html".into(), Str("true".into()));
