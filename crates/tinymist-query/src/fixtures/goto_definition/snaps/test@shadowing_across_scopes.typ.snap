@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/goto_definition.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/goto_definition/shadowing_across_scopes.typ
+---
+[
+ {
+  "originSelectionRange": "0:35:0:36",
+  "targetRange": "2:5:2:6",
+  "targetSelectionRange": "2:5:2:6",
+  "targetUri": "a.typ"
+ }
+]
