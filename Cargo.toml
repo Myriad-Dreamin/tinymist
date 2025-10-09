@@ -49,6 +49,7 @@ tempfile = "3.19.1"
 same-file = "1.0.6"
 libc = "0.2.155"
 core-foundation = { version = "0.10.0", features = ["mac_os_10_7_support"] }
+half = "=2.6.0"
 
 # Web
 js-sys = "^0.3"
