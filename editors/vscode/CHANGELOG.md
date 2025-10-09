@@ -9,6 +9,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.37-rc1 - [2025-10-09]
+
+Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev adfa2ad](https://github.com/ParaN3xus/typst/commit/adfa2adb93691a46322e16c39adb64542f4c39ae), a.k.a. [typst/typst Bump krilla and expose the remaining PDF/A standards (#7038)](https://github.com/typst/typst/commit/c65d766833b66a2e6fe9a4db80ddc361fafab0ad).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.35...v0.13.37-rc1
+
 ## v0.13.35 - [2025-10-06]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 575b4b7](https://github.com/ParaN3xus/typst/commit/575b4b779c29bffc439513491ffbeb4ed917bcc7), a.k.a. [typst/typst Align multi-line error messages](https://github.com/typst/typst/commit/b14c08e97a50178617c4ed46eb01445475ac6ac6).
