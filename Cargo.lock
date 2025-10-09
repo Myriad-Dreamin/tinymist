@@ -772,6 +772,7 @@ dependencies = [
  "comemo",
  "criterion",
  "ecow",
+ "half",
  "insta",
  "tinymist-project",
  "tinymist-std",
