@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/mode_math.typ
     "labelDetails": {
      "description": "op(text: [tanh], limits: false)"
     },
-    "sortText": "339",
+    "sortText": "361",
     "textEdit": {
      "newText": "tanh",
      "range": {

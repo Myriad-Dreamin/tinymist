@@ -29,7 +29,7 @@ A table of items.
 Tables are used to arrange content in cells. Cells can contain arbitrary
 content, including multiple paragraphs and are specified in row-major order.
 For a hands-on explanation of all the ways you can use and customize tables
-in Typst, check out the [Table Guide](https://typst.app/docs/guides/table-guide/).
+in Typst, check out the [Table Guide](https://typst.app/docs/guides/tables/).
 
 Because tables are just grids with different defaults for some cell
 properties (notably `stroke` and `inset`), refer to the [grid
@@ -41,10 +41,10 @@ whether the content you are arranging semantically belongs together as a set
 of related data points or similar or whether you are just want to enhance
 your presentation by arranging unrelated content in a grid. In the former
 case, a table is the right choice, while in the latter case, a grid is more
-appropriate. Furthermore, Typst will annotate its output in the future such
-that screenreaders will announce content in `table` as tabular while a
-grid's content will be announced no different than multiple content blocks
-in the document flow.
+appropriate. Furthermore, Assistive Technology (AT) like screen readers will
+announce content in a `table` as tabular while a grid's content will be
+announced no different than multiple content blocks in the document flow. AT
+users will be able to navigate tables two-dimensionally by cell.
 
 Note that, to override a particular cell's properties or apply show rules on
 table cells, you can use the [`table.cell`] element. See its documentation
@@ -128,6 +128,18 @@ and the position of each cell.
 )
 ```
 
+# Accessibility
+Tables are challenging to consume for users of Assistive Technology (AT). To
+make the life of AT users easier, we strongly recommend that you use
+[`table.header`] and [`table.footer`] to mark the header and footer sections
+of your table. This will allow AT to announce the column labels for each
+cell.
+
+Because navigating a table by cell is more cumbersome than reading it
+visually, you should consider making the core information in your table
+available as text as well. You can do this by wrapping your table in a
+[figure] and using its caption to summarize the table's content.
+
 # Rest Parameters
 
 ## children
@@ -157,7 +169,7 @@ You can specify the alignment in any of the following fashions:
 - use a function that maps a cell's X/Y position (both starting from
   zero) to its alignment
 
-See the [Table Guide](https://typst.app/docs/guides/table-guide/#alignment) for details.
+See the [Table Guide](https://typst.app/docs/guides/tables/#alignment) for details.
 
 ```typ
 #table(
@@ -200,7 +212,7 @@ This can be:
 - a function that maps a cell's position to its fill
 
 Most notably, arrays and functions are useful for creating striped
-tables. See the [Table Guide](https://typst.app/docs/guides/table-guide/#fills) for more
+tables. See the [Table Guide](https://typst.app/docs/guides/tables/#fills) for more
 details.
 
 ```typ
@@ -308,7 +320,7 @@ To specify varying strokes for different cells, you can:
 - use an array of strokes corresponding to each column
 - use a function that maps a cell's position to its stroke
 
-See the [Table Guide](https://typst.app/docs/guides/table-guide/#strokes) for more details.
+See the [Table Guide](https://typst.app/docs/guides/tables/#strokes) for more details.
 
 
 ======
