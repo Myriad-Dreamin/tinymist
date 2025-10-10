@@ -160,12 +160,16 @@ export async function buildTinymistVscodeSystem() {
 }
 
 export async function buildLspBinary(kind) {
-  await spawnAsync(`lsp:${kind}`, `cargo build -p tinymist-cli --color=always --profile=${kind}`, {
-    env: {
-      ...process.env,
-      FORCE_COLOR: "1",
+  await spawnAsync(
+    `lsp:${kind}`,
+    `cargo build -p tinymist-cli --color=always --profile=${kind === "debug" ? "dev" : "release"}`,
+    {
+      env: {
+        ...process.env,
+        FORCE_COLOR: "1",
+      },
     },
-  });
+  );
 
   const binName = process.platform === "win32" ? "tinymist.exe" : "tinymist";
 
