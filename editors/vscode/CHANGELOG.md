@@ -9,6 +9,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.39-rc1 - [2025-10-10]
+
+Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 37b8130](https://github.com/ParaN3xus/typst/commit/37b8130ad182e9e002c6836cac6c356c7aa36841), a.k.a. [typst/typst Typst 0.14 changelog (#7065)](https://github.com/typst/typst/commit/ddd8ae7f49d7adf35702fd9347d53fdd726ead55).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.37...v0.13.39-rc1
+
 ## v0.13.37 - [2025-10-10]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev adfa2ad](https://github.com/ParaN3xus/typst/commit/adfa2adb93691a46322e16c39adb64542f4c39ae), a.k.a. [typst/typst Bump krilla and expose the remaining PDF/A standards (#7038)](https://github.com/typst/typst/commit/c65d766833b66a2e6fe9a4db80ddc361fafab0ad).
