@@ -409,11 +409,13 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             ext: Default::default(),
             verse,
             reason: no_reason(),
+            cached_snapshot: None,
             handler,
             export_target,
+            latest_compilation: OnceLock::default(),
+            latest_success_doc: None,
             deps: Default::default(),
-            latest_compilation: None,
-            cached_snapshot: None,
+            committed_revision: 0,
         }
     }
 
@@ -546,8 +548,8 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         });
                     }
 
-                    // Forget the old compilation state.
-                    proj.latest_compilation = None;
+                    // Forget the document state of previous entry.
+                    proj.latest_success_doc = None;
                 }
 
                 proj.reason.merge(reason_by_entry_change());
@@ -751,25 +753,22 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
-    latest_compilation: Option<CompilationState>,
     /// The latest compute graph (snapshot), derived lazily from
     /// `latest_compilation` as needed.
-    cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
-}
+    pub cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
+    /// The latest compilation.
+    pub latest_compilation: OnceLock<CompiledArtifact<F>>,
+    /// The latest successly compiled document.
+    pub latest_success_doc: Option<TypstDocument>,
 
-/// Information about a completed compilation.
-struct CompilationState {
-    revision: usize,
-    /// The document, if it compiled successfully.
-    doc: Option<TypstDocument>,
+    committed_revision: usize,
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     /// Gets a snapshot of the project.
     pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
-        // Tries to use the cached snapshot if possible.
         match self.cached_snapshot.as_ref() {
-            Some(cached) if cached.world().revision() == self.verse.revision => cached.clone(),
+            Some(snap) if snap.world().revision() == self.verse.revision => snap.clone(),
             _ => {
                 let snap = self.make_snapshot();
                 self.cached_snapshot = Some(snap.clone());
@@ -785,7 +784,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             id: self.id.clone(),
             world,
             signal: self.reason,
-            success_doc: self.latest_compilation.as_ref().and_then(|c| c.doc.clone()),
+            success_doc: self.latest_success_doc.clone(),
         };
         WorldComputeGraph::new(snap)
     }
@@ -884,20 +883,17 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
     fn process_compile(&mut self, artifact: CompiledArtifact<F>) -> bool {
         let world = &artifact.snap.world;
         let compiled_revision = world.revision().get();
-        if let Some(cur) = &self.latest_compilation
-            && cur.revision >= compiled_revision
-        {
+        if self.committed_revision >= compiled_revision {
             return false;
         }
 
         // Updates state.
         let doc = artifact.doc.clone();
-        self.latest_compilation = Some(CompilationState {
-            revision: compiled_revision,
-            doc,
-        });
-        // Invalidates the snapshot. It will be recomputed on demand.
-        self.cached_snapshot = None;
+        self.committed_revision = compiled_revision;
+        if doc.is_some() {
+            self.latest_success_doc = doc;
+        }
+        self.cached_snapshot = None; // invalidate; will be recomputed on demand
 
         // Notifies the new file dependencies.
         let mut deps = eco_vec![];
