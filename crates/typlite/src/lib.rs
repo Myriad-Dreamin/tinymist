@@ -209,7 +209,10 @@ impl TypliteFeat {
             }
         };
 
-        let mut dict = TypstDict::new();
+        // Start with existing inputs from the world (CLI inputs)
+        let mut dict = (**world.inputs()).clone();
+        
+        // Add typlite-specific inputs
         dict.insert("x-target".into(), Str("md".into()));
         if format == Format::Text || self.remove_html {
             dict.insert("x-remove-html".into(), Str("true".into()));
