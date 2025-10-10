@@ -412,7 +412,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             cached_snapshot: None,
             handler,
             export_target,
-            compilation: OnceLock::default(),
+            latest_compilation: OnceLock::default(),
             latest_success_doc: None,
             deps: Default::default(),
             committed_revision: 0,
@@ -748,17 +748,18 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub export_target: ExportTarget,
     /// The reason to compile.
     pub reason: CompileSignal,
-    /// The latest compute graph (snapshot).
-    cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
-    /// The latest compilation.
-    pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
+    /// The latest compute graph (snapshot), derived lazily from
+    /// `latest_compilation` as needed.
+    pub cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
+    /// The latest compilation.
+    pub latest_compilation: OnceLock<CompiledArtifact<F>>,
     /// The latest successly compiled document.
-    latest_success_doc: Option<TypstDocument>,
+    pub latest_success_doc: Option<TypstDocument>,
 
     committed_revision: usize,
 }
@@ -886,7 +887,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             return false;
         }
 
-        // Upda te state.
+        // Updates state.
         let doc = artifact.doc.clone();
         self.committed_revision = compiled_revision;
         if doc.is_some() {
