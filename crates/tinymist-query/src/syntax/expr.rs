@@ -30,8 +30,41 @@ pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>
 
 /// Analyzes expressions in a source file and produces expression information.
 ///
-/// Processes the source file to extract expression analysis data including
-/// resolves, imports, docstrings, and lexical scoping information.
+/// This is the core function for expression analysis, which powers features like
+/// go-to-definition, hover, and completion. It performs a two-pass analysis:
+///
+/// 1. **First pass (init_stage)**: Builds the root lexical scope by scanning
+///    top-level definitions without resolving them. This handles forward
+///    references and circular dependencies.
+///
+/// 2. **Second pass**: Performs full expression analysis, resolving identifiers,
+///    tracking imports, and building the expression tree with type information.
+///
+/// # How it supports go-to-definition
+///
+/// The function builds a map of spans to `RefExpr` (stored in `resolves`), where
+/// each `RefExpr` contains:
+/// - The identifier being referenced (`decl`)
+/// - The resolution chain (`root` and `step`)
+/// - The resolved type (`term`)
+///
+/// When a user triggers go-to-definition on an identifier:
+/// 1. The span is looked up in the `resolves` map
+/// 2. The `RefExpr.root` or `RefExpr.step` provides the definition location
+/// 3. The `RefExpr.term` provides type information for hover
+///
+/// # Caching
+///
+/// Results are cached based on source content and imported module hashes.
+/// If nothing has changed, the previous result is returned immediately.
+///
+/// # Parameters
+///
+/// - `ctx`: Shared analysis context with world state and caches
+/// - `source`: The source file to analyze
+/// - `route`: Tracks cyclic dependencies during analysis
+/// - `guard`: Statistics tracking for cache hits/misses
+/// - `prev`: Previous analysis result for cache validation
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
@@ -576,6 +609,11 @@ impl ExprWorker<'_> {
 
         let creating_mod_var = mod_var.is_some();
         let mod_var = Interned::new(mod_var.unwrap_or_else(|| Decl::module_import(typed.span())));
+
+        // Create a RefExpr for the module import variable.
+        // - decl: The import variable (e.g., "foo" in "import 'file.typ' as foo")
+        // - step & root: Both point to the module expression (same for imports)
+        // - term: None because module types are complex and not stored here
         let mod_ref = RefExpr {
             decl: mod_var.clone(),
             step: mod_expr.clone(),
@@ -743,6 +781,10 @@ impl ExprWorker<'_> {
             Decl::include_path(source.span(), name)
         };
 
+        // Create a RefExpr for the import/include path.
+        // - decl: The path declaration (tracks the file path being imported)
+        // - step & root: Both point to the loaded module
+        // - term: None (module types not stored directly)
         let ref_expr = RefExpr {
             decl: import_path.into(),
             step: Some(module.clone()),
@@ -799,6 +841,12 @@ impl ExprWorker<'_> {
             }
 
             let (root, step) = extract_ref(root);
+
+            // Create RefExpr for the original name in the import.
+            // - decl: The original identifier (e.g., "old" in "import: old as new")
+            // - root: The module or selection expression where the value comes from
+            // - step: Intermediate expression (from extract_ref, handles reference chains)
+            // - term: The type if it was found in the scope
             let mut ref_expr = Interned::new(RefExpr {
                 decl: old.clone(),
                 root,
@@ -807,7 +855,13 @@ impl ExprWorker<'_> {
             });
             self.resolve_as(ref_expr.clone());
 
+            // If renamed, create a second RefExpr for the new name that chains to the old one.
+            // This builds the chain: new -> old -> root
             if let Some(new) = &rename {
+                // - decl: The new name (e.g., "new" in "import: old as new")
+                // - root: Same as original (ultimate source of the value)
+                // - step: Points to the old name (intermediate link in the chain)
+                // - term: Same type as original
                 ref_expr = Interned::new(RefExpr {
                     decl: new.clone(),
                     root: ref_expr.root.clone(),
@@ -1073,6 +1127,31 @@ impl ExprWorker<'_> {
         Expr::Ref(r)
     }
 
+    /// Resolves an identifier to a reference expression.
+    ///
+    /// This function looks up an identifier in the lexical scope and creates
+    /// a `RefExpr` that tracks the resolution chain.
+    ///
+    /// # Resolution Process
+    ///
+    /// 1. Evaluates the identifier to get its expression and type (`eval_ident`)
+    /// 2. If the result is itself a `RefExpr`, extracts its `root` and uses the
+    ///    RefExpr's `decl` as the `step` (building a reference chain)
+    /// 3. Otherwise, uses the expression as both `root` and `step`
+    ///
+    /// # Field Assignment
+    ///
+    /// - `decl`: The identifier being resolved
+    /// - `root`: The ultimate source of the value (extracted from chain or the expression itself)
+    /// - `step`: The immediate resolution (extracted from chain or the expression itself)
+    /// - `term`: The resolved type (if available from evaluation)
+    ///
+    /// # Example
+    ///
+    /// For `let x = 1; let y = x; let z = y`:
+    /// - Resolving `x` gives: `RefExpr { decl: x, root: None, step: None, term: Some(int) }`
+    /// - Resolving `y` gives: `RefExpr { decl: y, root: Some(x), step: Some(x), term: Some(int) }`
+    /// - Resolving `z` gives: `RefExpr { decl: z, root: Some(x), step: Some(y), term: Some(int) }`
     fn resolve_ident_(&mut self, decl: DeclExpr, mode: InterpretMode) -> RefExpr {
         let (step, val) = self.eval_ident(decl.name(), mode);
         let (root, step) = extract_ref(step);
@@ -1138,6 +1217,29 @@ impl ExprWorker<'_> {
         }
     }
 
+    /// Evaluates an identifier by looking it up in the lexical scope.
+    ///
+    /// Returns a tuple of `(expression, type)` where:
+    /// - `expression`: The expression the identifier resolves to (may be a `RefExpr`)
+    /// - `type`: The type of the value (if known)
+    ///
+    /// # Lookup Order
+    ///
+    /// 1. Current scope (`self.lexical.last`) - for block-local variables
+    /// 2. Parent scopes (`self.lexical.scopes`) - for outer scope variables
+    /// 3. Global/Math library scope - for built-in functions and constants
+    /// 4. Special case: "std" module
+    ///
+    /// # When `type` is Set
+    ///
+    /// - Built-in values from library: Always has type (wrapped in `Ty::Value`)
+    /// - Lexical scope variables: May have type if it was tracked during definition
+    /// - "std" module: Has type `Ty::Value(Module)`
+    ///
+    /// # When `type` is None
+    ///
+    /// - Identifier not found in any scope: Returns `(None, None)`
+    /// - Variable has no type information: Returns `(Some(expr), None)`
     fn eval_ident(&self, name: &Interned<str>, mode: InterpretMode) -> ConcolicExpr {
         let res = self.lexical.last.get(name);
         if res.0.is_some() || res.1.is_some() {
@@ -1212,6 +1314,12 @@ impl ExprWorker<'_> {
                 Decl::Module(module) => {
                     let exports = self.exports_of(module.fid);
                     let selected = exports.get(key.name())?;
+
+                    // Create RefExpr for module field access (e.g., "mod.field").
+                    // - decl: The field name being accessed
+                    // - root: The module expression being accessed
+                    // - step: The field's expression from the module's exports
+                    // - term: None (type will be inferred later during type checking)
                     let select_ref = Interned::new(RefExpr {
                         decl: key.clone(),
                         root: Some(lhs.clone()),
@@ -1241,6 +1349,28 @@ impl ExprWorker<'_> {
     }
 }
 
+/// Extracts the root and step from a potential reference expression.
+///
+/// This is a key helper function for building reference chains. It handles
+/// the case where an identifier resolves to another reference.
+///
+/// # Returns
+///
+/// A tuple of `(root, step)`:
+/// - If `step` is a `RefExpr`: Returns `(ref.root, Some(ref.decl))` - propagates
+///   the root forward and uses the ref's declaration as the new step
+/// - Otherwise: Returns `(step, step)` - the expression is both root and step
+///
+/// # Example
+///
+/// ```ignore
+/// // Given: let x = value; let y = x;
+/// // When resolving y:
+/// let step = Some(Expr::Ref(RefExpr { decl: x, root: Some(value), ... }));
+/// let (root, step) = extract_ref(step);
+/// // Result: root = Some(value), step = Some(Expr::Decl(x))
+/// // This builds the chain: y -> x -> value
+/// ```
 fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
     match step {
         Some(Expr::Ref(r)) => (r.root.clone(), Some(r.decl.clone().into())),
