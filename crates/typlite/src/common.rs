@@ -223,7 +223,7 @@ impl VerbatimNode {
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        writer.write_str(&self.content)
+        writer.raw_html(&self.content)
     }
 }
 
