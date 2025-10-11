@@ -273,6 +273,22 @@ impl HtmlToAstParser {
         self.inline_buffer = prev_buffer;
         Ok(())
     }
+
+    /// Convert element children while capturing both inline and block outputs.
+    pub fn capture_children(&mut self, element: &HtmlElement) -> Result<(Vec<Node>, Vec<Node>)> {
+        let prev_buffer = std::mem::take(&mut self.inline_buffer);
+        let prev_blocks = std::mem::take(&mut self.blocks);
+
+        self.convert_children(element)?;
+
+        let inline = std::mem::take(&mut self.inline_buffer);
+        let blocks = std::mem::take(&mut self.blocks);
+
+        self.inline_buffer = prev_buffer;
+        self.blocks = prev_blocks;
+
+        Ok((inline, blocks))
+    }
 }
 
 #[derive(Debug, Clone)]
