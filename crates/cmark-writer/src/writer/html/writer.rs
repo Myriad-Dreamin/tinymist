@@ -839,9 +839,7 @@ impl HtmlWriter {
             )));
         }
 
-        log::warn!(
-            "Unresolved reference link for label '{label}'. Rendering as plain text."
-        );
+        log::warn!("Unresolved reference link for label '{label}'. Rendering as plain text.");
         // Render as plain text: [content][label] or [label]
         self.text_internal("[")?;
         let content_text = render_nodes_to_plain_text_string(content, &self.options);

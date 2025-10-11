@@ -251,12 +251,26 @@ impl CommonMarkWriter {
 
     /// Write a document node
     pub(crate) fn write_document(&mut self, children: &[Node]) -> WriteResult<()> {
+        let mut prev_was_block = false;
+
         for (i, child) in children.iter().enumerate() {
             if i > 0 {
-                self.write_str("\n")?;
+                if prev_was_block && child.is_block() {
+                    self.ensure_blank_line()?;
+                } else if prev_was_block || child.is_block() {
+                    self.ensure_trailing_newline()?;
+                }
             }
+
             self.write(child)?;
+
+            if child.is_block() {
+                self.ensure_trailing_newline()?;
+            }
+
+            prev_was_block = child.is_block();
         }
+
         Ok(())
     }
 
@@ -267,7 +281,6 @@ impl CommonMarkWriter {
         content: &[Node],
         heading_type: &HeadingType,
     ) -> WriteResult<()> {
-        // 验证标题级别
         if level == 0 || level > 6 {
             if self.is_strict_mode() {
                 return Err(WriteError::InvalidHeadingLevel(level));
@@ -296,26 +309,29 @@ impl CommonMarkWriter {
             }
 
             HeadingType::Setext => {
-                // First write the heading content
+                let mut temp_writer = CommonMarkWriter::with_options(self.options.clone());
                 for node in content {
-                    self.write(node)?;
+                    temp_writer.write(node)?;
                 }
+
+                let heading_text = temp_writer.into_string();
+
+                self.write_str(&heading_text)?;
                 self.write_char('\n')?;
 
-                // Add underline characters based on level
-                // Setext only supports level 1 and 2 headings
                 let underline_char = if level == 1 { '=' } else { '-' };
 
-                // For good readability, we add underlines at least as long as the heading text
-                // Calculate a reasonable underline length (at least 3 characters)
-                let min_len = 3;
+                let max_line_width = heading_text
+                    .lines()
+                    .map(|line| line.chars().count())
+                    .max()
+                    .unwrap_or(0)
+                    .max(3);
 
-                // Write the underline characters
-                for _ in 0..min_len {
+                for _ in 0..max_line_width {
                     self.write_char(underline_char)?;
                 }
 
-                // Add a newline to end the heading
                 self.write_char('\n')?;
             }
         }
@@ -344,7 +360,7 @@ impl CommonMarkWriter {
             }
         }
 
-        Ok(())
+        self.ensure_trailing_newline()
     }
 
     /// Write a blockquote node
@@ -377,7 +393,7 @@ impl CommonMarkWriter {
     pub(crate) fn write_thematic_break(&mut self) -> WriteResult<()> {
         let char = self.options.thematic_break_char;
         self.write_str(&format!("{char}{char}{char}"))?;
-        Ok(())
+        self.ensure_trailing_newline()
     }
 
     /// Write a code block node
@@ -761,7 +777,8 @@ impl CommonMarkWriter {
 
     /// Write an autolink (URI or email address wrapped in < and >)
     pub(crate) fn write_autolink(&mut self, url: &str, is_email: bool) -> WriteResult<()> {
-        // Autolinks shouldn't contain newlines
+        let _ = is_email; // parameter retained for API compatibility
+                          // Autolinks shouldn't contain newlines
         if url.contains('\n') {
             if self.is_strict_mode() {
                 return Err(WriteError::NewlineInInlineElement(
@@ -777,14 +794,6 @@ impl CommonMarkWriter {
 
         // Write the autolink with < and > delimiters
         self.write_char('<')?;
-
-        // For email autolinks, we don't need to add any prefix
-        // For URI autolinks, ensure it has a scheme
-        if !is_email && !url.contains(':') {
-            // Default to https if no scheme is provided
-            self.write_str("https://")?;
-        }
-
         self.write_str(url)?;
         self.write_char('>')?;
 
@@ -976,6 +985,15 @@ impl CommonMarkWriter {
         Ok(())
     }
 
+    /// Ensure there is a blank line (two consecutive newlines) at the end of the buffer
+    pub(crate) fn ensure_blank_line(&mut self) -> WriteResult<()> {
+        self.ensure_trailing_newline()?;
+        if !self.buffer.ends_with("\n\n") {
+            self.write_char('\n')?;
+        }
+        Ok(())
+    }
+
     /// Write an emphasis (italic) node with custom delimiter
     pub(crate) fn write_emphasis(&mut self, content: &[Node]) -> WriteResult<()> {
         let delimiter = self.options.emphasis_char.to_string();
@@ -1151,5 +1169,57 @@ pub(crate) fn escape_str<E: Escapes>(s: &str) -> std::borrow::Cow<'_, str> {
         std::borrow::Cow::Owned(format!("{}", Escaped::<E>::new(s)))
     } else {
         std::borrow::Cow::Borrowed(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn render(node: &Node) -> String {
+        let mut writer = CommonMarkWriter::new();
+        writer.write(node).unwrap();
+        writer.into_string().into()
+    }
+
+    #[test]
+    fn paragraphs_are_separated_by_blank_line() {
+        let document = Node::Document(vec![
+            Node::Paragraph(vec![Node::Text("First".into())]),
+            Node::Paragraph(vec![Node::Text("Second".into())]),
+        ]);
+
+        assert_eq!(render(&document), "First\n\nSecond\n");
+    }
+
+    #[test]
+    fn setext_heading_matches_content_width() {
+        let heading = Node::Heading {
+            level: 2,
+            content: vec![Node::Text("Wide Title".into())],
+            heading_type: HeadingType::Setext,
+        };
+
+        assert_eq!(render(&heading), "Wide Title\n----------\n");
+    }
+
+    #[test]
+    fn autolink_preserves_url() {
+        let autolink = Node::Autolink {
+            url: "example.com/path".into(),
+            is_email: false,
+        };
+
+        assert_eq!(render(&autolink), "<example.com/path>");
+    }
+
+    #[test]
+    fn thematic_break_ends_with_newline() {
+        let document = Node::Document(vec![
+            Node::ThematicBreak,
+            Node::Paragraph(vec![Node::Text("After".into())]),
+        ]);
+
+        assert_eq!(render(&document), "---\n\nAfter\n");
     }
 }
