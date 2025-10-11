@@ -191,7 +191,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             removeHelp();
             updateNext();
             break;
-          case "h":
+          case "?":
             blurInput();
             toggleHelp();
             break;
