@@ -243,56 +243,58 @@ pub enum ListItem {
 impl Node {
     /// Check if a node is a block-level node
     pub fn is_block(&self) -> bool {
-        matches!(
-            self,
-            Node::Document(_)
-                // Leaf blocks
-                | Node::ThematicBreak
-                | Node::Heading { .. }
-                | Node::CodeBlock { .. }
-                | Node::HtmlBlock(_)
-                | Node::LinkReferenceDefinition { .. }
-                | Node::Paragraph(_)
-                // Container blocks
-                | Node::BlockQuote(_)
-                | Node::OrderedList { .. }
-                | Node::UnorderedList(_)
-                | Node::Table { .. }
-
-                | Node::Custom(_)
-        )
+        match self {
+            Node::Custom(node) => node.is_block(),
+            _ => matches!(
+                self,
+                Node::Document(_)
+                    // Leaf blocks
+                    | Node::ThematicBreak
+                    | Node::Heading { .. }
+                    | Node::CodeBlock { .. }
+                    | Node::HtmlBlock(_)
+                    | Node::LinkReferenceDefinition { .. }
+                    | Node::Paragraph(_)
+                    // Container blocks
+                    | Node::BlockQuote(_)
+                    | Node::OrderedList { .. }
+                    | Node::UnorderedList(_)
+                    | Node::Table { .. }
+            ),
+        }
     }
 
     /// Check if a node is an inline node
     pub fn is_inline(&self) -> bool {
-        matches!(
-            self,
-            // Inlines
-            // Code spans
-            Node::InlineCode(_)
-                // Emphasis and strong emphasis
-                | Node::Emphasis(_)
-                | Node::Strong(_)
-                | Node::Strikethrough(_)
-                // Links
-                | Node::Link { .. }
-                | Node::ReferenceLink { .. }
-                // Images
-                | Node::Image { .. }
-                // Autolinks
-                | Node::Autolink { .. }
-                | Node::ExtendedAutolink(_)
-                // Raw HTML
-                | Node::HtmlElement(_)
-                // Hard line breaks
-                | Node::HardBreak
-                // Soft line breaks
-                | Node::SoftBreak
-                // Textual content
-                | Node::Text(_)
-
-                | Node::Custom(_)
-        )
+        match self {
+            Node::Custom(node) => !node.is_block(),
+            _ => matches!(
+                self,
+                // Inlines
+                // Code spans
+                Node::InlineCode(_)
+                    // Emphasis and strong emphasis
+                    | Node::Emphasis(_)
+                    | Node::Strong(_)
+                    | Node::Strikethrough(_)
+                    // Links
+                    | Node::Link { .. }
+                    | Node::ReferenceLink { .. }
+                    // Images
+                    | Node::Image { .. }
+                    // Autolinks
+                    | Node::Autolink { .. }
+                    | Node::ExtendedAutolink(_)
+                    // Raw HTML
+                    | Node::HtmlElement(_)
+                    // Hard line breaks
+                    | Node::HardBreak
+                    // Soft line breaks
+                    | Node::SoftBreak
+                    // Textual content
+                    | Node::Text(_)
+            ),
+        }
     }
     /// Create a heading node
     ///

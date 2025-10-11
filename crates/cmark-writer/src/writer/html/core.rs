@@ -1,10 +1,13 @@
 use super::{utils, HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
-use crate::ast::{HtmlElement, ListItem, Node};
+use crate::ast::{CodeBlockType, CustomNode, HeadingType, HtmlElement, ListItem, Node};
 #[cfg(feature = "gfm")]
 use crate::ast::{TableAlignment, TaskListStatus};
+use crate::writer::runtime::diagnostics::{Diagnostic, DiagnosticSink, NullSink};
+use crate::writer::runtime::visitor::{walk_node, NodeHandler};
 use ecow::EcoString;
 use html_escape;
 use log;
+use std::fmt;
 
 /// HTML writer for serializing CommonMark AST nodes to HTML.
 ///
@@ -51,7 +54,6 @@ use log;
 /// let output = writer.into_string();
 /// assert_eq!(output, "<div class=\"container\"><h1>Welcome</h1></div>");
 /// ```
-#[derive(Debug)]
 pub struct HtmlWriter {
     /// Writer options
     pub options: HtmlWriterOptions,
@@ -59,6 +61,18 @@ pub struct HtmlWriter {
     buffer: EcoString,
     /// Whether a tag is currently opened
     tag_opened: bool,
+    /// Sink for reporting non-fatal diagnostics.
+    diagnostics: Box<dyn DiagnosticSink + 'static>,
+}
+
+impl fmt::Debug for HtmlWriter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HtmlWriter")
+            .field("options", &self.options)
+            .field("buffer", &self.buffer)
+            .field("tag_opened", &self.tag_opened)
+            .finish()
+    }
 }
 
 impl HtmlWriter {
@@ -73,7 +87,44 @@ impl HtmlWriter {
             options,
             buffer: EcoString::new(),
             tag_opened: false,
+            diagnostics: Box::new(NullSink),
         }
+    }
+
+    /// Replace the diagnostic sink used to capture non-fatal issues.
+    pub fn with_diagnostic_sink(mut self, sink: Box<dyn DiagnosticSink + 'static>) -> Self {
+        self.diagnostics = sink;
+        self
+    }
+
+    /// Swap the diagnostic sink on an existing writer.
+    pub fn set_diagnostic_sink(&mut self, sink: Box<dyn DiagnosticSink + 'static>) {
+        self.diagnostics = sink;
+    }
+
+    /// Get a mutable handle to the diagnostic sink.
+    pub fn diagnostic_sink(&mut self) -> &mut dyn DiagnosticSink {
+        self.diagnostics.as_mut()
+    }
+
+    fn emit_warning<S: Into<EcoString>>(&mut self, message: S) {
+        let message = message.into();
+        self.diagnostics.emit(Diagnostic::warning(message.clone()));
+        log::warn!("{message}");
+    }
+
+    #[allow(dead_code)]
+    fn emit_info<S: Into<EcoString>>(&mut self, message: S) {
+        let message = message.into();
+        self.diagnostics.emit(Diagnostic::info(message.clone()));
+        log::info!("{message}");
+    }
+
+    #[allow(dead_code)]
+    fn emit_debug<S: Into<EcoString>>(&mut self, message: S) {
+        let message = message.into();
+        self.diagnostics.emit(Diagnostic::info(message.clone()));
+        log::debug!("{message}");
     }
 
     /// Updates the writer's options at runtime.
@@ -251,66 +302,7 @@ impl HtmlWriter {
 
     /// Writes an AST `Node` to HTML using the configured options.
     pub fn write_node(&mut self, node: &Node) -> HtmlWriteResult<()> {
-        match node {
-            Node::Document(children) => self.write_document_node(children),
-            Node::Paragraph(children) => self.write_paragraph_node(children),
-            Node::Text(text) => self.write_text_node(text),
-            Node::Heading { level, content, .. } => self.write_heading_node(*level, content),
-            Node::Emphasis(children) => self.write_emphasis_node(children),
-            Node::Strong(children) => self.write_strong_node(children),
-            Node::ThematicBreak => self.write_thematic_break_node(),
-            Node::InlineCode(code) => self.write_inline_code_node(code),
-            Node::CodeBlock {
-                language, content, ..
-            } => self.write_code_block_node(language, content),
-            Node::HtmlBlock(block_content) => self.write_html_block_node(block_content),
-            Node::HtmlElement(element) => self.write_html_element_node(element),
-            Node::SoftBreak => self.write_soft_break_node(),
-            Node::HardBreak => self.write_hard_break_node(),
-            Node::Link {
-                url,
-                title,
-                content,
-            } => self.write_link_node(url, title, content),
-            Node::Image { url, title, alt } => self.write_image_node(url, title, alt),
-            Node::BlockQuote(children) => self.write_blockquote_node(children),
-            Node::OrderedList { start, items } => self.write_ordered_list_node(*start, items),
-            Node::UnorderedList(items) => self.write_unordered_list_node(items),
-            #[cfg(feature = "gfm")]
-            Node::Strikethrough(children) => self.write_strikethrough_node(children),
-            Node::Table {
-                headers,
-                #[cfg(feature = "gfm")]
-                alignments,
-                rows,
-            } => self.write_table_node(
-                headers,
-                #[cfg(feature = "gfm")]
-                alignments,
-                rows,
-            ),
-            Node::Autolink { url, is_email } => self.write_autolink_node(url, *is_email),
-            #[cfg(feature = "gfm")]
-            Node::ExtendedAutolink(url) => self.write_extended_autolink_node(url),
-            Node::LinkReferenceDefinition { .. } => Ok(()), // Definitions are not rendered in final HTML
-            Node::ReferenceLink { label, content } => {
-                self.write_reference_link_node(label, content)
-            }
-            Node::Custom(custom_node) => {
-                // Call the CustomNode's html_write method, which handles the HTML rendering
-                custom_node.html_write(self)
-            }
-            // Fallback for node types not handled, especially if GFM is off and GFM nodes appear
-            #[cfg(not(feature = "gfm"))]
-            Node::ExtendedAutolink(url) => {
-                // Handle GFM specific nodes explicitly if feature is off
-                log::warn!("ExtendedAutolink encountered but GFM feature is not enabled. Rendering as text: {url}");
-                self.text_internal(url)
-            }
-            // All node types are handled above, but keeping this for future extensibility
-            #[allow(unreachable_patterns)]
-            _ => Err(HtmlWriteError::UnsupportedNodeType(format!("{node:?}"))),
-        }
+        walk_node(self, node)
     }
 
     // --- Node-Specific Writing Methods (Internal) ---
@@ -427,7 +419,10 @@ impl HtmlWriter {
                 .iter()
                 .any(|tag| tag.eq_ignore_ascii_case(&element.tag))
         {
-            log::debug!("GFM: Textualizing disallowed HTML tag: <{}>", element.tag);
+            self.emit_debug(format!(
+                "GFM: Textualizing disallowed HTML tag: <{}>",
+                element.tag
+            ));
             self.textualize_full_element_node(element)?;
             return Ok(());
         }
@@ -436,10 +431,10 @@ impl HtmlWriter {
             if self.options.strict {
                 return Err(HtmlWriteError::InvalidHtmlTag(element.tag.to_string()));
             } else {
-                log::warn!(
+                self.emit_warning(format!(
                     "Invalid HTML tag name '{}' encountered. Textualizing in non-strict mode.",
                     element.tag
-                );
+                ));
                 self.textualize_full_element_node(element)?;
                 return Ok(());
             }
@@ -451,7 +446,10 @@ impl HtmlWriter {
                 if self.options.strict {
                     return Err(HtmlWriteError::InvalidHtmlAttribute(attr.name.to_string()));
                 } else {
-                    log::warn!("Invalid HTML attribute name '{}' in tag '{}'. Textualizing attribute in non-strict mode.", attr.name, element.tag);
+                    self.emit_warning(format!(
+                        "Invalid HTML attribute name '{}' in tag '{}'. Textualizing attribute in non-strict mode.",
+                        attr.name, element.tag
+                    ));
                     // Simple textualization of the attribute itself
                     self.buffer.push(' ');
                     self.buffer.push_str(&attr.name);
@@ -665,7 +663,9 @@ impl HtmlWriter {
         if !self.options.enable_gfm {
             // If GFM is disabled (e.g. via a more granular gfm_strikethrough option if added),
             // render content as is. This case should ideally be guarded by options check.
-            log::warn!("Strikethrough node encountered but GFM (or GFM strikethrough) is not enabled. Rendering content as plain.");
+            self.emit_warning(
+                "Strikethrough node encountered but GFM (or GFM strikethrough) is not enabled. Rendering content as plain."
+            );
             for child in children {
                 self.write_node(child)?;
             }
@@ -815,7 +815,9 @@ impl HtmlWriter {
     fn write_extended_autolink_node(&mut self, url: &str) -> HtmlWriteResult<()> {
         if !self.options.enable_gfm {
             // Or a more specific gfm_autolinks option
-            log::warn!("ExtendedAutolink node encountered but GFM (or GFM autolinks) is not enabled. Rendering as plain text.");
+            self.emit_warning(
+                "ExtendedAutolink node encountered but GFM (or GFM autolinks) is not enabled. Rendering as plain text."
+            );
             self.text_internal(url)?;
             return Ok(());
         }
@@ -839,7 +841,9 @@ impl HtmlWriter {
             )));
         }
 
-        log::warn!("Unresolved reference link for label '{label}'. Rendering as plain text.");
+        self.emit_warning(format!(
+            "Unresolved reference link for label '{label}'. Rendering as plain text."
+        ));
         // Render as plain text: [content][label] or [label]
         self.text_internal("[")?;
         let content_text = render_nodes_to_plain_text_string(content, &self.options);
@@ -876,6 +880,162 @@ impl HtmlWriter {
             }
         }
         Ok(())
+    }
+}
+
+impl NodeHandler for HtmlWriter {
+    type Error = HtmlWriteError;
+
+    fn document(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
+        self.write_document_node(children)
+    }
+
+    fn paragraph(&mut self, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_paragraph_node(content)
+    }
+
+    fn text(&mut self, text: &EcoString) -> HtmlWriteResult<()> {
+        self.write_text_node(text)
+    }
+
+    fn emphasis(&mut self, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_emphasis_node(content)
+    }
+
+    fn strong(&mut self, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_strong_node(content)
+    }
+
+    fn thematic_break(&mut self) -> HtmlWriteResult<()> {
+        self.write_thematic_break_node()
+    }
+
+    fn heading(
+        &mut self,
+        level: u8,
+        content: &[Node],
+        _heading_type: &HeadingType,
+    ) -> HtmlWriteResult<()> {
+        self.write_heading_node(level, content)
+    }
+
+    fn inline_code(&mut self, code: &EcoString) -> HtmlWriteResult<()> {
+        self.write_inline_code_node(code)
+    }
+
+    fn code_block(
+        &mut self,
+        language: &Option<EcoString>,
+        content: &EcoString,
+        _kind: &CodeBlockType,
+    ) -> HtmlWriteResult<()> {
+        self.write_code_block_node(language, content)
+    }
+
+    fn html_block(&mut self, content: &EcoString) -> HtmlWriteResult<()> {
+        self.write_html_block_node(content)
+    }
+
+    fn html_element(&mut self, element: &HtmlElement) -> HtmlWriteResult<()> {
+        self.write_html_element_node(element)
+    }
+
+    fn block_quote(&mut self, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_blockquote_node(content)
+    }
+
+    fn unordered_list(&mut self, items: &[ListItem]) -> HtmlWriteResult<()> {
+        self.write_unordered_list_node(items)
+    }
+
+    fn ordered_list(&mut self, start: u32, items: &[ListItem]) -> HtmlWriteResult<()> {
+        self.write_ordered_list_node(start, items)
+    }
+
+    #[cfg(feature = "gfm")]
+    fn table(
+        &mut self,
+        headers: &[Node],
+        alignments: &[TableAlignment],
+        rows: &[Vec<Node>],
+    ) -> HtmlWriteResult<()> {
+        self.write_table_node(headers, alignments, rows)
+    }
+
+    #[cfg(not(feature = "gfm"))]
+    fn table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> HtmlWriteResult<()> {
+        self.write_table_node(headers, rows)
+    }
+
+    fn link(
+        &mut self,
+        url: &EcoString,
+        title: &Option<EcoString>,
+        content: &[Node],
+    ) -> HtmlWriteResult<()> {
+        self.write_link_node(url, title, content)
+    }
+
+    fn image(
+        &mut self,
+        url: &EcoString,
+        title: &Option<EcoString>,
+        alt: &[Node],
+    ) -> HtmlWriteResult<()> {
+        self.write_image_node(url, title, alt)
+    }
+
+    fn soft_break(&mut self) -> HtmlWriteResult<()> {
+        self.write_soft_break_node()
+    }
+
+    fn hard_break(&mut self) -> HtmlWriteResult<()> {
+        self.write_hard_break_node()
+    }
+
+    fn autolink(&mut self, url: &EcoString, is_email: bool) -> HtmlWriteResult<()> {
+        self.write_autolink_node(url, is_email)
+    }
+
+    #[cfg(feature = "gfm")]
+    fn extended_autolink(&mut self, url: &EcoString) -> HtmlWriteResult<()> {
+        self.write_extended_autolink_node(url)
+    }
+
+    fn link_reference_definition(
+        &mut self,
+        _label: &EcoString,
+        _destination: &EcoString,
+        _title: &Option<EcoString>,
+    ) -> HtmlWriteResult<()> {
+        Ok(())
+    }
+
+    fn reference_link(&mut self, label: &EcoString, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_reference_link_node(label, content)
+    }
+
+    #[cfg(feature = "gfm")]
+    fn strikethrough(&mut self, content: &[Node]) -> HtmlWriteResult<()> {
+        self.write_strikethrough_node(content)
+    }
+
+    fn custom(&mut self, node: &dyn CustomNode) -> HtmlWriteResult<()> {
+        node.html_write(self)
+    }
+
+    fn unsupported(&mut self, node: &Node) -> HtmlWriteResult<()> {
+        #[cfg(not(feature = "gfm"))]
+        if let Node::ExtendedAutolink(url) = node {
+            self.emit_warning(
+                format!(
+                    "ExtendedAutolink encountered but GFM feature is not enabled. Rendering as text: {url}"
+                ),
+            );
+            return self.text_internal(url);
+        }
+
+        Err(HtmlWriteError::UnsupportedNodeType(format!("{node:?}")))
     }
 }
 

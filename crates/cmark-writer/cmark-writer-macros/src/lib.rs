@@ -80,7 +80,7 @@ impl Parse for CustomNodeArgs {
 ///
 /// impl HighlightNode {
 ///     // Required for CommonMark rendering
-///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut ::cmark_writer::writer::BlockWriterProxy) -> WriteResult<()> {
 ///         writer.write_str("<span style=\"background-color: ")?;
 ///         writer.write_str(&self.color)?;
 ///         writer.write_str("\">")?;
@@ -108,7 +108,7 @@ impl Parse for CustomNodeArgs {
 /// }
 ///
 /// impl AlertNode {
-///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut ::cmark_writer::writer::InlineWriterProxy) -> WriteResult<()> {
 ///         writer.write_str("<div class=\"alert\">")?;
 ///         writer.write_str(&self.content)?;
 ///         writer.write_str("</div>")?;
@@ -137,6 +137,8 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    let is_block = args.is_block.unwrap_or(false);
+
     // Configure html_write implementation
     let html_write_impl = if args.html_impl.unwrap_or(false) {
         // When html_impl=true, expect user to implement write_html_custom method
@@ -164,16 +166,39 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    let write_block_impl = if is_block {
+        quote! {
+            fn write_block(
+                &self,
+                writer: &mut ::cmark_writer::writer::BlockWriterProxy,
+            ) -> ::cmark_writer::error::WriteResult<()> {
+                self.write_custom(writer)
+            }
+        }
+    } else {
+        quote! {}
+    };
+
+    let write_inline_impl = if !is_block {
+        quote! {
+            fn write_inline(
+                &self,
+                writer: &mut ::cmark_writer::writer::InlineWriterProxy,
+            ) -> ::cmark_writer::error::WriteResult<()> {
+                self.write_custom(writer)
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         #input
 
         impl ::cmark_writer::ast::CustomNode for #name {
-            fn write(
-                &self,
-                writer: &mut ::cmark_writer::writer::CommonMarkWriter,
-            ) -> ::cmark_writer::error::WriteResult<()> {
-                self.write_custom(writer)
-            }
+            #write_block_impl
+
+            #write_inline_impl
 
             #html_write_impl
 

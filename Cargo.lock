@@ -575,22 +575,9 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer"
-version = "0.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "455314fe1e891d575c1b853f7765488ed9fc6a6e16a953ba21bbea931dc337f3"
+version = "0.8.0"
 dependencies = [
- "cmark-writer-macros 0.7.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "ecow",
- "env_logger",
- "html-escape",
- "log",
-]
-
-[[package]]
-name = "cmark-writer"
-version = "0.7.9"
-dependencies = [
- "cmark-writer-macros 0.7.9",
+ "cmark-writer-macros",
  "ecow",
  "env_logger",
  "html-escape",
@@ -599,18 +586,7 @@ dependencies = [
 
 [[package]]
 name = "cmark-writer-macros"
-version = "0.7.9"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
-name = "cmark-writer-macros"
-version = "0.7.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b8c6861091cb9cd00650ba21decd88aa48d010366800d6a8b81b2be2eacc53"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2029,9 +2005,9 @@ dependencies = [
 
 [[package]]
 name = "io-uring"
-version = "0.7.9"
+version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d93587f37623a1a17d94ef2bc9ada592f5465fe7732084ab7beefabe5c77c0c4"
+checksum = "046fa2d4d00aea763528b4950358d0ead425372445dc8ff86312b3c69ff7727b"
 dependencies = [
  "bitflags 2.9.1",
  "cfg-if",
@@ -5000,7 +4976,7 @@ version = "0.13.28"
 dependencies = [
  "base64",
  "clap",
- "cmark-writer 0.7.7",
+ "cmark-writer",
  "comemo",
  "docx-rs",
  "ecow",

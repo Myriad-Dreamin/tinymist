@@ -76,7 +76,7 @@ Enable GFM features by adding to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-cmark-writer = { version = "0.7.0", features = ["gfm"] }
+cmark-writer = { version = "0.8.0", features = ["gfm"] }
 ```
 
 GFM Support:
@@ -118,8 +118,8 @@ assert_eq!(html, "<p>Hello HTML</p>\n");
 ## Custom Nodes
 
 ```rust
-use cmark_writer::{CommonMarkWriter, HtmlWriter, HtmlWriteResult, Node};
-use cmark_writer::WriteResult;
+use cmark_writer::{HtmlWriteResult, HtmlWriter, Node, WriteResult};
+use cmark_writer::writer::InlineWriterProxy;
 use cmark_writer::custom_node;
 use ecow::EcoString;
 
@@ -132,7 +132,7 @@ struct HighlightNode {
 
 impl HighlightNode {
     // Implementation for CommonMark output
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
         writer.write_str("<span style=\"background-color: ")?;
         writer.write_str(&self.color)?;
         writer.write_str("\">")?;

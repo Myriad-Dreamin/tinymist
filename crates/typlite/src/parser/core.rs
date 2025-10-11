@@ -2,8 +2,9 @@
 
 use std::sync::Arc;
 
+use cmark_writer::WriteResult;
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
-use cmark_writer::{CommonMarkWriter, WriteResult};
+use cmark_writer::writer::InlineWriterProxy;
 use ecow::EcoString;
 use tinymist_project::LspWorld;
 use typst::html::{HtmlElement, HtmlNode, tag};
@@ -287,7 +288,7 @@ impl CustomNode for Comment {
         self
     }
 
-    fn write(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+    fn write_inline(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
         writer.write_str("<!-- ")?;
         writer.write_str(&self.0)?;
         writer.write_str(" -->")?;

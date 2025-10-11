@@ -1,13 +1,13 @@
 //! Custom node definitions for the CommonMark AST.
 
-use crate::error::WriteResult;
-use crate::writer::{CommonMarkWriter, HtmlWriteResult, HtmlWriter};
+use crate::error::{WriteError, WriteResult};
+use crate::writer::{BlockWriterProxy, HtmlWriteResult, HtmlWriter, InlineWriterProxy};
 use std::any::Any;
 
 /// Trait for implementing custom node behavior for the CommonMark AST.
 ///
 /// This trait defines methods that all custom node types must implement.
-/// Users can implement the `write` method for CommonMark output and
+/// Users can implement dedicated block or inline rendering methods for CommonMark output and
 /// optionally override the `html_write` method for HTML output.
 ///
 /// The recommended way to implement this trait is through the `custom_node` macro,
@@ -19,10 +19,8 @@ use std::any::Any;
 /// ```rust
 /// use ecow::EcoString;
 /// use cmark_writer_macros::custom_node;
-/// use cmark_writer::CommonMarkWriter;
-/// use cmark_writer::writer::HtmlWriter;
 /// use cmark_writer::error::WriteResult;
-/// use cmark_writer::writer::HtmlWriteResult;
+/// use cmark_writer::writer::{HtmlWriteResult, HtmlWriter, InlineWriterProxy};
 ///
 /// // Define a custom node with support for both CommonMark and HTML output
 /// #[derive(Debug, Clone, PartialEq)]
@@ -34,7 +32,7 @@ use std::any::Any;
 ///
 /// impl HighlightNode {
 ///     // Required for CommonMark output
-///     fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
 ///         writer.write_str("<span style=\"background-color: ")?;
 ///         writer.write_str(&self.color)?;
 ///         writer.write_str("\">")?;
@@ -55,11 +53,21 @@ use std::any::Any;
 /// }
 /// ```
 pub trait CustomNode: std::fmt::Debug + Send + Sync {
-    /// Write the custom node content to the CommonMarkWriter (for CommonMark output).
+    /// Write the custom node as a block element using the restricted block writer proxy.
     ///
-    /// When using the `custom_node` macro, this method delegates to the user-defined
-    /// `write_custom` method that must be implemented on the node type.
-    fn write(&self, writer: &mut CommonMarkWriter) -> WriteResult<()>;
+    /// Block custom nodes should implement this method to emit valid block-level content.
+    fn write_block(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
+        let _ = writer;
+        Err(WriteError::UnsupportedNodeType)
+    }
+
+    /// Write the custom node as an inline element using the restricted inline writer proxy.
+    ///
+    /// Inline custom nodes should implement this method to emit valid inline content.
+    fn write_inline(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
+        let _ = writer;
+        Err(WriteError::UnsupportedNodeType)
+    }
 
     /// Writes the HTML representation of the custom node to the provided HTML writer.
     ///
@@ -100,7 +108,7 @@ pub trait CustomNode: std::fmt::Debug + Send + Sync {
 }
 
 // NOTE: CustomNodeWriter trait is deprecated and will be removed in a future version.
-// Custom nodes should now directly use CommonMarkWriter instead.
+// Custom nodes should now directly use the provided writer proxies instead.
 /*
 /// Trait for custom node writer implementation
 pub trait CustomNodeWriter {
