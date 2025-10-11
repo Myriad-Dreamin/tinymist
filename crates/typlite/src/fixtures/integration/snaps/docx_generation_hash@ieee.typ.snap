@@ -2,6 +2,5 @@
 source: crates/typlite/src/tests.rs
 expression: hash
 input_file: crates/typlite/src/fixtures/integration/ieee.typ
-snapshot_kind: text
 ---
-siphash128_13:914f20b049c227a73ad350294a7d79b3
+siphash128_13:47f5f496ccb3e39b89162536a33cc4de

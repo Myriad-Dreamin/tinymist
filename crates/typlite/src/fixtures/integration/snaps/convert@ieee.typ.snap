@@ -2,7 +2,6 @@
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/ieee.typ
-snapshot_kind: text
 ---
 <!DOCTYPE html>
 <html>
@@ -43,18 +42,48 @@ In Figure 1 you can see a common representation of the Sun, which is a star tha
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim aeque doleamus animo, cum corpore dolemus, fieri tamen permagna accessio potest, si aliquod aeternum et infinitum impendere malum nobis opinemur. Quod idem licet transferre in voluptatem, ut postea variari voluptas distinguique possit, augeri amplificarique non possit. At etiam Athenis, ut e patre audiebam facete et urbane Stoicos irridente, statua est in quo a nobis philosophia defensa et collaudata est, cum id, quod maxime placeat, facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet, ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum.
 
-| Planet | Distance (million km) |
-| --- | --- |
-| Mercury | 57.9 |
-| Venus | 108.2 |
-| Earth | 149.6 |
-| Mars | 227.9 |
-| Jupiter | 778.6 |
-| Saturn | 1,433.5 |
-| Uranus | 2,872.5 |
-| Neptune | 4,495.1 |
-
-<p align="center"><figure class="figure"><p></p>
+<p align="center"><figure class="figure"><table>
+<thead>
+<tr>
+<th>Planet</th>
+<th>Distance (million km)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Mercury</td>
+<td>57.9</td>
+</tr>
+<tr>
+<td>Venus</td>
+<td>108.2</td>
+</tr>
+<tr>
+<td>Earth</td>
+<td>149.6</td>
+</tr>
+<tr>
+<td>Mars</td>
+<td>227.9</td>
+</tr>
+<tr>
+<td>Jupiter</td>
+<td>778.6</td>
+</tr>
+<tr>
+<td>Saturn</td>
+<td>1,433.5</td>
+</tr>
+<tr>
+<td>Uranus</td>
+<td>2,872.5</td>
+</tr>
+<tr>
+<td>Neptune</td>
+<td>4,495.1</td>
+</tr>
+</tbody>
+</table>
 </figure></p>
 
 In Table 1, you see the planets of the solar system and their average distance from the Sun. The distances were calculated with Equation 1 that we presented in Section II.
