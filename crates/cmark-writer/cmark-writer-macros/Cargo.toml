@@ -1,0 +1,15 @@
+[package]
+name = "cmark-writer-macros"
+version = "0.7.9"
+edition = "2021"
+authors = ["Hong Jiarong"]
+description = "Proc-macro implementations for cmark-writer"
+license = "MIT"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"

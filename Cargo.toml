@@ -315,6 +315,7 @@ tinymist-vfs = { path = "crates/tinymist-vfs" }
 tinymist-world = { path = "crates/tinymist-world" }
 tinymist-project = { path = "crates/tinymist-project" }
 tinymist-task = { path = "crates/tinymist-task" }
+cmark-writer = { path = "crates/cmark-writer" }
 
 # If reflexo use the tinymist from git, you should use the following patch.
 # [patch."https://github.com/Myriad-Dreamin/tinymist.git"]
