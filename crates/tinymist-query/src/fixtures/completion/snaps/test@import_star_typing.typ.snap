@@ -1,0 +1,68 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on o( (50..52)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import_star_typing.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "todo",
+    "labelDetails": {
+     "description": "(any) => any"
+    },
+    "sortText": "218",
+    "textEdit": {
+     "newText": "todo(${1:})",
+     "range": {
+      "end": {
+       "character": 3,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "todo",
+    "labelDetails": {
+     "description": "(any) => any"
+    },
+    "sortText": "218",
+    "textEdit": {
+     "newText": "todo(${1:})",
+     "range": {
+      "end": {
+       "character": 3,
+       "line": 2
+      },
+      "start": {
+       "character": 1,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
