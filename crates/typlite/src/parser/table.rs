@@ -1,8 +1,9 @@
 //! HTML table parsing module, processes the conversion of table elements
 
-use cmark_writer::ast::Node;
+use cmark_writer::HtmlWriter;
+use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::gfm::TableAlignment;
-use ecow::EcoString;
+use ecow::{EcoString, eco_format};
 use typst::html::{HtmlElement, HtmlNode, tag};
 use typst::utils::PicoStr;
 
@@ -39,7 +40,28 @@ impl TableParser {
             let mut rows = Vec::new();
             let mut is_header = true;
 
-            Self::extract_table_content(parser, table, &mut headers, &mut rows, &mut is_header)?;
+            let mut fallback_to_html = false;
+            Self::extract_table_content(
+                parser,
+                table,
+                &mut headers,
+                &mut rows,
+                &mut is_header,
+                &mut fallback_to_html,
+            )?;
+
+            if fallback_to_html {
+                eprintln!(
+                    "[typlite] warning: block content detected inside table cell; exporting original HTML table"
+                );
+                let html = Self::serialize_html_element(parser, table);
+                let html = eco_format!(
+                    "<!-- typlite warning: block content detected inside table cell; exported original HTML table -->\n{}",
+                    html
+                );
+                return Ok(Some(Node::HtmlBlock(html)));
+            }
+
             return Self::create_table_node(headers, rows);
         }
 
@@ -93,27 +115,52 @@ impl TableParser {
         headers: &mut Vec<Node>,
         rows: &mut Vec<Vec<Node>>,
         is_header: &mut bool,
+        fallback_to_html: &mut bool,
     ) -> Result<()> {
+        if *fallback_to_html {
+            return Ok(());
+        }
         // Process table structure (direct rows or thead/tbody)
         for child_node in &table.children {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead => {
                         // Process header rows
-                        Self::process_table_section(parser, element, headers, rows, true)?;
+                        Self::process_table_section(
+                            parser,
+                            element,
+                            headers,
+                            rows,
+                            true,
+                            fallback_to_html,
+                        )?;
                         *is_header = false;
                     }
                     tag::tbody => {
                         // Process body rows
-                        Self::process_table_section(parser, element, headers, rows, false)?;
+                        Self::process_table_section(
+                            parser,
+                            element,
+                            headers,
+                            rows,
+                            false,
+                            fallback_to_html,
+                        )?;
                     }
                     tag::tr => {
                         // Direct row (no thead/tbody structure)
-                        let current_row =
-                            Self::process_table_row(parser, element, *is_header, headers)?;
+                        let current_row = Self::process_table_row(
+                            parser,
+                            element,
+                            *is_header,
+                            headers,
+                            fallback_to_html,
+                        )?;
 
                         // After the first row, treat remaining rows as data rows
-                        if *is_header {
+                        if *fallback_to_html {
+                            return Ok(());
+                        } else if *is_header {
                             *is_header = false;
                         } else if !current_row.is_empty() {
                             rows.push(current_row);
@@ -132,13 +179,26 @@ impl TableParser {
         headers: &mut Vec<Node>,
         rows: &mut Vec<Vec<Node>>,
         is_header_section: bool,
+        fallback_to_html: &mut bool,
     ) -> Result<()> {
+        if *fallback_to_html {
+            return Ok(());
+        }
         for row_node in &section.children {
             if let HtmlNode::Element(row_elem) = row_node
                 && row_elem.tag == tag::tr
             {
-                let current_row =
-                    Self::process_table_row(parser, row_elem, is_header_section, headers)?;
+                let current_row = Self::process_table_row(
+                    parser,
+                    row_elem,
+                    is_header_section,
+                    headers,
+                    fallback_to_html,
+                )?;
+
+                if *fallback_to_html {
+                    return Ok(());
+                }
 
                 if !is_header_section && !current_row.is_empty() {
                     rows.push(current_row);
@@ -153,7 +213,11 @@ impl TableParser {
         row_elem: &HtmlElement,
         is_header: bool,
         headers: &mut Vec<Node>,
+        fallback_to_html: &mut bool,
     ) -> Result<Vec<Node>> {
+        if *fallback_to_html {
+            return Ok(Vec::new());
+        }
         let mut current_row = Vec::new();
 
         // Process cells in this row
@@ -161,8 +225,12 @@ impl TableParser {
             if let HtmlNode::Element(cell) = cell_node
                 && (cell.tag == tag::td || cell.tag == tag::th)
             {
-                let mut cell_content = Vec::new();
-                parser.convert_children_into(&mut cell_content, cell)?;
+                let (cell_content, block_content) = parser.capture_children(cell)?;
+
+                if !block_content.is_empty() {
+                    *fallback_to_html = true;
+                    return Ok(Vec::new());
+                }
 
                 // Merge cell content into a single node
                 let merged_cell = Self::merge_cell_content(cell_content);
@@ -253,5 +321,45 @@ impl TableParser {
         }
 
         Ok(None)
+    }
+
+    fn serialize_html_element(parser: &mut HtmlToAstParser, element: &HtmlElement) -> EcoString {
+        let node = Node::HtmlElement(Self::build_html_element(parser, element));
+        let mut writer = HtmlWriter::new();
+        match writer.write_node(&node) {
+            Ok(()) => writer.into_string(),
+            Err(_) => EcoString::new(),
+        }
+    }
+
+    fn build_html_element(parser: &mut HtmlToAstParser, element: &HtmlElement) -> CmarkHtmlElement {
+        let attributes = element
+            .attrs
+            .0
+            .iter()
+            .map(|(name, value)| HtmlAttribute {
+                name: name.resolve().to_string().into(),
+                value: value.clone(),
+            })
+            .collect();
+
+        let mut children = Vec::new();
+        for child in &element.children {
+            match child {
+                HtmlNode::Text(text, _) => children.push(Node::Text(text.clone())),
+                HtmlNode::Element(elem) => {
+                    children.push(Node::HtmlElement(Self::build_html_element(parser, elem)))
+                }
+                HtmlNode::Frame(frame) => children.push(parser.convert_frame(frame)),
+                HtmlNode::Tag(_) => {}
+            }
+        }
+
+        CmarkHtmlElement {
+            tag: element.tag.resolve().to_string().into(),
+            attributes,
+            children,
+            self_closing: element.children.is_empty(),
+        }
     }
 }
