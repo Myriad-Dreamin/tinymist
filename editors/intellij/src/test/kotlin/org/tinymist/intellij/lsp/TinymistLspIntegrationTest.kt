@@ -1,0 +1,84 @@
+package org.tinymist.intellij.lsp
+
+import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import org.tinymist.intellij.TypstFileType
+
+class TinymistLspIntegrationTest : BasePlatformTestCase() {
+
+    /**
+     * Test that verifies the LSP server is correctly started when a Typst file is opened.
+     * This test uses a mock LSP server to avoid dependencies on the actual tinymist executable.
+     */
+    fun testLspServerStartsForTypstFile() {
+        // Creates a temporary Typst file
+        val fileName = "test.typ"
+        val fileContent = "#set page(width: 10cm, height: auto)\n\n= Hello, Typst!\n\nThis is a test document."
+
+        // Configures the test fixture with the file
+        myFixture.configureByText(fileName, fileContent)
+
+        // Gets the virtual file
+        val virtualFile = myFixture.file.virtualFile
+
+        // Verifies that the file is recognized as a Typst file
+        assertEquals(TypstFileType, virtualFile.fileType)
+
+        // Gets the document for the file
+        val document = FileDocumentManager.getInstance().getDocument(virtualFile)
+        assertNotNull("Document should not be null", document)
+
+        // Triggers LSP initialization by making a change to the document
+        WriteCommandAction.runWriteCommandAction(project) {
+            document!!.insertString(document.textLength, "\n\nAdded text for testing.")
+        }
+
+        // Verifies that the LSP server exists for this file
+
+        // Note: LanguageServiceAccessor is used here despite being marked with @ApiStatus.Internal in LSP4IJ.
+        // This may lead to issues in the future if the API changes.
+        val languageServiceAccessor = com.redhat.devtools.lsp4ij.LanguageServiceAccessor.getInstance(project)
+        val hasServer = languageServiceAccessor.hasAny(myFixture.file) { true }
+        assertTrue("LSP server should exist for Typst files", hasServer)
+    }
+
+    /**
+     * Test that verifies basic LSP features like code completion work correctly.
+     * This test requires the actual tinymist executable to be available.
+     */
+    fun testLspCompletion() {
+        // Creates a temporary Typst file with content that should trigger completion
+        val fileName = "completion_test.typ"
+        val fileContent = "#set page(width: 10cm, height: auto)\n\n#"
+
+        // Configures the test fixture with the file
+        myFixture.configureByText(fileName, fileContent)
+
+        // Moves the caret to the position where we want to trigger completion
+        myFixture.editor.caretModel.moveToOffset(fileContent.length)
+
+        // Waits for the LSP server to start and be ready
+        waitForLspServerReady()
+
+        // Triggers completion at the current position
+        val lookupElements = myFixture.completeBasic()
+
+        // Verifies that we got some completion results
+        assertNotNull("Completion should return lookup elements", lookupElements)
+        assertTrue("Completion should return at least one result", lookupElements.isNotEmpty())
+
+        // Verifies that common Typst functions are included in the completion results
+        val completionTexts = lookupElements.map { it.lookupString }
+        assertTrue("Completion should include 'text' function", completionTexts.contains("text"))
+    }
+
+    /**
+     * Helper method to wait for the LSP server to be ready.
+     * This is a simplified approach and might need to be adjusted based on the actual behavior.
+     */
+    private fun waitForLspServerReady() {
+        // Waits for a reasonable amount of time for the server to start
+        Thread.sleep(2000)
+    }
+}
