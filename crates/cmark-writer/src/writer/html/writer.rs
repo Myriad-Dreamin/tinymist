@@ -304,12 +304,12 @@ impl HtmlWriter {
             #[cfg(not(feature = "gfm"))]
             Node::ExtendedAutolink(url) => {
                 // Handle GFM specific nodes explicitly if feature is off
-                log::warn!("ExtendedAutolink encountered but GFM feature is not enabled. Rendering as text: {}", url);
+                log::warn!("ExtendedAutolink encountered but GFM feature is not enabled. Rendering as text: {url}");
                 self.text_internal(url)
             }
             // All node types are handled above, but keeping this for future extensibility
             #[allow(unreachable_patterns)]
-            _ => Err(HtmlWriteError::UnsupportedNodeType(format!("{:?}", node))),
+            _ => Err(HtmlWriteError::UnsupportedNodeType(format!("{node:?}"))),
         }
     }
 
@@ -800,7 +800,7 @@ impl HtmlWriter {
     fn write_autolink_node(&mut self, url: &str, is_email: bool) -> HtmlWriteResult<()> {
         self.start_tag_internal("a")?;
         let href = if is_email && !url.starts_with("mailto:") {
-            format!("mailto:{}", url)
+            format!("mailto:{url}")
         } else {
             url.to_string()
         };
@@ -840,8 +840,7 @@ impl HtmlWriter {
         }
 
         log::warn!(
-            "Unresolved reference link for label '{}'. Rendering as plain text.",
-            label
+            "Unresolved reference link for label '{label}'. Rendering as plain text."
         );
         // Render as plain text: [content][label] or [label]
         self.text_internal("[")?;

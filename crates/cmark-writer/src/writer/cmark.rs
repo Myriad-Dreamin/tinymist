@@ -142,7 +142,7 @@ impl CommonMarkWriter {
         } else if node.is_inline() {
             InlineNodeProcessor.process(self, node)
         } else {
-            log::warn!("Unsupported node type encountered and skipped: {:?}", node);
+            log::warn!("Unsupported node type encountered and skipped: {node:?}");
             Ok(())
         }
     }
@@ -179,8 +179,7 @@ impl CommonMarkWriter {
                 ));
             } else {
                 log::warn!(
-                    "Newline character found in inline element '{}', but non-strict mode allows it (output may be affected).",
-                    context
+                    "Newline character found in inline element '{context}', but non-strict mode allows it (output may be affected)."
                 );
             }
         }
@@ -276,9 +275,7 @@ impl CommonMarkWriter {
                 let original_level = level;
                 level = level.clamp(1, 6); // Clamp level to 1-6
                 log::warn!(
-                    "Invalid heading level: {}. Corrected to {}. Strict mode is off.",
-                    original_level,
-                    level
+                    "Invalid heading level: {original_level}. Corrected to {level}. Strict mode is off."
                 );
             }
         }
@@ -379,7 +376,7 @@ impl CommonMarkWriter {
     /// Write a thematic break (horizontal rule)
     pub(crate) fn write_thematic_break(&mut self) -> WriteResult<()> {
         let char = self.options.thematic_break_char;
-        self.write_str(&format!("{}{}{}", char, char, char))?;
+        self.write_str(&format!("{char}{char}{char}"))?;
         Ok(())
     }
 
@@ -432,7 +429,7 @@ impl CommonMarkWriter {
     /// Write an unordered list node
     pub(crate) fn write_unordered_list(&mut self, items: &[ListItem]) -> WriteResult<()> {
         let list_marker = self.options.list_marker;
-        let prefix = format!("{} ", list_marker);
+        let prefix = format!("{list_marker} ");
 
         for (i, item) in items.iter().enumerate() {
             if i > 0 {
@@ -459,20 +456,20 @@ impl CommonMarkWriter {
                 ListItem::Ordered { number, content: _ } => {
                     if let Some(custom_num) = number {
                         // Use custom numbering
-                        let prefix = format!("{}. ", custom_num);
+                        let prefix = format!("{custom_num}. ");
                         self.write_list_item(item, &prefix)?;
                         // Next expected number
                         current_number = custom_num + 1;
                     } else {
                         // No custom number, use the current calculated number
-                        let prefix = format!("{}. ", current_number);
+                        let prefix = format!("{current_number}. ");
                         self.write_list_item(item, &prefix)?;
                         current_number += 1;
                     }
                 }
                 // For other types of list items, still use the current number
                 _ => {
-                    let prefix = format!("{}. ", current_number);
+                    let prefix = format!("{current_number}. ");
                     self.write_list_item(item, &prefix)?;
                     current_number += 1;
                 }
@@ -491,7 +488,7 @@ impl CommonMarkWriter {
             }
             ListItem::Ordered { number, content } => {
                 if let Some(num) = number {
-                    let custom_prefix = format!("{}. ", num);
+                    let custom_prefix = format!("{num}. ");
                     self.write_str(&custom_prefix)?;
                     self.write_list_item_content(content, custom_prefix.len())?;
                 } else {
@@ -772,8 +769,7 @@ impl CommonMarkWriter {
                 ));
             } else {
                 log::warn!(
-                    "Newline character found in autolink URL '{}'. Writing it as is, which might result in an invalid link. Strict mode is off.",
-                    url
+                    "Newline character found in autolink URL '{url}'. Writing it as is, which might result in an invalid link. Strict mode is off."
                 );
                 // Continue to write the URL as is, including the newline.
             }
@@ -989,7 +985,7 @@ impl CommonMarkWriter {
     /// Write a strong emphasis (bold) node with custom delimiter
     pub(crate) fn write_strong(&mut self, content: &[Node]) -> WriteResult<()> {
         let char = self.options.strong_char;
-        let delimiter = format!("{}{}", char, char);
+        let delimiter = format!("{char}{char}");
         self.write_delimited(content, &delimiter)
     }
 
@@ -1021,7 +1017,7 @@ impl fmt::Display for Node {
         let mut writer = CommonMarkWriter::new();
         match writer.write(self) {
             Ok(_) => write!(f, "{}", writer.into_string()),
-            Err(e) => write!(f, "Error writing Node: {}", e),
+            Err(e) => write!(f, "Error writing Node: {e}"),
         }
     }
 }
@@ -1087,7 +1083,7 @@ impl<E: Escapes> std::fmt::Display for Escaped<'_, E> {
             if E::char_needs_escaping(c) {
                 f.write_str(E::escape_char(c).unwrap())?;
             } else {
-                write!(f, "{}", c)?;
+                write!(f, "{c}")?;
             }
         }
         Ok(())

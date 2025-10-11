@@ -23,25 +23,24 @@ pub enum HtmlWriteError {
 impl Display for HtmlWriteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HtmlWriteError::Io(err) => write!(f, "HTML I/O error: {}", err),
+            HtmlWriteError::Io(err) => write!(f, "HTML I/O error: {err}"),
             HtmlWriteError::UnsupportedNodeType(node_type) => {
                 write!(
                     f,
-                    "HTML conversion not supported for node type: {}",
-                    node_type
+                    "HTML conversion not supported for node type: {node_type}"
                 )
             }
             HtmlWriteError::InvalidStructure(msg) => {
-                write!(f, "Invalid structure for HTML conversion: {}", msg)
+                write!(f, "Invalid structure for HTML conversion: {msg}")
             }
             HtmlWriteError::InvalidHtmlTag(tag_name) => {
-                write!(f, "Invalid HTML tag name: {}", tag_name)
+                write!(f, "Invalid HTML tag name: {tag_name}")
             }
             HtmlWriteError::InvalidHtmlAttribute(attr_name) => {
-                write!(f, "Invalid HTML attribute name: {}", attr_name)
+                write!(f, "Invalid HTML attribute name: {attr_name}")
             }
             HtmlWriteError::CustomNodeError(msg) => {
-                write!(f, "Error writing custom node: {}", msg)
+                write!(f, "Error writing custom node: {msg}")
             }
         }
     }
@@ -62,7 +61,7 @@ impl HtmlWriteError {
         match self {
             HtmlWriteError::Io(err) => WriteError::IoError(err),
             HtmlWriteError::UnsupportedNodeType(msg) => WriteError::Custom {
-                message: format!("HTML writer error: {}", msg).into(),
+                message: format!("HTML writer error: {msg}").into(),
                 code: None,
             },
             HtmlWriteError::InvalidStructure(msg) => WriteError::InvalidStructure(msg.into()),
@@ -71,7 +70,7 @@ impl HtmlWriteError {
                 WriteError::InvalidHtmlAttribute(attr.into())
             }
             HtmlWriteError::CustomNodeError(msg) => WriteError::Custom {
-                message: format!("Custom node error: {}", msg).into(),
+                message: format!("Custom node error: {msg}").into(),
                 code: None,
             },
         }

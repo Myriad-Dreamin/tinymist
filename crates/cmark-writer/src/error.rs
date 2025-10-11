@@ -47,39 +47,37 @@ impl Display for WriteError {
         match self {
             WriteError::InvalidHeadingLevel(level) => write!(
                 f,
-                "Invalid heading level: {}. Level must be between 1 and 6.",
-                level
+                "Invalid heading level: {level}. Level must be between 1 and 6."
             ),
             WriteError::NewlineInInlineElement(context) => write!(
                 f,
-                "Newline character found within an inline element ({}) which is not allowed in strict mode or this context.",
-                context
+                "Newline character found within an inline element ({context}) which is not allowed in strict mode or this context."
             ),
-            WriteError::FmtError(msg) => write!(f, "Formatting error: {}", msg),
-            WriteError::IoError(err) => write!(f, "I/O error: {}", err),
+            WriteError::FmtError(msg) => write!(f, "Formatting error: {msg}"),
+            WriteError::IoError(err) => write!(f, "I/O error: {err}"),
             WriteError::UnsupportedNodeType => {
                 write!(f, "Unsupported node type encountered during writing.")
             },
             WriteError::InvalidStructure(msg) => {
-                write!(f, "Invalid structure: {}", msg)
+                write!(f, "Invalid structure: {msg}")
             },
             WriteError::InvalidHtmlTag(tag) => {
-                write!(f, "Invalid HTML tag name: '{}'. Tag names should only contain alphanumeric characters, underscores, colons, or hyphens.", tag)
+                write!(f, "Invalid HTML tag name: '{tag}'. Tag names should only contain alphanumeric characters, underscores, colons, or hyphens.")
             },
             WriteError::InvalidHtmlAttribute(attr) => {
-                write!(f, "Invalid HTML attribute name: '{}'. Attribute names should only contain alphanumeric characters, underscores, colons, dots, or hyphens.", attr)
+                write!(f, "Invalid HTML attribute name: '{attr}'. Attribute names should only contain alphanumeric characters, underscores, colons, dots, or hyphens.")
             },
             WriteError::HtmlRenderingError(html_err) => {
-                write!(f, "Error during HTML rendering phase: {}", html_err)
+                write!(f, "Error during HTML rendering phase: {html_err}")
             },
             WriteError::HtmlFallbackError(msg) => {
-                write!(f, "Error during HTML fallback rendering: {}", msg)
+                write!(f, "Error during HTML fallback rendering: {msg}")
             },
             WriteError::Custom { message, code } => {
                 if let Some(code) = code {
-                    write!(f, "Custom error [{}]: {}", code, message)
+                    write!(f, "Custom error [{code}]: {message}")
                 } else {
-                    write!(f, "Custom error: {}", message)
+                    write!(f, "Custom error: {message}")
                 }
             }
         }
