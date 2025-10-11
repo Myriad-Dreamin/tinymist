@@ -1024,18 +1024,93 @@ pub struct ContentSeqExpr {
 
 /// Represents a reference expression.
 ///
-/// The step resolution is the intermediate step in resolution (if any).
-/// The root expression is the root expression of the reference chain.
-/// The term is the final resolved type of the reference.
+/// A reference expression tracks how an identifier resolves through the lexical
+/// scope, imports, and field accesses. It maintains a chain of resolution steps
+/// to support features like go-to-definition and type inference.
+///
+/// # Resolution Chain
+///
+/// The fields form a resolution chain: `root` -> `step` -> `decl`, where:
+/// - `root` is the original source of the value
+/// - `step` is any intermediate transformation
+/// - `decl` is the final identifier being referenced
+/// - `term` is the resolved type (if known)
+///
+/// # Examples
+///
+/// ## Simple identifier reference
+/// ```rust,ignore
+/// // For: let x = value; let y = x;
+/// RefExpr {
+///     decl: y,           // The identifier 'y'
+///     root: Some(x),     // Points back to 'x'
+///     step: Some(x),     // Same as root for simple refs
+///     term: Some(type),  // Type of the value if known
+/// }
+/// ```
+///
+/// ## Module field access
+/// ```rust,ignore
+/// // For: import "mod.typ"; mod.field
+/// RefExpr {
+///     decl: field,           // The field name
+///     root: Some(mod),       // The module expression
+///     step: Some(field_expr),// The field's expression from module
+///     term: None,            // Type may not be known yet
+/// }
+/// ```
+///
+/// ## Import with rename
+/// ```rust,ignore
+/// // For: import "mod.typ": old as new
+/// // First creates ref for 'old':
+/// RefExpr { decl: old, root: Some(mod), step: Some(field), term: Some(type) }
+/// // Then creates ref for 'new':
+/// RefExpr { decl: new, root: Some(mod), step: Some(old), term: Some(type) }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
-    /// The declaration being referenced.
+    /// The declaration being referenced (the final identifier in the chain).
+    ///
+    /// This is always set and represents the identifier at the current point
+    /// of reference (e.g., the variable name, import alias, or field name).
     pub decl: DeclExpr,
-    /// The intermediate step in resolution (if any).
+
+    /// The intermediate expression in the resolution chain.
+    ///
+    /// Set in the following cases:
+    /// - **Import/include**: The module expression being imported
+    /// - **Field access**: The selected field's expression
+    /// - **Chained references**: When an identifier resolves to another reference
+    /// - **Renamed imports**: The original name before renaming
+    ///
+    /// `None` when the identifier is a direct definition (not a reference).
     pub step: Option<Expr>,
-    /// The root expression of the reference chain.
+
+    /// The root expression at the start of the reference chain.
+    ///
+    /// Set in the following cases:
+    /// - **Module imports**: The module expression (same as `step`)
+    /// - **Field selection**: The base object being accessed
+    /// - **Chained references**: Propagated from the previous reference's `root`
+    ///
+    /// `None` when:
+    /// - The identifier is a direct definition
+    /// - The identifier resolves to a built-in or library value
+    /// - No reference chain exists
     pub root: Option<Expr>,
-    /// The final resolved type of the reference.
+
+    /// The final resolved type of the referenced value.
+    ///
+    /// Set when:
+    /// - Type inference successfully determines the type
+    /// - The value is a known constant or function
+    /// - The identifier resolves to a typed declaration
+    ///
+    /// `None` when:
+    /// - Type cannot be determined at analysis time
+    /// - The reference is to a module (modules don't have simple types)
+    /// - Type inference is incomplete or deferred
     pub term: Option<Ty>,
 }
 
