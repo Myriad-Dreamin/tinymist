@@ -67,7 +67,8 @@ impl Parse for CustomNodeArgs {
 /// # Example
 ///
 /// ```rust
-/// use cmark_writer_macros::custom_node;
+/// use cmark_writer::writer::{BlockWriterProxy, HtmlWriteResult, HtmlWriter, InlineWriterProxy};
+/// use cmark_writer::{custom_node, WriteResult};
 /// use ecow::EcoString;
 ///
 /// // Specified as an inline element with both CommonMark and HTML implementations
@@ -80,7 +81,7 @@ impl Parse for CustomNodeArgs {
 ///
 /// impl HighlightNode {
 ///     // Required for CommonMark rendering
-///     fn write_custom(&self, writer: &mut ::cmark_writer::writer::BlockWriterProxy) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
 ///         writer.write_str("<span style=\"background-color: ")?;
 ///         writer.write_str(&self.color)?;
 ///         writer.write_str("\">")?;
@@ -108,7 +109,7 @@ impl Parse for CustomNodeArgs {
 /// }
 ///
 /// impl AlertNode {
-///     fn write_custom(&self, writer: &mut ::cmark_writer::writer::InlineWriterProxy) -> WriteResult<()> {
+///     fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
 ///         writer.write_str("<div class=\"alert\">")?;
 ///         writer.write_str(&self.content)?;
 ///         writer.write_str("</div>")?;
@@ -245,7 +246,7 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```rust
-/// use cmark_writer_macros::structure_error;
+/// use cmark_writer::structure_error;
 ///
 /// #[structure_error(format = "Table column mismatch: {}")]
 /// struct TableColumnMismatchError(pub &'static str);
@@ -314,10 +315,10 @@ pub fn structure_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// ```rust
-/// use cmark_writer_macros::coded_error;
+/// use cmark_writer::coded_error;
 ///
 /// #[coded_error]
-/// struct MarkdownSyntaxError(pub &'static str, pub &'static str);
+/// struct MarkdownSyntaxError(pub String, pub String);
 /// ```
 #[proc_macro_attribute]
 pub fn coded_error(_attr: TokenStream, item: TokenStream) -> TokenStream {

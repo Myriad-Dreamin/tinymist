@@ -588,6 +588,8 @@ dependencies = [
 name = "cmark-writer-macros"
 version = "0.8.0"
 dependencies = [
+ "cmark-writer",
+ "ecow",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -1068,9 +1070,9 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "ecow"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b92b481eb5d59fd8e80e92ff11d057d1ca8d144b2cd8c66cc8d5bd177a3c0dc5"
+checksum = "78e4f79b296fbaab6ce2e22d52cb4c7f010fe0ebe7a32e34fa25885fd797bd02"
 dependencies = [
  "serde",
 ]
