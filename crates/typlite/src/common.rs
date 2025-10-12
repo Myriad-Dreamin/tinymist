@@ -181,8 +181,8 @@ impl CenterNode {
             ..Default::default()
         });
         temp_writer.write_node(&self.node)?;
-        let content = temp_writer.into_string();
-        writer.write_str(&content)?;
+        let content = temp_writer.into_string()?;
+        writer.write_trusted_html(&content)?;
         Ok(())
     }
 }

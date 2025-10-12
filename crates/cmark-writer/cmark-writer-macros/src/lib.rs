@@ -158,7 +158,7 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
                 &self,
                 writer: &mut ::cmark_writer::writer::HtmlWriter,
             ) -> ::cmark_writer::writer::HtmlWriteResult<()> {
-                writer.raw_html(&format!(
+                writer.write_trusted_html(&format!(
                     "<!-- HTML rendering not implemented for Custom Node: {} -->",
                     self.type_name()
                 ))?;

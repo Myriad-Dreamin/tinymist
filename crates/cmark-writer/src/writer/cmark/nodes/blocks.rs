@@ -4,8 +4,8 @@ use crate::ast::{TableAlignment, TaskListStatus};
 use crate::error::{WriteError, WriteResult};
 use ecow::EcoString;
 
-use super::utils::table_contains_block_elements;
-use super::CommonMarkWriter;
+use super::super::utils::table_contains_block_elements;
+use super::super::CommonMarkWriter;
 
 impl CommonMarkWriter {
     /// Apply a prefix to multi-line content, preserving the first-line prefix if provided.

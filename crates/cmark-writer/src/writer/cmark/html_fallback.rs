@@ -27,7 +27,11 @@ impl CommonMarkWriter {
             )
         })?;
 
-        let html_output = html_writer.into_string();
+        let html_output = html_writer.into_string().map_err(|e| {
+            crate::error::WriteError::HtmlFallbackError(
+                format!("Failed to finalize table HTML output: {e}").into(),
+            )
+        })?;
         self.buffer.push_str(&html_output);
         Ok(())
     }
@@ -53,7 +57,11 @@ impl CommonMarkWriter {
             )
         })?;
 
-        let html_output = html_writer.into_string();
+        let html_output = html_writer.into_string().map_err(|e| {
+            crate::error::WriteError::HtmlFallbackError(
+                format!("Failed to finalize GFM table HTML output: {e}").into(),
+            )
+        })?;
         self.buffer.push_str(&html_output);
         Ok(())
     }

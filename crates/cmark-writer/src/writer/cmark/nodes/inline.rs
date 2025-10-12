@@ -3,8 +3,8 @@ use crate::error::{WriteError, WriteResult};
 use crate::writer::html::{HtmlWriter, HtmlWriterOptions};
 use ecow::EcoString;
 
-use super::utils::{escape_str, CommonMarkEscapes};
-use super::CommonMarkWriter;
+use super::super::utils::{escape_str, CommonMarkEscapes};
+use super::super::CommonMarkWriter;
 
 impl CommonMarkWriter {
     /// Write text content, escaping special characters when configured.
@@ -268,7 +268,9 @@ impl CommonMarkWriter {
 
         let mut html_writer = HtmlWriter::with_options(html_options);
         html_writer.write_node(&Node::HtmlElement(element.clone()))?;
-        let html_output = html_writer.into_string();
+        let html_output = html_writer
+            .into_string()
+            .map_err(|err| err.into_write_error())?;
         self.write_str(&html_output)
     }
 }

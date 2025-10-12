@@ -4,11 +4,10 @@
 //! helpers split across multiple submodules to keep individual files
 //! focused and maintainable.
 
-mod blocks;
 mod core;
 mod format;
 mod html_fallback;
-mod inline;
+mod nodes;
 mod utils;
 
 #[cfg(test)]

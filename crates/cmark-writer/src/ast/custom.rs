@@ -79,7 +79,7 @@ pub trait CustomNode: std::fmt::Debug + Send + Sync {
     /// 1. Override this method directly, or
     /// 2. Use the `custom_node` macro with `html_impl=true` and implement the `write_html_custom` method.
     fn html_write(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        writer.raw_html(&format!(
+        writer.write_trusted_html(&format!(
             "<!-- HTML rendering not implemented for Custom Node: {} -->",
             self.type_name()
         ))?;

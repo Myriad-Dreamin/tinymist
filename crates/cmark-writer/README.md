@@ -111,7 +111,7 @@ let paragraph = Node::Paragraph(vec![Node::Text("Hello HTML".into())]);
 writer.write_node(&paragraph).unwrap();
 
 // Get resulting HTML
-let html = writer.into_string();
+let html = writer.into_string().unwrap();
 assert_eq!(html, "<p>Hello HTML</p>\n");
 ```
 
