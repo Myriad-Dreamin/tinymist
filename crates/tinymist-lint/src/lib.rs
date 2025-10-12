@@ -3,7 +3,8 @@
 use std::sync::Arc;
 
 use tinymist_analysis::{
-    syntax::ExprInfo,
+    adt::interner::Interned,
+    syntax::{Decl, ExprInfo},
     ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
@@ -31,28 +32,71 @@ pub struct LintInfo {
 }
 
 /// Performs linting check on file and returns a vector of diagnostics.
-pub fn lint_file(world: &LspWorld, expr: &ExprInfo, ti: Arc<TypeInfo>) -> LintInfo {
-    let diagnostics = Linter::new(world, ti).lint(expr.source.root());
+pub fn lint_file(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
+) -> LintInfo {
+    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
     LintInfo {
-        revision: expr.revision,
-        fid: expr.fid,
+        revision: ei.revision,
+        fid: ei.fid,
         diagnostics,
+    }
+}
+
+/// Information about issues the linter checks for that will already be reported
+/// to the user via other means (such as compiler diagnostics), to avoid
+/// duplicating warnings.
+#[derive(Default, Clone, Hash)]
+pub struct KnownIssues {
+    unknown_vars: EcoVec<Span>,
+}
+
+impl KnownIssues {
+    /// Collects known lint issues from the given compiler diagnostics.
+    pub fn from_compiler_diagnostics<'a>(
+        diags: impl Iterator<Item = &'a SourceDiagnostic>,
+    ) -> Self {
+        let mut unknown_vars = Vec::default();
+        for diag in diags {
+            if diag.message.starts_with("unknown variable") {
+                unknown_vars.push(diag.span);
+            }
+        }
+        unknown_vars.sort_by_key(|span| span.into_raw());
+        let unknown_vars = EcoVec::from(unknown_vars);
+        Self { unknown_vars }
+    }
+
+    pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
+        self.unknown_vars.contains(&ident.span())
     }
 }
 
 struct Linter<'w> {
     world: &'w LspWorld,
+    ei: ExprInfo,
     ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 }
 
 impl<'w> Linter<'w> {
-    fn new(world: &'w LspWorld, ti: Arc<TypeInfo>) -> Self {
+    fn new(
+        world: &'w LspWorld,
+        ei: ExprInfo,
+        ti: Arc<TypeInfo>,
+        known_issues: KnownIssues,
+    ) -> Self {
         Self {
             world,
+            ei,
             ti,
+            known_issues,
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
@@ -386,6 +430,27 @@ impl DataFlowVisitor for Linter<'_> {
         if expr.callee().to_untyped().text() == "text" {
             self.check_variable_font(expr.args().items());
         }
+        self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
+        Some(())
+    }
+
+    fn math_ident(&mut self, ident: ast::MathIdent<'_>) -> Option<()> {
+        let resolved = self.ei.get_def(&Interned::new(Decl::math_ident_ref(ident)));
+        let is_defined = resolved.is_some_and(|expr| expr.is_defined());
+
+        if !is_defined && !self.known_issues.has_unknown_math_ident(ident) {
+            let var = ident.as_str();
+            let mut warning =
+                SourceDiagnostic::warning(ident.span(), eco_format!("unknown variable: {var}"));
+
+            // Tries to produce the same hints as the corresponding Typst compiler error.
+            // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:
+            // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
+            let in_global = self.world.library.global.scope().get(var).is_some();
+            hint_unknown_variable_math(var, in_global, &mut warning);
+            self.diag.push(warning);
+        }
+
         Some(())
     }
 }
@@ -1020,4 +1085,33 @@ fn is_show_set(it: ast::Expr) -> bool {
 fn is_compare_op(op: ast::BinOp) -> bool {
     use ast::BinOp::*;
     matches!(op, Lt | Leq | Gt | Geq | Eq | Neq)
+}
+
+/// The error message when a variable wasn't found it math.
+#[cold]
+fn hint_unknown_variable_math(var: &str, in_global: bool, diag: &mut SourceDiagnostic) {
+    if matches!(var, "none" | "auto" | "false" | "true") {
+        diag.hint(eco_format!(
+            "if you meant to use a literal, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else if in_global {
+        diag.hint(eco_format!(
+            "`{var}` is not available directly in math, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else {
+        diag.hint(eco_format!(
+            "if you meant to display multiple letters as is, \
+             try adding spaces between each letter: `{}`",
+            var.chars()
+                .flat_map(|c| [' ', c])
+                .skip(1)
+                .collect::<EcoString>()
+        ));
+        diag.hint(eco_format!(
+            "or if you meant to display this as text, \
+             try placing it in quotes: `\"{var}\"`"
+        ));
+    }
 }

@@ -1,19 +1,21 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 
-use futures::future::MaybeDone;
 use reflexo_typst::package::PackageSpec;
-use sync_ls::transport::{MirrorArgs, with_stdio_transport};
-use sync_ls::{LspBuilder, LspMessage, LspResult, internal_error};
-use tinymist::{Config, ServerState, SuperInit};
+use tinymist::Config;
+use tinymist_project::WorldProvider;
+use tinymist_query::analysis::Analysis;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::error::prelude::*;
+use typlite::CompileOnceArgs;
 
-use crate::*;
-
+/// The commands for language server queries.
 #[derive(Debug, Clone, clap::Subcommand)]
 #[clap(rename_all = "camelCase")]
 pub enum QueryCommands {
+    /// Get the lsif for a specific package.
+    Lsif(QueryLsifArgs),
     /// Get the documentation for a specific package.
     PackageDocs(PackageDocsArgs),
     /// Check a specific package.
@@ -21,7 +23,31 @@ pub enum QueryCommands {
 }
 
 #[derive(Debug, Clone, clap::Parser)]
+pub struct QueryLsifArgs {
+    /// Compile a document once before querying.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// The path of the package to request lsif for.
+    #[clap(long)]
+    pub path: Option<String>,
+    /// The package of the package to request lsif for.
+    #[clap(long)]
+    pub id: String,
+    /// The output path for the requested lsif.
+    #[clap(short, long)]
+    pub output: String,
+    // /// The format of requested lsif.
+    // #[clap(long)]
+    // pub format: Option<QueryDocsFormat>,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
 pub struct PackageDocsArgs {
+    /// Compile a document once before querying.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
     /// The path of the package to request docs for.
     #[clap(long)]
     pub path: Option<String>,
@@ -37,78 +63,87 @@ pub struct PackageDocsArgs {
 }
 
 /// The main entry point for language server queries.
-pub fn query_main(cmds: QueryCommands) -> Result<()> {
+pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
     use tinymist_project::package::PackageRegistry;
+    let (config, _) = Config::extract_lsp_params(Default::default(), Default::default());
+    let const_config = &config.const_config;
+    let analysis = Arc::new(Analysis {
+        position_encoding: const_config.position_encoding,
+        allow_overlapping_token: const_config.tokens_overlapping_token_support,
+        allow_multiline_token: const_config.tokens_multiline_token_support,
+        remove_html: !config.support_html_in_markdown,
+        extended_code_action: config.extended_code_action,
+        completion_feat: config.completion.clone(),
+        color_theme: match config.color_theme.as_deref() {
+            Some("dark") => tinymist_query::ColorTheme::Dark,
+            _ => tinymist_query::ColorTheme::Light,
+        },
+        lint: config.lint.when().clone(),
+        periscope: None,
+        tokens_caches: Arc::default(),
+        workers: Default::default(),
+        caches: Default::default(),
+        analysis_rev_cache: Arc::default(),
+        stats: Arc::default(),
+    });
 
-    with_stdio_transport::<LspMessage>(MirrorArgs::default(), |conn| {
-        let client_root = client_root(conn.sender);
-        let client = client_root.weak();
+    let compile = match &mut cmds {
+        QueryCommands::Lsif(args) => &mut args.compile,
+        QueryCommands::PackageDocs(args) => &mut args.compile,
+        QueryCommands::CheckPackage(args) => &mut args.compile,
+    };
+    if compile.input.is_none() {
+        compile.input = Some("main.typ".to_string());
+    }
+    let verse = compile.resolve()?;
+    let snap = verse.computation();
+    let snap = analysis.query_snapshot(snap, None);
 
-        // todo: roots, inputs, font_opts
-        let config = Config::default();
+    let (id, path) = match &cmds {
+        QueryCommands::Lsif(args) => (&args.id, &args.path),
+        QueryCommands::PackageDocs(args) => (&args.id, &args.path),
+        QueryCommands::CheckPackage(args) => (&args.id, &args.path),
+    };
+    let pkg = PackageSpec::from_str(id).unwrap();
+    let path = path.as_ref().map(PathBuf::from);
+    let path = path.unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
 
-        let mut service = ServerState::install_lsp(LspBuilder::new(
-            SuperInit {
-                client: client.to_typed(),
-                exec_cmds: Vec::new(),
-                config,
-                err: None,
-            },
-            client.clone(),
-        ))
-        .build();
+    let info = PackageInfo {
+        path,
+        namespace: pkg.namespace,
+        name: pkg.name,
+        version: pkg.version.to_string(),
+    };
 
-        let resp = service.ready(()).unwrap();
-        let MaybeDone::Done(resp) = resp else {
-            anyhow::bail!("internal error: not sync init")
-        };
-        resp.unwrap();
+    match cmds {
+        QueryCommands::Lsif(args) => {
+            let res = snap.run_within_package(&info, move |a| {
+                let knowledge = tinymist_query::index::knowledge(a)
+                    .map_err(map_string_err("failed to generate index"))?;
+                Ok(knowledge.bind(a.shared()).to_string())
+            })?;
 
-        let state = service.state_mut().unwrap();
+            let output_path = Path::new(&args.output);
+            std::fs::write(output_path, res).context_ut("failed to write lsif output")?;
+        }
+        QueryCommands::PackageDocs(args) => {
+            let res = snap.run_within_package(&info, |a| {
+                let doc = tinymist_query::docs::package_docs(a, &info)
+                    .map_err(map_string_err("failed to generate docs"))?;
+                tinymist_query::docs::package_docs_md(&doc)
+                    .map_err(map_string_err("failed to generate docs"))
+            })?;
 
-        let snap = state.snapshot().unwrap();
-        let res = RUNTIMES.tokio_runtime.block_on(async move {
-            match cmds {
-                QueryCommands::PackageDocs(args) => {
-                    let pkg = PackageSpec::from_str(&args.id).unwrap();
-                    let path = args.path.map(PathBuf::from);
-                    let path = path
-                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
-
-                    let res = state
-                        .resource_package_docs_(PackageInfo {
-                            path,
-                            namespace: pkg.namespace,
-                            name: pkg.name,
-                            version: pkg.version.to_string(),
-                        })?
-                        .await?;
-
-                    let output_path = Path::new(&args.output);
-                    std::fs::write(output_path, res).map_err(internal_error)?;
-                }
-                QueryCommands::CheckPackage(args) => {
-                    let pkg = PackageSpec::from_str(&args.id).unwrap();
-                    let path = args.path.map(PathBuf::from);
-                    let path = path
-                        .unwrap_or_else(|| snap.registry().resolve(&pkg).unwrap().as_ref().into());
-
-                    state
-                        .check_package(PackageInfo {
-                            path,
-                            namespace: pkg.namespace,
-                            name: pkg.name,
-                            version: pkg.version.to_string(),
-                        })?
-                        .await?;
-                }
-            };
-
-            LspResult::Ok(())
-        });
-
-        res.map_err(|e| anyhow::anyhow!("{e:?}"))
-    })?;
+            let output_path = Path::new(&args.output);
+            std::fs::write(output_path, res).context_ut("failed to write package docs")?;
+        }
+        QueryCommands::CheckPackage(_args) => {
+            snap.run_within_package(&info, |a| {
+                tinymist_query::package::check_package(a, &info)
+                    .map_err(map_string_err("failed to check package"))
+            })?;
+        }
+    };
 
     Ok(())
 }

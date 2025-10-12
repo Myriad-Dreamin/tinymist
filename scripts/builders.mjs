@@ -127,6 +127,8 @@ export async function checkVersion() {
       `Version mismatch: ${cargoVersion} (in Cargo.toml) !== ${pkgVersion} (in package.json)`,
     );
   }
+
+  return { cargoVersion, pkgVersion };
 }
 
 export async function buildTinymistVscodeWebBase() {
@@ -157,22 +159,26 @@ export async function buildTinymistVscodeSystem() {
   ]);
 }
 
-export async function buildDebugLspBinary() {
-  await spawnAsync("lsp:debug", "cargo build -p tinymist-cli --color=always", {
-    env: {
-      ...process.env,
-      FORCE_COLOR: "1",
+export async function buildLspBinary(kind) {
+  await spawnAsync(
+    `lsp:${kind}`,
+    `cargo build -p tinymist-cli --color=always --profile=${kind === "debug" ? "dev" : "release"}`,
+    {
+      env: {
+        ...process.env,
+        FORCE_COLOR: "1",
+      },
     },
-  });
+  );
 
   const binName = process.platform === "win32" ? "tinymist.exe" : "tinymist";
 
   await Promise.all([
     fs.copyFile(
-      path.resolve(cwd, `target/debug/${binName}`),
+      path.resolve(cwd, `target/${kind}/${binName}`),
       path.resolve(vscodeDir, `out/${binName}`),
     ),
-    process.platform === "win32"
+    process.platform === "win32" && kind === "debug"
       ? [
           fs.copyFile(
             path.resolve(cwd, `target/debug/tinymist.pdb`),
@@ -183,8 +189,23 @@ export async function buildDebugLspBinary() {
   ]);
 }
 
-export async function prelaunchVscode() {
-  await Promise.all([buildTinymistVscodeSystem(), buildDebugLspBinary()]);
+export async function prelaunchVscode(kind) {
+  await Promise.all([buildTinymistVscodeSystem(), buildLspBinary(kind)]);
+}
+
+export async function installVscode(kind) {
+  const [{ pkgVersion }, ..._rest] = await Promise.all([
+    checkVersion(),
+    buildTinymistVscodeSystem(),
+    buildLspBinary(kind),
+  ]);
+  await spawnAsync("package:vscode", "cd editors/vscode && yarn package");
+
+  // install code
+  await spawnAsync(
+    "install:vscode",
+    `cd editors/vscode && code --install-extension tinymist-${pkgVersion}.vsix`,
+  );
 }
 
 export async function buildWebLspBinaryBase() {

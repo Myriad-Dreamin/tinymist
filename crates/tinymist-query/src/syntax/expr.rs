@@ -231,7 +231,12 @@ impl ExprWorker<'_> {
 
     fn summarize_scope(&self) -> LexicalScope {
         let mut exports = LexicalScope::default();
-        for scope in std::iter::once(&self.lexical.last).chain(self.lexical.scopes.iter()) {
+        for scope in self
+            .lexical
+            .scopes
+            .iter()
+            .chain(std::iter::once(&self.lexical.last))
+        {
             scope.merge_into(&mut exports);
         }
         exports

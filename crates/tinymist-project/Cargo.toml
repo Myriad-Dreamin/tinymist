@@ -34,7 +34,9 @@ tinymist-l10n.workspace = true
 toml = { workspace = true, optional = true }
 typst.workspace = true
 typst-assets.workspace = true
-notify.workspace = true
+notify = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 
 [features]
 
@@ -43,8 +45,8 @@ no-content-hint = ["tinymist-task/no-content-hint"]
 lsp = ["toml"]
 # "system", 
 
-system = ["tinymist-std/system", "tinymist-world/system", "toml"]
-web = ["tinymist-std/web", "tinymist-world/web"]
+system = ["tinymist-std/system", "tinymist-world/system", "toml", "notify"]
+web = ["tinymist-std/web", "tinymist-world/web", "js-sys", "wasm-bindgen"]
 
 [lints]
 workspace = true
