@@ -448,6 +448,17 @@ impl DocxWriter {
                             para.property = para.property.clone().align(AlignmentType::Center);
                         }
                     }
+                    Node::HtmlElement(element) => {
+                        let start_idx = docx.document.children.len();
+                        for child in &element.children {
+                            docx = self.process_node(docx, child)?;
+                        }
+                        for child in docx.document.children.iter_mut().skip(start_idx) {
+                            if let DocumentChild::Paragraph(para) = child {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                    }
                     other => {
                         docx = self.process_node(docx, other)?;
                         // Get the last element and center it if it's a paragraph
