@@ -218,12 +218,11 @@ pub struct VerbatimNode {
 
 impl VerbatimNode {
     fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
-        writer.write_str(&self.content)?;
-        Ok(())
+        writer.write_str(&self.content)
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        writer.raw_html(&self.content)
+        writer.write_trusted_html(&self.content)
     }
 }
 
