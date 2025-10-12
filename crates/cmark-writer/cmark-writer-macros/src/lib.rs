@@ -1,8 +1,9 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse::Parse, parse::ParseStream, parse_macro_input, DeriveInput, Ident, LitBool, Token,
+    parse::Parse, parse::ParseStream, parse_macro_input, DeriveInput, Ident, LitBool, LitStr, Token,
 };
 
 /// Parse custom_node attribute parameters
@@ -55,6 +56,40 @@ impl Parse for CustomNodeArgs {
             is_block,
             html_impl,
         })
+    }
+}
+
+#[derive(Default)]
+struct StructureErrorArgs {
+    format: Option<LitStr>,
+}
+
+impl Parse for StructureErrorArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut format = None;
+
+        while !input.is_empty() {
+            let ident: Ident = input.parse()?;
+
+            if ident == "format" {
+                let _: Token![=] = input.parse()?;
+                let value: LitStr = input.parse()?;
+                format = Some(value);
+            } else {
+                return Err(syn::Error::new_spanned(
+                    ident,
+                    "Unknown attribute parameter",
+                ));
+            }
+
+            if input.peek(Token![,]) {
+                let _: Token![,] = input.parse()?;
+            } else {
+                break;
+            }
+        }
+
+        Ok(Self { format })
     }
 }
 
@@ -253,23 +288,18 @@ pub fn custom_node(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn structure_error(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_str = attr.to_string();
+    let args = if attr.is_empty() {
+        StructureErrorArgs::default()
+    } else {
+        parse_macro_input!(attr as StructureErrorArgs)
+    };
     let input = parse_macro_input!(item as DeriveInput);
     let name = &input.ident;
 
     // Parse format attribute
-    let format = if attr_str.starts_with("format") {
-        let format_str = attr_str
-            .replace("format", "")
-            .replace("=", "")
-            .trim()
-            .trim_matches('"')
-            .to_string();
-        format_str
-    } else {
-        // Default error message if format not specified
-        "{}".to_string()
-    };
+    let format_lit = args
+        .format
+        .unwrap_or_else(|| LitStr::new("{}", Span::call_site()));
 
     let expanded = quote! {
         #input
@@ -280,7 +310,7 @@ pub fn structure_error(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             pub fn into_error(self) -> ::cmark_writer::error::WriteError {
-                let mut error_factory = ::cmark_writer::error::StructureError::new(#format);
+                let mut error_factory = ::cmark_writer::error::StructureError::new(#format_lit);
 
                 let arg = self.0.to_string();
                 error_factory = error_factory.arg(arg);
@@ -297,7 +327,7 @@ pub fn structure_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         impl ::cmark_writer::error::CustomErrorFactory for #name {
             fn create_error(&self) -> ::cmark_writer::error::WriteError {
-                let mut error_factory = ::cmark_writer::error::StructureError::new(#format);
+                let mut error_factory = ::cmark_writer::error::StructureError::new(#format_lit);
 
                 let arg = self.0.to_string();
                 error_factory = error_factory.arg(arg);
