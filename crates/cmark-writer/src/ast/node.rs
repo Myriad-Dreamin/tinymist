@@ -348,8 +348,8 @@ impl Node {
     /// # Returns
     /// A new task list item
     #[cfg(feature = "gfm")]
-    pub fn task_list_item(status: TaskListStatus, content: Vec<Node>) -> Self {
-        Node::UnorderedList(vec![ListItem::Task { status, content }])
+    pub fn task_list_item(status: TaskListStatus, content: Vec<Node>) -> ListItem {
+        ListItem::Task { status, content }
     }
 
     /// Create a table with alignment
