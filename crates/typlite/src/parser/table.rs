@@ -30,10 +30,7 @@ impl TableParser {
             // Check if the table contains rowspan or colspan attributes
             // If it does, fall back to using HtmlElement
             if Self::table_has_complex_cells(table) {
-                if let Ok(html_node) = parser.create_html_element(table) {
-                    return Ok(Some(html_node));
-                }
-                return Ok(None);
+                return parser.create_html_element(table).map(Some);
             }
 
             let mut headers = Vec::new();
@@ -54,7 +51,7 @@ impl TableParser {
                 eprintln!(
                     "[typlite] warning: block content detected inside table cell; exporting original HTML table"
                 );
-                let html = Self::serialize_html_element(parser, table);
+                let html = Self::serialize_html_element(parser, table)?;
                 let html = eco_format!(
                     "<!-- typlite warning: block content detected inside table cell; exported original HTML table -->\n{}",
                     html
@@ -323,13 +320,14 @@ impl TableParser {
         Ok(None)
     }
 
-    fn serialize_html_element(parser: &mut HtmlToAstParser, element: &HtmlElement) -> EcoString {
+    fn serialize_html_element(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+    ) -> Result<EcoString> {
         let node = Node::HtmlElement(Self::build_html_element(parser, element));
         let mut writer = HtmlWriter::new();
-        match writer.write_node(&node) {
-            Ok(()) => writer.into_string(),
-            Err(_) => EcoString::new(),
-        }
+        writer.write_node(&node).map_err(|err| err.to_string())?;
+        Ok(writer.into_string())
     }
 
     fn build_html_element(parser: &mut HtmlToAstParser, element: &HtmlElement) -> CmarkHtmlElement {
