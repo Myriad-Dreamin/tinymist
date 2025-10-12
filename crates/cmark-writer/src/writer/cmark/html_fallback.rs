@@ -21,9 +21,9 @@ impl CommonMarkWriter {
             rows: rows.to_vec(),
         };
 
-        html_writer.write_node(&table_node).map_err(|_| {
+        html_writer.write_node(&table_node).map_err(|e| {
             crate::error::WriteError::HtmlFallbackError(
-                "Failed to write table as HTML".to_string().into(),
+                format!("Failed to write table as HTML: {e}").into(),
             )
         })?;
 
@@ -47,9 +47,9 @@ impl CommonMarkWriter {
             rows: rows.to_vec(),
         };
 
-        html_writer.write_node(&table_node).map_err(|_| {
+        html_writer.write_node(&table_node).map_err(|e| {
             crate::error::WriteError::HtmlFallbackError(
-                "Failed to write GFM table as HTML".to_string().into(),
+                format!("Failed to write GFM table as HTML: {e}").into(),
             )
         })?;
 
