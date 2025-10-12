@@ -253,7 +253,7 @@ impl HtmlWriter {
     ///
     /// Prefer this when the HTML fragment originates from the renderer itself
     /// (e.g. structural newlines or tags we synthesise). External or
-    /// user-provided content should go through [`write_untrusted_html`] to
+    /// user-provided content should go through [`Self::write_untrusted_html`] to
     /// ensure escaping.
     pub fn write_trusted_html(&mut self, html: &str) -> HtmlWriteResult<()> {
         self.ensure_tag_closed()?;
@@ -263,7 +263,7 @@ impl HtmlWriter {
 
     /// Writes HTML content that may contain characters requiring escaping.
     ///
-    /// This is a semantic alias for [`text`], making call sites explicit about
+    /// This is a semantic alias for [`Self::text`], making call sites explicit about
     /// handling potentially untrusted content.
     pub fn write_untrusted_html(&mut self, html: &str) -> HtmlWriteResult<()> {
         self.text(html)
@@ -324,7 +324,7 @@ impl HtmlWriter {
     /// Writes an HTML fragment without additional escaping.
     ///
     /// # Deprecation
-    /// Prefer using [`write_trusted_html`] or [`write_untrusted_html`] to make
+    /// Prefer using [`Self::write_trusted_html`] or [`Self::write_untrusted_html`] to make
     /// the trust boundary explicit at the call site.
     #[deprecated(
         since = "0.8.0",

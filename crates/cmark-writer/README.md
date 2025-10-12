@@ -1,10 +1,6 @@
 # cmark-writer
 
-[![CI Status](https://github.com/hongjr03/cmark-writer/workflows/CI/badge.svg)](https://github.com/hongjr03/cmark-writer/actions)
-[![Crates.io](https://img.shields.io/crates/v/cmark-writer.svg)](https://crates.io/crates/cmark-writer)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Downloads](https://img.shields.io/crates/d/cmark-writer.svg)](https://crates.io/crates/cmark-writer)
-[![Codecov](https://codecov.io/gh/hongjr03/cmark-writer/branch/master/graph/badge.svg)](https://codecov.io/gh/hongjr03/cmark-writer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 A CommonMark writer implementation in Rust.
 
@@ -166,7 +162,3 @@ cargo test
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Feel free to submit a Pull Request.
