@@ -210,7 +210,7 @@ impl InlineNode {
 
 /// Verbatim node for raw text output
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node(block = false, html_impl = false)]
+#[custom_node(block = false, html_impl = true)]
 pub struct VerbatimNode {
     /// The content to directly output
     pub content: EcoString,
@@ -220,6 +220,10 @@ impl VerbatimNode {
     fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
         writer.write_str(&self.content)?;
         Ok(())
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.raw_html(&self.content)
     }
 }
 
