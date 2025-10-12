@@ -56,7 +56,7 @@ impl std::error::Error for HtmlWriteError {
 }
 
 impl HtmlWriteError {
-    /// 将 HtmlWriteError 转换为 WriteError
+    /// Converts an `HtmlWriteError` into a `WriteError`.
     pub fn into_write_error(self) -> WriteError {
         match self {
             HtmlWriteError::Io(err) => WriteError::IoError(err),
