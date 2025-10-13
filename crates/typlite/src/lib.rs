@@ -96,7 +96,7 @@ impl MarkdownDocument {
         if let Some(info) = &self.feat.wrap_info {
             warnings
                 .into_iter()
-                .map(|diag| self.remap_diagnostic(diag, info))
+                .filter_map(|diag| self.remap_diagnostic(diag, info))
                 .collect()
         } else {
             warnings
@@ -112,23 +112,28 @@ impl MarkdownDocument {
         &self,
         mut diagnostic: SourceDiagnostic,
         info: &WrapInfo,
-    ) -> SourceDiagnostic {
+    ) -> Option<SourceDiagnostic> {
         if let Some(span) = info.remap_span(self.world.as_ref(), diagnostic.span) {
             diagnostic.span = span;
+        } else {
+            return None;
         }
 
         diagnostic.trace = diagnostic
             .trace
             .into_iter()
-            .map(|mut spanned| {
-                if let Some(span) = info.remap_span(self.world.as_ref(), spanned.span) {
-                    spanned.span = span;
-                }
-                spanned
-            })
+            .filter_map(
+                |mut spanned| match info.remap_span(self.world.as_ref(), spanned.span) {
+                    Some(span) => {
+                        spanned.span = span;
+                        Some(spanned)
+                    }
+                    None => None,
+                },
+            )
             .collect();
 
-        diagnostic
+        Some(diagnostic)
     }
 
     /// Parse HTML document to AST
@@ -209,10 +214,22 @@ pub struct WrapInfo {
 
 impl WrapInfo {
     /// Translate a span from the wrapper file back into the original file.
-    pub fn remap_span(&self, world: &dyn WorldExt, span: Span) -> Option<Span> {
+    pub fn remap_span(&self, world: &dyn typst::World, span: Span) -> Option<Span> {
+        if span.id() != Some(self.wrap_file_id) {
+            return Some(span);
+        }
+
         let range = world.range(span)?;
-        let start = range.start - self.prefix_len_bytes;
-        let end = range.end - self.prefix_len_bytes;
+        let start = range.start.checked_sub(self.prefix_len_bytes)?;
+        let end = range.end.checked_sub(self.prefix_len_bytes)?;
+
+        let original_source = world.source(self.original_file_id).ok()?;
+        let original_len = original_source.len_bytes();
+
+        if start >= original_len || end > original_len {
+            return None;
+        }
+
         Some(Span::from_range(self.original_file_id, start..end))
     }
 }
