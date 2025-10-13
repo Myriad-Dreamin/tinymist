@@ -418,9 +418,16 @@ impl Typlite {
     ) -> tinymist_std::Result<MarkdownDocument> {
         let compiled = typst::compile(&world);
         let collector = WarningCollector::default();
-        collector.extend(compiled.warnings.iter().filter(|&diag| {
-            diag.message.as_str() != "html export is under active development and incomplete"
-        }).cloned());
+        collector.extend(
+            compiled
+                .warnings
+                .iter()
+                .filter(|&diag| {
+                    diag.message.as_str()
+                        != "html export is under active development and incomplete"
+                })
+                .cloned(),
+        );
         let base = compiled.output?;
         let mut feat = feat;
         feat.target = format;
