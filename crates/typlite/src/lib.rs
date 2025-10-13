@@ -5,6 +5,7 @@
 
 pub mod attributes;
 pub mod common;
+mod diagnostics;
 mod error;
 pub mod parser;
 pub mod tags;
@@ -22,11 +23,13 @@ use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
 use typst::World;
+use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
 use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;
+use crate::diagnostics::WarningCollector;
 use crate::parser::HtmlToAstParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
@@ -47,6 +50,7 @@ pub struct MarkdownDocument {
     world: Arc<LspWorld>,
     feat: TypliteFeat,
     ast: Option<Node>,
+    warnings: WarningCollector,
 }
 
 impl MarkdownDocument {
@@ -57,6 +61,7 @@ impl MarkdownDocument {
             world,
             feat,
             ast: None,
+            warnings: WarningCollector::default(),
         }
     }
 
@@ -72,7 +77,25 @@ impl MarkdownDocument {
             world,
             feat,
             ast: Some(ast),
+            warnings: WarningCollector::default(),
         }
+    }
+
+    /// Replace the backing warning collector, preserving shared state with
+    /// other components of the pipeline.
+    pub(crate) fn with_warning_collector(mut self, collector: WarningCollector) -> Self {
+        self.warnings = collector;
+        self
+    }
+
+    /// Get a snapshot of all collected warnings so far.
+    pub fn warnings(&self) -> Vec<SourceDiagnostic> {
+        self.warnings.snapshot()
+    }
+
+    /// Internal accessor for sharing the collector with the parser.
+    fn warning_collector(&self) -> WarningCollector {
+        self.warnings.clone()
     }
 
     /// Parse HTML document to AST
@@ -80,7 +103,7 @@ impl MarkdownDocument {
         if let Some(ast) = &self.ast {
             return Ok(ast.clone());
         }
-        let parser = HtmlToAstParser::new(self.feat.clone(), &self.world);
+        let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
         parser.parse(&self.base.root).context_ut("failed to parse")
     }
 
@@ -242,7 +265,6 @@ impl TypliteFeat {
                 Bytes::from_string(include_str!("markdown.typ")),
             )
             .context_ut("cannot map markdown.typ")?;
-
         world
             .map_shadow_by_id(
                 wrap_main_id,
@@ -251,7 +273,7 @@ impl TypliteFeat {
 {}"#,
                     world
                         .source(current)
-                        .context_ut("failed to get main file content")?
+                        .context_ut("cannot fetch main source")?
                         .text()
                 )),
             )
@@ -331,11 +353,13 @@ impl Typlite {
         format: Format,
         world: Arc<LspWorld>,
     ) -> tinymist_std::Result<MarkdownDocument> {
-        // todo: ignoring warnings
-        let base = typst::compile(&world).output?;
+        let compiled = typst::compile(&world);
+        let collector = WarningCollector::default();
+        collector.extend(compiled.warnings.iter().cloned());
+        let base = compiled.output?;
         let mut feat = feat;
         feat.target = format;
-        Ok(MarkdownDocument::new(base, world.clone(), feat))
+        Ok(MarkdownDocument::new(base, world.clone(), feat).with_warning_collector(collector))
     }
 }
 

@@ -13,6 +13,7 @@ use crate::Result;
 use crate::TypliteFeat;
 use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
+use crate::diagnostics::WarningCollector;
 use crate::tags::md_tag;
 
 use super::{list::ListParser, table::TableParser};
@@ -25,10 +26,15 @@ pub struct HtmlToAstParser {
     pub list_level: usize,
     pub blocks: Vec<Node>,
     pub inline_buffer: Vec<Node>,
+    pub(crate) warnings: WarningCollector,
 }
 
 impl HtmlToAstParser {
-    pub fn new(feat: TypliteFeat, world: &Arc<LspWorld>) -> Self {
+    pub(crate) fn new(
+        feat: TypliteFeat,
+        world: &Arc<LspWorld>,
+        warnings: WarningCollector,
+    ) -> Self {
         Self {
             feat,
             world: world.clone(),
@@ -36,6 +42,7 @@ impl HtmlToAstParser {
             list_level: 0,
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
+            warnings,
         }
     }
 
