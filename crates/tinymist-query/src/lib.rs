@@ -24,6 +24,7 @@ pub use document_link::*;
 pub use document_metrics::*;
 pub use document_symbol::*;
 pub use folding_range::*;
+pub use full_value::*;
 pub use goto_declaration::*;
 pub use goto_definition::*;
 pub use hover::*;
@@ -71,6 +72,7 @@ mod document_link;
 mod document_metrics;
 mod document_symbol;
 mod folding_range;
+mod full_value;
 mod goto_declaration;
 mod goto_definition;
 mod hover;
@@ -240,6 +242,7 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
         /// A request to interact with the code context.
         InteractCodeContext(InteractCodeContextRequest),
+        ShowFullValue(ShowFullValueRequest),
 
         /// A request to get extra text edits on enter.
         OnEnter(OnEnterRequest),
@@ -283,6 +286,7 @@ mod polymorphic {
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,
                 Self::InteractCodeContext(..) => PinnedFirst,
+                Self::ShowFullValue(..) => PinnedFirst,
 
                 Self::OnEnter(..) => ContextFreeUnique,
 
@@ -320,6 +324,7 @@ mod polymorphic {
                 Self::FoldingRange(req) => &req.path,
                 Self::SelectionRange(req) => &req.path,
                 Self::InteractCodeContext(req) => &req.path,
+                Self::ShowFullValue(..) => return None, // No specific path needed
 
                 Self::OnEnter(req) => &req.path,
 
@@ -385,6 +390,7 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
         /// The response to the interact code context request.
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
+        ShowFullValue(Option<String>),
 
         /// The response to the on enter request.
         OnEnter(Option<Vec<TextEdit>>),

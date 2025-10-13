@@ -304,6 +304,7 @@ impl ServerState {
                 Symbol(req) => snap.run_semantic(req, R::Symbol),
                 WorkspaceLabel(req) => snap.run_semantic(req, R::WorkspaceLabel),
                 DocumentMetrics(req) => snap.run_stateful(req, R::DocumentMetrics),
+                ShowFullValue(req) => snap.run_stateful(req, R::ShowFullValue),
                 _ => unreachable!(),
             };
 
