@@ -36,7 +36,7 @@ export function provideSvgDoc<
     postRender$svg() {
       const docRoot = this.hookedElem.firstElementChild as SVGElement;
       if (docRoot) {
-        window.initTypstSvg(docRoot);
+        this.windowElem.initTypstSvg(docRoot);
         this.r.rescale();
       }
     }
@@ -636,10 +636,11 @@ export function provideSvgDoc<
       const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
       // respect current scale ratio
       const revScale = computedRevScale / this.currentScaleRatio;
-      const left = (window.screenLeft - containerBRect.left) * revScale;
-      const top = (window.screenTop - containerBRect.top) * revScale;
-      const width = window.innerWidth * revScale;
-      const height = window.innerHeight * revScale;
+      const left =
+        (this.windowElem.offsetLeft - containerBRect.left) * revScale;
+      const top = (this.windowElem.offsetTop - containerBRect.top) * revScale;
+      const width = this.windowElem.clientWidth * revScale;
+      const height = this.windowElem.clientHeight * revScale;
 
       return { revScale, left, top, width, height };
     }
