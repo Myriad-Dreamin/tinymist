@@ -190,18 +190,12 @@ impl ExportTask {
     }
 }
 
-/// The legacy page selection specifier.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PageSelection {
-    /// Selects the first page.
-    #[default]
-    First,
-    /// Merges all pages into a single page.
-    Merged {
-        /// The gap between pages (in pt).
-        gap: Option<String>,
-    },
+/// A page merge specifier.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PageMerge {
+    /// The gap between pages (in pt).
+    pub gap: Option<String>,
 }
 
 /// A project export transform specifier.
@@ -242,6 +236,9 @@ pub struct ExportPdfTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -260,6 +257,15 @@ pub struct ExportPngTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// The page template to use for multiple pages.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub page_number_template: Option<String>,
+    /// The page merge specifier.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub merge: Option<PageMerge>,
     /// The PPI (pixels per inch) to use for PNG export.
     pub ppi: Scalar,
     /// The expression constructing background fill color (in typst script).
@@ -278,6 +284,15 @@ pub struct ExportSvgTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// The page template to use for multiple pages.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub page_number_template: Option<String>,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// The page merge specifier.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub merge: Option<PageMerge>,
 }
 
 /// An export html task specifier.
