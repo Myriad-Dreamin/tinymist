@@ -1,7 +1,7 @@
 ---
 source: crates/typlite/src/tests.rs
 expression: "conv(world, ConvKind::Md { for_docs: false })"
-input_file: crates/typlite/src/fixtures/regression/issue-1845.typ
+input_file: crates/typlite/src/fixtures/integration/issue-1845.typ
 ---
 <!DOCTYPE html>
 <html>
