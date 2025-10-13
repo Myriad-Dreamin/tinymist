@@ -15,5 +15,37 @@ Code line 2"></m1raw></td><td>Regular text</td></tr></table></m1table></m1grid><
 
 =====
 <!-- typlite warning: block content detected inside table cell; exported original HTML table -->
-<table><tr><td>Header</td><td>Row</td></tr><tr><td><m1raw lang="" block="true" text="Code line 1
-Code line 2"></m1raw></td><td>Regular text</td></tr></table>
+<table>
+
+<tr>
+
+<td>
+
+Header
+
+</td><td>
+
+Row
+
+</td>
+
+</tr><tr>
+
+<td>
+
+<m1raw lang="" block="true" text="Code line 1
+Code line 2">
+
+
+
+</m1raw>
+
+</td><td>
+
+Regular text
+
+</td>
+
+</tr>
+
+</table>

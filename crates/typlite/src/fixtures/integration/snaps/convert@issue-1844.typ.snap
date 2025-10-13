@@ -53,8 +53,18 @@ Who loves to lie with me,
 
 Source in grid
 
-<table x="test"><tr><td>Placeholder for<br />
-separately rendered SVG</td><td>````
+<table x="test">
+
+<tr>
+
+<td>
+
+Placeholder for<br />
+separately rendered SVG
+
+</td><td>
+
+````
 
 == Under the Greenwood Tree
 by Shakespeare.
@@ -64,4 +74,10 @@ Under the greenwood tree #emoji.tree
 Who loves to lie with me,
 ...
 ```)
-````</td></tr></table>
+````
+
+</td>
+
+</tr>
+
+</table>
