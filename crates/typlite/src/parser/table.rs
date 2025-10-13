@@ -1,8 +1,8 @@
 //! HTML table parsing module, processes the conversion of table elements
 
-use cmark_writer::HtmlWriter;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::gfm::TableAlignment;
+use cmark_writer::{HtmlWriteError, HtmlWriter};
 use ecow::{EcoString, eco_format};
 use typst::html::{HtmlElement, HtmlNode, tag};
 use typst::utils::PicoStr;
@@ -51,7 +51,8 @@ impl TableParser {
                 eprintln!(
                     "[typlite] warning: block content detected inside table cell; exporting original HTML table"
                 );
-                let html = Self::serialize_html_element(parser, table)?;
+                let html =
+                    Self::serialize_html_element(parser, table).map_err(|e| e.to_string())?;
                 let html = eco_format!(
                     "<!-- typlite warning: block content detected inside table cell; exported original HTML table -->\n{}",
                     html
@@ -323,14 +324,17 @@ impl TableParser {
     fn serialize_html_element(
         parser: &mut HtmlToAstParser,
         element: &HtmlElement,
-    ) -> Result<EcoString> {
-        let node = Node::HtmlElement(Self::build_html_element(parser, element));
+    ) -> Result<EcoString, HtmlWriteError> {
+        let node = Node::HtmlElement(Self::build_html_element(parser, element)?);
         let mut writer = HtmlWriter::new();
-        writer.write_node(&node).map_err(|err| err.to_string())?;
-        Ok(writer.into_string())
+        writer.write_node(&node)?;
+        writer.into_string()
     }
 
-    fn build_html_element(parser: &mut HtmlToAstParser, element: &HtmlElement) -> CmarkHtmlElement {
+    fn build_html_element(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+    ) -> Result<CmarkHtmlElement, HtmlWriteError> {
         let attributes = element
             .attrs
             .0
@@ -346,18 +350,18 @@ impl TableParser {
             match child {
                 HtmlNode::Text(text, _) => children.push(Node::Text(text.clone())),
                 HtmlNode::Element(elem) => {
-                    children.push(Node::HtmlElement(Self::build_html_element(parser, elem)))
+                    children.push(Node::HtmlElement(Self::build_html_element(parser, elem)?))
                 }
                 HtmlNode::Frame(frame) => children.push(parser.convert_frame(frame)),
                 HtmlNode::Tag(_) => {}
             }
         }
 
-        CmarkHtmlElement {
+        Ok(CmarkHtmlElement {
             tag: element.tag.resolve().to_string().into(),
             attributes,
             children,
             self_closing: element.children.is_empty(),
-        }
+        })
     }
 }
