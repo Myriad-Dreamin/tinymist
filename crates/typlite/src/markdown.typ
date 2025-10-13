@@ -13,7 +13,7 @@
 #let md-emph(body) = html.elem("span", html.elem("m1emph", body))
 #let md-highlight(body) = html.elem("span", html.elem("m1highlight", body))
 #let md-strike(body) = html.elem("span", html.elem("m1strike", body))
-#let md-raw(lang: none, block: false, text) = {
+#let md-raw(lang: none, block: false, text: text, body) = {
   let body = html.elem(
     "m1raw",
     attrs: (
@@ -25,7 +25,7 @@
       block: bool-str(block),
       text: text,
     ),
-    "",
+    body,
   )
 
   if block {
@@ -190,7 +190,7 @@
   // todo: icc?
   show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
 
-  show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, it.text))
+  show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, text: it.text, it))
   show link: it => if-not-paged(it, md-link(dest: it.dest, it.body))
   show ref: it => if-not-paged(it, md-ref(it))
 

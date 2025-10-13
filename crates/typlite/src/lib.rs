@@ -23,9 +23,11 @@ use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
 use typst::World;
+use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
 use typst::html::HtmlDocument;
+use typst_syntax::Span;
 use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;
@@ -90,12 +92,43 @@ impl MarkdownDocument {
 
     /// Get a snapshot of all collected warnings so far.
     pub fn warnings(&self) -> Vec<SourceDiagnostic> {
-        self.warnings.snapshot()
+        let warnings = self.warnings.snapshot();
+        if let Some(info) = &self.feat.wrap_info {
+            warnings
+                .into_iter()
+                .map(|diag| self.remap_diagnostic(diag, info))
+                .collect()
+        } else {
+            warnings
+        }
     }
 
     /// Internal accessor for sharing the collector with the parser.
     fn warning_collector(&self) -> WarningCollector {
         self.warnings.clone()
+    }
+
+    fn remap_diagnostic(
+        &self,
+        mut diagnostic: SourceDiagnostic,
+        info: &WrapInfo,
+    ) -> SourceDiagnostic {
+        if let Some(span) = info.remap_span(self.world.as_ref(), diagnostic.span) {
+            diagnostic.span = span;
+        }
+
+        diagnostic.trace = diagnostic
+            .trace
+            .into_iter()
+            .map(|mut spanned| {
+                if let Some(span) = info.remap_span(self.world.as_ref(), spanned.span) {
+                    spanned.span = span;
+                }
+                spanned
+            })
+            .collect();
+
+        diagnostic
     }
 
     /// Parse HTML document to AST
@@ -164,6 +197,26 @@ pub enum ColorTheme {
     Dark,
 }
 
+#[derive(Debug, Clone)]
+pub struct WrapInfo {
+    /// The synthetic wrapper file that hosts the original Typst source.
+    pub wrap_file_id: FileId,
+    /// The user's actual Typst source file.
+    pub original_file_id: FileId,
+    /// Number of UTF-8 bytes injected ahead of the original source.
+    pub prefix_len_bytes: usize,
+}
+
+impl WrapInfo {
+    /// Translate a span from the wrapper file back into the original file.
+    pub fn remap_span(&self, world: &dyn WorldExt, span: Span) -> Option<Span> {
+        let range = world.range(span)?;
+        let start = range.start - self.prefix_len_bytes;
+        let end = range.end - self.prefix_len_bytes;
+        Some(Span::from_range(self.original_file_id, start..end))
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct TypliteFeat {
     /// The preferred color theme.
@@ -201,6 +254,8 @@ pub struct TypliteFeat {
     /// It resembles the regular typst show rule function, like `#show:
     /// article`.
     pub processor: Option<String>,
+    /// Optional mapping from the wrapper file back to the original source.
+    pub wrap_info: Option<WrapInfo>,
 }
 
 impl TypliteFeat {
@@ -208,7 +263,7 @@ impl TypliteFeat {
         &self,
         world: &LspWorld,
         format: Format,
-    ) -> tinymist_std::Result<LspWorld> {
+    ) -> tinymist_std::Result<(LspWorld, Option<WrapInfo>)> {
         let entry = world.entry_state();
         let main = entry.main();
         let current = main.context("no main file in workspace")?;
@@ -265,18 +320,18 @@ impl TypliteFeat {
                 Bytes::from_string(include_str!("markdown.typ")),
             )
             .context_ut("cannot map markdown.typ")?;
+        let original_source = world
+            .source(current)
+            .context_ut("cannot fetch main source")?
+            .text()
+            .to_owned();
+
+        const WRAP_PREFIX: &str =
+            "#import \"@local/_markdown:0.1.0\": md-doc, example; #show: md-doc\n";
+        let wrap_content = format!("{WRAP_PREFIX}{original_source}");
+
         world
-            .map_shadow_by_id(
-                wrap_main_id,
-                Bytes::from_string(format!(
-                    r#"#import "@local/_markdown:0.1.0": md-doc, example; #show: md-doc
-{}"#,
-                    world
-                        .source(current)
-                        .context_ut("cannot fetch main source")?
-                        .text()
-                )),
-            )
+            .map_shadow_by_id(wrap_main_id, Bytes::from_string(wrap_content))
             .context_ut("cannot map source for main file")?;
 
         if let Some(main_content) = main_content {
@@ -285,7 +340,13 @@ impl TypliteFeat {
                 .context_ut("cannot map source for main file")?;
         }
 
-        Ok(world)
+        let wrap_info = Some(WrapInfo {
+            wrap_file_id: wrap_main_id,
+            original_file_id: current,
+            prefix_len_bytes: WRAP_PREFIX.len(),
+        });
+
+        Ok((world, wrap_info))
     }
 }
 
@@ -341,9 +402,11 @@ impl Typlite {
     }
 
     /// Convert the content to a markdown document.
-    pub fn convert_doc(self, format: Format) -> tinymist_std::Result<MarkdownDocument> {
-        let world = Arc::new(self.feat.prepare_world(&self.world, format)?);
+    pub fn convert_doc(mut self, format: Format) -> tinymist_std::Result<MarkdownDocument> {
+        let (prepared_world, wrap_info) = self.feat.prepare_world(&self.world, format)?;
+        self.feat.wrap_info = wrap_info;
         let feat = self.feat.clone();
+        let world = Arc::new(prepared_world);
         Self::convert_doc_prepared(feat, format, world)
     }
 
@@ -355,7 +418,9 @@ impl Typlite {
     ) -> tinymist_std::Result<MarkdownDocument> {
         let compiled = typst::compile(&world);
         let collector = WarningCollector::default();
-        collector.extend(compiled.warnings.iter().cloned());
+        collector.extend(compiled.warnings.iter().filter(|&diag| {
+            diag.message.as_str() != "html export is under active development and incomplete"
+        }).cloned());
         let base = compiled.output?;
         let mut feat = feat;
         feat.target = format;

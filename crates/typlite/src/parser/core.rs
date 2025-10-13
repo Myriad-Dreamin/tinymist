@@ -2,6 +2,9 @@
 
 use std::sync::Arc;
 
+use typst::diag::SourceDiagnostic;
+use typst_syntax::Span;
+
 use cmark_writer::WriteResult;
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::writer::InlineWriterProxy;
@@ -296,6 +299,23 @@ impl HtmlToAstParser {
         self.blocks = prev_blocks;
 
         Ok((inline, blocks))
+    }
+
+    pub(crate) fn warn_at(&mut self, span: Option<Span>, message: EcoString) {
+        let span = span.unwrap_or_else(Span::detached);
+        let span = self
+            .feat
+            .wrap_info
+            .as_ref()
+            .and_then(|info| self.remap_span_from_wrapper(span, info))
+            .unwrap_or(span);
+
+        let diag = SourceDiagnostic::warning(span, message);
+        self.warnings.extend(std::iter::once(diag));
+    }
+
+    fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<Span> {
+        info.remap_span(self.world.as_ref(), span)
     }
 }
 
