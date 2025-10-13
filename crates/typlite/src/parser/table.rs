@@ -257,11 +257,7 @@ impl TableParser {
             }
 
             let mut state = TableParseState::new();
-            TableContentExtractor::extract_table_content(
-                parser,
-                table,
-                &mut state,
-            )?;
+            TableContentExtractor::extract_table_content(parser, table, &mut state)?;
 
             if state.fallback_to_html {
                 let html = TableSerializer::serialize_html_element(parser, table)
@@ -422,7 +418,9 @@ impl TableValidator {
     pub fn emit_complex_cells_warning(parser: &mut HtmlToAstParser, table: &HtmlElement) {
         parser.warn_at(
             Some(table.span),
-            eco_format!("table contains rowspan or colspan attributes; exported original HTML table"),
+            eco_format!(
+                "table contains rowspan or colspan attributes; exported original HTML table"
+            ),
         );
     }
 
