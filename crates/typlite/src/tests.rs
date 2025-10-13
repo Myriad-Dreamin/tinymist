@@ -34,6 +34,13 @@ fn convert_docs() {
 }
 
 #[test]
+fn convert_regression() {
+    snapshot_testing("regression", &|world, _path| {
+        insta::assert_snapshot!(conv(world, ConvKind::Md { for_docs: false }));
+    });
+}
+
+#[test]
 #[cfg(feature = "docx")]
 fn test_docx_generation() {
     snapshot_testing("integration", &|world, _path| {

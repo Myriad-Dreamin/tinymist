@@ -54,6 +54,9 @@ jobs:
           tar -xvf editors/vscode/out/tinymist-${{ matrix.rust-target }}.tar.gz -C editors/vscode/out
           mv editors/vscode/out/tinymist-${{ matrix.rust-target }}/tinymist editors/vscode/out/tinymist
         if: matrix.platform != 'win32'
+      - name: Test GLIBC
+        run: node ./scripts/test-glibc.mjs editors/vscode/out/tinymist
+        if: matrix.platform != 'win32'
       - name: Test Tinymist (E2E)
         run: cargo test -p tests -- e2e
       - name: Upload Tinymist E2E Test Snapshot 

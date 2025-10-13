@@ -105,7 +105,7 @@ async function findWorkflowRunId(workflowId, branch) {
 
   console.log(runs, branch);
   const run = runs.find((run) => run.headBranch === branch);
-  return run.databaseId;
+  return run?.databaseId;
 }
 
 async function tryFindWorkflowRunId(workflowId, branch) {
@@ -144,7 +144,7 @@ const newCargoToml = cargoToml.replace(
   `tinymist-assets = { version = "=${tag}" }`,
 );
 await fs.writeFile("Cargo.toml", newCargoToml);
-await spawn("upate-lock", "cargo update tinymist");
+await spawn("update-lock", "cargo update tinymist");
 // sleep 20 seconds to wait for cargo.lock to be updated
 await new Promise((resolve) => setTimeout(resolve, 20000));
 

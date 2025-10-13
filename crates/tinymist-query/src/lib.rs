@@ -44,6 +44,7 @@ pub use workspace_label::*;
 
 pub mod analysis;
 pub mod docs;
+pub mod index;
 pub mod package;
 pub mod syntax;
 pub mod testing;
@@ -144,8 +145,42 @@ mod polymorphic {
         pub path: PathBuf,
         /// The export task to run.
         pub task: ProjectTask,
+        /// Whether to write to file.
+        pub write: bool,
         /// Whether to open the exported file(s) after the export is done.
         pub open: bool,
+    }
+
+    /// The response to an export request.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(untagged, rename_all = "camelCase")]
+    pub enum OnExportResponse {
+        /// Non-page or a single page exported.
+        Single {
+            /// The path of the exported file. None if not written to file.
+            path: Option<PathBuf>,
+            /// The data of the exported file. None if written to file.
+            data: Option<String>,
+        },
+        /// Multiple pages exported.
+        Paged {
+            /// The total number of pages of the document.
+            total_pages: usize,
+            /// The exported pages.
+            items: Vec<PagedExportResponse>,
+        },
+    }
+
+    /// The response to a single page export.
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct PagedExportResponse {
+        /// The page number of the exported page (0-based).
+        pub page: usize,
+        /// The path of the exported file. None if not written to file.
+        pub path: Option<PathBuf>,
+        /// The data of the exported file. None if written to file.
+        pub data: Option<String>,
     }
 
     /// A request to format the document.
@@ -333,7 +368,7 @@ mod polymorphic {
     #[serde(untagged)]
     pub enum CompilerQueryResponse {
         /// The response to the on export request.
-        OnExport(Option<PathBuf>),
+        OnExport(Option<OnExportResponse>),
         /// The response to the hover request.
         Hover(Option<Hover>),
         /// The response to the goto definition request.

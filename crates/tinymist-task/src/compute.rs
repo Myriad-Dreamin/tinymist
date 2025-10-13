@@ -3,24 +3,24 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use comemo::Track;
-use ecow::EcoString;
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst::{TypstDocument, TypstHtmlDocument, TypstPagedDocument};
+use tinymist_std::typst::TypstPagedDocument;
 use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
-use typst::World;
-use typst::diag::{SourceResult, StrResult};
-use typst::foundations::{Bytes, Content, IntoValue, LocatableSelector, Scope, Value};
-use typst::layout::Abs;
-use typst::routines::EvalMode;
-use typst::syntax::{Span, SyntaxNode, ast};
+use typst::foundations::Bytes;
+use typst::layout::{Abs, Page};
+use typst::syntax::{SyntaxNode, ast};
 use typst::visualize::Color;
-use typst_eval::eval_string;
 
-use crate::model::{ExportHtmlTask, ExportPngTask, ExportSvgTask};
-use crate::primitives::TaskWhen;
-use crate::{ExportTransform, Pages, QueryTask};
+use crate::{Pages, TaskWhen, exported_page_ranges};
 
+mod html;
+pub use html::*;
+mod png;
+pub use png::*;
+mod query;
+pub use query::*;
+mod svg;
+pub use svg::*;
 #[cfg(feature = "pdf")]
 pub mod pdf;
 #[cfg(feature = "pdf")]
@@ -52,283 +52,37 @@ impl ExportTimings {
     }
 }
 
-/// The computation for svg export.
-pub struct SvgExport;
-
-impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
-    type Output = String;
-    type Config = ExportSvgTask;
-
-    fn run(
-        _graph: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
-        config: &ExportSvgTask,
-    ) -> Result<String> {
-        let (is_first, merged_gap) = get_page_selection(&config.export)?;
-
-        let first_page = doc.pages.first();
-
-        Ok(if is_first {
-            if let Some(first_page) = first_page {
-                typst_svg::svg(first_page)
-            } else {
-                typst_svg::svg_merged(doc, merged_gap)
-            }
-        } else {
-            typst_svg::svg_merged(doc, merged_gap)
-        })
-    }
+/// The output of image exports, either paged or merged.
+pub enum ImageOutput<T> {
+    /// Each page exported separately.
+    Paged(Vec<PagedOutput<T>>),
+    /// All pages merged into one output.
+    Merged(T),
 }
 
-// impl<F: CompilerFeat> WorldComputable<F> for SvgExport {
-//     type Output = Option<String>;
-
-//     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-//         OptionDocumentTask::run_export::<F, Self>(graph)
-//     }
-// }
-
-/// The computation for png export.
-pub struct PngExport;
-
-impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
-    type Output = Bytes;
-    type Config = ExportPngTask;
-
-    fn run(
-        _graph: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstPagedDocument>,
-        config: &ExportPngTask,
-    ) -> Result<Bytes> {
-        let ppi = config.ppi.to_f32();
-        if ppi <= 1e-6 {
-            tinymist_std::bail!("invalid ppi: {ppi}");
-        }
-
-        let fill = if let Some(fill) = &config.fill {
-            parse_color(fill.clone()).map_err(|err| anyhow::anyhow!("invalid fill ({err})"))?
-        } else {
-            Color::WHITE
-        };
-
-        let (is_first, merged_gap) = get_page_selection(&config.export)?;
-
-        let ppp = ppi / 72.;
-        let pixmap = if is_first {
-            if let Some(first_page) = doc.pages.first() {
-                typst_render::render(first_page, ppp)
-            } else {
-                typst_render::render_merged(doc, ppp, merged_gap, Some(fill))
-            }
-        } else {
-            typst_render::render_merged(doc, ppp, merged_gap, Some(fill))
-        };
-
-        pixmap
-            .encode_png()
-            .map(Bytes::new)
-            .context_ut("failed to encode PNG")
-    }
+/// The output of a single page.
+pub struct PagedOutput<T> {
+    /// The page number (0-based).
+    pub page: usize,
+    /// The value of the page.
+    pub value: T,
 }
 
-// impl<F: CompilerFeat> WorldComputable<F> for PngExport {
-//     type Output = Option<Bytes>;
-
-//     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-//         OptionDocumentTask::run_export::<F, Self>(graph)
-//     }
-// }
-
-/// The computation for html export.
-pub struct HtmlExport;
-
-impl<F: CompilerFeat> ExportComputation<F, TypstHtmlDocument> for HtmlExport {
-    type Output = String;
-    type Config = ExportHtmlTask;
-
-    fn run(
-        _graph: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<TypstHtmlDocument>,
-        _config: &ExportHtmlTask,
-    ) -> Result<String> {
-        Ok(typst_html::html(doc)?)
-    }
-}
-
-// impl<F: CompilerFeat> WorldComputable<F> for HtmlExport {
-//     type Output = Option<String>;
-
-//     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-//         OptionDocumentTask::run_export::<F, Self>(graph)
-//     }
-// }
-
-/// The computation for document query.
-pub struct DocumentQuery;
-
-impl DocumentQuery {
-    // todo: query exporter
-    /// Retrieve the matches for the selector.
-    pub fn retrieve<D: typst::Document>(
-        world: &dyn World,
-        selector: &str,
-        document: &D,
-    ) -> StrResult<Vec<Content>> {
-        let selector = eval_string(
-            &typst::ROUTINES,
-            world.track(),
-            selector,
-            Span::detached(),
-            EvalMode::Code,
-            Scope::default(),
-        )
-        .map_err(|errors| {
-            let mut message = EcoString::from("failed to evaluate selector");
-            for (i, error) in errors.into_iter().enumerate() {
-                message.push_str(if i == 0 { ": " } else { ", " });
-                message.push_str(&error.message);
-            }
-            message
-        })?
-        .cast::<LocatableSelector>()
-        .map_err(|e| EcoString::from(format!("failed to cast: {}", e.message())))?;
-
-        Ok(document
-            .introspector()
-            .query(&selector.0)
-            .into_iter()
-            .collect::<Vec<_>>())
-    }
-
-    fn run_inner<F: CompilerFeat, D: typst::Document>(
-        g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<D>,
-        config: &QueryTask,
-    ) -> Result<Vec<Value>> {
-        let selector = &config.selector;
-        let elements = Self::retrieve(&g.snap.world, selector, doc.as_ref())
-            .map_err(|e| anyhow::anyhow!("failed to retrieve: {e}"))?;
-        if config.one && elements.len() != 1 {
-            bail!("expected exactly one element, found {}", elements.len());
-        }
-
-        Ok(elements
-            .into_iter()
-            .filter_map(|c| match &config.field {
-                Some(field) => c.get_by_name(field).ok(),
-                _ => Some(c.into_value()),
-            })
-            .collect())
-    }
-
-    /// Queries the document and returns the result as a value.
-    pub fn doc_get_as_value<F: CompilerFeat>(
-        g: &Arc<WorldComputeGraph<F>>,
-        doc: &TypstDocument,
-        config: &QueryTask,
-    ) -> Result<serde_json::Value> {
-        match doc {
-            TypstDocument::Paged(doc) => Self::get_as_value(g, doc, config),
-            TypstDocument::Html(doc) => Self::get_as_value(g, doc, config),
-        }
-    }
-
-    /// Queries the document and returns the result as a value.
-    pub fn get_as_value<F: CompilerFeat, D: typst::Document>(
-        g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<D>,
-        config: &QueryTask,
-    ) -> Result<serde_json::Value> {
-        let mapped = Self::run_inner(g, doc, config)?;
-
-        let res = if config.one {
-            let Some(value) = mapped.first() else {
-                bail!("no such field found for element");
-            };
-            serde_json::to_value(value)
-        } else {
-            serde_json::to_value(&mapped)
-        };
-
-        res.context("failed to serialize")
-    }
-}
-
-impl<F: CompilerFeat, D: typst::Document> ExportComputation<F, D> for DocumentQuery {
-    type Output = SourceResult<String>;
-    type Config = QueryTask;
-
-    fn run(
-        g: &Arc<WorldComputeGraph<F>>,
-        doc: &Arc<D>,
-        config: &QueryTask,
-    ) -> Result<SourceResult<String>> {
-        let pretty = false;
-        let mapped = Self::run_inner(g, doc, config)?;
-
-        let res = if config.one {
-            let Some(value) = mapped.first() else {
-                bail!("no such field found for element");
-            };
-            serialize(value, &config.format, pretty)
-        } else {
-            serialize(&mapped, &config.format, pretty)
-        };
-
-        res.map(Ok)
-    }
-}
-
-/// Serialize data to the output format.
-fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> Result<String> {
-    Ok(match format {
-        "json" if pretty => serde_json::to_string_pretty(data).context("serialize query")?,
-        "json" => serde_json::to_string(data).context("serialize query")?,
-        "yaml" => serde_yaml::to_string(&data).context_ut("serialize query")?,
-        "txt" => {
-            use serde_json::Value::*;
-            let value = serde_json::to_value(data).context("serialize query")?;
-            match value {
-                String(s) => s,
-                _ => {
-                    let kind = match value {
-                        Null => "null",
-                        Bool(_) => "boolean",
-                        Number(_) => "number",
-                        String(_) => "string",
-                        Array(_) => "array",
-                        Object(_) => "object",
-                    };
-                    bail!("expected a string value for format: {format}, got {kind}")
-                }
-            }
-        }
-        _ => bail!("unsupported format for query: {format}"),
-    })
-}
-
-/// Gets legacy page selection
-pub fn get_page_selection(task: &crate::ExportTask) -> Result<(bool, Abs)> {
-    let is_first = task
-        .transform
+fn select_pages<'a>(
+    document: &'a TypstPagedDocument,
+    pages: &Option<Vec<Pages>>,
+) -> Vec<(usize, &'a Page)> {
+    let pages = pages.as_ref().map(|pages| exported_page_ranges(pages));
+    document
+        .pages
         .iter()
-        .any(|t| matches!(t, ExportTransform::Pages { ranges, .. } if ranges == &[Pages::FIRST]));
-
-    let mut gap_res = Abs::default();
-    if !is_first {
-        for trans in &task.transform {
-            if let ExportTransform::Merge { gap } = trans {
-                let gap = gap
-                    .as_deref()
-                    .map(parse_length)
-                    .transpose()
-                    .context_ut("failed to parse gap")?;
-                gap_res = gap.unwrap_or_default();
-            }
-        }
-    }
-
-    Ok((is_first, gap_res))
+        .enumerate()
+        .filter(|(i, _)| {
+            pages
+                .as_ref()
+                .is_none_or(|exported_page_ranges| exported_page_ranges.includes_page_index(*i))
+        })
+        .collect::<Vec<_>>()
 }
 
 fn parse_length(gap: &str) -> Result<Abs> {
@@ -364,8 +118,8 @@ fn descendants(node: &SyntaxNode) -> impl IntoIterator<Item = &SyntaxNode> + '_ 
     res
 }
 
-fn parse_color(fill: String) -> anyhow::Result<Color> {
-    match fill.as_str() {
+fn parse_color(fill: &str) -> anyhow::Result<Color> {
+    match fill {
         "black" => Ok(Color::BLACK),
         "white" => Ok(Color::WHITE),
         "red" => Ok(Color::RED),
@@ -385,24 +139,15 @@ mod tests {
 
     #[test]
     fn test_parse_color() {
-        assert_eq!(parse_color("black".to_owned()).unwrap(), Color::BLACK);
-        assert_eq!(parse_color("white".to_owned()).unwrap(), Color::WHITE);
-        assert_eq!(parse_color("red".to_owned()).unwrap(), Color::RED);
-        assert_eq!(parse_color("green".to_owned()).unwrap(), Color::GREEN);
-        assert_eq!(parse_color("blue".to_owned()).unwrap(), Color::BLUE);
-        assert_eq!(
-            parse_color("#000000".to_owned()).unwrap().to_hex(),
-            "#000000"
-        );
-        assert_eq!(
-            parse_color("#ffffff".to_owned()).unwrap().to_hex(),
-            "#ffffff"
-        );
-        assert_eq!(
-            parse_color("#000000cc".to_owned()).unwrap().to_hex(),
-            "#000000cc"
-        );
-        assert!(parse_color("invalid".to_owned()).is_err());
+        assert_eq!(parse_color("black").unwrap(), Color::BLACK);
+        assert_eq!(parse_color("white").unwrap(), Color::WHITE);
+        assert_eq!(parse_color("red").unwrap(), Color::RED);
+        assert_eq!(parse_color("green").unwrap(), Color::GREEN);
+        assert_eq!(parse_color("blue").unwrap(), Color::BLUE);
+        assert_eq!(parse_color("#000000").unwrap().to_hex(), "#000000");
+        assert_eq!(parse_color("#ffffff").unwrap().to_hex(), "#ffffff");
+        assert_eq!(parse_color("#000000cc").unwrap().to_hex(), "#000000cc");
+        assert!(parse_color("invalid").is_err());
     }
 
     #[test]

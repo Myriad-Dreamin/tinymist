@@ -1,15 +1,14 @@
 //! Common types and interfaces for the conversion system
 
-use cmark_writer::CommonMarkWriter;
 use cmark_writer::HtmlAttribute;
 use cmark_writer::HtmlElement;
 use cmark_writer::HtmlWriteResult;
 use cmark_writer::HtmlWriter;
 use cmark_writer::HtmlWriterOptions;
 use cmark_writer::WriteResult;
-use cmark_writer::WriterOptions;
 use cmark_writer::ast::Node;
 use cmark_writer::custom_node;
+use cmark_writer::writer::{BlockWriterProxy, InlineWriterProxy};
 use ecow::EcoString;
 use ecow::eco_format;
 use std::path::PathBuf;
@@ -44,10 +43,11 @@ pub struct FigureNode {
 }
 
 impl FigureNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
-        temp_writer.write(&self.body)?;
-        let content = temp_writer.into_string();
+    fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
+        let content = writer.capture_block(|block| {
+            block.write_block(&self.body)?;
+            Ok(())
+        })?;
         writer.write_str(&content)?;
         writer.write_str("\n")?;
         writer.write_str(&self.caption)?;
@@ -83,7 +83,7 @@ pub struct ExternalFrameNode {
 }
 
 impl ExternalFrameNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
         // The actual handling is implemented in format-specific writers
         writer.write_str(&format!(
             "![{}]({})",
@@ -123,13 +123,10 @@ pub struct HighlightNode {
 }
 
 impl HighlightNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
-        for node in &self.content {
-            temp_writer.write(node)?;
-        }
-        let content = temp_writer.into_string();
-        writer.write_str(&format!("=={content}=="))?;
+    fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
+        writer.write_str("==")?;
+        writer.write_inline_nodes(&self.content)?;
+        writer.write_str("==")?;
         Ok(())
     }
 
@@ -168,10 +165,11 @@ impl CenterNode {
         }
     }
 
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        let mut temp_writer = CommonMarkWriter::with_options(writer.options.clone());
-        temp_writer.write(&self.node)?;
-        let content = temp_writer.into_string();
+    fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
+        let content = writer.capture_inline(|inline| {
+            inline.write_inline(&self.node)?;
+            Ok(())
+        })?;
         writer.write_str(&content)?;
         writer.write_str("\n")?;
         Ok(())
@@ -183,8 +181,8 @@ impl CenterNode {
             ..Default::default()
         });
         temp_writer.write_node(&self.node)?;
-        let content = temp_writer.into_string();
-        writer.write_str(&content)?;
+        let content = temp_writer.into_string()?;
+        writer.write_trusted_html(&content)?;
         Ok(())
     }
 }
@@ -198,11 +196,8 @@ pub struct InlineNode {
 }
 
 impl InlineNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        for node in &self.content {
-            writer.write(node)?;
-        }
-        Ok(())
+    fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
+        writer.write_inline_nodes(&self.content)
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
@@ -215,16 +210,19 @@ impl InlineNode {
 
 /// Verbatim node for raw text output
 #[derive(Debug, PartialEq, Clone)]
-#[custom_node(block = false, html_impl = false)]
+#[custom_node(block = false, html_impl = true)]
 pub struct VerbatimNode {
     /// The content to directly output
     pub content: EcoString,
 }
 
 impl VerbatimNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
-        writer.write_str(&self.content)?;
-        Ok(())
+    fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
+        writer.write_str(&self.content)
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.write_trusted_html(&self.content)
     }
 }
 
@@ -239,7 +237,7 @@ pub struct AlertNode {
 }
 
 impl AlertNode {
-    fn write_custom(&self, writer: &mut CommonMarkWriter) -> WriteResult<()> {
+    fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
         let quote = Node::BlockQuote(vec![
             Node::Paragraph(vec![Node::Text(eco_format!(
                 "[!{}]",
@@ -247,17 +245,12 @@ impl AlertNode {
             ))]),
             Node::Paragraph(vec![Node::Text("".into())]),
         ]);
-        let mut tmp_writer = CommonMarkWriter::with_options(WriterOptions {
-            escape_special_chars: false,
-            ..writer.options.clone()
-        });
-        tmp_writer.write(&quote)?;
-        let mut content = tmp_writer.into_string();
+        writer.with_temporary_options(
+            |options| options.escape_special_chars = false,
+            |writer| writer.write_block(&quote),
+        )?;
         let quote = Node::BlockQuote(self.content.clone());
-        let mut tmp_writer = CommonMarkWriter::with_options(writer.options.clone());
-        tmp_writer.write(&quote)?;
-        content += tmp_writer.into_string();
-        writer.write_str(&content)?;
+        writer.write_block(&quote)?;
         Ok(())
     }
 }

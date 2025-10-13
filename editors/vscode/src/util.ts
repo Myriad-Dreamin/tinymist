@@ -22,13 +22,19 @@ export function assert(condition: boolean, explanation: string): asserts conditi
 const bytes2utf8 = new TextDecoder("utf-8");
 const utf82bytes = new TextEncoder();
 
+/** Base64 to bytes
+ * @param encoded Base64 encoded string
+ * @returns bytes
+ */
+export const base64DecodeToBytes = (encoded: string) =>
+  Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0));
+
 /**
  * Base64 to UTF-8
  * @param encoded Base64 encoded string
  * @returns UTF-8 string
  */
-export const base64Decode = (encoded: string) =>
-  bytes2utf8.decode(Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0)));
+export const base64Decode = (encoded: string) => bytes2utf8.decode(base64DecodeToBytes(encoded));
 
 /**
  * bytes to Base64

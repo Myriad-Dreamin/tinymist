@@ -1,0 +1,25 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/figure_raw.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1figure caption=""><m1raw lang="md" block="true" text="markdown"></m1raw></m1figure></m1document></body>
+</html>
+
+=====
+\begin{center}
+\begin{figure}[htbp]
+\centering
+\begin{lstlisting}[language=md]
+markdown
+\end{lstlisting}
+
+\end{figure}
+
+\end{center}
