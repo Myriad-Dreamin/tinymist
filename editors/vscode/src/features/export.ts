@@ -46,21 +46,15 @@ export const quickExports: QuickExportFormatMeta[] = [
     selectPages: true,
   },
   {
-    label: l10nMsg("PNG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple PNGs"),
-    exportKind: "Png",
-    selectPages: true,
-  },
-  {
     label: l10nMsg("PNG (Merged)"),
     description: l10nMsg("Export as a single PNG by merging pages"),
     exportKind: "Png",
     selectPages: "merged",
   },
   {
-    label: l10nMsg("SVG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple SVGs"),
-    exportKind: "Svg",
+    label: l10nMsg("PNG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple PNGs"),
+    exportKind: "Png",
     selectPages: true,
   },
   {
@@ -68,6 +62,12 @@ export const quickExports: QuickExportFormatMeta[] = [
     description: l10nMsg("Export as a single SVG by merging pages"),
     exportKind: "Svg",
     selectPages: "merged",
+  },
+  {
+    label: l10nMsg("SVG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple SVGs"),
+    exportKind: "Svg",
+    selectPages: true,
   },
   {
     label: "HTML",
@@ -166,6 +166,7 @@ export async function askPageSelection(picked: QuickExportFormatMeta) {
 
   const pages = await vscode.window.showInputBox({
     title: l10nMsg("Pages to export"),
+    value: "1",
     placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
     prompt: l10nMsg("Specify the pages you want to export"),
     validateInput: validatePageRanges,
