@@ -37,7 +37,7 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2025.1")
         testFramework(TestFrameworkType.Platform)
-        plugins(listOf("com.redhat.devtools.lsp4ij:0.16.1"))
+        plugins(listOf("com.redhat.devtools.lsp4ij:0.17.0"))
     }
 }
 
