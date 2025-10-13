@@ -31,11 +31,10 @@ class TypstPreviewFileEditor(
 
     // Defines the Tinymist preview URL using dynamic port
     private val previewHost = "127.0.0.1"
-    private val settingsService = TinymistSettingsService.instance
-    
-    // Get the dynamic preview port and construct URL
-    private fun getPreviewPort(): Int = settingsService.getOrDiscoverPreviewPort()
-    private fun getTinymistPreviewUrl(): String = "http://$previewHost:${getPreviewPort()}"
+    private val currentPort = 1337
+
+    // TODO refactor for use with a PreviewSererManager
+    private fun getTinymistPreviewUrl(): String = "http://$previewHost}"
 
     // Flag to track if the server check is complete and successful
     @Volatile
@@ -72,7 +71,6 @@ class TypstPreviewFileEditor(
                 while (attempts < maxAttempts && !serverFound && JBCefApp.isSupported()) {
                     indicator.checkCanceled()
                     try {
-                        val currentPort = getPreviewPort()
                         Socket().use { socket ->
                             socket.connect(InetSocketAddress(previewHost, currentPort), 500)
                             isServerReady = true
@@ -81,7 +79,6 @@ class TypstPreviewFileEditor(
                         }
                     } catch (_: IOException) {
                         attempts++
-                        val currentPort = getPreviewPort()
                         indicator.text2 = "Attempt $attempts/$maxAttempts to connect to $previewHost:$currentPort"
                         Thread.sleep(500)
                     }
@@ -103,7 +100,6 @@ class TypstPreviewFileEditor(
                     this@TypstPreviewFileEditor.loadURL(previewUrl)
                 } else {
                     println("TypstPreviewFileEditor: Server not ready. Displaying error.")
-                    val currentPort = getPreviewPort()
                     ApplicationManager.getApplication().invokeLater {
                         this@TypstPreviewFileEditor.loadHTML("<html><body>Error: Tinymist server not available at $previewHost:$currentPort. Please check if tinymist is running.</body></html>")
                     }

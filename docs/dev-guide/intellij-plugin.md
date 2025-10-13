@@ -101,26 +101,30 @@ The following table shows the implementation status of LSP features as supported
 - **Handled by lsp4ij**: Feature implementation is provided by the lsp4ij library
 - **Direct implementation**: Feature has custom implementation in the plugin code
 
-### II. Current Focus & Next Steps
-*   **Additional LSP Features:** Implement remaining LSP features like `textDocument/references`, `textDocument/codeAction`, and `textDocument/formatting`
-*   **Preview Panel Stability:** Continue monitoring and addressing any JCEF preview panel issues that may arise
+### II. Current Focus
+* Debug server startup procedure
+  * currently no logs are shown in the preview. Is this because, our current method sends a command before the initialization?
+*   **Preview Panel Stability:** Handle server connection state
+  * A PreviewServerManager class to manage the server connection state and setup
+    * The preview panel should subscribe to the events from the preview manager
+    * The `PreviewServerManager` should start (and stop?) the preview server via the LSP command `tinymist/startPreview`
+    * The preview server holds one of these states:
+      * Server starting up -> the preview panel displays a message
+      * Server ready -> the preview panel loads URL:port as preview
+      * Server failed -> the preview panel displays an error message
+    * The `PreviewServerManager` informs its subscribers (mainly the preview panel) about state change
 
-### III. Next Steps
-*   **Additional LSP Features:** Implement `textDocument/codeAction`, `textDocument/formatting`, and other remaining features
-*   **Preview Panel Enhancements:** Continue improving preview functionality and addressing any performance issues
+### III. Next steps
+* Investigate `textDocument/formatting` + variant capabilities
+* Debug failing integration tests
 
 ### V. Planned Features & Enhancements
 *   **Additional LSP Features:**
-    *   `textDocument/codeAction` (Code fixes and refactoring actions)
     *   `textDocument/formatting` (Document formatting)
 *   **Enhanced Settings Panel:**
     *   Configure font paths, PDF export options
     *   Settings for `tinymist` preview server configuration
-*   **Full Server-Specific Interactions:**
-    *   Systematically implement robust handlers for: `workspace/configuration` requests, `textDocument/didOpen|Change|Close` for auxiliary files, focus tracking notifications.
-*   **Documentation:**
-    *   Update plugin `README.md` (setup, features, settings).
-    *   Keep `dev-notes.md` current.
+* Make the editor more colorfull. Does the current situation have something to do with 'textDocument/documentColor' not answering?
 
 ### VI. Technical Debt & Refinements
 *   **Missing File Type Icon**: TODO in `TypstLanguage.kt` - need to add custom icon for .typ files.
@@ -183,5 +187,3 @@ The source code is organized into the following main areas:
 *   **Preview Panel**:
     *   `TypstPreviewFileEditor` loads its content from the HTTP server run by the `tinymist` LSP (if `preview.background.enabled` is true in initialization options).
     *   Updates to the preview are likely driven by the `tinymist` server itself, potentially triggered by `textDocument/didChange` notifications from the client or its own file watching.
-
-This architecture aims to delegate most of the complex language understanding and preview rendering to the external `tinymist` LSP server, while the IntelliJ plugin focuses on integrating these features into the IDE's UI and user experience, adhering to IntelliJ Platform and `lsp4ij` conventions.

@@ -14,23 +14,8 @@ class TinymistLanguageServerFactory : LanguageServerFactory {
     }
 
     override fun createClientFeatures(): LSPClientFeatures {
-        return object : LSPClientFeatures() {
-            override fun initializeParams(initializeParams: InitializeParams) {
-                // Discover an unused port for the preview server
-                val settingsService = TinymistSettingsService.instance
-                val previewPort = settingsService.getOrDiscoverPreviewPort()
-                
-                val options = mapOf(
-                    "preview" to mapOf(
-                        "background" to mapOf(
-                            "enabled" to true,
-                            "port" to previewPort
-                        )
-                    )
-                )
-                initializeParams.initializationOptions = options
-            }
-        }.setDiagnosticFeature(TinymistLSPDiagnosticFeature())
+        return LSPClientFeatures()
+            .setDiagnosticFeature(TinymistLSPDiagnosticFeature())
     }
 
     override fun createServerInstaller(): ServerInstaller {
