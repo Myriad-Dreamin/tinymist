@@ -30,6 +30,12 @@ impl TableParser {
             // Check if the table contains rowspan or colspan attributes
             // If it does, fall back to using HtmlElement
             if Self::table_has_complex_cells(table) {
+                parser.warn_at(
+                    Some(table.span),
+                    eco_format!(
+                        "table contains rowspan or colspan attributes; exported original HTML table"
+                    ),
+                );
                 return parser.create_html_element(table).map(Some);
             }
 
@@ -48,15 +54,8 @@ impl TableParser {
             )?;
 
             if fallback_to_html {
-                eprintln!(
-                    "[typlite] warning: block content detected inside table cell; exporting original HTML table"
-                );
                 let html =
                     Self::serialize_html_element(parser, table).map_err(|e| e.to_string())?;
-                let html = eco_format!(
-                    "<!-- typlite warning: block content detected inside table cell; exported original HTML table -->\n{}",
-                    html
-                );
                 return Ok(Some(Node::HtmlBlock(html)));
             }
 
@@ -226,6 +225,12 @@ impl TableParser {
                 let (cell_content, block_content) = parser.capture_children(cell)?;
 
                 if !block_content.is_empty() {
+                    parser.warn_at(
+                        Some(cell.span),
+                        eco_format!(
+                            "block content detected inside table cell; exported original HTML table"
+                        ),
+                    );
                     *fallback_to_html = true;
                     return Ok(Vec::new());
                 }
