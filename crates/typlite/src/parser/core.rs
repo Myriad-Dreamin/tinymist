@@ -8,7 +8,7 @@ use typst_syntax::Span;
 use cmark_writer::WriteResult;
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::writer::InlineWriterProxy;
-use ecow::EcoString;
+use ecow::{eco_format, EcoString};
 use tinymist_project::LspWorld;
 use typst::html::{HtmlElement, HtmlNode, tag};
 
@@ -207,6 +207,10 @@ impl HtmlToAstParser {
                 let tag_name = element.tag.resolve().to_string();
 
                 if !tag_name.starts_with("m1") {
+                    self.warn_at(
+                        Some(element.span),
+                        eco_format!("unsupported HTML element `<{tag_name}>`; exported as raw HTML"),
+                    );
                     let html_element = self.create_html_element(element)?;
                     self.inline_buffer.push(html_element);
                 } else {
