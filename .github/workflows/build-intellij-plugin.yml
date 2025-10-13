@@ -14,18 +14,9 @@
 
 name: tinymist::build::intellij-plugin
 on:
-  # Trigger the workflow on pushes to only the 'main' branch (this avoids duplicate checks being run e.g., for dependabot pull requests)
-  push:
-    branches: [ main ]
-  # Trigger the workflow on any pull request
-  pull_request:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  workflow_call:
 
 jobs:
-
   # Prepare the environment and build the plugin
   build:
     name: Build
@@ -126,44 +117,6 @@ jobs:
           files: ${{ github.workspace }}/build/reports/kover/report.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # Run Qodana inspections and provide a report
-  inspectCode:
-    name: Inspect code
-    needs: [ build ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      checks: write
-      pull-requests: write
-    steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          tool-cache: false
-          large-packages: false
-
-      # Check out the current repository
-      - name: Fetch Sources
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
-          fetch-depth: 0  # a full history is required for pull request analysis
-
-      # Set up the Java environment for the next steps
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: zulu
-          java-version: 21
-
-      # Run Qodana inspections
-      - name: Qodana - Code Inspection
-        uses: JetBrains/qodana-action@v2025.1.1
-        with:
-          cache-default-branch-only: true
-
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin
@@ -212,7 +165,7 @@ jobs:
   releaseDraft:
     name: Release draft
     if: github.event_name != 'pull_request'
-    needs: [ build, test, inspectCode, verify ]
+    needs: [ build, verify ]
     runs-on: ubuntu-latest
     permissions:
       contents: write

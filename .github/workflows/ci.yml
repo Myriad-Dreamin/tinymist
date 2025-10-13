@@ -187,6 +187,9 @@ jobs:
   build-vscode-others:
     needs: [build-vsc-assets]
     uses: ./.github/workflows/build-vscode-others.yml
+
+  build-intellij:
+    uses: ./.github/workflows/build-intellij-plugin.yml
   
   publish-vscode:
     needs: [build-vscode, build-vscode-others] # , announce
