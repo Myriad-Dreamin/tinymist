@@ -22,6 +22,7 @@ zh = "导出为 Markdown"
 
 ["Export as PDF with specified pages"]
 en = "Export as PDF with specified pages"
+zh = "导出指定页码为 PDF"
 
 ["Export as PDF"]
 en = "Export as PDF"
@@ -37,6 +38,7 @@ zh = "导出为 SVG (并更新 tasks.json)"
 
 ["Export as TeX"]
 en = "Export as TeX"
+zh = "导出为 TeX"
 
 ["Export as Text"]
 en = "Export as Text"
@@ -52,9 +54,11 @@ zh = "合并页面并导出为单个 SVG"
 
 ["Export the specified pages as multiple PNGs"]
 en = "Export the specified pages as multiple PNGs"
+zh = "将指定页面导出为多个单独 PNG"
 
 ["Export the specified pages as multiple SVGs"]
 en = "Export the specified pages as multiple SVGs"
+zh = "将指定页面导出为多个单独 SVG"
 
 ["Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."]
 en = "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."
@@ -74,6 +78,7 @@ zh = "无效的页码范围：{range}"
 
 ["PDF (Specific Pages)"]
 en = "PDF (Specific Pages)"
+zh = "PDF (指定页码)"
 
 ["PNG (Merged)"]
 en = "PNG (Merged)"
@@ -81,6 +86,7 @@ zh = "PNG (合并)"
 
 ["PNG (Specific Pages)"]
 en = "PNG (Specific Pages)"
+zh = "PNG (指定页码)"
 
 ["PNG (Task)"]
 en = "PNG (Task)"
@@ -88,9 +94,11 @@ zh = "PNG (任务)"
 
 ["Pages to export"]
 en = "Pages to export"
+zh = "要导出的页码"
 
 ["Pick a method to export and show"]
 en = "Pick a method to export and show"
+zh = "选择导出并预览的方式"
 
 ["Pick a method to export"]
 en = "Pick a method to export"
@@ -121,6 +129,7 @@ zh = "SVG (任务)"
 
 ["Specify the pages you want to export"]
 en = "Specify the pages you want to export"
+zh = "指定要导出的页码"
 
 ["TeX processor"]
 en = "TeX processor"
@@ -128,6 +137,7 @@ zh = "TeX 导出的处理脚本"
 
 ["e.g. `1-3,5,7-9`, leave empty for all pages"]
 en = "e.g. `1-3,5,7-9`, leave empty for all pages"
+zh = "例如 `1-3,5,7-9`，留空表示导出所有页"
 
 ["e.g., `page-{0p}-of-{t}.png`"]
 en = "e.g., `page-{0p}-of-{t}.png`"
