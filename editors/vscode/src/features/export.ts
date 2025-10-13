@@ -30,7 +30,7 @@ export interface QuickExportFormatMeta {
   description: string;
   exportKind: ExportKind;
   extraOpts?: ExportOpts;
-  selectPages?: boolean | "first" | "merged";
+  selectPages?: true | "merged";
 }
 
 export const quickExports: QuickExportFormatMeta[] = [
@@ -46,21 +46,21 @@ export const quickExports: QuickExportFormatMeta[] = [
     selectPages: true,
   },
   {
+    label: l10nMsg("PNG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple PNGs"),
+    exportKind: "Png",
+    selectPages: true,
+  },
+  {
     label: l10nMsg("PNG (Merged)"),
     description: l10nMsg("Export as a single PNG by merging pages"),
     exportKind: "Png",
     selectPages: "merged",
   },
   {
-    label: l10nMsg("PNG (First Page)"),
-    description: l10nMsg("Export the first page as a single PNG"),
-    exportKind: "Png",
-    selectPages: "first",
-  },
-  {
-    label: l10nMsg("PNG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple PNGs"),
-    exportKind: "Png",
+    label: l10nMsg("SVG (Specific Pages)"),
+    description: l10nMsg("Export the specified pages as multiple SVGs"),
+    exportKind: "Svg",
     selectPages: true,
   },
   {
@@ -68,18 +68,6 @@ export const quickExports: QuickExportFormatMeta[] = [
     description: l10nMsg("Export as a single SVG by merging pages"),
     exportKind: "Svg",
     selectPages: "merged",
-  },
-  {
-    label: l10nMsg("SVG (First Page)"),
-    description: l10nMsg("Export the first page as a single SVG"),
-    exportKind: "Svg",
-    selectPages: "first",
-  },
-  {
-    label: l10nMsg("SVG (Specific Pages)"),
-    description: l10nMsg("Export the specified pages as multiple SVGs"),
-    exportKind: "Svg",
-    selectPages: true,
   },
   {
     label: "HTML",
@@ -156,48 +144,63 @@ async function askAndRun<T>(
     }
   }
 
-  await askPageSelection(picked);
+  if (!(await askPageSelection(picked))) {
+    return; // cancelled
+  }
 
   return cb(picked);
 }
 
+/** returns false if export cancelled */
 export async function askPageSelection(picked: QuickExportFormatMeta) {
   const selectPages = picked.selectPages;
   if (!selectPages) {
-    return;
+    return true; // no need to select pages
   }
 
   picked.extraOpts ??= {};
-  if (selectPages === "first") {
-    (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = ["1"];
-  } else if (selectPages === "merged") {
+  if (selectPages === "merged") {
     (picked.extraOpts as ExportPngOpts | ExportSvgOpts).merge = {};
-  } else if (selectPages === true) {
-    const pages = await vscode.window.showInputBox({
-      title: l10nMsg("Pages to export"),
-      placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
-      prompt: l10nMsg("Specify the pages you want to export"),
-    });
+    return true;
+  }
 
-    if (pages) {
-      (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = pages.split(",");
+  const pages = await vscode.window.showInputBox({
+    title: l10nMsg("Pages to export"),
+    placeHolder: l10nMsg("e.g. `1-3,5,7-9`, leave empty for all pages"),
+    prompt: l10nMsg("Specify the pages you want to export"),
+    validateInput: validatePageRanges,
+  });
+  if (pages === undefined) {
+    return false; // cancelled
+  }
+
+  const pageRanges = pages.split(",");
+  (picked.extraOpts as ExportPdfOpts | ExportPngOpts | ExportSvgOpts).pages = pageRanges;
+
+  if (
+    (picked.exportKind === "Png" || picked.exportKind === "Svg") &&
+    !(pageRanges.length === 1 && !pageRanges[0].includes("-"))
+  ) {
+    // multiple pages, ask for page number template
+    // if only one page without range, no need for page number template
+    const pageNumberTemplate = await vscode.window.showInputBox({
+      title: "Page Number Template",
+      placeHolder: l10nMsg("e.g., `page-{0p}-of-{t}.png`"),
+      prompt: l10nMsg(
+        "A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\nLeave empty for default naming scheme.",
+      ),
+    });
+    if (pageNumberTemplate === undefined) {
+      return false; // cancelled
     }
 
-    if (picked.exportKind === "Png" || picked.exportKind === "Svg") {
-      const pageNumberTemplate = await vscode.window.showInputBox({
-        title: "Page Number Template",
-        placeHolder: l10nMsg("e.g., `page-{0p}-of-{t}.png`"),
-        prompt: l10nMsg(
-          "A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\n" +
-            "Leave empty for default naming scheme.",
-        ),
-      });
-
-      if (pageNumberTemplate) {
-        (picked.extraOpts as ExportPngOpts | ExportSvgOpts).pageNumberTemplate = pageNumberTemplate;
-      }
+    if (pageNumberTemplate.length > 0) {
+      // only set if not empty
+      (picked.extraOpts as ExportPngOpts | ExportSvgOpts).pageNumberTemplate = pageNumberTemplate;
     }
   }
+
+  return true;
 }
 
 export async function commandAskAndExport(): Promise<ExportResponse | null> {
@@ -308,4 +311,52 @@ async function showExportFileIn(exportResponse: ExportResponse, openIn: string):
   }
 
   return true;
+}
+
+function validatePageRanges(value: string): string | undefined {
+  if (!value.trim()) {
+    return; // Allow empty input
+  }
+  const parts = value
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p);
+  for (const part of parts) {
+    const rangeParts = part.split("-").map((s) => s.trim());
+    if (rangeParts.length > 2) {
+      return l10nMsg("Invalid page range format: {range}", { range: part });
+    }
+    if (rangeParts.length === 1) {
+      // Single page
+      const num = parseInt(rangeParts[0], 10);
+      if (Number.isNaN(num) || num <= 0) {
+        return l10nMsg("Invalid page number: {page}", { page: part });
+      }
+    } else {
+      // Range
+      const [startStr, endStr] = rangeParts;
+      let startNum: number | undefined;
+      let endNum: number | undefined;
+      if (startStr) {
+        startNum = parseInt(startStr, 10);
+        if (Number.isNaN(startNum) || startNum <= 0) {
+          return l10nMsg("Invalid page range: {range}", { range: part });
+        }
+      }
+      if (endStr) {
+        endNum = parseInt(endStr, 10);
+        if (Number.isNaN(endNum) || endNum <= 0) {
+          return l10nMsg("Invalid page range: {range}", { range: part });
+        }
+      }
+      if (startNum !== undefined && endNum !== undefined && startNum > endNum) {
+        return l10nMsg("Invalid page range: {range}", { range: part });
+      }
+      // If both start and end are empty, invalid
+      if (!startStr && !endStr) {
+        return l10nMsg("Invalid page range: {range}", { range: part });
+      }
+    }
+  }
+  return;
 }

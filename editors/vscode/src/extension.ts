@@ -621,7 +621,9 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
         }
 
         // A quick export action
-        await askPageSelection(moreAction);
+        if (!(await askPageSelection(moreAction))) {
+          return; // cancelled
+        }
         await commandShow(moreAction.exportKind, moreAction.extraOpts);
         return;
       }

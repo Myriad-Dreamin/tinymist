@@ -5,8 +5,8 @@
 en = " (Preview)"
 zh = " (预览)"
 
-["A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\n"]
-en = "A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\n"
+["A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\nLeave empty for default naming scheme."]
+en = "A page number template must be present if the source document renders to multiple pages. Use `{p}` for page numbers, `{0p}` for zero padded page numbers and `{t}` for page count.\nLeave empty for default naming scheme."
 
 ["A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"]
 en = "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"
@@ -50,14 +50,6 @@ zh = "合并页面并导出为单个 PNG"
 en = "Export as a single SVG by merging pages"
 zh = "合并页面并导出为单个 SVG"
 
-["Export the first page as a single PNG"]
-en = "Export the first page as a single PNG"
-zh = "导出首页为单个 PNG"
-
-["Export the first page as a single SVG"]
-en = "Export the first page as a single SVG"
-zh = "导出首页为单个 SVG"
-
 ["Export the specified pages as multiple PNGs"]
 en = "Export the specified pages as multiple PNGs"
 
@@ -68,12 +60,20 @@ en = "Export the specified pages as multiple SVGs"
 en = "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."
 zh = "提示：您可以在侧边栏中创建和查找本地包。有关更多信息，请参见 https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper。"
 
+["Invalid page number: {page}"]
+en = "Invalid page number: {page}"
+zh = "无效的页码：{page}"
+
+["Invalid page range format: {range}"]
+en = "Invalid page range format: {range}"
+zh = "无效的页码范围格式：{range}"
+
+["Invalid page range: {range}"]
+en = "Invalid page range: {range}"
+zh = "无效的页码范围：{range}"
+
 ["PDF (Specific Pages)"]
 en = "PDF (Specific Pages)"
-
-["PNG (First Page)"]
-en = "PNG (First Page)"
-zh = "PNG (首页)"
 
 ["PNG (Merged)"]
 en = "PNG (Merged)"
@@ -107,10 +107,6 @@ zh = "查询当前文档并导出结果为 YAML 文件"
 ["Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."]
 en = "Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."
 zh = "查询当前文档并导出结果为文件。我们将会询问一些问题并为您更新 tasks.json 文件。"
-
-["SVG (First Page)"]
-en = "SVG (First Page)"
-zh = "SVG (首页)"
 
 ["SVG (Merged)"]
 en = "SVG (Merged)"
