@@ -30,41 +30,17 @@ pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>
 
 /// Analyzes expressions in a source file and produces expression information.
 ///
-/// This is the core function for expression analysis, which powers features like
-/// go-to-definition, hover, and completion. It performs a two-pass analysis:
+/// This is the core function for expression analysis, which powers features
+/// like go-to-definition, hover, and completion. It performs a two-pass
+/// analysis:
 ///
 /// 1. **First pass (init_stage)**: Builds the root lexical scope by scanning
 ///    top-level definitions without resolving them. This handles forward
 ///    references and circular dependencies.
 ///
-/// 2. **Second pass**: Performs full expression analysis, resolving identifiers,
-///    tracking imports, and building the expression tree with type information.
-///
-/// # How it supports go-to-definition
-///
-/// The function builds a map of spans to `RefExpr` (stored in `resolves`), where
-/// each `RefExpr` contains:
-/// - The identifier being referenced (`decl`)
-/// - The resolution chain (`root` and `step`)
-/// - The resolved type (`term`)
-///
-/// When a user triggers go-to-definition on an identifier:
-/// 1. The span is looked up in the `resolves` map
-/// 2. The `RefExpr.root` or `RefExpr.step` provides the definition location
-/// 3. The `RefExpr.term` provides type information for hover
-///
-/// # Caching
-///
-/// Results are cached based on source content and imported module hashes.
-/// If nothing has changed, the previous result is returned immediately.
-///
-/// # Parameters
-///
-/// - `ctx`: Shared analysis context with world state and caches
-/// - `source`: The source file to analyze
-/// - `route`: Tracks cyclic dependencies during analysis
-/// - `guard`: Statistics tracking for cache hits/misses
-/// - `prev`: Previous analysis result for cache validation
+/// 2. **Second pass**: Performs full expression analysis, resolving
+///    identifiers, tracking imports, and building the expression tree with type
+///    information.
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
@@ -140,11 +116,13 @@ pub(crate) fn expr_of(
             route,
         };
 
+        // First pass.
         let root = source.root().cast::<ast::Markup>().unwrap();
         w.check_root_scope(root.to_untyped().children());
         let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
         w.route.insert(w.fid, Some(root_scope.clone()));
 
+        // Second pass.
         w.lexical = LexicalContext::default();
         w.comment_matcher.reset();
         w.buffer.clear();
@@ -855,8 +833,8 @@ impl ExprWorker<'_> {
             });
             self.resolve_as(ref_expr.clone());
 
-            // If renamed, create a second RefExpr for the new name that chains to the old one.
-            // This builds the chain: new -> old -> root
+            // If renamed, create a second RefExpr for the new name that chains to the old
+            // one. This builds the chain: new -> old -> root
             if let Some(new) = &rename {
                 // - decl: The new name (e.g., "new" in "import: old as new")
                 // - root: Same as original (ultimate source of the value)
@@ -1134,7 +1112,8 @@ impl ExprWorker<'_> {
     ///
     /// # Resolution Process
     ///
-    /// 1. Evaluates the identifier to get its expression and type (`eval_ident`)
+    /// 1. Evaluates the identifier to get its expression and type
+    ///    (`eval_ident`)
     /// 2. If the result is itself a `RefExpr`, extracts its `root` and uses the
     ///    RefExpr's `decl` as the `step` (building a reference chain)
     /// 3. Otherwise, uses the expression as both `root` and `step`
@@ -1142,16 +1121,21 @@ impl ExprWorker<'_> {
     /// # Field Assignment
     ///
     /// - `decl`: The identifier being resolved
-    /// - `root`: The ultimate source of the value (extracted from chain or the expression itself)
-    /// - `step`: The immediate resolution (extracted from chain or the expression itself)
+    /// - `root`: The ultimate source of the value (extracted from chain or the
+    ///   expression itself)
+    /// - `step`: The immediate resolution (extracted from chain or the
+    ///   expression itself)
     /// - `term`: The resolved type (if available from evaluation)
     ///
     /// # Example
     ///
     /// For `let x = 1; let y = x; let z = y`:
-    /// - Resolving `x` gives: `RefExpr { decl: x, root: None, step: None, term: Some(int) }`
-    /// - Resolving `y` gives: `RefExpr { decl: y, root: Some(x), step: Some(x), term: Some(int) }`
-    /// - Resolving `z` gives: `RefExpr { decl: z, root: Some(x), step: Some(y), term: Some(int) }`
+    /// - Resolving `x` gives: `RefExpr { decl: x, root: None, step: None, term:
+    ///   Some(int) }`
+    /// - Resolving `y` gives: `RefExpr { decl: y, root: Some(x), step: Some(x),
+    ///   term: Some(int) }`
+    /// - Resolving `z` gives: `RefExpr { decl: z, root: Some(x), step: Some(y),
+    ///   term: Some(int) }`
     fn resolve_ident_(&mut self, decl: DeclExpr, mode: InterpretMode) -> RefExpr {
         let (step, val) = self.eval_ident(decl.name(), mode);
         let (root, step) = extract_ref(step);
@@ -1220,7 +1204,8 @@ impl ExprWorker<'_> {
     /// Evaluates an identifier by looking it up in the lexical scope.
     ///
     /// Returns a tuple of `(expression, type)` where:
-    /// - `expression`: The expression the identifier resolves to (may be a `RefExpr`)
+    /// - `expression`: The expression the identifier resolves to (may be a
+    ///   `RefExpr`)
     /// - `type`: The type of the value (if known)
     ///
     /// # Lookup Order
@@ -1233,7 +1218,8 @@ impl ExprWorker<'_> {
     /// # When `type` is Set
     ///
     /// - Built-in values from library: Always has type (wrapped in `Ty::Value`)
-    /// - Lexical scope variables: May have type if it was tracked during definition
+    /// - Lexical scope variables: May have type if it was tracked during
+    ///   definition
     /// - "std" module: Has type `Ty::Value(Module)`
     ///
     /// # When `type` is None
@@ -1357,8 +1343,8 @@ impl ExprWorker<'_> {
 /// # Returns
 ///
 /// A tuple of `(root, step)`:
-/// - If `step` is a `RefExpr`: Returns `(ref.root, Some(ref.decl))` - propagates
-///   the root forward and uses the ref's declaration as the new step
+/// - If `step` is a `RefExpr`: Returns `(ref.root, Some(ref.decl))` -
+///   propagates the root forward and uses the ref's declaration as the new step
 /// - Otherwise: Returns `(step, step)` - the expression is both root and step
 ///
 /// # Example
