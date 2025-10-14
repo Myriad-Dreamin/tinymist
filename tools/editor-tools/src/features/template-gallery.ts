@@ -114,7 +114,9 @@ const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => 
         button(
           {
             class: van.derive(() => {
-              const activatingCls = catState.getIsFavorite("preview", item.name) ? " active" : "";
+              const activatingCls = catState.getIsFavorite("preview", item.name)
+                ? " active"
+                : "";
               return "toggle-btn tinymist-template-action" + activatingCls;
             }),
             title: van.derive(() =>
