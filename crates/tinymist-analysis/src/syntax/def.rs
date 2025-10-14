@@ -512,8 +512,18 @@ impl Decl {
         })
     }
 
-    /// Creates a module declaration with a name and file ID.
-    pub fn module(name: Interned<str>, fid: TypstFileId) -> Self {
+    /// Creates a module declaration with a file ID.
+    pub fn module(fid: TypstFileId) -> Self {
+        let name = {
+            let stem = fid.vpath().as_rooted_path().file_stem();
+            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
+                .unwrap_or_default()
+        };
+        Self::Module(ModuleDecl { name, fid })
+    }
+
+    /// Creates a module declaration with a name and a file ID.
+    pub fn module_with_name(name: Interned<str>, fid: TypstFileId) -> Self {
         Self::Module(ModuleDecl { name, fid })
     }
 

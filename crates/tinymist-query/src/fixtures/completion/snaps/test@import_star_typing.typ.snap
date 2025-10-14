@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star_typing.typ
     "kind": 3,
     "label": "todo",
     "labelDetails": {
-     "description": "(any) => any"
+     "description": "(content) => content"
     },
     "sortText": "218",
     "textEdit": {
@@ -46,7 +46,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_star_typing.typ
     "kind": 3,
     "label": "todo",
     "labelDetails": {
-     "description": "(any) => any"
+     "description": "(content) => content"
     },
     "sortText": "218",
     "textEdit": {

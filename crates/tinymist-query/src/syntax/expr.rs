@@ -700,7 +700,7 @@ impl ExprWorker<'_> {
                 // todo: dyn resolve src_expr
                 match m.file_id() {
                     Some(fid) => Some(Expr::Decl(
-                        Decl::module(m.name().unwrap().into(), fid).into(),
+                        Decl::module_with_name(m.name().unwrap().into(), fid).into(),
                     )),
                     None => Some(Expr::Type(Ty::Value(InsTy::new(Value::Module(m))))),
                 }
@@ -735,7 +735,7 @@ impl ExprWorker<'_> {
     ) -> Option<Expr> {
         let fid = resolve_id_by_path(&self.ctx.world, self.fid, src)?;
         let name = Decl::calc_path_stem(src);
-        let module = Expr::Decl(Decl::module(name.clone(), fid).into());
+        let module = Expr::Decl(Decl::module_with_name(name.clone(), fid).into());
 
         let import_path = if is_import {
             Decl::import_path(source.span(), name)
