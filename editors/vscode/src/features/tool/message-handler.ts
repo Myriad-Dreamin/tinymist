@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
 import { extensionState } from "../../state";
 import type { EditorToolContext } from "../../tools";
+import { type ExportArgs, type ExportFormat, exportOps, provideFormats } from "../tasks.export";
 import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
-import { tinymist, type OnExportResponse } from "../../lsp";
-import { ExportArgs, ExportFormat, exportOps, provideFormats } from "../tasks.export";
 
 export interface WebviewMessage {
   type: string;
@@ -74,20 +73,6 @@ interface InitTemplateMessage {
 
 interface StopServerProfilingMessage {
   type: "stopServerProfiling";
-}
-
-interface CreateExportTaskMessage {
-  type: "createExportTask";
-  taskDefinition: {
-    label: string;
-    type: string;
-    command: string;
-    args?: string[];
-    group?: string;
-    problemMatcher?: string[];
-    options?: Record<string, unknown>;
-    export?: Record<string, unknown>;
-  };
 }
 
 interface ExportDocumentMessage {
@@ -251,48 +236,6 @@ export const messageHandlers: Record<string, MessageHandler> = {
     postMessage({ type: "traceData", data: traceData });
   },
 
-  createExportTask: async ({ taskDefinition }: CreateExportTaskMessage) => {
-    try {
-      // Get the current workspace folder
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-      if (!workspaceFolder) {
-        await vscode.window.showErrorMessage("No workspace folder found");
-        return;
-      }
-
-      // Create tasks.json in .vscode folder if it doesn't exist
-      const vscodeFolderUri = vscode.Uri.joinPath(workspaceFolder.uri, ".vscode");
-      const tasksFileUri = vscode.Uri.joinPath(vscodeFolderUri, "tasks.json");
-
-      let tasksConfig: { version: string; tasks: Record<string, unknown>[] } = {
-        version: "2.0.0",
-        tasks: [],
-      };
-
-      try {
-        // Try to read existing tasks.json
-        const tasksFileContent = await vscode.workspace.fs.readFile(tasksFileUri);
-        tasksConfig = JSON.parse(Buffer.from(tasksFileContent).toString());
-      } catch {
-        // File doesn't exist, use default config
-        await vscode.workspace.fs.createDirectory(vscodeFolderUri);
-      }
-
-      // Add the new task
-      tasksConfig.tasks.push(taskDefinition);
-
-      // Write back to tasks.json
-      const tasksJsonContent = JSON.stringify(tasksConfig, null, 2);
-      await vscode.workspace.fs.writeFile(tasksFileUri, Buffer.from(tasksJsonContent));
-
-      await vscode.window.showInformationMessage(
-        `Task "${taskDefinition.label}" created successfully`,
-      );
-    } catch (error) {
-      await vscode.window.showErrorMessage(`Failed to create task: ${error}`);
-    }
-  },
-
   exportDocument: async ({ format, extraArgs }: ExportDocumentMessage) => {
     try {
       const ops = exportOps(extraArgs);
@@ -315,28 +258,26 @@ export const messageHandlers: Record<string, MessageHandler> = {
       const result = await provider.export(uri, provider.opts());
 
       // Handle the response based on the new OnExportResponse format
-      if ("message" in result) {
-        // Error case - Failed { message: String }
-        await vscode.window.showErrorMessage(`Export failed: ${result.message}`);
+      if (!result) {
+        await vscode.window.showErrorMessage(`Export failed`);
+        return;
       } else if ("path" in result) {
-        // Success case - Single { path: Option<PathBuf>, data: Option<String> }
+        // Success case - Single
         if (result.path) {
           await vscode.window.showInformationMessage(`Exported successfully to: ${result.path}`);
         } else {
           await vscode.window.showInformationMessage("Export completed");
         }
-      } else if (Array.isArray(result)) {
-        // Multiple files - Multiple(Vec<PagedExportResponse>)
-        const paths = result.map((item) => item.path).filter(Boolean);
+      } else {
+        // Multiple files
+        const paths = result.items.map((item) => item.path).filter(Boolean);
         if (paths.length > 0) {
           await vscode.window.showInformationMessage(
-            `Exported successfully to: ${paths.join(", ")}`,
+            `Exported successfully to:\n${paths.join("\n")}`,
           );
         } else {
           await vscode.window.showInformationMessage("Export completed");
         }
-      } else {
-        await vscode.window.showInformationMessage("Export completed");
       }
     } catch (error) {
       await vscode.window.showErrorMessage(`Export failed: ${error}`);
@@ -344,10 +285,12 @@ export const messageHandlers: Record<string, MessageHandler> = {
   },
 
   generatePreview: async ({ format, extraArgs }: GeneratePreviewMessage, { postMessage }) => {
-    console.log(`Generating preview for format=${format}, extraArgs=${extraArgs}`);
+    console.log(`Generating preview for format=${format}, extraArgs=`, extraArgs);
     try {
       const ops = exportOps(extraArgs);
       const formatProvider = provideFormats(extraArgs);
+
+      // await vscode.window.showInformationMessage(`Active `)
 
       // Get the active document
       const uri = ops.resolveInputPath();
@@ -356,7 +299,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
         return;
       }
 
-      // Use PNG for both PDF and PNG preview (PNG is better for web display)
+      // Use PNG for both PDF and PNG preview
       const actualFormat = format === "pdf" ? "png" : format;
 
       const provider = formatProvider[actualFormat];
@@ -366,7 +309,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
 
       // Execute export with configuration (file export by default)
-      const response = await provider.export(uri, provider.opts(), true);
+      const response = await provider.export(uri, provider.opts(), { write: false });
       console.log("Preview generation response:", response);
       if (!response) {
         await vscode.window.showErrorMessage("Failed to generate preview data");
@@ -374,10 +317,10 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
 
       // Handle error case
-      if ("message" in response) {
+      if (!response) {
         postMessage({
           type: "previewError",
-          error: response.message,
+          error: "failed to generate preview",
         });
         return;
       }
@@ -386,7 +329,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       // For visual formats, generate PNG/SVG previews
       if (format === "pdf" || format === "png" || format === "svg") {
         // Extract base64 data from the response
-        const renderedPages = "data" in response ? [{ page: 1, ...response }] : response;
+        const renderedPages = "data" in response ? [{ page: 1, ...response }] : response.items;
 
         // Determine MIME type
         const mimeType = actualFormat === "svg" ? "image/svg+xml" : "image/png";
@@ -404,7 +347,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
         postMessage({
           type: "previewGenerated",
           format,
-          text: "data" in response ? response.data : response[0].data,
+          text: "data" in response ? response.data : response.items[0].data,
         });
       }
     } catch (error) {

@@ -1,7 +1,7 @@
 import { defineEditorTool } from ".";
 
 export default defineEditorTool({
-  id: "export",
+  id: "exporter",
   command: {
     command: "tinymist.openExportTool",
     title: "Export Tool",
