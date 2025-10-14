@@ -1,6 +1,6 @@
 import van, { type State } from "vanjs-core";
-import type { ExportFormat, ExportConfig } from "../types";
 import { EXPORT_FORMATS, getDefaultOptions } from "../config/formats";
+import type { ExportConfig, ExportFormat } from "../types";
 
 const { div, span } = van.tags;
 

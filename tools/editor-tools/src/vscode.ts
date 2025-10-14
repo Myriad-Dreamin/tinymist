@@ -1,6 +1,5 @@
 import van from "vanjs-core";
 import type { fontsExportConfigure } from "./features/summary";
-import type { TaskDefinition } from "./features/export/types";
 
 const vscodeAPI = typeof acquireVsCodeApi !== "undefined" && acquireVsCodeApi();
 
@@ -223,8 +222,4 @@ export function requestGeneratePreview(format: string, extraArgs: Record<string,
 
 export function requestExportDocument(format: string, extraArgs: Record<string, unknown>) {
   vscodeAPI?.postMessage?.({ type: "exportDocument", format, extraArgs: extraArgs ?? {} });
-}
-
-export function requestCreateExportTask(taskDefinition: TaskDefinition) {
-  vscodeAPI?.postMessage?.({ type: "createExportTask", taskDefinition });
 }

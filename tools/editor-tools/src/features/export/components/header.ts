@@ -8,35 +8,37 @@ interface HeaderProps {
   actions?: ChildDom;
 }
 
-export const Header = (props: HeaderProps = {}) => () => {
-  const {
-    title = "Export Tool",
-    description = "Configure and export your Typst documents to various formats",
-    actions
-  } = props;
+export const Header =
+  (props: HeaderProps = {}) =>
+  () => {
+    const {
+      title = "Export Tool",
+      description = "Configure and export your Typst documents to various formats",
+      actions,
+    } = props;
 
-  return div(
-    { class: "card flex flex-col gap-sm" },
-    div(
-      { class: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-sm" },
+    return div(
+      { class: "card flex flex-col gap-sm" },
       div(
-        { class: "flex flex-col gap-xs" },
-        h1(
-          {
-            class: "text-xl font-semibold text-base-content",
-            style: "margin: 0; font-size: 1.25rem; font-weight: 600;"
-          },
-          title
+        { class: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-sm" },
+        div(
+          { class: "flex flex-col gap-xs" },
+          h1(
+            {
+              class: "text-xl font-semibold text-base-content",
+              style: "margin: 0; font-size: 1.25rem; font-weight: 600;",
+            },
+            title,
+          ),
+          p(
+            {
+              class: "text-desc",
+              style: "margin: 0; font-size: 0.875rem;",
+            },
+            description,
+          ),
         ),
-        p(
-          {
-            class: "text-desc",
-            style: "margin: 0; font-size: 0.875rem;"
-          },
-          description
-        )
+        actions ? div({ class: "flex gap-xs" }, actions) : null,
       ),
-      actions ? div({ class: "flex gap-xs" }, actions) : null
-    )
-  );
-};
+    );
+  };

@@ -1,17 +1,17 @@
 import van, { type State } from "vanjs-core";
 import { base64Decode } from "../../utils";
-import type { ExportConfig, PreviewPage } from "./types";
 import { MOCK_EXPORT_CONFIG, MOCK_PREVIEW_PAGES } from "./mock-data";
+import type { ExportConfig, PreviewPage } from "./types";
 import "./styles.css";
 
+import { ActionButtons } from "./components/action-buttons";
+import { FormatSelector } from "./components/format-selector";
 // Components
 import { Header } from "./components/header";
-import { FormatSelector } from "./components/format-selector";
-import { OptionsPanel, DocumentUriSection } from "./components/options-panel";
+import { DocumentUriSection, OptionsPanel } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
-import { ActionButtons } from "./components/action-buttons";
 
-const { div, h2 } = van.tags;
+const { div } = van.tags;
 
 function useExportConfig(): State<ExportConfig> {
   const stub = `:[[preview:ExportConfig]]:`;

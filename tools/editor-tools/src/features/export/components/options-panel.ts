@@ -1,6 +1,6 @@
 import van, { type State } from "vanjs-core";
-import type { ExportConfig, OptionSchema } from "../types";
 import { focusedDocUri, isDocUriLocked } from "@/vscode";
+import type { ExportConfig, OptionSchema } from "../types";
 
 const { div, h3, label, input, select, option, span, p, button } = van.tags;
 

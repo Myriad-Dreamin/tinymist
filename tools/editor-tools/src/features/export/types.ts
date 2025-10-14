@@ -1,8 +1,8 @@
-export type ExportFormatId = 'pdf' | 'png' | 'svg' | 'html' | 'markdown' | 'tex' | 'text' | 'query';
+export type ExportFormatId = "pdf" | "png" | "svg" | "html" | "markdown" | "tex" | "text" | "query";
 
 export interface OptionSchema {
   key: string;
-  type: 'string' | 'number' | 'boolean' | 'color' | 'select';
+  type: "string" | "number" | "boolean" | "color" | "select";
   label: string;
   description?: string;
   default?: string | number | boolean;
@@ -40,10 +40,10 @@ export interface PreviewPage {
 }
 
 export interface TaskDefinition {
-  type: 'typst';
-  command: 'export';
+  type: "typst";
+  command: "export";
   label: string;
-  group: 'build';
+  group: "build";
   export: Record<string, string | number | boolean | undefined>;
 }
 
