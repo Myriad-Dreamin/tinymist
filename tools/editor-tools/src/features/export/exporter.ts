@@ -16,10 +16,16 @@ export function useExporter() {
   const previewData = van.state<PreviewData>({});
   const error = van.state<string | undefined>(undefined);
 
-  const buildOptions = () =>
-    Object.fromEntries(
+  const buildOptions = () => {
+    const extraOpts = Object.fromEntries(
       format.val.options.map((option) => [option.key, optionStates[option.key]?.val]),
     );
+    return {
+      inputPath: inputPath.val.length > 0 ? inputPath.val : undefined,
+      outputPath: outputPath.val.length > 0 ? outputPath.val : undefined,
+      ...extraOpts,
+    };
+  };
 
   const exportDocument = () => {
     const exportOptions = buildOptions();
@@ -31,7 +37,7 @@ export function useExporter() {
     previewGenerating.val = true;
     const exportOptions = buildOptions();
     console.log("Generate preview as", format.val.id, "With options:", exportOptions);
-    requestGeneratePreview(format.val.id, { ...exportOptions }, ++previewVersion);
+    requestGeneratePreview(format.val.id, exportOptions, ++previewVersion);
 
     if (import.meta.env.DEV) {
       // Simulate preview generation in dev mode
