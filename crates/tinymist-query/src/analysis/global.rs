@@ -841,6 +841,7 @@ impl SharedContext {
         res
     }
 
+    /// Gets the definition from a source location.
     pub(crate) fn def_of_span(
         self: &Arc<Self>,
         source: &Source,
@@ -851,6 +852,7 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
+    /// Gets the definition from a declaration.
     pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
         match decl.as_ref() {
             Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
@@ -859,6 +861,10 @@ impl SharedContext {
         }
     }
 
+    /// Gets the definition from static analysis.
+    ///
+    /// Passing a `doc` (compiled result) can help resolve dynamic things, e.g.
+    /// label definitions.
     pub(crate) fn def_of_syntax(
         self: &Arc<Self>,
         source: &Source,
@@ -868,6 +874,13 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
+    /// Gets the definition from static analysis or dynamic analysis.
+    ///
+    /// Note: while this has best quality in typst, it is expensive.
+    /// Use it if you know it is only called `O(1)` times to serve a user LSP
+    /// request, e.g. resolve a function definition for `completion`.
+    /// Otherwise, use `def_of_syntax`, e.g. resolves all definitions for
+    /// package docs.
     pub(crate) fn def_of_syntax_or_dyn(
         self: &Arc<Self>,
         source: &Source,
