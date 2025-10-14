@@ -1,4 +1,4 @@
-import type { ExportFormat, OptionSchema, Scalar } from "../types";
+import type { ExportFormat, OptionSchema } from "../types";
 
 const PAGES_OPT: OptionSchema = {
   key: "pages",
@@ -30,8 +30,6 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "pdf",
     label: "PDF",
-    description: "Portable Document Format - ideal for documents, print, and sharing",
-    supportsPreview: true,
     fileExtension: "pdf",
     options: [
       PAGES_OPT,
@@ -48,8 +46,6 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "png",
     label: "PNG",
-    description: "Portable Network Graphics - high-quality images for web and presentations",
-    supportsPreview: true,
     fileExtension: "png",
     options: [
       PAGES_OPT,
@@ -73,24 +69,18 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "svg",
     label: "SVG",
-    description: "Scalable Vector Graphics - perfect for web and scalable graphics",
-    supportsPreview: true,
     fileExtension: "svg",
     options: [PAGES_OPT, ...MERGE_OPTS],
   },
   {
     id: "html",
     label: "HTML",
-    description: "HyperText Markup Language - for web publishing and online viewing",
-    supportsPreview: false,
     fileExtension: "html",
     options: [],
   },
   {
     id: "markdown",
     label: "Markdown",
-    description: "Markdown format - for documentation and text processing",
-    supportsPreview: true,
     fileExtension: "md",
     options: [
       {
@@ -112,8 +102,6 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "tex",
     label: "TeX/LaTeX",
-    description: "TeX format - for LaTeX integration and academic publishing",
-    supportsPreview: true,
     fileExtension: "tex",
     options: [
       {
@@ -135,16 +123,12 @@ export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "text",
     label: "Plain Text",
-    description: "Plain text format - extract text content only",
-    supportsPreview: true,
     fileExtension: "txt",
     options: [],
   },
   {
     id: "query",
     label: "Query",
-    description: "Custom query export - extract specific data or metadata",
-    supportsPreview: true,
     fileExtension: "json",
     options: [
       {
@@ -203,17 +187,3 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     ],
   },
 ];
-
-export function getFormatById(id: string): ExportFormat | undefined {
-  return EXPORT_FORMATS.find((format) => format.id === id);
-}
-
-export function getDefaultOptions(format: ExportFormat): Record<string, Scalar | undefined> {
-  const options: Record<string, Scalar | undefined> = {};
-  format.options.forEach((option) => {
-    if (option.default !== undefined) {
-      options[option.key] = option.default;
-    }
-  });
-  return options;
-}

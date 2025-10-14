@@ -85,6 +85,7 @@ interface GeneratePreviewMessage {
   type: "generatePreview";
   format: ExportFormat;
   extraArgs: ExportArgs;
+  version: number;
 }
 
 export const messageHandlers: Record<string, MessageHandler> = {
@@ -284,7 +285,18 @@ export const messageHandlers: Record<string, MessageHandler> = {
     }
   },
 
-  generatePreview: async ({ format, extraArgs }: GeneratePreviewMessage, { postMessage }) => {
+  generatePreview: async (
+    { format, extraArgs, version }: GeneratePreviewMessage,
+    { postMessage },
+  ) => {
+    const sendError = (message: string) => {
+      postMessage({
+        type: "previewError",
+        format,
+        error: message,
+      });
+    };
+
     console.log(`Generating preview for format=${format}, extraArgs=`, extraArgs);
     try {
       const ops = exportOps(extraArgs);
@@ -295,6 +307,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       // Get the active document
       const uri = ops.resolveInputPath();
       if (!uri) {
+        sendError("No active document found");
         await vscode.window.showErrorMessage("No active document found");
         return;
       }
@@ -304,6 +317,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
 
       const provider = formatProvider[actualFormat];
       if (!provider) {
+        sendError(`Unsupported export format: ${format}`);
         await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
         return;
       }
@@ -312,16 +326,9 @@ export const messageHandlers: Record<string, MessageHandler> = {
       const response = await provider.export(uri, provider.opts(), { write: false });
       console.log("Preview generation response:", response);
       if (!response) {
-        await vscode.window.showErrorMessage("Failed to generate preview data");
-        return;
-      }
-
-      // Handle error case
-      if (!response) {
-        postMessage({
-          type: "previewError",
-          error: "failed to generate preview",
-        });
+        const failureMessage = "Failed to generate preview data";
+        sendError(failureMessage);
+        await vscode.window.showErrorMessage(failureMessage);
         return;
       }
 
@@ -337,6 +344,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
         // Multiple pages
         postMessage({
           type: "previewGenerated",
+          version,
           format,
           pages: renderedPages.map((page) => ({
             pageNumber: page.page,
@@ -346,15 +354,15 @@ export const messageHandlers: Record<string, MessageHandler> = {
       } else {
         postMessage({
           type: "previewGenerated",
+          version,
           format,
           text: "data" in response ? response.data : response.items[0].data,
         });
       }
     } catch (error) {
-      postMessage({
-        type: "previewError",
-        error: `Preview generation failed: ${error}`,
-      });
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Preview generation failed:", error);
+      sendError(`Preview generation failed: ${message}`);
     }
   },
 };

@@ -101,10 +101,12 @@ export function setupVscodeChannel() {
         case "focusedDocUri": {
           const incomingData = event.data.data as VersionedDocUri;
           // Only update if not locked and version is newer (or no current version)
-          if (!isDocUriLocked.val &&
-              incomingData &&
-              incomingData.uri &&
-              (!focusedDocUri.val || incomingData.version > focusedDocUri.val.version)) {
+          if (
+            !isDocUriLocked.val &&
+            incomingData &&
+            incomingData.uri &&
+            (!focusedDocUri.val || incomingData.version > focusedDocUri.val.version)
+          ) {
             focusedDocUri.val = incomingData;
           }
           break;
@@ -215,11 +217,25 @@ export function saveDataToFile({
   }
 }
 
-export function requestGeneratePreview(format: string, extraArgs: Record<string, unknown>) {
-  console.log("requestGeneratePreview", format, extraArgs);
-  vscodeAPI?.postMessage?.({ type: "generatePreview", format, extraArgs: extraArgs ?? {} });
+export function requestGeneratePreview(
+  format: string,
+  extraArgs: Record<string, unknown>,
+  version: number = 0,
+) {
+  console.log("requestGeneratePreview", format, extraArgs, version);
+  vscodeAPI?.postMessage?.({
+    type: "generatePreview",
+    format,
+    extraArgs: extraArgs ?? {},
+    version,
+  });
 }
 
 export function requestExportDocument(format: string, extraArgs: Record<string, unknown>) {
-  vscodeAPI?.postMessage?.({ type: "exportDocument", format, extraArgs: extraArgs ?? {} });
+  console.log("requestExportDocument", format, extraArgs);
+  vscodeAPI?.postMessage?.({
+    type: "exportDocument",
+    format,
+    extraArgs: extraArgs ?? {},
+  });
 }
