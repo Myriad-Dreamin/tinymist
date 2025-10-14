@@ -9,7 +9,7 @@ interface PreviewGridProps {
   previewPages: State<PreviewPage[]>;
 }
 
-export const PreviewGrid = (props: PreviewGridProps) => () => {
+export const PreviewGrid = (props: PreviewGridProps) => {
   const { exportConfig, previewPages } = props;
 
   const { format } = exportConfig.val;

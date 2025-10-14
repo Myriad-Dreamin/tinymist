@@ -1,12 +1,16 @@
+import { State } from "vanjs-core";
+
 export type ExportFormatId = "pdf" | "png" | "svg" | "html" | "markdown" | "tex" | "text" | "query";
+
+export type Scalar = string | number | boolean;
 
 export interface OptionSchema {
   key: string;
   type: "string" | "number" | "boolean" | "color" | "select";
   label: string;
   description?: string;
-  default?: string | number | boolean;
-  options?: Array<{ value: string | number | boolean; label: string }>;
+  default: Scalar;
+  options?: Array<{ value: Scalar; label: string }>;
   min?: number;
   max?: number;
   dependsOn?: string; // Key of another option that this option depends on
@@ -22,7 +26,7 @@ export interface ExportFormat {
 }
 
 export interface FormatOptions {
-  [key: string]: string | number | boolean | undefined;
+  [key: string]: Scalar | undefined;
 }
 
 export interface ExportConfig {
@@ -30,6 +34,13 @@ export interface ExportConfig {
   inputPath: string;
   outputPath: string;
   options: FormatOptions;
+}
+
+export interface ExportConfigState {
+  inputPath: State<string>;
+  outputPath: State<string>;
+  format: State<ExportFormat>;
+  options: Record<string, State<Scalar | undefined>>;
 }
 
 export interface PreviewPage {
@@ -44,7 +55,7 @@ export interface TaskDefinition {
   command: "export";
   label: string;
   group: "build";
-  export: Record<string, string | number | boolean | undefined>;
+  export: Record<string, Scalar | undefined>;
 }
 
 export interface ExportResult {

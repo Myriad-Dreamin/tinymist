@@ -1,7 +1,6 @@
 import van, { type State } from "vanjs-core";
-import { base64Decode } from "../../utils";
-import { MOCK_EXPORT_CONFIG, MOCK_PREVIEW_PAGES } from "./mock-data";
-import type { ExportConfig, PreviewPage } from "./types";
+import { MOCK_PREVIEW_PAGES } from "./mock-data";
+import type { ExportConfig, ExportConfigState, OptionSchema, PreviewPage, Scalar } from "./types";
 import "./styles.css";
 
 import { ActionButtons } from "./components/action-buttons";
@@ -10,25 +9,21 @@ import { FormatSelector } from "./components/format-selector";
 import { Header } from "./components/header";
 import { DocumentUriSection, OptionsPanel } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
+import { EXPORT_FORMATS, getDefaultOptions } from "./config/formats";
 
 const { div } = van.tags;
 
 function useExportConfig(): State<ExportConfig> {
-  const stub = `:[[preview:ExportConfig]]:`;
-
-  const exportConfig = van.state<ExportConfig>(
-    stub.startsWith(":") ? MOCK_EXPORT_CONFIG : JSON.parse(base64Decode(stub)),
-  );
-
-  return exportConfig;
+  return van.state<ExportConfig>({
+    format: EXPORT_FORMATS[0], // PDF format
+    inputPath: "",
+    outputPath: "",
+    options: getDefaultOptions(EXPORT_FORMATS[0]),
+  });
 }
 
 function usePreviewPages(): State<PreviewPage[]> {
-  const stub = `:[[preview:PreviewPages]]:`;
-
-  const previewPages = van.state<PreviewPage[]>(
-    stub.startsWith(":") ? MOCK_PREVIEW_PAGES : JSON.parse(base64Decode(stub)),
-  );
+  const previewPages = van.state<PreviewPage[]>(MOCK_PREVIEW_PAGES);
 
   return previewPages;
 }
@@ -38,11 +33,37 @@ function usePreviewPages(): State<PreviewPage[]> {
  */
 const ExportTool = () => {
   // Initialize state
-  const exportConfig = useExportConfig();
+  // const exportConfig = useExportConfig();
+  const inputPath = van.state("");
+  const outputPath = van.state("");
+  const format = van.state(EXPORT_FORMATS[0]);
+  const optionStates: Record<string, State<Scalar>> = {};
+
   const previewPages = usePreviewPages();
 
-  console.log("Export config:", exportConfig.val);
-  console.log("Preview pages:", previewPages.val);
+  for (const format of EXPORT_FORMATS) {
+    for (const option of format.options) {
+      if (!optionStates[option.key]) {
+        optionStates[option.key] = van.state(option.default);
+      }
+    }
+  }
+
+  console.log("initial option states", optionStates);
+
+  const activeOptions = van.derive(() => {
+    console.log("Deriving activeOptions for format", format.val.id);
+    const formatOptions = format.val.options;
+    for (const option of formatOptions) {
+      if (!optionStates[option.key]) {
+        optionStates[option.key] = van.state(option.default);
+      }
+    }
+
+    return formatOptions;
+  });
+
+  van.derive(() => console.log("Active changed", activeOptions.val));
 
   return div(
     { class: "export-tool-container flex flex-col gap-lg text-base-content" },
@@ -55,16 +76,21 @@ const ExportTool = () => {
     DocumentUriSection(),
 
     // Format Selection
-    FormatSelector({ exportConfig }),
+    FormatSelector({ selectedFormat: format }),
 
     // Options Configuration
-    OptionsPanel({ exportConfig }),
+    () =>
+      OptionsPanel({
+        format: format.val,
+        options: activeOptions.val,
+        optionStates,
+      }),
 
     // Preview Section
-    exportConfig.val.format.supportsPreview ? PreviewGrid({ exportConfig, previewPages }) : null,
+    // exportConfig.val.format.supportsPreview ? PreviewGrid({ exportConfig, previewPages }) : null,
 
     // Export Actions
-    ActionButtons({ exportConfig }),
+    // ActionButtons({ exportConfig }),
   );
 };
 

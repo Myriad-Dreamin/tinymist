@@ -1,10 +1,11 @@
-import type { ExportFormat, OptionSchema } from "../types";
+import type { ExportFormat, OptionSchema, Scalar } from "../types";
 
 const PAGES_OPT: OptionSchema = {
   key: "pages",
   type: "string",
   label: "Page Range",
   description: 'Page range to export (e.g., "1-3,5,7-9", leave empty for all pages)',
+  default: "",
 };
 
 const MERGE_OPTS: OptionSchema[] = [
@@ -40,6 +41,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         label: "Creation Timestamp",
         description:
           'Set creation timestamp (leave empty for current time, "null" for no timestamp)',
+        default: "",
       },
     ],
   },
@@ -96,12 +98,14 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         type: "string",
         label: "Processor",
         description: 'Typst file for custom processing (e.g., "/processor.typ")',
+        default: "",
       },
       {
         key: "markdown.assetsPath",
         type: "string",
         label: "Assets Path",
         description: "Directory path for exported assets",
+        default: "",
       },
     ],
   },
@@ -117,12 +121,14 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         type: "string",
         label: "Processor",
         description: 'Typst file for custom TeX processing (e.g., "/ieee-tex.typ")',
+        default: "",
       },
       {
         key: "tex.assetsPath",
         type: "string",
         label: "Assets Path",
         description: "Directory path for exported assets",
+        default: "",
       },
     ],
   },
@@ -171,6 +177,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         type: "string",
         label: "Field",
         description: "Field to extract from selected elements",
+        default: "",
       },
       {
         key: "query.strict",
@@ -201,10 +208,8 @@ export function getFormatById(id: string): ExportFormat | undefined {
   return EXPORT_FORMATS.find((format) => format.id === id);
 }
 
-export function getDefaultOptions(
-  format: ExportFormat,
-): Record<string, string | number | boolean | undefined> {
-  const options: Record<string, string | number | boolean | undefined> = {};
+export function getDefaultOptions(format: ExportFormat): Record<string, Scalar | undefined> {
+  const options: Record<string, Scalar | undefined> = {};
   format.options.forEach((option) => {
     if (option.default !== undefined) {
       options[option.key] = option.default;

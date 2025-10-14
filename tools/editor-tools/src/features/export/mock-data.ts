@@ -1,13 +1,4 @@
-import { EXPORT_FORMATS, getDefaultOptions } from "./config/formats";
-import type { ExportConfig, PreviewPage } from "./types";
-
-// Mock export configuration for development
-export const MOCK_EXPORT_CONFIG: ExportConfig = {
-  format: EXPORT_FORMATS[0], // PDF format
-  inputPath: "/workspace/document.typ",
-  outputPath: "/workspace/document.pdf",
-  options: getDefaultOptions(EXPORT_FORMATS[0]),
-};
+import type { PreviewPage } from "./types";
 
 // Mock preview pages for development
 export const MOCK_PREVIEW_PAGES: PreviewPage[] = [
@@ -33,11 +24,3 @@ export const MOCK_PREVIEW_PAGES: PreviewPage[] = [
     height: 792,
   },
 ];
-
-// Mock current document info for development
-export const MOCK_DOCUMENT_INFO = {
-  path: "/workspace/document.typ",
-  name: "document.typ",
-  pageCount: 3,
-  isTypstDocument: true,
-};
