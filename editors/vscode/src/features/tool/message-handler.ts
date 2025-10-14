@@ -3,6 +3,7 @@ import { extensionState } from "../../state";
 import type { EditorToolContext } from "../../tools";
 import { type ExportArgs, type ExportFormat, exportOps, provideFormats } from "../tasks.export";
 import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
+import { base64Decode } from "../../util";
 
 export interface WebviewMessage {
   type: string;
@@ -352,11 +353,12 @@ export const messageHandlers: Record<string, MessageHandler> = {
           })),
         });
       } else {
+        const text = "data" in response ? response.data : response.items[0].data;
         postMessage({
           type: "previewGenerated",
           version,
           format,
-          text: "data" in response ? response.data : response.items[0].data,
+          text: text && base64Decode(text),
         });
       }
     } catch (error) {

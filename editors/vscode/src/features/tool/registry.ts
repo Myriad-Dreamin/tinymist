@@ -9,6 +9,7 @@ import templateGallery from "../../tools/template-gallery";
 import tracing from "../../tools/tracing";
 
 export const tools: EditorTool[] = [
+  exporter,
   templateGallery,
   summary,
   tracing,
@@ -16,5 +17,4 @@ export const tools: EditorTool[] = [
   fontView,
   symbolView,
   docsView,
-  exporter,
 ];
