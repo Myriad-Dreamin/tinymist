@@ -13,7 +13,7 @@
 #let md-emph(body) = html.elem("span", html.elem("m1emph", body))
 #let md-highlight(body) = html.elem("span", html.elem("m1highlight", body))
 #let md-strike(body) = html.elem("span", html.elem("m1strike", body))
-#let md-raw(lang: none, block: false, text: text, body) = {
+#let md-raw(lang: none, block: false, text: "", body) = {
   let body = html.elem(
     "m1raw",
     attrs: (
