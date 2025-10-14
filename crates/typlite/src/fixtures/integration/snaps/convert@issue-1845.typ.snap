@@ -1,0 +1,51 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::Md { for_docs: false })"
+input_file: crates/typlite/src/fixtures/integration/issue-1845.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1grid><m1table><table><tr><td>Header</td><td>Row</td></tr><tr><td><m1raw lang="" block="true" text="Code line 1
+Code line 2"></m1raw></td><td>Regular text</td></tr></table></m1table></m1grid></m1document></body>
+</html>
+
+=====
+<!-- typlite warning: block content detected inside table cell; exported original HTML table -->
+<table>
+
+<tr>
+
+<td>
+
+Header
+
+</td><td>
+
+Row
+
+</td>
+
+</tr><tr>
+
+<td>
+
+<m1raw lang="" block="true" text="Code line 1
+Code line 2">
+
+
+
+</m1raw>
+
+</td><td>
+
+Regular text
+
+</td>
+
+</tr>
+
+</table>
