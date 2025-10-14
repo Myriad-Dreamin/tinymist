@@ -1,7 +1,7 @@
-import type { ExportFormat, PreviewData, PreviewPage, Scalar } from "./types";
+import van, { type State } from "vanjs-core";
 import { requestExportDocument, requestGeneratePreview } from "@/vscode";
-import van, { State } from "vanjs-core";
-import { EXPORT_FORMATS } from "./config/formats";
+import { EXPORT_FORMATS } from "./formats";
+import type { ExportFormat, PreviewData, PreviewPage, Scalar } from "./types";
 
 type PreviewResponse = PreviewData & { type: string; version: number };
 

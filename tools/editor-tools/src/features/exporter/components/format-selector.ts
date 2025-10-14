@@ -1,5 +1,5 @@
 import van, { type State } from "vanjs-core";
-import { EXPORT_FORMATS } from "../config/formats";
+import { EXPORT_FORMATS } from "../formats";
 import type { ExportFormat } from "../types";
 
 const { div, span } = van.tags;

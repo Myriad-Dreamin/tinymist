@@ -4,8 +4,8 @@ import { Tracing } from "./features/tracing";
 import { Summary } from "./features/summary";
 import { Diagnostics } from "./features/diagnostics";
 import { Docs } from "./features/docs";
+import Exporter from "./features/exporter";
 import FontView from "./features/font-view";
-import Exporter from "./features/export";
 
 mainHarness({
   "template-gallery": TemplateGallery,

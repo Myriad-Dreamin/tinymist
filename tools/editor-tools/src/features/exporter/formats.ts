@@ -1,4 +1,4 @@
-import type { ExportFormat, OptionSchema } from "../types";
+import type { ExportFormat, OptionSchema } from "./types";
 
 const PAGES_OPT: OptionSchema = {
   key: "pages",
