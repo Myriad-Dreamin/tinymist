@@ -1214,18 +1214,6 @@ impl ExprWorker<'_> {
     /// 2. Parent scopes (`self.lexical.scopes`) - for outer scope variables
     /// 3. Global/Math library scope - for built-in functions and constants
     /// 4. Special case: "std" module
-    ///
-    /// # When `type` is Set
-    ///
-    /// - Built-in values from library: Always has type (wrapped in `Ty::Value`)
-    /// - Lexical scope variables: May have type if it was tracked during
-    ///   definition
-    /// - "std" module: Has type `Ty::Value(Module)`
-    ///
-    /// # When `type` is None
-    ///
-    /// - Identifier not found in any scope: Returns `(None, None)`
-    /// - Variable has no type information: Returns `(Some(expr), None)`
     fn eval_ident(&self, name: &Interned<str>, mode: InterpretMode) -> ConcolicExpr {
         let res = self.lexical.last.get(name);
         if res.0.is_some() || res.1.is_some() {
@@ -1301,11 +1289,6 @@ impl ExprWorker<'_> {
                     let exports = self.exports_of(module.fid);
                     let selected = exports.get(key.name())?;
 
-                    // Create RefExpr for module field access (e.g., "mod.field").
-                    // - decl: The field name being accessed
-                    // - root: The module expression being accessed
-                    // - step: The field's expression from the module's exports
-                    // - term: None (type will be inferred later during type checking)
                     let select_ref = Interned::new(RefExpr {
                         decl: key.clone(),
                         root: Some(lhs.clone()),
@@ -1346,17 +1329,6 @@ impl ExprWorker<'_> {
 /// - If `step` is a `RefExpr`: Returns `(ref.root, Some(ref.decl))` -
 ///   propagates the root forward and uses the ref's declaration as the new step
 /// - Otherwise: Returns `(step, step)` - the expression is both root and step
-///
-/// # Example
-///
-/// ```ignore
-/// // Given: let x = value; let y = x;
-/// // When resolving y:
-/// let step = Some(Expr::Ref(RefExpr { decl: x, root: Some(value), ... }));
-/// let (root, step) = extract_ref(step);
-/// // Result: root = Some(value), step = Some(Expr::Decl(x))
-/// // This builds the chain: y -> x -> value
-/// ```
 fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
     match step {
         Some(Expr::Ref(r)) => (r.root.clone(), Some(r.decl.clone().into())),
