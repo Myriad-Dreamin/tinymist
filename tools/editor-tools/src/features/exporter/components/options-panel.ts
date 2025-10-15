@@ -1,5 +1,6 @@
 import van, { type State } from "vanjs-core";
 import type { ExportFormat, OptionSchema, Scalar } from "../types";
+import { lastFocusedTypstDoc } from "@/vscode";
 
 const { div, h3, label, input, select, option, span, p, button } = van.tags;
 
@@ -8,11 +9,17 @@ interface InputSectionProps {
 }
 
 export const InputSection = ({ inputPath }: InputSectionProps) => {
-  const isInputLocked = van.state(false);
+  const isInputLocked = van.state(false); // false means auto-update is enabled
 
   const toggleLock = () => {
     isInputLocked.val = !isInputLocked.val;
   };
+
+  van.derive(() => {
+    if (!isInputLocked.val && lastFocusedTypstDoc.val) {
+      inputPath.val = lastFocusedTypstDoc.val;
+    }
+  });
 
   return div(
     h3({ class: "mb-sm" }, "Input Document"),

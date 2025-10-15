@@ -68,6 +68,9 @@ export const serverTrace = van.state<any | undefined>(undefined);
 
 export const didStartServerProfiling = van.state<boolean>(false);
 
+let lastFocusedTypstDocVersion = 0;
+export const lastFocusedTypstDoc = van.state<string | undefined>(undefined);
+
 export const styleAtCursor = van.state<StyleAtCursor | undefined>(undefined);
 
 /// A frontend will try to setup a vscode channel if it is running
@@ -83,6 +86,13 @@ export function setupVscodeChannel() {
         }
         case "didStartServerProfiling": {
           serverTrace.val = event.data.data;
+          break;
+        }
+        case "focusTypstDoc": {
+          if (event.data.version >= lastFocusedTypstDocVersion) {
+            lastFocusedTypstDocVersion = event.data.version;
+            lastFocusedTypstDoc.val = event.data.fsPath;
+          }
           break;
         }
         case "styleAtCursor": {

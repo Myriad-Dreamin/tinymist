@@ -18,7 +18,10 @@ export function useExporter() {
 
   const buildOptions = () => {
     const extraOpts = Object.fromEntries(
-      format.val.options.map((option) => [option.key, optionStates[option.key]?.val]),
+      format.val.options.map((option) => {
+        const val = optionStates[option.key]?.val;
+        return [option.key, val === "" ? undefined : val];
+      }),
     );
     return {
       inputPath: inputPath.val.length > 0 ? inputPath.val : undefined,

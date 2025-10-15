@@ -195,6 +195,11 @@ body.typst-preview-light .btn.warning:hover {
   box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007acc);
 }
 
+.input:disabled {
+  --vscode-disabledForeground: rgba(204, 204, 204, 0.5);
+  cursor: not-allowed;
+}
+
 .input::placeholder {
   color: var(--vscode-input-placeholderForeground, #767676);
 }
