@@ -1,8 +1,8 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on / (71..72)
+description: Completion on o( (46..48)
 expression: "JsonRepr::new_pure(results)"
-input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rect.typ
+input_file: crates/tinymist-query/src/fixtures/completion/import_typing.typ
 ---
 [
  {
@@ -13,46 +13,51 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-utils-cover-with-rec
      "command": "tinymist.triggerSuggestAndParameterHints",
      "title": ""
     },
-    "kind": 5,
-    "label": "fill",
+    "kind": 3,
+    "label": "todo",
     "labelDetails": {
-     "description": "auto | color | int | ratio | type"
+     "description": "(content) => content"
     },
-    "sortText": "000",
+    "sortText": "217",
     "textEdit": {
-     "newText": "fill: ${1:}",
+     "newText": "todo(${1:})",
      "range": {
       "end": {
-       "character": 17,
+       "character": 3,
        "line": 2
       },
       "start": {
-       "character": 17,
+       "character": 1,
        "line": 2
       }
      }
     }
-   },
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
    {
     "command": {
      "command": "tinymist.triggerSuggestAndParameterHints",
      "title": ""
     },
     "kind": 3,
-    "label": "stroke",
+    "label": "todo",
     "labelDetails": {
-     "description": "type"
+     "description": "(content) => content"
     },
-    "sortText": "204",
+    "sortText": "217",
     "textEdit": {
-     "newText": "stroke(${1:})",
+     "newText": "todo(${1:})",
      "range": {
       "end": {
-       "character": 17,
+       "character": 3,
        "line": 2
       },
       "start": {
-       "character": 17,
+       "character": 1,
        "line": 2
       }
      }
