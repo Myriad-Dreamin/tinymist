@@ -84,6 +84,9 @@
 }
 
 /* Spacing */
+.mt-sm {
+  margin-top: 0.5rem;
+}
 .mb-sm {
   margin-bottom: 0.5rem;
 }

@@ -43,13 +43,12 @@ const ExportTool = () => {
     () => OptionsPanel({ format: format.val, optionStates }),
 
     // Preview Section
-    () =>
-      PreviewGrid({
-        format: format.val,
-        previewData,
-        previewGenerating,
-        onPreview: generatePreview,
-      }),
+    PreviewGrid({
+      format: format,
+      previewData,
+      previewGenerating,
+      onPreview: generatePreview,
+    }),
 
     // Export Actions
     ActionButtons({

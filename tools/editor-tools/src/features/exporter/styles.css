@@ -62,13 +62,18 @@
 }
 
 .preview-page {
-  background: white;
-  border-radius: 0.25rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
-  cursor: pointer;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 0.25rem;
+  background: var(--vscode-editorWidget-background, #252526);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
   overflow: hidden;
+  transition: transform 0.2s ease;
 }
 
 .preview-page:hover {
@@ -79,18 +84,38 @@
   width: 100%;
   height: auto;
   display: block;
+  object-fit: contain;
+  border: 1px solid var(--vscode-widget-border, #303031);
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .preview-page-number {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.5);
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  font-size: 0.75rem;
   font-weight: 500;
+  pointer-events: none;
+}
+
+.preview-text-content {
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid var(--vscode-widget-border, #303031);
+  border-radius: 4px;
+  padding: 16px;
+  background: var(--vscode-editor-background, #1e1e1e);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 8px 0;
 }
 
 .preview-loading {
@@ -112,6 +137,13 @@
   text-align: center;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.zoom-label {
+  margin-right: 8px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground, #999999);
+  font-weight: 500;
 }
 
 /* Action Buttons */

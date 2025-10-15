@@ -44,7 +44,10 @@ export function useExporter() {
 
     if (import.meta.env.DEV) {
       // Simulate preview generation in dev mode
-      window.postMessage(createMockPreviewResponse(format.val, previewVersion));
+      setTimeout(
+        () => window.postMessage(createMockPreviewResponse(format.val, previewVersion)),
+        Math.random() * 250 + 250,
+      );
     }
   };
 
@@ -56,11 +59,9 @@ export function useExporter() {
   });
 
   const handleMessage = (event: MessageEvent) => {
-    console.log("Received message event", event);
     const data = event.data;
     if (data.type === "previewGenerated") {
       if (data.version < previewVersion) {
-        console.log("Ignoring outdated preview version", data.version, "<", previewVersion);
         return;
       }
       previewData.val = data;
