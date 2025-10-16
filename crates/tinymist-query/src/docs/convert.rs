@@ -47,7 +47,7 @@ pub(crate) fn convert_docs(
         ));
         imports.join("; ")
     });
-    let feat = TypliteFeat {
+    let mut feat = TypliteFeat {
         color_theme: Some(ctx.analysis.color_theme),
         annotate_elem: true,
         soft_error: true,
@@ -67,9 +67,11 @@ pub(crate) fn convert_docs(
     w.map_shadow_by_id(w.main(), Bytes::from_string(content.to_owned()))?;
     // todo: bad performance
     w.take_db();
-    let w = feat
+    let (w, wrap_info) = feat
         .prepare_world(&w, Format::Md)
         .map_err(|e| eco_format!("failed to prepare world: {e}"))?;
+
+    feat.wrap_info = wrap_info;
 
     let w = Arc::new(w);
     let res = typlite::Typlite::new(w.clone())

@@ -4,6 +4,7 @@ use base64::Engine;
 use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
+use log::{debug, warn};
 use std::fs;
 use std::io::Cursor;
 
@@ -252,11 +253,14 @@ impl DocxWriter {
             }
             node if node.is_custom_type::<VerbatimNode>() => {
                 let node = node.as_custom_type::<VerbatimNode>().unwrap();
-                eprintln!("Warning: `m1verbatim` is ignored {:?}.", node.content);
+                warn!(
+                    "ignoring `m1verbatim` content in DOCX export: {:?}",
+                    node.content
+                );
             }
             // Other inline element types
             _ => {
-                eprintln!("other inline element: {node:?}");
+                debug!("unhandled inline node in DOCX export: {node:?}");
             }
         }
 
