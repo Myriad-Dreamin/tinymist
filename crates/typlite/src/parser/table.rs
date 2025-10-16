@@ -252,7 +252,12 @@ impl TableParser {
             // Check if the table contains rowspan or colspan attributes
             // If it does, fall back to using HtmlElement
             if TableValidator::table_has_complex_cells(table) {
-                TableValidator::emit_complex_cells_warning(parser, table);
+                parser.warn_at(
+                    Some(table.span),
+                    eco_format!(
+                        "table contains rowspan or colspan attributes; exported original HTML table"
+                    ),
+                );
                 return parser.create_html_element(table).map(Some);
             }
 
@@ -412,16 +417,6 @@ impl TableValidator {
             }
         }
         false
-    }
-
-    /// Emit warning for complex table cells
-    pub fn emit_complex_cells_warning(parser: &mut HtmlToAstParser, table: &HtmlElement) {
-        parser.warn_at(
-            Some(table.span),
-            eco_format!(
-                "table contains rowspan or colspan attributes; exported original HTML table"
-            ),
-        );
     }
 
     fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
