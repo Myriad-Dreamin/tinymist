@@ -769,18 +769,22 @@ impl Default for ConstConfig {
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
-        const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
+        // const DEFAULT_ENCODING: &[PositionEncodingKind] =
+        // &[PositionEncodingKind::UTF16];
 
+        // todo: respect position encoding.
         let position_encoding = {
-            let general = params.capabilities.general.as_ref();
-            let encodings = try_(|| Some(general?.position_encodings.as_ref()?.as_slice()));
-            let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
+            // let general = params.capabilities.general.as_ref();
+            // let encodings = try_(||
+            // Some(general?.position_encodings.as_ref()?.as_slice()));
+            // let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
 
-            if encodings.contains(&PositionEncodingKind::UTF8) {
-                PositionEncoding::Utf8
-            } else {
-                PositionEncoding::Utf16
-            }
+            // if encodings.contains(&PositionEncodingKind::UTF8) {
+            //     PositionEncoding::Utf8
+            // } else {
+            //     PositionEncoding::Utf16
+            // }
+            PositionEncoding::Utf16
         };
 
         let workspace = params.capabilities.workspace.as_ref();
