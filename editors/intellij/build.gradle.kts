@@ -1,3 +1,4 @@
+import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
@@ -61,6 +62,16 @@ intellijPlatform {
         }
 
         val changelog = project.changelog // local variable for configuration cache compatibility
+        changeNotes = providers.gradleProperty("pluginVersion").map { pluginVersion ->
+            with(changelog) {
+                renderItem(
+                    (getOrNull(pluginVersion) ?: getUnreleased())
+                        .withHeader(false)
+                        .withEmptySections(false),
+                    Changelog.OutputType.HTML,
+                )
+            }
+        }
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
