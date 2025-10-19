@@ -190,7 +190,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(./gradlew :intellij:properties --property version --quiet --console=plain | tail -n 1 | cut -f2- -d ' ')
-          RELEASE_NOTE="./build/tmp/release_note.txt"
+          RELEASE_NOTE="./build/release_note.txt"
           ./gradlew :intellij:getChangelog --unreleased --no-header --quiet --console=plain --output-file=$RELEASE_NOTE
           
           gh release create $VERSION \
