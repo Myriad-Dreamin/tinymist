@@ -329,7 +329,7 @@ impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
 where
     D: typst::Document + Send + Sync + 'static,
 {
-    type Output = Option<Warned<SourceResult<Arc<D>>>>;
+    type Output = Warned<SourceResult<Arc<D>>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
         let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
@@ -360,15 +360,15 @@ where
 
 impl<D> OptionDocumentTask<D> where D: typst::Document + Send + Sync + 'static {}
 
-/// A task that computes the diagnostics of a document.
-struct CompilationDiagnostics {
+/// A struct that holds the diagnostics of a document.
+pub struct CompilationDiagnostics {
     errors: Option<EcoVec<typst::diag::SourceDiagnostic>>,
     warnings: Option<EcoVec<typst::diag::SourceDiagnostic>>,
 }
 
 impl CompilationDiagnostics {
     /// Creates a new diagnostics from a result.
-    fn from_result<T>(result: &Option<Warned<SourceResult<T>>>) -> Self {
+    pub fn from_result<T>(result: &Option<Warned<SourceResult<T>>>) -> Self {
         let errors = result
             .as_ref()
             .and_then(|r| r.output.as_ref().map_err(|e| e.clone()).err());
