@@ -25,7 +25,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### LSIF (New)
 
 * Supported offline definition queries (LSIF) in https://github.com/Myriad-Dreamin/tinymist/pull/2032
-  * This is used for custom tpyst package docs generation.
+  * This is used for custom typst package docs generation.
 
 ### Code Analysis
 
