@@ -11,8 +11,8 @@ use typst::World;
 use typst::diag::{SourceResult, StrResult};
 use typst::engine::Sink;
 use typst::foundations::{Content, IntoValue, LocatableSelector, Scope, Value};
-use typst::routines::EvalMode;
 use typst::syntax::Span;
+use typst::syntax::SyntaxMode;
 use typst_eval::eval_string;
 
 use crate::QueryTask;
@@ -126,38 +126,4 @@ impl<F: CompilerFeat, D: typst::Document> ExportComputation<F, D> for DocumentQu
                 bail!("no such field found for element");
             };
             serialize(value, &config.format, pretty)
-        } else {
-            serialize(&mapped, &config.format, pretty)
-        };
-
-        res.map(Ok)
-    }
-}
-
-/// Serialize data to the output format.
-fn serialize(data: &impl serde::Serialize, format: &str, pretty: bool) -> Result<String> {
-    Ok(match format {
-        "json" if pretty => serde_json::to_string_pretty(data).context("serialize query")?,
-        "json" => serde_json::to_string(data).context("serialize query")?,
-        "yaml" => serde_yaml::to_string(&data).context_ut("serialize query")?,
-        "txt" => {
-            use serde_json::Value::*;
-            let value = serde_json::to_value(data).context("serialize query")?;
-            match value {
-                String(s) => s,
-                _ => {
-                    let kind = match value {
-                        Null => "null",
-                        Bool(_) => "boolean",
-                        Number(_) => "number",
-                        String(_) => "string",
-                        Array(_) => "array",
-                        Object(_) => "object",
-                    };
-                    bail!("expected a string value for format: {format}, got {kind}")
-                }
-            }
-        }
-        _ => bail!("unsupported format for query: {format}"),
-    })
-}
+       
