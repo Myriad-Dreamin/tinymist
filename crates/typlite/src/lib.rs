@@ -31,8 +31,8 @@ use crate::parser::HtmlToAstParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
-use crate::tinymist_std::typst::foundations::Value::Str;
 use crate::tinymist_std::typst::LazyHash;
+use crate::tinymist_std::typst::foundations::Value::Str;
 
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
@@ -211,7 +211,7 @@ impl TypliteFeat {
 
         // Start with existing inputs from the world (CLI inputs)
         let mut dict = (**world.inputs()).clone();
-        
+
         // Add typlite-specific inputs
         dict.insert("x-target".into(), Str("md".into()));
         if format == Format::Text || self.remove_html {
