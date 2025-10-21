@@ -3,7 +3,6 @@
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::gfm::TableAlignment;
 use cmark_writer::{HtmlWriteError, HtmlWriter};
-use ecow::EcoString;
 use ecow::{EcoString, eco_format};
 use typst::utils::PicoStr;
 use typst_html::{HtmlElement, HtmlNode, tag};

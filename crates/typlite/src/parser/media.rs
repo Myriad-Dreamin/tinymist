@@ -4,11 +4,6 @@ use core::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
-use crate::{
-    ColorTheme,
-    attributes::{IdocAttr, TypliteAttrsParser, md_attr},
-    common::ExternalFrameNode,
-};
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{EcoString, eco_format};

@@ -224,7 +224,7 @@ impl WrapInfo {
         let end = range.end.checked_sub(self.prefix_len_bytes)?;
 
         let original_source = world.source(self.original_file_id).ok()?;
-        let original_len = original_source.len_bytes();
+        let original_len = original_source.lines().len_bytes();
 
         if start >= original_len || end > original_len {
             return None;
