@@ -34,19 +34,34 @@
     html.elem("span", body)
   }
 }
+
+#let normalize-link-dest(dest) = {
+  if dest == none {
+    ""
+  } else if type(dest) == str {
+    dest
+  } else if type(dest) == label {
+    "#" + str(dest)
+  } else {
+    str(dest)
+  }
+}
+
 #let md-link(dest: none, body) = html.elem(
   "span",
   html.elem(
     "m1link",
-    attrs: (dest: dest),
+    attrs: (dest: normalize-link-dest(dest)),
     body,
   ),
 )
+
 #let md-label(dest: none, body) = html.elem(
   "m1label",
   attrs: (dest: dest),
   body,
 )
+
 #let md-ref(body) = html.elem(
   "span",
   html.elem(
