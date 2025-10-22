@@ -2,12 +2,13 @@ export function setupDrag() {
   let lastPos = { x: 0, y: 0 };
   let moved = false;
   let containerElement: HTMLElement | null = null;
+  let scrollElement: HTMLElement | null = null;
   const mouseMoveHandler = function (e: MouseEvent) {
     // How far the mouse has been moved
     const dx = e.clientX - lastPos.x;
     const dy = e.clientY - lastPos.y;
 
-    window.scrollBy(-dx, -dy);
+    scrollElement!.scrollBy(-dx, -dy);
     lastPos = {
       x: e.clientX,
       y: e.clientY,
@@ -54,7 +55,8 @@ export function setupDrag() {
   };
   document.addEventListener("DOMContentLoaded", () => {
     containerElement = document.getElementById("typst-container");
-    if (!containerElement) return;
+    scrollElement = document.getElementById("typst-container-main");
+    if (!containerElement || !scrollElement) return;
     containerElement.addEventListener("mousedown", mouseDownHandler);
   });
 }

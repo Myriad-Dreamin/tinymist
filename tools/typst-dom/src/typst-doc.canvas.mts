@@ -90,7 +90,7 @@ export function provideCanvasDoc<
             pageInfo.container.style.overflow = "hidden";
             pageInfo.container.addEventListener("click", () => {
               // console.log('click', pageInfo.index);
-              window.typstWebsocket.send(`outline-sync,${pageInfo.index + 1}`);
+              this.windowElem.typstWebsocket.send(`outline-sync,${pageInfo.index + 1}`);
             });
           }
         }
