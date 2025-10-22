@@ -4,8 +4,8 @@ use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use cmark_writer::gfm::TableAlignment;
 use cmark_writer::{HtmlWriteError, HtmlWriter};
 use ecow::{EcoString, eco_format};
-use typst::html::{HtmlElement, HtmlNode, tag};
 use typst::utils::PicoStr;
+use typst_html::{HtmlElement, HtmlNode, tag};
 use typst_syntax::Span;
 
 use crate::Result;
@@ -483,7 +483,7 @@ impl TableSerializer {
                 HtmlNode::Element(elem) => {
                     children.push(Node::HtmlElement(Self::build_html_element(parser, elem)?))
                 }
-                HtmlNode::Frame(frame) => children.push(parser.convert_frame(frame)),
+                HtmlNode::Frame(frame) => children.push(parser.convert_frame(&frame.inner)),
                 HtmlNode::Tag(_) => {}
             }
         }

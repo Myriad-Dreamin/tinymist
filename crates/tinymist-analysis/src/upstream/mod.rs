@@ -1,5 +1,9 @@
 //! Functions from typst-ide
 
+mod tooltip;
+
+pub use tooltip::{Tooltip, tooltip_};
+
 use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
@@ -7,16 +11,13 @@ use ecow::{EcoString, eco_format};
 use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
-    Category, Library, World,
+    Category, Library, LibraryExt, World,
     diag::{StrResult, bail},
     foundations::{Binding, Content, Func, Module, Type, Value},
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
 };
-
-mod tooltip;
-pub use tooltip::*;
 
 /// Extract the first sentence of plain text of a piece of documentation.
 ///
@@ -109,7 +110,7 @@ impl GroupData {
 static GROUPS: LazyLock<Vec<GroupData>> = LazyLock::new(|| {
     let mut groups: Vec<GroupData> = yaml::from_str(include_str!("groups.yml")).unwrap();
     for group in &mut groups {
-        if group.filter.is_empty() {
+        if group.filter.is_empty() && group.name != "std" {
             group.filter = group
                 .module()
                 .scope()
@@ -322,11 +323,13 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
 
                         let route = format_route(parent_name.as_deref(), &name, &cat);
 
-                        // Some types are defined multiple times, and the first one should take precedence.
+                        // Some types are defined multiple times, and the first one should take
+                        // precedence.
                         //
-                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep `pattern` remains as a deprecated alias.
-                        // Therefore, `Tiling` is first defined as `tiling`, then defined as `pattern` with deprecation again.
-                        // https://typst.app/docs/changelog/0.13.0/#visualization
+                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep
+                        // `pattern` remains as a deprecated alias.
+                        // Therefore, `Tiling` is first defined as `tiling`, then defined as
+                        // `pattern` with deprecation again. https://typst.app/docs/changelog/0.13.0/#visualization
                         // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L34
                         // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L47-L49
                         map.entry(CatKey::Type(*t)).or_insert(route);
@@ -502,7 +505,7 @@ mod tests {
         let mut values = ROUTE_MAPS.values().map(access).collect::<Vec<_>>();
         values.sort();
 
-        insta::assert_snapshot!(values.as_slice().join("\n"), @r###"
+        insta::assert_snapshot!(values.as_slice().join("\n"), @r"
         https://typst.app/docs/reference/data-loading/cbor/
         https://typst.app/docs/reference/data-loading/cbor/#definitions-decode
         https://typst.app/docs/reference/data-loading/cbor/#definitions-encode
@@ -680,6 +683,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/str/#definitions-len
         https://typst.app/docs/reference/foundations/str/#definitions-match
         https://typst.app/docs/reference/foundations/str/#definitions-matches
+        https://typst.app/docs/reference/foundations/str/#definitions-normalize
         https://typst.app/docs/reference/foundations/str/#definitions-position
         https://typst.app/docs/reference/foundations/str/#definitions-replace
         https://typst.app/docs/reference/foundations/str/#definitions-rev
@@ -726,8 +730,11 @@ mod tests {
         https://typst.app/docs/reference/layout/direction/
         https://typst.app/docs/reference/layout/direction/#definitions-axis
         https://typst.app/docs/reference/layout/direction/#definitions-end
+        https://typst.app/docs/reference/layout/direction/#definitions-from
         https://typst.app/docs/reference/layout/direction/#definitions-inv
+        https://typst.app/docs/reference/layout/direction/#definitions-sign
         https://typst.app/docs/reference/layout/direction/#definitions-start
+        https://typst.app/docs/reference/layout/direction/#definitions-to
         https://typst.app/docs/reference/layout/fraction/
         https://typst.app/docs/reference/layout/grid/
         https://typst.app/docs/reference/layout/grid/#definitions-cell
@@ -779,6 +786,7 @@ mod tests {
         https://typst.app/docs/reference/math/primes/
         https://typst.app/docs/reference/math/roots/#functions-root
         https://typst.app/docs/reference/math/roots/#functions-sqrt
+        https://typst.app/docs/reference/math/scr/
         https://typst.app/docs/reference/math/sizes/#functions-display
         https://typst.app/docs/reference/math/sizes/#functions-inline
         https://typst.app/docs/reference/math/sizes/#functions-script
@@ -803,6 +811,7 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-frak
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
+        https://typst.app/docs/reference/math/variants/#functions-scr
         https://typst.app/docs/reference/math/variants/#functions-serif
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
@@ -841,7 +850,9 @@ mod tests {
         https://typst.app/docs/reference/model/table/#definitions-vline
         https://typst.app/docs/reference/model/terms/
         https://typst.app/docs/reference/model/terms/#definitions-item
-        https://typst.app/docs/reference/pdf/embed/
+        https://typst.app/docs/reference/model/title/
+        https://typst.app/docs/reference/pdf/artifact/
+        https://typst.app/docs/reference/pdf/attach/
         https://typst.app/docs/reference/text/highlight/
         https://typst.app/docs/reference/text/linebreak/
         https://typst.app/docs/reference/text/lorem/
@@ -912,6 +923,6 @@ mod tests {
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
         https://typst.app/docs/reference/visualize/tiling/
-        "###);
+        ");
     }
 }

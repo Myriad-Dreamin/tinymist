@@ -6,6 +6,7 @@
 //! This crate provides a set of APIs to query the information about the source
 //! code. Currently it provides:
 //! + language queries defined by the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+#![recursion_limit = "256"]
 
 pub use analysis::{CompletionFeat, LocalContext, LocalContextGuard, LspWorldExt};
 pub use completion::{CompletionRequest, PostfixSnippet};

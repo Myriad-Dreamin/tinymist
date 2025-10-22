@@ -9,9 +9,10 @@ use tinymist_std::typst::TypstDocument;
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::World;
 use typst::diag::{SourceResult, StrResult};
+use typst::engine::Sink;
 use typst::foundations::{Content, IntoValue, LocatableSelector, Scope, Value};
-use typst::routines::EvalMode;
 use typst::syntax::Span;
+use typst::syntax::SyntaxMode;
 use typst_eval::eval_string;
 
 use crate::QueryTask;
@@ -30,9 +31,10 @@ impl DocumentQuery {
         let selector = eval_string(
             &typst::ROUTINES,
             world.track(),
+            Sink::new().track_mut(),
             selector,
             Span::detached(),
-            EvalMode::Code,
+            SyntaxMode::Code,
             Scope::default(),
         )
         .map_err(|errors| {

@@ -231,15 +231,17 @@ fn token_from_hashtag(hashtag: &LinkedNode) -> Option<TokenType> {
 
 /// Converts an offset to a position in UTF-8.
 fn offset_to_position_utf8(typst_offset: usize, typst_source: &Source) -> (u32, u32) {
-    let line_index = typst_source.byte_to_line(typst_offset).unwrap();
-    let column_index = typst_source.byte_to_column(typst_offset).unwrap();
+    let (line_index, column_index) = typst_source
+        .lines()
+        .byte_to_line_column(typst_offset)
+        .unwrap();
 
     (line_index as u32, column_index as u32)
 }
 
 /// Converts an offset to a position in UTF-16.
 fn offset_to_position_utf16(typst_offset: usize, typst_source: &Source) -> (u32, u32) {
-    let line_index = typst_source.byte_to_line(typst_offset).unwrap();
+    let line_index = typst_source.lines().byte_to_line(typst_offset).unwrap();
 
     let lsp_line = line_index as u32;
 
@@ -250,10 +252,13 @@ fn offset_to_position_utf16(typst_offset: usize, typst_source: &Source) -> (u32,
     // we   need here. Submit a PR to `typst` to add it, then update
     // this if/when merged.
 
-    let utf16_offset = typst_source.byte_to_utf16(typst_offset).unwrap();
+    let utf16_offset = typst_source.lines().byte_to_utf16(typst_offset).unwrap();
 
-    let byte_line_offset = typst_source.line_to_byte(line_index).unwrap();
-    let utf16_line_offset = typst_source.byte_to_utf16(byte_line_offset).unwrap();
+    let byte_line_offset = typst_source.lines().line_to_byte(line_index).unwrap();
+    let utf16_line_offset = typst_source
+        .lines()
+        .byte_to_utf16(byte_line_offset)
+        .unwrap();
 
     let utf16_column_offset = utf16_offset - utf16_line_offset;
     let lsp_column = utf16_column_offset;

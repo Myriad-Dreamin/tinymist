@@ -30,7 +30,7 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
     // Therefore, its next descendant must be added at its level, which is
     // enforced in the manner shown below.
     let mut last_skipped_level = None;
-    let elements = introspector.query(&HeadingElem::elem().select());
+    let elements = introspector.query(&HeadingElem::ELEM.select());
     for elem in elements.iter() {
         let heading = elem.to_packed::<HeadingElem>().unwrap();
         let leaf = HeadingNode::leaf(introspector, heading);
@@ -113,8 +113,9 @@ impl HeadingNode {
             position,
             // 'bookmarked' set to 'auto' falls back to the value of 'outlined'.
             bookmarked: element
-                .bookmarked(StyleChain::default())
-                .unwrap_or_else(|| element.outlined(StyleChain::default())),
+                .bookmarked
+                .get(StyleChain::default())
+                .unwrap_or_else(|| element.outlined.get(StyleChain::default())),
             body: element.body.clone(),
             span: element.span(),
             children: Vec::new(),
