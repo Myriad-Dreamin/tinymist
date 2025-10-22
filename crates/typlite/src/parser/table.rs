@@ -483,7 +483,7 @@ impl TableSerializer {
                 HtmlNode::Element(elem) => {
                     children.push(Node::HtmlElement(Self::build_html_element(parser, elem)?))
                 }
-                HtmlNode::Frame(frame) => children.push(parser.convert_frame(frame)),
+                HtmlNode::Frame(frame) => children.push(parser.convert_frame(&frame.inner)),
                 HtmlNode::Tag(_) => {}
             }
         }

@@ -14,6 +14,7 @@ use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
+use typst::foundations::eco_format;
 use typst::syntax::{LinkedNode, Source};
 
 use super::*;
