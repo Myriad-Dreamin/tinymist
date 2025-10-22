@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
@@ -870,7 +870,7 @@ pub fn symbol_detail(s: &str) -> EcoString {
         codes.join(" + ")
     };
 
-    format!("{}, unicode: `{}`", ld, unicode_repr).into()
+    format!("{ld}, unicode: `{unicode_repr}`").into()
 }
 
 /// If is printable, return the symbol itself.

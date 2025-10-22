@@ -2,7 +2,7 @@
 
 use core::fmt;
 use std::sync::Arc;
-use typst_html::{tag, HtmlNode::*};
+use typst_html::{HtmlNode::*, tag};
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;
