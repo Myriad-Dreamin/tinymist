@@ -57,16 +57,54 @@ export const pasteResourceKinds: Record<string, PasteResourceKind> = {
   ".ods": PasteResourceKind.Ods,
 };
 
-/** Base kind for any sort of markdown link, including both path and media links */
-export const typstPasteLinkEditKind = vscode.DocumentDropOrPasteEditKind.Empty.append(
-  "typst",
-  "link",
-);
+// Helper function to check if DocumentDropOrPasteEditKind is available
+function hasDocumentDropOrPasteEditKind(): boolean {
+  return typeof (vscode as any).DocumentDropOrPasteEditKind !== "undefined";
+}
 
-/** Kind for normal markdown links, i.e. include "path/to/file.typ" */
-export const typstUriEditKind = typstPasteLinkEditKind.append("uri");
+// Lazy evaluation of edit kinds to handle backward compatibility
+function createEditKinds() {
+  if (!hasDocumentDropOrPasteEditKind()) {
+    // Return null values for older VS Code versions
+    return {
+      typstPasteLinkEditKind: null,
+      typstUriEditKind: null,
+      typstImageEditKind: null,
+    };
+  }
 
-export const typstImageEditKind = typstPasteLinkEditKind.append("image");
+  const DocumentDropOrPasteEditKind = (vscode as any).DocumentDropOrPasteEditKind;
+  const pasteLinkKind = DocumentDropOrPasteEditKind.Empty.append("typst", "link");
+  
+  return {
+    typstPasteLinkEditKind: pasteLinkKind,
+    typstUriEditKind: pasteLinkKind.append("uri"),
+    typstImageEditKind: pasteLinkKind.append("image"),
+  };
+}
+
+// Cache the edit kinds
+let _editKinds: ReturnType<typeof createEditKinds> | null = null;
+
+function getEditKinds() {
+  if (_editKinds === null) {
+    _editKinds = createEditKinds();
+  }
+  return _editKinds;
+}
+
+// Export getter functions instead of constants to avoid immediate evaluation
+export function getTypstPasteLinkEditKind() {
+  return getEditKinds().typstPasteLinkEditKind;
+}
+
+export function getTypstUriEditKind() {
+  return getEditKinds().typstUriEditKind;
+}
+
+export function getTypstImageEditKind() {
+  return getEditKinds().typstImageEditKind;
+}
 
 export const Mime = {
   textUriList: "text/uri-list",
