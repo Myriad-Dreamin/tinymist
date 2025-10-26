@@ -139,11 +139,11 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.6.1-rc3", default-features = false, features = [
+reflexo = { version = "=0.6.1-rc4", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.6.1-rc3", default-features = false }
-reflexo-vec2svg = { version = "=0.6.1-rc3" }
+reflexo-typst = { version = "=0.6.1-rc4", default-features = false }
+reflexo-vec2svg = { version = "=0.6.1-rc4" }
 
 typst = "0.13.1"
 typst-html = "0.13.1"
