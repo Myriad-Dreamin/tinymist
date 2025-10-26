@@ -46,13 +46,13 @@ jobs:
           cargo publish --no-verify -p typlite || true
           cargo publish --no-verify -p crityp || true
           
-          cargo publish --no-verify -p tinymist-debug || true
-          cargo publish --no-verify -p tinymist-lint || true
-          cargo publish --no-verify -p tinymist-query || true
-          cargo publish --no-verify -p tinymist-render || true
-          cargo publish --no-verify -p tinymist-preview || true
-          cargo publish --no-verify -p tinymist || true
-          cargo publish --no-verify -p tinymist-cli || true
+          # cargo publish --no-verify -p tinymist-debug || true
+          # cargo publish --no-verify -p tinymist-lint || true
+          # cargo publish --no-verify -p tinymist-query || true
+          # cargo publish --no-verify -p tinymist-render || true
+          # cargo publish --no-verify -p tinymist-preview || true
+          # cargo publish --no-verify -p tinymist || true
+          # cargo publish --no-verify -p tinymist-cli || true
       - name: Verifies crate health (Optional)
         run: |
           cargo publish --dry-run -p typst-shim
