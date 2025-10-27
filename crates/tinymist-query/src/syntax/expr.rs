@@ -273,18 +273,18 @@ impl ExprWorker<'_> {
 
             Equation(equation) => self.check_math(equation.body().to_untyped().children()),
             Math(math) => self.check_math(math.to_untyped().children()),
-            Code(code_block) => self.check_code(code_block.body()),
-            Content(content_block) => self.check_markup(content_block.body()),
+            CodeBlock(code_block) => self.check_code(code_block.body()),
+            ContentBlock(content_block) => self.check_markup(content_block.body()),
 
             Ident(ident) => self.check_ident(ident),
             MathIdent(math_ident) => self.check_math_ident(math_ident),
             Label(label) => self.check_label(label),
             Ref(ref_node) => self.check_ref(ref_node),
 
-            Let(let_binding) => self.check_let(let_binding),
+            LetBinding(let_binding) => self.check_let(let_binding),
             Closure(closure) => self.check_closure(closure),
-            Import(module_import) => self.check_module_import(module_import),
-            Include(module_include) => self.check_module_include(module_include),
+            ModuleImport(module_import) => self.check_module_import(module_import),
+            ModuleInclude(module_include) => self.check_module_include(module_include),
 
             Parenthesized(paren_expr) => self.check(paren_expr.expr()),
             Array(array) => self.check_array(array),
@@ -293,18 +293,20 @@ impl ExprWorker<'_> {
             Binary(binary) => self.check_binary(binary),
             FieldAccess(field_access) => self.check_field_access(field_access),
             FuncCall(func_call) => self.check_func_call(func_call),
-            DestructAssign(destruct_assignment) => self.check_destruct_assign(destruct_assignment),
-            Set(set_rule) => self.check_set(set_rule),
-            Show(show_rule) => self.check_show(show_rule),
+            DestructAssignment(destruct_assignment) => {
+                self.check_destruct_assign(destruct_assignment)
+            }
+            SetRule(set_rule) => self.check_set(set_rule),
+            ShowRule(show_rule) => self.check_show(show_rule),
             Contextual(contextual) => {
                 Expr::Unary(UnInst::new(UnaryOp::Context, self.defer(contextual.body())))
             }
             Conditional(conditional) => self.check_conditional(conditional),
-            While(while_loop) => self.check_while_loop(while_loop),
-            For(for_loop) => self.check_for_loop(for_loop),
-            Break(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
-            Continue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
-            Return(func_return) => Expr::Unary(UnInst::new(
+            WhileLoop(while_loop) => self.check_while_loop(while_loop),
+            ForLoop(for_loop) => self.check_for_loop(for_loop),
+            LoopBreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
+            LoopContinue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
+            FuncReturn(func_return) => Expr::Unary(UnInst::new(
                 UnaryOp::Return,
                 func_return
                     .body()
@@ -355,15 +357,15 @@ impl ExprWorker<'_> {
                 let body = self.check_markup(heading.body());
                 self.check_element::<HeadingElem>(eco_vec![body])
             }
-            List(item) => {
+            ListItem(item) => {
                 let body = self.check_markup(item.body());
                 self.check_element::<ListElem>(eco_vec![body])
             }
-            Enum(item) => {
+            EnumItem(item) => {
                 let body = self.check_markup(item.body());
                 self.check_element::<EnumElem>(eco_vec![body])
             }
-            Term(item) => {
+            TermItem(item) => {
                 let term = self.check_markup(item.term());
                 let description = self.check_markup(item.description());
                 self.check_element::<TermsElem>(eco_vec![term, description])
@@ -1064,7 +1066,7 @@ impl ExprWorker<'_> {
         let ident = Interned::new(Decl::ref_(ref_node));
         let body = ref_node
             .supplement()
-            .map(|block| self.check(ast::Expr::Content(block)));
+            .map(|block| self.check(ast::Expr::ContentBlock(block)));
         let ref_expr = ContentRefExpr {
             ident: ident.clone(),
             of: None,
