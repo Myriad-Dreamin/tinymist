@@ -1,6 +1,6 @@
 [package]
 name = "cmark-writer-macros"
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 authors = ["Hong Jiarong"]
 description = "Proc-macro implementations for cmark-writer"
