@@ -357,7 +357,7 @@ impl<'a> CompletionCursor<'a> {
 
         LspCompletion {
             label: item.label.clone(),
-            kind: item.kind,
+            kind: item.kind.clone(),
             detail: item.detail.clone(),
             sort_text: item.sort_text.clone(),
             filter_text: item.filter_text.clone(),
@@ -853,17 +853,47 @@ impl CompletionPair<'_, '_, '_> {
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode detailed description.
-pub fn symbol_detail(ch: char) -> EcoString {
-    let ld = symbol_label_detail(ch);
+pub fn symbol_detail(s: &str) -> EcoString {
+    let ld = symbol_label_detail(s);
     if ld.starts_with("\\u") {
         return ld;
     }
-    format!("{}, unicode: `\\u{{{:04x}}}`", ld, ch as u32).into()
+
+    let unicode_repr = if s.chars().count() == 1 {
+        let ch = s.chars().next().unwrap();
+        format!("\\u{{{:04x}}}", ch as u32)
+    } else {
+        let codes: Vec<String> = s
+            .chars()
+            .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+            .collect();
+        codes.join(" + ")
+    };
+
+    format!("{ld}, unicode: `{unicode_repr}`").into()
 }
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode description.
-pub fn symbol_label_detail(ch: char) -> EcoString {
+pub fn symbol_label_detail(s: &str) -> EcoString {
+    if let Some(ch) = s.chars().next()
+        && s.chars().count() == 1
+    {
+        return symbol_label_detail_single_char(ch);
+    }
+
+    if s.chars().all(|ch| !ch.is_whitespace() && !ch.is_control()) {
+        return s.into();
+    }
+
+    let codes: Vec<String> = s
+        .chars()
+        .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+        .collect();
+    codes.join(" + ").into()
+}
+
+fn symbol_label_detail_single_char(ch: char) -> EcoString {
     if !ch.is_whitespace() && !ch.is_control() {
         return ch.into();
     }

@@ -23,7 +23,7 @@ struct ResourceSymbolResponse {
 struct ResourceSymbolItem {
     id: String,
     category: SymCategory,
-    unicode: u32,
+    symbol: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     glyph: Option<String>,
 }
@@ -31,7 +31,7 @@ struct ResourceSymbolItem {
 #[derive(Debug)]
 struct SymbolItem {
     category: SymCategory,
-    unicode: u32,
+    symbol: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -991,9 +991,10 @@ fn populate(
     fallback_cat: SymCategory,
     out: &mut ResourceSymbolMap,
 ) {
-    for (modifier_name, ch) in sym.variants() {
-        let mut name =
-            String::with_capacity(mod_name.len() + sym_name.len() + modifier_name.len() + 2);
+    for (modifier_name, ch, _) in sym.variants() {
+        let mut name = String::with_capacity(
+            mod_name.len() + sym_name.len() + modifier_name.as_str().len() + 2,
+        );
 
         name.push_str(mod_name);
         name.push('.');
@@ -1001,7 +1002,7 @@ fn populate(
 
         if !modifier_name.is_empty() {
             name.push('.');
-            name.push_str(modifier_name);
+            name.push_str(modifier_name.as_str());
         }
 
         let category = CAT_MAP.get(name.as_str()).cloned().unwrap_or(fallback_cat);
@@ -1009,7 +1010,7 @@ fn populate(
             name,
             SymbolItem {
                 category,
-                unicode: ch as u32,
+                symbol: ch.into(),
             },
         );
     }
@@ -1031,7 +1032,7 @@ fn render_symbols(
 
     let math_shaping_text = symbols.iter().fold(PRELUDE.to_owned(), |mut o, (k, e)| {
         use std::fmt::Write;
-        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.unicode).ok();
+        writeln!(o, "$#{k}$/* {} */#pagebreak()", e.symbol).ok();
         o
     });
     log::debug!("math shaping text: {math_shaping_text}");
@@ -1147,7 +1148,7 @@ fn render_glyphs(
         .map(|(k, v)| ResourceSymbolItem {
             id: k.clone(),
             category: v.category,
-            unicode: v.unicode,
+            symbol: v.symbol.clone(),
             glyph: render_sym(k),
         })
         .collect();
