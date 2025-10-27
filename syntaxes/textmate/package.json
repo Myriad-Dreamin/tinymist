@@ -1,6 +1,6 @@
 {
   "name": "typst-textmate",
-  "version": "0.13.30-rc1",
+  "version": "0.13.30-rc2",
   "private": true,
   "type": "module",
   "scripts": {
