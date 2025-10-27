@@ -14,7 +14,6 @@ use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
-use typst::foundations::eco_format;
 use typst::syntax::{LinkedNode, Source};
 
 use super::*;
@@ -524,43 +523,8 @@ impl ServerState {
     ) -> AnySchedulableResponse {
         let info = get_arg!(arguments[1] as PackageInfo);
 
-        let snap = match self.query_snapshot().map_err(internal_error) {
-            Ok(snap) => snap,
-            Err(e) => return just_future(async move { Err(e) }),
-        };
-
-        just_future(async move {
-            let world = snap.world();
-
-            let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
-                let pkg_root = toml_path.parent().ok_or_else(|| {
-                    eco_format!("cannot get package root (parent of {toml_path:?})")
-                })?;
-
-                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
-                let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-                Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
-            });
-            let entry = entry.map_err(|e| internal_error(e.to_string()))?;
-
-            let snap = snap.task(TaskInputs {
-                entry: Some(entry),
-                inputs: None,
-            });
-
-            let result = snap
-                .run_analysis(|a| {
-                    tinymist_query::docs::package_docs(a, &info)
-                        .map_err(map_string_err("failed to generate docs"))
-                        .map_err(internal_error)
-                })
-                .map_err(internal_error)?;
-
-            serde_json::to_value(result).map_err(internal_error)
-        })
+        let fut = self.resource_package_docs_(info)?;
+        just_future(async move { serde_json::to_value(fut.await?).map_err(internal_error) })
     }
 
     /// Get the lsif for package
