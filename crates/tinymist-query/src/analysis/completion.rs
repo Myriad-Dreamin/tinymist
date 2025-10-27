@@ -859,8 +859,8 @@ pub fn symbol_detail(s: &str) -> EcoString {
         return ld;
     }
 
-    let unicode_repr = if s.chars().count() == 1 {
-        let ch = s.chars().next().unwrap();
+    let mut chars = s.chars();
+    let unicode_repr = if let (Some(ch), None) = (chars.next(), chars.next()) {
         format!("\\u{{{:04x}}}", ch as u32)
     } else {
         let codes: Vec<String> = s
@@ -876,9 +876,8 @@ pub fn symbol_detail(s: &str) -> EcoString {
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode description.
 pub fn symbol_label_detail(s: &str) -> EcoString {
-    if let Some(ch) = s.chars().next()
-        && s.chars().count() == 1
-    {
+    let mut chars = s.chars();
+    if let (Some(ch), None) = (chars.next(), chars.next()) {
         return symbol_label_detail_single_char(ch);
     }
 
