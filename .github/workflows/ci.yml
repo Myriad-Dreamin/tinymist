@@ -75,7 +75,6 @@ jobs:
           name: tinymist-completion-scripts
           path: tinymist-completions.tar.gz
       - name: Test tinymist
-        continue-on-error: true
         run: cargo test --workspace -- --skip=e2e
       - name: Test Lockfile (Prepare)
         run: ./scripts/test-lock.sh
@@ -104,9 +103,7 @@ jobs:
           yarn build:l10n
       - run: cargo check --workspace
       - name: Test tinymist
-        continue-on-error: true
         run: cargo test --workspace -- --skip=e2e
-
 
   prepare-build:
     runs-on: "ubuntu-latest"
