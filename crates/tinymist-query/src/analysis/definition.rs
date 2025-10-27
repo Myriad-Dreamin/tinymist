@@ -200,13 +200,11 @@ fn ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::construct(name.into());
-    let sel = Selector::Label(label);
-
     // if it is a label, we put the selection range to itself
     let (decl, ty) = match ref_expr {
         ast::Expr::Label(label) => (Decl::label(name, label.span()), None),
         ast::Expr::Ref(..) => {
+            let sel = Selector::Label(Label::construct(name.into()).ok()?);
             let elem = introspector.query_first(&sel)?;
             let span = elem.labelled_at();
             let decl = if !span.is_detached() {
