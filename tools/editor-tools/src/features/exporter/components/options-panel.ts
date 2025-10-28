@@ -16,13 +16,11 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
     }
   }
 
-  console.log("OptionsPanel render", options);
-
   if (options.length === 0) {
     return div(
       { class: "card" },
       div(
-        { class: "text-center", style: "padding: 2rem;" },
+        { class: "text-center" },
         h3({ class: "mb-sm" }, "No Configuration Needed"),
         p(
           { class: "text-desc" },
@@ -55,8 +53,6 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
 const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
   const { key, label: optionLabel, description } = schema;
   const validationError = van.state<string | undefined>();
-
-  console.log("OptionField");
 
   return div(
     { class: "flex flex-col gap-xs" },

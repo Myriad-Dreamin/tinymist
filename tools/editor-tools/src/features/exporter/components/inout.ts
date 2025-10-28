@@ -8,7 +8,7 @@ interface InputSectionProps {
   outputPath: State<string>;
 }
 
-export const InputSection = ({ inputPath, outputPath }: InputSectionProps) => {
+export const InputSection = ({ inputPath }: InputSectionProps) => {
   return div(
     { class: "flex flex-col gap-sm" },
     // Input Path Section
@@ -26,8 +26,8 @@ export const InputSection = ({ inputPath, outputPath }: InputSectionProps) => {
         },
       }),
     ),
-    // Output Path Section
-    div(
+    // Output Path Section (not supported yet)
+    /* div(
       { class: "flex flex-col gap-xs" },
       h3({ class: "mb-xs" }, "Output Path"),
       input({
@@ -40,6 +40,6 @@ export const InputSection = ({ inputPath, outputPath }: InputSectionProps) => {
           outputPath.val = target.value;
         },
       }),
-    ),
+    ), */
   );
 };
