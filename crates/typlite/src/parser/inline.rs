@@ -1,7 +1,9 @@
 //! Inline element processing module, handles text and inline style elements
 
+use base64::Engine;
 use cmark_writer::ast::Node;
-use typst::html::HtmlElement;
+use ecow::eco_format;
+use typst::html::{HtmlElement, HtmlNode};
 
 use crate::Result;
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
@@ -61,6 +63,44 @@ impl HtmlToAstParser {
         let attrs = ImageAttr::parse(&element.attrs)?;
         self.inline_buffer.push(Node::Image {
             url: attrs.src,
+            title: None,
+            alt: vec![Node::Text(attrs.alt)],
+        });
+        Ok(())
+    }
+
+    /// Convert image element with bytes source
+    pub fn convert_image_bytes(&mut self, element: &HtmlElement) -> Result<()> {
+        let attrs = ImageAttr::parse(&element.attrs)?;
+
+        let Some(HtmlNode::Frame(frame)) = element.children.first() else {
+            // should not happen
+            log::warn!("Image with bytes source has no frame in children");
+            self.inline_buffer.push(Node::Image {
+                url: eco_format!(""),
+                title: None,
+                alt: vec![Node::Text(attrs.alt)],
+            });
+            return Ok(());
+        };
+        let svg = typst_svg::svg_frame(frame);
+
+        let url = if let Some(assets_path) = &self.feat.assets_path {
+            let file_id = self.asset_counter;
+            self.asset_counter += 1;
+            let file_name = format!("image_{file_id}.svg");
+            let file_path = assets_path.join(&file_name);
+
+            std::fs::write(&file_path, svg.as_bytes())?;
+
+            eco_format!("{file_name}")
+        } else {
+            let base64_data = base64::engine::general_purpose::STANDARD.encode(&svg);
+            eco_format!("data:image/svg+xml;base64,{base64_data}")
+        };
+
+        self.inline_buffer.push(Node::Image {
+            url,
             title: None,
             alt: vec![Node::Text(attrs.alt)],
         });

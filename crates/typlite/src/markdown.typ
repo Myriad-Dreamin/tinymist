@@ -94,18 +94,27 @@
     table(columns: columns, ..header, ..children.map(it => table.cell(it)), ..footer)
   },
 )
-#let md-image(src: "", alt: none) = html.elem(
-  "m1image",
-  attrs: (
-    src: src,
-    alt: if alt == none {
-      ""
-    } else {
-      alt
-    },
-  ),
-  "",
-)
+#let md-image(src: "", alt: none, it) = {
+  // if it's bytes, wrap it into html.frame
+  let (tag, src-str, body) = if type(src) == bytes {
+    ("m1imagebytes", "", html.frame(it))
+  } else {
+    ("m1image", src, it)
+  }
+
+  html.elem(
+    tag,
+    attrs: (
+      src: src-str,
+      alt: if alt == none {
+        ""
+      } else {
+        alt
+      },
+    ),
+    body,
+  )
+}
 #let md-figure(body, caption: none) = html.elem(
   "m1figure",
   attrs: (
@@ -188,7 +197,7 @@
   show highlight: it => if-not-paged(it, md-highlight(it))
   show strike: it => if-not-paged(it, md-strike(it))
   // todo: icc?
-  show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
+  show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt, it))
 
   show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, text: it.text, it))
   show link: it => if-not-paged(it, md-link(dest: it.dest, it.body))
