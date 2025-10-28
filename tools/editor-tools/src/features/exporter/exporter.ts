@@ -25,7 +25,7 @@ export function useExporter() {
     );
     return {
       inputPath: inputPath.val.length > 0 ? inputPath.val : lastFocusedTypstDoc.val,
-      outputPath: outputPath.val.length > 0 ? outputPath.val : undefined,
+      outputPath: outputPath.rawVal.length > 0 ? outputPath.rawVal : undefined,
       ...extraOpts,
     };
   };
@@ -51,10 +51,12 @@ export function useExporter() {
     }
   };
 
-  // Regenerate preview when format changes
+  // Regenerate preview automatically when format or options change
   van.derive(() => {
-    format.val; // Track format changes
-    previewData.val = {};
+    if (format.oldVal !== format.val) {
+      // Clear previous preview data when format changes
+      previewData.val = {};
+    }
     generatePreview();
   });
 

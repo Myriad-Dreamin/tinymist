@@ -58,7 +58,6 @@
   border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   border-radius: 0.5rem;
   padding: 1rem;
-  min-height: 300px;
 }
 
 .preview-page {

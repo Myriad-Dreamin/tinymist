@@ -22,7 +22,7 @@ export const PreviewGrid = (props: PreviewGridProps) => {
       h3({ class: "text-lg font-semibold" }, () => `Preview (${format.val.label})`),
       () =>
         div(
-          { class: "flex items-center gap-sm" },
+          { class: "flex items-center gap-sm", style: "min-height: 2rem;" },
           // Only show zoom controls for image content (thumbnails)
           !previewGenerating.val && previewData.val.pages && previewData.val.pages.length > 0
             ? ZoomControls(thumbnailZoom)
@@ -41,10 +41,6 @@ export const PreviewGrid = (props: PreviewGridProps) => {
     // Preview Content
     () =>
       (() => {
-        if (previewGenerating.val) {
-          return PreviewLoading();
-        }
-
         if (previewData.val.error) {
           return PreviewError(previewData.val.error, onPreview);
         }
@@ -57,6 +53,10 @@ export const PreviewGrid = (props: PreviewGridProps) => {
         // Handle image pages for visual formats
         if (previewData.val.pages) {
           return PreviewPagesGrid(previewData.val.pages, thumbnailZoom.val);
+        }
+
+        if (previewGenerating.val) {
+          return PreviewLoading();
         }
 
         return PreviewEmpty(onPreview);
@@ -183,7 +183,7 @@ const ZoomControls = (zoom: State<number>) => {
       },
       "−",
     ),
-    span({ class: "text-xs font-medium" }, () => `${zoom.val}%`),
+    span({ class: "text-xs font-medium", style: "width: 3em" }, () => `${zoom.val}%`),
     button(
       {
         class: "btn btn-secondary",
