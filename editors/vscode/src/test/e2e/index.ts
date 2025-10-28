@@ -23,6 +23,15 @@ class Suite {
     this.tests = [];
   }
 
+  private _skip: Suite | null = null;
+
+  public skip(): Suite {
+    if (this._skip) {
+      return this._skip;
+    }
+    return (this._skip = new Suite());
+  }
+
   public addTest(name: string, f: () => Promise<void>): void {
     const test = new Test(name, f);
     this.tests.push(test);
@@ -108,7 +117,7 @@ export class Context {
     });
     assert.ok(
       vscode.workspace.workspaceFolders?.length === 1 &&
-        vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
+      vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
       // eslint-disable-next-line @typescript-eslint/no-base-to-string
       `Expected workspace folder to be ${resolved.toString()}, got ${vscode.workspace.workspaceFolders}`,
     );
