@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow2.typ
     "kind": 3,
     "label": "base",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "sortText": "009",
     "textEdit": {
@@ -38,7 +38,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/item_shadow2.typ
     "kind": 3,
     "label": "base",
     "labelDetails": {
-     "description": "() => any"
+     "description": "() => 1"
     },
     "sortText": "009",
     "textEdit": {

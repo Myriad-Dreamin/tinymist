@@ -119,15 +119,11 @@ struct ScanDefCtx<'a> {
 
 impl ScanDefCtx<'_> {
     fn defs(&mut self, paths: EcoVec<&str>, ei: ExprInfo) -> DefInfo {
-        let name = {
-            let stem = ei.fid.vpath().as_rooted_path().file_stem();
-            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
-                .unwrap_or_default()
-        };
-        let module_decl = Decl::module(name.clone(), ei.fid).into();
+        let module_decl = Decl::module(ei.fid);
+        let key = module_decl.name().clone();
         let site = Some(self.root);
         let paths = paths.clone();
-        self.def(&name, paths, site.as_ref(), &module_decl, None)
+        self.def(&key, paths, site.as_ref(), &module_decl.into(), None)
     }
 
     fn expr(

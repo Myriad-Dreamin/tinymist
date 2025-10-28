@@ -1,7 +1,7 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, ConvKind::Md { for_docs: false })"
-input_file: crates/typlite/src/fixtures/regression/issue-1844.typ
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/issue-1844.typ
 ---
 <!DOCTYPE html>
 <html>
@@ -33,9 +33,9 @@ Who loves to lie with me,
 </html>
 
 =====
-## Reproducer document
+\section{Reproducer document}
 
-### Example
+\subsection{Example}
 
 Just the source (ok)
 
@@ -53,8 +53,8 @@ Who loves to lie with me,
 
 Source in grid
 
-<table x="test"><tr><td>Placeholder for<br />
-separately rendered SVG</td><td>````
+Placeholder for\\
+separately rendered SVG````
 
 == Under the Greenwood Tree
 by Shakespeare.
@@ -64,4 +64,4 @@ Under the greenwood tree #emoji.tree
 Who loves to lie with me,
 ...
 ```)
-````</td></tr></table>
+````

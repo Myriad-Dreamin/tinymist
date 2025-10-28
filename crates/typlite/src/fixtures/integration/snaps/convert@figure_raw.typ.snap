@@ -9,9 +9,17 @@ input_file: crates/typlite/src/fixtures/integration/figure_raw.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1figure caption=""><m1raw lang="md" block="true" text="markdown"></m1raw></m1figure></m1document></body>
+  <body><m1document><m1figure caption=""><m1raw lang="md" block="true" text="markdown"><pre>markdown</pre></m1raw></m1figure></m1document></body>
 </html>
 
 =====
-<p align="center"><figure class="figure"><pre><code class="language-md">markdown</code></pre>
-</figure></p>
+<p align="center">
+
+<figure class="figure">
+
+<pre><code class="language-md">markdown</code></pre>
+
+
+</figure>
+
+</p>

@@ -123,8 +123,7 @@ impl Initializer for SuperInit {
 
         let res = InitializeResult {
             capabilities: ServerCapabilities {
-                // todo: respect position_encoding
-                // position_encoding: Some(cc.position_encoding.into()),
+                position_encoding: Some(const_config.position_encoding.into()),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec![

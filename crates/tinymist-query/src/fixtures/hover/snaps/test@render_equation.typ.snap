@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/hover.rs
 expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/render_equation.typ
-snapshot_kind: text
 ---
 Range: 12:20:12:23
 
@@ -21,7 +20,11 @@ Lambda constructor.
 
 Typing Rule:
 
-<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
+<p align="center">
+
+<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+
+</p>
 
 # Positional Parameters
 
