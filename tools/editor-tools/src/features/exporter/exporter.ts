@@ -14,7 +14,6 @@ export function useExporter() {
   let previewVersion = 0;
   const previewGenerating = van.state(false);
   const previewData = van.state<PreviewData>({});
-  const error = van.state<string | undefined>(undefined);
 
   const buildOptions = () => {
     const extraOpts = Object.fromEntries(
@@ -46,7 +45,7 @@ export function useExporter() {
       // Simulate preview generation in dev mode
       setTimeout(
         () => window.postMessage(createMockPreviewResponse(format.val, previewVersion)),
-        Math.random() * 250 + 250,
+        Math.random() * 100 + 100,
       );
     }
   };
@@ -62,18 +61,11 @@ export function useExporter() {
 
   const handleMessage = (event: MessageEvent) => {
     const data = event.data;
-    if (data.type === "previewGenerated") {
+    if (data.type === "previewGenerated" || data.type === "previewError") {
       if (data.version < previewVersion) {
         return;
       }
       previewData.val = data;
-      error.val = data.error;
-      previewGenerating.val = false;
-    } else if (data.type === "previewError") {
-      if (data.version < previewVersion) {
-        return;
-      }
-      error.val = data.error;
       previewGenerating.val = false;
     }
   };
@@ -92,6 +84,14 @@ export function useExporter() {
 }
 
 function createMockPreviewResponse(format: ExportFormat, version: number): PreviewResponse {
+  if (Math.random() < 0.1) {
+    return {
+      type: "previewError",
+      version,
+      error: "Mock preview generation error",
+    };
+  }
+
   if (format.id === "pdf" || format.id === "png" || format.id === "svg") {
     const MOCK_IMAGE =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";

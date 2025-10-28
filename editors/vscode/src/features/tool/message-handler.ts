@@ -246,7 +246,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       // Get the active document
       const uri = ops.resolveInputPath();
       if (!uri) {
-        // await vscode.window.showErrorMessage("No active document found");
+        await vscode.window.showErrorMessage("No active document found");
         return;
       }
 
@@ -308,8 +308,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       // Get the active document
       const uri = ops.resolveInputPath();
       if (!uri) {
-        sendError("No active document found");
-        // await vscode.window.showErrorMessage("No active document found");
+        // sendError("No active document found");
         return;
       }
 
@@ -363,7 +362,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("Preview generation failed:", error);
+      console.log("Preview generation failed:", error);
       sendError(`Preview generation failed: ${message}`);
     }
   },

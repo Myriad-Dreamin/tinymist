@@ -42,7 +42,7 @@ export const PreviewGrid = (props: PreviewGridProps) => {
     () =>
       (() => {
         if (previewData.val.error) {
-          return PreviewError(previewData.val.error, onPreview);
+          return PreviewError(previewData.val.error);
         }
 
         // Handle text content for text-based formats
@@ -72,18 +72,11 @@ const PreviewLoading = () => {
   );
 };
 
-const PreviewError = (errorMessage: string, onRetry: () => void) => {
+const PreviewError = (errorMessage: string) => {
   return div(
     { class: "preview-error" },
     span("⚠️ Failed to generate preview"),
-    span({ class: "text-xs" }, errorMessage),
-    button(
-      {
-        class: "btn btn-secondary mt-sm",
-        onclick: onRetry,
-      },
-      "Retry",
-    ),
+    span({ class: "text-sm" }, errorMessage),
   );
 };
 
