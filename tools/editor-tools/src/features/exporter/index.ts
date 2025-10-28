@@ -4,7 +4,8 @@ import "./styles.css";
 import { ActionButtons } from "./components/action-buttons";
 import { FormatSelector } from "./components/format-selector";
 import { Header } from "./components/header";
-import { InputSection, OptionsPanel } from "./components/options-panel";
+import { InputSection } from "./components/inout";
+import { OptionsPanel } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
 import { useExporter } from "./exporter";
 
@@ -17,6 +18,7 @@ const ExportTool = () => {
   // Initialize state
   const {
     inputPath,
+    outputPath,
     format,
     optionStates,
     previewGenerating,
@@ -34,7 +36,7 @@ const ExportTool = () => {
     }),
 
     // Input Document Section
-    InputSection({ inputPath }),
+    InputSection({ inputPath, outputPath }),
 
     // Format Selection
     FormatSelector({ selectedFormat: format }),

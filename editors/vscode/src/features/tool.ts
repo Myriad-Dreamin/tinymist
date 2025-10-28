@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: type-erased */
 import * as vscode from "vscode";
 import type { IContext } from "../context";
-import type { ExtensionContext } from "../state";
+import { extensionState, type ExtensionContext } from "../state";
 import type { EditorTool, EditorToolContext } from "../tools";
 import { isTypstDocument, loadHTMLFile } from "../util";
 import { handleMessage, type WebviewMessage } from "./tool/message-handler";
@@ -103,15 +103,22 @@ export async function updateEditorToolView<T extends EditorTool<TOptions>, TOpti
 
   // Track focused Typst document
   let focusedDocVersion = 0;
+  if (isTypstDocument(extensionState.getFocusingDoc())) {
+    // Initial focus message
+    toolContext.postMessage({
+      type: "focusTypstDoc",
+      version: ++focusedDocVersion,
+      fsPath: extensionState.getFocusingFile(),
+    });
+  }
   disposalManager.add(
     vscode.window.onDidChangeTextEditorSelection(async (event) => {
       if (!isTypstDocument(event.textEditor.document)) {
         return;
       }
-      focusedDocVersion++;
       toolContext.postMessage({
         type: "focusTypstDoc",
-        version: focusedDocVersion,
+        version: ++focusedDocVersion,
         fsPath: event.textEditor.document.uri.fsPath,
       });
     }),

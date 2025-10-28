@@ -1,5 +1,5 @@
 import van, { type State } from "vanjs-core";
-import { requestExportDocument, requestGeneratePreview } from "@/vscode";
+import { lastFocusedTypstDoc, requestExportDocument, requestGeneratePreview } from "@/vscode";
 import { EXPORT_FORMATS } from "./formats";
 import type { ExportFormat, PreviewData, PreviewPage, Scalar } from "./types";
 
@@ -24,7 +24,7 @@ export function useExporter() {
       }),
     );
     return {
-      inputPath: inputPath.val.length > 0 ? inputPath.val : undefined,
+      inputPath: inputPath.val.length > 0 ? inputPath.val : lastFocusedTypstDoc.val,
       outputPath: outputPath.val.length > 0 ? outputPath.val : undefined,
       ...extraOpts,
     };

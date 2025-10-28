@@ -246,7 +246,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       // Get the active document
       const uri = ops.resolveInputPath();
       if (!uri) {
-        await vscode.window.showErrorMessage("No active document found");
+        // await vscode.window.showErrorMessage("No active document found");
         return;
       }
 
@@ -309,7 +309,7 @@ export const messageHandlers: Record<string, MessageHandler> = {
       const uri = ops.resolveInputPath();
       if (!uri) {
         sendError("No active document found");
-        await vscode.window.showErrorMessage("No active document found");
+        // await vscode.window.showErrorMessage("No active document found");
         return;
       }
 
