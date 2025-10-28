@@ -697,9 +697,124 @@ mod tests {
         https://typst.app/docs/reference/foundations/str/#definitions-to-unicode
         https://typst.app/docs/reference/foundations/str/#definitions-trim
         https://typst.app/docs/reference/foundations/symbol/
+        https://typst.app/docs/reference/foundations/target/
         https://typst.app/docs/reference/foundations/type/
         https://typst.app/docs/reference/foundations/version/
         https://typst.app/docs/reference/foundations/version/#definitions-at
+        https://typst.app/docs/reference/html/typed/#functions-a
+        https://typst.app/docs/reference/html/typed/#functions-abbr
+        https://typst.app/docs/reference/html/typed/#functions-address
+        https://typst.app/docs/reference/html/typed/#functions-area
+        https://typst.app/docs/reference/html/typed/#functions-article
+        https://typst.app/docs/reference/html/typed/#functions-aside
+        https://typst.app/docs/reference/html/typed/#functions-audio
+        https://typst.app/docs/reference/html/typed/#functions-b
+        https://typst.app/docs/reference/html/typed/#functions-base
+        https://typst.app/docs/reference/html/typed/#functions-bdi
+        https://typst.app/docs/reference/html/typed/#functions-bdo
+        https://typst.app/docs/reference/html/typed/#functions-blockquote
+        https://typst.app/docs/reference/html/typed/#functions-body
+        https://typst.app/docs/reference/html/typed/#functions-br
+        https://typst.app/docs/reference/html/typed/#functions-button
+        https://typst.app/docs/reference/html/typed/#functions-canvas
+        https://typst.app/docs/reference/html/typed/#functions-caption
+        https://typst.app/docs/reference/html/typed/#functions-cite
+        https://typst.app/docs/reference/html/typed/#functions-code
+        https://typst.app/docs/reference/html/typed/#functions-col
+        https://typst.app/docs/reference/html/typed/#functions-colgroup
+        https://typst.app/docs/reference/html/typed/#functions-data
+        https://typst.app/docs/reference/html/typed/#functions-datalist
+        https://typst.app/docs/reference/html/typed/#functions-dd
+        https://typst.app/docs/reference/html/typed/#functions-del
+        https://typst.app/docs/reference/html/typed/#functions-details
+        https://typst.app/docs/reference/html/typed/#functions-dfn
+        https://typst.app/docs/reference/html/typed/#functions-dialog
+        https://typst.app/docs/reference/html/typed/#functions-div
+        https://typst.app/docs/reference/html/typed/#functions-dl
+        https://typst.app/docs/reference/html/typed/#functions-dt
+        https://typst.app/docs/reference/html/typed/#functions-elem
+        https://typst.app/docs/reference/html/typed/#functions-em
+        https://typst.app/docs/reference/html/typed/#functions-embed
+        https://typst.app/docs/reference/html/typed/#functions-fieldset
+        https://typst.app/docs/reference/html/typed/#functions-figcaption
+        https://typst.app/docs/reference/html/typed/#functions-figure
+        https://typst.app/docs/reference/html/typed/#functions-footer
+        https://typst.app/docs/reference/html/typed/#functions-form
+        https://typst.app/docs/reference/html/typed/#functions-frame
+        https://typst.app/docs/reference/html/typed/#functions-h1
+        https://typst.app/docs/reference/html/typed/#functions-h2
+        https://typst.app/docs/reference/html/typed/#functions-h3
+        https://typst.app/docs/reference/html/typed/#functions-h4
+        https://typst.app/docs/reference/html/typed/#functions-h5
+        https://typst.app/docs/reference/html/typed/#functions-h6
+        https://typst.app/docs/reference/html/typed/#functions-head
+        https://typst.app/docs/reference/html/typed/#functions-header
+        https://typst.app/docs/reference/html/typed/#functions-hgroup
+        https://typst.app/docs/reference/html/typed/#functions-hr
+        https://typst.app/docs/reference/html/typed/#functions-html
+        https://typst.app/docs/reference/html/typed/#functions-i
+        https://typst.app/docs/reference/html/typed/#functions-iframe
+        https://typst.app/docs/reference/html/typed/#functions-img
+        https://typst.app/docs/reference/html/typed/#functions-input
+        https://typst.app/docs/reference/html/typed/#functions-ins
+        https://typst.app/docs/reference/html/typed/#functions-kbd
+        https://typst.app/docs/reference/html/typed/#functions-label
+        https://typst.app/docs/reference/html/typed/#functions-legend
+        https://typst.app/docs/reference/html/typed/#functions-li
+        https://typst.app/docs/reference/html/typed/#functions-link
+        https://typst.app/docs/reference/html/typed/#functions-main
+        https://typst.app/docs/reference/html/typed/#functions-map
+        https://typst.app/docs/reference/html/typed/#functions-mark
+        https://typst.app/docs/reference/html/typed/#functions-menu
+        https://typst.app/docs/reference/html/typed/#functions-meta
+        https://typst.app/docs/reference/html/typed/#functions-meter
+        https://typst.app/docs/reference/html/typed/#functions-nav
+        https://typst.app/docs/reference/html/typed/#functions-noscript
+        https://typst.app/docs/reference/html/typed/#functions-object
+        https://typst.app/docs/reference/html/typed/#functions-ol
+        https://typst.app/docs/reference/html/typed/#functions-optgroup
+        https://typst.app/docs/reference/html/typed/#functions-option
+        https://typst.app/docs/reference/html/typed/#functions-output
+        https://typst.app/docs/reference/html/typed/#functions-p
+        https://typst.app/docs/reference/html/typed/#functions-picture
+        https://typst.app/docs/reference/html/typed/#functions-pre
+        https://typst.app/docs/reference/html/typed/#functions-progress
+        https://typst.app/docs/reference/html/typed/#functions-q
+        https://typst.app/docs/reference/html/typed/#functions-rp
+        https://typst.app/docs/reference/html/typed/#functions-rt
+        https://typst.app/docs/reference/html/typed/#functions-ruby
+        https://typst.app/docs/reference/html/typed/#functions-s
+        https://typst.app/docs/reference/html/typed/#functions-samp
+        https://typst.app/docs/reference/html/typed/#functions-script
+        https://typst.app/docs/reference/html/typed/#functions-search
+        https://typst.app/docs/reference/html/typed/#functions-section
+        https://typst.app/docs/reference/html/typed/#functions-select
+        https://typst.app/docs/reference/html/typed/#functions-slot
+        https://typst.app/docs/reference/html/typed/#functions-small
+        https://typst.app/docs/reference/html/typed/#functions-source
+        https://typst.app/docs/reference/html/typed/#functions-span
+        https://typst.app/docs/reference/html/typed/#functions-strong
+        https://typst.app/docs/reference/html/typed/#functions-style
+        https://typst.app/docs/reference/html/typed/#functions-sub
+        https://typst.app/docs/reference/html/typed/#functions-summary
+        https://typst.app/docs/reference/html/typed/#functions-sup
+        https://typst.app/docs/reference/html/typed/#functions-table
+        https://typst.app/docs/reference/html/typed/#functions-tbody
+        https://typst.app/docs/reference/html/typed/#functions-td
+        https://typst.app/docs/reference/html/typed/#functions-template
+        https://typst.app/docs/reference/html/typed/#functions-textarea
+        https://typst.app/docs/reference/html/typed/#functions-tfoot
+        https://typst.app/docs/reference/html/typed/#functions-th
+        https://typst.app/docs/reference/html/typed/#functions-thead
+        https://typst.app/docs/reference/html/typed/#functions-time
+        https://typst.app/docs/reference/html/typed/#functions-title
+        https://typst.app/docs/reference/html/typed/#functions-tr
+        https://typst.app/docs/reference/html/typed/#functions-track
+        https://typst.app/docs/reference/html/typed/#functions-u
+        https://typst.app/docs/reference/html/typed/#functions-ul
+        https://typst.app/docs/reference/html/typed/#functions-var
+        https://typst.app/docs/reference/html/typed/#functions-video
+        https://typst.app/docs/reference/html/typed/#functions-wbr
         https://typst.app/docs/reference/introspection/counter/
         https://typst.app/docs/reference/introspection/counter/#definitions-at
         https://typst.app/docs/reference/introspection/counter/#definitions-display
@@ -790,7 +905,6 @@ mod tests {
         https://typst.app/docs/reference/math/primes/
         https://typst.app/docs/reference/math/roots/#functions-root
         https://typst.app/docs/reference/math/roots/#functions-sqrt
-        https://typst.app/docs/reference/math/scr/
         https://typst.app/docs/reference/math/sizes/#functions-display
         https://typst.app/docs/reference/math/sizes/#functions-inline
         https://typst.app/docs/reference/math/sizes/#functions-script
@@ -815,6 +929,7 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-frak
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
+        https://typst.app/docs/reference/math/variants/#functions-scr
         https://typst.app/docs/reference/math/variants/#functions-serif
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
