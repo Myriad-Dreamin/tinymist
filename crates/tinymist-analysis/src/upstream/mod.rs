@@ -323,11 +323,13 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
 
                         let route = format_route(parent_name.as_deref(), &name, &cat);
 
-                        // Some types are defined multiple times, and the first one should take precedence.
+                        // Some types are defined multiple times, and the first one should take
+                        // precedence.
                         //
-                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep `pattern` remains as a deprecated alias.
-                        // Therefore, `Tiling` is first defined as `tiling`, then defined as `pattern` with deprecation again.
-                        // https://typst.app/docs/changelog/0.13.0/#visualization
+                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep
+                        // `pattern` remains as a deprecated alias.
+                        // Therefore, `Tiling` is first defined as `tiling`, then defined as
+                        // `pattern` with deprecation again. https://typst.app/docs/changelog/0.13.0/#visualization
                         // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L34
                         // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L47-L49
                         map.entry(CatKey::Type(*t)).or_insert(route);
@@ -809,7 +811,6 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-frak
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
-        https://typst.app/docs/reference/math/variants/#functions-scr
         https://typst.app/docs/reference/math/variants/#functions-serif
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
