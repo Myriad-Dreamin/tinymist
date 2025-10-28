@@ -21,8 +21,7 @@ use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
 
 #[cfg(feature = "system")]
-use typst::diag::EcoString;
-use typst::diag::StrResult;
+use typst::diag::{EcoString, StrResult};
 #[cfg(feature = "system")]
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
