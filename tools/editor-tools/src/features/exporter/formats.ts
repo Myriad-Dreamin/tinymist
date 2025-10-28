@@ -6,6 +6,7 @@ const PAGES_OPT: OptionSchema = {
   label: "Page Range",
   description: 'Page range to export (e.g., "1-3,5,7-9", leave empty for all pages)',
   default: "",
+  validate: validatePageRanges,
 };
 
 const MERGE_OPTS: OptionSchema[] = [
@@ -38,8 +39,18 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         type: "string",
         label: "Creation Timestamp",
         description:
-          'Set creation timestamp (leave empty for current time, "null" for no timestamp)',
+          "The document's creation date formatted as a UNIX timestamp. (leave empty for current time)",
         default: "",
+        validate: (value: string) => {
+          if (value.trim() === "") {
+            return; // Allow empty input
+          }
+          const num = Number(value);
+          if (Number.isNaN(num) || !Number.isInteger(num) || num < 0) {
+            // fixme: it still accepts floating point numbers like "1e5"
+            return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
+          }
+        },
       },
     ],
   },
@@ -56,12 +67,19 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         label: "PPI (Pixels per inch)",
         description: "Resolution for the exported image",
         default: 144,
+        min: 0,
+        validate: (value: string) => {
+          const num = Number(value);
+          if (Number.isNaN(num) || !Number.isFinite(num) || num <= 0) {
+            return "PPI must be a valid positive number";
+          }
+        },
       },
       {
         key: "png.fill",
         type: "color",
         label: "Background Fill",
-        description: "Background color for transparent areas",
+        description: "Background color for transparent areas (use CLI instead if alpha is needed)",
         default: "#ffffff",
       },
     ],
@@ -187,3 +205,50 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     ],
   },
 ];
+
+function validatePageRanges(value: string): string | undefined {
+  if (!value.trim()) {
+    return; // Allow empty input
+  }
+  const parts = value
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p);
+  for (const part of parts) {
+    const rangeParts = part.split("-").map((s) => s.trim());
+    if (rangeParts.length > 2) {
+      return `Invalid page range format: ${part}`;
+    }
+    if (rangeParts.length === 1) {
+      // Single page
+      const num = parseInt(rangeParts[0], 10);
+      if (Number.isNaN(num) || num <= 0) {
+        return `Invalid page number: ${part}`;
+      }
+    } else {
+      // Range
+      const [startStr, endStr] = rangeParts;
+      let startNum: number | undefined;
+      let endNum: number | undefined;
+      if (startStr) {
+        startNum = parseInt(startStr, 10);
+        if (Number.isNaN(startNum) || startNum <= 0) {
+          return `Invalid page range: ${part}`;
+        }
+      }
+      if (endStr) {
+        endNum = parseInt(endStr, 10);
+        if (Number.isNaN(endNum) || endNum <= 0) {
+          return `Invalid page range: ${part}`;
+        }
+      }
+      if (startNum !== undefined && endNum !== undefined && startNum > endNum) {
+        return `Invalid page range: ${part}`;
+      }
+      // If both start and end are empty, invalid
+      if (!startStr && !endStr) {
+        return `Invalid page range: ${part}`;
+      }
+    }
+  }
+}

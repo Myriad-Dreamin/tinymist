@@ -12,6 +12,8 @@ export interface OptionSchema {
   min?: number;
   max?: number;
   dependsOn?: string; // Key of another option that this option depends on
+  // Custom validation function for string fields
+  validate?: (value: string) => string | undefined; // Returns error message or undefined if valid
 }
 
 export interface ExportFormat {

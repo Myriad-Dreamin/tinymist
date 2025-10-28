@@ -39,53 +39,54 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
 
     div(
       { class: "options-grid" },
-      ...options.map((schema) => {
-        const valueState = optionStates[schema.key];
-        if (!valueState) {
-          throw new Error(`Missing state for option ${schema.key}`);
-        }
-        return OptionField(schema, valueState);
-      }),
+      ...options
+        .filter((schema) => (schema.dependsOn ? optionStates[schema.dependsOn]?.val : true))
+        .map((schema) => {
+          const valueState = optionStates[schema.key];
+          if (!valueState) {
+            throw new Error(`Missing state for option ${schema.key}`);
+          }
+          return OptionField(schema, valueState);
+        }),
     ),
   );
 };
 
 const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
-  const { key, type, label: optionLabel, description, options: selectOptions, min, max } = schema;
+  const { key, label: optionLabel, description } = schema;
+  const validationError = van.state<string | undefined>();
 
   console.log("OptionField");
 
   return div(
     { class: "flex flex-col gap-xs" },
     label({ class: "text-sm font-medium", for: key }, optionLabel),
-    renderInput(type, key, { selectOptions, min, max }, valueState),
-    description ? p({ class: "text-xs text-desc" }, description) : null,
+    renderInput(schema, valueState, validationError),
+    () =>
+      validationError.val
+        ? p({ class: "text-xs text-error" }, validationError.val)
+        : p({ class: "text-xs text-desc" }, description),
   );
 };
 
 const renderInput = (
-  type: OptionSchema["type"],
-  key: string,
-  props: {
-    selectOptions?: Array<{ value: Scalar; label: string }>;
-    min?: number;
-    max?: number;
-  },
+  schema: OptionSchema,
   valueState: State<Scalar>,
+  validationError: State<string | undefined>,
 ) => {
-  const { selectOptions, min, max } = props;
+  const { type, key, options: selectOptions, min, max } = schema;
 
   switch (type) {
     case "string":
       return input({
-        class: "input",
+        class: () => (validationError.val ? "input input-error" : "input"),
         type: "text",
         id: key,
         value: () => String((valueState.val ?? "") as string),
         oninput: (e: Event) => {
           const target = e.target as HTMLInputElement;
-          console.log("String input changed", target.value);
-          // setValue(target.value);
+          // Call custom validation function if provided
+          validationError.val = schema.validate?.(target.value);
           valueState.val = target.value;
         },
       });
@@ -103,6 +104,8 @@ const renderInput = (
         max: max?.toString() ?? null,
         oninput: (e: Event) => {
           const target = e.target as HTMLInputElement;
+          // Call custom validation function if provided
+          validationError.val = schema.validate?.(target.value);
           valueState.val = parseFloat(target.value);
         },
       });

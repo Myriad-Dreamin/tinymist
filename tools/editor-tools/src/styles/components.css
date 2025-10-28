@@ -15,6 +15,9 @@
 .text-desc {
   color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
 }
+.text-error {
+  color: var(--vscode-errorForeground, #f88070);
+}
 
 /* ===== Badges ===== */
 .badge {
