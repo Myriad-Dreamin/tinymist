@@ -141,11 +141,11 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.6.1-rc4", default-features = false, features = [
+reflexo = { version = "=0.7.0-rc1", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.6.1-rc4", default-features = false }
-reflexo-vec2svg = { version = "=0.6.1-rc4" }
+reflexo-typst = { version = "=0.7.0-rc1", default-features = false }
+reflexo-vec2svg = { version = "=0.7.0-rc1" }
 
 typst = "0.14.0"
 typst-html = "0.14.0"
@@ -280,19 +280,19 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
 
 # typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "34869bfa9db089c5196be5fac2a5e9d752904ca2" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
@@ -308,9 +308,9 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nigh
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
