@@ -133,6 +133,7 @@ impl HtmlToAstParser {
             md_tag::strike => self.convert_strikethrough(element),
             md_tag::link => self.convert_link(element),
             md_tag::image => self.convert_image(element),
+            md_tag::image_bytes => self.convert_image_bytes(element),
 
             md_tag::linebreak => {
                 self.inline_buffer.push(Node::HardBreak);

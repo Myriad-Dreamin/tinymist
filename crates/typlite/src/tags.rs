@@ -17,6 +17,7 @@ pub mod md_tag {
         parbreak -> m1parbreak
         linebreak -> m1linebreak
         image -> m1image
+        image_bytes -> m1imagebytes
         strong -> m1strong
         emph -> m1emph
         highlight -> m1highlight

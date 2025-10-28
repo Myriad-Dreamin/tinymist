@@ -1,0 +1,19 @@
+---
+source: crates/typlite/src/tests.rs
+assertion_line: 25
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/image_bytes.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1imagebytes src="" alt="">redacted-frame</m1imagebytes><m1parbreak></m1parbreak></m1document></body>
+</html>
+
+=====
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth]{data:image-hash/svg+xml;base64,redacted
