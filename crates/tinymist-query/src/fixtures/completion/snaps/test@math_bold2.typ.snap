@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_bold2.typ
     "labelDetails": {
      "description": "(content) => content"
     },
-    "sortText": "090",
+    "sortText": "093",
     "textEdit": {
      "newText": "bold(${1:})",
      "range": {

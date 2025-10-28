@@ -37,7 +37,7 @@ occurs.
 
 Pagination tries to avoid single lines of text at the top or bottom of a
 page (these are called _widows_ and _orphans_). You can adjust the
-[`text.costs`](https://typst.app/docs/reference/text/text/#parameters-costs) parameter to disable this behavior.
+[`text.costs`] parameter to disable this behavior.
 
 # Named Parameters
 
