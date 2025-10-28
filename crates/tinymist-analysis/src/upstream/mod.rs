@@ -11,7 +11,7 @@ use ecow::{EcoString, eco_format};
 use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
-    Category, Library, LibraryExt, World,
+    Category, Feature, Features, Library, LibraryExt, World,
     diag::{StrResult, bail},
     foundations::{Binding, Content, Func, Module, Type, Value},
     introspection::MetadataElem,
@@ -172,7 +172,11 @@ fn resolve_known(head: &str, base: &str) -> Option<String> {
     })
 }
 
-static LIBRARY: LazyLock<Library> = LazyLock::new(Library::default);
+static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
+    Library::builder()
+        .with_features(Features::from_iter([Feature::Html]))
+        .build()
+});
 
 /// Extract a module from another module.
 #[track_caller]
