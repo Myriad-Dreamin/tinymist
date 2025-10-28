@@ -133,10 +133,10 @@ async function createReleaseAsset() {
   await spawn(`workflow-run-watch`, `gh run watch ${runId}`);
 }
 
-// await spawn(
-//   "pr-create",
-//   `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
-// );
+await spawn(
+  "pr-create",
+  `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
+);
 await createReleaseAsset();
 const cargoToml = await fs.readFile("Cargo.toml", "utf-8");
 const newCargoToml = cargoToml.replace(
