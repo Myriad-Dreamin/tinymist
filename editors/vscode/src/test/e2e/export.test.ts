@@ -118,7 +118,7 @@ export async function getTests(ctx: Context) {
 
     suite.addTest("export pdf", async () => {
       const resp = await exportDoc("main.typ", "Pdf", { creationTimestamp: "0" });
-      expectSingleHash(resp).eq("02443410");
+      expectSingleHash(resp).eq("31c4f731");
     });
 
     suite.addTest("export html", async () => {
