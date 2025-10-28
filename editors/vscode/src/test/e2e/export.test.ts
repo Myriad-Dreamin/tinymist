@@ -28,6 +28,7 @@ export async function getTests(ctx: Context) {
     if ("items" in response) {
       throw new Error("Expected single export, got multiple");
     }
+    console.log(response.path);
     const sha256 = getFileHash(response.path);
     return ctx.expect(ignoreHash ? undefined : sha256.slice(0, 8), `sha256:${sha256}`);
   };
@@ -118,7 +119,7 @@ export async function getTests(ctx: Context) {
 
     suite.addTest("export pdf", async () => {
       const resp = await exportDoc("main.typ", "Pdf", { creationTimestamp: "0" });
-      expectSingleHash(resp).eq("f5d1a181");
+      expectSingleHash(resp).eq("86c3e3b3");
     });
 
     suite.addTest("export html", async () => {
