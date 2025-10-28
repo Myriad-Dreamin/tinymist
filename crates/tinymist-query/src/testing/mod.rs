@@ -143,7 +143,7 @@ struct UserTestConfig {
 }
 
 fn extract_test_configuration(doc: &TypstDocument) -> Result<TestConfig> {
-    let selector = Label::new(PicoStr::intern("test-config"));
+    let selector = Label::new(PicoStr::intern("test-config")).context("failed to create label")?;
     let metadata = doc.introspector().query(&Selector::Label(selector));
     if metadata.len() > 1 {
         // todo: attach source locations.

@@ -302,7 +302,7 @@ pub(crate) fn value_to_completion_kind(value: &Value) -> CompletionKind {
         Value::Func(..) => CompletionKind::Func,
         Value::Module(..) => CompletionKind::Module,
         Value::Type(..) => CompletionKind::Type,
-        Value::Symbol(s) => CompletionKind::Symbol(s.get()),
+        Value::Symbol(s) => CompletionKind::Symbol(s.get().into()),
         Value::None
         | Value::Auto
         | Value::Bool(..)

@@ -7,16 +7,15 @@ use std::sync::{Arc, LazyLock};
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{EcoString, eco_format};
-use log::debug;
 use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowApi};
 use typst::{
     World,
     foundations::{Bytes, Dict, IntoValue},
-    html::{HtmlElement, HtmlNode},
     layout::{Abs, Frame},
     utils::LazyHash,
 };
+use typst_html::{HtmlElement, HtmlNode};
 
 use crate::{
     ColorTheme,
@@ -79,7 +78,7 @@ impl HtmlToAstParser {
             });
         };
 
-        let svg = typst_svg::svg_frame(frame);
+        let svg = typst_svg::svg_frame(&frame.inner);
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {
@@ -211,7 +210,7 @@ impl HtmlToAstParser {
         });
 
         if self.feat.remove_html {
-            debug!("remove_html feature active, dropping inline document element");
+            log::debug!("remove_html feature active, dropping inline document element");
             // todo: make error silent is not good.
             return Node::Text(EcoString::new());
         }

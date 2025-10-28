@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_typing.typ
     "labelDetails": {
      "description": "(content) => content"
     },
-    "sortText": "217",
+    "sortText": "218",
     "textEdit": {
      "newText": "todo(${1:})",
      "range": {
@@ -48,7 +48,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_typing.typ
     "labelDetails": {
      "description": "(content) => content"
     },
-    "sortText": "217",
+    "sortText": "218",
     "textEdit": {
      "newText": "todo(${1:})",
      "range": {

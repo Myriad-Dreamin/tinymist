@@ -2,7 +2,7 @@
 
 /// Tag definitions specific to markdown conversion
 pub mod md_tag {
-    use typst::html::HtmlTag;
+    use typst_html::HtmlTag;
 
     macro_rules! tags {
         ($($tag:ident -> $name:ident)*) => {
@@ -19,8 +19,6 @@ pub mod md_tag {
         image -> m1image
         strong -> m1strong
         emph -> m1emph
-        highlight -> m1highlight
-        strike -> m1strike
         raw -> m1raw
         verbatim -> m1verbatim
         label -> m1label

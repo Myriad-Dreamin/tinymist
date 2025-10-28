@@ -2,7 +2,7 @@
 
 use cmark_writer::ast::{ListItem, Node};
 use ecow::eco_format;
-use typst::html::{HtmlElement, HtmlNode, tag};
+use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
 use crate::attributes::{ListItemAttr, TypliteAttrsParser};
