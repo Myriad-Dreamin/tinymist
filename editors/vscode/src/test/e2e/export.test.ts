@@ -70,6 +70,22 @@ export async function getTests(ctx: Context) {
 
   const workspaceCtx = ctx.workspaceCtx("export");
 
+  const prepareMain = async (mainPath: string) => {
+    const baseUri = workspaceCtx.getWorkspace("export");
+    const mainUrl = vscode.Uri.joinPath(baseUri, mainPath);
+
+    await ctx.openDocument(mainUrl);
+  };
+
+  const exportDoc = async (kind: ExportKind, opts?: ExportOpts, actionOpts?: ExportActionOpts) => {
+    return await vscode.commands.executeCommand<ExportResponse | null>(
+      "tinymist.export",
+      kind,
+      opts,
+      actionOpts,
+    );
+  };
+
   await workspaceCtx.suite("export", async (suite) => {
     // const uri = workspaceCtx.workspaceUri();
     const baseUri = workspaceCtx.getWorkspace("export");
@@ -83,33 +99,11 @@ export async function getTests(ctx: Context) {
       fs.rmdirSync(targetDir.fsPath, { recursive: true });
     }
 
-    const prepareMain = async (mainPath: string) => {
-      const mainUrl = vscode.Uri.joinPath(baseUri, mainPath);
-
-      await ctx.openDocument(mainUrl);
-    };
-
-    const exportDoc = async (
-      mainPath: string,
-      kind: ExportKind,
-      opts?: ExportOpts,
-      actionOpts?: ExportActionOpts,
-    ) => {
-      await prepareMain(mainPath);
-
-      return await vscode.commands.executeCommand<ExportResponse | null>(
-        "tinymist.export",
-        kind,
-        opts,
-        actionOpts,
-      );
-    };
+    await prepareMain("main.typ");
 
     // NOTE: For svg tests, the output (especially glyph id) may vary between different environments. So we do not check hash.
 
     suite.addTest("export current pdf", async () => {
-      await prepareMain("main.typ");
-
       const resp = await vscode.commands.executeCommand<ExportResponse | null>(
         "tinymist.exportCurrentPdf",
       );
@@ -117,47 +111,63 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export pdf", async () => {
-      const resp = await exportDoc("main.typ", "Pdf", { creationTimestamp: "0" });
+      const resp = await exportDoc("Pdf", { creationTimestamp: "0" });
       expectSingleHash(resp).eq("31c4f731");
     });
 
     suite.addTest("export html", async () => {
-      const resp = await exportDoc("main.typ", "Html");
+      const resp = await exportDoc("Html");
       expectSingleHash(resp).eq("a55cf03e");
     });
 
     suite.addTest("export markdown", async () => {
-      const resp = await exportDoc("main.typ", "Markdown");
+      const resp = await exportDoc("Markdown");
       expectSingleHash(resp).eq("62ca0c72");
     });
 
     suite.addTest("export tex", async () => {
-      const resp = await exportDoc("main.typ", "TeX");
+      const resp = await exportDoc("TeX");
       expectSingleHash(resp).eq("492c3e62");
     });
 
     suite.addTest("export text", async () => {
-      const resp = await exportDoc("main.typ", "Text");
+      const resp = await exportDoc("Text");
       expectSingleHash(resp).eq("8ae8f637");
     });
 
     suite.addTest("export query", async () => {
-      const resp = await exportDoc("main.typ", "Query", { format: "json", selector: "heading" });
+      const resp = await exportDoc("Query", { format: "json", selector: "heading" });
       expectSingleHash(resp).eq("a08f208d");
     });
 
     suite.addTest("export png", async () => {
-      const resp = await exportDoc("main.typ", "Png");
+      const resp = await exportDoc("Png");
       expectPaged(resp).eq([{ page: 0, hash: "a3987ce8" }]);
     });
 
     suite.addTest("export svg", async () => {
-      const resp = await exportDoc("main.typ", "Svg");
+      const resp = await exportDoc("Svg");
       expectPaged(resp, true).eq([{ page: 0, hash: undefined }]);
     });
+  });
+
+  await workspaceCtx.suite("export paged", async (suite) => {
+    // const uri = workspaceCtx.workspaceUri();
+    const baseUri = workspaceCtx.getWorkspace("export");
+    vscode.window.showInformationMessage("Start export tests.");
+
+    console.log("Start all tests on ", baseUri.fsPath);
+
+    // check and clear target directory
+    const targetDir = vscode.Uri.joinPath(baseUri, "target");
+    if (fs.existsSync(targetDir.fsPath)) {
+      fs.rmdirSync(targetDir.fsPath, { recursive: true });
+    }
+
+    await prepareMain("paged.typ");
 
     suite.addTest("export png paged all", async () => {
-      const resp = await exportDoc("paged.typ", "Png", { pageNumberTemplate: "paged-{p}" });
+      const resp = await exportDoc("Png", { pageNumberTemplate: "paged-{p}" });
       expectPaged(resp).eq([
         { page: 0, hash: "27d34da8" },
         { page: 1, hash: "a97c7cc8" },
@@ -166,7 +176,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export png paged partial", async () => {
-      const resp = await exportDoc("paged.typ", "Png", {
+      const resp = await exportDoc("Png", {
         pages: ["1"],
         pageNumberTemplate: "paged-partial-{p}",
       });
@@ -174,7 +184,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export png paged merged", async () => {
-      const resp = await exportDoc("paged.typ", "Png", {
+      const resp = await exportDoc("Png", {
         pages: ["2-3"],
         merge: {},
       });
@@ -182,7 +192,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export svg paged all", async () => {
-      const resp = await exportDoc("paged.typ", "Svg", { pageNumberTemplate: "paged-{p}" });
+      const resp = await exportDoc("Svg", { pageNumberTemplate: "paged-{p}" });
       expectPaged(resp, true).eq([
         { page: 0, hash: undefined },
         { page: 1, hash: undefined },
@@ -191,7 +201,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export svg paged partial", async () => {
-      const resp = await exportDoc("paged.typ", "Svg", {
+      const resp = await exportDoc("Svg", {
         pages: ["2"],
         pageNumberTemplate: "paged-partial-{p}",
       });
@@ -199,7 +209,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export svg paged merged", async () => {
-      const resp = await exportDoc("paged.typ", "Svg", {
+      const resp = await exportDoc("Svg", {
         pages: ["1-2"],
         merge: {},
       });
@@ -207,12 +217,7 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest("export png paged all no-write", async () => {
-      const resp = await exportDoc(
-        "paged.typ",
-        "Png",
-        { pageNumberTemplate: "paged-{p}" },
-        { write: false },
-      );
+      const resp = await exportDoc("Png", { pageNumberTemplate: "paged-{p}" }, { write: false });
       expectPagedData(resp).eq([
         { page: 0, hash: "27d34da8" },
         { page: 1, hash: "a97c7cc8" },
