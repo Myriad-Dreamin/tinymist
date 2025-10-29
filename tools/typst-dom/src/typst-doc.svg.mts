@@ -1,5 +1,5 @@
 import { PreviewMode } from "./typst-doc.mjs";
-import { TypstCancellationToken } from "./typst-cancel.mjs";
+import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
@@ -14,9 +14,6 @@ export function provideSvgDoc<
   TBase extends GConstructor<TypstDocumentContext & Partial<TypstCanvasDocument>>,
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
   return class SvgDocument extends Base {
-    /// canvas render ctoken
-    canvasRenderCToken?: TypstCancellationToken;
-
     constructor(...args: any[]) {
       super(...args);
       this.registerMode("svg");
@@ -561,20 +558,17 @@ export function provideSvgDoc<
 
         const tok = (this.canvasRenderCToken = new TypstCancellationToken());
 
-        renderCanvasWhenIdle(
-          async () => {
-            await waitCancel;
-            this.updateCanvas(pagesInCanvasMode, {
-              cancel: tok,
-              lazy: true,
-            }).finally(() => {
-              if (tok === this.canvasRenderCToken) {
-                this.canvasRenderCToken = undefined;
-              }
-            });
-          },
-          { timeout: 1000 },
-        );
+        (async () => {
+          await waitCancel;
+          this.updateCanvas(pagesInCanvasMode, {
+            cancel: tok,
+            lazy: true,
+          }).finally(() => {
+            if (tok === this.canvasRenderCToken) {
+              this.canvasRenderCToken = undefined;
+            }
+          });
+        })();
       }
 
       if (this.isContentPreview) {
@@ -645,8 +639,3 @@ export function provideSvgDoc<
     }
   };
 }
-
-const renderCanvasWhenIdle =
-  "requestIdleCallback" in window
-    ? requestIdleCallback
-    : (cb: (args: void) => void, { timeout }: any) => setTimeout(cb, timeout);
