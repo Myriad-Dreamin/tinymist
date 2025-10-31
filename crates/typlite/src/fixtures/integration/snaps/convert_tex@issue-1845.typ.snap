@@ -9,17 +9,8 @@ input_file: crates/typlite/src/fixtures/integration/issue-1845.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1grid><m1table><table><tr><td></td><td></td></tr><tr><td></td><td></td></tr></table></m1table></m1grid></m1document></body>
+  <body><m1document><m1grid><m1table><table><tr><td>Header</td><td>Row</td></tr><tr><td><m1raw lang block="true" text="Code line 1
+Code line 2"><pre><code><p>Code line 1</p><m1linebreak></m1linebreak><p>Code line 2</p></code></pre></m1raw></td><td>Regular text</td></tr></table></m1table></m1grid></m1document></body>
 </html>
 
 =====
-\begin{table}[htbp]
-\centering
-\begin{tabular}{cc}
-\hline
- &  \\
-\hline
- &  \\
-\hline
-\end{tabular}
-\end{table}
