@@ -80,19 +80,19 @@
   {
     let children = children.pos()
     let header = if children.first().func() == grid.header {
-      (table.header(..children.first().children.map(cell => table.cell(cell.body))),)
+      (table.header(..children.first().children.map(cell => cell.body)),)
       children = children.slice(1)
     } else {
       ()
     }
     let footer = if children.last().func() == grid.footer {
-      (table.footer(..children.last().children.map(cell => table.cell(cell.body))),)
+      (table.footer(..children.last().children.map(cell => cell.body)),)
       children = children.slice(0, -1)
     } else {
       ()
     }
 
-    table(columns: columns, ..header, ..children.map(it => table.cell(it)), ..footer)
+    table(columns: columns, ..header, ..children.map(cell => cell.body), ..footer)
   },
 )
 #let md-image(src: "", alt: none) = html.elem(

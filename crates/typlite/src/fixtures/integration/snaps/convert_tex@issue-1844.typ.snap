@@ -19,7 +19,17 @@ Under the greenwood tree #emoji.tree
 Who loves to lie with me,
 ...
 ```)
-````"></m1verbatim><m1parbreak></m1parbreak><p>Source in grid</p><m1parbreak></m1parbreak><table x="test"><tr><td></td><td></td></tr></table></m1document></body>
+````"></m1verbatim><m1parbreak></m1parbreak><p>Source in grid</p><m1parbreak></m1parbreak><table x="test"><tr><td><p>Placeholder for</p><m1linebreak></m1linebreak><p>separately rendered SVG</p></td><td><m1verbatim src="````
+
+== Under the Greenwood Tree
+by Shakespeare.
+
+#some-function(```
+Under the greenwood tree #emoji.tree
+Who loves to lie with me,
+...
+```)
+````"></m1verbatim></td></tr></table></m1document></body>
 </html>
 
 =====
@@ -42,3 +52,16 @@ Who loves to lie with me,
 ````
 
 Source in grid
+
+Placeholder for\\
+separately rendered SVG````
+
+== Under the Greenwood Tree
+by Shakespeare.
+
+#some-function(```
+Under the greenwood tree #emoji.tree
+Who loves to lie with me,
+...
+```)
+````
