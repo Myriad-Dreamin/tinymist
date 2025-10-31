@@ -59,6 +59,8 @@ impl UserActionTask {
         let task = ServerTraceTask { stop_tx, resp_rx };
 
         typst_timing::enable();
+        typst_timing::clear();
+
         // Empty trace array is not legal, so we add a root scope.
         let _scope = typst_timing::TimingScope::new("server_trace");
         let timings = async move {
@@ -66,6 +68,7 @@ impl UserActionTask {
 
             stop_rx.recv().await;
             drop(_scope);
+
             typst_timing::disable();
 
             let mut writer = std::io::BufWriter::new(Vec::new());
@@ -78,6 +81,8 @@ impl UserActionTask {
             let timings = writer.into_inner().unwrap();
             log::info!("after generate timings {res:?}");
             log::info!("timings: {:?}", std::str::from_utf8(&timings));
+
+            typst_timing::clear();
 
             resp_tx
                 .send(Ok(json!({})))
