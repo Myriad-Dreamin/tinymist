@@ -9,13 +9,21 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.14.0 - [2025-10-31]
+## v0.14.0 - [2025-11-02]
 
-* feat: bump typst to v0.14.0 in https://github.com/Myriad-Dreamin/tinymist/pull/2201
+* Bumping typst to v0.14.0 in https://github.com/Myriad-Dreamin/tinymist/pull/2201
+
+### Server
+
+* Clearing global timing objects before and after user profiling in https://github.com/Myriad-Dreamin/tinymist/pull/2210
+
+### Typlite
+
+* (Fix) Ignoring `{table,grid}.cell` during HTML export in https://github.com/Myriad-Dreamin/tinymist/pull/2209
 
 ### Code Analysis
 
-* feat: match pdf images for path completion in https://github.com/Myriad-Dreamin/tinymist/pull/2205
+* Matching pdf images for path completion in https://github.com/Myriad-Dreamin/tinymist/pull/2205
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.30...v0.14.0
 
