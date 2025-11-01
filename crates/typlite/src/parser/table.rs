@@ -287,9 +287,9 @@ impl TableParser {
         if let Some(table) = real_table_elem {
             // Check if the table contains rowspan or colspan attributes
             // If it does, fall back to using HtmlElement
-            if TableValidator::table_has_complex_cells(table) {
+            if let Some(cell_span) = TableValidator::find_complex_cell(table) {
                 parser.warn_at(
-                    Some(table.span),
+                    Some(cell_span),
                     eco_format!(
                         "table contains rowspan or colspan attributes; exported original HTML table"
                     ),
@@ -353,77 +353,24 @@ impl TableSpanResolver {
     }
 
     fn find_block_child(cell: &HtmlElement) -> Option<&HtmlElement> {
-        Self::find_block_child_in_nodes(&cell.children)
-    }
-
-    fn find_block_child_in_nodes(nodes: &[HtmlNode]) -> Option<&HtmlElement> {
-        for node in nodes {
+        // table.cell has only one child (the body element)
+        cell.children.first().and_then(|node| {
             if let HtmlNode::Element(elem) = node {
                 if HtmlToAstParser::is_block_element(elem) {
                     return Some(elem);
                 }
-
-                if let Some(found) = Self::find_block_child_in_nodes(&elem.children) {
-                    return Some(found);
-                }
             }
-        }
-        None
+            None
+        })
     }
 
     fn resolve_span_and_tag(cell: &HtmlElement, block_elem: &HtmlElement) -> (Span, EcoString) {
-        if let Some(elem) = Self::find_element_with_span(block_elem) {
-            return (elem.span, elem.tag.resolve().to_string().into());
-        }
-
-        if !cell.span.is_detached() {
-            return (cell.span, cell.tag.resolve().to_string().into());
-        }
-
-        if !block_elem.span.is_detached() {
-            return (block_elem.span, block_elem.tag.resolve().to_string().into());
-        }
-
-        if let Some(span) = Self::find_descendant_text_span(&block_elem.children) {
-            return (span, block_elem.tag.resolve().to_string().into());
-        }
-
-        (block_elem.span, block_elem.tag.resolve().to_string().into())
-    }
-
-    fn find_element_with_span(element: &HtmlElement) -> Option<&HtmlElement> {
-        for node in &element.children {
-            if let HtmlNode::Element(child) = node {
-                if !child.span.is_detached() {
-                    return Some(child);
-                }
-            }
-        }
-
-        for node in &element.children {
-            if let HtmlNode::Element(child) = node {
-                if let Some(found) = Self::find_element_with_span(child) {
-                    return Some(found);
-                }
-            }
-        }
-
-        None
-    }
-
-    fn find_descendant_text_span(nodes: &[HtmlNode]) -> Option<Span> {
-        for node in nodes {
-            match node {
-                HtmlNode::Text(_, span) if !span.is_detached() => return Some(*span),
-                HtmlNode::Element(elem) => {
-                    if let Some(span) = Self::find_descendant_text_span(&elem.children) {
-                        return Some(span);
-                    }
-                }
-                HtmlNode::Frame(_) | HtmlNode::Tag(_) | HtmlNode::Text(_, _) => {}
-            }
-        }
-        None
+        let span = if !block_elem.span.is_detached() {
+            block_elem.span
+        } else {
+            cell.span
+        };
+        (span, block_elem.tag.resolve().to_string().into())
     }
 }
 
@@ -431,43 +378,44 @@ impl TableSpanResolver {
 pub struct TableValidator;
 
 impl TableValidator {
-    /// Check if the table has complex cells (rowspan/colspan)
-    pub fn table_has_complex_cells(table: &HtmlElement) -> bool {
+    /// Check if the table has complex cells (rowspan/colspan), returns the span of the first complex cell
+    pub fn find_complex_cell(table: &HtmlElement) -> Option<Span> {
         for child_node in &table.children {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead | tag::tbody => {
                         // Check rows within thead/tbody
-                        if Self::check_section_for_complex_cells(element) {
-                            return true;
+                        if let Some(span) = Self::check_section_for_complex_cells(element) {
+                            return Some(span);
                         }
                     }
                     tag::tr => {
                         // Direct row
-                        if Self::check_row_for_complex_cells(element) {
-                            return true;
+                        if let Some(span) = Self::check_row_for_complex_cells(element) {
+                            return Some(span);
                         }
                     }
                     _ => {}
                 }
             }
         }
-        false
+        None
     }
 
-    fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
+    fn check_section_for_complex_cells(section: &HtmlElement) -> Option<Span> {
         for row_node in &section.children {
             if let HtmlNode::Element(row_elem) = row_node
                 && row_elem.tag == tag::tr
-                && Self::check_row_for_complex_cells(row_elem)
             {
-                return true;
+                if let Some(span) = Self::check_row_for_complex_cells(row_elem) {
+                    return Some(span);
+                }
             }
         }
-        false
+        None
     }
 
-    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> bool {
+    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> Option<Span> {
         for cell_node in &row_elem.children {
             if let HtmlNode::Element(cell) = cell_node
                 && (cell.tag == tag::td || cell.tag == tag::th)
@@ -476,10 +424,10 @@ impl TableValidator {
                     name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
                 })
             {
-                return true;
+                return Some(cell.span);
             }
         }
-        false
+        None
     }
 }
 
