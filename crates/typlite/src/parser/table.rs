@@ -213,8 +213,8 @@ impl TableContentExtractor {
                 let merged_cell = Self::merge_cell_content(cell_content);
 
                 // Check if this is a header cell appearing after data rows
-                if cell.tag == tag::th {
-                    if has_data_rows && !is_header {
+                if cell.tag == tag::th
+                    && has_data_rows && !is_header {
                         parser.warn_at(
                             Some(cell.span),
                             eco_format!(
@@ -224,7 +224,6 @@ impl TableContentExtractor {
                         *fallback_to_html = true;
                         return Ok(Vec::new());
                     }
-                }
 
                 // Add to appropriate section
                 if is_header || cell.tag == tag::th {
