@@ -77,6 +77,16 @@ impl TableContentExtractor {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead => {
+                        if state.has_data_rows {
+                            parser.warn_at(
+                                Some(element.span),
+                                eco_format!(
+                                    "table header appears after data rows; exported original HTML table"
+                                ),
+                            );
+                            state.fallback_to_html = true;
+                            return Ok(());
+                        }
                         // Process header rows
                         Self::process_table_section(
                             parser,
@@ -85,10 +95,13 @@ impl TableContentExtractor {
                             &mut state.rows,
                             true,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
                         state.is_header = false;
                     }
                     tag::tbody => {
+                        // Mark that we have data rows
+                        state.has_data_rows = true;
                         // Process body rows
                         Self::process_table_section(
                             parser,
@@ -97,6 +110,7 @@ impl TableContentExtractor {
                             &mut state.rows,
                             false,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
                     }
                     tag::tr => {
@@ -107,6 +121,7 @@ impl TableContentExtractor {
                             state.is_header,
                             &mut state.headers,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
 
                         // After the first row, treat remaining rows as data rows
@@ -115,6 +130,7 @@ impl TableContentExtractor {
                         } else if state.is_header {
                             state.is_header = false;
                         } else if !current_row.is_empty() {
+                            state.has_data_rows = true;
                             state.rows.push(current_row);
                         }
                     }
@@ -132,6 +148,7 @@ impl TableContentExtractor {
         rows: &mut Vec<Vec<Node>>,
         is_header_section: bool,
         fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<()> {
         if *fallback_to_html {
             return Ok(());
@@ -146,6 +163,7 @@ impl TableContentExtractor {
                     is_header_section,
                     headers,
                     fallback_to_html,
+                    has_data_rows,
                 )?;
 
                 if *fallback_to_html {
@@ -166,6 +184,7 @@ impl TableContentExtractor {
         is_header: bool,
         headers: &mut Vec<Node>,
         fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<Vec<Node>> {
         if *fallback_to_html {
             return Ok(Vec::new());
@@ -193,6 +212,20 @@ impl TableContentExtractor {
 
                 // Merge cell content into a single node
                 let merged_cell = Self::merge_cell_content(cell_content);
+
+                // Check if this is a header cell appearing after data rows
+                if cell.tag == tag::th {
+                    if has_data_rows && !is_header {
+                        parser.warn_at(
+                            Some(cell.span),
+                            eco_format!(
+                                "table header cell appears after data rows; exported original HTML table"
+                            ),
+                        );
+                        *fallback_to_html = true;
+                        return Ok(Vec::new());
+                    }
+                }
 
                 // Add to appropriate section
                 if is_header || cell.tag == tag::th {
@@ -225,6 +258,8 @@ pub struct TableParseState {
     pub rows: Vec<Vec<Node>>,
     pub is_header: bool,
     pub fallback_to_html: bool,
+    /// Track whether we have encountered any data rows
+    pub has_data_rows: bool,
 }
 
 impl TableParseState {
@@ -234,6 +269,7 @@ impl TableParseState {
             rows: Vec::new(),
             is_header: true,
             fallback_to_html: false,
+            has_data_rows: false,
         }
     }
 }
