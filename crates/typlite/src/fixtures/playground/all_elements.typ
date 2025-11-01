@@ -71,17 +71,22 @@ Referencing previous content: #ref(<ref-example>)
 
 #table(
   columns: 3,
-  [Header 1], [Header 2], [Header 3],
+  table.header([Header 1], [Header 2], [Header 3]),
+  table.cell(colspan: 2)[Row 2 Cell 1], [Row 2 Cell 3],
+  table.header([Header 1], [Header 2], [Header 3]),
   [Row 1 Cell 1], [Row 1 Cell 2], [Row 1 Cell 3],
-  [Row 2 Cell 1], [Row 2 Cell 2], [Row 2 Cell 3],
+  table.footer([Footer 1], [Footer 2], [Footer 3]),
 )
 
 === Grid
 
 #grid(
   columns: 2,
+  grid.header([Header 1], [Header 2]),
   [Grid Cell 1], [Grid Cell 2],
+  grid.header([Header 1], [Header 2]),
   [Grid Cell 3], [Grid Cell 4],
+  grid.header([Footer 1], [Footer 2]),
 )
 
 == Mathematical Formulas
