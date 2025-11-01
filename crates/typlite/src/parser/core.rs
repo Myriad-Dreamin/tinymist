@@ -235,8 +235,13 @@ impl HtmlToAstParser {
             })
             .collect();
 
+        let (inline_nodes, block_nodes) = self.capture_children(element)?;
+
         let mut children = Vec::new();
-        self.convert_children_into(&mut children, element)?;
+        if !inline_nodes.is_empty() {
+            children.extend(inline_nodes);
+        }
+        children.extend(block_nodes);
 
         Ok(Node::HtmlElement(CmarkHtmlElement {
             tag: element.tag.resolve().to_string().into(),

@@ -75,25 +75,29 @@
   "m1table",
   it,
 )
-#let md-grid(columns: auto, ..children) = html.elem(
+#let md-grid(it) = html.elem(
   "m1grid",
-  {
-    let children = children.pos()
-    let header = if children.first().func() == grid.header {
-      (table.header(..children.first().children.map(cell => cell.body)),)
-      children = children.slice(1)
-    } else {
-      ()
-    }
-    let footer = if children.last().func() == grid.footer {
-      (table.footer(..children.last().children.map(cell => cell.body)),)
-      children = children.slice(0, -1)
-    } else {
-      ()
-    }
-
-    table(columns: columns, ..header, ..children.map(cell => cell.body), ..footer)
-  },
+  table(columns: it.columns, ..it
+      .children
+      .map(child => {
+        {
+          let func = child.func()
+          if func == grid.cell {
+            table.cell(
+              child.body,
+            )
+          } else if func == grid.header {
+            table.header(..child.children.map(it => table.cell(
+              it.body,
+            )))
+          } else if func == grid.footer {
+            table.footer(..child.children.map(it => table.cell(
+              it.body,
+            )))
+          }
+        }
+      })
+      .flatten()),
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
@@ -108,7 +112,7 @@
   "",
 )
 #let md-figure(body, caption: none) = html.elem(
-  "m1figure",
+    "m1figure",
   attrs: (
     caption: if caption == none {
       ""
@@ -121,7 +125,7 @@
     },
   ),
   body,
-)
+  )
 
 #let if-not-paged(it, act) = {
   if target() == "html" {
@@ -198,7 +202,7 @@
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
   show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
+  show grid: it => if-not-paged(it, md-grid(it))
 
   show math.equation.where(block: false): it => if-not-paged(
     it,

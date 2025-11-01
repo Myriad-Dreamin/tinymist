@@ -1,8 +1,7 @@
 //! HTML table parsing module, processes the conversion of table elements
 
-use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
+use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
-use cmark_writer::{HtmlWriteError, HtmlWriter};
 use ecow::{EcoString, eco_format};
 use typst::utils::PicoStr;
 use typst_html::{HtmlElement, HtmlNode, tag};
@@ -77,6 +76,16 @@ impl TableContentExtractor {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead => {
+                        if state.has_data_rows {
+                            parser.warn_at(
+                                Some(element.span),
+                                eco_format!(
+                                    "table header appears after data rows; exported original HTML table"
+                                ),
+                            );
+                            state.fallback_to_html = true;
+                            return Ok(());
+                        }
                         // Process header rows
                         Self::process_table_section(
                             parser,
@@ -85,10 +94,13 @@ impl TableContentExtractor {
                             &mut state.rows,
                             true,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
                         state.is_header = false;
                     }
                     tag::tbody => {
+                        // Mark that we have data rows
+                        state.has_data_rows = true;
                         // Process body rows
                         Self::process_table_section(
                             parser,
@@ -97,6 +109,7 @@ impl TableContentExtractor {
                             &mut state.rows,
                             false,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
                     }
                     tag::tr => {
@@ -107,6 +120,7 @@ impl TableContentExtractor {
                             state.is_header,
                             &mut state.headers,
                             &mut state.fallback_to_html,
+                            state.has_data_rows,
                         )?;
 
                         // After the first row, treat remaining rows as data rows
@@ -115,6 +129,7 @@ impl TableContentExtractor {
                         } else if state.is_header {
                             state.is_header = false;
                         } else if !current_row.is_empty() {
+                            state.has_data_rows = true;
                             state.rows.push(current_row);
                         }
                     }
@@ -132,6 +147,7 @@ impl TableContentExtractor {
         rows: &mut Vec<Vec<Node>>,
         is_header_section: bool,
         fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<()> {
         if *fallback_to_html {
             return Ok(());
@@ -146,6 +162,7 @@ impl TableContentExtractor {
                     is_header_section,
                     headers,
                     fallback_to_html,
+                    has_data_rows,
                 )?;
 
                 if *fallback_to_html {
@@ -166,6 +183,7 @@ impl TableContentExtractor {
         is_header: bool,
         headers: &mut Vec<Node>,
         fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<Vec<Node>> {
         if *fallback_to_html {
             return Ok(Vec::new());
@@ -193,6 +211,20 @@ impl TableContentExtractor {
 
                 // Merge cell content into a single node
                 let merged_cell = Self::merge_cell_content(cell_content);
+
+                // Check if this is a header cell appearing after data rows
+                if cell.tag == tag::th {
+                    if has_data_rows && !is_header {
+                        parser.warn_at(
+                            Some(cell.span),
+                            eco_format!(
+                                "table header cell appears after data rows; exported original HTML table"
+                            ),
+                        );
+                        *fallback_to_html = true;
+                        return Ok(Vec::new());
+                    }
+                }
 
                 // Add to appropriate section
                 if is_header || cell.tag == tag::th {
@@ -225,6 +257,8 @@ pub struct TableParseState {
     pub rows: Vec<Vec<Node>>,
     pub is_header: bool,
     pub fallback_to_html: bool,
+    /// Track whether we have encountered any data rows
+    pub has_data_rows: bool,
 }
 
 impl TableParseState {
@@ -234,6 +268,7 @@ impl TableParseState {
             rows: Vec::new(),
             is_header: true,
             fallback_to_html: false,
+            has_data_rows: false,
         }
     }
 }
@@ -251,9 +286,9 @@ impl TableParser {
         if let Some(table) = real_table_elem {
             // Check if the table contains rowspan or colspan attributes
             // If it does, fall back to using HtmlElement
-            if TableValidator::table_has_complex_cells(table) {
+            if let Some(cell_span) = TableValidator::find_complex_cell(table) {
                 parser.warn_at(
-                    Some(table.span),
+                    Some(cell_span),
                     eco_format!(
                         "table contains rowspan or colspan attributes; exported original HTML table"
                     ),
@@ -265,9 +300,7 @@ impl TableParser {
             TableContentExtractor::extract_table_content(parser, table, &mut state)?;
 
             if state.fallback_to_html {
-                let html = TableSerializer::serialize_html_element(parser, table)
-                    .map_err(|e| e.to_string())?;
-                return Ok(Some(Node::HtmlBlock(html)));
+                return parser.create_html_element(table).map(Some);
             }
 
             return Self::create_table_node(state.headers, state.rows);
@@ -317,77 +350,24 @@ impl TableSpanResolver {
     }
 
     fn find_block_child(cell: &HtmlElement) -> Option<&HtmlElement> {
-        Self::find_block_child_in_nodes(&cell.children)
-    }
-
-    fn find_block_child_in_nodes(nodes: &[HtmlNode]) -> Option<&HtmlElement> {
-        for node in nodes {
+        // table.cell has only one child (the body element)
+        cell.children.first().and_then(|node| {
             if let HtmlNode::Element(elem) = node {
                 if HtmlToAstParser::is_block_element(elem) {
                     return Some(elem);
                 }
-
-                if let Some(found) = Self::find_block_child_in_nodes(&elem.children) {
-                    return Some(found);
-                }
             }
-        }
-        None
+            None
+        })
     }
 
     fn resolve_span_and_tag(cell: &HtmlElement, block_elem: &HtmlElement) -> (Span, EcoString) {
-        if let Some(elem) = Self::find_element_with_span(block_elem) {
-            return (elem.span, elem.tag.resolve().to_string().into());
-        }
-
-        if !cell.span.is_detached() {
-            return (cell.span, cell.tag.resolve().to_string().into());
-        }
-
-        if !block_elem.span.is_detached() {
-            return (block_elem.span, block_elem.tag.resolve().to_string().into());
-        }
-
-        if let Some(span) = Self::find_descendant_text_span(&block_elem.children) {
-            return (span, block_elem.tag.resolve().to_string().into());
-        }
-
-        (block_elem.span, block_elem.tag.resolve().to_string().into())
-    }
-
-    fn find_element_with_span(element: &HtmlElement) -> Option<&HtmlElement> {
-        for node in &element.children {
-            if let HtmlNode::Element(child) = node {
-                if !child.span.is_detached() {
-                    return Some(child);
-                }
-            }
-        }
-
-        for node in &element.children {
-            if let HtmlNode::Element(child) = node {
-                if let Some(found) = Self::find_element_with_span(child) {
-                    return Some(found);
-                }
-            }
-        }
-
-        None
-    }
-
-    fn find_descendant_text_span(nodes: &[HtmlNode]) -> Option<Span> {
-        for node in nodes {
-            match node {
-                HtmlNode::Text(_, span) if !span.is_detached() => return Some(*span),
-                HtmlNode::Element(elem) => {
-                    if let Some(span) = Self::find_descendant_text_span(&elem.children) {
-                        return Some(span);
-                    }
-                }
-                HtmlNode::Frame(_) | HtmlNode::Tag(_) | HtmlNode::Text(_, _) => {}
-            }
-        }
-        None
+        let span = if !block_elem.span.is_detached() {
+            block_elem.span
+        } else {
+            cell.span
+        };
+        (span, block_elem.tag.resolve().to_string().into())
     }
 }
 
@@ -395,43 +375,44 @@ impl TableSpanResolver {
 pub struct TableValidator;
 
 impl TableValidator {
-    /// Check if the table has complex cells (rowspan/colspan)
-    pub fn table_has_complex_cells(table: &HtmlElement) -> bool {
+    /// Check if the table has complex cells (rowspan/colspan), returns the span of the first complex cell
+    pub fn find_complex_cell(table: &HtmlElement) -> Option<Span> {
         for child_node in &table.children {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead | tag::tbody => {
                         // Check rows within thead/tbody
-                        if Self::check_section_for_complex_cells(element) {
-                            return true;
+                        if let Some(span) = Self::check_section_for_complex_cells(element) {
+                            return Some(span);
                         }
                     }
                     tag::tr => {
                         // Direct row
-                        if Self::check_row_for_complex_cells(element) {
-                            return true;
+                        if let Some(span) = Self::check_row_for_complex_cells(element) {
+                            return Some(span);
                         }
                     }
                     _ => {}
                 }
             }
         }
-        false
+        None
     }
 
-    fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
+    fn check_section_for_complex_cells(section: &HtmlElement) -> Option<Span> {
         for row_node in &section.children {
             if let HtmlNode::Element(row_elem) = row_node
                 && row_elem.tag == tag::tr
-                && Self::check_row_for_complex_cells(row_elem)
             {
-                return true;
+                if let Some(span) = Self::check_row_for_complex_cells(row_elem) {
+                    return Some(span);
+                }
             }
         }
-        false
+        None
     }
 
-    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> bool {
+    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> Option<Span> {
         for cell_node in &row_elem.children {
             if let HtmlNode::Element(cell) = cell_node
                 && (cell.tag == tag::td || cell.tag == tag::th)
@@ -440,59 +421,9 @@ impl TableValidator {
                     name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
                 })
             {
-                return true;
+                return Some(cell.span);
             }
         }
-        false
-    }
-}
-
-/// Responsible for serializing HTML elements back to HTML strings.
-pub struct TableSerializer;
-
-impl TableSerializer {
-    /// Serialize HTML element to HTML string
-    pub fn serialize_html_element(
-        parser: &mut HtmlToAstParser,
-        element: &HtmlElement,
-    ) -> Result<EcoString, HtmlWriteError> {
-        let node = Node::HtmlElement(Self::build_html_element(parser, element)?);
-        let mut writer = HtmlWriter::new();
-        writer.write_node(&node)?;
-        writer.into_string()
-    }
-
-    fn build_html_element(
-        parser: &mut HtmlToAstParser,
-        element: &HtmlElement,
-    ) -> Result<CmarkHtmlElement, HtmlWriteError> {
-        let attributes = element
-            .attrs
-            .0
-            .iter()
-            .map(|(name, value)| HtmlAttribute {
-                name: name.resolve().to_string().into(),
-                value: value.clone(),
-            })
-            .collect();
-
-        let mut children = Vec::new();
-        for child in &element.children {
-            match child {
-                HtmlNode::Text(text, _) => children.push(Node::Text(text.clone())),
-                HtmlNode::Element(elem) => {
-                    children.push(Node::HtmlElement(Self::build_html_element(parser, elem)?))
-                }
-                HtmlNode::Frame(frame) => children.push(parser.convert_frame(&frame.inner)),
-                HtmlNode::Tag(_) => {}
-            }
-        }
-
-        Ok(CmarkHtmlElement {
-            tag: element.tag.resolve().to_string().into(),
-            attributes,
-            children,
-            self_closing: element.children.is_empty(),
-        })
+        None
     }
 }

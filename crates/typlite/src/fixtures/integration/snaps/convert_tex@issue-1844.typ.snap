@@ -53,8 +53,12 @@ Who loves to lie with me,
 
 Source in grid
 
+\begin{table}[htbp]
+\centering
+\begin{tabular}{cc}
+\hline
 Placeholder for\\
-separately rendered SVG````
+separately rendered SVG & ````
 
 == Under the Greenwood Tree
 by Shakespeare.
@@ -64,4 +68,7 @@ Under the greenwood tree #emoji.tree
 Who loves to lie with me,
 ...
 ```)
-````
+```` \\
+\hline
+\end{tabular}
+\end{table}
