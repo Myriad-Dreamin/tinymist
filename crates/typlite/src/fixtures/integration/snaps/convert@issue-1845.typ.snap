@@ -32,32 +32,9 @@ Row
 
 <td>
 
-<m1raw lang="" block="true" text="Code line 1
-Code line 2">
+<pre><code>Code line 1
+Code line 2</code></pre>
 
-<pre>
-
-<code>
-
-<p>
-
-Code line 1
-
-</p><m1linebreak>
-
-
-
-</m1linebreak><p>
-
-Code line 2
-
-</p>
-
-</code>
-
-</pre>
-
-</m1raw>
 
 </td><td>
 

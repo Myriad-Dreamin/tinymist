@@ -1,8 +1,7 @@
 //! HTML table parsing module, processes the conversion of table elements
 
-use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
+use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
-use cmark_writer::{HtmlWriteError, HtmlWriter};
 use ecow::{EcoString, eco_format};
 use typst::utils::PicoStr;
 use typst_html::{HtmlElement, HtmlNode, tag};
@@ -301,9 +300,7 @@ impl TableParser {
             TableContentExtractor::extract_table_content(parser, table, &mut state)?;
 
             if state.fallback_to_html {
-                let html = TableSerializer::serialize_html_element(parser, table)
-                    .map_err(|e| e.to_string())?;
-                return Ok(Some(Node::HtmlBlock(html)));
+                return parser.create_html_element(table).map(Some);
             }
 
             return Self::create_table_node(state.headers, state.rows);
@@ -428,55 +425,5 @@ impl TableValidator {
             }
         }
         None
-    }
-}
-
-/// Responsible for serializing HTML elements back to HTML strings.
-pub struct TableSerializer;
-
-impl TableSerializer {
-    /// Serialize HTML element to HTML string
-    pub fn serialize_html_element(
-        parser: &mut HtmlToAstParser,
-        element: &HtmlElement,
-    ) -> Result<EcoString, HtmlWriteError> {
-        let node = Node::HtmlElement(Self::build_html_element(parser, element)?);
-        let mut writer = HtmlWriter::new();
-        writer.write_node(&node)?;
-        writer.into_string()
-    }
-
-    fn build_html_element(
-        parser: &mut HtmlToAstParser,
-        element: &HtmlElement,
-    ) -> Result<CmarkHtmlElement, HtmlWriteError> {
-        let attributes = element
-            .attrs
-            .0
-            .iter()
-            .map(|(name, value)| HtmlAttribute {
-                name: name.resolve().to_string().into(),
-                value: value.clone(),
-            })
-            .collect();
-
-        let mut children = Vec::new();
-        for child in &element.children {
-            match child {
-                HtmlNode::Text(text, _) => children.push(Node::Text(text.clone())),
-                HtmlNode::Element(elem) => {
-                    children.push(Node::HtmlElement(Self::build_html_element(parser, elem)?))
-                }
-                HtmlNode::Frame(frame) => children.push(parser.convert_frame(&frame.inner)),
-                HtmlNode::Tag(_) => {}
-            }
-        }
-
-        Ok(CmarkHtmlElement {
-            tag: element.tag.resolve().to_string().into(),
-            attributes,
-            children,
-            self_closing: element.children.is_empty(),
-        })
     }
 }

@@ -28,13 +28,19 @@ namespace MyApplication
 </html>
 
 =====
-## Contents
-
-1. ### Heading 1
-   1. #### Heading 2
-
 <nav role="doc-toc">
 
+<h2>Contents</h2>
+<ol>
+<li><p><h3>Heading 1</h3>
+<ol>
+<li><p><h4>Heading 2</h4>
+</p>
+</li>
+</ol>
+</p>
+</li>
+</ol>
 
 
 </nav>

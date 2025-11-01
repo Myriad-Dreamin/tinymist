@@ -75,9 +75,10 @@
   "m1table",
   it,
 )
-#let md-grid(columns: auto, children) = html.elem(
+#let md-grid(it) = html.elem(
   "m1grid",
-  table(columns: columns, ..children
+  table(columns: it.columns, ..it
+      .children
       .map(child => {
         {
           let func = child.func()
@@ -111,7 +112,7 @@
   "",
 )
 #let md-figure(body, caption: none) = html.elem(
-  "m1figure",
+    "m1figure",
   attrs: (
     caption: if caption == none {
       ""
@@ -124,7 +125,7 @@
     },
   ),
   body,
-)
+  )
 
 #let if-not-paged(it, act) = {
   if target() == "html" {
@@ -201,7 +202,7 @@
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
   show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(columns: it.columns, it.children))
+  show grid: it => if-not-paged(it, md-grid(it))
 
   show math.equation.where(block: false): it => if-not-paged(
     it,

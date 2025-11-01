@@ -14,3 +14,17 @@ Code line 2"><pre><code><p>Code line 1</p><m1linebreak></m1linebreak><p>Code lin
 </html>
 
 =====
+\begin{table}[htbp]
+\centering
+\begin{tabular}{cc}
+\hline
+Header & Row \\
+\begin{verbatim}
+Code line 1
+Code line 2
+\end{verbatim}
+
+ & Regular text \\
+\hline
+\end{tabular}
+\end{table}
