@@ -14,6 +14,7 @@ pub use crate::outline::Outline;
 use std::sync::{Arc, OnceLock};
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
+use bytes::Bytes;
 use futures::sink::SinkExt;
 use reflexo_typst::Error;
 use reflexo_typst::args::TaskWhen;
@@ -313,7 +314,7 @@ pub enum WsMessage {
     /// A text WebSocket message
     Text(String),
     /// A binary WebSocket message
-    Binary(Vec<u8>),
+    Binary(Bytes),
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;

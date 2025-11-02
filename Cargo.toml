@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.13.30"
+version = "0.14.0"
 edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
@@ -21,21 +21,21 @@ anyhow = "1"
 itertools = "0.13"
 paste = "1.0"
 cfg-if = "1.0"
-strum = { version = "0.26.2", features = ["derive"] }
+strum = { version = "0.27.2", features = ["derive"] }
 quote = "1"
 syn = "2"
 triomphe = { version = "0.1.10", default-features = false, features = ["std"] }
 
 # Asynchoronous and Multi-threading
-async-trait = "0.1.77"
+async-trait = "0.1.89"
 futures = "0.3"
-rayon = "1.10.0"
-tokio = { version = "1.44.0", features = ["macros"] }
-tokio-util = { version = "0.7.14", features = ["compat"] }
+rayon = "1.11.0"
+tokio = { version = "1.48.0", features = ["macros"] }
+tokio-util = { version = "0.7.16", features = ["compat"] }
 
 # System
-temp-env = "0.3.0"
-open = { version = "5.1.3" }
+temp-env = "0.3.6"
+open = { version = "5.3.2" }
 parking_lot = "0.12.1"
 walkdir = "2"
 chrono = { version = "0.4", default-features = false }
@@ -44,7 +44,7 @@ dirs = "6"
 fontdb = { version = "0.23", default-features = false }
 notify = "6"
 path-clean = "1.0.1"
-windows-sys = "0.59"
+windows-sys = "0.61.2"
 tempfile = "3.19.1"
 same-file = "1.0.6"
 libc = "0.2.155"
@@ -62,24 +62,24 @@ console_error_panic_hook = { version = "0.1.7" }
 
 # Networking
 hyper = { version = "1", features = ["full"] }
-hyper-util = { version = "0.1.7", features = ["tokio"] }
-hyper-tungstenite = "0.15.0"
+hyper-util = { version = "0.1.17", features = ["tokio"] }
+hyper-tungstenite = "0.19.0"
 reqwest = { version = "^0.12", default-features = false, features = [
     "rustls-tls",
     "blocking",
     "multipart",
 ] }
-http-body-util = "0.1.2"
+http-body-util = "0.1.3"
 
 # Algorithms
 base64 = "0.22"
-regex = "1.10.5"
+regex = "1.12.2"
 
 # Cryptography and data processing
 rustc-hash = { version = "2", features = ["std"] }
 siphasher = "1"
 fxhash = "0.2.1"
-sha2 = "0.10.6"
+sha2 = "0.10.9"
 nohash-hasher = "0.2.0"
 fastrand = "2.3.0"
 
@@ -88,16 +88,17 @@ bitvec = "1"
 comemo = "0.5.0"
 # We need to freeze the version of the crate, as the raw-api feature is considered unstable
 dashmap = { version = "=5.5.3", features = ["raw-api"] }
-ecow = "0.2.3"
-ena = "0.14.2"
+ecow = "0.2.6"
+ena = "0.14.3"
 hashbrown = { version = "0.14", features = [
     "inline-more",
 ], default-features = false }
-indexmap = "2.7.0"
+indexmap = "2.12.0"
 rpds = "1"
 
 # Data/Text Format and Processing
-biblatex = "0.10"
+biblatex = "0.11"
+bytes = "1"
 cmark-writer = { version = "0.9.0", features = [
     "gfm",
 ], path = "crates/cmark-writer" }
@@ -106,7 +107,7 @@ hayagriva = "0.9.1"
 hex = "0.4.3"
 flate2 = "1"
 # typst can only support these formats.
-image = { version = "0.25.6", default-features = false, features = [
+image = { version = "0.25.5", default-features = false, features = [
     "png",
     "jpeg",
     "gif",
@@ -115,7 +116,7 @@ pathdiff = "0.2"
 percent-encoding = "2"
 rust_iso639 = "0.0.3"
 rust_iso3166 = "0.1.4"
-resvg = { version = "0.43.0" }
+resvg = { version = "0.45" }
 rkyv = "0.7.42"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
@@ -140,11 +141,11 @@ env_logger = "0.11.3"
 log = "0.4"
 
 # Typst
-reflexo = { version = "=0.6.1-rc4", default-features = false, features = [
+reflexo = { version = "=0.7.0-rc1", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "=0.6.1-rc4", default-features = false }
-reflexo-vec2svg = { version = "=0.6.1-rc4" }
+reflexo-typst = { version = "=0.7.0-rc1", default-features = false }
+reflexo-vec2svg = { version = "=0.7.0-rc1" }
 
 typst = "0.14.0"
 typst-html = "0.14.0"
@@ -159,10 +160,10 @@ typst-eval = "0.14.0"
 typst-assets = "0.14.0"
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.17", default-features = false }
+typstyle-core = { version = "=0.14.0", default-features = false }
 
 # LSP
-crossbeam-channel = "0.5.12"
+crossbeam-channel = "0.5.15"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
 dapts = "0.0.6"
 
@@ -183,36 +184,36 @@ vergen = { version = "8.3.1", features = [
 
 # Testing
 dhat = "0.3.3"
-divan = "0.1.14"
+divan = "0.1.21"
 insta = { version = "1.43", features = ["glob", "filters"] }
 insta-cmd = "0.6.0"
 
 
 # Our Own Crates
-tinymist-assets = { version = "=0.13.29-rc1" }
+tinymist-assets = { version = "=0.14.0" }
 
-tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.14.0-rc1" }
-tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.14.0-rc1" }
-tinymist-package = { path = "./crates/tinymist-package/", version = "0.14.0-rc1" }
-tinymist-std = { path = "./crates/tinymist-std/", version = "0.14.0-rc1", default-features = false }
-tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.14.0-rc1", default-features = false }
-tinymist-world = { path = "./crates/tinymist-world/", version = "0.14.0-rc1", default-features = false }
-tinymist-project = { path = "./crates/tinymist-project/", version = "0.14.0-rc1" }
-tinymist-task = { path = "./crates/tinymist-task/", version = "0.14.0-rc1" }
-typst-shim = { path = "./crates/typst-shim", version = "0.14.0-rc1" }
+tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.14.0" }
+tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.14.0" }
+tinymist-package = { path = "./crates/tinymist-package/", version = "0.14.0" }
+tinymist-std = { path = "./crates/tinymist-std/", version = "0.14.0", default-features = false }
+tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.14.0", default-features = false }
+tinymist-world = { path = "./crates/tinymist-world/", version = "0.14.0", default-features = false }
+tinymist-project = { path = "./crates/tinymist-project/", version = "0.14.0" }
+tinymist-task = { path = "./crates/tinymist-task/", version = "0.14.0" }
+typst-shim = { path = "./crates/typst-shim", version = "0.14.0" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.13.30" }
-tinymist = { path = "./crates/tinymist/", version = "0.13.30", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.13.30" }
-tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.13.30" }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.13.30" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.13.30" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.13.30" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.13.30" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.13.30" }
-typlite = { path = "./crates/typlite", version = "0.13.30", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.14.0" }
+tinymist = { path = "./crates/tinymist/", version = "0.14.0", default-features = false }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.0" }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.0" }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.0" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.0" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.0" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.0" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.14.0" }
+typlite = { path = "./crates/typlite", version = "0.14.0", default-features = false }
 
 [profile.dev.package.insta]
 opt-level = 3
@@ -279,19 +280,19 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "4a3335c4a1ec26aa0cb3c747ae01ebc061c7832f" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
 
 # typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nightly" }
+# typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "34869bfa9db089c5196be5fac2a5e9d752904ca2" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
@@ -307,9 +308,9 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", branch = "nigh
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
+# reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "d6f553b832e45790e85af5e2929ceeb8bb0b097b" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
