@@ -198,21 +198,12 @@ export const Summary = () => {
       ),
   );
 
-  const compileStats = div(
-    { class: `tinymist-card`, style: "flex: 1; width: 100%; padding: 10px" },
-    `The language servers runs compilation and traces for 2,100 times in last 5 minutes.
-- ran 94 times to export documents.
-- ran 2,006 times to analyze dynamic expressions for LSP requests.
-`,
-  );
-
   return div(
     {
       class: "flex-col",
       style: "justify-content: center; align-items: center; gap: 10px;",
     },
     fontStats,
-    compileStats,
     div(
       { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(van.derive(() => `This document is compiled with following arguments.`)),

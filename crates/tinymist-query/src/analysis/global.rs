@@ -1115,13 +1115,7 @@ impl SharedContext {
     }
 
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
-        let stats = &self.analysis.stats.query_stats;
-        let entry = stats.entry(id).or_default();
-        let entry = entry.entry(query).or_default();
-        QueryStatGuard {
-            bucket: entry.clone(),
-            since: tinymist_std::time::Instant::now(),
-        }
+        self.analysis.stats.stat(id, query)
     }
 
     /// Check on a module before really needing them. But we likely use them

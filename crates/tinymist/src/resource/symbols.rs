@@ -5,6 +5,7 @@ use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::{vector::font::GlyphId, TypstFont};
 use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
+use tinymist_query::GLOBAL_STATS;
 use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
@@ -1045,6 +1046,8 @@ fn render_symbols(
         entry: Some(new_entry),
         ..TaskInputs::default()
     });
+
+    let _guard = GLOBAL_STATS.stat(forked.main(), "render_symbols");
     forked
         .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
         .map_err(|e| error_once!("cannot map shadow", err: e))
@@ -1175,7 +1178,8 @@ fn create_display_svg(font: &TypstFont, gid: GlyphId, svg_path: &str) -> String 
         .map(f32::from)
         .unwrap_or(units_per_em);
 
-    // Start viewBox.x at left-most ink or 0, whichever is smaller (to include left overhang)
+    // Start viewBox.x at left-most ink or 0, whichever is smaller (to include left
+    // overhang)
     let view_x = x_min.min(0.0);
 
     // Start view width as the advance; enlarge if ink extends past that

@@ -1,7 +1,6 @@
 //! Semantic static and dynamic analysis of the source code.
 
 mod bib;
-
 pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
@@ -15,30 +14,30 @@ pub mod doc_highlight;
 pub use doc_highlight::*;
 pub mod link_expr;
 pub use link_expr::*;
-pub mod stats;
-pub use stats::*;
 pub mod definition;
 pub use definition::*;
 pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-use tinymist_std::error::WithContextUntyped;
-mod post_tyck;
-mod tyck;
-pub(crate) use crate::ty::*;
-pub(crate) use post_tyck::*;
-pub(crate) use tyck::*;
-mod prelude;
 
 mod global;
+mod post_tyck;
+mod prelude;
+mod tyck;
+
+pub(crate) use crate::ty::*;
 pub use global::*;
+pub(crate) use post_tyck::*;
+pub(crate) use tinymist_analysis::stats::{AnalysisStats, QueryStatGuard};
+pub(crate) use tyck::*;
 
 use std::sync::Arc;
 
 use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
+use tinymist_std::error::WithContextUntyped;
 use tinymist_std::{Result, bail};
 use tinymist_world::{EntryReader, EntryState, TaskInputs};
 use typst::diag::{FileError, FileResult, StrResult};
