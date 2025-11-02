@@ -11,7 +11,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.14.0 - [2025-11-02]
 
-* Bumping typst to v0.14.0 in https://github.com/Myriad-Dreamin/tinymist/pull/2201
+* Bumped typst to v0.14.0 in https://github.com/Myriad-Dreamin/tinymist/pull/2201
 
 ### Server
 

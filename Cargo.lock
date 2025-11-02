@@ -528,7 +528,7 @@ dependencies = [
  "strsim",
  "terminal_size",
  "unicase",
- "unicode-width 0.2.1",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -2945,7 +2945,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "749d63085aa461d80b3233e48781bf9e9dca8147fbc98f577e0697c6827dc418"
 dependencies = [
  "typed-arena",
- "unicode-width 0.2.1",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -4089,7 +4089,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4221,7 +4221,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -4345,7 +4345,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4390,7 +4390,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.14.0-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -4423,7 +4423,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "comemo",
  "dashmap",
@@ -4455,17 +4455,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.0-rc2"
+version = "0.14.0"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.0-rc2"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2841e107e819076b0446bdcf0052d57758a80a29dc03d1d42b0cc3c823e527d8"
+checksum = "da2b9650546805edf40bf1d19042d408e1d6f57dfe3b9dcf9d005ad19bc428f6"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "divan",
  "tinymist",
@@ -4473,7 +4473,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4516,7 +4516,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.14.0-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -4547,7 +4547,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "base64",
  "comemo",
@@ -4566,7 +4566,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "base64",
  "comemo",
@@ -4584,7 +4584,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -4592,7 +4592,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4606,7 +4606,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "comemo",
  "insta",
@@ -4620,7 +4620,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "base64",
  "comemo",
@@ -4647,7 +4647,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "bytes",
  "clap",
@@ -4661,7 +4661,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.14.0-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
  "tokio",
  "typst",
@@ -4672,7 +4672,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4702,7 +4702,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -4755,7 +4755,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "base64",
  "log",
@@ -4768,7 +4768,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -4806,7 +4806,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4839,7 +4839,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "comemo",
  "insta",
@@ -4852,7 +4852,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "comemo",
  "ecow",
@@ -4870,7 +4870,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5196,7 +5196,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "typlite"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "base64",
  "clap",
@@ -5472,7 +5472,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.14.0-rc2"
+version = "0.14.0"
 dependencies = [
  "cfg-if",
  "comemo",
@@ -5601,13 +5601,14 @@ dependencies = [
  "toml",
  "tracing",
  "typst-syntax 0.13.1",
- "unicode-width 0.2.1",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
 name = "typstyle-core"
-version = "0.13.17"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=34869bfa9db089c5196be5fac2a5e9d752904ca2#34869bfa9db089c5196be5fac2a5e9d752904ca2"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab63c637927751a8eab9b56d02146ea14e1e25307918f590e658446813276b64"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
@@ -5616,7 +5617,7 @@ dependencies = [
  "smallvec",
  "thiserror 2.0.17",
  "typst-syntax 0.14.0",
- "unicode-width 0.2.1",
+ "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -5740,9 +5741,9 @@ checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
 
 [[package]]
 name = "unicode-width"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a1a07cc7db3810833284e8d372ccdc6da29741639ecc70c9ec107df0fa6154c"
+checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
 name = "unsafe-libyaml"
