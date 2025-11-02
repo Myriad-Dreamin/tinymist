@@ -32,7 +32,6 @@ export const SymbolCell = (sym: SymbolItem) => {
 
   const handleUnicodeClick = (e: Event) => {
     e.stopPropagation();
-    const unicode = `\\u{${sym.unicode.toString(16).toUpperCase().padStart(4, "0")}}`;
     copyToClipboard(unicode);
   };
 
@@ -42,7 +41,13 @@ export const SymbolCell = (sym: SymbolItem) => {
   };
 
   const symbolName = stripSymPrefix(sym.id);
-  const unicode = `\\u{${sym.unicode.toString(16).toUpperCase().padStart(4, "0")}}`;
+  const unicode = Array.from(sym.value)
+    .map((c) => {
+      // biome-ignore lint/style/noNonNullAssertion: The codePointAt will always return a value for a non-empty string
+      const u = c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
+      return `\\u{${u}}`;
+    })
+    .join("");
 
   const elem = div(
     {
