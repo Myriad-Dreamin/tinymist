@@ -1,5 +1,6 @@
 //! Tinymist Analysis Statistics
 
+use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock};
 
@@ -152,18 +153,17 @@ impl AnalysisStats {
     /// Reports the statistics of the analysis.
     pub fn report(&self) -> String {
         let stats = &self.query_stats;
-        let mut data: Vec<_> = stats
-            .iter()
-            .flat_map(|refs| {
-                let id = *refs.key();
-                refs.value().iter().map(move |refs2| {
-                    let query = *refs2.key();
-                    let bucket = refs2.value().data.lock().clone();
-                    let name = format!("{id:?}:{query}").replace('\\', "/");
-                    (name, bucket)
-                })
-            })
-            .collect();
+        let mut data = Vec::new();
+        for refs in stats.iter() {
+            let id = refs.key();
+            let queries = refs.value();
+            for refs2 in queries.iter() {
+                let query = refs2.key();
+                let bucket = refs2.value().data.lock().clone();
+                let name = format!("{id:?}:{query}").replace('\\', "/");
+                data.push((name, bucket));
+            }
+        }
 
         // sort by query duration
         data.sort_by(|x, y| y.1.max.cmp(&x.1.max));

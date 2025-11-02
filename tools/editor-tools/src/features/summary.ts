@@ -203,7 +203,6 @@ export const Summary = () => {
       class: "flex-col",
       style: "justify-content: center; align-items: center; gap: 10px;",
     },
-    fontStats,
     div(
       { class: `card`, style: "flex: 1; width: 100%; padding: 10px" },
       div(van.derive(() => `This document is compiled with following arguments.`)),
