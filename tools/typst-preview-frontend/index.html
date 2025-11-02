@@ -146,24 +146,6 @@
         "--typst-preview-toolbar-bg-color",
         previewToolbarBgColor
       );
-
-      // Add scrolling with `ijkl` vim-like motions.
-      document.addEventListener('keydown', function(event) {
-        // https://stackoverflow.com/questions/3464876/javascript-get-window-x-y-position-for-scroll
-        var doc = document.documentElement;
-        var top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
-        var scrollDelta = 50
-
-        if (event.key === "j") {
-          window.scroll({ top: top + scrollDelta, behavior: "instant" });
-        } else if (event.key === "k") {
-          window.scroll({ top: top - scrollDelta, behavior: "instant" });
-        } else if (event.key === "h") {
-          window.scroll({ top: top - scrollDelta * 10, behavior: "smooth" });
-        } else if (event.key === "l") {
-          window.scroll({ top: top + scrollDelta * 10, behavior: "smooth" });
-        }
-      })
     </script>
     <script type="module" src="/src/main.js"></script>
     <script type="module" src="/src/typst.ts"></script>
@@ -309,21 +291,21 @@
                 <div class="key-binding-desc">/</div>
                 <div class="key-binding-box">l</div>
               </div>
-              <div class="key-binding-row">
+              <div class="key-binding-row slide-specific">
                 <div class="key-binding-box">g</div>
               </div>
-              <div class="key-binding-row">
+              <div class="key-binding-row slide-specific">
                 <div class="key-binding-box">right</div>
                 <div class="key-binding-desc">/</div>
                 <div class="key-binding-box">space</div>
               </div>
-              <div class="key-binding-row">
+              <div class="key-binding-row slide-specific">
                 <div class="key-binding-box">left</div>
               </div>
-              <div class="key-binding-row">
+              <div class="key-binding-row slide-specific">
                 <div class="key-binding-box">down</div>
               </div>
-              <div class="key-binding-row">
+              <div class="key-binding-row slide-specific">
                 <div class="key-binding-box">up</div>
               </div>
             </div>
@@ -338,14 +320,14 @@
               </div>
               <div class="key-binding-desc">Scroll down</div>
               <div class="key-binding-desc">Scroll up</div>
-              <div class="key-binding-desc">Goto the page by number.</div>
-              <div class="key-binding-desc">
+              <div class="key-binding-desc slide-specific">Goto the page by number.</div>
+              <div class="key-binding-desc slide-specific">
                 Switch to next animation or slide.
               </div>
-              <div class="key-binding-desc">
+              <div class="key-binding-desc slide-specific">
                 Switch to previous animation or slide.
               </div>
-              <div class="key-binding-desc">
+              <div class="key-binding-desc slide-specific">
                 Switch to next slide.
                 <span style="color: orange"
                   >(currently just same as
@@ -354,7 +336,7 @@
                   >)</span
                 >
               </div>
-              <div class="key-binding-desc">
+              <div class="key-binding-desc slide-specific">
                 Switch to previous slide.
                 <span style="color: orange"
                   >(currently just same as

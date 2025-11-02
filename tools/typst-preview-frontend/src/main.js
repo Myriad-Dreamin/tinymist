@@ -75,6 +75,7 @@ function buildWs() {
 
   function resetAppMode({ previewMode: mode, isContentPreview }) {
     const app = document.getElementById("typst-container");
+    const helpPanel = document.getElementById("typst-help-panel");
 
     /// Set the root css selector to the content preview mode.
     app.classList.remove("content-preview");
@@ -85,10 +86,14 @@ function buildWs() {
     /// Set the root css selector to the preview mode.
     app.classList.remove("mode-slide");
     app.classList.remove("mode-doc");
+    helpPanel?.classList.remove("mode-slide");
+    helpPanel?.classList.remove("mode-doc");
     if (mode === PreviewMode.Slide) {
       app.classList.add("mode-slide");
+      helpPanel?.classList.add("mode-slide");
     } else if (mode === PreviewMode.Doc) {
       app.classList.add("mode-doc");
+      helpPanel?.classList.add("mode-doc");
     } else {
       throw new Error(`Unknown preview mode: ${mode}`);
     }
