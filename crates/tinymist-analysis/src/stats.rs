@@ -183,14 +183,11 @@ table.analysis-stats tr:nth-child(odd) { background-color: rgba(242, 242, 242, 0
 <table class="analysis-stats"><tr><th class="query-column">Name</th><th>Count</th><th>Missing</th><th>Total</th><th>Min</th><th>Max</th></tr>"#);
 
         for (name, bucket) in data {
-            html.push_str("<tr>");
-            html.push_str(&format!(r#"<td class="query-column">{name}</td>"#));
-            html.push_str(&format!("<td>{}</td>", bucket.query));
-            html.push_str(&format!("<td>{}</td>", bucket.missing));
-            html.push_str(&format!("<td>{:?}</td>", bucket.total));
-            html.push_str(&format!("<td>{:?}</td>", bucket.min));
-            html.push_str(&format!("<td>{:?}</td>", bucket.max));
-            html.push_str("</tr>");
+            let _ = write!(
+                &mut html,
+                "<tr><td class=\"query-column\">{name}</td><td>{}</td><td>{}</td><td>{:?}</td><td>{:?}</td><td>{:?}</td></tr>",
+                bucket.query, bucket.missing, bucket.total, bucket.min, bucket.max
+            );
         }
         html.push_str("</table>");
         html.push_str("</div>");
