@@ -22,7 +22,7 @@ export const CATEGORY_NAMES = {
   shape: "Shape",
   arrow: "Arrows, harpoons, and tacks",
   greek: "Greek Letters",
-  cyrillicc: "Cyrillic Letters",
+  cyrillic: "Cyrillic Letters",
   hebrew: "Hebrew Letters",
   doubleStruck: "Double Struck",
   miscellany: "Miscellany",

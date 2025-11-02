@@ -41,8 +41,7 @@ export const SymbolCell = (sym: SymbolItem) => {
   };
 
   const symbolName = stripSymPrefix(sym.id);
-  const unicode = sym.value
-    .split("")
+  const unicode = Array.from(sym.value)
     .map((c) => {
       // biome-ignore lint/style/noNonNullAssertion: The codePointAt will always return a value for a non-empty string
       const u = c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0");
