@@ -1,7 +1,7 @@
 //! Inline element processing module, handles text and inline style elements
 
 use cmark_writer::ast::Node;
-use typst::html::HtmlElement;
+use typst_html::HtmlElement;
 
 use crate::Result;
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
@@ -75,10 +75,21 @@ impl HtmlToAstParser {
         let attrs = FigureAttr::parse(&element.attrs)?;
         let caption = attrs.caption.to_string();
 
-        // Find image and body content
-        let mut body_content = Vec::new();
-        self.convert_children_into(&mut body_content, element)?;
-        let body = Box::new(Node::Paragraph(body_content));
+        let (inline_content, mut block_content) = self.capture_children(element)?;
+
+        let mut content_nodes = Vec::new();
+        if !inline_content.is_empty() {
+            content_nodes.push(Node::Paragraph(inline_content));
+        }
+        content_nodes.append(&mut block_content);
+
+        let body = if content_nodes.is_empty() {
+            Box::new(Node::Paragraph(Vec::new()))
+        } else if content_nodes.len() == 1 {
+            Box::new(content_nodes.into_iter().next().unwrap())
+        } else {
+            Box::new(Node::Document(content_nodes))
+        };
 
         // Create figure node with centering
         let figure_node = Box::new(FigureNode { body, caption });

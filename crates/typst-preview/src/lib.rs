@@ -366,7 +366,8 @@ pub struct ResolveSourceLocRequest {
 
 impl ResolveSourceLocRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line as usize, self.character as usize)
+        src.lines()
+            .line_column_to_byte(self.line as usize, self.character as usize)
     }
 }
 

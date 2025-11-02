@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.26-rc1",
+  "version": "0.13.30",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -1431,7 +1431,7 @@
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
-    "test": "vitest && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+    "test": "vitest run && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
   },
   "dependencies": {
     "cpr": "^3.0.1",

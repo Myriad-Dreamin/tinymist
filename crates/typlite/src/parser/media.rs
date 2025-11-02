@@ -12,10 +12,10 @@ use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowA
 use typst::{
     World,
     foundations::{Bytes, Dict, IntoValue},
-    html::{HtmlElement, HtmlNode},
     layout::{Abs, Frame},
     utils::LazyHash,
 };
+use typst_html::{HtmlElement, HtmlNode};
 
 use crate::{
     ColorTheme,
@@ -78,7 +78,7 @@ impl HtmlToAstParser {
             });
         };
 
-        let svg = typst_svg::svg_frame(frame);
+        let svg = typst_svg::svg_frame(&frame.inner);
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {
@@ -210,7 +210,7 @@ impl HtmlToAstParser {
         });
 
         if self.feat.remove_html {
-            eprintln!("Removing idoc element due to remove_html feature");
+            log::debug!("remove_html feature active, dropping inline document element");
             // todo: make error silent is not good.
             return Node::Text(EcoString::new());
         }
@@ -278,12 +278,12 @@ impl HtmlToAstParser {
             )
             .unwrap();
 
-        //todo: ignoring warnings
-        let doc = typst::compile(&world);
-        let doc = match doc.output {
+        let compiled = typst::compile(&world);
+        self.warnings.extend(compiled.warnings.iter().cloned());
+        let doc = match compiled.output {
             Ok(doc) => doc,
             Err(e) => {
-                let diag = doc.warnings.iter().chain(e.iter());
+                let diag = compiled.warnings.iter().chain(e.iter());
 
                 let e = print_diagnostics_to_string(
                     &world,

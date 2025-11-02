@@ -553,7 +553,9 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let label = Label::new(PicoStr::intern("test-html-example"));
+        let Some(label) = Label::new(PicoStr::intern("test-html-example")) else {
+            return false;
+        };
         // todo: error multiple times
         doc.introspector.query_label(label).is_ok()
     }

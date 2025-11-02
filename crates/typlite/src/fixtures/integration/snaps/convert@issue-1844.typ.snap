@@ -1,0 +1,54 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::Md { for_docs: false })"
+input_file: crates/typlite/src/fixtures/integration/issue-1844.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1parbreak></m1parbreak><m1parbreak></m1parbreak><m1heading level="1"><span style="display: inline-block">Reproducer document</span></m1heading><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">Example</span></m1heading><m1parbreak></m1parbreak><m1parbreak></m1parbreak><p>Just the source (ok)</p><m1parbreak></m1parbreak><m1verbatim src="````
+
+== Under the Greenwood Tree
+by Shakespeare.
+
+#some-function(```
+Under the greenwood tree #emoji.tree
+Who loves to lie with me,
+...
+```)
+````"></m1verbatim><m1parbreak></m1parbreak><p>Source in grid</p><m1parbreak></m1parbreak><table x="test"><tr><td></td><td></td></tr></table></m1document></body>
+</html>
+
+=====
+## Reproducer document
+
+### Example
+
+Just the source (ok)
+
+````
+
+== Under the Greenwood Tree
+by Shakespeare.
+
+#some-function(```
+Under the greenwood tree #emoji.tree
+Who loves to lie with me,
+...
+```)
+````
+
+Source in grid
+
+<table x="test">
+
+<tr>
+
+<td /><td />
+
+</tr>
+
+</table>

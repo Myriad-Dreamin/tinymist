@@ -297,6 +297,8 @@ impl LexicalHierarchyWorker {
                             },
                             eco_vec![],
                         ));
+                        // Push the lexical node to the children of the current top of the stack.
+                        self.finish_hierarchy();
                     }
 
                     if !Self::is_plain_token(child.kind()) {
@@ -311,7 +313,7 @@ impl LexicalHierarchyWorker {
 
     /// Check lexical hierarchy a node recursively.
     fn check_node(&mut self, node: LinkedNode) -> Option<()> {
-        let own_symbol = self.get_ident(&node)?;
+        let own_symbol = self.get_ident(&node);
 
         let checkpoint = self.enter_node(&node)?;
 
@@ -352,13 +354,13 @@ impl LexicalHierarchyWorker {
                 SyntaxKind::LetBinding => 'let_binding: {
                     let pattern = node.children().find(|n| n.cast::<ast::Pattern>().is_some());
 
-                    if let Some(name) = &pattern {
-                        let pat = name.cast::<ast::Pattern>().unwrap();
+                    if let Some(pattern) = &pattern {
+                        let pat = pattern.cast::<ast::Pattern>().unwrap();
 
                         // special case: it will then match SyntaxKind::Closure in the inner looking
                         // up.
                         if matches!(pat, ast::Pattern::Normal(ast::Expr::Closure(..))) {
-                            let closure = name.clone();
+                            let closure = pattern.clone();
                             self.check_node_with(closure, IdentContext::Ref)?;
                             break 'let_binding;
                         }
@@ -486,7 +488,7 @@ impl LexicalHierarchyWorker {
     /// Get symbol for a leaf node of a valid type, or `None` if the node is an
     /// invalid type.
     #[allow(deprecated)]
-    fn get_ident(&self, node: &LinkedNode) -> Option<Option<LexicalInfo>> {
+    fn get_ident(&self, node: &LinkedNode) -> Option<LexicalInfo> {
         let (name, kind) = match node.kind() {
             SyntaxKind::Label if self.sk.affect_symbol() => {
                 // filter out label in code context.
@@ -501,20 +503,20 @@ impl LexicalHierarchyWorker {
                             | SyntaxKind::Colon
                     ) || prev_kind.is_keyword()
                 }) {
-                    return Some(None);
+                    return None;
                 }
-                let ast_node = node.cast::<ast::Label>()?;
+                let ast_node = node.cast::<ast::Label>().unwrap();
                 let name = ast_node.get().into();
 
                 (name, LexicalKind::label())
             }
             SyntaxKind::Ident if self.sk.affect_symbol() => {
-                let ast_node = node.cast::<ast::Ident>()?;
+                let ast_node = node.cast::<ast::Ident>().unwrap();
                 let name = ast_node.get().clone();
                 let kind = match self.ident_context {
                     IdentContext::Func => LexicalKind::function(),
                     IdentContext::Var | IdentContext::Params => LexicalKind::variable(),
-                    _ => return Some(None),
+                    _ => return None,
                 };
 
                 (name, kind)
@@ -539,30 +541,28 @@ impl LexicalHierarchyWorker {
             SyntaxKind::Markup => {
                 let name = node.get().to_owned().into_text();
                 if name.is_empty() {
-                    return Some(None);
+                    return None;
                 }
-                let Some(parent) = node.parent() else {
-                    return Some(None);
-                };
+                let parent = node.parent()?;
                 let kind = match parent.kind() {
                     SyntaxKind::Heading if self.sk.affect_heading() => LexicalKind::Heading(
                         parent.cast::<ast::Heading>().unwrap().depth().get() as i16,
                     ),
-                    _ => return Some(None),
+                    _ => return None,
                 };
 
                 (name, kind)
             }
             SyntaxKind::ListItem => (EcoString::new(), LexicalKind::Block),
             SyntaxKind::EnumItem => (EcoString::new(), LexicalKind::Block),
-            _ => return Some(None),
+            _ => return None,
         };
 
-        Some(Some(LexicalInfo {
+        Some(LexicalInfo {
             name,
             kind,
             range: node.range(),
-        }))
+        })
     }
 }
 

@@ -16,12 +16,12 @@ import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
 import {
-  base64Encode,
   bytesBase64Encode,
   DisposeList,
   getSensibleTextEditorColumn,
   typstDocumentSelector,
 } from "./util";
+import type { ExportActionOpts, ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
@@ -347,8 +347,8 @@ export class LanguageState {
   exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
   exportQuery = exportCommand("tinymist.exportQuery");
-  exportAnsiHighlight = exportCommand("tinymist.exportAnsiHighlight");
-  exportAst = exportCommand("tinymist.exportAst");
+  exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
+  exportAst = exportStringCommand("tinymist.exportAst");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
@@ -749,9 +749,30 @@ export class LanguageState {
 
 export const tinymist = new LanguageState();
 
+// Type definitions for export responses (matches Rust OnExportResponse)
+export type ExportResponse =
+  | { path: string | null; data: string | null } // Single
+  | { totalPages: number; items: ExportedPage[] }; // Multiple
+
+type ExportedPage = { page: number; path: string | null; data: string | null };
+
 function exportCommand(command: string) {
-  return (uri: string, extraOpts?: any) => {
-    return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+  return (
+    uri: string,
+    extraOpts?: ExportOpts,
+    actions?: ExportActionOpts,
+  ): Promise<ExportResponse | null> => {
+    return tinymist.executeCommand<ExportResponse | null>(command, [
+      uri,
+      extraOpts ?? {},
+      actions ?? {},
+    ]);
+  };
+}
+
+function exportStringCommand(command: string) {
+  return (uri: string, extraOpts?: ExportOpts): Promise<string> => {
+    return tinymist.executeCommand<string>(command, [uri, extraOpts ?? {}]);
   };
 }
 

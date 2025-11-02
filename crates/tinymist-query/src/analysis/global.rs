@@ -11,9 +11,9 @@ use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
-use tinymist_analysis::ty::term_value;
+use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::LintInfo;
+use tinymist_lint::{KnownIssues, LintInfo};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -475,8 +475,12 @@ impl LocalContext {
         cache.get_or_init(|| self.shared.type_check(source)).clone()
     }
 
-    pub(crate) fn lint(&mut self, source: &Source) -> EcoVec<SourceDiagnostic> {
-        self.shared.lint(source).diagnostics
+    pub(crate) fn lint(
+        &mut self,
+        source: &Source,
+        known_issues: &KnownIssues,
+    ) -> EcoVec<SourceDiagnostic> {
+        self.shared.lint(source, known_issues).diagnostics
     }
 
     /// Get the type check information of a source file.
@@ -696,51 +700,68 @@ impl SharedContext {
         })
     }
 
-    /// Get a module by file id.
+    /// Gets a module by file id.
     pub fn module_by_id(&self, fid: TypstFileId) -> SourceResult<Module> {
         let source = self.source_by_id(fid).at(Span::detached())?;
         self.module_by_src(source)
     }
 
-    /// Get a module by string.
+    /// Gets a module by string.
     pub fn module_by_str(&self, rr: String) -> Option<Module> {
         let src = Source::new(*DETACHED_ENTRY, rr);
         self.module_by_src(src).ok()
     }
 
-    /// Get (Create) a module by source.
+    /// Gets (Creates) a module by source.
     pub fn module_by_src(&self, source: Source) -> SourceResult<Module> {
         eval_compat(&self.world, &source)
     }
 
-    /// Try to load a module from the current source file.
-    pub fn module_by_syntax(&self, source: &SyntaxNode) -> Option<Value> {
+    /// Gets a module value from a given source file.
+    pub fn module_by_syntax(self: &Arc<Self>, source: &SyntaxNode) -> Option<Value> {
+        self.module_term_by_syntax(source, true)
+            .and_then(|ty| ty.value())
+    }
+
+    /// Gets a module term from a given source file. If `value` is true, it will
+    /// prefer to get a value instead of a term.
+    pub fn module_term_by_syntax(self: &Arc<Self>, source: &SyntaxNode, value: bool) -> Option<Ty> {
         let (src, scope) = self.analyze_import(source);
         if let Some(scope) = scope {
-            return Some(scope);
+            return Some(match scope {
+                Value::Module(m) if m.file_id().is_some() => {
+                    Ty::Builtin(BuiltinTy::Module(Decl::module(m.file_id()?).into()))
+                }
+                scope => Ty::Value(InsTy::new(scope)),
+            });
         }
 
         match src {
             Some(Value::Str(s)) => {
                 let id = resolve_id_by_path(&self.world, source.span().id()?, s.as_str())?;
-                self.module_by_id(id).ok().map(Value::Module)
+
+                Some(if value {
+                    Ty::Value(InsTy::new(Value::Module(self.module_by_id(id).ok()?)))
+                } else {
+                    Ty::Builtin(BuiltinTy::Module(Decl::module(id).into()))
+                })
             }
             _ => None,
         }
     }
 
-    /// Get the expression information of a source file.
+    /// Gets the expression information of a source file.
     pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<ExprInfo> {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
-    /// Get the expression information of a source file.
+    /// Gets the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
         self.expr_stage_(source, &mut route)
     }
 
-    /// Get the expression information of a source file.
+    /// Gets the expression information of a source file.
     pub(crate) fn expr_stage_(
         self: &Arc<Self>,
         source: &Source,
@@ -765,13 +786,13 @@ impl SharedContext {
         Some(self.expr_stage_(source, route).exports.clone())
     }
 
-    /// Get the type check information of a source file.
+    /// Gets the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
         let mut route = TypeEnv::default();
         self.type_check_(source, &mut route)
     }
 
-    /// Get the type check information of a source file.
+    /// Gets the type check information of a source file.
     pub(crate) fn type_check_(
         self: &Arc<Self>,
         source: &Source,
@@ -792,15 +813,15 @@ impl SharedContext {
         })
     }
 
-    /// Get the lint result of a source file.
+    /// Gets the lint result of a source file.
     #[typst_macros::time(span = source.root().span())]
-    pub(crate) fn lint(self: &Arc<Self>, source: &Source) -> LintInfo {
+    pub(crate) fn lint(self: &Arc<Self>, source: &Source, issues: &KnownIssues) -> LintInfo {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti)), |_prev| {
+        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(&self.world, &ei, ti)
+            tinymist_lint::lint_file(&self.world, &ei, ti, issues.clone())
         })
     }
 
@@ -837,6 +858,7 @@ impl SharedContext {
         res
     }
 
+    /// Gets the definition from a source location.
     pub(crate) fn def_of_span(
         self: &Arc<Self>,
         source: &Source,
@@ -847,6 +869,7 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
+    /// Gets the definition from a declaration.
     pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
         match decl.as_ref() {
             Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
@@ -855,6 +878,10 @@ impl SharedContext {
         }
     }
 
+    /// Gets the definition from static analysis.
+    ///
+    /// Passing a `doc` (compiled result) can help resolve dynamic things, e.g.
+    /// label definitions.
     pub(crate) fn def_of_syntax(
         self: &Arc<Self>,
         source: &Source,
@@ -864,6 +891,13 @@ impl SharedContext {
         definition(self, source, doc, syntax)
     }
 
+    /// Gets the definition from static analysis or dynamic analysis.
+    ///
+    /// Note: while this has best quality in typst, it is expensive.
+    /// Use it if you know it is only called `O(1)` times to serve a user LSP
+    /// request, e.g. resolve a function definition for `completion`.
+    /// Otherwise, use `def_of_syntax`, e.g. resolves all definitions for
+    /// package docs.
     pub(crate) fn def_of_syntax_or_dyn(
         self: &Arc<Self>,
         source: &Source,
@@ -1413,7 +1447,7 @@ fn analyze_bib(
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`
-    let csl_style = bib_elem.style(StyleChain::default()).derived;
+    let csl_style = bib_elem.style.get_cloned(StyleChain::default()).derived;
 
     let Value::Array(paths) = bib_elem.sources.clone().into_value() else {
         return None;

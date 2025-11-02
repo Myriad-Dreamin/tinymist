@@ -9,6 +9,70 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.13.30 - [2025-10-27]
+
+### Server
+
+* (Fix) Ignoring non-typst files to focus implicitly in https://github.com/Myriad-Dreamin/tinymist/pull/2152
+* (Fix) Setting position_encoding on handshake and fixing to utf-16 in https://github.com/Myriad-Dreamin/tinymist/pull/2153
+* Added js package registry support for tinymist-wasm by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2102
+* Tested and lowered glibc version requirement in https://github.com/Myriad-Dreamin/tinymist/pull/2143
+
+### Editor
+
+* Adding multi-page export and no-write support by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2098
+
+### LSIF (New)
+
+* Supported offline definition queries (LSIF) in https://github.com/Myriad-Dreamin/tinymist/pull/2032
+  * This is used for custom typst package docs generation.
+
+### Code Analysis
+
+* (Fix) Correcting scope merging order by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2154 and https://github.com/Myriad-Dreamin/tinymist/pull/2166
+  * If not, some symbols were not completing correctly.
+* (Fix) Holding success compilation that was lost due to bad refactor in "fix: invalidate cached snapshot after compile" in https://github.com/Myriad-Dreamin/tinymist/pull/2165
+  * If not, label completion and reference completion were not working correctly.
+* (Fix) Importing type inference result from other modules in https://github.com/Myriad-Dreamin/tinymist/pull/2168
+* (Fix) Enabling local registry feature in https://github.com/Myriad-Dreamin/tinymist/pull/2186
+
+### Typlite
+
+* (Fix) Enabling HTML rendering for VerbatimNode and adding regression test by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2172 and https://github.com/Myriad-Dreamin/tinymist/pull/2178
+  * Fix #1844.
+* (Fix) Rendering figure images during docx export by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2175
+  * Fix #2104.
+* (Fix) Fallback for tables with block-level cells by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2173
+  * Fix #1845.
+* (Fix) Not ignoring user inputs in typlite by @Jollywatt in https://github.com/Myriad-Dreamin/tinymist/pull/2164
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.28...v0.13.30
+
+## v0.13.28 - [2025-09-29]
+
+### Code Analysis
+
+* (Fix) Corrected the lexical hierarchy of comment group by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2116
+  * Fixed issue that "Symbols list was incomplete" (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2021).
+* Generating lint warning for unknown math variables by @jo3-l in https://github.com/Myriad-Dreamin/tinymist/pull/2065
+  * To enable quick-fixes all "add spaces separating letters in unknown math var" once (Issue https://github.com/Myriad-Dreamin/tinymist/pull/2062).
+
+### Folding Range
+
+* (Fix) Corrected `parent_last_loc` for heading children in folding ranges by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2123
+  * Fixed issue that "Headings before lower-level headings are not foldable" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/1796)
+
+### Preview
+
+* (Fix) Extending origin check for vscode servers by @AllanChain in https://github.com/Myriad-Dreamin/tinymist/pull/2106
+  * Fixed issue that "Cannot connect to websocket for preview on code-servers" (Issue https://github.com/Myriad-Dreamin/tinymist/issues/625)
+
+### Misc
+
+* Updated toml-edit-js by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2125
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.26...v0.13.28
+
 ## v0.13.26 - [2025-09-13]
 
 ### CLI

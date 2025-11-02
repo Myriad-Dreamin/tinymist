@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.13.24"
+version = "0.14.0-rc1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -43,6 +43,7 @@ rkyv = { workspace = true, optional = true }
 
 # feature = "typst"
 typst = { workspace = true, optional = true }
+typst-html = { workspace = true, optional = true }
 typst-shim = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -70,7 +71,7 @@ hex.workspace = true
 default = ["full"]
 full = ["web", "rkyv", "typst"]
 
-typst = ["dep:typst", "dep:typst-shim"]
+typst = ["dep:typst", "dep:typst-shim", "dep:typst-html"]
 
 rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]

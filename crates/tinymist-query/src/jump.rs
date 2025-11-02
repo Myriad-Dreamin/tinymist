@@ -31,8 +31,7 @@ pub fn jump_from_click(
     }
 
     // If there's no link, search for a jump target.
-    for (pos, item) in frame.items().rev() {
-        let mut pos = *pos;
+    for &(mut pos, ref item) in frame.items().rev() {
         match item {
             FrameItem::Group(group) => {
                 // TODO: Handle transformation.
@@ -169,8 +168,7 @@ fn jump_from_cursor_(
 
 /// Finds the position of a span in a frame.
 fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) -> Option<Point> {
-    for (pos, item) in frame.items() {
-        let mut pos = *pos;
+    for &(mut pos, ref item) in frame.items() {
         if let FrameItem::Group(group) = item {
             // TODO: Handle transformation.
             if let Some(point) = find_in_frame(&group.frame, span, min_dis, res) {

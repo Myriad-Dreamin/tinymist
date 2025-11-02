@@ -1,5 +1,7 @@
 //! Tinymist LSP commands
 
+mod export;
+
 use std::ops::Range;
 use std::path::PathBuf;
 
@@ -9,72 +11,22 @@ use serde_json::Value as JsonValue;
 #[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{
-    ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask, ExportTeXTask,
-    ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
-};
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
-use tinymist_task::ExportMarkdownTask;
-use typst::diag::{eco_format, StrResult};
 use typst::syntax::{LinkedNode, Source};
-use world::TaskInputs;
 
 use super::*;
 use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
 
 #[cfg(feature = "system")]
-use typst::diag::EcoString;
+use typst::diag::{EcoString, StrResult};
 #[cfg(feature = "system")]
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 
 #[cfg(feature = "system")]
 use crate::tool::package::InitTask;
-
-/// See [`ProjectTask`].
-#[derive(Debug, Clone, Default, Deserialize)]
-struct ExportOpts {
-    fill: Option<String>,
-    ppi: Option<f32>,
-    #[serde(default)]
-    page: PageSelection,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-    // todo: we made a mistake that they will be snakecase, but they should be camelCase
-    /// The creation timestamp for various outputs (in seconds).
-    creation_timestamp: Option<String>,
-    /// A PDF standard that Typst can enforce conformance with.
-    pdf_standard: Option<Vec<PdfStandard>>,
-}
-
-/// See [`ProjectTask`].
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ExportTypliteOpts {
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-    /// The processor to use for the typlite export.
-    processor: Option<String>,
-    /// The path of external assets directory.
-    assets_path: Option<PathBuf>,
-}
-
-/// See [`ProjectTask`].
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryOpts {
-    format: String,
-    output_extension: Option<String>,
-    strict: Option<bool>,
-    pretty: Option<bool>,
-    selector: String,
-    field: Option<String>,
-    one: Option<bool>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -84,161 +36,6 @@ struct ExportSyntaxRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
-    /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let creation_timestamp = if let Some(value) = opts.creation_timestamp {
-            Some(
-                parse_source_date_epoch(&value)
-                    .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
-            )
-        } else {
-            self.config.creation_timestamp()
-        };
-        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
-
-        let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportPdf(ExportPdfTask {
-                export,
-                pdf_standards: pdf_standards.unwrap_or_default(),
-                creation_timestamp,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as HTML file(s).
-    pub fn export_html(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-        let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportHtml(ExportHtmlTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Markdown file(s).
-    pub fn export_markdown(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
-        let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportMd(ExportMarkdownTask {
-                processor: opts.processor,
-                assets_path: opts.assets_path,
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Tex file(s).
-    pub fn export_tex(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
-        let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportTeX(ExportTeXTask {
-                processor: opts.processor,
-                assets_path: opts.assets_path,
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Text file(s).
-    pub fn export_text(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-        let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportText(ExportTextTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Query the current document and export the result as JSON file(s).
-    pub fn export_query(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as QueryOpts);
-        // todo: deprecate it
-        let _ = opts.strict;
-
-        let mut export = self.config.export_task();
-        if opts.pretty.unwrap_or(true) {
-            export.apply_pretty();
-        }
-
-        self.export(
-            ProjectTask::Query(QueryTask {
-                format: opts.format,
-                output_extension: opts.output_extension,
-                selector: opts.selector,
-                field: opts.field,
-                one: opts.one.unwrap_or(false),
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Svg file(s).
-    pub fn export_svg(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let mut export = self.config.export_task();
-        select_page(&mut export, opts.page).map_err(invalid_params)?;
-
-        self.export(
-            ProjectTask::ExportSvg(ExportSvgTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Png file(s).
-    pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let ppi = opts.ppi.unwrap_or(144.);
-        let ppi = ppi
-            .try_into()
-            .context("cannot convert ppi")
-            .map_err(invalid_params)?;
-
-        let mut export = self.config.export_task();
-        select_page(&mut export, opts.page).map_err(invalid_params)?;
-
-        self.export(
-            ProjectTask::ExportPng(ExportPngTask {
-                fill: opts.fill,
-                ppi,
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as some format. The client is responsible
-    /// for passing the correct absolute path of typst document.
-    pub fn export(
-        &mut self,
-
-        task: ProjectTask,
-        open: bool,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduleResult {
-        let path = get_arg!(args[0] as PathBuf);
-
-        run_query!(self.OnExport(path, open, task))
-    }
-
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
@@ -729,6 +526,18 @@ impl ServerState {
         just_future(async move { serde_json::to_value(fut.await?).map_err(internal_error) })
     }
 
+    /// Get the lsif for package
+    pub fn resource_lsif_(
+        &mut self,
+        info: PackageInfo,
+    ) -> LspResult<impl Future<Output = LspResult<String>>> {
+        self.within_package(info.clone(), move |a| {
+            let knowledge = tinymist_query::index::knowledge(a)
+                .map_err(map_string_err("failed to generate docs"))?;
+            Ok(knowledge.bind(a.shared()).to_string())
+        })
+    }
+
     /// Get the all symbol docs
     pub fn resource_package_docs_(
         &mut self,
@@ -736,11 +545,9 @@ impl ServerState {
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
         self.within_package(info.clone(), move |a| {
             let doc = tinymist_query::docs::package_docs(a, &info)
-                .map_err(map_string_err("failed to generate docs"))
-                .map_err(internal_error)?;
+                .map_err(map_string_err("failed to generate docs"))?;
             tinymist_query::docs::package_docs_md(&doc)
                 .map_err(map_string_err("failed to generate docs"))
-                .map_err(internal_error)
         })
     }
 
@@ -752,7 +559,6 @@ impl ServerState {
         self.within_package(info.clone(), move |a| {
             tinymist_query::package::check_package(a, &info)
                 .map_err(map_string_err("failed to check package"))
-                .map_err(internal_error)
         })
     }
 
@@ -760,47 +566,9 @@ impl ServerState {
     pub fn within_package<T>(
         &mut self,
         info: PackageInfo,
-        f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
+        f: impl FnOnce(&mut LocalContextGuard) -> Result<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let snap = self.query_snapshot().map_err(internal_error)?;
-
-        Ok(async move {
-            let world = snap.world();
-
-            let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
-                let pkg_root = toml_path.parent().ok_or_else(|| {
-                    eco_format!("cannot get package root (parent of {toml_path:?})")
-                })?;
-
-                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
-                let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-                Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
-            });
-            let entry = entry.map_err(|e| internal_error(e.to_string()))?;
-
-            let snap = snap.task(TaskInputs {
-                entry: Some(entry),
-                inputs: None,
-            });
-
-            snap.run_analysis(f).map_err(internal_error)?
-        })
+        Ok(async move { snap.run_within_package(&info, f).map_err(internal_error) })
     }
-}
-
-/// Applies page selection to the export task.
-fn select_page(task: &mut ExportTask, selection: PageSelection) -> Result<()> {
-    match selection {
-        PageSelection::First => task.transform.push(ExportTransform::Pages {
-            ranges: vec![Pages::FIRST],
-        }),
-        PageSelection::Merged { gap } => {
-            task.transform.push(ExportTransform::Merge { gap });
-        }
-    }
-
-    Ok(())
 }

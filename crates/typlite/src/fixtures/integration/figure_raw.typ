@@ -1,0 +1,5 @@
+#figure(
+  ```md
+  markdown
+  ```,
+)

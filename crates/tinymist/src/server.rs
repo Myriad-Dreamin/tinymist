@@ -131,6 +131,7 @@ impl ServerState {
 
         #[cfg(feature = "preview")]
         let watchers = crate::project::ProjectPreviewState::default();
+
         let handle = Self::project(
             &config,
             editor_tx.clone(),
@@ -138,6 +139,12 @@ impl ServerState {
             dep_tx.clone(),
             #[cfg(feature = "preview")]
             watchers.clone(),
+            #[cfg(all(not(feature = "system"), feature = "web"))]
+            if let TransportHost::Js { sender, .. } = client.clone().to_untyped().sender {
+                sender.resolve_fn
+            } else {
+                panic!("Expected Js TransportHost")
+            },
         );
 
         Self {

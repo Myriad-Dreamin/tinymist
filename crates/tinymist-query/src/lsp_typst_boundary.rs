@@ -20,6 +20,11 @@ pub fn untitled_url(path: &Path) -> anyhow::Result<Url> {
     Ok(Url::parse(&format!("untitled:{}", path.display()))?)
 }
 
+/// Determines if a path is untitled.
+pub fn is_untitled_path(p: &Path) -> bool {
+    p.starts_with(UNTITLED_ROOT)
+}
+
 /// Convert a path to a URL.
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
@@ -102,7 +107,6 @@ fn url_to_file_path(uri: &Url) -> PathBuf {
     // In WASM, manually parse the URL path
     PathBuf::from(uri.path())
 }
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -116,6 +120,7 @@ mod test {
 
         let path = url_to_path(&uri);
         assert_eq!(path, Path::new("/untitled/test").clean());
+        assert!(is_untitled_path(&path));
     }
 
     #[test]

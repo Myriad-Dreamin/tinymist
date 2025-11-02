@@ -1,0 +1,25 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::LaTeX)"
+input_file: crates/typlite/src/fixtures/integration/issue-1845.typ
+---
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document><m1grid><m1table><table><tr><td></td><td></td></tr><tr><td></td><td></td></tr></table></m1table></m1grid></m1document></body>
+</html>
+
+=====
+\begin{table}[htbp]
+\centering
+\begin{tabular}{cc}
+\hline
+ &  \\
+\hline
+ &  \\
+\hline
+\end{tabular}
+\end{table}

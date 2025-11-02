@@ -4,7 +4,7 @@ description = "Provides derive for tinymist."
 categories = ["compilers"]
 keywords = ["typst"]
 # group: world
-version = "0.13.24"
+version = "0.14.0-rc1"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
