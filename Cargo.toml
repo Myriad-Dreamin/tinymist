@@ -160,7 +160,7 @@ typst-eval = "0.14.0"
 typst-assets = "0.14.0"
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.13.17", default-features = false }
+typstyle-core = { version = "=0.14.0", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.15"
@@ -292,7 +292,7 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.14.0-rc1" }
 
 # typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "34869bfa9db089c5196be5fac2a5e9d752904ca2" }
+# typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "34869bfa9db089c5196be5fac2a5e9d752904ca2" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
