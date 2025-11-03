@@ -179,7 +179,7 @@ fn test_help_compile() {
               Page numbers are one-indexed and correspond to physical page numbers in the document
               (therefore not being affected by the document's page counter).
 
-          --pdf-standard <PDF_STANDARD>
+          --pdf-standard <STANDARD>
               Specify the PDF standards that Typst will enforce conformance with.
               
               If multiple standards are specified, they are separated by commas.
@@ -310,24 +310,7 @@ fn test_help_preview() {
               
               [env: TYPST_PACKAGE_CACHE_PATH=REDACTED]
 
-          --features <FEATURES>
-              Enable in-development features that may be changed or removed at any time
-              
-              [env: TYPST_FEATURES=REDACTED]
-
-              Possible values:
-              - html: The HTML feature
-
-          --input <key=value>
-              Add a string key-value pair visible through `sys.inputs`.
-              
-              ### Examples
-              
-              Tell the script that `sys.inputs.foo` is `"bar"` (type: `str`).
-              
-              ```bash tinymist compile --input foo=bar ```
-
-          --pdf-standard <PDF_STANDARD>
+          --pdf-standard <STANDARD>
               Specify the PDF standards that Typst will enforce conformance with.
               
               If multiple standards are specified, they are separated by commas.
@@ -355,6 +338,28 @@ fn test_help_preview() {
               By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is
               written to provide a baseline of accessibility. In some circumstances (for example when
               trying to reduce the size of a document) it can be desirable to disable tagged PDF
+
+          --ppi <PPI>
+              Specify the PPI (pixels per inch) to use for PNG export
+              
+              [default: 144]
+
+          --features <FEATURES>
+              Enable in-development features that may be changed or removed at any time
+              
+              [env: TYPST_FEATURES=REDACTED]
+
+              Possible values:
+              - html: The HTML feature
+
+          --input <key=value>
+              Add a string key-value pair visible through `sys.inputs`.
+              
+              ### Examples
+              
+              Tell the script that `sys.inputs.foo` is `"bar"` (type: `str`).
+              
+              ```bash tinymist compile --input foo=bar ```
 
           --cert <CERT_PATH>
               Specify the path to CA certificate file for network access, especially for downloading
