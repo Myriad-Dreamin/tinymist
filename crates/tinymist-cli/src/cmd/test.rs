@@ -68,10 +68,6 @@ pub struct TestConfigArgs {
     #[clap(long)]
     pub update: bool,
 
-    /// The argument to export to PNG.
-    #[clap(flatten)]
-    pub png: PngExportArgs,
-
     /// Whether to collect coverage.
     #[clap(long)]
     pub coverage: bool,
@@ -137,6 +133,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
     let config = TestContext {
         root,
         args: args.config,
+        png: args.compile.png,
         out_file,
         analysis: Analysis::default(),
     };
@@ -266,6 +263,7 @@ struct TestContext {
     analysis: Analysis,
     root: ImmutPath,
     args: TestConfigArgs,
+    png: PngExportArgs,
     out_file: Option<Arc<Mutex<std::fs::File>>>,
 }
 
@@ -468,7 +466,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let ppp = self.ctx.args.png.ppi / 72.0;
+        let ppp = self.ctx.png.ppi / 72.0;
         let pixmap = typst_render::render_merged(doc, ppp, Default::default(), None);
         let output = pixmap.encode_png().context_ut("cannot encode pixmap");
         let output = output.and_then(|output| self.update_example(example, &output, "paged"));
