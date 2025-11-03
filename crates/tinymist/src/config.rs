@@ -1085,6 +1085,7 @@ mod tests {
             config.typst_extra_args,
             Some(TypstExtraArgs {
                 root_dir: Some(ImmutPath::from(root_path)),
+                ppi: 144.0,
                 ..TypstExtraArgs::default()
             })
         );
