@@ -185,9 +185,28 @@ fn test_help_compile() {
               If multiple standards are specified, they are separated by commas.
 
               Possible values:
+              - 1.4:  PDF 1.4
+              - 1.5:  PDF 1.5
+              - 1.6:  PDF 1.6
               - 1.7:  PDF 1.7
+              - 2.0:  PDF 2.0
+              - a-1b: PDF/A-1b
+              - a-1a: PDF/A-1a
               - a-2b: PDF/A-2b
+              - a-2u: PDF/A-2u
+              - a-2a: PDF/A-2a
               - a-3b: PDF/A-3b
+              - a-3u: PDF/A-3u
+              - a-3a: PDF/A-3a
+              - a-4:  PDF/A-4
+              - a-4f: PDF/A-4f
+              - a-4e: PDF/A-4e
+              - ua-1: PDF/UA-1
+
+          --no-pdf-tags
+              By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is
+              written to provide a baseline of accessibility. In some circumstances (for example when
+              trying to reduce the size of a document) it can be desirable to disable tagged PDF
 
           --ppi <PPI>
               Specify the PPI (pixels per inch) to use for PNG export
@@ -314,9 +333,28 @@ fn test_help_preview() {
               If multiple standards are specified, they are separated by commas.
 
               Possible values:
+              - 1.4:  PDF 1.4
+              - 1.5:  PDF 1.5
+              - 1.6:  PDF 1.6
               - 1.7:  PDF 1.7
+              - 2.0:  PDF 2.0
+              - a-1b: PDF/A-1b
+              - a-1a: PDF/A-1a
               - a-2b: PDF/A-2b
+              - a-2u: PDF/A-2u
+              - a-2a: PDF/A-2a
               - a-3b: PDF/A-3b
+              - a-3u: PDF/A-3u
+              - a-3a: PDF/A-3a
+              - a-4:  PDF/A-4
+              - a-4f: PDF/A-4f
+              - a-4e: PDF/A-4e
+              - ua-1: PDF/UA-1
+
+          --no-pdf-tags
+              By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is
+              written to provide a baseline of accessibility. In some circumstances (for example when
+              trying to reduce the size of a document) it can be desirable to disable tagged PDF
 
           --cert <CERT_PATH>
               Specify the path to CA certificate file for network access, especially for downloading
