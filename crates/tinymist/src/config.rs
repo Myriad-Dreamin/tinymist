@@ -980,8 +980,8 @@ pub struct TypstExtraArgs {
     pub font: CompileFontArgs,
     /// The package related arguments.
     pub package: CompilePackageArgs,
-    /// One (or multiple comma-separated) PDF standards that Typst will enforce
-    /// conformance with.
+    /// Enable in-development features that may be changed or removed at any
+    /// time.
     pub features: Vec<Feature>,
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.

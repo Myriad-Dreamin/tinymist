@@ -3,7 +3,23 @@
 
 [<img src="https://img.shields.io/github/license/Myriad-Dreamin/tinymist" alt="GitHub license" />](https://github.com/Myriad-Dreamin/tinymist/blob/main/LICENSE)[<img src="https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml/badge.svg?event=push" alt="Actions status" />](https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml)[<img src="https://img.shields.io/badge/view-documentation-blue" alt="Documentation" />](https://myriad-dreamin.github.io/tinymist/)[<img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" />](https://deepwiki.com/Myriad-Dreamin/tinymist)
 
-Tinymist \[ˈtaɪni mɪst\] is an integrated language service for [Typst](https://typst.app/) \[taɪpst\]. You can also call it <ruby>微<rt>wēi</rt></ruby><ruby>霭<rt>ǎi</rt></ruby> in Chinese.
+Tinymist \[ˈtaɪni mɪst\] is an integrated language service for [Typst](https://typst.app/) \[taɪpst\]. You can also call it <ruby>
+
+微<rt>
+
+wēi
+
+</rt>
+
+</ruby><ruby>
+
+霭<rt>
+
+ǎi
+
+</rt>
+
+</ruby> in Chinese.
 
 It contains:
 
@@ -57,10 +73,26 @@ Language service (LSP) features:
   - Increasing/Decreasing heading levels.
   - Turn equation into "inline", "block" or "multiple-line block" styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
-  - <kbd>Enter</kbd> inside triple-slash comments automatically inserts `///`
-  - <kbd>Enter</kbd> in the middle or after a trailing space in `//` inserts `//`
-  - <kbd>Enter</kbd> inside `//!` doc comments automatically inserts `//!`
-  - <kbd>Enter</kbd> inside equation markups automatically inserts indents.
+  - <kbd>
+    
+    Enter
+    
+    </kbd> inside triple-slash comments automatically inserts `///`
+  - <kbd>
+    
+    Enter
+    
+    </kbd> in the middle or after a trailing space in `//` inserts `//`
+  - <kbd>
+    
+    Enter
+    
+    </kbd> inside `//!` doc comments automatically inserts `//!`
+  - <kbd>
+    
+    Enter
+    
+    </kbd> inside equation markups automatically inserts indents.
 
 Extra features:
 
@@ -78,7 +110,11 @@ Extra features:
 
 Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
 
-- If a version is suffixed with `-rcN` (<picture><source media="(prefers-color-scheme: dark)" srcset="assets/images/introduction/frame_0.svg" /><img src="assets/images/introduction/frame_1.svg" alt="typst-frame" /></picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
+- If a version is suffixed with `-rcN` (<picture>
+  
+  <source media="(prefers-color-scheme: dark)" srcset="assets/images/introduction/frame_0.svg" /><img src="assets/images/introduction/frame_1.svg" alt="typst-frame" />
+  
+  </picture>), e.g. `0.11.0-rc1` and `0.12.1-rc1`, it means this version is a release candidate. It is used to test publish script and E2E functionalities. These versions will not be published to the marketplace.
 - If the `PATCH` number is odd, e.g. `0.11.1` and `0.12.3`, it means this version is a nightly release. The nightly release will use both [tinymist](https://github.com/Myriad-Dreamin/tinymist/tree/main) and [typst](https://github.com/typst/typst/tree/main) at **main branch**. They will be published as prerelease version to the marketplace. Note that in nightly releases, we change `#sys.version` to the next minor release to help develop documents with nightly features. For example, in tinymist nightly v0.12.1 or v0.12.3, the `#sys.version` is changed to `version(0, 13, 0)`.
 - Otherwise, if the `PATCH` number is even, e.g. `0.11.0` and `0.12.2`, it means this version is a regular release. The regular release will always use the recent stable version of tinymist and typst.
 
@@ -117,7 +153,11 @@ Besides published releases specific for each editors, you can also download the 
       ```
   - The prebuilts for other revisions can also be found manually. For example, if you are seeking a nightly release for the featured [PR: build: bump version to 0.11.17-rc1](https://github.com/Myriad-Dreamin/tinymist/pull/468), you could click and go to the [action page](https://github.com/Myriad-Dreamin/tinymist/actions/runs/10120639466) run for the related commits and download the artifacts.
 
-To install extension file (the file with `.vsix` extension) manually, please <kbd>Ctrl+Shift+X</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
+To install extension file (the file with `.vsix` extension) manually, please <kbd>
+
+Ctrl+Shift+X
+
+</kbd> in the editor window and drop the downloaded vsix file into the opened extensions view.
 
 ## Documentation
 
@@ -127,11 +167,19 @@ See [Online Documentation](https://myriad-dreamin.github.io/tinymist/).
 
 Stable Channel:
 
-<a href="https://repology.org/project/tinymist/versions" target="_blank" rel="noopener noreferrer"><img src="https://repology.org/badge/vertical-allrepos/tinymist.svg" alt="Packaging status" style="max-width: 100%; height: auto;" /></a>
+<a href="https://repology.org/project/tinymist/versions" target="_blank" rel="noopener noreferrer">
+
+<img src="https://repology.org/badge/vertical-allrepos/tinymist.svg" alt="Packaging status" style="max-width: 100%; height: auto;" />
+
+</a>
 
 Nightly Channel:
 
-<a href="https://repology.org/project/tinymist-nightly/versions" target="_blank" rel="noopener noreferrer"><img src="https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg" alt="Packaging status" style="max-width: 100%; height: auto;" /></a>
+<a href="https://repology.org/project/tinymist-nightly/versions" target="_blank" rel="noopener noreferrer">
+
+<img src="https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg" alt="Packaging status" style="max-width: 100%; height: auto;" />
+
+</a>
 
 ## Roadmap
 

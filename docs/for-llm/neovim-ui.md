@@ -261,7 +261,22 @@ A flag that determines whether to load system fonts for Typst compiler, which is
 
 ## `typstExtraArgs`
 
-You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`.
+You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`. The following arguments are supported:
+
+- entry file: The last string in the array will be treated as the entry file.
+  - This is used to specify the _default_ entry file for the compiler, which may be overridden by other settings.
+- `--root`: Configure the project root (for absolute paths). If the path is relative, it will be resolved relative to the current working directory (PWD).
+- `--input`: Add a string key-value pair visible through `sys.inputs`.
+- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
+- `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
+- `--package-path`: Specify a custom path to local packages, defaults to system-dependent location.
+- `--package-cache-path`: Specify a custom path to package cache, defaults to system-dependent location.
+- `--features`: Add a string key-value pair visible through `sys.features`.
+- `--pdf-standard`: Specify the PDF standards that Typst will enforce conformance with.
+- `--no-pdf-tags`: By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is written to provide a baseline of accessibility. In some circumstances (for example when trying to reduce the size of a document) it can be desirable to disable tagged PDF.
+- `--ppi`: Specify the PPI (pixels per inch) to use for PNG export.
+- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link(“https://reproducible-builds.org/specs/source-date-epoch/”)\[UNIX timestamp\].
+- `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
 - **Type**: `array`
 - **Default**: `[]`

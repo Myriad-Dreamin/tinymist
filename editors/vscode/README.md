@@ -194,8 +194,7 @@ You can pin a main file by command.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
 > [!NOTE]
-> 
-> `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
+> > `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
 
 ### Passing Extra CLI Arguments
 
@@ -209,9 +208,16 @@ Supported arguments:
 
 - entry file: The last string in the array will be treated as the entry file.
   - This is used to specify the **default** entry file for the compiler, which may be overridden by other settings.
+- `--root`: Configure the project root (for absolute paths). If the path is relative, it will be resolved relative to the current working directory (PWD).
 - `--input`: Add a string key-value pair visible through `sys.inputs`.
 - `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
 - `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
+- `--package-path`: Specify a custom path to local packages, defaults to system-dependent location.
+- `--package-cache-path`: Specify a custom path to package cache, defaults to system-dependent location.
+- `--features`: Add a string key-value pair visible through `sys.features`.
+- `--pdf-standard`: Specify the PDF standards that Typst will enforce conformance with.
+- `--no-pdf-tags`: By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is written to provide a baseline of accessibility. In some circumstances (for example when trying to reduce the size of a document) it can be desirable to disable tagged PDF.
+- `--ppi`: Specify the PPI (pixels per inch) to use for PNG export.
 - `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a [UNIX timestamp](https://reproducible-builds.org/specs/source-date-epoch/).
 - `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
