@@ -33,7 +33,7 @@ You should perform following steps to make a release PR with name in format of `
 
 Before release, you should determine the version number to release.
 
-Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
+Tinymist’s versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
 
 - If a version is suffixed with `-rcN` (<picture>
   

@@ -117,11 +117,11 @@ end, {})
 > [!NOTE]
 > > For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 
-Make sure to change `exportPdf` to "onType" or "onSave".
+Make sure to change `exportPdf` to “onType” or “onSave”.
 
 ### Working with Multiple-Files Projects
 
-Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
+Tinymist cannot know the main file of a multiple-files project if you don’t tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
 ```typ
 // in file: /sub.typ
@@ -168,7 +168,7 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.v.null } })
 ```
 
-It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
+It also doesn’t remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
 This could be improved in the future.
 

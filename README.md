@@ -34,9 +34,9 @@ It contains:
 Language service (LSP) features:
 
 - [Semantic highlighting](https://code.visualstudio.com/api/language-extensions/semantic-highlight-guide)
-  - The "semantic highlighting" is supplementary to ["syntax highlighting"](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
+  - The “semantic highlighting” is supplementary to [“syntax highlighting”](https://code.visualstudio.com/api/language-extensions/syntax-highlight-guide).
 - [Code actions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#provide-code-actions)
-  - Also known as "quick fixes" or "refactorings".
+  - Also known as “quick fixes” or “refactorings”.
 - [Formatting (Reformatting)](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#format-source-code-in-an-editor)
   - Provide the user with support for formatting whole documents, using [typstfmt](https://github.com/astrale-sharp/typstfmt) or [typstyle](https://github.com/Enter-tainer/typstyle).
 - [Document highlight](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#highlight-all-occurrences-of-a-symbol-in-a-document)
@@ -47,23 +47,23 @@ Language service (LSP) features:
 - [Document links](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink)
   - Renders path or link references in the document, such as `image("path.png")` or `bibliography(style: "path.csl")`.
 - [Document symbols](https://code.visualstudio.com/docs/getstarted/userinterface#_outline-view)
-  - Also known as "document outline" or "table of contents" _in Typst_.
+  - Also known as “document outline” or “table of contents” _in Typst_.
 - [Folding ranges](https://burkeholland.gitbook.io/vs-code-can-do-that/exercise-3-navigation-and-refactoring/folding-sections)
   - You can collapse code/content blocks and headings.
 - [Goto definitions](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-definitions-of-a-symbol)
-  - Right-click on a symbol and select "Go to Definition".
+  - Right-click on a symbol and select “Go to Definition”.
   - Or ctrl+click on a symbol.
 - [References](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#find-all-references-to-a-symbol)
-  - Right-click on a symbol and select "Go to References" or "Find References".
+  - Right-click on a symbol and select “Go to References” or “Find References”.
   - Or ctrl+click on a symbol.
 - [Hover tips](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-hovers)
-  - Also known as "hovering tooltip".
+  - Also known as “hovering tooltip”.
   - Render docs according to [tidy](https://github.com/Mc-Zen/tidy) style.
 - [Inlay hints](https://www.jetbrains.com/help/idea/inlay-hints.html)
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
 - [Color Provider](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators)
   - View all inlay colorful label for color literals in your document.
-  - Change the color literal's value by a color picker or its code presentation.
+  - Change the color literal’s value by a color picker or its code presentation.
 - [Code Lens](https://code.visualstudio.com/blogs/2017/02/12/code-lens-roundup)
   - Should give contextual buttons along with code. For example, a button for exporting your document to various formats at the start of the document.
 - [Rename symbols and embedded paths](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#rename-symbols)
@@ -71,7 +71,7 @@ Language service (LSP) features:
 - [Workspace Symbols](https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-all-symbol-definitions-in-folder)
 - [Code Action](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-code-actions)
   - Increasing/Decreasing heading levels.
-  - Turn equation into "inline", "block" or "multiple-line block" styles.
+  - Turn equation into “inline”, “block” or “multiple-line block” styles.
 - [experimental/onEnter](https://github.com/rust-lang/rust-analyzer/blob/master/docs/dev/lsp-extensions.md#on-enter)
   - <kbd>
     
@@ -100,7 +100,7 @@ Extra features:
 - Also compiles to SVG, PNG, HTML, Markdown, Text, and other formats by commands, vscode tasks, or code lenses.
 - Provides test, benchmark, coverage collecting on documents and modules. Check [Docs: Testing Features](https://myriad-dreamin.github.io/tinymist/feature/testing.html).
 - Provides builtin linting. Check [Docs: Linting Features](https://myriad-dreamin.github.io/tinymist/feature/linting.html).
-- Provides a status bar item to show the current document's compilation status and words count.
+- Provides a status bar item to show the current document’s compilation status and words count.
 - [Editor tools](/tools/editor-tools/):
   - View a list of templates in template gallery. (`tinymist.showTemplateGallery`)
   - Click a button in template gallery to initialize a new project with a template. (`tinymist.initTemplate` and `tinymist.initTemplateInPlace`)
@@ -108,7 +108,7 @@ Extra features:
 
 ## Versioning and Release Cycle
 
-Tinymist's versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
+Tinymist’s versions follow the [Semantic Versioning](https://semver.org/) scheme, in format of `MAJOR.MINOR.PATCH`. Besides, tinymist follows special rules for the version number:
 
 - If a version is suffixed with `-rcN` (<picture>
   
@@ -136,7 +136,7 @@ Follow the instructions to enable tinymist in your favorite editor.
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 
-Note: if you are not knowing what is a regular/nightly release, please don't follow this section.
+Note: if you are not knowing what is a regular/nightly release, please don’t follow this section.
 
 Besides published releases specific for each editors, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
 
@@ -195,18 +195,18 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
 - Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
 - Inlay hint: It is disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
-- Improve symbol view's appearance.
+- Improve symbol view’s appearance.
 - Improve package view.
   - Navigate to symbols by clicking on the symbol name in the view.
   - Automatically locate the symbol item in the view when viewing local documentation.
-  - Remember the recently invoked package commands, e.g. "Open Docs of @preview/cetz:0.3.1", "Open directory of @preview/touying:0.5.3".
+  - Remember the recently invoked package commands, e.g. “Open Docs of @preview/cetz:0.3.1”, “Open directory of @preview/touying:0.5.3”.
 - Improve label view.
   - Group labels.
   - Search labels.
   - Keep (persist) group preferences.
 - Improve Typst Preview.
-  - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
-  - Render in web worker (another thread) to reduce overhead on the electron's main thread.
+  - Pin drop-down: Set the file to preview in the drop-down for clients that doesn’t support passing arguments to the preview command.
+  - Render in web worker (another thread) to reduce overhead on the electron’s main thread.
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
   - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](https://github.com/Automattic/harper) looks promise.
 
@@ -218,7 +218,7 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) file for contribution guideli
 
 ## Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to [Maintainers Page](/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
+Tinymist thrives on community love and remains proudly independent. While we don’t accept direct project funding, we warmly welcome support for our maintainers’ personal efforts. Please go to [Maintainers Page](/MAINTAINERS.md) and [Contributors Page](https://github.com/Myriad-Dreamin/tinymist/graphs/contributors) and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the [GitHub Issues](https://github.com/Myriad-Dreamin/tinymist/issues/new).
 
 ## Acknowledgements
 

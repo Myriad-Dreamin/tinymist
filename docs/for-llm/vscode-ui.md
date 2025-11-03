@@ -67,7 +67,7 @@ You can find all syntatical labels in the workspaces in the [_Label View_](#labe
 
 ### Outline View
 
-You can get the document outline in the [_Outline View_](#outline-view) if [_Preview State_](#preview-state) is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP's syntax outline which shows language syntax structure in the current opened document.
+You can get the document outline in the [_Outline View_](#outline-view) if [_Preview State_](#preview-state) is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP’s syntax outline which shows language syntax structure in the current opened document.
 
 ## Tools
 
