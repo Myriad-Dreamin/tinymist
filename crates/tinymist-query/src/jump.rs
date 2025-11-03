@@ -222,11 +222,7 @@ mod tests {
     fn test() {
         snapshot_testing("jump_from_cursor", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-
-            let graph = compile_doc_for_test(ctx, &properties);
-            let document = graph.snap.success_doc.as_ref().unwrap();
+            let document = ctx.success_doc().unwrap();
 
             let cursors = find_test_range_(&source);
 

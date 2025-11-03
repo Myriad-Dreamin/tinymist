@@ -31,11 +31,10 @@ pub struct PrepareRenameRequest {
 
 // todo: rename alias
 // todo: rename import path?
-impl StatefulRequest for PrepareRenameRequest {
+impl SemanticRequest for PrepareRenameRequest {
     type Response = PrepareRenameResponse;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
@@ -45,7 +44,7 @@ impl StatefulRequest for PrepareRenameRequest {
         }
 
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
-        let def = ctx.def_of_syntax(&source, doc, syntax.clone())?;
+        let def = ctx.def_of_syntax(&source, syntax.clone())?;
 
         let (name, range) = prepare_renaming(&syntax, &def)?;
 
@@ -139,9 +138,8 @@ mod tests {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
-            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
-            let result = request.request(ctx, snap);
+            let result = request.request(ctx);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

@@ -44,7 +44,7 @@ use typst::diag::{FileError, FileResult, StrResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::{CompilerQueryResponse, SemanticRequest, StatefulRequest, path_res_to_url};
+use crate::{CompilerQueryResponse, SemanticRequest, path_res_to_url};
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -100,17 +100,6 @@ impl LspQuerySnapshot {
         self
     }
 
-    /// Runs a stateful query.
-    pub fn run_stateful<T: StatefulRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        let graph = self.snap.clone();
-        self.run_analysis(|ctx| query.request(ctx, graph))
-            .map(wrapper)
-    }
-
     /// Runs a semantic query.
     pub fn run_semantic<T: SemanticRequest>(
         self,
@@ -122,13 +111,13 @@ impl LspQuerySnapshot {
 
     /// Runs a query.
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world().clone();
-        let Some(..) = world.main_id() else {
+        let graph = self.snap.clone();
+        let Some(..) = graph.world().main_id() else {
             log::error!("Project: main file is not set");
             bail!("main file is not set");
         };
 
-        let mut ctx = self.analysis.enter_(world, self.rev_lock);
+        let mut ctx = self.analysis.enter_(graph, self.rev_lock);
         Ok(f(&mut ctx))
     }
 

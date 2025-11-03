@@ -751,7 +751,7 @@ impl ExprWorker<'_> {
         src: &str,
         is_import: bool,
     ) -> Option<Expr> {
-        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src)?;
+        let fid = resolve_id_by_path(&self.ctx.world(), self.fid, src)?;
         let name = Decl::calc_path_stem(src);
         let module = Expr::Decl(Decl::module_with_name(name.clone(), fid).into());
 
@@ -1230,8 +1230,8 @@ impl ExprWorker<'_> {
         }
 
         let scope = match mode {
-            InterpretMode::Math => self.ctx.world.library.math.scope(),
-            InterpretMode::Markup | InterpretMode::Code => self.ctx.world.library.global.scope(),
+            InterpretMode::Math => self.ctx.world().library.math.scope(),
+            InterpretMode::Markup | InterpretMode::Code => self.ctx.world().library.global.scope(),
             _ => return (None, None),
         };
 
@@ -1244,7 +1244,7 @@ impl ExprWorker<'_> {
         }
 
         if name.as_ref() == "std" {
-            let val = Ty::Value(InsTy::new(self.ctx.world.library.std.read().clone()));
+            let val = Ty::Value(InsTy::new(self.ctx.world().library.std.read().clone()));
             return (None, Some(val));
         }
 

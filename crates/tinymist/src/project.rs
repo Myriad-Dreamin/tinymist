@@ -549,7 +549,7 @@ impl CompileHandlerImpl {
         if !should_lint {
             let enc = self.analysis.position_encoding;
             let diagnostics =
-                tinymist_query::convert_diagnostics(art.world(), art.diagnostics(), enc);
+                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
@@ -561,8 +561,7 @@ impl CompileHandlerImpl {
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
             spawn_cpu(move || {
-                let world = snap.world().clone();
-                let mut ctx = analysis.enter(world);
+                let mut ctx = analysis.enter(snap.graph.clone());
 
                 // todo: check all errors in this file
                 let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {

@@ -10,7 +10,7 @@ use std::{
 
 use regex::{Regex, Replacer};
 use serde_json::{Serializer, Value, ser::PrettyFormatter};
-use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
+use tinymist_project::{LspCompileSnapshot, LspComputeGraph, LspWorld};
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
@@ -31,15 +31,35 @@ pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
 
+#[derive(Default, Clone, Copy)]
+pub struct Opts {
+    pub need_compile: bool,
+}
+
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
         run_with_ctx(verse, path, f);
     });
 }
 
+pub fn snapshot_testing_with(name: &str, opts: Opts, f: &impl Fn(&mut LocalContext, PathBuf)) {
+    tinymist_tests::snapshot_testing!(name, |verse, path| {
+        run_with_ctx_(verse, path, opts, f);
+    });
+}
+
 pub fn run_with_ctx<T>(
     verse: &mut LspUniverse,
     path: PathBuf,
+    f: &impl Fn(&mut LocalContext, PathBuf) -> T,
+) -> T {
+    run_with_ctx_(verse, path, Opts::default(), f)
+}
+
+pub fn run_with_ctx_<T>(
+    verse: &mut LspUniverse,
+    path: PathBuf,
+    opts: Opts,
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
     let root = verse.entry_state().workspace_root().unwrap();
@@ -65,7 +85,8 @@ pub fn run_with_ctx<T>(
         .map(|v| v.trim() == "true")
         .unwrap_or(true);
 
-    let mut ctx = Arc::new(Analysis {
+    let g = compile_doc_for_test(&world, &properties, opts.need_compile);
+    let a = Arc::new(Analysis {
         remove_html: !supports_html,
         completion_feat: CompletionFeat {
             trigger_on_snippet_placeholders: true,
@@ -75,8 +96,8 @@ pub fn run_with_ctx<T>(
             ..Default::default()
         },
         ..Analysis::default()
-    })
-    .enter(world);
+    });
+    let mut ctx = a.enter_(g, a.lock_revision(None));
 
     ctx.test_package_list(|| {
         vec![(
@@ -103,18 +124,20 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 }
 
 pub fn compile_doc_for_test(
-    ctx: &mut LocalContext,
+    world: &LspWorld,
     properties: &HashMap<&str, &str>,
+    need_compile: bool,
 ) -> LspComputeGraph {
-    let prev = ctx.world.entry_state();
+    let prev = world.entry_state();
     let next = match properties.get("compile").map(|s| s.trim()) {
+        _ if need_compile => prev.clone(),
         Some("true") => prev.clone(),
-        None | Some("false") => return WorldComputeGraph::from_world(ctx.world.clone()),
+        None | Some("false") => return WorldComputeGraph::from_world(world.clone()),
         Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
         v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
-    let mut world = Cow::Borrowed(&ctx.world);
+    let mut world = Cow::Borrowed(world);
     if next != prev {
         world = Cow::Owned(world.task(TaskInputs {
             entry: Some(next),

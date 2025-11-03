@@ -17,7 +17,6 @@ use lsp_types::Url;
 use tinymist_analysis::syntax::classify_syntax;
 use tinymist_std::error::WithContextUntyped;
 use tinymist_std::hash::FxHashMap;
-use tinymist_std::typst::TypstDocument;
 use tinymist_world::EntryReader;
 use typst::syntax::{FileId, LinkedNode, Source, Span};
 
@@ -274,7 +273,6 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
         ctx,
         strings: FxHashMap::default(),
         references: FxHashMap::default(),
-        doc: None,
     };
     let files = files
         .iter()
@@ -299,8 +297,6 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
 struct DumpWorker<'a> {
     /// The context.
     ctx: &'a mut LocalContext,
-    /// The document.
-    doc: Option<TypstDocument>,
     /// A string interner.
     strings: FxHashMap<EcoString, EcoString>,
     /// The references collected so far.
@@ -343,7 +339,7 @@ impl DumpWorker<'_> {
                 return;
             }
 
-            let Some(def) = self.ctx.def_of_syntax(source, self.doc.as_ref(), syntax) else {
+            let Some(def) = self.ctx.def_of_syntax(source, syntax) else {
                 return;
             };
             self.references.insert(span, def);

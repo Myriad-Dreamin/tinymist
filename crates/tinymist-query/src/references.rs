@@ -1,7 +1,6 @@
 use std::sync::OnceLock;
 
 use tinymist_analysis::adt::interner::Interned;
-use tinymist_std::typst::TypstDocument;
 use typst::syntax::Span;
 
 use crate::{
@@ -24,15 +23,14 @@ pub struct ReferencesRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for ReferencesRequest {
+impl SemanticRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let locations = find_references(ctx, &source, doc, syntax)?;
+        let locations = find_references(ctx, &source, syntax)?;
 
         crate::log_debug_ct!("references: {locations:?}");
         Some(locations)
@@ -42,7 +40,6 @@ impl StatefulRequest for ReferencesRequest {
 pub(crate) fn find_references(
     ctx: &mut LocalContext,
     source: &Source,
-    doc: Option<&TypstDocument>,
     syntax: SyntaxClass<'_>,
 ) -> Option<Vec<LspLocation>> {
     let finding_label = match syntax {
@@ -62,7 +59,7 @@ pub(crate) fn find_references(
         }
     };
 
-    let def = ctx.def_of_syntax(source, doc, syntax)?;
+    let def = ctx.def_of_syntax(source, syntax)?;
 
     let worker = ReferencesWorker {
         ctx: ctx.fork_for_search(),
@@ -178,7 +175,6 @@ impl ReferencesWorker<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syntax::find_module_level_docs;
     use crate::tests::*;
 
     #[test]
@@ -186,16 +182,12 @@ mod tests {
         snapshot_testing("references", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-            let doc = compile_doc_for_test(ctx, &properties);
-
             let request = ReferencesRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(ctx, doc);
+            let result = request.request(ctx);
             let mut result = result.map(|v| {
                 v.into_iter()
                     .map(|loc| {

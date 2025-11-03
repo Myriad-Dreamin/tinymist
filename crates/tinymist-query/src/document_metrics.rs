@@ -95,11 +95,11 @@ pub struct DocumentMetricsRequest {
     pub path: PathBuf,
 }
 
-impl StatefulRequest for DocumentMetricsRequest {
+impl SemanticRequest for DocumentMetricsRequest {
     type Response = DocumentMetricsResponse;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref()?;
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
+        let doc = ctx.success_doc()?.clone();
 
         let mut worker = DocumentMetricsWorker {
             ctx,
@@ -108,7 +108,7 @@ impl StatefulRequest for DocumentMetricsRequest {
             font_info: Default::default(),
         };
 
-        worker.work(doc)?;
+        worker.work(&doc)?;
 
         let font_info = worker.compute()?;
         let span_info = SpanInfo {
