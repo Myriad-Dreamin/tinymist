@@ -398,7 +398,7 @@ You can pass any arguments as you like, and we will try to follow behaviors of t
 - `--pdf-standard`: Specify the PDF standards that Typst will enforce conformance with.
 - `--no-pdf-tags`: By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is written to provide a baseline of accessibility. In some circumstances (for example when trying to reduce the size of a document) it can be desirable to disable tagged PDF.
 - `--ppi`: Specify the PPI (pixels per inch) to use for PNG export.
-- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link(“https://reproducible-builds.org/specs/source-date-epoch/”)\[UNIX timestamp\].
+- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a [UNIX timestamp](https://reproducible-builds.org/specs/source-date-epoch/).
 - `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
 
 - **Type**: `array`

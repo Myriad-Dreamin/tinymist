@@ -58,44 +58,6 @@ pub fn load_translations(input: &str) -> anyhow::Result<TranslationMapSet> {
                 return;
             }
 
-            if v.starts_with("\"\"\"") {
-                let content = v
-                    .strip_prefix("\"\"\"")
-                    .unwrap()
-                    .strip_suffix("\"\"\"")
-                    .unwrap_or_else(|| panic!("cannot parse translation message: message: {v}"));
-
-                let mut result = String::new();
-                let mut slash_escape = false;
-                let mut met_space = false;
-                for c in content.chars() {
-                    if slash_escape {
-                        if c.is_whitespace() || c == '\n' || c == '\r' {
-                            met_space = true;
-                            continue;
-                        }
-                        slash_escape = false;
-                        if met_space {
-                            result.push(c);
-                            met_space = false;
-                            continue;
-                        }
-                        match c {
-                            'n' => result.push('\n'),
-                            'r' => result.push('\r'),
-                            't' => result.push('\t'),
-                            _ => result.push(c),
-                        }
-                    } else if c == '\\' {
-                        slash_escape = true;
-                    } else {
-                        result.push(c);
-                    }
-                }
-
-                *v = result;
-            }
-
             *v = serde_json::from_str::<String>(v)
                 .unwrap_or_else(|e| panic!("cannot parse translation message: {e}, message: {v}"));
         });

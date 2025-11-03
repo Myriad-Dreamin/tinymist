@@ -1168,36 +1168,8 @@ en = "Typst Extra Arguments"
 zh = "Typst 额外参数"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.desc]
-en = """You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`. The following arguments are supported:
-- entry file: The last string in the array will be treated as the entry file.
-  - This is used to specify the *default* entry file for the compiler, which may be overridden by other settings.
-- `--root`: Configure the project root (for absolute paths). If the path is relative, it will be resolved relative to the current working directory (PWD).
-- `--input`: Add a string key-value pair visible through `sys.inputs`.
-- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
-- `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
-- `--package-path`: Specify a custom path to local packages, defaults to system-dependent location.
-- `--package-cache-path`: Specify a custom path to package cache, defaults to system-dependent location.
-- `--features`: Add a string key-value pair visible through `sys.features`.
-- `--pdf-standard`: Specify the PDF standards that Typst will enforce conformance with.
-- `--no-pdf-tags`: By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is written to provide a baseline of accessibility. In some circumstances (for example when trying to reduce the size of a document) it can be desirable to disable tagged PDF.
-- `--ppi`: Specify the PPI (pixels per inch) to use for PNG export.
-- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX timestamp].
-- `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages."""
-zh = """您可以传递任何您喜欢的参数，我们将尝试遵循**相同版本**的 typst-cli 的行为。注意：参数可能会被其他设置覆盖。例如，`--font-path` 将被 `tinymist.fontPaths` 覆盖。支持的参数包括：
-- 入口文件：数组中的最后一个字符串将被视为入口文件。
-  - 这用于指定编译器的**默认**入口文件，可能会被其他设置覆盖。
-- `--root`: 配置项目根目录（用于绝对路径）。如果路径是相对的，它将相对于当前工作目录（PWD）解析。
-- `--input`: 添加一个字符串键值对，通过 `sys.inputs` 可见。
-- `--font-path` (环境变量: `TYPST_FONT_PATHS`): 字体路径，可能被 `tinymist.fontPaths` 覆盖。
-- `--ignore-system-fonts`: 确保系统字体不会被搜索，可能被 `tinymist.systemFonts` 覆盖。
-- `--package-path`: 指定本地包的自定义路径，默认为系统依赖位置。
-- `--package-cache-path`: 指定包缓存的定制路径，默认为系统依赖位置。
-- `--features`: 添加一个字符串键值对，通过 `sys.features` 可见。
-- `--pdf-standard`: 指定 Typst 将强制遵循的 PDF 标准。
-- `--no-pdf-tags`: 默认情况下，即使不生成 `PDF/UA-1` 文档，也会生成一个标记的 PDF 文档，以提供基础的辅助功能。在某些情况下（例如尝试减小文档大小），可能希望禁用标记的 PDF。
-- `--ppi`: 指定 PNG 导出的 PPI（像素每英寸）。
-- `--creation-timestamp` (环境变量: `SOURCE_DATE_EPOCH`): 文档的创建日期格式化为一个 #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX 时间戳]。
-- `--cert` (环境变量: `TYPST_CERT`): 用于网络访问的 CA 证书文件路径，特别是用于下载 typst 包。"""
+en = "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`. The following arguments are supported:\n- entry file: The last string in the array will be treated as the entry file.\n  - This is used to specify the *default* entry file for the compiler, which may be overridden by other settings.\n- `--root`: Configure the project root (for absolute paths). If the path is relative, it will be resolved relative to the current working directory (PWD).\n- `--input`: Add a string key-value pair visible through `sys.inputs`.\n- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.\n- `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.\n- `--package-path`: Specify a custom path to local packages, defaults to system-dependent location.\n- `--package-cache-path`: Specify a custom path to package cache, defaults to system-dependent location.\n- `--features`: Add a string key-value pair visible through `sys.features`.\n- `--pdf-standard`: Specify the PDF standards that Typst will enforce conformance with.\n- `--no-pdf-tags`: By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is written to provide a baseline of accessibility. In some circumstances (for example when trying to reduce the size of a document) it can be desirable to disable tagged PDF.\n- `--ppi`: Specify the PPI (pixels per inch) to use for PNG export.\n- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a [UNIX timestamp](https://reproducible-builds.org/specs/source-date-epoch/).\n- `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages."
+zh = "您可以传递任何您喜欢的参数，我们将尝试遵循**相同版本**的 typst-cli 的行为。注意：参数可能会被其他设置覆盖。例如，`--font-path` 将被 `tinymist.fontPaths` 覆盖。支持的参数包括：\n- 入口文件：数组中的最后一个字符串将被视为入口文件。\n  - 这用于指定编译器的**默认**入口文件，可能会被其他设置覆盖。\n- `--root`: 配置项目根目录（用于绝对路径）。如果路径是相对的，它将相对于当前工作目录（PWD）解析。\n- `--input`: 添加一个字符串键值对，通过 `sys.inputs` 可见。\n- `--font-path` (环境变量: `TYPST_FONT_PATHS`): 字体路径，可能被 `tinymist.fontPaths` 覆盖。\n- `--ignore-system-fonts`: 确保系统字体不会被搜索，可能被 `tinymist.systemFonts` 覆盖。\n- `--package-path`: 指定本地包的自定义路径，默认为系统依赖位置。\n- `--package-cache-path`: 指定包缓存的定制路径，默认为系统依赖位置。\n- `--features`: 添加一个字符串键值对，通过 `sys.features` 可见。\n- `--pdf-standard`: 指定 Typst 将强制遵循的 PDF 标准。\n- `--no-pdf-tags`: 默认情况下，即使不生成 `PDF/UA-1` 文档，也会生成一个标记的 PDF 文档，以提供基础的辅助功能。在某些情况下（例如尝试减小文档大小），可能希望禁用标记的 PDF。\n- `--ppi`: 指定 PNG 导出的 PPI（像素每英寸）。\n- `--creation-timestamp` (环境变量: `SOURCE_DATE_EPOCH`): 文档的创建日期格式化为一个 [UNIX 时间戳](https://reproducible-builds.org/specs/source-date-epoch/)。\n- `--cert` (环境变量: `TYPST_CERT`): 用于网络访问的 CA 证书文件路径，特别是用于下载 typst 包。"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.items.title]
 en = "arguments in order"
