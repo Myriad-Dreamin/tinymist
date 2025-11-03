@@ -350,54 +350,71 @@ pub enum ExportTarget {
 pub enum PdfStandard {
     /// PDF 1.4.
     #[value(name = "1.4")]
+    #[serde(rename = "1.4")]
     V_1_4,
     /// PDF 1.5.
     #[value(name = "1.5")]
+    #[serde(rename = "1.5")]
     V_1_5,
     /// PDF 1.6.
     #[value(name = "1.6")]
+    #[serde(rename = "1.6")]
     V_1_6,
     /// PDF 1.7.
     #[value(name = "1.7")]
+    #[serde(rename = "1.7")]
     V_1_7,
     /// PDF 2.0.
     #[value(name = "2.0")]
+    #[serde(rename = "2.0")]
     V_2_0,
     /// PDF/A-1b.
     #[value(name = "a-1b")]
+    #[serde(rename = "a-1b")]
     A_1b,
     /// PDF/A-1a.
     #[value(name = "a-1a")]
+    #[serde(rename = "a-1a")]
     A_1a,
     /// PDF/A-2b.
     #[value(name = "a-2b")]
+    #[serde(rename = "a-2b")]
     A_2b,
     /// PDF/A-2u.
     #[value(name = "a-2u")]
+    #[serde(rename = "a-2u")]
     A_2u,
     /// PDF/A-2a.
     #[value(name = "a-2a")]
+    #[serde(rename = "a-2a")]
     A_2a,
     /// PDF/A-3b.
     #[value(name = "a-3b")]
+    #[serde(rename = "a-3b")]
     A_3b,
     /// PDF/A-3u.
     #[value(name = "a-3u")]
+    #[serde(rename = "a-3u")]
     A_3u,
     /// PDF/A-3a.
     #[value(name = "a-3a")]
+    #[serde(rename = "a-3a")]
     A_3a,
     /// PDF/A-4.
     #[value(name = "a-4")]
+    #[serde(rename = "a-4")]
     A_4,
     /// PDF/A-4f.
     #[value(name = "a-4f")]
+    #[serde(rename = "a-4f")]
     A_4f,
     /// PDF/A-4e.
     #[value(name = "a-4e")]
+    #[serde(rename = "a-4e")]
     A_4e,
     /// PDF/UA-1.
     #[value(name = "ua-1")]
+    #[serde(rename = "ua-1")]
     Ua_1,
 }
 
