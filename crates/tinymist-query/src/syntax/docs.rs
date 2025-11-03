@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, ops::Deref, sync::LazyLock};
 
 use ecow::eco_format;
+use tinymist_analysis::stats::GLOBAL_STATS;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use crate::{StrRef, adt::interner::Interned};
@@ -20,6 +21,8 @@ pub(crate) fn do_compute_docstring(
     docs: String,
     kind: DefKind,
 ) -> Option<DocString> {
+    let _guard = GLOBAL_STATS.stat(fid, "compute_docstring");
+
     let checker = DocsChecker {
         fid,
         ctx,

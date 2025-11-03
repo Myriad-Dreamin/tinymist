@@ -127,6 +127,7 @@ mod tests {
         source: &Source,
         request_range: &LspRange,
     ) -> CodeActionContext {
+        // todo: reuse world compute graph APIs.
         let Warned {
             output,
             warnings: compiler_warnings,
@@ -144,8 +145,8 @@ mod tests {
         CodeActionContext {
             // The filtering here matches the LSP specification and VS Code behavior;
             // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
-            //   `diagnostics`: An array of diagnostics known on the client side overlapping the range
-            //   provided to the textDocument/codeAction request [...]
+            //   `diagnostics`: An array of diagnostics known on the client side overlapping the
+            // range   provided to the textDocument/codeAction request [...]
             diagnostics: diagnostics
                 .filter(|diag| ranges_overlap(&diag.range, request_range))
                 .collect(),

@@ -48,7 +48,7 @@ pub mod index;
 pub mod package;
 pub mod syntax;
 pub mod testing;
-pub use tinymist_analysis::{ty, upstream};
+pub use tinymist_analysis::{stats::GLOBAL_STATS, ty, upstream};
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;

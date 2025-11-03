@@ -6,10 +6,10 @@ use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
-use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
+use reflexo_typst::{Bytes, CompilationTask, ExportComputation, DETACHED_ENTRY};
 use sync_ls::{internal_error, just_future};
 use tinymist_project::LspWorld;
-use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse};
+use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse, GLOBAL_STATS};
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
@@ -73,6 +73,9 @@ impl ServerState {
                 entry: Some(entry),
                 ..TaskInputs::default()
             });
+
+            let id = snap.world().main_id().unwrap_or_else(|| *DETACHED_ENTRY);
+            let _guard = GLOBAL_STATS.stat(id, "export");
 
             let is_html = matches!(task, ProjectTask::ExportHtml { .. });
             // todo: we may get some file missing errors here

@@ -8,7 +8,7 @@ use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
-use tinymist_query::ServerInfoResponse;
+use tinymist_query::{ServerInfoResponse, GLOBAL_STATS};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
@@ -497,6 +497,7 @@ impl ServerState {
         let dg = self.project.primary_id().to_string();
         let api_stats = self.project.stats.report();
         let query_stats = self.project.analysis.report_query_stats();
+        let global_stats = GLOBAL_STATS.report();
         let alloc_stats = self.project.analysis.report_alloc_stats();
 
         let snap = self.snapshot().map_err(internal_error)?;
@@ -509,6 +510,7 @@ impl ServerState {
                 inputs: w.inputs().as_ref().deref().clone(),
                 stats: HashMap::from_iter([
                     ("api".to_owned(), api_stats),
+                    ("global".to_owned(), global_stats),
                     ("query".to_owned(), query_stats),
                     ("alloc".to_owned(), alloc_stats),
                 ]),
