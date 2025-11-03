@@ -247,6 +247,7 @@ pub struct ExportPdfTask {
     /// document is written to provide a baseline of accessibility. In some
     /// circumstances (for example when trying to reduce the size of a document)
     /// it can be desirable to disable tagged PDF.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
     pub no_pdf_tags: bool,
     /// The document's creation date formatted as a UNIX timestamp (in seconds).
     ///
