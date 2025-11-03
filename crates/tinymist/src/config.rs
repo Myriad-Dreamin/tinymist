@@ -447,7 +447,9 @@ impl Config {
                 root_dir: args.root.as_ref().map(|r| r.as_path().into()),
                 font: args.font,
                 package: args.package,
-                pdf_standard: args.pdf_standard,
+                pdf_standard: args.pdf.standard,
+                no_pdf_tags: args.pdf.no_tags,
+                ppi: args.png.ppi,
                 features: args.features,
                 creation_timestamp: args.creation_timestamp,
                 cert: args.cert.as_deref().map(From::from),
@@ -562,6 +564,7 @@ impl Config {
                 export,
                 pages: None, // todo: set pages
                 pdf_standards: self.pdf_standards().unwrap_or_default(),
+                no_pdf_tags: self.no_pdf_tags(),
                 creation_timestamp: self.creation_timestamp(),
             }),
             count_words: self.notify_status,
@@ -659,6 +662,18 @@ impl Config {
     /// Determines the pdf standards.
     pub fn pdf_standards(&self) -> Option<Vec<PdfStandard>> {
         Some(self.typst_extra_args.as_ref()?.pdf_standard.clone())
+    }
+
+    /// Determines the no pdf tags.
+    pub fn no_pdf_tags(&self) -> bool {
+        self.typst_extra_args
+            .as_ref()
+            .is_some_and(|x| x.no_pdf_tags)
+    }
+
+    /// Determines the ppi.
+    pub fn ppi(&self) -> Option<f32> {
+        Some(self.typst_extra_args.as_ref()?.ppi)
     }
 
     /// Determines the creation timestamp.
@@ -971,6 +986,13 @@ pub struct TypstExtraArgs {
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.
     pub pdf_standard: Vec<PdfStandard>,
+    /// The PPI (pixels per inch) to use for PNG export.
+    pub ppi: f32,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    pub no_pdf_tags: bool,
     /// The creation timestamp for various outputs (in seconds).
     pub creation_timestamp: Option<i64>,
     /// The path to the certification file.

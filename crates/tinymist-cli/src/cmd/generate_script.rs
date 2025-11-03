@@ -183,6 +183,10 @@ fn shell_build_script(shell: Shell) -> Result<String> {
                     cmd.push(s);
                 }
 
+                if task.no_pdf_tags {
+                    cmd.push("--no-pdf-tags");
+                }
+
                 if let Some(output) = &task.creation_timestamp {
                     cmd.push("--creation-timestamp");
                     cmd.push(output.to_string());

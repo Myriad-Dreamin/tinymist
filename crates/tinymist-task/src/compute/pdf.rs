@@ -35,13 +35,35 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
                 .pdf_standards
                 .iter()
                 .map(|standard| match standard {
+                    tinymist_world::args::PdfStandard::V_1_4 => typst_pdf::PdfStandard::V_1_4,
+                    tinymist_world::args::PdfStandard::V_1_5 => typst_pdf::PdfStandard::V_1_5,
+                    tinymist_world::args::PdfStandard::V_1_6 => typst_pdf::PdfStandard::V_1_6,
                     tinymist_world::args::PdfStandard::V_1_7 => typst_pdf::PdfStandard::V_1_7,
+                    tinymist_world::args::PdfStandard::V_2_0 => typst_pdf::PdfStandard::V_2_0,
+                    tinymist_world::args::PdfStandard::A_1b => typst_pdf::PdfStandard::A_1b,
+                    tinymist_world::args::PdfStandard::A_1a => typst_pdf::PdfStandard::A_1a,
                     tinymist_world::args::PdfStandard::A_2b => typst_pdf::PdfStandard::A_2b,
+                    tinymist_world::args::PdfStandard::A_2u => typst_pdf::PdfStandard::A_2u,
+                    tinymist_world::args::PdfStandard::A_2a => typst_pdf::PdfStandard::A_2a,
                     tinymist_world::args::PdfStandard::A_3b => typst_pdf::PdfStandard::A_3b,
+                    tinymist_world::args::PdfStandard::A_3u => typst_pdf::PdfStandard::A_3u,
+                    tinymist_world::args::PdfStandard::A_3a => typst_pdf::PdfStandard::A_3a,
+                    tinymist_world::args::PdfStandard::A_4 => typst_pdf::PdfStandard::A_4,
+                    tinymist_world::args::PdfStandard::A_4f => typst_pdf::PdfStandard::A_4f,
+                    tinymist_world::args::PdfStandard::A_4e => typst_pdf::PdfStandard::A_4e,
+                    tinymist_world::args::PdfStandard::Ua_1 => typst_pdf::PdfStandard::Ua_1,
                 })
                 .collect::<Vec<_>>(),
         )
         .context_ut("prepare pdf standards")?;
+
+        let tagged = !config.no_pdf_tags && config.pages.is_none();
+        // todo: emit warning diag
+        if config.pages.is_some() && !config.no_pdf_tags {
+            log::warn!(
+                "the resulting PDF will be inaccessible because using --pages implies --no-pdf-tags"
+            );
+        }
 
         // todo: Some(pdf_uri.as_str())
         // todo: ident option
@@ -54,6 +76,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
                     .map(|pages| exported_page_ranges(pages)),
                 timestamp: Some(timestamp),
                 standards,
+                tagged,
                 ..Default::default()
             },
         )?))

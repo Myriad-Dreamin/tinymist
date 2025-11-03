@@ -79,6 +79,14 @@ pub struct CompileOnceArgs {
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 
+    /// Specify the PDF export related arguments.
+    #[clap(flatten)]
+    pub pdf: PdfExportArgs,
+
+    /// Specify the PNG export related arguments.
+    #[clap(flatten)]
+    pub png: PngExportArgs,
+
     /// Enable in-development features that may be changed or removed at any
     /// time.
     #[arg(long = "features", value_delimiter = ',', env = "TYPST_FEATURES")]
@@ -113,12 +121,6 @@ pub struct CompileOnceArgs {
         hide(true),
     )]
     pub creation_timestamp: Option<i64>,
-
-    /// Specify the PDF standards that Typst will enforce conformance with.
-    ///
-    /// If multiple standards are specified, they are separated by commas.
-    #[arg(long = "pdf-standard", value_delimiter = ',')]
-    pub pdf_standard: Vec<PdfStandard>,
 
     /// Specify the path to CA certificate file for network access, especially
     /// for downloading typst packages.
@@ -232,6 +234,31 @@ pub fn parse_source_date_epoch(raw: &str) -> Result<i64, String> {
         .map_err(|err| format!("timestamp must be decimal integer ({err})"))
 }
 
+/// Specify the PDF export related arguments.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct PdfExportArgs {
+    /// Specify the PDF standards that Typst will enforce conformance with.
+    ///
+    /// If multiple standards are specified, they are separated by commas.
+    #[arg(long = "pdf-standard", value_delimiter = ',')]
+    pub standard: Vec<PdfStandard>,
+
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    #[arg(long = "no-pdf-tags")]
+    pub no_tags: bool,
+}
+
+/// Specify the PNG export related arguments.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct PngExportArgs {
+    /// Specify the PPI (pixels per inch) to use for PNG export.
+    #[arg(long = "ppi", default_value_t = 144.0)]
+    pub ppi: f32,
+}
+
 macro_rules! display_possible_values {
     ($ty:ty) => {
         impl fmt::Display for $ty {
@@ -321,18 +348,57 @@ pub enum ExportTarget {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub enum PdfStandard {
+    /// PDF 1.4.
+    #[value(name = "1.4")]
+    V_1_4,
+    /// PDF 1.5.
+    #[value(name = "1.5")]
+    V_1_5,
+    /// PDF 1.6.
+    #[value(name = "1.6")]
+    V_1_6,
     /// PDF 1.7.
     #[value(name = "1.7")]
-    #[serde(rename = "1.7")]
     V_1_7,
+    /// PDF 2.0.
+    #[value(name = "2.0")]
+    V_2_0,
+    /// PDF/A-1b.
+    #[value(name = "a-1b")]
+    A_1b,
+    /// PDF/A-1a.
+    #[value(name = "a-1a")]
+    A_1a,
     /// PDF/A-2b.
     #[value(name = "a-2b")]
-    #[serde(rename = "a-2b")]
     A_2b,
+    /// PDF/A-2u.
+    #[value(name = "a-2u")]
+    A_2u,
+    /// PDF/A-2a.
+    #[value(name = "a-2a")]
+    A_2a,
     /// PDF/A-3b.
     #[value(name = "a-3b")]
-    #[serde(rename = "a-3b")]
     A_3b,
+    /// PDF/A-3u.
+    #[value(name = "a-3u")]
+    A_3u,
+    /// PDF/A-3a.
+    #[value(name = "a-3a")]
+    A_3a,
+    /// PDF/A-4.
+    #[value(name = "a-4")]
+    A_4,
+    /// PDF/A-4f.
+    #[value(name = "a-4f")]
+    A_4f,
+    /// PDF/A-4e.
+    #[value(name = "a-4e")]
+    A_4e,
+    /// PDF/UA-1.
+    #[value(name = "ua-1")]
+    Ua_1,
 }
 
 display_possible_values!(PdfStandard);

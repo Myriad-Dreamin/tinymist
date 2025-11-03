@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist::project::*;
 use tinymist::tool::project::{StartProjectResult, start_project};
-use tinymist::world::{SourceWorld, with_main};
+use tinymist::world::{PngExportArgs, SourceWorld, with_main};
 use tinymist_debug::CoverageResult;
 use tinymist_project::world::{DiagnosticFormat, system::print_diagnostics};
 use tinymist_query::analysis::Analysis;
