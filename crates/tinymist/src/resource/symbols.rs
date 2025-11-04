@@ -10,7 +10,7 @@ use typst::foundations::Bytes;
 use typst::{syntax::VirtualPath, World};
 
 use super::prelude::*;
-use crate::project::LspComputeGraph;
+use crate::project::{EntryReader, LspComputeGraph};
 use crate::world::{base::ShadowApi, EntryState, TaskInputs};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -232,7 +232,7 @@ fn render_symbols(
         ..TaskInputs::default()
     });
 
-    let _guard = GLOBAL_STATS.stat(forked.main(), "render_symbols");
+    let _guard = GLOBAL_STATS.stat(forked.main_id(), "render_symbols");
     forked
         .map_shadow_by_id(forked.main(), Bytes::from_string(math_shaping_text))
         .map_err(|e| error_once!("cannot map shadow", err: e))

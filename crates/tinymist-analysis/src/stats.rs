@@ -104,8 +104,21 @@ pub struct QueryStatBucket {
     pub data: Arc<Mutex<QueryStatBucketData>>,
 }
 
+impl QueryStatBucket {
+    /// Increment the query statistic.
+    pub fn increment(&self, elapsed: Duration) {
+        let mut data = self.data.lock();
+        data.query += 1;
+        data.total += elapsed;
+        data.min = data.min.min(elapsed);
+        data.max = data.max.max(elapsed);
+    }
+}
+
 /// A guard for the query statistic.
 pub struct QueryStatGuard {
+    /// The bucket of the query statistic for any file.
+    pub bucket_any: Option<QueryStatBucket>,
     /// The bucket of the query statistic.
     pub bucket: QueryStatBucket,
     /// The start time of the query.
@@ -115,11 +128,10 @@ pub struct QueryStatGuard {
 impl Drop for QueryStatGuard {
     fn drop(&mut self) {
         let elapsed = self.since.elapsed();
-        let mut data = self.bucket.data.lock();
-        data.query += 1;
-        data.total += elapsed;
-        data.min = data.min.min(elapsed);
-        data.max = data.max.max(elapsed);
+        self.bucket.increment(elapsed);
+        if let Some(bucket) = self.bucket_any.as_ref() {
+            bucket.increment(elapsed);
+        }
     }
 }
 
@@ -135,16 +147,28 @@ impl QueryStatGuard {
 #[derive(Default)]
 pub struct AnalysisStats {
     /// The query statistics.
-    pub query_stats: FxDashMap<FileId, FxDashMap<&'static str, QueryStatBucket>>,
+    pub query_stats: Arc<FxDashMap<Option<FileId>, FxDashMap<&'static str, QueryStatBucket>>>,
 }
 
 impl AnalysisStats {
     /// Gets a statistic guard for a query.
-    pub fn stat(&self, id: FileId, query: &'static str) -> QueryStatGuard {
+    pub fn stat(&self, id: Option<FileId>, query: &'static str) -> QueryStatGuard {
         let stats = &self.query_stats;
         let entry = stats.entry(id).or_default();
         let entry = entry.entry(query).or_default();
         QueryStatGuard {
+            bucket_any: if id.is_some() {
+                Some(
+                    stats
+                        .entry(None)
+                        .or_default()
+                        .entry(query)
+                        .or_default()
+                        .clone(),
+                )
+            } else {
+                None
+            },
             bucket: entry.clone(),
             since: tinymist_std::time::Instant::now(),
         }
@@ -160,7 +184,11 @@ impl AnalysisStats {
             for refs2 in queries.iter() {
                 let query = refs2.key();
                 let bucket = refs2.value().data.lock().clone();
-                let name = format!("{id:?}:{query}").replace('\\', "/");
+                let name = match id {
+                    Some(id) => format!("{id:?}:{query}"),
+                    None => query.to_string(),
+                };
+                let name = name.replace('\\', "/");
                 data.push((name, bucket));
             }
         }

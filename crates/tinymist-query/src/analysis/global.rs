@@ -1115,7 +1115,7 @@ impl SharedContext {
     }
 
     fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
-        self.analysis.stats.stat(id, query)
+        self.analysis.stats.stat(Some(id), query)
     }
 
     /// Check on a module before really needing them. But we likely use them
