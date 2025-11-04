@@ -38,7 +38,7 @@ impl SemanticRequest for SignatureHelpRequest {
         };
 
         let syntax = classify_syntax(callee, cursor)?;
-        let def = ctx.def_of_syntax_or_dyn(&source, None, syntax)?;
+        let def = ctx.def_of_syntax_or_dyn(&source, syntax)?;
         let sig = ctx.sig_of_def(def.clone())?;
         crate::log_debug_ct!("got signature {sig:?}");
 

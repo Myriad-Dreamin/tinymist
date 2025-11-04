@@ -219,12 +219,14 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 }
 
 fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
-    let mut actx = ctx.analysis.enter(world.clone());
-    let doc = typst::compile::<TypstPagedDocument>(&actx.world).output?;
+    let doc = typst::compile::<TypstPagedDocument>(&world).output?;
+
+    let mut snap = CompileSnapshot::from_world(world.clone());
+    snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
+    let mut actx = ctx.analysis.enter(WorldComputeGraph::new(snap));
 
     let suites =
-        tinymist_query::testing::test_suites(&mut actx, &TypstDocument::from(Arc::new(doc)))
-            .context("failed to discover tests")?;
+        tinymist_query::testing::test_suites(&mut actx).context("failed to discover tests")?;
     log_info!(
         "Found {} tests and {} examples",
         suites.tests.len(),

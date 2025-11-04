@@ -86,8 +86,8 @@ pub struct TestCase {
 }
 
 /// Extracts the test suites in the document
-pub fn test_suites(ctx: &mut LocalContext, doc: &TypstDocument) -> Result<TestSuites> {
-    let main_id = ctx.world.main();
+pub fn test_suites(ctx: &mut LocalContext) -> Result<TestSuites> {
+    let main_id = ctx.world().main();
     let main_workspace = main_id.package();
 
     crate::log_debug_ct!(
@@ -108,7 +108,7 @@ pub fn test_suites(ctx: &mut LocalContext, doc: &TypstDocument) -> Result<TestSu
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let config = extract_test_configuration(doc)?;
+    let config = extract_test_configuration(ctx.success_doc().context("no success doc")?)?;
 
     let mut worker = TestSuitesWorker {
         files: &files,

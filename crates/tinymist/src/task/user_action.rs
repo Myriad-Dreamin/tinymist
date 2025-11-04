@@ -16,6 +16,7 @@ use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value as JsonValue};
 use sync_ls::{just_future, LspClient, LspResult, RequestId, SchedulableResponse};
+use tinymist_project::LspComputeGraph;
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -118,7 +119,7 @@ impl UserActionTask {
     pub async fn trace_main(
         client: LspClient,
         state: &mut ServerState,
-        w: &LspWorld,
+        w: LspComputeGraph,
         rpc_kind: String,
         req_id: RequestId,
     ) -> ! {
@@ -232,26 +233,26 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
 async fn trace_main(
     client: LspClient,
     state: &mut ServerState,
-    w: &LspWorld,
+    g: LspComputeGraph,
     rpc_kind: String,
     req_id: RequestId,
 ) -> ! {
     typst_timing::enable();
-    let res = typst::compile::<TypstPagedDocument>(w);
+    let res = typst::compile::<TypstPagedDocument>(g.world());
     let diags = match &res.output {
         Ok(_res) => res.warnings,
         Err(errors) => errors.clone(),
     };
     let mut writer = std::io::BufWriter::new(Vec::new());
     let _ = typst_timing::export_json(&mut writer, |span| {
-        resolve_span(w, Span::from_raw(span)).unwrap_or_else(|| ("unknown".to_string(), 0))
+        resolve_span(g.world(), Span::from_raw(span)).unwrap_or_else(|| ("unknown".to_string(), 0))
     });
 
     let timings = writer.into_inner().unwrap();
 
     let handle = &state.project;
     let diagnostics =
-        tinymist_query::convert_diagnostics(w, diags.iter(), handle.analysis.position_encoding);
+        tinymist_query::convert_diagnostics(g, diags.iter(), handle.analysis.position_encoding);
 
     let rpc_kind = rpc_kind.as_str();
 

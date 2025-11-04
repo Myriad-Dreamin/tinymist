@@ -25,11 +25,11 @@ pub struct HoverRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for HoverRequest {
+impl SemanticRequest for HoverRequest {
     type Response = Hover;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.clone();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
+        let doc = ctx.success_doc().cloned();
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
@@ -120,7 +120,7 @@ impl HoverWorker<'_> {
         let syntax = classify_syntax(leaf.clone(), self.cursor)?;
         let def = self
             .ctx
-            .def_of_syntax_or_dyn(&self.source, self.doc.as_ref(), syntax.clone())?;
+            .def_of_syntax_or_dyn(&self.source, syntax.clone())?;
 
         use Decl::*;
         match def.decl.as_ref() {
@@ -419,16 +419,12 @@ mod tests {
         snapshot_testing("hover", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-            let graph = compile_doc_for_test(ctx, &properties);
-
             let request = HoverRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(ctx, graph);
+            let result = request.request(ctx);
             let content = HoverDisplay(result.as_ref())
                 .to_string()
                 .replace("\n---\n", "\n\n======\n\n");

@@ -21,10 +21,10 @@ pub(crate) fn convert_docs(
     content: &str,
     source_fid: Option<FileId>,
 ) -> StrResult<EcoString> {
-    let mut entry = ctx.world.entry_state();
+    let mut entry = ctx.world().entry_state();
     let import_context = source_fid.map(|fid| {
         let root = ctx
-            .world
+            .world()
             .vfs()
             .file_path(fid.join("/"))
             .ok()
@@ -58,7 +58,7 @@ pub(crate) fn convert_docs(
 
     let entry = entry.select_in_workspace(Path::new("__tinymist_docs__.typ"));
 
-    let mut w = ctx.world.task(TaskInputs {
+    let mut w = ctx.world().task(TaskInputs {
         entry: Some(entry),
         inputs: None,
     });
