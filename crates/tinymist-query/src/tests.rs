@@ -436,7 +436,7 @@ impl Redact for RedactFields {
                         static REG: LazyLock<Regex> = LazyLock::new(|| {
                             Regex::new(r#"(/dummy-root/|C:\\dummy-root\\).*?\.typ"#).unwrap()
                         });
-                        let error = REG.replace_all(error, "/__redacted_path__typ");
+                        let error = REG.replace_all(error, "/__redacted_path__.typ");
                         map.insert("error".to_owned(), Value::String(error.into()));
                     }
                 }

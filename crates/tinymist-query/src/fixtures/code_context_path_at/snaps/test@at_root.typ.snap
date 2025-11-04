@@ -83,7 +83,7 @@ input_file: crates/tinymist-query/src/fixtures/code_context_path_at/at_root.typ
   },
   "response": [
    {
-    "error": "crates/tinymist-query/src/code_context.rs:274:47: failed to evaluate path expression: error: join argument is not a string: 1\n  ┌─ /__redacted_path__typ:1:0\n  │\n1 │ { join(root, 1) }\n  │ ^^^^^^^^^^^^^^^^^\n\n",
+    "error": "crates/tinymist-query/src/code_context.rs:275:21: failed to evaluate path expression: error: join argument is not a string: 1\n  ┌─ /__redacted_path__.typ:1:0\n  │\n1 │ { join(root, 1) }\n  │ ^^^^^^^^^^^^^^^^^\n\n",
     "kind": "pathAt"
    }
   ]
@@ -97,7 +97,7 @@ input_file: crates/tinymist-query/src/fixtures/code_context_path_at/at_root.typ
   },
   "response": [
    {
-    "error": "crates/tinymist-query/src/code_context.rs:274:47: failed to evaluate path expression: error: unknown variable: roo\n  ┌─ /__redacted_path__typ:1:0\n  │\n1 │ { join(roo, 1) }\n  │ ^^^^^^^^^^^^^^^^\n\n",
+    "error": "crates/tinymist-query/src/code_context.rs:275:21: failed to evaluate path expression: error: unknown variable: roo\n  ┌─ /__redacted_path__.typ:1:0\n  │\n1 │ { join(roo, 1) }\n  │ ^^^^^^^^^^^^^^^^\n\n",
     "kind": "pathAt"
    }
   ]
