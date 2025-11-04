@@ -843,6 +843,16 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         return Some(ref_syntax);
     }
 
+    if node.kind() == SyntaxKind::Text
+        && node.offset() + 1 == cursor
+        && node.text().starts_with('@')
+    {
+        return Some(SyntaxClass::Ref {
+            node,
+            suffix_colon: false,
+        });
+    }
+
     // todo: check if we can remove Text here
     if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
         let mode = interpret_mode_at(Some(&node));
@@ -1633,6 +1643,14 @@ Text
 
     #[test]
     fn ref_syntax() {
+        assert_snapshot!(map_syntax("@"), @r"
+        @
+        r
+        ");
+        assert_snapshot!(map_syntax("@;"), @r"
+        @;
+        r
+        ");
         assert_snapshot!(map_syntax("@ab"), @r###"
         @ab
         rrr
