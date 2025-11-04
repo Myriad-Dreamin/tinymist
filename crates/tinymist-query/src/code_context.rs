@@ -271,9 +271,8 @@ fn eval_path_expr(
                 Err(e) => {
                     let res =
                         print_diagnostics_to_string(&world, e.iter(), DiagnosticFormat::Human);
-                    match res {
-                        Ok(err) | Err(err) => bail!("failed to evaluate path expression: {err}"),
-                    }
+                    let err = res.unwrap_or_else(|e| e);
+                    bail!("failed to evaluate path expression: {err}")
                 }
             }
         })
