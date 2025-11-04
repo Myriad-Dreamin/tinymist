@@ -648,6 +648,7 @@ impl Default for ExportUserConfig {
                 },
                 pages: None,
                 pdf_standards: vec![],
+                no_pdf_tags: false,
                 creation_timestamp: None,
             }),
             count_words: false,
