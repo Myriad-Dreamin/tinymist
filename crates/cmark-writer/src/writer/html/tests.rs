@@ -80,10 +80,7 @@ fn guarded_writer_textualizes_invalid_tag_in_non_strict_mode() {
     writer.write_html_element(&element).unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(
-        output,
-        "&lt;div! class=\"unsafe\"&gt;\noops\n&lt;/div!&gt;"
-    );
+    assert_eq!(output, "&lt;div! class=\"unsafe\"&gt;\noops\n&lt;/div!&gt;");
 }
 
 #[test]
@@ -121,10 +118,7 @@ fn guarded_writer_textualizes_invalid_attribute_in_non_strict_mode() {
 
     writer.write_html_element(&element).unwrap();
     let output = writer.into_string().unwrap();
-    assert_eq!(
-        output,
-        "&lt;div onload!=\"evil\"&gt;\nbody\n&lt;/div&gt;"
-    );
+    assert_eq!(output, "&lt;div onload!=\"evil\"&gt;\nbody\n&lt;/div&gt;");
 }
 
 #[test]
