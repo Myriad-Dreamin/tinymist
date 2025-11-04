@@ -395,6 +395,19 @@ impl<T, E: std::fmt::Display> WithContextUntyped<T> for Result<T, E> {
     }
 }
 
+impl<T> WithContextUntyped<T> for Option<T> {
+    fn context_ut(self, loc: &'static str) -> Result<T> {
+        self.ok_or_else(|| Error::new(loc, ErrKind::None, None))
+    }
+
+    fn with_context_ut<F>(self, loc: &'static str, f: F) -> Result<T>
+    where
+        F: FnOnce() -> Option<Box<[(&'static str, String)]>>,
+    {
+        self.ok_or_else(|| Error::new(loc, ErrKind::None, f()))
+    }
+}
+
 /// The error prelude.
 pub mod prelude {
 

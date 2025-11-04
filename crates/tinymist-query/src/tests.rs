@@ -329,6 +329,7 @@ pub static REDACT_LOC: LazyLock<RedactFields> = LazyLock::new(|| {
     RedactFields::from_iter([
         "location",
         "contents",
+        "file",
         "uri",
         "oldUri",
         "newUri",
@@ -419,6 +420,27 @@ impl Redact for RedactFields {
                 for (_, val) in map.iter_mut() {
                     *val = self.redact(val.clone());
                 }
+
+                if let Some(kind) = map.get("kind")
+                    && matches!(kind.as_str(), Some("pathAt"))
+                {
+                    if let Some(value) = map.get("value")
+                        && let Value::String(s) = value
+                    {
+                        let v = file_path_(Path::new(s)).into();
+                        map.insert("value".to_owned(), v);
+                    }
+
+                    if let Some(error) = map.get("error") {
+                        let error = error.as_str().unwrap();
+                        static REG: LazyLock<Regex> = LazyLock::new(|| {
+                            Regex::new(r#"(/dummy-root/|C:\\dummy-root\\).*?\.typ"#).unwrap()
+                        });
+                        let error = REG.replace_all(error, "/__redacted_path__typ");
+                        map.insert("error".to_owned(), Value::String(error.into()));
+                    }
+                }
+
                 for key in self.0.iter().copied() {
                     let Some(t) = map.remove(key) else {
                         continue;
@@ -430,12 +452,18 @@ impl Redact for RedactFields {
                             map.insert(
                                 key.to_owned(),
                                 Value::Object(
-                                    obj.iter().map(|(k, v)| (file_path(k), v.clone())).collect(),
+                                    obj.iter().map(|(k, v)| (file_uri(k), v.clone())).collect(),
                                 ),
                             );
                         }
+                        "file" => {
+                            map.insert(
+                                key.to_owned(),
+                                file_path_(Path::new(t.as_str().unwrap())).into(),
+                            );
+                        }
                         "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
-                            map.insert(key.to_owned(), file_path(t.as_str().unwrap()).into());
+                            map.insert(key.to_owned(), file_uri(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -465,20 +493,24 @@ impl Redact for RedactFields {
     }
 }
 
-pub(crate) fn file_path(uri: &str) -> String {
-    file_path_(&lsp_types::Url::parse(uri).unwrap())
+pub(crate) fn file_uri(uri: &str) -> String {
+    file_uri_(&lsp_types::Url::parse(uri).unwrap())
 }
 
-pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
+pub(crate) fn file_uri_(uri: &lsp_types::Url) -> String {
+    let uri = uri.to_file_path().unwrap();
+    file_path_(&uri)
+}
+
+pub(crate) fn file_path_(path: &Path) -> String {
     let root = if cfg!(windows) {
         PathBuf::from("C:\\dummy-root")
     } else {
         PathBuf::from("/dummy-root")
     };
-    let uri = uri.to_file_path().unwrap();
-    let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
-    let rel_path = abs_path
-        .unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().next_back().unwrap()));
+    let abs_path = path.strip_prefix(root).map(|p| p.to_owned());
+    let rel_path =
+        abs_path.unwrap_or_else(|_| Path::new("-").join(path.iter().next_back().unwrap()));
 
     unix_slash(&rel_path)
 }
