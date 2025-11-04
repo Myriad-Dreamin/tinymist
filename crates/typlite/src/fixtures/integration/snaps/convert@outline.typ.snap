@@ -29,7 +29,6 @@ namespace MyApplication
 
 =====
 <nav role="doc-toc">
-
 <h2>Contents</h2>
 <ol>
 <li><p><h3>Heading 1</h3>
@@ -41,7 +40,6 @@ namespace MyApplication
 </p>
 </li>
 </ol>
-
 
 </nav>
 
@@ -75,9 +73,7 @@ namespace MyApplication
 Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />and block:
 
 <p align="center">
-
 <img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
-
 </p>
 
 - First item
@@ -87,17 +83,11 @@ Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted"
      - First sub-sub-item
 
 <dl>
-
 <dt>
-
 First term
-
 </dt><dd>
-
 First definition
-
 </dd>
-
 </dl>
 
 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 |

@@ -89,11 +89,15 @@ impl HtmlWriter {
                 }
 
                 let mut body = guard.finish()?;
-                body.writer().buffer.push_str("\n\n");
+
+                body.writer().buffer.push_str("\n");
+
                 for child in &element.children {
                     body.writer().write_node(child)?;
                 }
-                body.writer().buffer.push_str("\n\n");
+
+                body.writer().buffer.push_str("\n");
+
                 body.end()?;
                 Ok(())
             }
@@ -115,11 +119,13 @@ impl HtmlWriter {
             self.text(" />")?;
         } else {
             self.text(">")?;
-            self.buffer.push_str("\n\n");
+
+            self.buffer.push_str("\n");
             for child in &element.children {
                 self.write_node(child)?;
             }
-            self.buffer.push_str("\n\n");
+            self.buffer.push_str("\n");
+
             self.text("</")?;
             self.text(&element.tag)?;
             self.text(">")?;

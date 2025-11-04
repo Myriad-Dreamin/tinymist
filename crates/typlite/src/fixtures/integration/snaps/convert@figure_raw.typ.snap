@@ -14,12 +14,8 @@ input_file: crates/typlite/src/fixtures/integration/figure_raw.typ
 
 =====
 <p align="center">
-
 <figure class="figure">
-
 <pre><code class="language-md">markdown</code></pre>
 
-
 </figure>
-
 </p>
