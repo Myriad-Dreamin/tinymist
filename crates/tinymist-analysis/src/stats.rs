@@ -154,22 +154,17 @@ impl AnalysisStats {
     /// Gets a statistic guard for a query.
     pub fn stat(&self, id: Option<FileId>, query: &'static str) -> QueryStatGuard {
         let stats = &self.query_stats;
-        let entry = stats.entry(id).or_default();
-        let entry = entry.entry(query).or_default();
+        let get = |v| {
+            stats
+                .entry(v)
+                .or_default()
+                .entry(query)
+                .or_default()
+                .clone()
+        };
         QueryStatGuard {
-            bucket_any: if id.is_some() {
-                Some(
-                    stats
-                        .entry(None)
-                        .or_default()
-                        .entry(query)
-                        .or_default()
-                        .clone(),
-                )
-            } else {
-                None
-            },
-            bucket: entry.clone(),
+            bucket_any: if id.is_some() { Some(get(None)) } else { None },
+            bucket: get(id),
             since: tinymist_std::time::Instant::now(),
         }
     }
