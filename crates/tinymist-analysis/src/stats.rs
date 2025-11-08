@@ -152,16 +152,9 @@ pub struct AnalysisStats {
 
 impl AnalysisStats {
     /// Gets a statistic guard for a query.
-    pub fn stat(&self, id: Option<FileId>, query: &'static str) -> QueryStatGuard {
+    pub fn stat(&self, id: Option<FileId>, name: &'static str) -> QueryStatGuard {
         let stats = &self.query_stats;
-        let get = |v| {
-            stats
-                .entry(v)
-                .or_default()
-                .entry(query)
-                .or_default()
-                .clone()
-        };
+        let get = |v| stats.entry(v).or_default().entry(name).or_default().clone();
         QueryStatGuard {
             bucket_any: if id.is_some() { Some(get(None)) } else { None },
             bucket: get(id),
