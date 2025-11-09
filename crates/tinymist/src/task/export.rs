@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
-use reflexo_typst::{Bytes, CompilationTask, ExportComputation, DETACHED_ENTRY};
+use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
 use sync_ls::{internal_error, just_future};
 use tinymist_project::LspWorld;
 use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse, GLOBAL_STATS};
@@ -74,7 +74,7 @@ impl ServerState {
                 ..TaskInputs::default()
             });
 
-            let id = snap.world().main_id().unwrap_or_else(|| *DETACHED_ENTRY);
+            let id = snap.world().main_id();
             let _guard = GLOBAL_STATS.stat(id, "export");
 
             let is_html = matches!(task, ProjectTask::ExportHtml { .. });

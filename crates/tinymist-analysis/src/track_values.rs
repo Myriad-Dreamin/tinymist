@@ -3,7 +3,6 @@
 use comemo::Track;
 use ecow::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
-use tinymist_world::DETACHED_ENTRY;
 use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
@@ -48,8 +47,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 return analyze_expr_(world, child);
             }
 
-            let id = node.span().id().unwrap_or_else(|| *DETACHED_ENTRY);
-            let _guard = GLOBAL_STATS.stat(id, "analyze_expr");
+            let _guard = GLOBAL_STATS.stat(node.span().id(), "analyze_expr");
             return typst::trace::<TypstPagedDocument>(world, node.span());
         }
     };
@@ -68,8 +66,7 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
         return (Some(source.clone()), Some(source));
     }
 
-    let id = source_span.id().unwrap_or_else(|| *DETACHED_ENTRY);
-    let _guard = GLOBAL_STATS.stat(id, "analyze_import");
+    let _guard = GLOBAL_STATS.stat(source_span.id(), "analyze_import");
 
     let introspector = Introspector::default();
     let traced = Traced::default();
@@ -124,7 +121,7 @@ pub struct DynLabel {
 pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
-    let _guard = GLOBAL_STATS.stat(*DETACHED_ENTRY, "analyze_labels");
+    let _guard = GLOBAL_STATS.stat(None, "analyze_labels");
 
     // Labels in the document.
     for elem in document.introspector().all() {

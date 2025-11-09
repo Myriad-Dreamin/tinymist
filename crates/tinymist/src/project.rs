@@ -662,11 +662,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
-            let id = s
-                .snapshot()
-                .world()
-                .main_id()
-                .unwrap_or_else(|| *DETACHED_ENTRY);
+            let id = s.snapshot().world().main_id();
 
             s.ext.compiling_since = Some(tinymist_std::time::now());
             spawn_cpu(move || {

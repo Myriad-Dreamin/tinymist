@@ -21,7 +21,7 @@ pub(crate) fn do_compute_docstring(
     docs: String,
     kind: DefKind,
 ) -> Option<DocString> {
-    let _guard = GLOBAL_STATS.stat(fid, "compute_docstring");
+    let _guard = GLOBAL_STATS.stat(Some(fid), "compute_docstring");
 
     let checker = DocsChecker {
         fid,
