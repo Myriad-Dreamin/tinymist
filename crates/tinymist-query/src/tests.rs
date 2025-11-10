@@ -436,8 +436,11 @@ impl Redact for RedactFields {
                         static REG: LazyLock<Regex> = LazyLock::new(|| {
                             Regex::new(r#"(/dummy-root/|C:\\dummy-root\\).*?\.typ"#).unwrap()
                         });
-                        let error = REG.replace_all(error, "/__redacted_path__.typ");
-                        map.insert("error".to_owned(), Value::String(error.into()));
+                        let error = REG.replace_all(error, "/__redacted_path__.typ").replace(
+                            "crates\\tinymist-query\\src\\code_context.rs",
+                            "crates/tinymist-query/src/code_context.rs",
+                        );
+                        map.insert("error".to_owned(), Value::String(error));
                     }
                 }
 
