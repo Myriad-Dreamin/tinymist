@@ -358,6 +358,18 @@ export class LanguageState {
     return tinymist.executeCommand<SymbolInformation[]>("tinymist.getWorkspaceLabels", []);
   }
 
+  interactCodeContext<Qs extends InteractCodeContextQuery[]>(
+    documentUri: string,
+    query: Qs,
+  ): Promise<InteractCodeContextResponses<Qs> | undefined> {
+    return this.executeCommand("tinymist.interactCodeContext", [
+      {
+        textDocument: { uri: documentUri },
+        query,
+      },
+    ]);
+  }
+
   showLog() {
     if (this.client) {
       this.client.outputChannel.show();
@@ -775,6 +787,50 @@ function exportStringCommand(command: string) {
     return tinymist.executeCommand<string>(command, [uri, extraOpts ?? {}]);
   };
 }
+
+type InteractCodeContextQuery = PathAtQuery | ModeAtQuery | StyleAtQuery;
+type LspPosition = {
+  line: number;
+  character: number;
+};
+interface PathAtQuery {
+  kind: "pathAt";
+  code: string;
+  inputs: Record<string, string>;
+}
+interface ModeAtQuery {
+  kind: "modeAt";
+  position: LspPosition;
+}
+interface StyleAtQuery {
+  kind: "styleAt";
+  position: LspPosition;
+  style: string[];
+}
+type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = {
+  [Index in keyof Qs]: InteractCodeContextResponse<Qs[Index]>;
+} & { length: Qs["length"] };
+type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
+  ? QueryResult
+  : Q extends ModeAtQuery
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
+type QueryResult<T = any> =
+  | {
+      value: T;
+    }
+  | {
+      error: string;
+    };
+type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
+type StyleAtQueryResult = {
+  style: any[];
+};
+type ModeAtQueryResult = {
+  mode: InterpretMode;
+};
 
 const previewDisposes: Record<string, () => void> = {};
 export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {
