@@ -642,7 +642,7 @@ mod lint_tests {
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
-                .map(|(k, v)| (file_path_(&k), v))
+                .map(|(k, v)| (file_uri_(&k), v))
                 .collect::<BTreeMap<_, _>>();
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });

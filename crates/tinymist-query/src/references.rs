@@ -191,7 +191,7 @@ mod tests {
             let mut result = result.map(|v| {
                 v.into_iter()
                     .map(|loc| {
-                        let fp = file_path(loc.uri.as_str());
+                        let fp = file_uri(loc.uri.as_str());
                         format!(
                             "{fp}@{}:{}:{}:{}",
                             loc.range.start.line,

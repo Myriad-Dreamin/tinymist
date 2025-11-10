@@ -177,6 +177,7 @@ impl PathPattern {
 
         let w = root.to_string_lossy();
         let f = file_name.to_string_lossy();
+        let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
 
         // replace all $root
         let mut path = self.0.replace("$root", &w);
@@ -184,7 +185,7 @@ impl PathPattern {
             let d = dir.to_string_lossy();
             path = path.replace("$dir", &d);
         }
-        path = path.replace("$name", &f);
+        path = path.replace("$name", f);
 
         Some(Path::new(path.as_str()).clean().into())
     }
