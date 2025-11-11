@@ -1,8 +1,8 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: [Testing Feature])
+#show: book-page.with(title: [Hook Script])
 
-The testing feature is available since `tinymist` v0.14.2.
+The hook script feature is available since `tinymist` v0.14.2.
 
 = Script Hooks
 
@@ -64,9 +64,10 @@ The following example demonstrates how to customize the paste behavior when past
   caption: [The workflow of running `tinymist.onPaste`],
 ) <fig:script-hook-workflow>
 
-Specifically, two script hooks are currently supported:
-- Paste Script: customize the paste behavior when pasting resources into the editing typst document.
-- Watch Script: customize the watch behavior when a file change is detected in the workspaces.
+Specifically, three script hooks are currently supported:
+- Hook on Paste: customize the paste behavior when pasting resources into the editing typst document.
+- Hook on Watch: customize the watch behavior when a file change is detected in the workspaces.
+- Hook on Generating Code Actions and Lenses: adding additional code actions by typst scripting.
 
 = Customizing Paste Behavior
 // en = "The script to be executed when pasting resources into the editing typst document. If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression, e.g. `$root/x/$dir/$name` evaluated as `/path/to/root/x/dir/main`, otherwise it will be evaluated as a path pattern, e.g. `{ join(root, \"x\", dir, if name.ends-with(\".png\") (\"imgs\"), name) }` evaluated as `/path/to/root/x/dir/imgs/main`. The extra valid definitions are `root`, `dir`, `name`, and `join`. To learn more about the paste script, please visit [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html). Hint: you could import `@local` packages in the paste script. Note: restarting the editor is required to change this setting."
