@@ -64,7 +64,7 @@ The following example demonstrates how to customize the paste behavior when past
 
 Specifically, three script hooks will be supported:
 - Hook on Paste: customize the paste behavior when pasting resources into the editing typst document.
-- Hook on Watch: customize the watch behavior when a file change is detected in the workspaces.
+- Hook on Ex[prt]: customize the export behavior when a file change is detected in the workspaces.
 - Hook on Generating Code Actions and Lenses: adding additional code actions by typst scripting.
 
 = Customizing Paste Behavior
@@ -109,11 +109,9 @@ If the result is a string, it will be treated as the `dir` field, i.e. `{ dir: <
 
 More fields will be supported in the future. If you have any suggestions, please feel free to open an issue.
 
-= Customizing Watch Behavior (Experimental)
+= Customizing Export Behavior (Experimental)
 
-*Note: this is not implemented yet in current version.*
-
-You could configure `tinymist.onWatch` to customize the watch behavior. It will be executed when a file change is detected in the workspace.
+You could configure `tinymist.onExport` to customize the export behavior. It will be executed when a file change is detected in the workspace.
 
 For example, debouncing time:
 
@@ -150,6 +148,8 @@ async function pdfWithGhostScript() {
 ```
 
 Hint: you could create your own vscode extension to define such custom commands.
+
+`tinymist.exportPdf` will be ignored if this configuration item is set.
 
 = Providing Package-Specific Code Actions (Experimental)
 
