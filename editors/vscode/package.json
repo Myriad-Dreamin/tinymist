@@ -593,6 +593,12 @@
             "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable%"
           ]
         },
+        "tinymist.onPaste": {
+          "title": "%extension.tinymist.config.tinymist.onPaste.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.onPaste.desc%",
+          "type": "string",
+          "default": "$root/assets"
+        },
         "tinymist.renderDocs": {
           "title": "%extension.tinymist.config.tinymist.renderDocs.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.renderDocs.desc%",
@@ -1431,7 +1437,8 @@
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
-    "test": "vitest run && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+    "test:vsc": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js",
+    "test": "vitest run && yarn test:vsc"
   },
   "dependencies": {
     "cpr": "^3.0.1",
