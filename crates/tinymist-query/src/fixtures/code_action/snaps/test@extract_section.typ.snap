@@ -1,0 +1,114 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on ext.\n\n= My||/* range 0"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/extract_section_complex.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "==",
+      "range": "4:0:4:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Increase depth of heading"
+ },
+ {
+  "edit": {
+   "changeAnnotations": {
+    "Typst Extract Section": {
+     "description": "Extract section to new file(s)",
+     "label": "Typst Extract Section",
+     "needsConfirmation": true
+    }
+   },
+   "documentChanges": [
+    {
+     "annotationId": "Typst Extract Section",
+     "kind": "create",
+     "options": {
+      "overwrite": false
+     },
+     "uri": "my__-range-0__0-__-great-section/subsection-one.typ"
+    },
+    {
+     "edits": [
+      {
+       "insertTextFormat": 1,
+       "newText": "== Subsection One\n\nContent of subsection one.\n\n",
+       "range": "0:0:0:0"
+      }
+     ],
+     "textDocument": {
+      "uri": "my__-range-0__0-__-great-section/subsection-one.typ",
+      "version": null
+     }
+    },
+    {
+     "annotationId": "Typst Extract Section",
+     "kind": "create",
+     "options": {
+      "overwrite": false
+     },
+     "uri": "my__-range-0__0-__-great-section/subsection-two.typ"
+    },
+    {
+     "edits": [
+      {
+       "insertTextFormat": 1,
+       "newText": "== Subsection Two\n\nContent of subsection two.\n\n",
+       "range": "0:0:0:0"
+      }
+     ],
+     "textDocument": {
+      "uri": "my__-range-0__0-__-great-section/subsection-two.typ",
+      "version": null
+     }
+    },
+    {
+     "annotationId": "Typst Extract Section",
+     "kind": "create",
+     "options": {
+      "overwrite": false
+     },
+     "uri": "my__-range-0__0-__-great-section/index.typ"
+    },
+    {
+     "edits": [
+      {
+       "insertTextFormat": 1,
+       "newText": "= My/* range 0..0 */ Great Section\n\nThis is the content of the section that should be extracted.\n\n#include(\"subsection-one.typ\")\n#include(\"subsection-two.typ\")\n",
+       "range": "0:0:0:0"
+      }
+     ],
+     "textDocument": {
+      "uri": "my__-range-0__0-__-great-section/index.typ",
+      "version": null
+     }
+    },
+    {
+     "edits": [
+      {
+       "insertTextFormat": 1,
+       "newText": "#include(\"my__-range-0__0-__-great-section/index.typ\")\n",
+       "range": "4:0:16:0"
+      }
+     ],
+     "textDocument": {
+      "uri": "s0.typ",
+      "version": null
+     }
+    }
+   ]
+  },
+  "kind": "refactor.extract",
+  "title": "Extract section with subsections to directory"
+ }
+]

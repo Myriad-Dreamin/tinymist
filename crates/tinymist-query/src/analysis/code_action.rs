@@ -1,7 +1,10 @@
 //! Provides code actions for the document.
 
 use ecow::eco_format;
-use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
+use lsp_types::{
+    ChangeAnnotation, CreateFile, CreateFileOptions, OneOf,
+    OptionalVersionedTextDocumentIdentifier, ResourceOp,
+};
 use regex::Regex;
 use tinymist_analysis::syntax::{
     PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
@@ -11,6 +14,7 @@ use typst::syntax::Side;
 
 use super::get_link_exprs_in;
 use crate::analysis::LinkTarget;
+use crate::code_action::proto::{EcoSnippetTextEdit, EcoTextDocumentEdit};
 use crate::prelude::*;
 use crate::syntax::{InterpretMode, interpret_mode_at};
 
@@ -471,7 +475,310 @@ impl<'a> CodeActionWorker<'a> {
         };
         self.actions.push(action);
 
+        // Extract section to new file
+        self.extract_section_action(node);
+
         Some(())
+    }
+
+    fn extract_section_action(&mut self, node: &LinkedNode) -> Option<()> {
+        let heading_text = self.get_heading_text(node)?;
+        let section_name = self.sanitize_filename(&heading_text);
+
+        let current_id = self.source.id();
+        let current_path = self.ctx.path_for_id(current_id).ok()?;
+        let parent_dir = current_path.as_path().parent()?;
+
+        let has_subsections = self.has_subsections(node)?;
+        let mut edits = vec![];
+        let change_id = "Typst Extract Section".to_string();
+
+        if has_subsections {
+            self.extract_section_with_subsections(
+                node,
+                &section_name,
+                parent_dir,
+                &change_id,
+                &mut edits,
+            )?;
+        } else {
+            self.extract_section_itself(node, &section_name, parent_dir, &change_id, &mut edits)?;
+        }
+
+        self.actions.push(CodeAction {
+            title: if has_subsections {
+                "Extract section with subsections to directory".to_string()
+            } else {
+                "Extract section to new file".to_string()
+            },
+            kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+            edit: Some(EcoWorkspaceEdit {
+                changes: None,
+                document_changes: Some(EcoDocumentChanges::Operations(edits)),
+                change_annotations: Some(HashMap::from_iter([(
+                    change_id.clone(),
+                    ChangeAnnotation {
+                        label: change_id,
+                        needs_confirmation: Some(true),
+                        description: Some("Extract section to new file(s)".to_string()),
+                    },
+                )])),
+            }),
+            ..CodeAction::default()
+        });
+
+        Some(())
+    }
+
+    fn has_subsections(&self, heading_node: &LinkedNode) -> Option<bool> {
+        let current_depth = heading_node.cast::<ast::Heading>()?.depth().get();
+        let mut current = heading_node.clone();
+
+        while let Some(next) = current.next_sibling() {
+            if let Some(next_heading) = next.cast::<ast::Heading>() {
+                let next_depth = next_heading.depth().get();
+                if next_depth == current_depth + 1 {
+                    return Some(true);
+                }
+                if next_depth <= current_depth {
+                    break;
+                }
+            }
+            current = next;
+        }
+        Some(false)
+    }
+
+    fn extract_section_itself(
+        &self,
+        node: &LinkedNode,
+        section_name: &str,
+        parent_dir: &Path,
+        change_id: &str,
+        edits: &mut Vec<EcoDocumentChangeOperation>,
+    ) -> Option<()> {
+        let section_range = self.find_section_range(node)?;
+        let section_text = self.source.text().get(section_range.clone())?;
+        let new_filename = format!("{}.typ", section_name);
+        let new_file_url = path_to_url(&parent_dir.join(&new_filename)).ok()?;
+
+        self.create_file_with_content(&new_file_url, section_text, change_id, edits);
+        self.replace_with_include(
+            &self.ctx.to_lsp_range(section_range, &self.source),
+            &new_filename,
+            edits,
+        )?;
+
+        Some(())
+    }
+
+    fn extract_section_with_subsections(
+        &self,
+        node: &LinkedNode,
+        section_name: &str,
+        parent_dir: &Path,
+        change_id: &str,
+        edits: &mut Vec<EcoDocumentChangeOperation>,
+    ) -> Option<()> {
+        let current_depth = node.cast::<ast::Heading>()?.depth().get();
+        let section_start = node.offset();
+        let section_dir = parent_dir.join(section_name);
+
+        let subsections = self.collect_subsections(node, current_depth)?;
+
+        let mut main_content = String::new();
+        let mut last_end = section_start;
+
+        if let Some(first) = subsections.first() {
+            if let Some(text) = self.source.text().get(section_start..first.offset()) {
+                main_content.push_str(text);
+            }
+            last_end = first.offset();
+        }
+
+        for subsection in &subsections {
+            let subsection_name = self.get_heading_text(subsection)?;
+            let subsection_file = format!("{}.typ", self.sanitize_filename(&subsection_name));
+            let subsection_range = self.find_subsection_range(subsection, current_depth + 1)?;
+            let subsection_content = self.source.text().get(subsection_range.clone())?;
+
+            if subsection.offset() > last_end {
+                if let Some(text) = self.source.text().get(last_end..subsection.offset()) {
+                    main_content.push_str(text);
+                }
+            }
+
+            main_content.push_str(&format!("#include(\"{}\")\n", subsection_file));
+
+            // Create subsection file
+            let subsection_url = path_to_url(&section_dir.join(&subsection_file)).ok()?;
+            self.create_file_with_content(&subsection_url, subsection_content, change_id, edits);
+
+            last_end = subsection_range.end;
+        }
+
+        let main_url = path_to_url(&section_dir.join("index.typ")).ok()?;
+        self.create_file_with_content(&main_url, &main_content, change_id, edits);
+
+        let section_range = self.find_section_range(node)?;
+        let include_path = format!("{}/index.typ", section_name);
+        self.replace_with_include(
+            &self.ctx.to_lsp_range(section_range, &self.source),
+            &include_path,
+            edits,
+        )?;
+
+        Some(())
+    }
+
+    fn find_subsection_range(
+        &self,
+        subsection_node: &LinkedNode,
+        parent_depth: usize,
+    ) -> Option<Range<usize>> {
+        let start = subsection_node.offset();
+        let mut current = subsection_node.clone();
+        let mut end = self.source.text().len();
+
+        while let Some(next) = current.next_sibling() {
+            if let Some(next_heading) = next.cast::<ast::Heading>() {
+                let next_depth = next_heading.depth().get();
+                if next_depth as usize <= parent_depth {
+                    end = next.offset();
+                    break;
+                }
+            }
+            current = next;
+        }
+
+        Some(start..end)
+    }
+
+    fn create_file_with_content(
+        &self,
+        url: &Url,
+        content: &str,
+        change_id: &str,
+        edits: &mut Vec<EcoDocumentChangeOperation>,
+    ) {
+        edits.push(EcoDocumentChangeOperation::Op(ResourceOp::Create(
+            CreateFile {
+                uri: url.clone(),
+                options: Some(CreateFileOptions {
+                    overwrite: Some(false),
+                    ignore_if_exists: None,
+                }),
+                annotation_id: Some(change_id.to_string()),
+            },
+        )));
+
+        edits.push(EcoDocumentChangeOperation::Edit(EcoTextDocumentEdit {
+            text_document: OptionalVersionedTextDocumentIdentifier {
+                uri: url.clone(),
+                version: None,
+            },
+            edits: vec![OneOf::Left(EcoSnippetTextEdit::new_plain(
+                LspRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
+                content.into(),
+            ))],
+        }));
+    }
+
+    fn replace_with_include(
+        &self,
+        range: &LspRange,
+        path: &str,
+        edits: &mut Vec<EcoDocumentChangeOperation>,
+    ) -> Option<()> {
+        edits.push(EcoDocumentChangeOperation::Edit(EcoTextDocumentEdit {
+            text_document: OptionalVersionedTextDocumentIdentifier {
+                uri: self.local_url()?.clone(),
+                version: None,
+            },
+            edits: vec![OneOf::Left(EcoSnippetTextEdit::new_plain(
+                *range,
+                format!("#include(\"{}\")\n", path).into(),
+            ))],
+        }));
+        Some(())
+    }
+
+    fn collect_subsections<'b>(
+        &self,
+        node: &'b LinkedNode,
+        parent_depth: usize,
+    ) -> Option<Vec<LinkedNode<'b>>> {
+        let mut subsections = vec![];
+        let mut current = node.clone();
+
+        while let Some(next) = current.next_sibling() {
+            if let Some(next_heading) = next.cast::<ast::Heading>() {
+                let next_depth = next_heading.depth().get();
+                if next_depth == parent_depth + 1 {
+                    subsections.push(next.clone());
+                } else if next_depth <= parent_depth {
+                    break;
+                }
+            }
+            current = next;
+        }
+        Some(subsections)
+    }
+
+    fn get_heading_text(&self, heading_node: &LinkedNode) -> Option<EcoString> {
+        let body_node = heading_node
+            .children()
+            .find(|child| child.cast::<ast::Markup>().is_some())?;
+
+        Some(body_node.get().clone().into_text())
+    }
+
+    fn find_section_range(&self, heading_node: &LinkedNode) -> Option<Range<usize>> {
+        let heading = heading_node.cast::<ast::Heading>()?;
+        let current_depth = heading.depth().get();
+        let start = heading_node.offset();
+
+        let mut current = heading_node.clone();
+        let mut end = self.source.text().len();
+
+        while let Some(next) = current.next_sibling() {
+            if let Some(next_heading) = next.cast::<ast::Heading>() {
+                let next_depth = next_heading.depth().get();
+                if next_depth <= current_depth {
+                    end = next.offset();
+                    break;
+                }
+            }
+            current = next;
+        }
+
+        Some(start..end)
+    }
+
+    fn sanitize_filename(&self, text: &str) -> String {
+        let sanitized = text
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c.to_ascii_lowercase()
+                } else if c.is_whitespace() {
+                    '-'
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+            .trim_matches('-')
+            .trim_matches('_')
+            .chars()
+            .take(50)
+            .collect::<String>();
+
+        if sanitized.is_empty() {
+            "extracted-section".to_string()
+        } else {
+            sanitized
+        }
     }
 
     fn equation_actions(&mut self, node: &LinkedNode) -> Option<()> {
