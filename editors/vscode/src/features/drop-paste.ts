@@ -406,6 +406,11 @@ class DropOrPasteContext<A extends DropPasteAction> {
     } else {
       dragFilePath = relative(dirname(dropFileUri.fsPath), dragFileUri.fsPath);
     }
+    if (dragFilePath.startsWith("..")) {
+      if (workspaceFolder) {
+        dragFilePath = "/" + relative(workspaceFolder.uri.fsPath, dragFileUri.fsPath);
+      }
+    }
 
     const barStrPath = escapeStr(dragFilePath.replace(/\\/g, "/"));
     const strPath = `"${barStrPath}"`;
