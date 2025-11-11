@@ -585,12 +585,14 @@ type OverwriteBehavior = "overwrite" | "nameIncrementally";
 
 export interface CopyFileConfiguration {
   readonly overwriteBehavior: OverwriteBehavior;
+  readonly onPasteScript: string;
 }
 
 export function getCopyFileConfiguration(document: vscode.TextDocument): CopyFileConfiguration {
   const config = vscode.workspace.getConfiguration("tinymist", document);
   return {
     overwriteBehavior: readOverwriteBehavior(config),
+    onPasteScript: config.get("onPaste") ?? "$root/assets",
   };
 }
 
@@ -614,18 +616,10 @@ export class NewFilePathGenerator {
     const config = getCopyFileConfiguration(document);
     const desiredPath = await getDesiredNewFilePath(
       document.uri,
-      "$root/assets/$dir/$name",
+      config.onPasteScript,
       file,
       (uri, code) => tinymist.interactCodeContext(uri, [{ kind: "pathAt", code, inputs: {} }]),
     );
-    const handle = await tinymist.interactCodeContext(document.uri, [
-      {
-        kind: "pathAt",
-        code: "$root/assets/$dir/$name",
-        inputs: {},
-      },
-    ]);
-    console.log("getNewFilePath", config, desiredPath, handle);
 
     const root = vscode.Uri.joinPath(desiredPath, "..");
     const ext = extname(desiredPath.fsPath);

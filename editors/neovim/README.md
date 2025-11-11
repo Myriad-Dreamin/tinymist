@@ -10,8 +10,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 - **Live Web Preview** with [typst-preview.](https://github.com/chomosuke/typst-preview.nvim)
 
 > [!NOTE]
-> 
-> Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
+> > Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
 
 ## Installation
 
@@ -28,11 +27,9 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   ```
 - Or manually:
   To enable LSP, you must install `tinymist`. You can find `tinymist` by:
-  - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
-  - Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
+  - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
     \
-    If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.
-  - Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
+    If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.- Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
     ```bash
     cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist-cli
     ```
@@ -118,14 +115,13 @@ end, {})
 ```
 
 > [!NOTE]
-> 
-> For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
+> > For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 
-Make sure to change `exportPdf` to "onType" or "onSave".
+Make sure to change `exportPdf` to “onType” or “onSave”.
 
 ### Working with Multiple-Files Projects
 
-Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
+Tinymist cannot know the main file of a multiple-files project if you don’t tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
 ```typ
 // in file: /sub.typ
@@ -172,7 +168,7 @@ vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.ap
 vim.lsp.buf.execute_command({ command = 'tinymist.pinMain', arguments = { vim.v.null } })
 ```
 
-It also doesn't remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
+It also doesn’t remember the pinned main file across sessions, so you may need to run the command again after restarting Neovim.
 
 This could be improved in the future.
 

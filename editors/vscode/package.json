@@ -593,6 +593,12 @@
             "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable%"
           ]
         },
+        "tinymist.onPaste": {
+          "title": "%extension.tinymist.config.tinymist.onPaste.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.onPaste.desc%",
+          "type": "string",
+          "default": "$root/assets"
+        },
         "tinymist.renderDocs": {
           "title": "%extension.tinymist.config.tinymist.renderDocs.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.renderDocs.desc%",
