@@ -13,7 +13,7 @@ The following example demonstrates how to customize the paste behavior when past
 - Then, the editor client checks the physical file system. If it detects conflict when creating a resource file, it again runs the `onConflict` script to determine next behavior.
 - After several iterations, the editor client finally creates the resource files and inserts the corresponding Typst code into the document.
 
-#let actor-graph(theme) = {
+#let hook-graph(theme) = {
   let (colors, node, edge) = fletcher-ctx(theme)
   diagram(
     edge-stroke: 0.85pt,
@@ -58,7 +58,7 @@ The following example demonstrates how to customize the paste behavior when past
 }
 
 #figure(
-  cond-image(actor-graph),
+  cond-image(hook-graph),
   caption: [The workflow of running `tinymist.onPaste`],
 ) <fig:script-hook-workflow>
 
