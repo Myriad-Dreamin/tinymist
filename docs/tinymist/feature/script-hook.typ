@@ -4,11 +4,9 @@
 
 The hook script feature is available since `tinymist` v0.14.2.
 
-= Script Hooks
+Hook Scripts allow you to hook and customize certain behaviors of tinymist by providing code snippets that will be executed at specific events.
 
-Script hooks allow you to hook and customize certain behaviors of tinymist by providing code snippets that will be executed at specific events.
-
-The script hooks are run as typst scripts with some predefined variables. Since typst is sandboxed, the script hooks cannot access system directly. However, you can still bind lsp commands to perform complex operations.
+The hook scripts are run as typst scripts with some predefined variables. Since typst is sandboxed, the hook scripts cannot access system directly. However, you can still bind lsp commands to perform complex operations.
 
 The following example demonstrates how to customize the paste behavior when pasting resources into the editing typst document.
 - First, the editor client (VS Code) invokes the `tinymist.onPaste` and gets the action $cal(A)$ to perform. the action $cal(A)$ contains two fields `dir`, and `onConflict`, where `dir` is the directory to store the pasted resources, and `onConflict` is the script to execute when a conflict occurs (i.e., the file already exists). Note that `import` statements are allowed in the paste script.
