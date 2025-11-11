@@ -1,0 +1,21 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/lint/cast.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "comparing strings with types is deprecated\nHint: compare with the literal type instead\nHint: this comparison will always return `false` since typst v0.14",
+   "range": "9:7:9:19",
+   "severity": 2,
+   "source": "typst"
+  },
+  {
+   "message": "comparing strings with types is deprecated\nHint: compare with the literal type instead\nHint: this comparison will always return `false` since typst v0.14",
+   "range": "16:7:16:19",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}
