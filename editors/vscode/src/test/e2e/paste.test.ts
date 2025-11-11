@@ -1,51 +1,86 @@
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 
-import * as fs from "node:fs";
 import * as vscode from "vscode";
-import type { ExportResponse } from "../../lsp";
-import { tinymist } from "../../lsp";
+import * as path from "path";
+import { getDesiredNewFilePath } from "../../features/drop-paste";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
-  const workspaceCtx = ctx.workspaceCtx("export");
+  const workspaceCtx = ctx.workspaceCtx("book");
+  const baseUri = workspaceCtx.workspaceUri();
 
   const prepareMain = async (mainPath: string) => {
-    const baseUri = workspaceCtx.getWorkspace("export");
-    const mainUrl = vscode.Uri.joinPath(baseUri, mainPath);
+    const uri = workspaceCtx.workspaceUri();
+    const mainUrl = vscode.Uri.joinPath(uri, mainPath);
 
-    return await ctx.openDocument(mainUrl);
+    console.log("Start file test on ", mainUrl.fsPath);
+    return await workspaceCtx.openDocument(mainUrl);
   };
 
-  await workspaceCtx.suite("export", async (suite) => {
-    // const uri = workspaceCtx.workspaceUri();
-    const baseUri = workspaceCtx.getWorkspace("export");
-    vscode.window.showInformationMessage("Start export tests.");
-
-    console.log("Start all tests on ", baseUri.fsPath);
-
-    // check and clear target directory
-    const targetDir = vscode.Uri.joinPath(baseUri, "target");
-    if (fs.existsSync(targetDir.fsPath)) {
-      fs.rmdirSync(targetDir.fsPath, { recursive: true });
-    }
-
-    const editor = await prepareMain("main.typ");
-
-    suite.addTest("eval paste function", async () => {
-      const res = await tinymist.interactCodeContext(editor.document.uri.toString(), [
-        {
-          kind: "pathAt",
-          code: "$root/x/y/z",
-          inputs: {},
-        },
-      ]);
-      ctx.expect(res).to.be.ok;
-      if ("error" in res![0]) {
-        ctx.expect.fail(res![0].error);
-      } else {
-        ctx.expect(res![0].value).to.be.eq("$root/x/y/z");
+  const testDesiredNewFilePath = async (
+    uri: vscode.Uri,
+    pasteScript: string,
+    file: Pick<vscode.DataTransferFile, "name">,
+  ) => {
+    for (;;) {
+      let commandNotFound = false;
+      const res = await getDesiredNewFilePath(uri, pasteScript, file, async (uri, code) => {
+        try {
+          return await vscode.commands.executeCommand<any>("tinymist.interactCodeContext", {
+            textDocument: { uri: uri.toString() },
+            query: [
+              {
+                kind: "pathAt",
+                code,
+                inputs: {},
+              },
+            ],
+          });
+        } catch (err: any) {
+          if (err.toString().includes("not found")) {
+            commandNotFound = true;
+          }
+          throw err;
+        }
+      });
+      if (commandNotFound) {
+        console.log("probing interactCodeContext command");
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        continue;
       }
-    });
+
+      ctx.expect(res).to.be.ok;
+      return res;
+    }
+  };
+
+  const tit = (name: string) => async (uri: vscode.Uri, script: string, toBe: string) => {
+    const res = await testDesiredNewFilePath(uri, script, { name });
+    const x = path.resolve(res.fsPath);
+    const expected = path.resolve(baseUri.fsPath, toBe);
+    ctx.expect(x).to.be.eq(expected, `scriptRes=${x}, expected=${expected}`);
+  };
+  const pngTest = tit("test.png");
+
+  await workspaceCtx.suite("getDesiredNewFilePath", async (suite) => {
+    const editor = await prepareMain("main.typ");
+    suite.addTest("assets", () => pngTest(editor.document.uri, "$root/assets", "assets/test.png"));
+    suite.addTest("assets name", () =>
+      pngTest(editor.document.uri, "$root/assets/$name", "assets/main/test.png"),
+    );
+    suite.addTest("assets dir name", () =>
+      pngTest(editor.document.uri, "$root/assets/$dir/$name", "assets/main/test.png"),
+    );
+  });
+  await workspaceCtx.suite("getDesiredNewFilePathInSubFile", async (suite) => {
+    const editor = await prepareMain("chapters/chapter1.typ");
+    suite.addTest("assets", () => pngTest(editor.document.uri, "$root/assets", "assets/test.png"));
+    suite.addTest("assets name", () =>
+      pngTest(editor.document.uri, "$root/assets/$name", "assets/chapter1/test.png"),
+    );
+    suite.addTest("assets dir name", () =>
+      pngTest(editor.document.uri, "$root/assets/$dir/$name", "assets/chapters/chapter1/test.png"),
+    );
   });
 }

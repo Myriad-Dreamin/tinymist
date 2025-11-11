@@ -16,6 +16,7 @@ import {
   Schemes,
 } from "./drop-paste.def";
 import { IContext } from "../context";
+import { CodeContextQueryResult, tinymist } from "../lsp";
 
 export function dragAndDropActivate(context: IContext) {
   context.subscriptions.push(
@@ -611,7 +612,20 @@ export class NewFilePathGenerator {
     token: vscode.CancellationToken,
   ): Promise<{ readonly uri: vscode.Uri; readonly overwrite: boolean } | undefined> {
     const config = getCopyFileConfiguration(document);
-    const desiredPath = getDesiredNewFilePath(document, file);
+    const desiredPath = await getDesiredNewFilePath(
+      document.uri,
+      "$root/assets/$dir/$name",
+      file,
+      (uri, code) => tinymist.interactCodeContext(uri, [{ kind: "pathAt", code, inputs: {} }]),
+    );
+    const handle = await tinymist.interactCodeContext(document.uri, [
+      {
+        kind: "pathAt",
+        code: "$root/assets/$dir/$name",
+        inputs: {},
+      },
+    ]);
+    console.log("getNewFilePath", config, desiredPath, handle);
 
     const root = vscode.Uri.joinPath(desiredPath, "..");
     const ext = extname(desiredPath.fsPath);
@@ -652,14 +666,46 @@ export class NewFilePathGenerator {
   }
 }
 
-export function getDesiredNewFilePath(
-  document: vscode.TextDocument,
-  file: vscode.DataTransferFile,
-): vscode.Uri {
-  const docUri = getParentDocumentUri(document.uri);
+export async function getDesiredNewFilePath(
+  uri: vscode.Uri,
+  pasteScript: string,
+  file: Pick<vscode.DataTransferFile, "name">,
+  getPathAt: (uri: vscode.Uri, code: string) => Promise<CodeContextQueryResult<any>[] | undefined>,
+): Promise<vscode.Uri> {
+  try {
+    const customized = await getPathAt(uri, pasteScript);
 
-  // Default to next to current file
-  return vscode.Uri.joinPath(docUri, "..", file.name);
+    if (!customized || customized.length !== 1) {
+      throw new Error(`internal error: invalid code context response ${customized}`);
+    }
+    const pathAt = customized[0];
+    if ("error" in pathAt) {
+      throw new Error(pathAt.error);
+    }
+    const path = pathAt.value;
+    if (typeof path !== "string") {
+      throw new Error(
+        `expect paste script to return an object { value: string }, got { value: ${typeof path} }`,
+      );
+    }
+
+    const newFileDir = vscode.Uri.file(path);
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(newFileDir);
+    if (!workspaceFolder) {
+      throw new Error(
+        `paste script would like to create a file in the directory, which is not in any workspace, got: ${newFileDir}, workspaces: ${vscode.workspace.workspaceFolders}`,
+      );
+    }
+
+    return vscode.Uri.joinPath(newFileDir, file.name);
+  } catch (err: any) {
+    vscode.window.showWarningMessage(`cannot run custom paste handler: ${err}`);
+
+    const docUri = getParentDocumentUri(uri);
+
+    // Default to next to current file
+    return vscode.Uri.joinPath(docUri, "..", file.name);
+  }
 }
 
 function getParentDocumentUri(uri: vscode.Uri): vscode.Uri {

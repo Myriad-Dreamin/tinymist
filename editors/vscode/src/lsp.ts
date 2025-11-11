@@ -359,12 +359,14 @@ export class LanguageState {
   }
 
   interactCodeContext<Qs extends InteractCodeContextQuery[]>(
-    documentUri: string,
+    documentUri: string | vscode.Uri,
     query: Qs,
   ): Promise<InteractCodeContextResponses<Qs> | undefined> {
-    return this.executeCommand("tinymist.interactCodeContext", [
+    return tinymist.executeCommand("tinymist.interactCodeContext", [
       {
-        textDocument: { uri: documentUri },
+        textDocument: {
+          uri: typeof documentUri !== "string" ? documentUri.toString() : documentUri,
+        },
         query,
       },
     ]);
@@ -796,7 +798,7 @@ type LspPosition = {
 interface PathAtQuery {
   kind: "pathAt";
   code: string;
-  inputs: Record<string, string>;
+  inputs?: Record<string, string>;
 }
 interface ModeAtQuery {
   kind: "modeAt";
@@ -811,24 +813,24 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
   [Index in keyof Qs]: InteractCodeContextResponse<Qs[Index]>;
 } & { length: Qs["length"] };
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
-  ? QueryResult
+  ? CodeContextQueryResult
   : Q extends ModeAtQuery
     ? ModeAtQueryResult
     : Q extends StyleAtQuery
       ? StyleAtQueryResult
       : never;
-type QueryResult<T = any> =
+export type CodeContextQueryResult<T = any> =
   | {
       value: T;
     }
   | {
       error: string;
     };
-type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
-type StyleAtQueryResult = {
+export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
+export type StyleAtQueryResult = {
   style: any[];
 };
-type ModeAtQueryResult = {
+export type ModeAtQueryResult = {
   mode: InterpretMode;
 };
 
