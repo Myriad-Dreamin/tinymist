@@ -62,7 +62,7 @@ The following example demonstrates how to customize the paste behavior when past
   caption: [The workflow of running `tinymist.onPaste`],
 ) <fig:script-hook-workflow>
 
-Specifically, three script hooks are currently supported:
+Specifically, three script hooks will be supported:
 - Hook on Paste: customize the paste behavior when pasting resources into the editing typst document.
 - Hook on Watch: customize the watch behavior when a file change is detected in the workspaces.
 - Hook on Generating Code Actions and Lenses: adding additional code actions by typst scripting.
@@ -73,7 +73,7 @@ You could configure `tinymist.onPaste` to customize the paste behavior. It will 
 - If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression.
 - Otherwise, it will be evaluated as a path pattern.
 
-== Path Pattern
+== Path Pattern (Stable)
 
 When evaluated as a path pattern, the path variables could be used:
 - `root`: the root of the workspace.
@@ -86,7 +86,7 @@ $root/assets
 ```
 is evaluated as `/path/to/root/assets` when pasting `main.typ` in `/path/to/root/dir/main.typ`.
 
-== Code Expression
+== Code Expression (Experimental)
 
 When evaluated as a typst code expression, the script could use following predefined definitions:
 - `root`: the root of the workspace.
@@ -109,7 +109,7 @@ If the result is a string, it will be treated as the `dir` field, i.e. `{ dir: <
 
 More fields will be supported in the future. If you have any suggestions, please feel free to open an issue.
 
-= Customizing Watch Behavior
+= Customizing Watch Behavior (Experimental)
 
 *Note: this is not implemented yet in current version.*
 
@@ -151,7 +151,7 @@ async function pdfWithGhostScript() {
 
 Hint: you could create your own vscode extension to define such custom commands.
 
-= Providing Package-Specific Code Actions
+= Providing Package-Specific Code Actions (Experimental)
 
 *Note: this is not implemented yet in current version.*
 
