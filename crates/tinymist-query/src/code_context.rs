@@ -1,23 +1,18 @@
 use std::ops::Deref;
 
-use comemo::Track;
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::analyze_expr;
-use tinymist_project::{DiagnosticFormat, PathPattern};
+use tinymist_project::PathPattern;
 use tinymist_std::error::prelude::*;
-use tinymist_world::vfs::WorkspaceResolver;
-use tinymist_world::{EntryReader, EntryState, ShadowApi, diag::print_diagnostics_to_string};
-use typst::diag::{At, SourceResult};
-use typst::foundations::{Args, Dict, NativeFunc, eco_format};
-use typst::syntax::Span;
-use typst::utils::LazyHash;
+use tinymist_world::{EntryReader, ShadowApi};
+use typst::foundations::{Dict, eco_format};
 use typst::{
     foundations::{Bytes, IntoValue, StyleChain},
     text::TextElem,
 };
-use typst_shim::eval::{Eval, Vm};
 use typst_shim::syntax::LinkedNodeExt;
 
+use crate::hook::HookScript;
 use crate::{
     prelude::*,
     syntax::{InterpretMode, interpret_mode_at},
@@ -112,7 +107,7 @@ impl SemanticRequest for InteractCodeContextRequest {
         for query in self.query {
             responses.push(query.and_then(|query| match query {
                 InteractCodeContextQuery::PathAt { code, inputs: base } => {
-                    let res = eval_path_expr(ctx, &code, base)?;
+                    let res = eval_path(ctx, &code, base)?;
                     Some(InteractCodeContextResponse::PathAt(res))
                 }
                 InteractCodeContextQuery::ModeAt { position } => {
@@ -217,65 +212,16 @@ impl InteractCodeContextRequest {
     }
 }
 
-fn eval_path_expr(
+fn eval_path(
     ctx: &mut LocalContext,
     code: &str,
     inputs: Dict,
 ) -> Option<QueryResult<serde_json::Value>> {
     let entry = ctx.world().entry_state();
     let path = if code.starts_with("{") && code.ends_with("}") {
-        let id = entry
-            .select_in_workspace(Path::new("/__path__.typ"))
-            .main()?;
-
-        let inputs = make_sys(&entry, ctx.world().inputs(), inputs);
-        let (inputs, root, dir, name) = match inputs {
-            Some(EvalSysCtx {
-                inputs,
-                root,
-                dir,
-                name,
-            }) => (Some(inputs), Some(root), dir, Some(name)),
-            None => (None, None, None, None),
-        };
-
-        let mut world = ctx.world().task(tinymist_world::TaskInputs {
-            entry: None,
-            inputs,
-        });
-        // todo: bad performance
-        world.take_db();
-        let _ = world.map_shadow_by_id(id, Bytes::from_string(code.to_owned()));
-
-        tinymist_analysis::upstream::with_vm((&world as &dyn World).track(), |vm| {
-            define_val(vm, "join", Value::Func(join::data().into()));
-            for (key, value) in [("root", root), ("dir", dir), ("name", name)] {
-                if let Some(value) = value {
-                    define_val(vm, key, value);
-                }
-            }
-
-            let mut expr = typst::syntax::parse_code(code);
-            let span = Span::from_range(id, 0..code.len());
-            expr.synthesize(span);
-
-            let expr = match expr.cast::<ast::Code>() {
-                Some(v) => v,
-                None => bail!(
-                    "code is not a valid code expression: kind={:?}",
-                    expr.kind()
-                ),
-            };
-            match expr.eval(vm) {
-                Ok(value) => serde_json::to_value(value).context_ut("failed to serialize path"),
-                Err(e) => {
-                    let res =
-                        print_diagnostics_to_string(&world, e.iter(), DiagnosticFormat::Human);
-                    let err = res.unwrap_or_else(|e| e);
-                    bail!("failed to evaluate path expression: {err}")
-                }
-            }
-        })
+        crate::hook::eval_script(ctx.world(), HookScript::Code(code), inputs, &entry).and_then(
+            |(_, value)| serde_json::to_value(value).context_ut("failed to serialize path"),
+        )
     } else {
         PathPattern::new(code)
             .substitute(&entry)
@@ -285,85 +231,6 @@ fn eval_path_expr(
             })
     };
     Some(path.into())
-}
-
-#[derive(Debug, Clone, Hash)]
-struct EvalSysCtx {
-    inputs: Arc<LazyHash<Dict>>,
-    root: Value,
-    dir: Option<Value>,
-    name: Value,
-}
-
-#[comemo::memoize]
-fn make_sys(entry: &EntryState, base: Arc<LazyHash<Dict>>, inputs: Dict) -> Option<EvalSysCtx> {
-    let root = entry.root();
-    let main = entry.main();
-
-    log::debug!("Check path {main:?} and root {root:?}");
-
-    let (root, main) = root.zip(main)?;
-
-    // Files in packages are not exported
-    if WorkspaceResolver::is_package_file(main) {
-        return None;
-    }
-    // Files without a path are not exported
-    let path = main.vpath().resolve(&root)?;
-
-    // todo: handle untitled path
-    if path.strip_prefix("/untitled").is_ok() {
-        return None;
-    }
-
-    let path = path.strip_prefix(&root).ok()?;
-    let dir = path.parent();
-    let file_name = path.file_name().unwrap_or_default();
-
-    let root = Value::Str(root.to_string_lossy().into());
-
-    let dir = dir.map(|d| Value::Str(d.to_string_lossy().into()));
-
-    let name = file_name.to_string_lossy();
-    let name = name.as_ref().strip_suffix(".typ").unwrap_or(name.as_ref());
-    let name = Value::Str(name.into());
-
-    let mut dict = base.as_ref().deref().clone();
-    for (key, value) in inputs {
-        dict.insert(key, value);
-    }
-    dict.insert("root".into(), root.clone());
-    if let Some(dir) = &dir {
-        dict.insert("dir".into(), dir.clone());
-    }
-    dict.insert("name".into(), name.clone());
-
-    Some(EvalSysCtx {
-        inputs: Arc::new(LazyHash::new(dict)),
-        root,
-        dir,
-        name,
-    })
-}
-
-fn define_val(vm: &mut Vm, name: &str, value: Value) {
-    let ident = SyntaxNode::leaf(SyntaxKind::Ident, name);
-    vm.define(ident.cast::<ast::Ident>().unwrap(), value);
-}
-
-#[typst_macros::func(title = "Join function")]
-fn join(args: &mut Args) -> SourceResult<Value> {
-    let pos = args.take().to_pos();
-    let mut res = PathBuf::new();
-    for arg in pos {
-        match arg {
-            Value::Str(s) => res.push(s.as_str()),
-            _ => {
-                return Err(eco_format!("join argument is not a string: {arg:?}")).at(args.span);
-            }
-        };
-    }
-    Ok(Value::Str(res.to_string_lossy().into()))
 }
 
 /// A result of a query.
