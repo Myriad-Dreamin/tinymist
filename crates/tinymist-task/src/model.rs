@@ -76,7 +76,7 @@ pub enum ProjectTask {
     ExportTeX(ExportTeXTask),
     /// An export Text task.
     ExportText(ExportTextTask),
-    /// An query task.
+    /// A query task.
     Query(QueryTask),
     // todo: compatibility
     // An export task of another type.
