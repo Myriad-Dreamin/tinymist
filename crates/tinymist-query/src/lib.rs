@@ -44,6 +44,7 @@ pub use workspace_label::*;
 
 pub mod analysis;
 pub mod docs;
+pub mod hook;
 pub mod index;
 pub mod package;
 pub mod syntax;

@@ -1303,6 +1303,14 @@ zh = "自定义粘贴行为的脚本"
 en = "The script to be executed when pasting resources into the editing typst document. If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression, e.g. `$root/x/$dir/$name` evaluated as `/path/to/root/x/dir/main`, otherwise it will be evaluated as a path pattern, e.g. `{ join(root, \"x\", dir, if name.ends-with(\".png\") (\"imgs\"), name) }` evaluated as `/path/to/root/x/dir/imgs/main`. The extra valid definitions are `root`, `dir`, `name`, and `join`. To learn more about the paste script, please visit [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html). Hint: you could import `@local` packages in the paste script. Note: restarting the editor is required to change this setting."
 zh = "将资源粘贴到正在编辑的 typst 文档时要执行的脚本。如果脚本代码以 `{` 开头并以 `}` 结尾，那么依 typst 代码表达式语法解释脚本，否则依路径模板解释脚本。路径模板例如 `$root/x/$dir/$name` 求解为 `/path/to/root/x/dir/main`；typst 代码表达式例如 `{ join(root, \"x\", dir, if name.ends-with(\".png\") (\"imgs\"), name) }` 求解为 `/path/to/root/x/dir/imgs/main`。额外的有效定义有 `root`、`dir`、`name` 和 `join`。要了解有关粘贴脚本的更多信息，请访问 [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html)。提示：您可以在粘贴脚本中导入 `@local` 包。注意：更改此设置需要重新启动编辑器。"
 
+[extension.tinymist.config.tinymist.onExport.title]
+en = "The Script to Customize Export Behavior"
+zh = "自定义导出行为的脚本"
+
+[extension.tinymist.config.tinymist.onExport.desc]
+en = "The script to be executed when perform export on change of typst document. `tinymist.exportPdf` will be ignored if this configuration item is set."
+zh = "当修改 Typst 文档时用于确定导出行为的脚本。此配置不为空时，将忽略`tinymist.exportPdf`。"
+
 [extension.tinymist.config.tinymist.renderDocs.title]
 en = "(Experimental) Render Docs"
 zh = "（实验性）渲染文档"
