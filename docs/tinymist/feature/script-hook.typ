@@ -64,7 +64,7 @@ The following example demonstrates how to customize the paste behavior when past
 
 Specifically, three script hooks will be supported:
 - Hook on Paste: customize the paste behavior when pasting resources into the editing typst document.
-- Hook on Ex[prt]: customize the export behavior when a file change is detected in the workspaces.
+- Hook on Export: customize the export behavior when a file change is detected in the workspaces.
 - Hook on Generating Code Actions and Lenses: adding additional code actions by typst scripting.
 
 = Customizing Paste Behavior
