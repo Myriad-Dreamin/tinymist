@@ -411,10 +411,10 @@
                     "title": "%extension.tinymist.config.tinymist.convertExtension.items.string.title%",
                     "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.string.desc%",
                     "enum": [
-                      "md"
+                      "markdown"
                     ],
                     "enumDescriptions": [
-                      "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.md%"
+                      "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown%"
                     ]
                   },
                   {
@@ -433,10 +433,10 @@
                         "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.language.desc%",
                         "type": "string",
                         "enum": [
-                          "md"
+                          "markdown"
                         ],
                         "enumDescriptions": [
-                          "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.md%"
+                          "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown%"
                         ]
                       },
                       "processor": {

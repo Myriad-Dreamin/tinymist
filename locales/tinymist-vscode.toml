@@ -1112,8 +1112,8 @@ en = "Matching Markup Language or File Kind to convert to PDF"
 zh = "匹配标记语言或文件类型转换为 PDF"
 
 [extension.tinymist.config.tinymist.convertExtension.items.string.desc]
-en = "The language or file kind to match to convert to PDF using the typst template. For example, `md` will convert to PDF using the typst template `md.typst`."
-zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`md` 将使用内置 typst 模板 转换为 PDF。"
+en = "The language or file kind to match to convert to PDF using the typst template. For example, `markdown` will convert to PDF using the latest typst package `@preview/cmarker`."
+zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`markdown` 将使用最新版的 typst 包 `@preview/cmarker` 转换为 PDF。"
 
 [extension.tinymist.config.tinymist.convertExtension.items.object.title]
 en = "A object to configure the conversion"
@@ -1128,10 +1128,10 @@ en = "Matching Markup Language or File Kind to convert to PDF"
 zh = "匹配标记语言或文件类型转换为 PDF"
 
 [extension.tinymist.config.tinymist.convertExtension.items.object.language.desc]
-en = "The language or file kind to match to convert to PDF using the typst template. For example, `md` will convert to PDF using the typst template `md.typst`."
-zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`md` 将使用内置 typst 模板 转换为 PDF。"
+en = "The language or file kind to match to convert to PDF using the typst template. For example, `markdown` will convert to PDF using the latest typst package `@preview/cmarker`."
+zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`markdown` 将使用最新版的 typst 包 `@preview/cmarker` 转换为 PDF。"
 
-[extension.tinymist.config.tinymist.convertExtension.items.string.enum.md]
+[extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown]
 en = "Markdown"
 zh = "Markdown"
 
@@ -1148,8 +1148,8 @@ en = "The processor package to use for conversion"
 zh = "使用的处理器包（processor package）"
 
 [extension.tinymist.config.tinymist.convertExtension.items.object.processor.desc]
-en = "The processor package to use for conversion. . For example, the default markdown processor is `@preview/cmarker:0.1.6` which contains a `render(string)` function to convert Markdown to PDF."
-zh = "使用的处理器包（processor package）。例如，默认的 Markdown 处理器是 `@preview/cmarker:0.1.6`，其中包含一个 `render(string)` 函数来转换 Markdown 为 PDF。"
+en = "The processor package to use for conversion. . For example, the default markdown processor is `@preview/cmarker:0.1.6` which provides a `render(string)` function to convert Markdown to PDF."
+zh = "使用的处理器包（processor package）。例如，默认的 Markdown 处理器是 `@preview/cmarker:0.1.6`，其提供了一个 `render(string)` 函数来转换 Markdown 为 PDF。"
 
 [extension.tinymist.config.tinymist.rootPath.title]
 en = "Root path"

@@ -107,8 +107,8 @@ export async function tinymistActivate(
     config.convertExtension instanceof Array &&
     config.convertExtension.some(
       (item: any) =>
-        item === "md" ||
-        (typeof item === "object" && item.language === "md" && item.showNavigationIcon),
+        item === "markdown" ||
+        (typeof item === "object" && item.language === "markdown" && item.showNavigationIcon),
     );
   console.log("enableNavigateMdToPdfIcon:", config.convertExtension, enableNavigateMdToPdfIcon);
   vscode.commands.executeCommand(

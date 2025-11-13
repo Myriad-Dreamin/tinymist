@@ -261,12 +261,14 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
 
   // Gets the template from the convertExtension configuration
   const language = activeEditor.document.languageId;
-  if (language === "md") {
+  if (language === "markdown") {
     const convertExtension = conf.get("convertExtension");
     if (convertExtension && convertExtension instanceof Array) {
       const convertExtensionItem = convertExtension.find((item: any) => item.language === language);
-      if (convertExtensionItem && convertExtensionItem.template) {
-        actionOpts.template = convertExtensionItem.template;
+      if (convertExtensionItem && convertExtensionItem.processor) {
+        extraOpts ||= {};
+        // todo: processor type
+        (extraOpts as ExportPdfOpts).processor = convertExtensionItem.processor;
       }
     }
   }

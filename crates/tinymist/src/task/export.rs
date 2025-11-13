@@ -22,7 +22,7 @@ use tinymist_std::path::PathClean;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{
     output_template, DocumentQuery, ExportMarkdownTask, ExportPngTask, ExportSvgTask, ExportTarget,
-    ImageOutput, PdfExport, PngExport, SvgExport, TextExport,
+    ImageOutput, PathPattern, PdfExport, PngExport, SvgExport, TextExport,
 };
 use tokio::sync::mpsc;
 use typlite::{Format, Typlite};
@@ -95,15 +95,22 @@ impl ServerState {
         let OnExportMdRequest {
             path,
             processor,
-            task,
+            mut task,
             open,
             write,
         } = req;
 
-        let entry = self
-            .entry_resolver()
-            .resolve(Some(path.as_path().into()))
-            .select_in_workspace(Path::new("/__md_main.typ"));
+        // Pre-substitute the output path
+        let origin_entry = self.entry_resolver().resolve(Some(path.as_path().into()));
+        let subst = task
+            .as_export()
+            .and_then(|e| e.output.as_ref().and_then(|o| o.substitute(&origin_entry)));
+        if let Some(export) = task.as_export_mut() {
+            // todo: to string lossy?
+            export.output = subst.map(|s| PathPattern::new(&s.as_os_str().to_string_lossy()));
+        }
+
+        let entry = origin_entry.select_in_workspace(Path::new("/__md_main.typ"));
         let md_content = self
             .memory_changes
             .get(path.as_path())
@@ -125,6 +132,7 @@ impl ServerState {
             world.take_db();
 
             let processor = processor.as_deref().unwrap_or("@preview/cmarker:0.1.6");
+            log::info!("ExportPdfTask: using processor {processor:?}");
             let content = format!(
                 r#"#import {processor:?}: render
 #render({})"#,
