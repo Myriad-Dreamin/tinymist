@@ -6,10 +6,16 @@ use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
-use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
-use sync_ls::{internal_error, just_future};
+use reflexo_typst::{
+    Bytes, CompilationTask, CompileSnapshot, ExportComputation, ShadowApi, WorldComputeGraph,
+};
+use sync_ls::{internal_error, invalid_params, just_future, LspResult};
+use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::LspWorld;
-use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse, GLOBAL_STATS};
+use tinymist_query::{
+    CompilerQueryResponse, OnExportMdRequest, OnExportRequest, OnExportResponse,
+    PagedExportResponse, GLOBAL_STATS,
+};
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
@@ -21,6 +27,7 @@ use tinymist_task::{
 use tokio::sync::mpsc;
 use typlite::{Format, Typlite};
 use typst::ecow::EcoString;
+use typst::foundations::Repr;
 
 use futures::Future;
 use parking_lot::Mutex;
@@ -48,22 +55,24 @@ impl ServerState {
             write,
         } = req;
         let entry = self.entry_resolver().resolve(Some(path.as_path().into()));
+
         let lock_dir = self.entry_resolver().resolve_lock(&entry);
-
         let update_dep = lock_dir.clone().map(|lock_dir| {
-            |snap: LspComputeGraph| async move {
-                let mut updater = update_lock(lock_dir.clone());
-                let world = snap.world();
-                // todo: rootless.
-                let root_dir = world.entry_state().root()?;
-                let doc_id = updater.compiled(world, (&root_dir, &lock_dir))?;
+            |snap: LspComputeGraph| {
+                tokio::spawn(async move {
+                    let mut updater = update_lock(lock_dir.clone());
+                    let world = snap.world();
+                    // todo: rootless.
+                    let root_dir = world.entry_state().root()?;
+                    let doc_id = updater.compiled(world, (&root_dir, &lock_dir))?;
 
-                updater.update_materials(doc_id.clone(), world.depended_fs_paths());
-                updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
+                    updater.update_materials(doc_id.clone(), world.depended_fs_paths());
+                    updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
 
-                updater.commit();
+                    updater.commit();
 
-                Some(())
+                    Some(())
+                });
             }
         });
 
@@ -77,51 +86,112 @@ impl ServerState {
             let id = snap.world().main_id();
             let _guard = GLOBAL_STATS.stat(id, "export");
 
-            let is_html = matches!(task, ProjectTask::ExportHtml { .. });
-            // todo: we may get some file missing errors here
-            let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
+            Self::on_export_typ(task, snap, write, open, update_dep).await
+        })
+    }
 
-            let res = if write {
-                // Export to file and return path
-                ExportTask::do_export(task, artifact, lock_dir)
-                    .await
-                    .map_err(internal_error)?
-            } else {
-                // Export to memory and return base64-encoded data
-                ExportTask::do_export_to_memory(task, artifact)
-                    .await
-                    .map_err(internal_error)?
-            };
+    /// Exports the current document using a custom template.
+    pub fn on_export_md(&mut self, req: OnExportMdRequest) -> QueryFuture {
+        let OnExportMdRequest {
+            path,
+            processor,
+            task,
+            open,
+            write,
+        } = req;
 
-            if let Some(update_dep) = update_dep {
-                tokio::spawn(update_dep(snap));
-            }
+        let entry = self
+            .entry_resolver()
+            .resolve(Some(path.as_path().into()))
+            .select_in_workspace(Path::new("/__md_main.typ"));
+        let md_content = self
+            .memory_changes
+            .get(path.as_path())
+            .map(|s| Ok(s.text().to_owned()))
+            .unwrap_or_else(|| tinymist_std::fs::paths::read(&path))
+            .context("failed to read markdown file")
+            .map_err(invalid_params)?;
 
-            // Only open the first page if multiple pages are exported
-            if open {
-                match &res {
-                    Some(OnExportResponse::Single {
-                        path: Some(path), ..
-                    }) => {
-                        open_external(path);
-                    }
-                    Some(OnExportResponse::Paged { items, .. }) => {
-                        if let Some(first_page) = items.first() {
-                            if let Some(path) = &first_page.path {
-                                open_external(path);
-                            }
+        let snap = self.snapshot().map_err(internal_error)?;
+        just_future(async move {
+            let id = entry.main().unwrap();
+            let _guard = GLOBAL_STATS.stat(Some(id), "export");
+
+            let mut world = snap.world().task(TaskInputs {
+                entry: Some(entry),
+                ..TaskInputs::default()
+            });
+            // todo: bad performance
+            world.take_db();
+
+            let processor = processor.as_deref().unwrap_or("@preview/cmarker:0.1.6");
+            let content = format!(
+                r#"#import {processor:?}: render
+#render({})"#,
+                md_content.repr()
+            );
+            world
+                .map_shadow_by_id(id, Bytes::from_string(content))
+                .map_err(internal_error)?;
+
+            let snap = WorldComputeGraph::new(CompileSnapshot::from_world(world));
+
+            Self::on_export_typ(task, snap, write, open, None::<fn(LspComputeGraph)>).await
+        })
+    }
+
+    async fn on_export_typ(
+        task: ProjectTask,
+        snap: LspComputeGraph,
+        write: bool,
+        open: bool,
+        update_dep: Option<impl FnOnce(LspComputeGraph)>,
+    ) -> LspResult<CompilerQueryResponse> {
+        let is_html = matches!(task, ProjectTask::ExportHtml { .. });
+        // todo: we may get some file missing errors here
+        let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
+        let id = artifact.world().main_id();
+
+        let res = if write {
+            // Export to file and return path
+            ExportTask::do_export(task, artifact, None)
+                .await
+                .map_err(internal_error)?
+        } else {
+            // Export to memory and return base64-encoded data
+            ExportTask::do_export_to_memory(task, artifact)
+                .await
+                .map_err(internal_error)?
+        };
+
+        if let Some(update_dep) = update_dep {
+            update_dep(snap);
+        }
+
+        // Only open the first page if multiple pages are exported
+        if open {
+            match &res {
+                Some(OnExportResponse::Single {
+                    path: Some(path), ..
+                }) => {
+                    open_external(path);
+                }
+                Some(OnExportResponse::Paged { items, .. }) => {
+                    if let Some(first_page) = items.first() {
+                        if let Some(path) = &first_page.path {
+                            open_external(path);
                         }
                     }
-                    None => {
-                        log::warn!("CompileActor: on export end: no export result to open");
-                    }
-                    _ => {}
                 }
+                None => {
+                    log::warn!("CompileActor: on export end: no export result to open");
+                }
+                _ => {}
             }
+        }
 
-            log::trace!("CompileActor: on export end: {path:?} as {res:?}");
-            Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
-        })
+        log::trace!("CompileActor: on export end: {id:?} as {res:?}");
+        Ok(tinymist_query::CompilerQueryResponse::OnExport(res))
     }
 }
 
@@ -476,10 +546,24 @@ impl ExportTask {
         use reflexo_vec2svg::DefaultExportFeature;
         use ProjectTask::*;
 
-        let CompiledArtifact { graph, doc, .. } = artifact;
+        let CompiledArtifact {
+            graph, doc, diag, ..
+        } = artifact;
 
         // Prepare the document.
-        let doc = doc.context("cannot export with compilation errors")?;
+        let doc = match doc {
+            Some(doc) => doc,
+            None => {
+                let diag = diag.diagnostics();
+                let error = print_diagnostics_to_string(
+                    graph.world(),
+                    diag,
+                    reflexo_typst::DiagnosticFormat::Human,
+                )
+                .unwrap_or_else(|e| e);
+                bail!("ExportTask({export_id}): document is not available for export: {error:?}")
+            }
+        };
 
         // Prepare data.
         let data = FutureFolder::compute(move |_| -> Result<ExportArtifact> {

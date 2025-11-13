@@ -397,6 +397,64 @@
             "%extension.tinymist.config.tinymist.exportPdf.string.enum.onDocumentHasTitle%"
           ]
         },
+        "tinymist.convertExtension": {
+          "title": "%extension.tinymist.config.tinymist.convertExtension.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.desc%",
+          "default": [],
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "title": "%extension.tinymist.config.tinymist.convertExtension.items.string.title%",
+                    "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.string.desc%",
+                    "enum": [
+                      "md"
+                    ],
+                    "enumDescriptions": [
+                      "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.md%"
+                    ]
+                  },
+                  {
+                    "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.title%",
+                    "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.desc%",
+                    "type": "object",
+                    "properties": {
+                      "showNavigationIcon": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.desc%",
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "language": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.language.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.language.desc%",
+                        "type": "string",
+                        "enum": [
+                          "md"
+                        ],
+                        "enumDescriptions": [
+                          "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.md%"
+                        ]
+                      },
+                      "processor": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.processor.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.processor.desc%",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "default": null
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
         "tinymist.rootPath": {
           "title": "%extension.tinymist.config.tinymist.rootPath.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.rootPath.desc%",
@@ -1400,7 +1458,7 @@
       "editor/title": [
         {
           "command": "tinymist.showPdf",
-          "when": "resourceLangId == typst && editorTextFocus",
+          "when": "(resourceLangId == typst || (resourceLangId == markdown && ext.navigateMdToPdfIcon)) && editorTextFocus",
           "group": "navigation"
         },
         {

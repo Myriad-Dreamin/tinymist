@@ -102,6 +102,28 @@ export async function tinymistActivate(
       vscode.commands.executeCommand("setContext", "ext.tinymistActivated", false);
     },
   });
+  // Sets a global context key to indicate that the navigate Md to Pdf icon is enabled
+  const enableNavigateMdToPdfIcon =
+    config.convertExtension instanceof Array &&
+    config.convertExtension.some(
+      (item: any) =>
+        item === "md" ||
+        (typeof item === "object" && item.language === "md" && item.showNavigationIcon),
+    );
+  console.log("enableNavigateMdToPdfIcon:", config.convertExtension, enableNavigateMdToPdfIcon);
+  vscode.commands.executeCommand(
+    "setContext",
+    "ext.navigateMdToPdfIcon",
+    enableNavigateMdToPdfIcon,
+  );
+  context.subscriptions.push({
+    dispose: () => {
+      if (enableNavigateMdToPdfIcon) {
+        vscode.commands.executeCommand("setContext", "ext.navigateMdToPdfIcon", false);
+      }
+    },
+  });
+  console.log(enableNavigateMdToPdfIcon);
 
   configureEditorAndLanguage(context, trait);
 

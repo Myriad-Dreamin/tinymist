@@ -259,7 +259,19 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
     actionOpts.open = true;
   }
 
-  // only create pdf if it does not exist yet
+  // Gets the template from the convertExtension configuration
+  const language = activeEditor.document.languageId;
+  if (language === "md") {
+    const convertExtension = conf.get("convertExtension");
+    if (convertExtension && convertExtension instanceof Array) {
+      const convertExtensionItem = convertExtension.find((item: any) => item.language === language);
+      if (convertExtensionItem && convertExtensionItem.template) {
+        actionOpts.template = convertExtensionItem.template;
+      }
+    }
+  }
+
+  // only creates pdf if it does not exist yet
   const exportResponse = await commandExport(kind, extraOpts, actionOpts);
   if (!exportResponse || "message" in exportResponse) {
     // show error message

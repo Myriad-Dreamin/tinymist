@@ -39,10 +39,10 @@ export interface ExportQueryOpts {
 }
 
 // biome-ignore lint/suspicious/noEmptyInterface: no fields yet
-export interface ExportHtmlOpts {}
+export interface ExportHtmlOpts { }
 
 // biome-ignore lint/suspicious/noEmptyInterface: no fields yet
-export interface ExportTextOpts {}
+export interface ExportTextOpts { }
 
 export type ExportOpts =
   | ExportPdfOpts
@@ -56,4 +56,5 @@ export type ExportOpts =
 export interface ExportActionOpts {
   write?: boolean;
   open?: boolean;
+  template?: string;
 }
