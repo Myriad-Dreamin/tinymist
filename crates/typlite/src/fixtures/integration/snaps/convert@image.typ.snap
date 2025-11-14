@@ -9,8 +9,8 @@ input_file: crates/typlite/src/fixtures/integration/image.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1image src="./fig.svg" alt></m1image></m1document></body>
+  <body><m1document><img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="></m1document></body>
 </html>
 
 =====
-![](./fig.svg)
+![](data:image-hash/svg+xml;base64,redacted

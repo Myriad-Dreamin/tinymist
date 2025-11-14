@@ -1,3 +1,7 @@
+#import "/src/markdown.typ": md-doc
+
+#show: md-doc
+
 = Example Document Title (Level 1 Heading)
 
 This is an example file containing all elements, used to test the conversion from Typst to other formats.
@@ -53,19 +57,28 @@ fn main() {
 }
 ```
 
-====== Links and References (Level 6 Heading)
+===== Links and References (Level 6 Heading)
 
-This is a [link text](https://example.com).
+This is a #link("https://example.com")[link text].
 
 #figure(
-  image("/editors/vscode/icons/typst-small.png", alt: "Example image"),
+  [image],
   caption: "Example of an image with a caption",
 )<ref-example>
 Referencing previous content: #ref(<ref-example>)
 
 == Images and Tables
 
-#image("/editors/vscode/icons/typst-small.png", alt: "Standalone image")
+#image(
+  bytes(
+    ```
+    <?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1708" height="588" viewBox="0 0 1708 588" font-family="Inter, system-ui, sans-serif">
+    </svg>
+    ```.text,
+  ),
+  alt: "Standalone image",
+)
 
 === Tables
 
