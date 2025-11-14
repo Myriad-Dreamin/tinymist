@@ -14,7 +14,7 @@ use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
 use crate::TypliteFeat;
-use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
+use crate::attributes::{AlertsAttr, TypliteAttrsParser, VerbatimAttr, md_attr};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
 use crate::tags::md_tag;
@@ -58,15 +58,41 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            tag::p | tag::span | tag::div => {
+            tag::p
+            | tag::span
+            | tag::div
+            | tag::section
+            | tag::article
+            | tag::header
+            | tag::footer
+            | tag::main
+            | tag::nav => {
                 self.convert_children(element)?;
                 Ok(())
             }
 
-            tag::strong | md_tag::strong => self.convert_strong(element),
-            tag::em | md_tag::emph => self.convert_emphasis(element),
+            tag::h1 => self.convert_html_heading(element, 1),
+            tag::h2 => self.convert_html_heading(element, 2),
+            tag::h3 => self.convert_html_heading(element, 3),
+            tag::h4 => self.convert_html_heading(element, 4),
+            tag::h5 => self.convert_html_heading(element, 5),
+            tag::h6 => self.convert_html_heading(element, 6),
+
+            tag::strong => self.convert_strong(element),
+            tag::em => self.convert_emphasis(element),
             tag::mark => self.convert_highlight(element),
             tag::s => self.convert_strikethrough(element),
+            tag::code => self.convert_inline_code(element),
+            tag::pre => self.convert_pre(element),
+            tag::hr => {
+                self.flush_inline_buffer();
+                self.blocks.push(Node::ThematicBreak);
+                Ok(())
+            }
+            tag::blockquote => self.convert_blockquote(element),
+            tag::a => self.convert_link(element),
+            tag::img => self.convert_image(element),
+            tag::figure => self.convert_figure(element),
 
             tag::br => {
                 self.inline_buffer.push(Node::HardBreak);
@@ -95,57 +121,13 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            md_tag::heading => {
-                self.flush_inline_buffer();
-                let attrs = HeadingAttr::parse(&element.attrs)?;
-                self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| {
-                    Node::heading(attrs.level as u8 + 1, content)
-                });
-                Ok(())
-            }
-
-            md_tag::raw => {
-                let attrs = RawAttr::parse(&element.attrs)?;
-                if attrs.block {
-                    self.flush_inline_buffer();
-                    self.blocks
-                        .push(Node::code_block(Some(attrs.lang), attrs.text));
-                } else {
-                    self.inline_buffer.push(Node::InlineCode(attrs.text));
-                }
-                Ok(())
-            }
-
-            md_tag::quote => {
-                let prev_blocks = std::mem::take(&mut self.blocks);
-                self.flush_inline_buffer();
-                self.convert_children(element)?;
-                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
-                let mut quote = std::mem::take(&mut self.blocks);
-                quote.push(content);
-                self.blocks.clear();
-                self.blocks.extend(prev_blocks);
-                self.blocks.push(Node::BlockQuote(quote));
-                Ok(())
-            }
-
-            md_tag::figure => self.convert_figure(element),
-            md_tag::link => self.convert_link(element),
-            md_tag::image => self.convert_image(element),
-
-            md_tag::linebreak => {
-                self.inline_buffer.push(Node::HardBreak);
-                Ok(())
-            }
-
             md_tag::source => {
                 let src = self.convert_source(element);
                 self.inline_buffer.push(src);
                 Ok(())
             }
 
-            md_tag::table | md_tag::grid => {
+            tag::table => {
                 self.flush_inline_buffer();
                 if let Some(table) = TableParser::convert_table(self, element)? {
                     self.blocks.push(table);
@@ -191,15 +173,16 @@ impl HtmlToAstParser {
             }
 
             md_tag::verbatim => {
-                self.inline_buffer.push(Node::Custom(Box::new(VerbatimNode {
-                    content: element
-                        .attrs
-                        .0
-                        .iter()
-                        .find(|(name, _)| *name == md_attr::src)
-                        .map(|(_, value)| value.clone())
-                        .unwrap_or_default(),
-                })));
+                let attrs = VerbatimAttr::parse(&element.attrs)?;
+                if attrs.block {
+                    self.flush_inline_buffer();
+                    self.blocks.push(Node::Paragraph(vec![Node::Custom(Box::new(
+                        VerbatimNode { content: attrs.src },
+                    ))]));
+                } else {
+                    self.inline_buffer
+                        .push(Node::Custom(Box::new(VerbatimNode { content: attrs.src })));
+                }
                 Ok(())
             }
 
@@ -267,19 +250,7 @@ impl HtmlToAstParser {
 
     pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
         for child in &element.children {
-            match child {
-                HtmlNode::Text(text, _) => {
-                    self.inline_buffer.push(Node::Text(text.clone()));
-                }
-                HtmlNode::Element(element) => {
-                    self.convert_element(element)?;
-                }
-                HtmlNode::Frame(frame) => {
-                    let res = self.convert_frame(&frame.inner);
-                    self.inline_buffer.push(res);
-                }
-                HtmlNode::Tag(..) => {}
-            }
+            self.convert_child(child)?;
         }
         Ok(())
     }
@@ -293,6 +264,23 @@ impl HtmlToAstParser {
         self.convert_children(element)?;
         target.append(&mut self.inline_buffer);
         self.inline_buffer = prev_buffer;
+        Ok(())
+    }
+
+    pub(crate) fn convert_child(&mut self, child: &HtmlNode) -> Result<()> {
+        match child {
+            HtmlNode::Text(text, _) => {
+                self.inline_buffer.push(Node::Text(text.clone()));
+            }
+            HtmlNode::Element(element) => {
+                self.convert_element(element)?;
+            }
+            HtmlNode::Frame(frame) => {
+                let res = self.convert_frame(&frame.inner);
+                self.inline_buffer.push(res);
+            }
+            HtmlNode::Tag(..) => {}
+        }
         Ok(())
     }
 
@@ -367,12 +355,101 @@ impl CustomNode for Comment {
 }
 
 impl HtmlToAstParser {
+    fn convert_html_heading(&mut self, element: &HtmlElement, level: u8) -> Result<()> {
+        self.flush_inline_buffer();
+        self.convert_children(element)?;
+        self.flush_inline_buffer_as_block(|content| Node::heading(level, content));
+        Ok(())
+    }
+
+    fn convert_blockquote(&mut self, element: &HtmlElement) -> Result<()> {
+        self.flush_inline_buffer();
+        let prev_blocks = std::mem::take(&mut self.blocks);
+        self.convert_children(element)?;
+        self.flush_inline_buffer();
+        let content = std::mem::take(&mut self.blocks);
+        self.blocks = prev_blocks;
+        if !content.is_empty() {
+            self.blocks.push(Node::BlockQuote(content));
+        }
+        Ok(())
+    }
+
+    fn convert_inline_code(&mut self, element: &HtmlElement) -> Result<()> {
+        let text = self.extract_plain_text(element);
+        self.inline_buffer.push(Node::InlineCode(text));
+        Ok(())
+    }
+
+    fn convert_pre(&mut self, element: &HtmlElement) -> Result<()> {
+        self.flush_inline_buffer();
+        let mut language = self
+            .attr_value(element, "data-lang")
+            .or_else(|| self.attr_value(element, "lang"));
+        let mut content_source = element;
+
+        for child in &element.children {
+            if let HtmlNode::Element(code) = child
+                && code.tag == tag::code
+            {
+                language = language
+                    .or_else(|| self.attr_value(code, "data-lang"))
+                    .or_else(|| self.attr_value(code, "lang"));
+                content_source = code;
+                break;
+            }
+        }
+
+        let mut text = self.extract_plain_text(content_source);
+        if text.is_empty() {
+            text = EcoString::new();
+        }
+        let language = language.and_then(|lang| if lang.is_empty() { None } else { Some(lang) });
+        self.blocks.push(Node::code_block(language, text));
+        Ok(())
+    }
+
+    pub(crate) fn attr_value(&self, element: &HtmlElement, name: &str) -> Option<EcoString> {
+        element
+            .attrs
+            .0
+            .iter()
+            .find(|(attr, _)| attr.resolve().as_str() == name)
+            .map(|(_, value)| value.clone())
+    }
+
+    pub(crate) fn extract_plain_text(&self, element: &HtmlElement) -> EcoString {
+        let mut buffer = EcoString::new();
+        for child in &element.children {
+            Self::append_plain_text(child, &mut buffer);
+        }
+        buffer
+    }
+
+    fn append_plain_text(node: &HtmlNode, buffer: &mut EcoString) {
+        match node {
+            HtmlNode::Text(text, _) => buffer.push_str(text),
+            HtmlNode::Element(element) => {
+                if element.tag == tag::br {
+                    buffer.push_str("\n");
+                } else {
+                    for child in &element.children {
+                        Self::append_plain_text(child, buffer);
+                    }
+                }
+            }
+            HtmlNode::Frame(_) => {}
+            HtmlNode::Tag(..) => {}
+        }
+    }
+
     pub fn is_block_element(element: &HtmlElement) -> bool {
         matches!(
             element.tag,
             tag::p
                 | tag::div
                 | tag::blockquote
+                | tag::figure
                 | tag::h1
                 | tag::h2
                 | tag::h3
@@ -391,14 +468,19 @@ impl HtmlToAstParser {
                 | tag::nav
                 | tag::ul
                 | tag::ol
-                | md_tag::heading
-                | md_tag::quote
-                | md_tag::raw
                 | md_tag::parbreak
-                | md_tag::table
                 | md_tag::grid
-                | md_tag::figure
-        )
+        ) || (element.tag == md_tag::verbatim && Self::is_verbatim_block(element))
+    }
+
+    fn is_verbatim_block(element: &HtmlElement) -> bool {
+        element
+            .attrs
+            .0
+            .iter()
+            .find(|(name, _)| *name == md_attr::block)
+            .and_then(|(_, value)| value.parse::<bool>().ok())
+            .unwrap_or(false)
     }
 
     pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Node>> {

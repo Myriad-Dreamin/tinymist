@@ -41,37 +41,10 @@ pub struct IdocAttr {
     pub src: EcoString,
     pub mode: EcoString,
 }
-
-#[derive(TypliteAttr, Default)]
-pub struct HeadingAttr {
-    pub id: EcoString,
-    pub level: usize,
-}
-
-#[derive(TypliteAttr, Default)]
-pub struct ImageAttr {
-    pub id: EcoString,
-    pub src: EcoString,
-    pub alt: EcoString,
-}
-
 #[derive(TypliteAttr, Default)]
 pub struct FigureAttr {
     pub id: EcoString,
     pub caption: EcoString,
-}
-
-#[derive(TypliteAttr, Default)]
-pub struct LinkAttr {
-    pub dest: EcoString,
-}
-
-#[derive(TypliteAttr, Default)]
-pub struct RawAttr {
-    pub id: EcoString,
-    pub lang: EcoString,
-    pub block: bool,
-    pub text: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
@@ -82,6 +55,12 @@ pub struct ListItemAttr {
 #[derive(TypliteAttr, Default)]
 pub struct AlertsAttr {
     pub class: EcoString,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct VerbatimAttr {
+    pub block: bool,
+    pub src: EcoString,
 }
 
 pub trait TypliteAttrsParser {

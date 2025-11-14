@@ -9,54 +9,8 @@ use typst_syntax::Span;
 
 use crate::Result;
 use crate::common::InlineNode;
-use crate::tags::md_tag;
 
 use super::core::HtmlToAstParser;
-
-/// Responsible for finding HTML table elements in the DOM structure.
-pub struct TableStructureFinder;
-
-impl TableStructureFinder {
-    /// Find the real table element in the HTML structure
-    pub fn find_real_table_element(element: &HtmlElement) -> Option<&HtmlElement> {
-        if element.tag == md_tag::grid {
-            // For grid: grid -> table -> table
-            Self::find_table_in_grid(element)
-        } else {
-            // For m1table -> table
-            Self::find_table_direct(element)
-        }
-    }
-
-    fn find_table_in_grid(grid_element: &HtmlElement) -> Option<&HtmlElement> {
-        for child in &grid_element.children {
-            if let HtmlNode::Element(table_elem) = child
-                && table_elem.tag == md_tag::table
-            {
-                // Find table tag within m1table
-                for inner_child in &table_elem.children {
-                    if let HtmlNode::Element(inner) = inner_child
-                        && inner.tag == tag::table
-                    {
-                        return Some(inner);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    fn find_table_direct(element: &HtmlElement) -> Option<&HtmlElement> {
-        for child in &element.children {
-            if let HtmlNode::Element(table_elem) = child
-                && table_elem.tag == tag::table
-            {
-                return Some(table_elem);
-            }
-        }
-        None
-    }
-}
 
 /// Responsible for extracting and processing table content from HTML elements.
 pub struct TableContentExtractor;
@@ -278,33 +232,26 @@ impl TableParser {
         element: &HtmlElement,
     ) -> Result<Option<Node>> {
         // Find the real table element
-        let real_table_elem = TableStructureFinder::find_real_table_element(element);
+        let table = element;
 
-        // Process the table (if found)
-        if let Some(table) = real_table_elem {
-            // Check if the table contains rowspan or colspan attributes
-            // If it does, fall back to using HtmlElement
-            if let Some(cell_span) = TableValidator::find_complex_cell(table) {
-                parser.warn_at(
-                    Some(cell_span),
-                    eco_format!(
-                        "table contains rowspan or colspan attributes; exported original HTML table"
-                    ),
-                );
-                return parser.create_html_element(table).map(Some);
-            }
-
-            let mut state = TableParseState::new();
-            TableContentExtractor::extract_table_content(parser, table, &mut state)?;
-
-            if state.fallback_to_html {
-                return parser.create_html_element(table).map(Some);
-            }
-
-            return Self::create_table_node(state.headers, state.rows);
+        if let Some(cell_span) = TableValidator::find_complex_cell(table) {
+            parser.warn_at(
+                Some(cell_span),
+                eco_format!(
+                    "table contains rowspan or colspan attributes; exported original HTML table"
+                ),
+            );
+            return parser.create_html_element(table).map(Some);
         }
 
-        Ok(None)
+        let mut state = TableParseState::new();
+        TableContentExtractor::extract_table_content(parser, table, &mut state)?;
+
+        if state.fallback_to_html {
+            return parser.create_html_element(table).map(Some);
+        }
+
+        Self::create_table_node(state.headers, state.rows)
     }
 
     fn create_table_node(headers: Vec<Node>, rows: Vec<Vec<Node>>) -> Result<Option<Node>> {
