@@ -1,0 +1,54 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+assertion_line: 135
+description: "Code Action on code\n#let |foo|/* range -"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/dead_code.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "_foo",
+      "range": "1:5:1:8"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Prefix `_` to `foo`"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "_",
+      "range": "1:5:1:8"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Replace with `_`"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "",
+      "range": "1:1:2:0"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Remove unused declaration"
+ }
+]
