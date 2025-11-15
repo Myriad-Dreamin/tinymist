@@ -198,7 +198,10 @@ impl fmt::Display for CompileReportMsg<'_> {
             CompileError(res) => ("compilation failed", res),
             ExportError(res) => ("export failed", res),
         };
-        write!(f, "{input:?}: {stage} with {diag} warnings in {elapsed:?}")
+        write!(
+            f,
+            "{input:?}: {stage} with {diag} warnings and errors in {elapsed:?}"
+        )
     }
 }
 
@@ -879,7 +882,18 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         move || {
             let compiled = if syntax_only {
                 let main = graph.snap.world.main();
-                let syntax_error = graph.world().source(main).at(Span::from_range(main, 0..0));
+                let syntax_error = graph
+                    .world()
+                    .source(main)
+                    .at(Span::from_range(main, 0..0))
+                    .and_then(|source| {
+                        let errors = source.root().errors();
+                        if errors.is_empty() {
+                            Ok(())
+                        } else {
+                            Err(errors.into_iter().map(|s| s.into()).collect())
+                        }
+                    });
                 let diag = Arc::new(DiagnosticsTask::from_errors(syntax_error.err()));
 
                 CompiledArtifact {
@@ -902,6 +916,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
                 status: match &compiled.doc {
                     Some(..) => CompileStatusEnum::CompileSuccess(res),
+                    None if res.diag == 0 => CompileStatusEnum::CompileSuccess(res),
                     None => CompileStatusEnum::CompileError(res),
                 },
             };
