@@ -3,7 +3,7 @@
 //! This module creates user-friendly diagnostic messages for unused
 //! definitions, with appropriate hints and severity levels.
 
-use tinymist_analysis::syntax::{DefKind, ExprInfo};
+use tinymist_analysis::syntax::{Decl, DefKind, ExprInfo};
 use tinymist_project::LspWorld;
 use typst::diag::{SourceDiagnostic, eco_format};
 
@@ -23,6 +23,9 @@ pub fn generate_diagnostic(
         return None;
     }
 
+    let is_module_import = matches!(def_info.decl.as_ref(), Decl::ModuleImport(..));
+    let is_module_like = is_module_import || matches!(def_info.kind, DefKind::Module);
+
     let kind_str = match def_info.kind {
         DefKind::Function => "function",
         DefKind::Variable => "variable",
@@ -35,13 +38,16 @@ pub fn generate_diagnostic(
     let name = def_info.decl.name();
 
     // Don't warn about empty names (anonymous items)
-    if name.is_empty() {
+    if name.is_empty() && !is_module_import {
         return None;
     }
 
     // Create the base diagnostic
-    let mut diag =
-        SourceDiagnostic::warning(def_info.span, eco_format!("unused {kind_str}: `{name}`"));
+    let mut diag = if is_module_import {
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused module import"))
+    } else {
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused {kind_str}: `{name}`"))
+    };
 
     // Add helpful hints based on the scope and kind
     match def_info.scope {
@@ -50,11 +56,12 @@ pub fn generate_diagnostic(
                 "if this parameter is intentionally unused, prefix it with underscore: `_{name}`"
             ));
         }
-        DefScope::File | DefScope::Local => {
+        DefScope::File | DefScope::Local if !is_module_like => {
             diag = diag.with_hint(eco_format!(
                 "consider removing this {kind_str} or prefixing with underscore: `_{name}`"
             ));
         }
+        DefScope::File | DefScope::Local => {}
         DefScope::Exported => {
             diag = diag.with_hint(eco_format!("this {kind_str} is exported but never used"));
         }
@@ -71,11 +78,11 @@ pub fn generate_diagnostic(
                 return None;
             }
         }
-        DefKind::Module => {
-            diag =
-                diag.with_hint("imported modules should be used or the import should be removed");
-        }
         _ => {}
+    }
+
+    if is_module_like {
+        diag = diag.with_hint("imported modules should be used or the import should be removed");
     }
 
     Some(diag)

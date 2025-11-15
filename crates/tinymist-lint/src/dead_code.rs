@@ -84,11 +84,7 @@ fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
 
     matches!(
         def_info.decl.as_ref(),
-        Decl::ModuleImport(_)
-            | Decl::Pattern(_)
-            | Decl::Spread(_)
-            | Decl::Constant(_)
-            | Decl::Content(_)
+        Decl::Pattern(_) | Decl::Spread(_) | Decl::Constant(_) | Decl::Content(_)
     )
 }
 
