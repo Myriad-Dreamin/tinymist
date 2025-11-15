@@ -160,7 +160,7 @@ const PreviewPageCard = (
     img({
       class: "preview-page-image",
       src: page.imageData,
-      alt: `Page ${page.pageNumber}`,
+      alt: `Page ${page.pageNumber + 1}`,
       loading: "lazy",
       style: thumbnailStyle,
     }),
@@ -168,7 +168,7 @@ const PreviewPageCard = (
       {
         class: "preview-page-number",
       },
-      `${page.pageNumber}`,
+      `${page.pageNumber + 1}`,
     ),
   );
 };

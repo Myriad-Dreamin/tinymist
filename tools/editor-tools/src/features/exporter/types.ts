@@ -24,7 +24,7 @@ export interface ExportFormat {
 }
 
 export interface PreviewPage {
-  pageNumber: number;
+  pageNumber: number; // zero-based
   imageData: string; // base64 encoded PNG
 }
 
