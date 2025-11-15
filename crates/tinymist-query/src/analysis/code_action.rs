@@ -91,7 +91,7 @@ impl<'a> CodeActionWorker<'a> {
                         self.autofix_remove_unused_import(root, &diag_range);
                     } else {
                         self.autofix_unused_symbol(&diag_range);
-                        self.autofix_replace_with_placeholder(&diag_range);
+                        self.autofix_replace_with_placeholder(root, &diag_range);
                         self.autofix_remove_declaration(root, &diag_range);
                     }
                 }
@@ -310,8 +310,12 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    fn autofix_replace_with_placeholder(&mut self, range: &Range<usize>) -> Option<()> {
-        if range.is_empty() {
+    fn autofix_replace_with_placeholder(
+        &mut self,
+        root: &LinkedNode<'_>,
+        range: &Range<usize>,
+    ) -> Option<()> {
+        if range.is_empty() || self.is_spread_binding(root, range) {
             return None;
         }
 
@@ -334,6 +338,23 @@ impl<'a> CodeActionWorker<'a> {
         self.actions.push(action);
 
         Some(())
+    }
+
+    fn is_spread_binding(&self, root: &LinkedNode<'_>, range: &Range<usize>) -> bool {
+        if range.is_empty() {
+            return false;
+        }
+
+        let cursor = (range.start + range.end) / 2;
+        let Some(node) = root.leaf_at_compat(cursor) else {
+            return false;
+        };
+
+        if node.kind() == SyntaxKind::Spread {
+            return true;
+        }
+
+        node_ancestors(&node).any(|ancestor| ancestor.kind() == SyntaxKind::Spread)
     }
 
     /// Remove the declaration corresponding to an unused binding.
