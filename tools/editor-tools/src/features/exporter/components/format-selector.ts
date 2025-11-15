@@ -26,11 +26,11 @@ const FormatCard = (format: ExportFormat, isSelected: boolean, onSelect: () => v
   return div(
     {
       class: `format-card ${isSelected ? "selected" : ""}`,
+      title: format.label,
       onclick: onSelect,
     },
     div(
       { class: "flex justify-between items-center" },
-      span({ class: "font-semibold" }, format.label),
       span({ class: "badge font-mono" }, `.${format.fileExtension}`),
     ),
   );

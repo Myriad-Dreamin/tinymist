@@ -3,7 +3,6 @@ import "./styles.css";
 
 import { ActionButtons } from "./components/action-buttons";
 import { FormatSelector } from "./components/format-selector";
-import { Header } from "./components/header";
 import { InputSection } from "./components/inout";
 import { OptionsPanel } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
@@ -35,13 +34,13 @@ const ExportTool = () => {
   return div(
     { class: "export-tool-container flex flex-col gap-lg text-base-content" },
 
-    Header({
-      title: "Export Tool",
-      description: "Configure and export your Typst documents to various formats",
-    }),
-
     // Input Document Section
     InputSection({ inputPath, outputPath }),
+
+    // Export Actions
+    ActionButtons({
+      onExport: exportDocument,
+    }),
 
     // Format Selection
     FormatSelector({ selectedFormat: format }),
@@ -56,11 +55,6 @@ const ExportTool = () => {
       previewGenerating,
       autoPreview,
       onPreview: generatePreview,
-    }),
-
-    // Export Actions
-    ActionButtons({
-      onExport: exportDocument,
     }),
   );
 };

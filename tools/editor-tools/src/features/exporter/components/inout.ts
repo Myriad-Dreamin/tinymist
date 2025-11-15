@@ -13,10 +13,13 @@ export const InputSection = ({ inputPath }: InputSectionProps) => {
     { class: "flex flex-col gap-sm" },
     // Input Path Section
     div(
-      { class: "flex flex-col gap-xs" },
-      h3({ class: "mb-xs" }, "Input Document"),
+      { class: "flex flex-row items-center gap-xs" },
+      h3(
+        { class: "mb-xs", title: "Configure and export your Typst documents to various formats" },
+        "Export Document",
+      ),
       input({
-        class: "input",
+        class: "input flex-1",
         type: "text",
         placeholder: () => lastFocusedTypstDoc.val || "Document Path",
         value: inputPath,

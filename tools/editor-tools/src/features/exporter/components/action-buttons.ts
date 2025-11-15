@@ -1,6 +1,6 @@
 import van from "vanjs-core";
 
-const { div, h3, button } = van.tags;
+const { div, button } = van.tags;
 
 interface ActionButtonsProps {
   onExport: () => void;
@@ -9,8 +9,6 @@ interface ActionButtonsProps {
 export const ActionButtons = ({ onExport }: ActionButtonsProps) => {
   return div(
     { class: "flex flex-col gap-sm" },
-
-    h3("Export Actions"),
 
     // Action Buttons
     div(
@@ -23,7 +21,7 @@ export const ActionButtons = ({ onExport }: ActionButtonsProps) => {
           class: "btn action-button",
           onclick: onExport,
         },
-        "📄 Export",
+        "Export",
       ),
 
       // Create Task Button
@@ -33,7 +31,6 @@ export const ActionButtons = ({ onExport }: ActionButtonsProps) => {
           class: "btn btn-secondary action-button",
           onclick: handleCreateTask,
         },
-        "⚙️",
         "Create Task",
       ), */
     ),

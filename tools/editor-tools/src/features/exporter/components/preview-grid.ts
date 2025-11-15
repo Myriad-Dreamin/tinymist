@@ -116,7 +116,7 @@ const PreviewEmpty = (onGenerate: () => void) => {
           class: "btn",
           onclick: onGenerate,
         },
-        "Generate Preview",
+        "Flush",
       ),
     ),
   );
