@@ -24,6 +24,10 @@ pub fn generate_diagnostic(
     }
 
     let is_module_import = matches!(def_info.decl.as_ref(), Decl::ModuleImport(..));
+    let is_import_item = matches!(
+        def_info.decl.as_ref(),
+        Decl::Import(_) | Decl::ImportAlias(_)
+    );
     let is_module_like = is_module_import || matches!(def_info.kind, DefKind::Module);
 
     let kind_str = match def_info.kind {
@@ -38,13 +42,15 @@ pub fn generate_diagnostic(
     let name = def_info.decl.name();
 
     // Don't warn about empty names (anonymous items)
-    if name.is_empty() && !is_module_import {
+    if name.is_empty() && !is_module_import && !is_import_item {
         return None;
     }
 
     // Create the base diagnostic
     let mut diag = if is_module_import {
         SourceDiagnostic::warning(def_info.span, eco_format!("unused module import"))
+    } else if is_import_item {
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused import: `{name}`"))
     } else {
         SourceDiagnostic::warning(def_info.span, eco_format!("unused {kind_str}: `{name}`"))
     };
@@ -56,10 +62,13 @@ pub fn generate_diagnostic(
                 "if this parameter is intentionally unused, prefix it with underscore: `_{name}`"
             ));
         }
-        DefScope::File | DefScope::Local if !is_module_like => {
+        DefScope::File | DefScope::Local if !is_module_like && !is_import_item => {
             diag = diag.with_hint(eco_format!(
                 "consider removing this {kind_str} or prefixing with underscore: `_{name}`"
             ));
+        }
+        DefScope::File | DefScope::Local if is_import_item => {
+            diag = diag.with_hint(eco_format!("consider removing this unused import"));
         }
         DefScope::File | DefScope::Local => {}
         DefScope::Exported => {
