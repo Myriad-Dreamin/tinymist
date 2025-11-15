@@ -66,6 +66,32 @@ impl SemanticRequest for CodeLensRequest {
             vec!["more".into()],
         );
 
+        if !ctx.analysis.support_client_codelens
+            && let Some(uri) = path_to_url(&self.path)
+                .ok()
+                .and_then(|u| serde_json::to_value(u).ok())
+        {
+            res.push(CodeLens {
+                range: doc_start,
+                command: Some(Command {
+                    title: if is_html {
+                        tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF")
+                    } else {
+                        tinymist_l10n::t!("tinymist-query.code-action.exportHtml", "Export HTML")
+                    }
+                    .to_string(),
+                    command: if is_html {
+                        "tinymist.exportPdf"
+                    } else {
+                        "tinymist.exportHtml"
+                    }
+                    .to_string(),
+                    arguments: Some(vec![uri]),
+                }),
+                data: None,
+            })
+        }
+
         Some(res)
     }
 }
