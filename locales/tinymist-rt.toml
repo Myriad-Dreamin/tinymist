@@ -29,6 +29,10 @@ zh = "性能分析"
 en = "compileStatus must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}"
 zh = "compileStatus 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭），得到 {value}"
 
+[tinymist.config.badSyntaxOnly]
+en = "syntaxOnly must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}"
+zh = "syntaxOnly 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭）, `\"onPowerSaving\"`（省电模式下开启）或 `\"auto\"`（自动），得到 {value}"
+
 [tinymist.config.badHoverPeriscope]
 en = "failed to parse hoverPeriscope: {err}"
 zh = "解析 hoverPeriscope 失败：{err}"

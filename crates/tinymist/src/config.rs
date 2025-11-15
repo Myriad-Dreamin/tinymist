@@ -378,12 +378,13 @@ impl Config {
             }
         };
         self.syntax_only = match try_(|| update.get("syntaxOnly")?.as_str()) {
-            Some("enable" | "onPowerSaving") => true,
+            Some("onPowerSaving") => tinymist_std::battery::is_power_saving(),
+            Some("enable") => true,
             Some("disable" | "auto") | None => false,
             Some(value) => {
                 self.warnings.push(tinymist_l10n::t!(
-                    "tinymist.config.badCompileStatus",
-                    "compileStatus must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}",
+                    "tinymist.config.badSyntaxOnly",
+                    "syntaxOnly must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}",
                     value = value.debug_l10n(),
                 ));
 
