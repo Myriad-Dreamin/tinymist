@@ -23,9 +23,14 @@ const ExportTool = () => {
     optionStates,
     previewGenerating,
     previewData,
+    autoPreview,
     exportDocument,
     generatePreview,
   } = useExporter();
+
+  // Note: cleanup() should be called when the component is unmounted
+  // In the current single-page architecture, this might not be needed,
+  // but it's available for future use if the tool becomes part of a larger app
 
   return div(
     { class: "export-tool-container flex flex-col gap-lg text-base-content" },
@@ -49,6 +54,7 @@ const ExportTool = () => {
       format: format,
       previewData,
       previewGenerating,
+      autoPreview,
       onPreview: generatePreview,
     }),
 

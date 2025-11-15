@@ -45,9 +45,11 @@ export const EXPORT_FORMATS: ExportFormat[] = [
           if (value.trim() === "") {
             return; // Allow empty input
           }
+          if (!/^\d+$/.test(value)) {
+            return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
+          }
           const num = Number(value);
           if (Number.isNaN(num) || !Number.isInteger(num) || num < 0) {
-            // fixme: it still accepts floating point numbers like "1e5"
             return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
           }
         },

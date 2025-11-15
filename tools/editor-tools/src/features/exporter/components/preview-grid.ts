@@ -1,17 +1,18 @@
 import van, { type State } from "vanjs-core";
 import type { ExportFormat, PreviewData, PreviewPage } from "../types";
 
-const { div, h3, img, span, button } = van.tags;
+const { div, h3, img, span, button, label, input } = van.tags;
 
 interface PreviewGridProps {
   format: State<ExportFormat>;
   previewData: State<PreviewData>;
   previewGenerating: State<boolean>;
+  autoPreview: State<boolean>;
   onPreview: () => void;
 }
 
 export const PreviewGrid = (props: PreviewGridProps) => {
-  const { format, previewData, previewGenerating, onPreview } = props;
+  const { format, previewData, previewGenerating, autoPreview, onPreview } = props;
 
   const thumbnailZoom = van.state<number>(100); // Percentage for thumbnail sizing
 
@@ -19,14 +20,13 @@ export const PreviewGrid = (props: PreviewGridProps) => {
     // Preview Header
     div(
       { class: "flex justify-between items-center mb-md" },
-      h3({ class: "text-lg font-semibold" }, () => `Preview (${format.val.label})`),
-      () =>
-        div(
-          { class: "flex items-center gap-sm", style: "min-height: 2rem;" },
-          // Only show zoom controls for image content (thumbnails)
-          !previewGenerating.val && previewData.val.pages && previewData.val.pages.length > 0
-            ? ZoomControls(thumbnailZoom)
-            : null,
+      div(
+        { class: "flex items-center gap-sm" },
+
+        h3({ class: "text-lg font-semibold" }, () => `Preview (${format.val.label})`),
+
+        // Generate Preview Button
+        () =>
           button(
             {
               class: "btn btn-secondary",
@@ -35,6 +35,31 @@ export const PreviewGrid = (props: PreviewGridProps) => {
             },
             previewGenerating.val ? "Generating..." : "Generate Preview",
           ),
+
+        // Auto-preview toggle
+        label(
+          { class: "flex items-center gap-xs cursor-pointer", style: "user-select: none;" },
+          input({
+            type: "checkbox",
+            class: "toggle",
+            checked: autoPreview,
+            onchange: (e: Event) => {
+              const target = e.target as HTMLInputElement;
+              autoPreview.val = target.checked;
+            },
+          }),
+          span({ class: "text-sm" }, "Auto"),
+        ),
+      ),
+
+      () =>
+        div(
+          { class: "flex items-center gap-sm", style: "min-height: 2rem;" },
+
+          // Only show zoom controls for image content (thumbnails)
+          !previewGenerating.val && previewData.val.pages && previewData.val.pages.length > 0
+            ? ZoomControls(thumbnailZoom)
+            : null,
         ),
     ),
 

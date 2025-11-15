@@ -23,20 +23,8 @@ export const Header =
         { class: "flex flex-col sm:flex-row sm:justify-between sm:items-center gap-sm" },
         div(
           { class: "flex flex-col gap-xs" },
-          h1(
-            {
-              class: "text-xl font-semibold text-base-content",
-              style: "margin: 0; font-size: 1.25rem; font-weight: 600;",
-            },
-            title,
-          ),
-          p(
-            {
-              class: "text-desc",
-              style: "margin: 0; font-size: 0.875rem;",
-            },
-            description,
-          ),
+          h1({ class: "text-xl font-semibold text-base-content" }, title),
+          p({ class: "text-desc font-sm" }, description),
         ),
         actions ? div({ class: "flex gap-xs" }, actions) : null,
       ),

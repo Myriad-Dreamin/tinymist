@@ -14,6 +14,7 @@ export function useExporter() {
   let previewVersion = 0;
   const previewGenerating = van.state(false);
   const previewData = van.state<PreviewData>({});
+  const autoPreview = van.state(true);
 
   const buildOptions = () => {
     const extraOpts = Object.fromEntries(
@@ -52,6 +53,8 @@ export function useExporter() {
 
   // Regenerate preview automatically when format or options change
   van.derive(() => {
+    if (!autoPreview.val) return;
+
     if (format.oldVal !== format.val) {
       // Clear previous preview data when format changes
       previewData.val = {};
@@ -71,6 +74,10 @@ export function useExporter() {
   };
   window?.addEventListener("message", handleMessage);
 
+  const cleanup = () => {
+    window?.removeEventListener("message", handleMessage);
+  };
+
   return {
     inputPath,
     outputPath,
@@ -78,8 +85,10 @@ export function useExporter() {
     optionStates,
     previewGenerating,
     previewData,
+    autoPreview,
     exportDocument,
     generatePreview,
+    cleanup,
   };
 }
 

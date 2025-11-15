@@ -282,7 +282,8 @@ export const messageHandlers: Record<string, MessageHandler> = {
         }
       }
     } catch (error) {
-      await vscode.window.showErrorMessage(`Export failed: ${error}`);
+      const message = error instanceof Error ? error.message : String(error);
+      await vscode.window.showErrorMessage(`Export failed: ${message}`);
     }
   },
 
@@ -298,17 +299,14 @@ export const messageHandlers: Record<string, MessageHandler> = {
       });
     };
 
-    console.log(`Generating preview for format=${format}, extraArgs=`, extraArgs);
     try {
       const ops = exportOps(extraArgs);
       const formatProvider = provideFormats(extraArgs);
 
-      // await vscode.window.showInformationMessage(`Active `)
-
       // Get the active document
       const uri = ops.resolveInputPath();
       if (!uri) {
-        // sendError("No active document found");
+        // Just ignore if no active document
         return;
       }
 
@@ -332,7 +330,6 @@ export const messageHandlers: Record<string, MessageHandler> = {
         return;
       }
 
-      console.log(`Generating preview for format=${format}, extraArgs=${extraArgs}, uri=${uri}`);
       // For visual formats, generate PNG/SVG previews
       if (format === "pdf" || format === "png" || format === "svg") {
         // Extract base64 data from the response
@@ -362,7 +359,6 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log("Preview generation failed:", error);
       sendError(`Preview generation failed: ${message}`);
     }
   },

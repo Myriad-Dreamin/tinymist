@@ -67,7 +67,7 @@ const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
 
 const renderInput = (
   schema: OptionSchema,
-  valueState: State<Scalar>,
+  valueState: State<Scalar | undefined>,
   validationError: State<string | undefined>,
 ) => {
   const { type, key, options: selectOptions, min, max } = schema;
@@ -102,7 +102,7 @@ const renderInput = (
           const target = e.target as HTMLInputElement;
           // Call custom validation function if provided
           validationError.val = schema.validate?.(target.value);
-          valueState.val = parseFloat(target.value);
+          valueState.val = target.value === "" ? undefined : parseFloat(target.value);
         },
       });
 
