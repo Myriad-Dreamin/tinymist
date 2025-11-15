@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/unused_variable.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "unused variable: `unused_var`\nHint: consider removing this variable or prefixing with underscore: `_unused_var`",
+   "range": "1:5:1:15",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}
