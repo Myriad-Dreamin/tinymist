@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 120
+assertion_line: 135
 description: "Code Action on rt \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ

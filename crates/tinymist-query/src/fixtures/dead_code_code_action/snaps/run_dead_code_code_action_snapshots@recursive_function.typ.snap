@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+assertion_line: 180
+description: Dead code code actions in /dummy-root/s0.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/recursive_function.typ
+---
+[]
