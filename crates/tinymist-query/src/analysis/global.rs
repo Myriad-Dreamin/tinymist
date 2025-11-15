@@ -843,7 +843,16 @@ impl SharedContext {
             let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
 
             let has_references = |decl: &Interned<Decl>| -> bool {
-                if ei
+                if matches!(decl.as_ref(), Decl::PathStem(_)) {
+                    if ei.resolves.values().any(|r| {
+                        matches!(
+                            r.step.as_ref(),
+                            Some(Expr::Decl(step_decl)) if step_decl == decl
+                        )
+                    }) {
+                        return true;
+                    }
+                } else if ei
                     .get_refs(decl.clone())
                     .any(|(_, r)| r.as_ref().decl != *decl)
                 {
