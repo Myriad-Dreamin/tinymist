@@ -1,45 +1,45 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 120
-description: "Code Action on rt \"base.t||yp\"/* rang"
+assertion_line: 135
+description: Code Action on $a_(i||j)/* range
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
+input_file: crates/tinymist-query/src/fixtures/code_action/unknown_math_subscript_paren.typ
 ---
 [
  {
   "edit": {
    "changes": {
-    "s1.typ": [
+    "s0.typ": [
      {
-      "insertTextFormat": 1,
-      "newText": "",
-      "range": "0:2:0:19"
+      "insertTextFormat": 2,
+      "newText": "\n\nlet ij",
+      "range": "0:0:0:0"
      }
     ]
    }
   },
   "kind": "quickfix",
-  "title": "Remove unused declaration"
+  "title": "Create missing variable"
  },
  {
   "edit": {
    "changes": {
-    "s1.typ": [
+    "s0.typ": [
      {
-      "insertTextFormat": 1,
-      "newText": "\"/base.typ\"",
-      "range": "0:9:0:19"
+      "insertTextFormat": 2,
+      "newText": "i j",
+      "range": "0:4:0:6"
      }
     ]
    }
   },
-  "kind": "refactor.rewrite",
-  "title": "Convert to absolute path"
+  "kind": "quickfix",
+  "title": "Add spaces between letters"
  },
  {
   "edit": {
    "changes": {
-    "s1.typ": [
+    "s0.typ": [
      {
       "insertTextFormat": 1,
       "newText": " ",
@@ -48,7 +48,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
      {
       "insertTextFormat": 1,
       "newText": " ",
-      "range": "0:38:0:38"
+      "range": "0:7:0:25"
      }
     ]
    }
@@ -59,7 +59,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
  {
   "edit": {
    "changes": {
-    "s1.typ": [
+    "s0.typ": [
      {
       "insertTextFormat": 1,
       "newText": "\n",
@@ -68,7 +68,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
      {
       "insertTextFormat": 1,
       "newText": "\n",
-      "range": "0:38:0:38"
+      "range": "0:7:0:25"
      }
     ]
    }

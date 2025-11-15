@@ -1,9 +1,9 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 120
-description: "Code Action on t \"/base.t||yp\"/* rang"
+assertion_line: 135
+description: "Code Action on rt \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/code_action/absolute_path_import.typ
+input_file: crates/tinymist-query/src/fixtures/code_action/path_import.typ
 ---
 [
  {
@@ -13,7 +13,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/absolute_path_import.
      {
       "insertTextFormat": 1,
       "newText": "",
-      "range": "0:1:0:19"
+      "range": "0:1:0:18"
      }
     ]
    }
@@ -27,13 +27,13 @@ input_file: crates/tinymist-query/src/fixtures/code_action/absolute_path_import.
     "s1.typ": [
      {
       "insertTextFormat": 1,
-      "newText": "\"base.typ\"",
-      "range": "0:8:0:19"
+      "newText": "\"/base.typ\"",
+      "range": "0:8:0:18"
      }
     ]
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Convert to relative path"
+  "title": "Convert to absolute path"
  }
 ]

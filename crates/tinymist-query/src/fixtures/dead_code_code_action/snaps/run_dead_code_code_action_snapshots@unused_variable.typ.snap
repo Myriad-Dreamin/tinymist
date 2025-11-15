@@ -1,0 +1,60 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+assertion_line: 180
+description: Dead code code actions in /dummy-root/s0.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/unused_variable.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused_var",
+        "range": "1:5:1:15"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused_var`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "1:5:1:15"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "1:1:2:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused variable: `unused_var`\nHint: consider removing this variable or prefixing with underscore: `_unused_var`",
+  "range": "1:5:1:15"
+ }
+]

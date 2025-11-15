@@ -1,0 +1,264 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+assertion_line: 180
+description: Dead code code actions in /dummy-root/s0.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused1",
+        "range": "1:5:1:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused1`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "1:5:1:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "1:1:2:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused variable: `unused1`\nHint: consider removing this variable or prefixing with underscore: `_unused1`",
+  "range": "1:5:1:12"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused2",
+        "range": "2:5:2:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused2`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "2:5:2:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:1:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused variable: `unused2`\nHint: consider removing this variable or prefixing with underscore: `_unused2`",
+  "range": "2:5:2:12"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused3",
+        "range": "4:5:4:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused3`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "4:5:4:12"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "4:1:5:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused variable: `unused3`\nHint: consider removing this variable or prefixing with underscore: `_unused3`",
+  "range": "4:5:4:12"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused_func1",
+        "range": "6:5:6:17"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused_func1`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "6:5:6:17"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "6:1:7:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused function: `unused_func1`\nHint: consider removing this function or prefixing with underscore: `_unused_func1`",
+  "range": "6:5:6:17"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused_func2",
+        "range": "8:5:8:17"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused_func2`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "8:5:8:17"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "8:1:9:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused function: `unused_func2`\nHint: consider removing this function or prefixing with underscore: `_unused_func2`",
+  "range": "8:5:8:17"
+ }
+]

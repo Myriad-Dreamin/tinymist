@@ -1,7 +1,23 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-description: "Code Action on  + \"base.t||yp\"/* rang)"
+description: "Code Action on  + \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/path_expression_import.typ
 ---
-null
+[
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "",
+      "range": "0:1:0:24"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Remove unused declaration"
+ }
+]
