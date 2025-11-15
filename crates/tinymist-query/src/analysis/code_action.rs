@@ -383,6 +383,17 @@ impl<'a> CodeActionWorker<'a> {
         let mut remove_range = decl_node.range();
         let bytes = self.source.text().as_bytes();
 
+        if remove_range.start > 0 {
+            let mut idx = remove_range.start;
+            while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
+                idx -= 1;
+            }
+
+            if idx > 0 && bytes[idx - 1] == b'#' {
+                remove_range.start = idx - 1;
+            }
+        }
+
         if remove_range.end < bytes.len() && bytes[remove_range.end] == b'\n' {
             remove_range.end += 1;
         } else if remove_range.start > 0 && bytes[remove_range.start - 1] == b'\n' {

@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 135
 description: "Code Action on code\n#let |foo|/* range -"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/dead_code.typ
@@ -43,7 +42,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/dead_code.typ
      {
       "insertTextFormat": 1,
       "newText": "",
-      "range": "1:1:2:0"
+      "range": "1:0:2:0"
      }
     ]
    }
