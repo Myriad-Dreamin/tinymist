@@ -175,9 +175,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             Expr::Import(import) => {
-                // Don't collect ModuleImport itself, only collect individual imported symbols
-                // which are handled in collect_resolves()
-                let _ = import;
+                self.add_definition(import.decl.decl.clone(), DefScope::File);
             }
 
             Expr::Include(include) => {
