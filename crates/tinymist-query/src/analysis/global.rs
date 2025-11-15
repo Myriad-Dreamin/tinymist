@@ -7,7 +7,8 @@ use std::{collections::HashSet, ops::Deref};
 use comemo::{Track, Tracked};
 use lsp_types::Url;
 use parking_lot::Mutex;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use tinymist_analysis::adt::interner::Interned;
 use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
@@ -39,7 +40,7 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
+    Decl, DefKind, Expr, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
     classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
     scan_workspace_files,
 };
@@ -828,8 +829,75 @@ impl SharedContext {
         let guard = self.query_stat(source.id(), "lint");
         self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone())
+
+            let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
+
+            let has_references = |decl: &Interned<Decl>| -> bool {
+                if ei
+                    .get_refs(decl.clone())
+                    .any(|(_, r)| r.as_ref().decl != *decl)
+                {
+                    return true;
+                }
+
+                cross_file_refs.contains(decl)
+            };
+
+            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone(), has_references)
         })
+    }
+
+    /// Computes which declarations from the current file are referenced by other files.
+    fn compute_cross_file_references(
+        self: &Arc<Self>,
+        current_file: TypstFileId,
+        current_ei: &ExprInfo,
+    ) -> FxHashSet<Interned<Decl>> {
+        let mut referenced_decls = FxHashSet::default();
+        let files: Vec<_> = self.world().depended_files().into_iter().collect();
+
+        let mut all_decls = Vec::new();
+
+        for (_, expr) in current_ei.exports.iter() {
+            if let Expr::Decl(decl) = expr {
+                all_decls.push(decl.clone());
+            }
+        }
+
+        for (_, ref_expr) in current_ei.resolves.iter() {
+            all_decls.push(ref_expr.decl.clone());
+        }
+
+        for &file_id in &files {
+            if file_id == current_file {
+                continue;
+            }
+
+            let src = match self.source_by_id(file_id) {
+                Ok(src) => src,
+                Err(e) => {
+                    log::debug!(
+                        "failed to load source file {:?} for cross-file reference check: {:?}",
+                        file_id,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            let file_ei = self.expr_stage(&src);
+
+            for decl in &all_decls {
+                if file_ei
+                    .get_refs(decl.clone())
+                    .any(|(_, r)| r.as_ref().decl != *decl)
+                {
+                    referenced_decls.insert(decl.clone());
+                }
+            }
+        }
+
+        referenced_decls
     }
 
     pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {

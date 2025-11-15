@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+assertion_line: 662
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/cross_module_usage.typ
+---
+{}
