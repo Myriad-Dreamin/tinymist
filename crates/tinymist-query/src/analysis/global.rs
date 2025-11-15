@@ -887,9 +887,7 @@ impl SharedContext {
                 Ok(src) => src,
                 Err(e) => {
                     log::debug!(
-                        "failed to load source file {:?} for cross-file reference check: {:?}",
-                        file_id,
-                        e
+                        "failed to load source file {file_id:?} for cross-file reference check: {e:?}"
                     );
                     continue;
                 }
