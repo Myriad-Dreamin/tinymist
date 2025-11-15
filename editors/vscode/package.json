@@ -341,11 +341,11 @@
             "%extension.tinymist.config.tinymist.projectResolution.string.enum.lockDatabase%"
           ]
         },
-        "tinymist.lsp.syntaxOnly": {
-          "title": "%extension.tinymist.config.tinymist.lsp.syntaxOnly.title%",
+        "tinymist.syntaxOnly": {
+          "title": "%extension.tinymist.config.tinymist.syntaxOnly.title%",
           "type": "string",
           "default": "auto",
-          "markdownDescription": "%extension.tinymist.config.tinymist.lsp.syntaxOnly.desc%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.syntaxOnly.desc%",
           "enum": [
             "auto",
             "onPowerSaving",
@@ -353,10 +353,10 @@
             "disable"
           ],
           "enumDescriptions": [
-            "%extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.auto%",
-            "%extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.onPowerSaving%",
-            "%extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.enable%",
-            "%extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.disable%"
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.auto%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.onPowerSaving%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.disable%"
           ]
         },
         "tinymist.outputPath": {

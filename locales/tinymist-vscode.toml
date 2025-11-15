@@ -1027,27 +1027,27 @@ zh = "像在 Markdown 中一样管理 typst 文档。每个单独的文件都是
 en = "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file."
 zh = "像在 Rust 中一样管理 typst 文档。对于每个工作区，tinymist 会跟踪您的预览和编译历史，并将信息存储在锁定文件中。Tinymist 将根据锁定文件自动选择要使用的主文件。这还允许其他工具通过更新锁定文件将预览和导出任务推送到语言服务器。"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.title]
-en = "LSP Syntax Only Mode"
-zh = "LSP 仅语法模式"
+[extension.tinymist.config.tinymist.syntaxOnly.title]
+en = "Syntax Only Mode"
+zh = "仅语法模式"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.desc]
+[extension.tinymist.config.tinymist.syntaxOnly.desc]
 en = "Configure whether to enable syntax-only mode for the language server. In syntax-only mode, the language server will only provide syntax checking and basic code completion, but will not perform full document compilation or code analysis. This can be useful for improving performance on low-end devices or when working with large documents."
-zh = "配置是否为语言服务器启用仅语法模式。在仅语法模式下，语言服务器将仅提供语法检查和基本的代码补全，但不会执行完整的文档编译或代码分析。这对于提高低端设备的性能或处理大型文档时非常有用。"
+zh = "配置是否为扩展（语言服务器）启用仅语法模式。在仅语法模式下，语言服务器将仅提供语法检查和基本的代码补全，但不会执行完整的文档编译或代码分析。这对于提高低端设备的性能或处理大型文档时非常有用。"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.auto]
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.auto]
 en = "Always disable syntax-only mode. The strategy may be changed in the future, for example, automatically enable syntax-only mode when the system is in power-saving mode."
-zh = "始终启用仅语法模式。未来可能会更改策略，例如，当系统处于省电模式时自动启用仅语法模式。"
+zh = "始终禁用仅语法模式。未来可能会更改策略，例如，当系统处于省电模式时自动启用仅语法模式。"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.onPowerSaving]
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.onPowerSaving]
 en = "Enable syntax-only mode when the system is in power-saving mode."
 zh = "当系统处于省电模式时，启用仅语法模式。"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.enable]
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.enable]
 en = "Always enable syntax-only mode."
 zh = "始终启用仅语法模式。"
 
-[extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.disable]
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.disable]
 en = "Always disable syntax-only mode."
 zh = "始终禁用仅语法模式。"
 

@@ -235,6 +235,7 @@ impl ServerState {
             CompileServerOpts {
                 handler: compile_handle,
                 export_target: config.export_target,
+                syntax_only: config.syntax_only,
                 ignore_first_sync: true,
             },
         );

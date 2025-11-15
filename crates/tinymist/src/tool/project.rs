@@ -97,6 +97,7 @@ where
         CompileServerOpts {
             handler: compile_handle,
             export_target: opts.export_target,
+            syntax_only: opts.config.syntax_only,
             ignore_first_sync: true,
         },
     );

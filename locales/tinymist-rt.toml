@@ -26,7 +26,7 @@ en = "Profile"
 zh = "性能分析"
 
 [tinymist.config.badCompileStatus]
-en = "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}"
+en = "compileStatus must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}"
 zh = "compileStatus 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭），得到 {value}"
 
 [tinymist.config.badHoverPeriscope]
