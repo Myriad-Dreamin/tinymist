@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 180
 description: Dead code code actions in /dummy-root/s0.typ
 expression: "JsonRepr::new_pure(ordered_entries)"
 input_file: crates/tinymist-query/src/fixtures/dead_code/show_set_rules.typ
@@ -45,7 +44,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/show_set_rules.typ
        {
         "insertTextFormat": 1,
         "newText": "",
-        "range": "1:1:2:0"
+        "range": "1:0:2:0"
        }
       ]
      }
