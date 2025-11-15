@@ -1,6 +1,6 @@
 //! Provides code actions for the document.
 
-use ecow::eco_format;
+use ecow::{EcoString, eco_format};
 use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
 use regex::Regex;
 use tinymist_analysis::syntax::{
@@ -59,7 +59,6 @@ impl<'a> CodeActionWorker<'a> {
     pub(crate) fn autofix(
         &mut self,
         root: &LinkedNode<'_>,
-        range: &Range<usize>,
         context: &lsp_types::CodeActionContext,
     ) -> Option<()> {
         if let Some(only) = &context.only
@@ -72,16 +71,25 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         for diag in &context.diagnostics {
-            if diag.source.as_ref().is_none_or(|t| t != "typst") {
+            let Some(source) = diag.source.as_deref() else {
                 continue;
-            }
+            };
 
-            match match_autofix_kind(diag.message.as_str()) {
+            let Some(diag_range) = self.ctx.to_typst_range(diag.range.clone(), &self.source) else {
+                continue;
+            };
+
+            match match_autofix_kind(source, diag.message.as_str()) {
                 Some(AutofixKind::UnknownVariable) => {
-                    self.autofix_unknown_variable(root, range);
+                    self.autofix_unknown_variable(root, &diag_range);
                 }
                 Some(AutofixKind::FileNotFound) => {
-                    self.autofix_file_not_found(root, range);
+                    self.autofix_file_not_found(root, &diag_range);
+                }
+                Some(AutofixKind::MarkUnusedSymbol) => {
+                    self.autofix_unused_symbol(&diag_range);
+                    self.autofix_replace_with_placeholder(&diag_range);
+                    self.autofix_remove_declaration(root, &diag_range);
                 }
                 _ => {}
             }
@@ -264,6 +272,127 @@ impl<'a> CodeActionWorker<'a> {
         let file_to_create = unix_slash(path_in_workspace.as_rooted_path());
         let action = CodeAction {
             title: format!("Create missing file at `{file_to_create}`"),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    /// Prefix unused bindings with `_` to silence dead-code lint diagnostics.
+    fn autofix_unused_symbol(&mut self, range: &Range<usize>) -> Option<()> {
+        if range.is_empty() {
+            return None;
+        }
+
+        let name = self.source.text().get(range.clone())?;
+        if !is_plain_identifier(name) || name.starts_with('_') {
+            return None;
+        }
+
+        let replacement = eco_format!("_{name}");
+        let lsp_range = self.ctx.to_lsp_range(range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, replacement))?;
+        let action = CodeAction {
+            title: format!("Prefix `_` to `{name}`"),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    fn autofix_replace_with_placeholder(&mut self, range: &Range<usize>) -> Option<()> {
+        if range.is_empty() {
+            return None;
+        }
+
+        let name = self.source.text().get(range.clone())?;
+        if !is_plain_identifier(name) {
+            return None;
+        }
+
+        let lsp_range = self.ctx.to_lsp_range(range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(
+            lsp_range,
+            EcoString::from("_"),
+        ))?;
+        let action = CodeAction {
+            title: "Replace with `_`".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    /// Remove the declaration corresponding to an unused binding.
+    fn autofix_remove_declaration(
+        &mut self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<()> {
+        if name_range.is_empty() {
+            return None;
+        }
+
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+        let mut node = &node;
+
+        let decl_node = loop {
+            match node.kind() {
+                SyntaxKind::LetBinding | SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                    break node.clone();
+                }
+                _ => {
+                    node = node.parent()?;
+                }
+            }
+        };
+
+        if decl_node.kind() == SyntaxKind::LetBinding {
+            let let_binding = decl_node.cast::<ast::LetBinding>()?;
+            let bindings = let_binding.kind().bindings();
+
+            // remove declarations only when the let binding introduces a single identifier
+            // that corresponds to the unused diagnostic.
+            if bindings.len() != 1 {
+                return None;
+            }
+
+            let Some(binding_ident) = bindings.first() else {
+                return None;
+            };
+
+            let Some(binding_node) = decl_node.find(binding_ident.span()) else {
+                return None;
+            };
+
+            if binding_node.range() != *name_range {
+                return None;
+            }
+        }
+
+        let mut remove_range = decl_node.range();
+        let bytes = self.source.text().as_bytes();
+
+        if remove_range.end < bytes.len() && bytes[remove_range.end] == b'\n' {
+            remove_range.end += 1;
+        } else if remove_range.start > 0 && bytes[remove_range.start - 1] == b'\n' {
+            remove_range.start -= 1;
+        }
+
+        let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
+        let action = CodeAction {
+            title: "Remove unused declaration".to_string(),
             kind: Some(CodeActionKind::QUICKFIX),
             edit: Some(edit),
             ..CodeAction::default()
@@ -610,19 +739,39 @@ impl<'a> CodeActionWorker<'a> {
 enum AutofixKind {
     UnknownVariable,
     FileNotFound,
+    MarkUnusedSymbol,
 }
 
-fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
-    static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
-        ("file not found", AutofixKind::FileNotFound),
-    ];
+fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
+    if msg.starts_with("unused ") {
+        return Some(AutofixKind::MarkUnusedSymbol);
+    }
 
-    for (pattern, kind) in PATTERNS {
-        if msg.starts_with(pattern) {
-            return Some(*kind);
+    if source == "typst" {
+        static PATTERNS: &[(&str, AutofixKind)] = &[
+            ("unknown variable", AutofixKind::UnknownVariable),
+            ("file not found", AutofixKind::FileNotFound),
+        ];
+
+        for (pattern, kind) in PATTERNS {
+            if msg.starts_with(pattern) {
+                return Some(*kind);
+            }
         }
     }
 
     None
+}
+
+fn is_plain_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
