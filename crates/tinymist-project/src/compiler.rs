@@ -882,19 +882,16 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         move || {
             let compiled = if syntax_only {
                 let main = graph.snap.world.main();
-                let syntax_error = graph
-                    .world()
-                    .source(main)
-                    .at(Span::from_range(main, 0..0))
-                    .and_then(|source| {
-                        let errors = source.root().errors();
-                        if errors.is_empty() {
-                            Ok(())
-                        } else {
-                            Err(errors.into_iter().map(|s| s.into()).collect())
-                        }
-                    });
-                let diag = Arc::new(DiagnosticsTask::from_errors(syntax_error.err()));
+                let source_res = graph.world().source(main).at(Span::from_range(main, 0..0));
+                let syntax_res = source_res.and_then(|source| {
+                    let errors = source.root().errors();
+                    if errors.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(errors.into_iter().map(|s| s.into()).collect())
+                    }
+                });
+                let diag = Arc::new(DiagnosticsTask::from_errors(syntax_res.err()));
 
                 CompiledArtifact {
                     diag,
