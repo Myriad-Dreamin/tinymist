@@ -303,7 +303,7 @@ impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
         };
 
         world.to_mut().set_is_compiling(true);
-        let compiled = ::typst::compile::<D>(world.as_ref());
+        let compiled = ::typst_shim::compile_opt::<D>(world.as_ref());
         world.to_mut().set_is_compiling(false);
 
         let exclude_html_warnings = if !is_html_compilation {

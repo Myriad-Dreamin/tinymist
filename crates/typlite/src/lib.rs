@@ -436,6 +436,7 @@ impl Typlite {
         format: Format,
         world: Arc<LspWorld>,
     ) -> tinymist_std::Result<MarkdownDocument> {
+        // this is not affected by syntax-only mode (typst_shim::compile_opt)
         let compiled = typst::compile(&world);
         let collector = WarningCollector::default();
         collector.extend(

@@ -1036,7 +1036,7 @@ en = "Configure whether to enable syntax-only mode for the language server. In s
 zh = "配置是否为语言服务器启用仅语法模式。在仅语法模式下，语言服务器将仅提供语法检查和基本的代码补全，但不会执行完整的文档编译或代码分析。这对于提高低端设备的性能或处理大型文档时非常有用。"
 
 [extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.auto]
-en = "Always enable syntax-only mode. The strategy may be changed in the future, for example, automatically enable syntax-only mode when the system is in power-saving mode."
+en = "Always disable syntax-only mode. The strategy may be changed in the future, for example, automatically enable syntax-only mode when the system is in power-saving mode."
 zh = "始终启用仅语法模式。未来可能会更改策略，例如，当系统处于省电模式时自动启用仅语法模式。"
 
 [extension.tinymist.config.tinymist.lsp.syntaxOnly.string.enum.onPowerSaving]

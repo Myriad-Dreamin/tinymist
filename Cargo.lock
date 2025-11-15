@@ -4562,6 +4562,7 @@ dependencies = [
  "tinymist-world",
  "typst",
  "typst-library",
+ "typst-shim",
 ]
 
 [[package]]
@@ -4580,6 +4581,7 @@ dependencies = [
  "tinymist-world",
  "typst",
  "typst-library",
+ "typst-shim",
 ]
 
 [[package]]
@@ -4903,6 +4905,7 @@ dependencies = [
  "ttf-parser",
  "typst",
  "typst-assets",
+ "typst-shim",
  "wasm-bindgen",
  "web-sys",
 ]
