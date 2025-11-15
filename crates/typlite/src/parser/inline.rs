@@ -1,10 +1,10 @@
 //! Inline element processing module, handles text and inline style elements
 
 use cmark_writer::ast::Node;
-use typst_html::HtmlElement;
+use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
-use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser};
+use crate::attributes::{FigureAttr, TypliteAttrsParser};
 use crate::common::{CenterNode, FigureNode, HighlightNode};
 
 use super::core::HtmlToAstParser;
@@ -45,11 +45,11 @@ impl HtmlToAstParser {
 
     /// Convert link element
     pub fn convert_link(&mut self, element: &HtmlElement) -> Result<()> {
-        let attrs = LinkAttr::parse(&element.attrs)?;
+        let dest = self.attr_value(element, "href").unwrap_or_default();
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
         self.inline_buffer.push(Node::Link {
-            url: attrs.dest,
+            url: dest,
             title: None,
             content,
         });
@@ -58,11 +58,13 @@ impl HtmlToAstParser {
 
     /// Convert image element
     pub fn convert_image(&mut self, element: &HtmlElement) -> Result<()> {
-        let attrs = ImageAttr::parse(&element.attrs)?;
+        let src = self.attr_value(element, "src").unwrap_or_default();
+        let alt = self.attr_value(element, "alt").unwrap_or_default();
+
         self.inline_buffer.push(Node::Image {
-            url: attrs.src,
+            url: src,
             title: None,
-            alt: vec![Node::Text(attrs.alt)],
+            alt: vec![Node::Text(alt)],
         });
         Ok(())
     }
@@ -73,9 +75,29 @@ impl HtmlToAstParser {
 
         // Parse figure attributes to extract caption
         let attrs = FigureAttr::parse(&element.attrs)?;
-        let caption = attrs.caption.to_string();
+        let mut caption = attrs.caption.to_string();
 
-        let (inline_content, mut block_content) = self.capture_children(element)?;
+        let prev_blocks = std::mem::take(&mut self.blocks);
+        let prev_buffer = std::mem::take(&mut self.inline_buffer);
+
+        for child in &element.children {
+            if let HtmlNode::Element(child_elem) = child
+                && child_elem.tag == tag::figcaption
+            {
+                if caption.is_empty() {
+                    caption = self.extract_plain_text(child_elem).to_string();
+                }
+                continue;
+            }
+
+            self.convert_child(child)?;
+        }
+
+        let inline_content = std::mem::take(&mut self.inline_buffer);
+        let mut block_content = std::mem::take(&mut self.blocks);
+
+        self.inline_buffer = prev_buffer;
+        self.blocks = prev_blocks;
 
         let mut content_nodes = Vec::new();
         if !inline_content.is_empty() {
