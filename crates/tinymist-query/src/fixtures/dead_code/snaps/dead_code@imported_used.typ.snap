@@ -1,19 +1,13 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/dead_code/imported_unused.typ
+input_file: crates/tinymist-query/src/fixtures/dead_code/imported_used.typ
 ---
 {
  "main.typ": [
   {
-   "message": "unused import: `Bbar`\nHint: consider removing this unused import",
-   "range": "2:24:2:28",
-   "severity": 2,
-   "source": "typst"
-  },
-  {
    "message": "unused import: `foo`\nHint: consider removing this unused import",
-   "range": "2:30:2:33",
+   "range": "2:31:2:34",
    "severity": 2,
    "source": "typst"
   }

@@ -44,6 +44,7 @@ pub fn collect_definitions(ei: &ExprInfo) -> Vec<DefInfo> {
     };
 
     collector.collect_exports();
+    collector.collect_resolves();
     collector.visit_expr(&ei.root, DefScope::File);
 
     collector
@@ -67,6 +68,15 @@ impl<'a> DefinitionCollector<'a> {
                 if decl.is_def() {
                     self.add_definition(decl, DefScope::Exported);
                 }
+            }
+        }
+    }
+
+    fn collect_resolves(&mut self) {
+        for (_span, ref_expr) in self.ei.resolves.iter() {
+            let decl = &ref_expr.decl;
+            if matches!(decl.as_ref(), Decl::Import(_) | Decl::ImportAlias(_)) {
+                self.add_definition(decl.clone(), DefScope::File);
             }
         }
     }
@@ -165,9 +175,9 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             Expr::Import(import) => {
-                if import.decl.decl.is_def() {
-                    self.add_definition(import.decl.decl.clone(), scope);
-                }
+                // Don't collect ModuleImport itself, only collect individual imported symbols
+                // which are handled in collect_resolves()
+                let _ = import;
             }
 
             Expr::Include(include) => {
@@ -242,7 +252,7 @@ impl<'a> DefinitionCollector<'a> {
 
     fn add_definition(&mut self, decl: Interned<Decl>, scope: DefScope) {
         match decl.as_ref() {
-            Decl::IdentRef(_) | Decl::ContentRef(_) | Decl::ImportAlias(_) | Decl::Import(_) => {
+            Decl::IdentRef(_) | Decl::ContentRef(_) => {
                 return;
             }
             _ => {}

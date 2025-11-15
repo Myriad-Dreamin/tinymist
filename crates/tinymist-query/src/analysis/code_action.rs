@@ -87,9 +87,13 @@ impl<'a> CodeActionWorker<'a> {
                     self.autofix_file_not_found(root, &diag_range);
                 }
                 Some(AutofixKind::MarkUnusedSymbol) => {
-                    self.autofix_unused_symbol(&diag_range);
-                    self.autofix_replace_with_placeholder(&diag_range);
-                    self.autofix_remove_declaration(root, &diag_range);
+                    if diag.message.starts_with("unused import:") {
+                        self.autofix_remove_unused_import(root, &diag_range);
+                    } else {
+                        self.autofix_unused_symbol(&diag_range);
+                        self.autofix_replace_with_placeholder(&diag_range);
+                        self.autofix_remove_declaration(root, &diag_range);
+                    }
                 }
                 _ => {}
             }
@@ -411,6 +415,64 @@ impl<'a> CodeActionWorker<'a> {
         self.actions.push(action);
 
         Some(())
+    }
+
+    /// Remove an unused import item, handling trailing commas.
+    fn autofix_remove_unused_import(
+        &mut self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<()> {
+        // Calculate the range to remove, expand to cover the whole import item
+        // (e.g. `foo as bar`) and include trailing comma if present.
+        let mut remove_range = self
+            .find_import_item_range(root, name_range)
+            .unwrap_or_else(|| name_range.clone());
+        let bytes = self.source.text().as_bytes();
+
+        // Check for trailing comma after the item
+        let mut end = remove_range.end;
+        while end < bytes.len() && matches!(bytes[end], b' ' | b'\t') {
+            end += 1;
+        }
+        if end < bytes.len() && bytes[end] == b',' {
+            remove_range.end = end + 1;
+        } else {
+            // Check for comma before the item
+            let mut start = remove_range.start;
+            while start > 0 && matches!(bytes[start - 1], b' ' | b'\t') {
+                start -= 1;
+            }
+            if start > 0 && bytes[start - 1] == b',' {
+                remove_range.start = start - 1;
+            }
+        }
+
+        let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
+        let action = CodeAction {
+            title: "Remove unused import".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    fn find_import_item_range(
+        &self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<Range<usize>> {
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        node_ancestors(&node).find_map(|ancestor| match ancestor.kind() {
+            SyntaxKind::RenamedImportItem => Some(ancestor.range()),
+            _ => None,
+        })
     }
 
     /// Starts to work.

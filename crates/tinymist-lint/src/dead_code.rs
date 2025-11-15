@@ -3,9 +3,11 @@
 mod collector;
 mod diagnostic;
 
+use std::collections::{HashMap, HashSet};
+
 use tinymist_analysis::{
     adt::interner::Interned,
-    syntax::{Decl, ExprInfo},
+    syntax::{Decl, Expr, ExprInfo},
 };
 use tinymist_project::LspWorld;
 use typst::ecow::EcoVec;
@@ -49,12 +51,22 @@ pub fn check_dead_code(
         return diagnostics;
     }
 
+    let (import_usage, shadowed_imports) = compute_import_usage(&definitions, ei);
+
     for def_info in definitions {
+        if shadowed_imports.contains(&def_info.decl) {
+            continue;
+        }
         if should_skip_definition(&def_info, config) {
             continue;
         }
 
-        if !has_references(&def_info.decl) {
+        let is_unused = match def_info.decl.as_ref() {
+            Decl::Import(_) | Decl::ImportAlias(_) => !import_usage.contains(&def_info.decl),
+            _ => !has_references(&def_info.decl),
+        };
+
+        if is_unused {
             if let Some(diag) = generate_diagnostic(&def_info, world, ei) {
                 diagnostics.push(diag);
             }
@@ -62,6 +74,48 @@ pub fn check_dead_code(
     }
 
     diagnostics
+}
+
+fn compute_import_usage(
+    definitions: &[DefInfo],
+    ei: &ExprInfo,
+) -> (HashSet<Interned<Decl>>, HashSet<Interned<Decl>>) {
+    let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
+    let mut shadowed = HashSet::new();
+
+    for def in definitions {
+        if matches!(def.decl.as_ref(), Decl::ImportAlias(_)) {
+            if let Some(alias_ref) = ei.resolves.get(&def.span) {
+                if let Some(Expr::Decl(step_decl)) = alias_ref.step.as_ref() {
+                    alias_links.insert(def.decl.clone(), step_decl.clone());
+                    shadowed.insert(step_decl.clone());
+                }
+            }
+        }
+    }
+
+    let mut used: HashSet<Interned<Decl>> = HashSet::new();
+
+    for r in ei.resolves.values() {
+        if matches!(r.decl.as_ref(), Decl::IdentRef(_)) {
+            if let Some(Expr::Decl(step_decl)) = r.step.as_ref() {
+                used.insert(step_decl.clone());
+            }
+        }
+    }
+
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for (alias, target) in alias_links.iter() {
+            if used.contains(alias) && !used.contains(target) {
+                used.insert(target.clone());
+                changed = true;
+            }
+        }
+    }
+
+    (used, shadowed)
 }
 
 fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
