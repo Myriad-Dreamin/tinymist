@@ -15,6 +15,7 @@ Ref: `fig:test1`
 ```typc
 figure(
   body: [Test1],
+  alt: none,
   placement: none,
   scope: "column",
   caption: none,

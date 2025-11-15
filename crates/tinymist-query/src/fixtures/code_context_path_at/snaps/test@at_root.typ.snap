@@ -1,0 +1,136 @@
+---
+source: crates/tinymist-query/src/code_context.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_context_path_at/at_root.typ
+---
+[
+ {
+  "code": "$root/$dir/$name",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "x_at_root"
+   }
+  ]
+ },
+ {
+  "code": "$root/$name",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "x_at_root"
+   }
+  ]
+ },
+ {
+  "code": "$root/assets",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "assets"
+   }
+  ]
+ },
+ {
+  "code": "$root/assets/$name",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "assets/x_at_root"
+   }
+  ]
+ },
+ {
+  "code": "{ join(root, \"x\", dir, \"y\", name) }",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "x/y/x_at_root"
+   }
+  ]
+ },
+ {
+  "code": "{ join(root, 1) }",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "error": "crates/tinymist-query/src/code_context.rs:275:21: failed to evaluate path expression: error: join argument is not a string: 1\n  ┌─ /__redacted_path__.typ:1:0\n  │\n1 │ { join(root, 1) }\n  │ ^^^^^^^^^^^^^^^^^\n\n",
+    "kind": "pathAt"
+   }
+  ]
+ },
+ {
+  "code": "{ join(roo, 1) }",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "error": "crates/tinymist-query/src/code_context.rs:275:21: failed to evaluate path expression: error: unknown variable: roo\n  ┌─ /__redacted_path__.typ:1:0\n  │\n1 │ { join(roo, 1) }\n  │ ^^^^^^^^^^^^^^^^\n\n",
+    "kind": "pathAt"
+   }
+  ]
+ },
+ {
+  "code": "{ import \"/resolve.typ\": resolve; resolve(join, root, dir, name) }",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "img.png",
+   "x-path-input-uri": "https://huh.io/img.png"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": {
+     "file": "images/img.png",
+     "on-conflict": "import \"/resolve.typ\": on-conflict; on-conflict(join, root, dir, name)"
+    }
+   }
+  ]
+ },
+ {
+  "code": "{ import \"/resolve.typ\": resolve; resolve(join, root, dir, name) }",
+  "inputs": {
+   "x-path-context": "vscode-paste",
+   "x-path-input-name": "text.md",
+   "x-path-input-uri": "https://huh.io/text.md"
+  },
+  "response": [
+   {
+    "kind": "pathAt",
+    "value": "assets/x_at_root"
+   }
+  ]
+ }
+]

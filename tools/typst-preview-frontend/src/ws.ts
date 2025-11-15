@@ -1,5 +1,5 @@
 import { PreviewMode } from "typst-dom/typst-doc.mjs";
-import { TypstPreviewDocument as TypstDocument } from "typst-dom/index.preview.mjs";
+import { TypstPreviewDocument as TypstDocument, TypstDomHookedElement, TypstDomWindowElement } from "typst-dom/index.preview.mjs";
 import {
   rendererBuildInfo,
   createTypstRenderer,
@@ -33,21 +33,23 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (hookedElem) {
       hookedElem.innerHTML = "";
     }
-    return () => {};
+    return () => { };
   }
+  const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
 
   let disposed = false;
   let $ws: WebSocketSubject<ArrayBuffer> | undefined = undefined;
   const subsribes: Subscription[] = [];
 
   function createSvgDocument(kModule: RenderSession) {
-    const hookedElem = document.getElementById("typst-app")!;
+    const hookedElem = document.getElementById("typst-app")! as TypstDomHookedElement;
     if (hookedElem.firstElementChild?.tagName !== "svg") {
       hookedElem.innerHTML = "";
     }
     const resizeTarget = document.getElementById("typst-container-main")!;
 
     const svgDoc = new TypstDocument({
+      windowElem,
       hookedElem,
       kModule,
       previewMode,
@@ -55,9 +57,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       // set rescale target to `body`
       retrieveDOMState() {
         return {
-          // reserving 1px to hide width border
-          width: resizeTarget.clientWidth + 1,
-          // reserving 1px to hide width border
+          width: resizeTarget.clientWidth,
           height: resizeTarget.offsetHeight,
           boundingRect: resizeTarget.getBoundingClientRect(),
         };
@@ -89,6 +89,59 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       }),
     );
 
+
+    const focusInput = () => {
+      const inpPageSelector = document.getElementById("typst-page-selector") as
+        | HTMLSelectElement
+        | undefined;
+      if (inpPageSelector) {
+        inpPageSelector.focus();
+      }
+    };
+
+    const blurInput = () => {
+      const inpPageSelector = document.getElementById("typst-page-selector") as
+        | HTMLSelectElement
+        | undefined;
+      if (inpPageSelector) {
+        inpPageSelector.blur();
+      }
+    };
+
+    const updateDiff = (diff: number) => () => {
+      const pageSelector = document.getElementById("typst-page-selector") as
+        | HTMLSelectElement
+        | undefined;
+
+      if (pageSelector) {
+        console.log("updateDiff", diff);
+        const v = pageSelector.value;
+        if (v.length === 0) {
+          return;
+        }
+        const page = Number.parseInt(v) + diff;
+        if (page <= 0) {
+          return;
+        }
+        if (svgDoc.setPartialPageNumber(page)) {
+          pageSelector.value = page.toString();
+          blurInput();
+        }
+      }
+    };
+
+    const updatePrev = updateDiff(-1);
+    const updateNext = updateDiff(1);
+
+    const pagePrevSelector = document.getElementById("typst-page-prev-selector");
+    if (pagePrevSelector) {
+      pagePrevSelector.addEventListener("click", updatePrev);
+    }
+    const pageNextSelector = document.getElementById("typst-page-next-selector");
+    if (pageNextSelector) {
+      pageNextSelector.addEventListener("click", updateNext);
+    }
+
     if (previewMode === PreviewMode.Slide) {
       {
         const inpPageSelector = document.getElementById("typst-page-selector") as
@@ -104,121 +157,93 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           });
         }
       }
+    }
 
-      const focusInput = () => {
-        const inpPageSelector = document.getElementById("typst-page-selector") as
-          | HTMLSelectElement
-          | undefined;
-        if (inpPageSelector) {
-          inpPageSelector.focus();
-        }
-      };
-
-      const blurInput = () => {
-        const inpPageSelector = document.getElementById("typst-page-selector") as
-          | HTMLSelectElement
-          | undefined;
-        if (inpPageSelector) {
-          inpPageSelector.blur();
-        }
-      };
-
-      const updateDiff = (diff: number) => () => {
-        const pageSelector = document.getElementById("typst-page-selector") as
-          | HTMLSelectElement
-          | undefined;
-
-        if (pageSelector) {
-          console.log("updateDiff", diff);
-          const v = pageSelector.value;
-          if (v.length === 0) {
-            return;
-          }
-          const page = Number.parseInt(v) + diff;
-          if (page <= 0) {
-            return;
-          }
-          if (svgDoc.setPartialPageNumber(page)) {
-            pageSelector.value = page.toString();
-            blurInput();
-          }
-        }
-      };
-
-      const updatePrev = updateDiff(-1);
-      const updateNext = updateDiff(1);
-
-      const pagePrevSelector = document.getElementById("typst-page-prev-selector");
-      if (pagePrevSelector) {
-        pagePrevSelector.addEventListener("click", updatePrev);
+    const toggleHelp = () => {
+      const help = document.getElementById("typst-help-panel");
+      console.log("toggleHelp", help);
+      if (help) {
+        help.classList.toggle("hidden");
       }
-      const pageNextSelector = document.getElementById("typst-page-next-selector");
-      if (pageNextSelector) {
-        pageNextSelector.addEventListener("click", updateNext);
+    };
+
+    const removeHelp = () => {
+      const help = document.getElementById("typst-help-panel");
+      if (help) {
+        help.classList.add("hidden");
       }
+    };
 
-      const toggleHelp = () => {
-        const help = document.getElementById("typst-help-panel");
-        console.log("toggleHelp", help);
-        if (help) {
-          help.classList.toggle("hidden");
-        }
+    const helpButton = document.getElementById("typst-top-help-button");
+    helpButton?.addEventListener("click", toggleHelp);
+
+    window.addEventListener("keydown", (e) => {
+      let handled = true;
+
+      // https://stackoverflow.com/questions/3464876/javascript-get-window-x-y-position-for-scroll
+      let top = () => {
+        let doc = document.documentElement;
+        return (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0)
       };
+      const scrollDelta = 50
 
-      const removeHelp = () => {
-        const help = document.getElementById("typst-help-panel");
-        if (help) {
-          help.classList.add("hidden");
-        }
-      };
-
-      const helpButton = document.getElementById("typst-top-help-button");
-      helpButton?.addEventListener("click", toggleHelp);
-
-      window.addEventListener("keydown", (e) => {
-        let handled = true;
-        switch (e.key) {
-          case "ArrowLeft":
-          case "ArrowUp":
+      switch (e.key) {
+        case "ArrowLeft":
+        case "ArrowUp":
+          if (previewMode === PreviewMode.Slide) {
             blurInput();
             removeHelp();
             updatePrev();
-            break;
-          case " ":
-          case "ArrowRight":
-          case "ArrowDown":
+          }
+          break;
+        case " ":
+        case "ArrowRight":
+        case "ArrowDown":
+          if (previewMode === PreviewMode.Slide) {
             blurInput();
             removeHelp();
             updateNext();
-            break;
-          case "h":
-            blurInput();
-            toggleHelp();
-            break;
-          case "g":
-            removeHelp();
-            focusInput();
-            break;
-          case "Escape":
-            removeHelp();
-            blurInput();
-            handled = false;
-            break;
-          default:
-            handled = false;
-        }
+          }
+          break;
+        case "j":
+          window.scroll({ top: top() + scrollDelta, behavior: "instant" });
+          break;
+        case "k":
+          window.scroll({ top: top() - scrollDelta, behavior: "instant" });
+          break;
+        case "h":
+          window.scroll({ top: top() - scrollDelta * 10, behavior: "smooth" });
+          break;
+        case "l":
+          window.scroll({ top: top() + scrollDelta * 10, behavior: "smooth" });
+          break;
+        case "?":
+          blurInput();
+          toggleHelp();
+          break;
+        case "g":
+          removeHelp();
+          focusInput();
+          break;
+        case "Escape":
+          removeHelp();
+          blurInput();
+          handled = false;
+          break;
+        default:
+          handled = false;
+      }
 
-        if (handled) {
-          e.preventDefault();
-        }
-      });
-    }
+      if (handled) {
+        e.preventDefault();
+      }
+    });
 
     return svgDoc;
   }
 
   function setupSocket(svgDoc: TypstDocument): () => void {
-    window.documents.push(svgDoc);
+    windowElem.documents.push(svgDoc);
 
     // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
     $ws = webSocket<ArrayBuffer>({
@@ -230,9 +255,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         next: (e) => {
           const sock = e.target;
           console.log("WebSocket connection opened", sock);
-          window.typstWebsocket = sock as any;
+          windowElem.typstWebsocket = sock as any;
           svgDoc.reset();
-          window.typstWebsocket.send("current");
+          windowElem.typstWebsocket.send("current");
         },
       },
       closeObserver: {
@@ -251,9 +276,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     const dispose = () => {
       disposed = true;
       svgDoc.dispose();
-      const index = window.documents.indexOf(svgDoc);
+      const index = windowElem.documents.indexOf(svgDoc);
       if (index >= 0) {
-        window.documents.splice(index, 1);
+        windowElem.documents.splice(index, 1);
       }
       for (const sub of subsribes.splice(0, subsribes.length)) {
         sub.unsubscribe();
@@ -329,7 +354,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         if (previewMode === PreviewMode.Slide) {
           currentPageNumber = svgDoc.getPartialPageNumber();
         } else if (rootElem) {
-          currentPageNumber = window.currentPosition(rootElem)?.page || 1;
+          currentPageNumber = windowElem.currentPosition(rootElem)?.page || 1;
         }
 
         let positions = dec
@@ -377,7 +402,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         if (rootElem) {
           /// Note: when it is really scrolled, it will trigger `svgDoc.addViewportChange`
           /// via `window.onscroll` event
-          window.handleTypstLocation(rootElem, pageToJump, x, y);
+          windowElem.handleTypstLocation(rootElem, pageToJump, x, y);
         }
         return;
       } else if (message[0] === "cursor") {

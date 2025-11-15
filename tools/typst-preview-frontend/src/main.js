@@ -9,7 +9,8 @@ import "./styles/outline.css";
 import { wsMain, PreviewMode } from "./ws";
 import { setupDrag } from "./drag";
 
-window.documents = [];
+const windowElem = document.getElementById("typst-container");
+windowElem.documents = [];
 
 /// Main entry point of the frontend program.
 main();
@@ -56,7 +57,7 @@ function retrieveWsArgs() {
 /// `buildWs` returns a object, which keeps track of websocket
 ///  connections.
 function buildWs() {
-  let previousDispose = Promise.resolve(() => {});
+  let previousDispose = Promise.resolve(() => { });
   /// `nextWs` will always hold a global unique websocket connection
   /// to the preview backend.
   function nextWs(nextWsArgs) {
@@ -75,6 +76,7 @@ function buildWs() {
 
   function resetAppMode({ previewMode: mode, isContentPreview }) {
     const app = document.getElementById("typst-container");
+    const helpPanel = document.getElementById("typst-help-panel");
 
     /// Set the root css selector to the content preview mode.
     app.classList.remove("content-preview");
@@ -85,10 +87,14 @@ function buildWs() {
     /// Set the root css selector to the preview mode.
     app.classList.remove("mode-slide");
     app.classList.remove("mode-doc");
+    helpPanel?.classList.remove("mode-slide");
+    helpPanel?.classList.remove("mode-doc");
     if (mode === PreviewMode.Slide) {
       app.classList.add("mode-slide");
+      helpPanel?.classList.add("mode-slide");
     } else if (mode === PreviewMode.Doc) {
       app.classList.add("mode-doc");
+      helpPanel?.classList.add("mode-doc");
     } else {
       throw new Error(`Unknown preview mode: ${mode}`);
     }

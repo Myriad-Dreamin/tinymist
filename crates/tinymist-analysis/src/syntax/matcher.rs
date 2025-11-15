@@ -198,14 +198,14 @@ pub fn previous_decls<T>(
 ) -> Option<T> {
     previous_items(node, |item| {
         match (&item, item.node().cast::<ast::Expr>()?) {
-            (PreviousItem::Sibling(..), ast::Expr::Let(lb)) => {
+            (PreviousItem::Sibling(..), ast::Expr::LetBinding(lb)) => {
                 for ident in lb.kind().bindings() {
                     if let Some(t) = recv(PreviousDecl::Ident(ident)) {
                         return Some(t);
                     }
                 }
             }
-            (PreviousItem::Sibling(..), ast::Expr::Import(import)) => {
+            (PreviousItem::Sibling(..), ast::Expr::ModuleImport(import)) => {
                 // import items
                 match import.imports() {
                     Some(ast::Imports::Wildcard) => {
@@ -234,7 +234,7 @@ pub fn previous_decls<T>(
                     return Some(t);
                 }
             }
-            (PreviousItem::Parent(parent, child), ast::Expr::For(for_expr)) => {
+            (PreviousItem::Parent(parent, child), ast::Expr::ForLoop(for_expr)) => {
                 let body = parent.find(for_expr.body().span());
                 let in_body = body.is_some_and(|n| n.find(child.span()).is_some());
                 if !in_body {
@@ -467,9 +467,9 @@ fn classify_def_(node: LinkedNode<'_>, strict: bool) -> Option<DefClass<'_>> {
         // todo: label, reference
         // todo: include
         ast::Expr::FuncCall(..) => return None,
-        ast::Expr::Set(..) => return None,
-        ast::Expr::Let(..) => DefClass::Let(adjusted),
-        ast::Expr::Import(..) => DefClass::Import(adjusted),
+        ast::Expr::SetRule(..) => return None,
+        ast::Expr::LetBinding(..) => DefClass::Let(adjusted),
+        ast::Expr::ModuleImport(..) => DefClass::Import(adjusted),
         // todo: parameter
         ast::Expr::Ident(..)
         | ast::Expr::MathIdent(..)
@@ -843,6 +843,16 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         return Some(ref_syntax);
     }
 
+    if node.kind() == SyntaxKind::Text
+        && node.offset() + 1 == cursor
+        && node.text().starts_with('@')
+    {
+        return Some(SyntaxClass::Ref {
+            node,
+            suffix_colon: false,
+        });
+    }
+
     // todo: check if we can remove Text here
     if matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
         let mode = interpret_mode_at(Some(&node));
@@ -868,7 +878,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
             suffix_colon: false,
         },
         ast::Expr::FuncCall(call) => SyntaxClass::Callee(adjusted.find(call.callee().span())?),
-        ast::Expr::Set(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
+        ast::Expr::SetRule(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) => {
             SyntaxClass::VarAccess(VarClass::Ident(adjusted))
         }
@@ -1206,7 +1216,7 @@ pub fn classify_context_outer<'a>(
             let parent = callee.parent()?;
             let args = match parent.cast::<ast::Expr>() {
                 Some(ast::Expr::FuncCall(call)) => call.args(),
-                Some(ast::Expr::Set(set)) => set.args(),
+                Some(ast::Expr::SetRule(set)) => set.args(),
                 _ => return None,
             };
             let args = parent.find(args.span())?;
@@ -1276,7 +1286,7 @@ pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<S
             let callee = node_ancestors(&node_parent).find_map(|ancestor| {
                 let span = match ancestor.cast::<ast::Expr>()? {
                     ast::Expr::FuncCall(call) => call.callee().span(),
-                    ast::Expr::Set(set) => set.target().span(),
+                    ast::Expr::SetRule(set) => set.target().span(),
                     _ => return None,
                 };
                 ancestor.find(span)
@@ -1333,7 +1343,7 @@ fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<Sy
     let parent = callee.parent()?;
     let args = match parent.cast::<ast::Expr>() {
         Some(ast::Expr::FuncCall(call)) => call.args(),
-        Some(ast::Expr::Set(set)) => set.args(),
+        Some(ast::Expr::SetRule(set)) => set.args(),
         _ => return None,
     };
     let args = parent.find(args.span())?;
@@ -1633,6 +1643,14 @@ Text
 
     #[test]
     fn ref_syntax() {
+        assert_snapshot!(map_syntax("@"), @r"
+        @
+        r
+        ");
+        assert_snapshot!(map_syntax("@;"), @r"
+        @;
+        r
+        ");
         assert_snapshot!(map_syntax("@ab"), @r###"
         @ab
         rrr

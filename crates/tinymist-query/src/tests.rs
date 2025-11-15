@@ -10,7 +10,7 @@ use std::{
 
 use regex::{Regex, Replacer};
 use serde_json::{Serializer, Value, ser::PrettyFormatter};
-use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
+use tinymist_project::{LspCompileSnapshot, LspComputeGraph, LspWorld};
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
@@ -31,15 +31,35 @@ pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
 
+#[derive(Default, Clone, Copy)]
+pub struct Opts {
+    pub need_compile: bool,
+}
+
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
         run_with_ctx(verse, path, f);
     });
 }
 
+pub fn snapshot_testing_with(name: &str, opts: Opts, f: &impl Fn(&mut LocalContext, PathBuf)) {
+    tinymist_tests::snapshot_testing!(name, |verse, path| {
+        run_with_ctx_(verse, path, opts, f);
+    });
+}
+
 pub fn run_with_ctx<T>(
     verse: &mut LspUniverse,
     path: PathBuf,
+    f: &impl Fn(&mut LocalContext, PathBuf) -> T,
+) -> T {
+    run_with_ctx_(verse, path, Opts::default(), f)
+}
+
+pub fn run_with_ctx_<T>(
+    verse: &mut LspUniverse,
+    path: PathBuf,
+    opts: Opts,
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
     let root = verse.entry_state().workspace_root().unwrap();
@@ -65,7 +85,8 @@ pub fn run_with_ctx<T>(
         .map(|v| v.trim() == "true")
         .unwrap_or(true);
 
-    let mut ctx = Arc::new(Analysis {
+    let g = compile_doc_for_test(&world, &properties, opts.need_compile);
+    let a = Arc::new(Analysis {
         remove_html: !supports_html,
         completion_feat: CompletionFeat {
             trigger_on_snippet_placeholders: true,
@@ -75,8 +96,8 @@ pub fn run_with_ctx<T>(
             ..Default::default()
         },
         ..Analysis::default()
-    })
-    .enter(world);
+    });
+    let mut ctx = a.enter_(g, a.lock_revision(None));
 
     ctx.test_package_list(|| {
         vec![(
@@ -103,18 +124,20 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 }
 
 pub fn compile_doc_for_test(
-    ctx: &mut LocalContext,
+    world: &LspWorld,
     properties: &HashMap<&str, &str>,
+    need_compile: bool,
 ) -> LspComputeGraph {
-    let prev = ctx.world.entry_state();
+    let prev = world.entry_state();
     let next = match properties.get("compile").map(|s| s.trim()) {
+        _ if need_compile => prev.clone(),
         Some("true") => prev.clone(),
-        None | Some("false") => return WorldComputeGraph::from_world(ctx.world.clone()),
+        None | Some("false") => return WorldComputeGraph::from_world(world.clone()),
         Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
         v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
-    let mut world = Cow::Borrowed(&ctx.world);
+    let mut world = Cow::Borrowed(world);
     if next != prev {
         world = Cow::Owned(world.task(TaskInputs {
             entry: Some(next),
@@ -306,6 +329,7 @@ pub static REDACT_LOC: LazyLock<RedactFields> = LazyLock::new(|| {
     RedactFields::from_iter([
         "location",
         "contents",
+        "file",
         "uri",
         "oldUri",
         "newUri",
@@ -396,6 +420,30 @@ impl Redact for RedactFields {
                 for (_, val) in map.iter_mut() {
                     *val = self.redact(val.clone());
                 }
+
+                if let Some(kind) = map.get("kind")
+                    && matches!(kind.as_str(), Some("pathAt"))
+                {
+                    if let Some(value) = map.get("value")
+                        && let Value::String(s) = value
+                    {
+                        let v = file_path_(Path::new(s)).into();
+                        map.insert("value".to_owned(), v);
+                    }
+
+                    if let Some(error) = map.get("error") {
+                        let error = error.as_str().unwrap();
+                        static REG: LazyLock<Regex> = LazyLock::new(|| {
+                            Regex::new(r#"(/dummy-root/|C:\\dummy-root\\).*?\.typ"#).unwrap()
+                        });
+                        let error = REG.replace_all(error, "/__redacted_path__.typ").replace(
+                            "crates\\tinymist-query\\src\\code_context.rs",
+                            "crates/tinymist-query/src/code_context.rs",
+                        );
+                        map.insert("error".to_owned(), Value::String(error));
+                    }
+                }
+
                 for key in self.0.iter().copied() {
                     let Some(t) = map.remove(key) else {
                         continue;
@@ -407,12 +455,18 @@ impl Redact for RedactFields {
                             map.insert(
                                 key.to_owned(),
                                 Value::Object(
-                                    obj.iter().map(|(k, v)| (file_path(k), v.clone())).collect(),
+                                    obj.iter().map(|(k, v)| (file_uri(k), v.clone())).collect(),
                                 ),
                             );
                         }
+                        "file" => {
+                            map.insert(
+                                key.to_owned(),
+                                file_path_(Path::new(t.as_str().unwrap())).into(),
+                            );
+                        }
                         "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
-                            map.insert(key.to_owned(), file_path(t.as_str().unwrap()).into());
+                            map.insert(key.to_owned(), file_uri(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
@@ -442,35 +496,26 @@ impl Redact for RedactFields {
     }
 }
 
-pub(crate) fn file_path(uri: &str) -> String {
-    file_path_(&lsp_types::Url::parse(uri).unwrap())
+pub(crate) fn file_uri(uri: &str) -> String {
+    file_uri_(&lsp_types::Url::parse(uri).unwrap())
 }
 
-pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
+pub(crate) fn file_uri_(uri: &lsp_types::Url) -> String {
+    let uri = uri.to_file_path().unwrap();
+    file_path_(&uri)
+}
+
+pub(crate) fn file_path_(path: &Path) -> String {
     let root = if cfg!(windows) {
         PathBuf::from("C:\\dummy-root")
     } else {
         PathBuf::from("/dummy-root")
     };
-    let uri = uri.to_file_path().unwrap();
-    let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
-    let rel_path = abs_path
-        .unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().next_back().unwrap()));
+    let abs_path = path.strip_prefix(root).map(|p| p.to_owned());
+    let rel_path =
+        abs_path.unwrap_or_else(|_| Path::new("-").join(path.iter().next_back().unwrap()));
 
     unix_slash(&rel_path)
-}
-
-pub struct HashRepr<T>(pub T);
-
-// sha256
-impl fmt::Display for HashRepr<JsonRepr> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use sha2::{Digest, Sha256};
-
-        let res = self.0.to_string();
-        let hash = Sha256::digest(res).to_vec();
-        write!(f, "sha256:{}", hex::encode(hash))
-    }
 }
 
 /// Extension methods for `Regex` that operate on `Cow<str>` instead of `&str`.

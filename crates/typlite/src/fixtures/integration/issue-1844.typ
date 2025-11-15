@@ -5,7 +5,7 @@
   html.elem("table", attrs: (x: "test"), {
     for row in it.children.chunks(columns) {
       html.elem("tr", {
-        row.map(cell => html.elem("td", cell)).join()
+        row.map(cell => html.elem("td", cell.body)).join()
       })
     }
   })

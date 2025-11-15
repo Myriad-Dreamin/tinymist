@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use tinymist_lint::KnownIssues;
-use tinymist_project::LspWorld;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
 
@@ -18,7 +17,7 @@ type TypstSeverity = typst::diag::Severity;
 /// Converts a list of Typst diagnostics to LSP diagnostics,
 /// with potential refinements on the error messages.
 pub fn convert_diagnostics<'a>(
-    world: &LspWorld,
+    graph: LspComputeGraph,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
     position_encoding: PositionEncoding,
 ) -> DiagnosticsMap {
@@ -26,7 +25,7 @@ pub fn convert_diagnostics<'a>(
         position_encoding,
         ..Analysis::default()
     };
-    let mut ctx = analysis.enter(world.clone());
+    let mut ctx = analysis.enter(graph);
     DiagWorker::new(&mut ctx).convert_all(errors)
 }
 
@@ -53,12 +52,12 @@ impl<'w> DiagWorker<'w> {
     pub fn check(mut self, known_issues: &KnownIssues) -> Self {
         let source = self.source;
         self.source = "tinymist-lint";
-        for dep in self.ctx.world.depended_files() {
+        for dep in self.ctx.world().depended_files() {
             if WorkspaceResolver::is_package_file(dep) {
                 continue;
             }
 
-            let Ok(source) = self.ctx.world.source(dep) else {
+            let Ok(source) = self.ctx.world().source(dep) else {
                 continue;
             };
 
@@ -166,7 +165,7 @@ impl<'w> DiagWorker<'w> {
         iter::once(typst_diagnostic.span)
             .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
             .find_map(|span| Some((span.id()?, span)))
-            .unwrap_or_else(|| (self.ctx.world.main(), Span::detached()))
+            .unwrap_or_else(|| (self.ctx.world().main(), Span::detached()))
     }
 
     fn diagnostic_range(&self, source: &Source, typst_span: Span) -> LspRange {

@@ -14,6 +14,7 @@ const vector = {
   "install:vscode": () => build.installVscode("release"),
   "build:web:base": build.buildWebLspBinaryBase,
   "build:web": build.buildTinymistVscodeWeb,
+  "test:vsc": build.testTinymistVscode,
 };
 
 const fn = vector[kind];

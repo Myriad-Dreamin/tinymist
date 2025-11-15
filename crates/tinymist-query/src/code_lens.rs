@@ -40,7 +40,11 @@ impl SemanticRequest for CodeLensRequest {
             vec!["preview".into()],
         ));
 
-        let is_html = ctx.world.library.features.is_enabled(typst::Feature::Html);
+        let is_html = ctx
+            .world()
+            .library
+            .features
+            .is_enabled(typst::Feature::Html);
 
         if is_html {
             res.push(doc_lens(

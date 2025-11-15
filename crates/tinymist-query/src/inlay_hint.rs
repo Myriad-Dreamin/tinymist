@@ -280,8 +280,8 @@ fn is_one_line(src: &Source, arg_node: &LinkedNode<'_>) -> bool {
 fn is_one_line_(src: &Source, arg_node: &LinkedNode<'_>) -> Option<bool> {
     let lb = arg_node.children().next()?;
     let rb = arg_node.children().next_back()?;
-    let ll = src.byte_to_line(lb.offset())?;
-    let rl = src.byte_to_line(rb.offset())?;
+    let ll = src.lines().byte_to_line(lb.offset())?;
+    let rl = src.lines().byte_to_line(rb.offset())?;
     Some(ll == rl)
 }
 

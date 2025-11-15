@@ -3,6 +3,8 @@ use std::{path::Path, sync::OnceLock};
 use clap::ValueHint;
 use tinymist_std::{bail, error::prelude::Result};
 
+use tinymist_world::args::PdfExportArgs;
+use tinymist_world::args::PngExportArgs;
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
 
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
@@ -227,7 +229,8 @@ impl TaskCompileArgs {
             OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
                 export,
                 pages: self.pages.clone(),
-                pdf_standards: self.pdf.pdf_standard.clone(),
+                pdf_standards: self.pdf.standard.clone(),
+                no_pdf_tags: self.pdf.no_tags,
                 creation_timestamp: None,
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
@@ -253,22 +256,4 @@ impl TaskCompileArgs {
             task: config,
         })
     }
-}
-
-/// Specify the PDF export related arguments.
-#[derive(Debug, Clone, clap::Parser)]
-pub struct PdfExportArgs {
-    /// Specify the PDF standards that Typst will enforce conformance with.
-    ///
-    /// If multiple standards are specified, they are separated by commas.
-    #[arg(long = "pdf-standard", value_delimiter = ',')]
-    pub pdf_standard: Vec<PdfStandard>,
-}
-
-/// Specify the PNG export related arguments.
-#[derive(Debug, Clone, clap::Parser)]
-pub struct PngExportArgs {
-    /// Specify the PPI (pixels per inch) to use for PNG export.
-    #[arg(long = "ppi", default_value_t = 144.0)]
-    pub ppi: f32,
 }

@@ -48,7 +48,7 @@ pub mod index;
 pub mod package;
 pub mod syntax;
 pub mod testing;
-pub use tinymist_analysis::{ty, upstream};
+pub use tinymist_analysis::{stats::GLOBAL_STATS, ty, upstream};
 
 /// The physical position in a document.
 pub type FramePosition = typst::layout::Position;
@@ -91,7 +91,6 @@ mod workspace_label;
 use typst::syntax::Source;
 
 use tinymist_analysis::{adt::interner::Interned, log_debug_ct};
-use tinymist_project::LspComputeGraph;
 
 /// A reference to the interned string
 pub(crate) type StrRef = Interned<str>;
@@ -116,16 +115,6 @@ pub trait SemanticRequest {
 
     /// Request the information from the given context.
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response>;
-}
-
-/// A request handler with given (semantic) analysis context and a project
-/// snapshot.
-pub trait StatefulRequest {
-    /// The response type of the request.
-    type Response;
-
-    /// Request the information from the given context.
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response>;
 }
 
 mod polymorphic {

@@ -255,13 +255,13 @@ impl CompletionPair<'_, '_, '_> {
     }
 
     pub fn symbol_completions(&mut self, label: EcoString, symbol: &Symbol) {
-        let ch = symbol.get();
-        let kind = CompletionKind::Symbol(ch);
+        let sym_val = symbol.get();
+        let kind = CompletionKind::Symbol(sym_val.into());
         self.push_completion(Completion {
             kind,
             label: label.clone(),
-            label_details: Some(symbol_label_detail(ch)),
-            detail: Some(symbol_detail(ch)),
+            label_details: Some(symbol_label_detail(sym_val)),
+            detail: Some(symbol_detail(sym_val)),
             ..Completion::default()
         });
 
@@ -273,7 +273,7 @@ impl CompletionPair<'_, '_, '_> {
 
     pub fn symbol_var_completions(&mut self, symbol: &Symbol, prefix: Option<&str>) {
         for modifier in symbol.modifiers() {
-            if let Ok(modified) = symbol.clone().modified(modifier) {
+            if let Ok(modified) = symbol.clone().modified((), modifier) {
                 let label = match &prefix {
                     Some(prefix) => eco_format!("{prefix}.{modifier}"),
                     None => modifier.into(),

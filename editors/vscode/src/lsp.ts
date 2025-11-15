@@ -358,6 +358,20 @@ export class LanguageState {
     return tinymist.executeCommand<SymbolInformation[]>("tinymist.getWorkspaceLabels", []);
   }
 
+  interactCodeContext<Qs extends InteractCodeContextQuery[]>(
+    documentUri: string | vscode.Uri,
+    query: Qs,
+  ): Promise<InteractCodeContextResponses<Qs> | undefined> {
+    return tinymist.executeCommand("tinymist.interactCodeContext", [
+      {
+        textDocument: {
+          uri: typeof documentUri !== "string" ? documentUri.toString() : documentUri,
+        },
+        query,
+      },
+    ]);
+  }
+
   showLog() {
     if (this.client) {
       this.client.outputChannel.show();
@@ -775,6 +789,50 @@ function exportStringCommand(command: string) {
     return tinymist.executeCommand<string>(command, [uri, extraOpts ?? {}]);
   };
 }
+
+type InteractCodeContextQuery = PathAtQuery | ModeAtQuery | StyleAtQuery;
+type LspPosition = {
+  line: number;
+  character: number;
+};
+interface PathAtQuery {
+  kind: "pathAt";
+  code: string;
+  inputs?: Record<string, string>;
+}
+interface ModeAtQuery {
+  kind: "modeAt";
+  position: LspPosition;
+}
+interface StyleAtQuery {
+  kind: "styleAt";
+  position: LspPosition;
+  style: string[];
+}
+type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = {
+  [Index in keyof Qs]: InteractCodeContextResponse<Qs[Index]>;
+} & { length: Qs["length"] };
+type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
+  ? CodeContextQueryResult
+  : Q extends ModeAtQuery
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
+export type CodeContextQueryResult<T = any> =
+  | {
+      value: T;
+    }
+  | {
+      error: string;
+    };
+export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
+export type StyleAtQueryResult = {
+  style: any[];
+};
+export type ModeAtQueryResult = {
+  mode: InterpretMode;
+};
 
 const previewDisposes: Record<string, () => void> = {};
 export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {

@@ -30,7 +30,7 @@ use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
-    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest,
+    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest, GLOBAL_STATS,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
@@ -549,7 +549,7 @@ impl CompileHandlerImpl {
         if !should_lint {
             let enc = self.analysis.position_encoding;
             let diagnostics =
-                tinymist_query::convert_diagnostics(art.world(), art.diagnostics(), enc);
+                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
@@ -561,8 +561,7 @@ impl CompileHandlerImpl {
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
             spawn_cpu(move || {
-                let world = snap.world().clone();
-                let mut ctx = analysis.enter(world);
+                let mut ctx = analysis.enter(snap.graph.clone());
 
                 // todo: check all errors in this file
                 let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
@@ -663,9 +662,11 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
+            let id = s.snapshot().world().main_id();
 
             s.ext.compiling_since = Some(tinymist_std::time::now());
             spawn_cpu(move || {
+                let _guard = GLOBAL_STATS.stat(id, "main_compile");
                 compile_fn();
             });
         }

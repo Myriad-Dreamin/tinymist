@@ -11,8 +11,6 @@
 #let md-linebreak = html.elem("m1linebreak", "")
 #let md-strong(body, delta: 0) = html.elem("span", html.elem("m1strong", body))
 #let md-emph(body) = html.elem("span", html.elem("m1emph", body))
-#let md-highlight(body) = html.elem("span", html.elem("m1highlight", body))
-#let md-strike(body) = html.elem("span", html.elem("m1strike", body))
 #let md-raw(lang: none, block: false, text: "", body) = {
   let body = html.elem(
     "m1raw",
@@ -47,13 +45,16 @@
   attrs: (dest: dest),
   body,
 )
-#let md-ref(body) = html.elem(
-  "span",
+#let md-ref(body) = {
+  show link: it => it.body
   html.elem(
-    "m1ref",
-    body,
-  ),
-)
+    "span",
+    html.elem(
+      "m1ref",
+      body,
+    ),
+  )
+}
 #let md-heading(level: int, body) = html.elem(
   "m1heading",
   attrs: (level: str(level)),
@@ -74,25 +75,29 @@
   "m1table",
   it,
 )
-#let md-grid(columns: auto, ..children) = html.elem(
+#let md-grid(it) = html.elem(
   "m1grid",
-  {
-    let children = children.pos()
-    let header = if children.first().func() == grid.header {
-      (table.header(..children.first().children.map(cell => table.cell(cell.body))),)
-      children = children.slice(1)
-    } else {
-      ()
-    }
-    let footer = if children.last().func() == grid.footer {
-      (table.footer(..children.last().children.map(cell => table.cell(cell.body))),)
-      children = children.slice(0, -1)
-    } else {
-      ()
-    }
-
-    table(columns: columns, ..header, ..children.map(it => table.cell(it)), ..footer)
-  },
+  table(columns: it.columns, ..it
+      .children
+      .map(child => {
+        {
+          let func = child.func()
+          if func == grid.cell {
+            table.cell(
+              child.body,
+            )
+          } else if func == grid.header {
+            table.header(..child.children.map(it => table.cell(
+              it.body,
+            )))
+          } else if func == grid.footer {
+            table.footer(..child.children.map(it => table.cell(
+              it.body,
+            )))
+          }
+        }
+      })
+      .flatten()),
 )
 #let md-image(src: "", alt: none) = html.elem(
   "m1image",
@@ -107,7 +112,7 @@
   "",
 )
 #let md-figure(body, caption: none) = html.elem(
-  "m1figure",
+    "m1figure",
   attrs: (
     caption: if caption == none {
       ""
@@ -120,7 +125,7 @@
     },
   ),
   body,
-)
+  )
 
 #let if-not-paged(it, act) = {
   if target() == "html" {
@@ -185,8 +190,6 @@
   show parbreak: it => if-not-paged(it, md-parbreak)
   show strong: it => if-not-paged(it, md-strong(it.body, delta: it.delta))
   show emph: it => if-not-paged(it, md-emph(it.body))
-  show highlight: it => if-not-paged(it, md-highlight(it))
-  show strike: it => if-not-paged(it, md-strike(it))
   // todo: icc?
   show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
 
@@ -199,7 +202,7 @@
   show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
   show quote: it => if-not-paged(it, md-quote(it.body))
   show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(columns: it.columns, ..it.children))
+  show grid: it => if-not-paged(it, md-grid(it))
 
   show math.equation.where(block: false): it => if-not-paged(
     it,

@@ -243,6 +243,12 @@ pub struct ExportPdfTask {
     /// conformance with.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub pdf_standards: Vec<PdfStandard>,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub no_pdf_tags: bool,
     /// The document's creation date formatted as a UNIX timestamp (in seconds).
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.

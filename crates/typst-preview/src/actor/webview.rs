@@ -89,12 +89,12 @@ where
                     match msg {
                         WebviewActorRequest::SrcToDocJump(jump_info) => {
                             let msg = positions_req("jump", jump_info);
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into()))
                               .await.log_error("WebViewActor");
                         }
                         WebviewActorRequest::ViewportPosition(jump_info) => {
                             let msg = position_req("viewport", jump_info);
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into()))
                               .await.log_error("WebViewActor");
                         }
                         // WebviewActorRequest::CursorPosition(jump_info) => {
@@ -104,7 +104,7 @@ where
                         WebviewActorRequest::CursorPaths(jump_info) => {
                             let json = serde_json::to_string(&jump_info).unwrap();
                             let msg = format!("cursor-paths,{json}");
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes()))
+                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into()))
                               .await.log_error("WebViewActor");
                         }
                     }
@@ -112,7 +112,7 @@ where
                 Some(svg) = self.svg_receiver.recv() => {
                     log::trace!("WebviewActor: received svg from renderer");
                     let _scope = typst_timing::TimingScope::new("webview_actor_send_svg");
-                    self.webview_websocket_conn.send(WsMessage::Binary(svg))
+                    self.webview_websocket_conn.send(WsMessage::Binary(svg.into()))
                     .await.log_error("WebViewActor");
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {

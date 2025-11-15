@@ -101,6 +101,14 @@ export function getSensibleTextEditorColumn(): ViewColumn {
   return editor?.viewColumn !== undefined ? editor.viewColumn : ViewColumn.Beside;
 }
 
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
+}
+
 export async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {
   const filePath = path.resolve(context.extensionPath, relativePath);
   const fileContents = await readFile(filePath, "utf8");
@@ -110,7 +118,7 @@ export async function loadHTMLFile(context: vscode.ExtensionContext, relativePat
 export class DisposeList {
   disposes: (() => void)[] = [];
   disposed = false;
-  constructor() {}
+  constructor() { }
   add(d: (() => void) | vscode.Disposable) {
     if (this.disposed) {
       // console.error("disposed", this.taskId, "for", this.filePath);

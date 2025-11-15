@@ -11,6 +11,8 @@ use typst::model::BibliographyElem;
 use typst::syntax::{LinkedNode, Span, SyntaxKind, SyntaxNode, ast};
 use typst_shim::eval::Vm;
 
+use crate::stats::GLOBAL_STATS;
+
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
     if let Some(parent) = node.parent()
@@ -45,6 +47,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 return analyze_expr_(world, child);
             }
 
+            let _guard = GLOBAL_STATS.stat(node.span().id(), "analyze_expr");
             return typst::trace::<TypstPagedDocument>(world, node.span());
         }
     };
@@ -62,6 +65,8 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
     if source.scope().is_some() {
         return (Some(source.clone()), Some(source));
     }
+
+    let _guard = GLOBAL_STATS.stat(source_span.id(), "analyze_import");
 
     let introspector = Introspector::default();
     let traced = Traced::default();
@@ -115,6 +120,8 @@ pub struct DynLabel {
 #[typst_macros::time]
 pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
+
+    let _guard = GLOBAL_STATS.stat(None, "analyze_labels");
 
     // Labels in the document.
     for elem in document.introspector().all() {
