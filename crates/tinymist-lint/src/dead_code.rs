@@ -3,7 +3,10 @@
 mod collector;
 mod diagnostic;
 
-use tinymist_analysis::syntax::{Decl, ExprInfo};
+use tinymist_analysis::{
+    adt::interner::Interned,
+    syntax::{Decl, ExprInfo},
+};
 use tinymist_project::LspWorld;
 use typst::ecow::EcoVec;
 
@@ -32,7 +35,12 @@ impl Default for DeadCodeConfig {
     }
 }
 
-pub fn check_dead_code(world: &LspWorld, ei: &ExprInfo, config: &DeadCodeConfig) -> DiagnosticVec {
+pub fn check_dead_code(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    has_references: impl Fn(&Interned<Decl>) -> bool,
+    config: &DeadCodeConfig,
+) -> DiagnosticVec {
     let mut diagnostics = EcoVec::new();
 
     let definitions = collect_definitions(ei);
@@ -46,14 +54,7 @@ pub fn check_dead_code(world: &LspWorld, ei: &ExprInfo, config: &DeadCodeConfig)
             continue;
         }
 
-        let has_refs = {
-            let target_decl = def_info.decl.clone();
-
-            ei.get_refs(target_decl.clone())
-                .any(|(_, r)| r.as_ref().decl != target_decl)
-        };
-
-        if !has_refs {
+        if !has_references(&def_info.decl) {
             if let Some(diag) = generate_diagnostic(&def_info, world, ei) {
                 diagnostics.push(diag);
             }
