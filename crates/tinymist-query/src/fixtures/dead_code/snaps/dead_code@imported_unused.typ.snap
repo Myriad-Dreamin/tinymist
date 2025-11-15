@@ -16,6 +16,12 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/imported_unused.typ
    "range": "2:30:2:33",
    "severity": 2,
    "source": "typst"
+  },
+  {
+   "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+   "range": "2:1:2:33",
+   "severity": 2,
+   "source": "typst"
   }
  ]
 }
