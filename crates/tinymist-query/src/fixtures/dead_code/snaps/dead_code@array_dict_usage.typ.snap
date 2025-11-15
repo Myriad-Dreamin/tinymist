@@ -1,0 +1,15 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/array_dict_usage.typ
+---
+{
+ "s0.typ": [
+  {
+   "message": "unused variable: `unused`\nHint: consider removing this variable or prefixing with underscore: `_unused`",
+   "range": "3:5:3:11",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}
