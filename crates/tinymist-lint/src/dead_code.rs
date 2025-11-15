@@ -102,13 +102,11 @@ fn matches_pattern(name: &str, pattern: &str) -> bool {
         return name.contains(middle);
     }
 
-    if pattern.starts_with('*') {
-        let suffix = &pattern[1..];
+    if let Some(suffix) = pattern.strip_prefix('*') {
         return name.ends_with(suffix);
     }
 
-    if pattern.ends_with('*') {
-        let prefix = &pattern[..pattern.len() - 1];
+    if let Some(prefix) = pattern.strip_suffix('*') {
         return name.starts_with(prefix);
     }
 
