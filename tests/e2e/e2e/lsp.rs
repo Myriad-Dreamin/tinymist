@@ -38,7 +38,7 @@ fn test_lsp() {
 
     {
         gen_smoke(SmokeArgs {
-            root: root.join("vscode"),
+            root: root.join("vscode-syntax-only"),
             init: "initialization/vscode-syntax-only-1.87.2".to_owned(),
             log: "tests/fixtures/editions/base.log".to_owned(),
         });
