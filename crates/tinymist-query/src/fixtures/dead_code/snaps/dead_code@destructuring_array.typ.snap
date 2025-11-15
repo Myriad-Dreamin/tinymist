@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_tuple.typ
+input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_array.typ
 ---
 {
  "s0.typ": [
