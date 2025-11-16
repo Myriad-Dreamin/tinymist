@@ -1,0 +1,29 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/main.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_unused.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:15:2:23"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused import: `util`\nHint: consider removing this unused import",
+  "range": "2:19:2:23"
+ }
+]

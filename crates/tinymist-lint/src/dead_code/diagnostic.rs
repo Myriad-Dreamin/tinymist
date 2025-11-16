@@ -24,11 +24,13 @@ pub fn generate_diagnostic(
     }
 
     let is_module_import = matches!(def_info.decl.as_ref(), Decl::ModuleImport(..));
+    let is_module_alias = matches!(def_info.decl.as_ref(), Decl::ModuleAlias(_));
     let is_import_item = matches!(
         def_info.decl.as_ref(),
-        Decl::Import(_) | Decl::ImportAlias(_)
+        Decl::Import(_) | Decl::ImportAlias(_) | Decl::ModuleAlias(_)
     );
-    let is_module_like = is_module_import || matches!(def_info.kind, DefKind::Module);
+    let is_module_like =
+        is_module_import || matches!(def_info.kind, DefKind::Module) && !is_module_alias;
 
     let kind_str = match def_info.kind {
         DefKind::Function => "function",
