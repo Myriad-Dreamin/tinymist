@@ -8,13 +8,14 @@ mod system {
             .ok()
             .and_then(|manager| manager.batteries().ok())
             .map(|batteries| {
-                let mut batteries = batteries;
-                let next = batteries.next();
-                next.as_ref().is_some()
-                    && (next.into_iter().chain(batteries)).all(|battery| match battery {
-                        Ok(bat) => matches!(bat.state(), ::battery::State::Discharging),
-                        Err(_) => false,
-                    })
+                let mut batteries = batteries.peekable();
+                if batteries.peek().is_none() {
+                    return false;
+                }
+                batteries.all(|battery| match battery {
+                    Ok(bat) => matches!(bat.state(), ::battery::State::Discharging),
+                    Err(_) => false,
+                })
             })
             .unwrap_or(false)
     }
