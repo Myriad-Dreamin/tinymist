@@ -28,21 +28,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/function_as_value.typ
       "s0.typ": [
        {
         "insertTextFormat": 1,
-        "newText": "_",
-        "range": "6:5:6:20"
-       }
-      ]
-     }
-    },
-    "kind": "quickfix",
-    "title": "Replace with `_`"
-   },
-   {
-    "edit": {
-     "changes": {
-      "s0.typ": [
-       {
-        "insertTextFormat": 1,
         "newText": "",
         "range": "6:0:7:0"
        }
