@@ -319,7 +319,14 @@ impl<'a> CodeActionWorker<'a> {
         root: &LinkedNode<'_>,
         range: &Range<usize>,
     ) -> Option<()> {
-        if range.is_empty() || self.is_spread_binding(root, range) {
+        if range.is_empty() {
+            return None;
+        }
+
+        let cursor = (range.start + range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        if self.is_spread_binding(&node) || self.is_function_binding(&node) {
             return None;
         }
 
@@ -344,21 +351,73 @@ impl<'a> CodeActionWorker<'a> {
         Some(())
     }
 
-    fn is_spread_binding(&self, root: &LinkedNode<'_>, range: &Range<usize>) -> bool {
-        if range.is_empty() {
-            return false;
-        }
-
-        let cursor = (range.start + range.end) / 2;
-        let Some(node) = root.leaf_at_compat(cursor) else {
-            return false;
-        };
-
+    fn is_spread_binding(&self, node: &LinkedNode<'_>) -> bool {
         if node.kind() == SyntaxKind::Spread {
             return true;
         }
 
-        node_ancestors(&node).any(|ancestor| ancestor.kind() == SyntaxKind::Spread)
+        node_ancestors(node).any(|ancestor| ancestor.kind() == SyntaxKind::Spread)
+    }
+
+    fn is_function_binding(&self, node: &LinkedNode<'_>) -> bool {
+        self.find_let_binding_ancestor(node)
+            .map(|let_binding| matches!(let_binding.kind(), ast::LetBindingKind::Closure(..)))
+            .unwrap_or(false)
+    }
+
+    fn find_let_binding_ancestor<'b>(
+        &self,
+        node: &'b LinkedNode<'b>,
+    ) -> Option<ast::LetBinding<'b>> {
+        let mut current = Some(node);
+        while let Some(n) = current {
+            if n.kind() == SyntaxKind::LetBinding {
+                return n.cast::<ast::LetBinding>();
+            }
+            current = n.parent();
+        }
+        None
+    }
+
+    fn find_declaration_ancestor<'b>(
+        &self,
+        node: &'b LinkedNode<'b>,
+    ) -> Option<&'b LinkedNode<'b>> {
+        let mut current = Some(node);
+        while let Some(n) = current {
+            match n.kind() {
+                SyntaxKind::LetBinding | SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                    return Some(n);
+                }
+                _ => {
+                    current = n.parent();
+                }
+            }
+        }
+        None
+    }
+
+    fn expand_declaration_range(&self, mut range: Range<usize>) -> Range<usize> {
+        let bytes = self.source.text().as_bytes();
+
+        if range.start > 0 {
+            let mut idx = range.start;
+            while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
+                idx -= 1;
+            }
+
+            if idx > 0 && bytes[idx - 1] == b'#' {
+                range.start = idx - 1;
+            }
+        }
+
+        if range.end < bytes.len() && bytes[range.end] == b'\n' {
+            range.end += 1;
+        } else if range.start > 0 && bytes[range.start - 1] == b'\n' {
+            range.start -= 1;
+        }
+
+        range
     }
 
     /// Remove the declaration corresponding to an unused binding.
@@ -373,18 +432,7 @@ impl<'a> CodeActionWorker<'a> {
 
         let cursor = (name_range.start + name_range.end) / 2;
         let node = root.leaf_at_compat(cursor)?;
-        let mut node = &node;
-
-        let decl_node = loop {
-            match node.kind() {
-                SyntaxKind::LetBinding | SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
-                    break node.clone();
-                }
-                _ => {
-                    node = node.parent()?;
-                }
-            }
-        };
+        let decl_node = self.find_declaration_ancestor(&node)?;
 
         if decl_node.kind() == SyntaxKind::LetBinding {
             let let_binding = decl_node.cast::<ast::LetBinding>()?;
@@ -403,25 +451,7 @@ impl<'a> CodeActionWorker<'a> {
             }
         }
 
-        let mut remove_range = decl_node.range();
-        let bytes = self.source.text().as_bytes();
-
-        if remove_range.start > 0 {
-            let mut idx = remove_range.start;
-            while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
-                idx -= 1;
-            }
-
-            if idx > 0 && bytes[idx - 1] == b'#' {
-                remove_range.start = idx - 1;
-            }
-        }
-
-        if remove_range.end < bytes.len() && bytes[remove_range.end] == b'\n' {
-            remove_range.end += 1;
-        } else if remove_range.start > 0 && bytes[remove_range.start - 1] == b'\n' {
-            remove_range.start -= 1;
-        }
+        let remove_range = self.expand_declaration_range(decl_node.range());
 
         let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
         let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
@@ -522,6 +552,10 @@ impl<'a> CodeActionWorker<'a> {
         root: &LinkedNode<'_>,
         name_range: &Range<usize>,
     ) -> Option<Range<usize>> {
+        if name_range.is_empty() {
+            return None;
+        }
+
         let cursor = (name_range.start + name_range.end) / 2;
         let node = root.leaf_at_compat(cursor)?;
 
