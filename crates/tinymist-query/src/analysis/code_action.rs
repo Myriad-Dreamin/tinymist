@@ -4,7 +4,8 @@ use ecow::{EcoString, eco_format};
 use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
 use regex::Regex;
 use tinymist_analysis::syntax::{
-    PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
+    ExprInfo, ModuleItemLayout, PreviousItem, SyntaxClass, adjust_expr, node_ancestors,
+    previous_items,
 };
 use tinymist_std::path::{diff, unix_slash};
 use typst::syntax::Side;
@@ -24,6 +25,8 @@ pub struct CodeActionWorker<'a> {
     pub actions: Vec<CodeAction>,
     /// The lazily calculated local URL to [`Self::source`].
     local_url: OnceLock<Option<Url>>,
+    /// Cached expression information for the current source file.
+    expr_info: Option<ExprInfo>,
 }
 
 impl<'a> CodeActionWorker<'a> {
@@ -34,6 +37,7 @@ impl<'a> CodeActionWorker<'a> {
             source,
             actions: Vec::new(),
             local_url: OnceLock::new(),
+            expr_info: None,
         }
     }
 
@@ -446,29 +450,14 @@ impl<'a> CodeActionWorker<'a> {
     ) -> Option<()> {
         // Calculate the range to remove, expand to cover the whole import item
         // (e.g. `foo as bar`) and include trailing comma if present.
-        let mut remove_range = self
-            .module_alias_remove_range(root, name_range)
-            .or_else(|| self.find_import_item_range(root, name_range))
-            .unwrap_or_else(|| name_range.clone());
-        let bytes = self.source.text().as_bytes();
-
-        // Check for trailing comma after the item
-        let mut end = remove_range.end;
-        while end < bytes.len() && matches!(bytes[end], b' ' | b'\t') {
-            end += 1;
-        }
-        if end < bytes.len() && bytes[end] == b',' {
-            remove_range.end = end + 1;
+        let mut remove_range = if let Some(layout) = self.module_item_layout_for_range(name_range) {
+            layout.item_range.clone()
         } else {
-            // Check for comma before the item
-            let mut start = remove_range.start;
-            while start > 0 && matches!(bytes[start - 1], b' ' | b'\t') {
-                start -= 1;
-            }
-            if start > 0 && bytes[start - 1] == b',' {
-                remove_range.start = start - 1;
-            }
-        }
+            self.module_alias_remove_range(root, name_range)
+                .or_else(|| self.find_import_item_range(root, name_range))
+                .unwrap_or_else(|| name_range.clone())
+        };
+        remove_range = self.expand_import_item_range(remove_range);
 
         let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
         let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
@@ -481,6 +470,57 @@ impl<'a> CodeActionWorker<'a> {
         self.actions.push(action);
 
         Some(())
+    }
+
+    fn module_item_layout_for_range(
+        &mut self,
+        binding_range: &Range<usize>,
+    ) -> Option<ModuleItemLayout> {
+        let info = self.expr_info()?;
+        info.module_items
+            .values()
+            .find(|layout| layout.binding_range == *binding_range)
+            .cloned()
+    }
+
+    fn expand_import_item_range(&self, mut range: Range<usize>) -> Range<usize> {
+        let bytes = self.source.text().as_bytes();
+        let len = bytes.len();
+
+        let mut idx = range.end;
+        while idx < len && matches!(bytes[idx], b' ' | b'\t' | b'\r' | b'\n') {
+            idx += 1;
+        }
+        if idx < len && bytes[idx] == b',' {
+            range.end = idx + 1;
+            let mut tail = range.end;
+            while tail < len && matches!(bytes[tail], b' ' | b'\t') {
+                tail += 1;
+            }
+            range.end = tail;
+            return range;
+        }
+
+        let mut idx = range.start;
+        while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t' | b'\r' | b'\n') {
+            idx -= 1;
+        }
+        if idx > 0 && bytes[idx - 1] == b',' {
+            range.start = idx - 1;
+            while range.start > 0 && matches!(bytes[range.start - 1], b' ' | b'\t') {
+                range.start -= 1;
+            }
+        }
+
+        range
+    }
+
+    fn expr_info(&mut self) -> Option<ExprInfo> {
+        if self.expr_info.is_none() {
+            let info = self.ctx.expr_stage(&self.source);
+            self.expr_info = Some(info);
+        }
+        self.expr_info.clone()
     }
 
     fn find_import_item_range(

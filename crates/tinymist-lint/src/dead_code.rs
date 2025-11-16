@@ -4,14 +4,13 @@ mod collector;
 mod diagnostic;
 
 use std::collections::{HashMap, HashSet};
-use std::ops::Range;
 
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{Decl, Expr, ExprInfo},
 };
-use tinymist_project::{LspWorld, SourceWorld};
-use typst::{ecow::EcoVec, syntax::FileId};
+use tinymist_project::LspWorld;
+use typst::ecow::EcoVec;
 
 use crate::DiagnosticVec;
 use collector::{DefInfo, DefScope, collect_definitions};
@@ -52,8 +51,7 @@ pub fn check_dead_code(
         return diagnostics;
     }
 
-    let (import_usage, shadowed_imports, module_children) =
-        compute_import_usage(world, &definitions, ei);
+    let (import_usage, shadowed_imports, module_children) = compute_import_usage(&definitions, ei);
 
     let mut seen_module_aliases = HashSet::new();
 
@@ -92,7 +90,6 @@ pub fn check_dead_code(
 }
 
 fn compute_import_usage(
-    world: &LspWorld,
     definitions: &[DefInfo],
     ei: &ExprInfo,
 ) -> (
@@ -100,29 +97,16 @@ fn compute_import_usage(
     HashSet<Interned<Decl>>,
     HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
 ) {
-    struct ModuleSpan {
-        decl: Interned<Decl>,
-        fid: FileId,
-        range: Range<usize>,
-    }
-
-    let text = ei.source.text();
-    let module_spans: Vec<ModuleSpan> = definitions
-        .iter()
-        .filter_map(|def| match def.decl.as_ref() {
-            Decl::ModuleImport(_) => world.source_range(def.span).map(|range| ModuleSpan {
-                decl: def.decl.clone(),
-                fid: def.fid,
-                range,
-            }),
-            _ => None,
-        })
-        .collect();
-
     let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
     let mut shadowed = HashSet::new();
     let mut module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>> = HashMap::new();
-    let mut alias_item_ranges: Vec<(Range<usize>, Interned<Decl>)> = Vec::new();
+
+    for (child, layout) in ei.module_items.iter() {
+        module_children
+            .entry(layout.parent.clone())
+            .or_default()
+            .insert(child.clone());
+    }
 
     for def in definitions {
         if matches!(def.decl.as_ref(), Decl::ImportAlias(_)) {
@@ -130,39 +114,6 @@ fn compute_import_usage(
                 if let Some(Expr::Decl(step_decl)) = alias_ref.step.as_ref() {
                     alias_links.insert(def.decl.clone(), step_decl.clone());
                     shadowed.insert(step_decl.clone());
-                }
-            }
-        }
-        if matches!(def.decl.as_ref(), Decl::ModuleAlias(_)) {
-            if let Some(alias_range) = world.source_range(def.span) {
-                if let Some(items_range) = alias_items_range(text, &alias_range) {
-                    alias_item_ranges.push((items_range, def.decl.clone()));
-                }
-            }
-        }
-    }
-
-    for def in definitions {
-        if matches!(def.decl.as_ref(), Decl::Import(_) | Decl::ImportAlias(_)) {
-            if let Some(child_range) = world.source_range(def.span) {
-                if let Some(module) = module_spans
-                    .iter()
-                    .find(|span| span.fid == def.fid && contains_range(&span.range, &child_range))
-                {
-                    module_children
-                        .entry(module.decl.clone())
-                        .or_default()
-                        .insert(def.decl.clone());
-                }
-
-                if let Some((_, alias_decl)) = alias_item_ranges
-                    .iter()
-                    .find(|(range, _)| range.contains(&child_range.start))
-                {
-                    module_children
-                        .entry(alias_decl.clone())
-                        .or_default()
-                        .insert(def.decl.clone());
                 }
             }
         }
@@ -190,30 +141,6 @@ fn compute_import_usage(
     }
 
     (used, shadowed, module_children)
-}
-
-fn contains_range(outer: &Range<usize>, inner: &Range<usize>) -> bool {
-    outer.start <= inner.start && outer.end >= inner.end
-}
-
-fn alias_items_range(text: &str, alias_range: &Range<usize>) -> Option<Range<usize>> {
-    let bytes = text.as_bytes();
-    let mut idx = alias_range.end;
-    while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-        idx += 1;
-    }
-    if idx >= bytes.len() || bytes[idx] != b':' {
-        return None;
-    }
-    idx += 1;
-    while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
-        idx += 1;
-    }
-    let mut end = idx;
-    while end < bytes.len() && bytes[end] != b'\n' && bytes[end] != b'\r' {
-        end += 1;
-    }
-    Some(idx..end)
 }
 
 fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
