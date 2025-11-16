@@ -8,7 +8,7 @@ When working under power-saving mode or with resource-consumed projects, typst c
 
 #align(center, table(
   columns: 4,
-  [Mode], [CPU Usage], [Memory Usage (Code Compilation)], [Memory Usage (Incremental Compilation)],
+  [Mode], [CPU Usage], [Memory Usage (Cold Compilation)], [Memory Usage (Incremental Compilation)],
   [Normal Mode], [5% \~ 12%], [2.72 GB], [6.62\~8.73GB],
   [Syntax-Only Mode], [0% \~ 0.6%], [15.0 MB], [15.1\~16.0 MB],
 ))
