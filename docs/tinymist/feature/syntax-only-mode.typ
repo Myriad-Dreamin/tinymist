@@ -7,10 +7,10 @@ The syntax-only mode is available since `tinymist` v0.14.2.
 When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. From a simple test on a typst document with 200 pages, containing complex figures and WASM plugin calls, editing a large `.typ` file on a windows laptop (i9-12900H), the CPU and memory usage are as follows:
 
 #align(center, table(
-  columns: 3,
-  [Mode], [CPU Usage], [Memory Usage],
-  [Normal Mode], [5% \~ 12%], [0.9\~1.184 GB],
-  [Syntax-Only Mode], [0% \~ 0.6%], [15.1\~16.0 MB],
+  columns: 4,
+  [Mode], [CPU Usage], [Memory Usage (Code Compilation)], [Memory Usage (Incremental Compilation)],
+  [Normal Mode], [5% \~ 12%], [2.72 GB], [6.62\~8.73GB],
+  [Syntax-Only Mode], [0% \~ 0.6%], [15.0 MB], [15.1\~16.0 MB],
 ))
 
 You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
