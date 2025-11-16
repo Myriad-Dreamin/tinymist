@@ -79,17 +79,14 @@ pub fn generate_diagnostic(
     }
 
     // Add kind-specific hints
-    match def_info.kind {
-        DefKind::Function => {
-            // Check if there's a docstring - documented functions might be intentional API
-            if matches!(def_info.scope, DefScope::Exported)
-                && ei.docstrings.contains_key(&def_info.decl)
-            {
-                // Reduce severity for documented functions (they might be public API)
-                return None;
-            }
+    if let DefKind::Function = def_info.kind {
+        // Check if there's a docstring - documented functions might be intentional API
+        if matches!(def_info.scope, DefScope::Exported)
+            && ei.docstrings.contains_key(&def_info.decl)
+        {
+            // Reduce severity for documented functions (they might be public API)
+            return None;
         }
-        _ => {}
     }
 
     if is_module_like {
