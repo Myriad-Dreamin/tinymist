@@ -32,6 +32,10 @@ language-servers = ["tinymist"]
 
 #cross-link("/feature/preview.typ", reference: <default-preview>)[Default Preview Feature] and #cross-link("/feature/preview.typ", reference: <background-preview>)[Background Preview Feature] are suitable in helix.
 
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+#include "syntax-only.typ"
+
 == Working with Multiple-File Projects
 
 There is a way in #github-link("/editors/neovim/README.md#working-with-multiple-files-projects")[Neovim];, but you cannot invoke related commands with arguments by #link("https://docs.helix-editor.com/commands.html")[:lsp-workspace-command] in helix. As a candidate solution, assuming your having following directory layout:

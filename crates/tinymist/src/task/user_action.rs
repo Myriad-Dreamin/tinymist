@@ -238,7 +238,7 @@ async fn trace_main(
     req_id: RequestId,
 ) -> ! {
     typst_timing::enable();
-    let res = typst::compile::<TypstPagedDocument>(g.world());
+    let res = typst_shim::compile_opt::<TypstPagedDocument>(g.world());
     let diags = match &res.output {
         Ok(_res) => res.warnings,
         Err(errors) => errors.clone(),

@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: [Hook Script])
+#show: book-page.with(title: [Hook Scripts])
 
 The hook script feature is available since `tinymist` v0.14.2.
 

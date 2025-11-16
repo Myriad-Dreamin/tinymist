@@ -44,6 +44,7 @@ tar.workspace = true
 tinymist-package.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
+typst-shim.workspace = true
 typst.workspace = true
 typst-assets.workspace = true
 ttf-parser.workspace = true

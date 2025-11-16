@@ -10,6 +10,7 @@ use typst::introspection::Introspector;
 use typst::model::BibliographyElem;
 use typst::syntax::{LinkedNode, Span, SyntaxKind, SyntaxNode, ast};
 use typst_shim::eval::Vm;
+use typst_shim::is_syntax_only;
 
 use crate::stats::GLOBAL_STATS;
 
@@ -45,6 +46,12 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
                 && let Some(child) = node.children().last()
             {
                 return analyze_expr_(world, child);
+            }
+
+            // Only traces if not in syntax-only mode because typst::trace requires
+            // compilation information.
+            if is_syntax_only() {
+                return eco_vec![];
             }
 
             let _guard = GLOBAL_STATS.stat(node.span().id(), "analyze_expr");

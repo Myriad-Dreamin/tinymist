@@ -35,6 +35,17 @@ fn test_lsp() {
         let hash = replay_log(&root.join("vscode"));
         insta::assert_snapshot!(hash, @"siphash128_13:9a266bad2c9e8113b66eae3cfe83aab5");
     }
+
+    {
+        gen_smoke(SmokeArgs {
+            root: root.join("vscode-syntax-only"),
+            init: "initialization/vscode-syntax-only-1.87.2".to_owned(),
+            log: "tests/fixtures/editions/base.log".to_owned(),
+        });
+
+        let hash = replay_log(&root.join("vscode-syntax-only"));
+        insta::assert_snapshot!(hash, @"siphash128_13:9a266bad2c9e8113b66eae3cfe83aab5");
+    }
 }
 
 fn handle_io<T>(res: io::Result<T>) -> T {
