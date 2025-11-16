@@ -14,7 +14,9 @@ use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
 use crate::TypliteFeat;
-use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
+use crate::attributes::{
+    AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, VerbatimAttr, md_attr,
+};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
 use crate::tags::md_tag;
@@ -191,15 +193,16 @@ impl HtmlToAstParser {
             }
 
             md_tag::verbatim => {
-                self.inline_buffer.push(Node::Custom(Box::new(VerbatimNode {
-                    content: element
-                        .attrs
-                        .0
-                        .iter()
-                        .find(|(name, _)| *name == md_attr::src)
-                        .map(|(_, value)| value.clone())
-                        .unwrap_or_default(),
-                })));
+                let attrs = VerbatimAttr::parse(&element.attrs)?;
+                if attrs.block {
+                    self.flush_inline_buffer();
+                    self.blocks.push(Node::Paragraph(vec![Node::Custom(Box::new(
+                        VerbatimNode { content: attrs.src },
+                    ))]));
+                } else {
+                    self.inline_buffer
+                        .push(Node::Custom(Box::new(VerbatimNode { content: attrs.src })));
+                }
                 Ok(())
             }
 
@@ -398,7 +401,17 @@ impl HtmlToAstParser {
                 | md_tag::table
                 | md_tag::grid
                 | md_tag::figure
-        )
+        ) || (element.tag == md_tag::verbatim && Self::is_verbatim_block(element))
+    }
+
+    fn is_verbatim_block(element: &HtmlElement) -> bool {
+        element
+            .attrs
+            .0
+            .iter()
+            .find(|(name, _)| *name == md_attr::block)
+            .and_then(|(_, value)| value.parse::<bool>().ok())
+            .unwrap_or(false)
     }
 
     pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Node>> {
