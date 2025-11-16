@@ -7,8 +7,12 @@ mod system {
         ::battery::Manager::new()
             .ok()
             .and_then(|manager| manager.batteries().ok())
-            .map(|mut batteries| {
-                batteries.any(|battery| match battery {
+            .map(|batteries| {
+                let mut batteries = batteries.peekable();
+                if batteries.peek().is_none() {
+                    return false;
+                }
+                batteries.all(|battery| match battery {
                     Ok(bat) => matches!(bat.state(), ::battery::State::Discharging),
                     Err(_) => false,
                 })
