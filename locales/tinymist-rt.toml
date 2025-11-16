@@ -5,13 +5,9 @@
 en = "rootPath or typstExtraArgs.root must be an absolute path: {root:?}"
 zh = "rootPath 或 typstExtraArgs.root 必须是绝对路径：{root:?}"
 
-[tinymist-query.code-action.exportHtml]
-en = "Export HTML"
-zh = "导出 HTML"
-
-[tinymist-query.code-action.exportPdf]
-en = "Export PDF"
-zh = "导出 PDF"
+[tinymist-query.code-action.export]
+en = "Export"
+zh = "导出"
 
 [tinymist-query.code-action.more]
 en = "More .."

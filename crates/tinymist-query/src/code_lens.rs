@@ -21,24 +21,29 @@ impl SemanticRequest for CodeLensRequest {
         let mut res = vec![];
 
         let doc_start = ctx.to_lsp_range(0..0, &source);
-        let doc_lens = |title: &str, args: Vec<JsonValue>| CodeLens {
-            range: doc_start,
-            command: Some(Command {
-                title: title.to_string(),
-                command: "tinymist.runCodeLens".to_string(),
-                arguments: Some(args),
-            }),
-            data: None,
+        let mut doc_lens = |title: &str, args: Vec<JsonValue>| {
+            if !ctx.analysis.support_client_codelens {
+                return;
+            }
+            res.push(CodeLens {
+                range: doc_start,
+                command: Some(Command {
+                    title: title.to_string(),
+                    command: "tinymist.runCodeLens".to_string(),
+                    arguments: Some(args),
+                }),
+                data: None,
+            })
         };
 
-        res.push(doc_lens(
+        doc_lens(
             &tinymist_l10n::t!("tinymist-query.code-action.profile", "Profile"),
             vec!["profile".into()],
-        ));
-        res.push(doc_lens(
+        );
+        doc_lens(
             &tinymist_l10n::t!("tinymist-query.code-action.preview", "Preview"),
             vec!["preview".into()],
-        ));
+        );
 
         let is_html = ctx
             .world()
@@ -46,22 +51,46 @@ impl SemanticRequest for CodeLensRequest {
             .features
             .is_enabled(typst::Feature::Html);
 
+        doc_lens(
+            &tinymist_l10n::t!("tinymist-query.code-action.export", "Export"),
+            vec!["export".into()],
+        );
         if is_html {
-            res.push(doc_lens(
-                &tinymist_l10n::t!("tinymist-query.code-action.exportHtml", "Export HTML"),
-                vec!["export-html".into()],
-            ));
+            doc_lens("HTML", vec!["export-html".into()]);
         } else {
-            res.push(doc_lens(
-                &tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF"),
-                vec!["export-pdf".into()],
-            ));
+            doc_lens("PDF", vec!["export-pdf".into()]);
         }
 
-        res.push(doc_lens(
+        doc_lens(
             &tinymist_l10n::t!("tinymist-query.code-action.more", "More .."),
             vec!["more".into()],
-        ));
+        );
+
+        if !ctx.analysis.support_client_codelens
+            && let Some(uri) = path_to_url(&self.path)
+                .ok()
+                .and_then(|u| serde_json::to_value(u).ok())
+        {
+            res.push(CodeLens {
+                range: doc_start,
+                command: Some(Command {
+                    title: if is_html {
+                        tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF")
+                    } else {
+                        tinymist_l10n::t!("tinymist-query.code-action.exportHtml", "Export HTML")
+                    }
+                    .to_string(),
+                    command: if is_html {
+                        "tinymist.exportPdf"
+                    } else {
+                        "tinymist.exportHtml"
+                    }
+                    .to_string(),
+                    arguments: Some(vec![uri]),
+                }),
+                data: None,
+            })
+        }
 
         Some(res)
     }

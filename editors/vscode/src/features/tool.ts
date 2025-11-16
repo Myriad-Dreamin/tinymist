@@ -1,9 +1,9 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: type-erased */
 import * as vscode from "vscode";
 import type { IContext } from "../context";
-import type { ExtensionContext } from "../state";
+import { extensionState, type ExtensionContext } from "../state";
 import type { EditorTool, EditorToolContext } from "../tools";
-import { loadHTMLFile } from "../util";
+import { isTypstDocument, loadHTMLFile } from "../util";
 import { handleMessage, type WebviewMessage } from "./tool/message-handler";
 import { tools } from "./tool/registry";
 import { ToolViewProvider } from "./tool/views";
@@ -98,6 +98,29 @@ export async function updateEditorToolView<T extends EditorTool<TOptions>, TOpti
     panel.webview.onDidReceiveMessage(async (message: WebviewMessage) => {
       console.log("onDidReceiveMessage", message);
       handleMessage(message, toolContext);
+    }),
+  );
+
+  // Track focused Typst document
+  let focusedDocVersion = 0;
+  if (isTypstDocument(extensionState.getFocusingDoc())) {
+    // Initial focus message
+    toolContext.postMessage({
+      type: "focusTypstDoc",
+      version: ++focusedDocVersion,
+      fsPath: extensionState.getFocusingFile(),
+    });
+  }
+  disposalManager.add(
+    vscode.window.onDidChangeTextEditorSelection(async (event) => {
+      if (!isTypstDocument(event.textEditor.document)) {
+        return;
+      }
+      toolContext.postMessage({
+        type: "focusTypstDoc",
+        version: ++focusedDocVersion,
+        fsPath: event.textEditor.document.uri.fsPath,
+      });
     }),
   );
 
