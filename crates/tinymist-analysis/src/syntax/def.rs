@@ -97,11 +97,7 @@ impl std::hash::Hash for ExprInfoRepr {
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
-        let mut module_items = self
-            .module_items
-            .iter()
-            .map(|(decl, layout)| (decl.clone(), layout.clone()))
-            .collect::<Vec<_>>();
+        let mut module_items = self.module_items.iter().collect::<Vec<_>>();
         module_items.sort_by_key(|(decl, _)| decl.span().into_raw());
         module_items.hash(state);
     }
