@@ -105,10 +105,10 @@ function createMockPreviewResponse(format: ExportFormat, version: number): Previ
     const MOCK_IMAGE =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
-    const pages: PreviewPage[] = [
-      { pageNumber: 1, imageData: MOCK_IMAGE },
-      { pageNumber: 2, imageData: MOCK_IMAGE },
-    ];
+    const pages: PreviewPage[] = [];
+    for (let i = 0; i < 100; i++) {
+      pages.push({ pageNumber: i, imageData: MOCK_IMAGE });
+    }
 
     return {
       type: "previewGenerated",
@@ -117,9 +117,10 @@ function createMockPreviewResponse(format: ExportFormat, version: number): Previ
     };
   }
 
+  const text = `# ${format.label} Preview\n\nThis is mock preview data for ${format.label}.\n\n- Item 1\n- Item 2\n- Item 3`;
   return {
     type: "previewGenerated",
     version,
-    text: `# ${format.label} Preview\n\nThis is mock preview data for ${format.label}.\n\n- Item 1\n- Item 2\n- Item 3`,
+    text: text.repeat(10),
   };
 }

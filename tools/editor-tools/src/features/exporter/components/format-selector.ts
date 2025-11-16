@@ -31,7 +31,8 @@ const FormatCard = (format: ExportFormat, isSelected: boolean, onSelect: () => v
     },
     div(
       { class: "flex justify-between items-center" },
-      span({ class: "badge font-mono" }, `.${format.fileExtension}`),
+      span({ class: "font-semibold" }, format.label),
+      // span({ class: "badge font-mono" }, `.${format.fileExtension}`),
     ),
   );
 };

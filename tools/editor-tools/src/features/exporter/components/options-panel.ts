@@ -108,7 +108,7 @@ const renderInput = (
 
     case "boolean":
       return label(
-        { style: "display: flex; align-items: center; cursor: pointer;" },
+        { class: "flex items-center cursor-pointer" },
         input({
           class: "input",
           type: "checkbox",
@@ -119,7 +119,7 @@ const renderInput = (
             valueState.val = target.checked;
           },
         }),
-        span({ style: "font-size: 0.875rem;" }, "Enable"),
+        span({ class: "text-sm" }, "Enable"),
       );
 
     case "color":

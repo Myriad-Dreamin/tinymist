@@ -1,14 +1,13 @@
 import van from "vanjs-core";
 import "./styles.css";
 
-import { ActionButtons } from "./components/action-buttons";
 import { FormatSelector } from "./components/format-selector";
 import { InputSection } from "./components/inout";
 import { OptionsPanel } from "./components/options-panel";
 import { PreviewGrid } from "./components/preview-grid";
 import { useExporter } from "./exporter";
 
-const { div } = van.tags;
+const { div, button } = van.tags;
 
 /**
  * Main Export Tool Component
@@ -31,16 +30,20 @@ const ExportTool = () => {
   // In the current single-page architecture, this might not be needed,
   // but it's available for future use if the tool becomes part of a larger app
 
+  const exportBtn = button(
+    {
+      title: "Immediately export the current document with these settings",
+      class: "btn action-button",
+      onclick: exportDocument,
+    },
+    "Export",
+  );
+
   return div(
     { class: "export-tool-container flex flex-col gap-lg text-base-content" },
 
     // Input Document Section
-    InputSection({ inputPath, outputPath }),
-
-    // Export Actions
-    ActionButtons({
-      onExport: exportDocument,
-    }),
+    InputSection({ inputPath, outputPath, actionButton: exportBtn }),
 
     // Format Selection
     FormatSelector({ selectedFormat: format }),

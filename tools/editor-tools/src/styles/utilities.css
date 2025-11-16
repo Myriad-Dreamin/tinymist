@@ -116,3 +116,6 @@
 .cursor-pointer {
   cursor: pointer;
 }
+.select-none {
+  user-select: none;
+}

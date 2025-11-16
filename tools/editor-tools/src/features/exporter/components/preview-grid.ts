@@ -38,7 +38,7 @@ export const PreviewGrid = (props: PreviewGridProps) => {
 
         // Auto-preview toggle
         label(
-          { class: "flex items-center gap-xs cursor-pointer", style: "user-select: none;" },
+          { class: "flex items-center gap-xs cursor-pointer select-none" },
           input({
             type: "checkbox",
             class: "toggle",
@@ -109,7 +109,7 @@ const PreviewEmpty = (onGenerate: () => void) => {
   return div(
     { class: "preview-loading" },
     div(
-      { style: "text-align: center;" },
+      { class: "text-center" },
       div({ class: "mb-md" }, "No preview available"),
       button(
         {
@@ -133,25 +133,13 @@ const PreviewPagesGrid = (
   return div(
     {
       class: "preview-grid",
-      style: `display: grid; grid-template-columns: repeat(auto-fill, minmax(${scaledSize}px, 1fr)); gap: 16px; padding: 16px;`,
+      style: `--thumbnail-size: ${scaledSize}px;`,
     },
-    ...pages.map((page) => PreviewPageCard(page, scaledSize, onImageClick)),
+    ...pages.map((page) => PreviewPageCard(page, onImageClick)),
   );
 };
 
-const PreviewPageCard = (
-  page: PreviewPage,
-  thumbnailSize: number,
-  onImageClick?: (page: PreviewPage) => void,
-) => {
-  // Calculate responsive thumbnail dimensions based on zoom
-  const maxThumbnailHeight = Math.round(thumbnailSize * 1.4); // Maintain aspect ratio expectation
-
-  const thumbnailStyle = `
-    max-width: ${thumbnailSize}px;
-    max-height: ${maxThumbnailHeight}px;
-  `;
-
+const PreviewPageCard = (page: PreviewPage, onImageClick?: (page: PreviewPage) => void) => {
   return div(
     {
       class: "preview-page",
@@ -162,7 +150,6 @@ const PreviewPageCard = (
       src: page.imageData,
       alt: `Page ${page.pageNumber + 1}`,
       loading: "lazy",
-      style: thumbnailStyle,
     }),
     span(
       {
