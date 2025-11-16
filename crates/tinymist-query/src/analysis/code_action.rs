@@ -447,7 +447,8 @@ impl<'a> CodeActionWorker<'a> {
         // Calculate the range to remove, expand to cover the whole import item
         // (e.g. `foo as bar`) and include trailing comma if present.
         let mut remove_range = self
-            .find_import_item_range(root, name_range)
+            .module_alias_remove_range(root, name_range)
+            .or_else(|| self.find_import_item_range(root, name_range))
             .unwrap_or_else(|| name_range.clone());
         let bytes = self.source.text().as_bytes();
 
@@ -494,6 +495,74 @@ impl<'a> CodeActionWorker<'a> {
             SyntaxKind::RenamedImportItem => Some(ancestor.range()),
             _ => None,
         })
+    }
+
+    fn module_alias_remove_range(
+        &self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<Range<usize>> {
+        if name_range.is_empty() {
+            return None;
+        }
+
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        let mut in_module_import = false;
+        for ancestor in node_ancestors(&node) {
+            match ancestor.kind() {
+                SyntaxKind::RenamedImportItem => return None,
+                SyntaxKind::ModuleImport => {
+                    in_module_import = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        if !in_module_import {
+            return None;
+        }
+
+        let bytes = self.source.text().as_bytes();
+        if name_range.end > bytes.len() || name_range.start > bytes.len() {
+            return None;
+        }
+
+        let mut idx = name_range.start;
+        while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
+            idx -= 1;
+        }
+
+        if idx < 2 {
+            return None;
+        }
+
+        let as_end = idx;
+        let as_start = as_end - 2;
+        if &bytes[as_start..as_end] != b"as" {
+            return None;
+        }
+
+        if as_start > 0 && is_ascii_ident(bytes[as_start - 1]) {
+            return None;
+        }
+        if as_end < bytes.len() && is_ascii_ident(bytes[as_end]) {
+            return None;
+        }
+
+        let mut removal_start = as_start;
+        while removal_start > 0 && matches!(bytes[removal_start - 1], b' ' | b'\t') {
+            removal_start -= 1;
+        }
+
+        let mut removal_end = name_range.end;
+        while removal_end < bytes.len() && matches!(bytes[removal_end], b' ' | b'\t') {
+            removal_end += 1;
+        }
+
+        Some(removal_start..removal_end)
     }
 
     /// Starts to work.
@@ -855,6 +924,10 @@ fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
     }
 
     None
+}
+
+fn is_ascii_ident(ch: u8) -> bool {
+    matches!(ch, b'_' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9')
 }
 
 fn is_plain_identifier(name: &str) -> bool {
