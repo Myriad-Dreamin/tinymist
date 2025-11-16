@@ -55,7 +55,14 @@ pub fn check_dead_code(
     let (import_usage, shadowed_imports, module_children) =
         compute_import_usage(world, &definitions, ei);
 
+    let mut seen_module_aliases = HashSet::new();
+
     for def_info in definitions {
+        if matches!(def_info.decl.as_ref(), Decl::ModuleAlias(_))
+            && !seen_module_aliases.insert(def_info.decl.clone())
+        {
+            continue;
+        }
         if shadowed_imports.contains(&def_info.decl) {
             continue;
         }
@@ -65,7 +72,7 @@ pub fn check_dead_code(
 
         let is_unused = match def_info.decl.as_ref() {
             Decl::Import(_) | Decl::ImportAlias(_) => !import_usage.contains(&def_info.decl),
-            Decl::ModuleImport(_) => {
+            Decl::ModuleImport(_) | Decl::ModuleAlias(_) => {
                 let children_used = module_children.get(&def_info.decl).is_some_and(|children| {
                     children.iter().any(|child| import_usage.contains(child))
                 });
@@ -99,6 +106,7 @@ fn compute_import_usage(
         range: Range<usize>,
     }
 
+    let text = ei.source.text();
     let module_spans: Vec<ModuleSpan> = definitions
         .iter()
         .filter_map(|def| match def.decl.as_ref() {
@@ -114,6 +122,7 @@ fn compute_import_usage(
     let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
     let mut shadowed = HashSet::new();
     let mut module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>> = HashMap::new();
+    let mut alias_item_ranges: Vec<(Range<usize>, Interned<Decl>)> = Vec::new();
 
     for def in definitions {
         if matches!(def.decl.as_ref(), Decl::ImportAlias(_)) {
@@ -124,6 +133,16 @@ fn compute_import_usage(
                 }
             }
         }
+        if matches!(def.decl.as_ref(), Decl::ModuleAlias(_)) {
+            if let Some(alias_range) = world.source_range(def.span) {
+                if let Some(items_range) = alias_items_range(text, &alias_range) {
+                    alias_item_ranges.push((items_range, def.decl.clone()));
+                }
+            }
+        }
+    }
+
+    for def in definitions {
         if matches!(def.decl.as_ref(), Decl::Import(_) | Decl::ImportAlias(_)) {
             if let Some(child_range) = world.source_range(def.span) {
                 if let Some(module) = module_spans
@@ -132,6 +151,16 @@ fn compute_import_usage(
                 {
                     module_children
                         .entry(module.decl.clone())
+                        .or_default()
+                        .insert(def.decl.clone());
+                }
+
+                if let Some((_, alias_decl)) = alias_item_ranges
+                    .iter()
+                    .find(|(range, _)| range.contains(&child_range.start))
+                {
+                    module_children
+                        .entry(alias_decl.clone())
                         .or_default()
                         .insert(def.decl.clone());
                 }
@@ -165,6 +194,26 @@ fn compute_import_usage(
 
 fn contains_range(outer: &Range<usize>, inner: &Range<usize>) -> bool {
     outer.start <= inner.start && outer.end >= inner.end
+}
+
+fn alias_items_range(text: &str, alias_range: &Range<usize>) -> Option<Range<usize>> {
+    let bytes = text.as_bytes();
+    let mut idx = alias_range.end;
+    while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
+        idx += 1;
+    }
+    if idx >= bytes.len() || bytes[idx] != b':' {
+        return None;
+    }
+    idx += 1;
+    while idx < bytes.len() && matches!(bytes[idx], b' ' | b'\t') {
+        idx += 1;
+    }
+    let mut end = idx;
+    while end < bytes.len() && bytes[end] != b'\n' && bytes[end] != b'\r' {
+        end += 1;
+    }
+    Some(idx..end)
 }
 
 fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
