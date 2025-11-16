@@ -79,7 +79,7 @@ impl<'a> CodeActionWorker<'a> {
                 continue;
             };
 
-            let Some(diag_range) = self.ctx.to_typst_range(diag.range.clone(), &self.source) else {
+            let Some(diag_range) = self.ctx.to_typst_range(diag.range, &self.source) else {
                 continue;
             };
 
@@ -396,14 +396,8 @@ impl<'a> CodeActionWorker<'a> {
                 return None;
             }
 
-            let Some(binding_ident) = bindings.first() else {
-                return None;
-            };
-
-            let Some(binding_node) = decl_node.find(binding_ident.span()) else {
-                return None;
-            };
-
+            let binding_ident = bindings.first()?;
+            let binding_node = decl_node.find(binding_ident.span())?;
             if binding_node.range() != *name_range {
                 return None;
             }

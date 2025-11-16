@@ -147,7 +147,7 @@ mod tests {
 
             let request = CodeActionRequest {
                 path: path.clone(),
-                range: diag.range.clone(),
+                range: diag.range,
                 context: CodeActionContext {
                     diagnostics: vec![diag.clone()],
                     only: None,
@@ -163,7 +163,7 @@ mod tests {
             }
 
             let actions = REDACT_LOC.redact(serde_json::to_value(&actions).unwrap());
-            let range = JsonRepr::range(&diag.range);
+            let range = JsonRepr::range(diag.range);
             entries.push((
                 range.clone(),
                 json!({
