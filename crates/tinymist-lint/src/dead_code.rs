@@ -16,6 +16,12 @@ use crate::DiagnosticVec;
 use collector::{DefInfo, DefScope, collect_definitions};
 use diagnostic::generate_diagnostic;
 
+type ImportUsageResult = (
+    HashSet<Interned<Decl>>,
+    HashSet<Interned<Decl>>,
+    HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
+);
+
 /// Configuration for dead code detection.
 #[derive(Debug, Clone)]
 pub struct DeadCodeConfig {
@@ -89,14 +95,7 @@ pub fn check_dead_code(
     diagnostics
 }
 
-fn compute_import_usage(
-    definitions: &[DefInfo],
-    ei: &ExprInfo,
-) -> (
-    HashSet<Interned<Decl>>,
-    HashSet<Interned<Decl>>,
-    HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
-) {
+fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageResult {
     let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
     let mut shadowed = HashSet::new();
     let mut module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>> = HashMap::new();
