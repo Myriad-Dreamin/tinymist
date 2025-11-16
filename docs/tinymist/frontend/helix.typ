@@ -72,7 +72,7 @@ To enable a live preview you can use the `preview.background`:
 ```toml
 [language-server.tinymist]
 command = "tinymist"
-config = { preview.background.enabled = "true", preview.background.args = ["--data-plane-host=127.0.0.1:23635", "--invert-colors=never", "--open"] }
+config = { preview.background.enabled = true, preview.background.args = ["--data-plane-host=127.0.0.1:23635", "--invert-colors=never", "--open"] }
 ```
 
 See #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration]
