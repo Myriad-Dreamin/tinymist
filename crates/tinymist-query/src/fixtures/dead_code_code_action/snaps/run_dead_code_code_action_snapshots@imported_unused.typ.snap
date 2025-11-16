@@ -35,7 +35,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/imported_unused.typ
        {
         "insertTextFormat": 1,
         "newText": "",
-        "range": "2:17:2:29"
+        "range": "2:17:2:30"
        }
       ]
      }
