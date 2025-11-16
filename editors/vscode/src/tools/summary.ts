@@ -109,20 +109,18 @@ async function fetchSummaryInfo(): Promise<[string | undefined, string | undefin
   async function work(focusingFile: string, res: [string | undefined, string | undefined]) {
     if (!res[0]) {
       const result = await tinymist.executeCommand("tinymist.getDocumentMetrics", [focusingFile]);
-      if (!result) {
-        return;
+      if (result) {
+        const docMetrics = JSON.stringify(result);
+        res[0] = docMetrics;
       }
-      const docMetrics = JSON.stringify(result);
-      res[0] = docMetrics;
     }
 
     if (!res[1]) {
       const result2 = await tinymist.executeCommand("tinymist.getServerInfo", []);
-      if (!result2) {
-        return;
+      if (result2) {
+        const serverInfo = JSON.stringify(result2);
+        res[1] = serverInfo;
       }
-      const serverInfo = JSON.stringify(result2);
-      res[1] = serverInfo;
     }
   }
 }
@@ -144,21 +142,17 @@ export default defineEditorTool({
     const fontsExportConfig = JSON.stringify(fontsExportConfigure.data);
     const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
-    if (!docMetrics || !serverInfo) {
-      if (!docMetrics) {
-        vscode.window.showErrorMessage("No document metrics available");
-      }
-      if (!serverInfo) {
-        vscode.window.showErrorMessage("No server info");
-      }
-
-      return;
+    if (!docMetrics) {
+      vscode.window.showWarningMessage("No document metrics available");
+    }
+    if (!serverInfo) {
+      vscode.window.showWarningMessage("No server info");
     }
 
     return substituteTemplateString(html, {
       ":[[preview:FontsExportConfigure]]:": fontsExportConfig,
-      ":[[preview:DocumentMetrics]]:": docMetrics,
-      ":[[preview:ServerInfo]]:": serverInfo,
+      ":[[preview:DocumentMetrics]]:": docMetrics ?? "null",
+      ":[[preview:ServerInfo]]:": serverInfo ?? "null",
     });
   },
 });
