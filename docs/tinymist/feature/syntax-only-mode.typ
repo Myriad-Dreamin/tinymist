@@ -15,10 +15,10 @@ When working under power-saving mode or with resource-consumed projects, typst c
 
 You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
 
-The syntax-only mode is known to disable or disallowed:
+The syntax-only mode is known to disable or limit the functionality of the following features:
 - typst preview feature.
-- label completion.
 - compilation diagnostics.
+- label completion.
 
 The syntax-only mode will be able to work with following features:
 - export PDF or other formats.
