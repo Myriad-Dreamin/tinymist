@@ -33,6 +33,7 @@ time = { workspace = true, features = ["formatting"] }
 lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
 same-file = { workspace = true, optional = true }
+battery = { workspace = true, optional = true }
 
 # feature = "web"
 js-sys = { workspace = true, optional = true }
@@ -78,7 +79,7 @@ rkyv-validation = ["rkyv/validation"]
 
 __web = ["wasm-bindgen", "js-sys", "web-time"]
 web = ["__web"]
-system = ["tempfile", "same-file"]
+system = ["tempfile", "same-file", "battery"]
 bi-hash = []
 
 [lints]

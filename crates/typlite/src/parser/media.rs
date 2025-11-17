@@ -278,6 +278,7 @@ impl HtmlToAstParser {
             )
             .unwrap();
 
+        // this is not affected by syntax-only mode (typst_shim::compile_opt)
         let compiled = typst::compile(&world);
         self.warnings.extend(compiled.warnings.iter().cloned());
         let doc = match compiled.output {

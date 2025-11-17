@@ -20,12 +20,19 @@ type ServerInfoMap = Record<string, ServerInfo>;
 export const Summary = () => {
   const documentMetricsData = `:[[preview:DocumentMetrics]]:`;
   const docMetrics = van.state<DocumentMetrics>(
-    documentMetricsData.startsWith(":") ? DOC_MOCK : JSON.parse(base64Decode(documentMetricsData)),
+    (documentMetricsData.startsWith(":")
+      ? DOC_MOCK
+      : JSON.parse(base64Decode(documentMetricsData))) || {
+      fontInfo: [],
+      spanInfo: { sources: [] },
+    },
   );
   console.log("docMetrics", docMetrics);
   const serverInfoData = `:[[preview:ServerInfo]]:`;
   const serverInfos = van.state<ServerInfoMap>(
-    serverInfoData.startsWith(":") ? SERVER_INFO_MOCK : JSON.parse(base64Decode(serverInfoData)),
+    (serverInfoData.startsWith(":")
+      ? SERVER_INFO_MOCK
+      : JSON.parse(base64Decode(serverInfoData))) || {},
   );
   console.log("serverInfos", serverInfos);
 

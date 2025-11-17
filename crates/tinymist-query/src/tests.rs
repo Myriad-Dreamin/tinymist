@@ -147,7 +147,7 @@ pub fn compile_doc_for_test(
     let mut snap = LspCompileSnapshot::from_world(world.into_owned());
     snap.world.set_is_compiling(true);
 
-    let doc = typst::compile(&snap.world).output.unwrap();
+    let doc = typst_shim::compile_opt(&snap.world).output.unwrap();
     snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
     WorldComputeGraph::new(snap)
 }

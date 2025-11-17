@@ -238,7 +238,7 @@ fn render_symbols(
         .map_err(|e| error_once!("cannot map shadow", err: e))
         .map_err(internal_error)?;
 
-    let sym_doc = typst::compile::<TypstPagedDocument>(&forked)
+    let sym_doc = typst_shim::compile_opt::<TypstPagedDocument>(&forked)
         .output
         .map_err(|e| error_once!("cannot compile symbols", err: format!("{e:?}")))
         .map_err(internal_error)?;

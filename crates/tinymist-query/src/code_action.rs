@@ -131,7 +131,7 @@ mod tests {
         let Warned {
             output,
             warnings: compiler_warnings,
-        } = typst::compile::<PagedDocument>(ctx.world());
+        } = typst_shim::compile_opt::<PagedDocument>(ctx.world());
         let compiler_errors = output.err().unwrap_or_default();
         let compiler_diags = compiler_warnings.iter().chain(compiler_errors.iter());
 

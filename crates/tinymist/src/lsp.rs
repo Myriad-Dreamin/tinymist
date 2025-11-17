@@ -145,6 +145,8 @@ impl ServerState {
             }
         }
 
+        self.config.configure_syntax_only();
+
         #[cfg(feature = "export")]
         {
             let new_export_config = self.config.export();

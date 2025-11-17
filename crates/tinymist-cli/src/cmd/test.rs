@@ -219,7 +219,7 @@ pub async fn test_main(args: TestArgs) -> Result<()> {
 }
 
 fn test_once(world: &LspWorld, ctx: &TestContext) -> Result<bool> {
-    let doc = typst::compile::<TypstPagedDocument>(&world).output?;
+    let doc = typst_shim::compile_opt::<TypstPagedDocument>(&world).output?;
 
     let mut snap = CompileSnapshot::from_world(world.clone());
     snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
@@ -449,7 +449,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn build_example<T: typst::Document>(&self, world: &dyn World) -> (bool, Option<T>) {
-        let result = typst::compile::<T>(world);
+        let result = typst_shim::compile_opt::<T>(world);
         if !result.warnings.is_empty() {
             self.diagnostics.lock().push(result.warnings);
         }

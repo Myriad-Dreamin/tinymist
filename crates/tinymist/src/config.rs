@@ -22,6 +22,7 @@ use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
 use typst::Features;
 use typst_shim::utils::LazyHash;
+use typst_shim::SYNTAX_ONLY;
 
 use super::*;
 use crate::input::WatchAccessModel;
@@ -56,6 +57,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "hoverPeriscope",
     "onEnter",
     "outputPath",
+    "syntaxOnly",
     "preview",
     "projectResolution",
     "rootPath",
@@ -92,6 +94,8 @@ pub struct Config {
     pub extended_code_action: bool,
     /// Whether to run the server in development mode.
     pub development: bool,
+    /// Whether to run the server in syntax-only mode.
+    pub syntax_only: bool,
 
     /// The preferred color theme for rendering.
     pub color_theme: Option<String>,
@@ -202,6 +206,7 @@ impl Config {
         if let Some(locale) = config.const_config.locale.as_ref() {
             tinymist_l10n::set_locale(locale);
         }
+        config.configure_syntax_only();
 
         let err = params
             .initialization_options
@@ -372,6 +377,20 @@ impl Config {
                 false
             }
         };
+        self.syntax_only = match try_(|| update.get("syntaxOnly")?.as_str()) {
+            Some("onPowerSaving") => tinymist_std::battery::is_power_saving(),
+            Some("enable") => true,
+            Some("disable" | "auto") | None => false,
+            Some(value) => {
+                self.warnings.push(tinymist_l10n::t!(
+                    "tinymist.config.badSyntaxOnly",
+                    "syntaxOnly must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}",
+                    value = value.debug_l10n(),
+                ));
+
+                false
+            }
+        };
 
         // periscope_args
         self.periscope_args = match update.get("hoverPeriscope") {
@@ -495,6 +514,17 @@ impl Config {
         self.entry_resolver.validate()?;
 
         Ok(())
+    }
+
+    /// Configures the syntax-only mode.
+    pub fn configure_syntax_only(&self) {
+        if self.syntax_only {
+            log::info!("Server: running lsp in syntax-only mode, some features may be disabled");
+            SYNTAX_ONLY.store(true, std::sync::atomic::Ordering::SeqCst);
+        } else {
+            log::info!("Server: running lsp in full mode");
+            SYNTAX_ONLY.store(false, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 
     /// Gets the formatter configuration.
@@ -691,6 +721,7 @@ impl Config {
     pub fn primary_opts(
         &self,
     ) -> (
+        bool,
         Option<bool>,
         &Vec<PathBuf>,
         Option<&CompileFontArgs>,
@@ -698,6 +729,7 @@ impl Config {
         Option<Arc<Path>>,
     ) {
         (
+            self.syntax_only,
             self.system_fonts,
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font),

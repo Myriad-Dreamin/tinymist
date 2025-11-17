@@ -516,7 +516,7 @@ impl ExprWorker<'_> {
                         }
                         ast::DestructuringItem::Named(named) => {
                             let key = Decl::var(named.name()).into();
-                            let val = self.check_pattern_expr(named.expr());
+                            let val = self.check_pattern(named.pattern());
                             names.push((key, val));
                         }
                         ast::DestructuringItem::Spread(spreading) => {
@@ -525,14 +525,17 @@ impl ExprWorker<'_> {
                             } else {
                                 Decl::spread(spreading.span()).into()
                             };
+                            let pattern = Pattern::Expr(Expr::Star).into();
 
                             if inputs.is_empty() {
-                                spread_left =
-                                    Some((decl, self.check_pattern_expr(spreading.expr())));
+                                spread_left = Some((decl.clone(), pattern));
                             } else {
-                                spread_right =
-                                    Some((decl, self.check_pattern_expr(spreading.expr())));
+                                spread_right = Some((decl.clone(), pattern));
                             }
+
+                            self.resolve_as(Decl::as_def(&decl, None));
+                            self.scope_mut()
+                                .insert_mut(decl.name().clone(), decl.into());
                         }
                     }
                 }
