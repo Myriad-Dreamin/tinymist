@@ -9,6 +9,39 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.2 - [2025-11-22]
+
+### Server
+
+* feat: hot reload compiler respecting typst font, package and library options in https://github.com/Myriad-Dreamin/tinymist/pull/2252
+* feat: add `no_pdf_tags`, `ppi`, and more `pdf_standard` to extra args in https://github.com/Myriad-Dreamin/tinymist/pull/2220
+* feat: minimal viable support for syntax-only mode in https://github.com/Myriad-Dreamin/tinymist/pull/2247, https://github.com/Myriad-Dreamin/tinymist/pull/2248, and https://github.com/Myriad-Dreamin/tinymist/pull/2249
+
+### Editor
+
+* feat: introspect and show complation statistics happening in the language server in https://github.com/Myriad-Dreamin/tinymist/pull/1958 and https://github.com/Myriad-Dreamin/tinymist/pull/2231
+* feat: export tool with page/text preview features by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2182
+* feat: customize paste behaviors in vscode in https://github.com/Myriad-Dreamin/tinymist/pull/2238 and https://github.com/Myriad-Dreamin/tinymist/pull/2239
+
+### Code Analysis
+
+* feat: update symbol list and preserve definition order by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2217
+* fix: specially identify text that is starts with `@` in https://github.com/Myriad-Dreamin/tinymist/pull/2233
+* feat: add `PathAt` code context query in https://github.com/Myriad-Dreamin/tinymist/pull/2232
+* fix: destructuring pattern handling in ExprWorker by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2244
+
+### Preview
+
+* feat: replace `window` global with `windowElem` in preview web frontend by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2145
+* feat: scroll preview with hjkl by @odilf in https://github.com/Myriad-Dreamin/tinymist/pull/2111
+
+### Misc
+
+* build: update to `macos-14` runner in https://github.com/Myriad-Dreamin/tinymist/pull/2234
+* fix: typo in helix docs by @CGMossa in https://github.com/Myriad-Dreamin/tinymist/pull/2251
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.0...v0.14.2
+
 ## v0.14.0 - [2025-11-02]
 
 * Bumped typst to v0.14.0 in https://github.com/Myriad-Dreamin/tinymist/pull/2201
