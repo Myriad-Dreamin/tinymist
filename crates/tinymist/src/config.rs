@@ -723,6 +723,7 @@ impl Config {
     ) -> (
         bool,
         Option<bool>,
+        ExportTarget,
         &Vec<PathBuf>,
         Option<&CompileFontArgs>,
         Option<i64>,
@@ -731,6 +732,7 @@ impl Config {
         (
             self.syntax_only,
             self.system_fonts,
+            self.export_target,
             &self.font_paths,
             self.typst_extra_args.as_ref().map(|e| &e.font),
             self.creation_timestamp(),
