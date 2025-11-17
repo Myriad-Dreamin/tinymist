@@ -10,10 +10,7 @@ use tinymist_analysis::{
     syntax::{Decl, Expr, ExprInfo},
 };
 use tinymist_project::LspWorld;
-use typst::{
-    ecow::EcoVec,
-    syntax::FileId,
-};
+use typst::{ecow::EcoVec, syntax::FileId};
 
 use crate::DiagnosticVec;
 use collector::{DefInfo, DefScope, collect_definitions};
@@ -88,9 +85,9 @@ pub fn check_dead_code(
         let is_unused = match def_info.decl.as_ref() {
             Decl::Import(_) | Decl::ImportAlias(_) => !used.contains(&def_info.decl),
             Decl::ModuleImport(_) | Decl::ModuleAlias(_) => {
-                let children_used = module_children.get(&def_info.decl).is_some_and(|children| {
-                    children.iter().any(|child| used.contains(child))
-                });
+                let children_used = module_children
+                    .get(&def_info.decl)
+                    .is_some_and(|children| children.iter().any(|child| used.contains(child)));
                 let module_used = if module_children.contains_key(&def_info.decl) {
                     false
                 } else {
@@ -127,7 +124,10 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
     }
 
     for def in definitions {
-        if matches!(def.decl.as_ref(), Decl::ModuleImport(_) | Decl::ModuleAlias(_)) {
+        if matches!(
+            def.decl.as_ref(),
+            Decl::ModuleImport(_) | Decl::ModuleAlias(_)
+        ) {
             if let Some(r) = ei.resolves.get(&def.span) {
                 let fid = r
                     .root
