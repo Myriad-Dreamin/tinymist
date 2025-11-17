@@ -10,17 +10,22 @@ use tinymist_analysis::{
     syntax::{Decl, Expr, ExprInfo},
 };
 use tinymist_project::LspWorld;
-use typst::ecow::EcoVec;
+use typst::{
+    ecow::EcoVec,
+    syntax::FileId,
+};
 
 use crate::DiagnosticVec;
 use collector::{DefInfo, DefScope, collect_definitions};
 use diagnostic::generate_diagnostic;
 
-type ImportUsageResult = (
-    HashSet<Interned<Decl>>,
-    HashSet<Interned<Decl>>,
-    HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
-);
+struct ImportUsageInfo {
+    used: HashSet<Interned<Decl>>,
+    shadowed: HashSet<Interned<Decl>>,
+    module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
+    module_targets: HashMap<Interned<Decl>, FileId>,
+    used_module_files: HashSet<FileId>,
+}
 
 /// Configuration for dead code detection.
 #[derive(Debug, Clone)]
@@ -57,7 +62,13 @@ pub fn check_dead_code(
         return diagnostics;
     }
 
-    let (import_usage, shadowed_imports, module_children) = compute_import_usage(&definitions, ei);
+    let ImportUsageInfo {
+        used,
+        shadowed,
+        module_children,
+        module_targets,
+        used_module_files,
+    } = compute_import_usage(&definitions, ei);
 
     let mut seen_module_aliases = HashSet::new();
 
@@ -67,7 +78,7 @@ pub fn check_dead_code(
         {
             continue;
         }
-        if shadowed_imports.contains(&def_info.decl) {
+        if shadowed.contains(&def_info.decl) {
             continue;
         }
         if should_skip_definition(&def_info, config) {
@@ -75,12 +86,19 @@ pub fn check_dead_code(
         }
 
         let is_unused = match def_info.decl.as_ref() {
-            Decl::Import(_) | Decl::ImportAlias(_) => !import_usage.contains(&def_info.decl),
+            Decl::Import(_) | Decl::ImportAlias(_) => !used.contains(&def_info.decl),
             Decl::ModuleImport(_) | Decl::ModuleAlias(_) => {
                 let children_used = module_children.get(&def_info.decl).is_some_and(|children| {
-                    children.iter().any(|child| import_usage.contains(child))
+                    children.iter().any(|child| used.contains(child))
                 });
-                !(children_used || has_references(&def_info.decl))
+                let module_used = if module_children.contains_key(&def_info.decl) {
+                    false
+                } else {
+                    module_targets
+                        .get(&def_info.decl)
+                        .is_some_and(|fid| used_module_files.contains(fid))
+                };
+                !(children_used || module_used || has_references(&def_info.decl))
             }
             _ => !has_references(&def_info.decl),
         };
@@ -95,10 +113,11 @@ pub fn check_dead_code(
     diagnostics
 }
 
-fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageResult {
+fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageInfo {
     let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
     let mut shadowed = HashSet::new();
     let mut module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>> = HashMap::new();
+    let mut module_targets: HashMap<Interned<Decl>, FileId> = HashMap::new();
 
     for (child, layout) in ei.module_items.iter() {
         module_children
@@ -108,6 +127,19 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageRe
     }
 
     for def in definitions {
+        if matches!(def.decl.as_ref(), Decl::ModuleImport(_) | Decl::ModuleAlias(_)) {
+            if let Some(r) = ei.resolves.get(&def.span) {
+                let fid = r
+                    .root
+                    .as_ref()
+                    .and_then(|expr| expr.file_id())
+                    .or_else(|| r.step.as_ref().and_then(|expr| expr.file_id()));
+                if let Some(fid) = fid {
+                    module_targets.insert(def.decl.clone(), fid);
+                }
+            }
+        }
+
         if matches!(def.decl.as_ref(), Decl::ImportAlias(_)) {
             if let Some(alias_ref) = ei.resolves.get(&def.span) {
                 if let Some(Expr::Decl(step_decl)) = alias_ref.step.as_ref() {
@@ -139,7 +171,20 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageRe
         }
     }
 
-    (used, shadowed, module_children)
+    let mut used_module_files = HashSet::new();
+    for decl in &used {
+        if let Some(fid) = decl.file_id() {
+            used_module_files.insert(fid);
+        }
+    }
+
+    ImportUsageInfo {
+        used,
+        shadowed,
+        module_children,
+        module_targets,
+        used_module_files,
+    }
 }
 
 fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
