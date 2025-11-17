@@ -724,7 +724,7 @@ impl Config {
         bool,
         ImmutDict,
         ExportTarget,
-        Option<Features>,
+        Option<Vec<typst::Feature>>,
         Option<ImmutPath>,
         CompilePackageArgs,
         Option<bool>,
@@ -738,7 +738,17 @@ impl Config {
             // typst library
             self.user_inputs(),
             self.export_target,
-            self.typst_features(),
+            self.typst_features().map(|feat| {
+                let mut features = vec![];
+                if feat.is_enabled(typst::Feature::Html) {
+                    features.push(typst::Feature::Html);
+                }
+                if feat.is_enabled(typst::Feature::A11yExtras) {
+                    features.push(typst::Feature::A11yExtras);
+                }
+
+                features
+            }),
             // typst package
             self.certification_path(),
             self.package_opts(),
