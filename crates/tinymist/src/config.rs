@@ -722,20 +722,31 @@ impl Config {
         &self,
     ) -> (
         bool,
-        Option<bool>,
+        ImmutDict,
         ExportTarget,
-        &Vec<PathBuf>,
-        Option<&CompileFontArgs>,
+        Option<Features>,
+        Option<ImmutPath>,
+        CompilePackageArgs,
+        Option<bool>,
+        CompileFontArgs,
         Option<i64>,
         Option<Arc<Path>>,
     ) {
         (
+            // server
             self.syntax_only,
-            self.system_fonts,
+            // typst library
+            self.user_inputs(),
             self.export_target,
-            &self.font_paths,
-            self.typst_extra_args.as_ref().map(|e| &e.font),
+            self.typst_features(),
+            // typst package
+            self.certification_path(),
+            self.package_opts(),
+            // typst font
+            self.system_fonts,
+            self.font_opts(),
             self.creation_timestamp(),
+            // typst root
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )
