@@ -72,6 +72,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
         allow_overlapping_token: const_config.tokens_overlapping_token_support,
         allow_multiline_token: const_config.tokens_multiline_token_support,
         remove_html: !config.support_html_in_markdown,
+        support_client_codelens: true,
         extended_code_action: config.extended_code_action,
         completion_feat: config.completion.clone(),
         color_theme: match config.color_theme.as_deref() {

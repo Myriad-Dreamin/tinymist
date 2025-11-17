@@ -65,6 +65,8 @@ pub struct Analysis {
     pub allow_multiline_token: bool,
     /// Whether to remove html from markup content in responses.
     pub remove_html: bool,
+    /// Whether to add client-side code lens.
+    pub support_client_codelens: bool,
     /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
     /// side.
     ///
