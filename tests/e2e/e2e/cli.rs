@@ -350,7 +350,8 @@ fn test_help_preview() {
               [env: TYPST_FEATURES=REDACTED]
 
               Possible values:
-              - html: The HTML feature
+              - html:        The HTML feature
+              - a11y-extras: The A11yExtras feature
 
           --input <key=value>
               Add a string key-value pair visible through `sys.inputs`.

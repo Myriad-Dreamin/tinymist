@@ -425,6 +425,8 @@ display_possible_values!(PdfStandard);
 pub enum Feature {
     /// The HTML feature.
     Html,
+    /// The A11yExtras feature.
+    A11yExtras,
 }
 
 display_possible_values!(Feature);
@@ -433,6 +435,7 @@ impl From<Feature> for typst::Feature {
     fn from(f: Feature) -> typst::Feature {
         match f {
             Feature::Html => typst::Feature::Html,
+            Feature::A11yExtras => typst::Feature::A11yExtras,
         }
     }
 }
