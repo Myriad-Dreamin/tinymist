@@ -30,6 +30,7 @@ pub use tinymist_world::WorldComputeGraph;
 pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
+use crate::testing::{test_suites, TestCaseKind};
 
 #[derive(Default, Clone, Copy)]
 pub struct Opts {
@@ -532,3 +533,25 @@ impl RegexCowExt for Regex {
         }
     }
 }
+
+#[cfg(test)]
+mod testing_tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        snapshot_testing_with("testing", Opts { need_compile: true }, &|ctx, _| {
+            let suites = test_suites(ctx).unwrap();
+            assert_snapshot!(json!({
+                "tests": suites.tests.iter().map(|t| json!({
+                    "name": t.name,
+                    "kind": format!("{:?}", t.kind),
+                })).collect::<Vec<_>>(),
+                "examples": suites.examples.iter().map(|e| {
+                    e.id().vpath().as_rooted_path().to_string_lossy().to_string()
+                }).collect::<Vec<_>>(),
+            }));
+        });
+    }
+}
+
