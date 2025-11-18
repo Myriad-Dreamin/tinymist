@@ -65,6 +65,7 @@ serde.workspace = true
 serde_json.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
 tinymist-tests = { workspace = true }
+tinymist-debug = { workspace = true }
 sha2 = { version = "0.10" }
 hex = { version = "0.4" }
 
