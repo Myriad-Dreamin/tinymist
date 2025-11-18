@@ -597,15 +597,25 @@ mod testing_tests {
                                         if let (Some(start), Some(end)) =
                                             (loc.get("start"), loc.get("end"))
                                         {
-                                            let start_line =
-                                                start["line"].as_u64().unwrap_or(0) as usize;
-                                            let start_char =
-                                                start["character"].as_u64().unwrap_or(0) as usize;
-                                            let end_line =
-                                                end["line"].as_u64().unwrap_or(0) as usize;
-                                            let end_char =
-                                                end["character"].as_u64().unwrap_or(0) as usize;
-                                            let executed = d["executed"].as_bool().unwrap_or(false);
+                                            let start_line = start["line"]
+                                                .as_u64()
+                                                .expect("`start.line` should be a u64")
+                                                as usize;
+                                            let start_char = start["character"]
+                                                .as_u64()
+                                                .expect("`start.character` should be a u64")
+                                                as usize;
+                                            let end_line = end["line"]
+                                                .as_u64()
+                                                .expect("`end.line` should be a u64")
+                                                as usize;
+                                            let end_char = end["character"]
+                                                .as_u64()
+                                                .expect("`end.character` should be a u64")
+                                                as usize;
+                                            let executed = d["executed"]
+                                                .as_bool()
+                                                .expect("`executed` should be a bool");
 
                                             if start_line == end_line && start_line < lines.len() {
                                                 line_ranges[start_line]
@@ -627,7 +637,22 @@ mod testing_tests {
                                         let has_uncovered = ranges.iter().any(|r| !r.2);
                                         let prefix = if has_uncovered { "-" } else { "+" };
 
-                                        for (start, end, executed) in ranges {
+                                        // Helper function to convert UTF-16 offset to byte offset
+                                        let utf16_to_byte = |utf16_offset: usize| -> usize {
+                                            let mut utf16_count = 0;
+                                            for (byte_idx, ch) in line.char_indices() {
+                                                if utf16_count >= utf16_offset {
+                                                    return byte_idx;
+                                                }
+                                                utf16_count += ch.len_utf16();
+                                            }
+                                            line.len()
+                                        };
+
+                                        for (start_utf16, end_utf16, executed) in ranges {
+                                            let start = utf16_to_byte(start_utf16);
+                                            let end = utf16_to_byte(end_utf16);
+
                                             if pos < start {
                                                 marked_line.push_str(&line[pos..start]);
                                             }
