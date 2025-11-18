@@ -576,7 +576,15 @@ mod testing_tests {
                 let json = cov.to_json(world);
 
                 let mut coverage_report = String::new();
-                coverage_report.push_str(&serde_json::to_string(&json).unwrap());
+
+                let mut normalized_json = serde_json::Map::new();
+                if let Some(obj) = json.as_object() {
+                    for (file, details) in obj {
+                        let normalized_file = unix_slash(&std::path::PathBuf::from(file.as_str()));
+                        normalized_json.insert(normalized_file, details.clone());
+                    }
+                }
+                coverage_report.push_str(&serde_json::to_string(&normalized_json).unwrap());
 
                 if let Some(obj) = json.as_object() {
                     for (file, details) in obj {
@@ -585,7 +593,9 @@ mod testing_tests {
                                 .source_by_path(&std::path::PathBuf::from(file.as_str()))
                                 .ok();
                             if let Some(src) = source {
-                                coverage_report.push_str(&format!("\n--- {file}\n"));
+                                let normalized_file =
+                                    unix_slash(&std::path::PathBuf::from(file.as_str()));
+                                coverage_report.push_str(&format!("\n--- {normalized_file}\n"));
 
                                 let text = src.text();
                                 let lines: Vec<&str> = text.lines().collect();
