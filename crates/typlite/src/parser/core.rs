@@ -14,10 +14,8 @@ use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
 use crate::TypliteFeat;
-use crate::attributes::{
-    AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, VerbatimAttr, md_attr,
-};
-use crate::common::{AlertNode, CenterNode, VerbatimNode};
+use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, VerbatimAttr};
+use crate::common::{AlertNode, BlockVerbatimNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
 use crate::tags::md_tag;
 
@@ -196,9 +194,9 @@ impl HtmlToAstParser {
                 let attrs = VerbatimAttr::parse(&element.attrs)?;
                 if attrs.block {
                     self.flush_inline_buffer();
-                    self.blocks.push(Node::Paragraph(vec![Node::Custom(Box::new(
-                        VerbatimNode { content: attrs.src },
-                    ))]));
+                    self.blocks.push(Node::Custom(Box::new(BlockVerbatimNode {
+                        content: attrs.src,
+                    })));
                 } else {
                     self.inline_buffer
                         .push(Node::Custom(Box::new(VerbatimNode { content: attrs.src })));
@@ -405,12 +403,8 @@ impl HtmlToAstParser {
     }
 
     fn is_verbatim_block(element: &HtmlElement) -> bool {
-        element
-            .attrs
-            .0
-            .iter()
-            .find(|(name, _)| *name == md_attr::block)
-            .and_then(|(_, value)| value.parse::<bool>().ok())
+        VerbatimAttr::parse(&element.attrs)
+            .map(|attrs| attrs.block)
             .unwrap_or(false)
     }
 
