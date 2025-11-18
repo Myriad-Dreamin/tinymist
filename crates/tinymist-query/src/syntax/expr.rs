@@ -100,39 +100,38 @@ pub(crate) fn expr_of(
         .and_then(|docs| ctx.compute_docstring(source.id(), docs, DefKind::Module))
         .unwrap_or_default();
 
-    let (exports, root) = {
-        let mut w = ExprWorker {
-            fid: source.id(),
-            ctx,
-            imports,
-            docstrings,
-            exprs,
-            import_buffer: Vec::new(),
-            lexical: LexicalContext::default(),
-            resolves,
-            buffer: vec![],
-            init_stage: true,
-            comment_matcher: DocCommentMatcher::default(),
-            route,
-        };
-
-        // First pass.
-        let root = source.root().cast::<ast::Markup>().unwrap();
-        w.check_root_scope(root.to_untyped().children());
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-        w.route.insert(w.fid, Some(root_scope.clone()));
-
-        // Second pass.
-        w.lexical = LexicalContext::default();
-        w.comment_matcher.reset();
-        w.buffer.clear();
-        w.import_buffer.clear();
-        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-
-        w.collect_buffer();
-        (root_scope, root)
+    let mut worker = ExprWorker {
+        fid: source.id(),
+        source: source.clone(),
+        ctx,
+        imports,
+        docstrings,
+        exprs,
+        import_buffer: Vec::new(),
+        lexical: LexicalContext::default(),
+        resolves,
+        buffer: vec![],
+        module_items: FxHashMap::default(),
+        init_stage: true,
+        comment_matcher: DocCommentMatcher::default(),
+        route,
     };
+
+    let root_markup = source.root().cast::<ast::Markup>().unwrap();
+    worker.check_root_scope(root_markup.to_untyped().children());
+    let first_scope = Arc::new(LazyHash::new(worker.summarize_scope()));
+    worker.route.insert(worker.fid, Some(first_scope.clone()));
+
+    worker.lexical = LexicalContext::default();
+    worker.comment_matcher.reset();
+    worker.buffer.clear();
+    worker.import_buffer.clear();
+    worker.module_items.clear();
+    let root = worker.check_in_mode(root_markup.to_untyped().children(), InterpretMode::Markup);
+    let exports = Arc::new(LazyHash::new(worker.summarize_scope()));
+
+    worker.collect_buffer();
+    let module_items = std::mem::take(&mut worker.module_items);
 
     let info = ExprInfoRepr {
         fid: source.id(),
@@ -145,6 +144,7 @@ pub(crate) fn expr_of(
         exports,
         exprs: std::mem::take(exprs_base.lock().deref_mut()),
         root,
+        module_items,
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
@@ -176,6 +176,7 @@ impl Default for LexicalContext {
 /// Worker for processing expressions during source file analysis.
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
+    source: Source,
     ctx: Arc<SharedContext>,
     imports: Arc<Mutex<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>>,
     import_buffer: Vec<(TypstFileId, Arc<LazyHash<LexicalScope>>)>,
@@ -184,6 +185,7 @@ pub(crate) struct ExprWorker<'a> {
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
+    module_items: FxHashMap<DeclExpr, ModuleItemLayout>,
     init_stage: bool,
 
     route: &'a mut ExprRoute,
@@ -671,7 +673,7 @@ impl ExprWorker<'_> {
                 }
                 ast::Imports::Items(items) => {
                     let module = Expr::Decl(mod_var.clone());
-                    self.import_decls(&scope, module, items);
+                    self.import_decls(&scope, Some(mod_var.clone()), module, items);
                 }
             }
         };
@@ -786,7 +788,13 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
+    fn import_decls(
+        &mut self,
+        scope: &ExprScope,
+        module_decl: Option<DeclExpr>,
+        module: Expr,
+        items: ast::ImportItems,
+    ) {
         crate::log_debug_ct!("import scope {scope:?}");
 
         for item in items.iter() {
@@ -802,6 +810,18 @@ impl ExprWorker<'_> {
                     (path, old, Some(new))
                 }
             };
+
+            let item_span = match item {
+                ast::ImportItem::Simple(path) => path.span(),
+                ast::ImportItem::Renamed(renamed) => renamed.span(),
+            };
+
+            if let Some(parent) = module_decl.as_ref() {
+                self.record_module_item(parent, &old, item_span);
+                if let Some(rename_decl) = &rename {
+                    self.record_module_item(parent, rename_decl, item_span);
+                }
+            }
 
             let mut path = Vec::with_capacity(1);
             for seg in path_ast.iter() {
@@ -859,6 +879,26 @@ impl ExprWorker<'_> {
             let expr = Expr::Ref(ref_expr);
             self.scope_mut().insert_mut(name, expr.clone());
         }
+    }
+
+    fn record_module_item(&mut self, parent: &DeclExpr, child: &DeclExpr, span: Span) {
+        if self.init_stage || span.is_detached() || span.id() != Some(self.fid) {
+            return;
+        }
+        let Some(item_range) = self.source.range(span) else {
+            return;
+        };
+        let Some(binding_range) = self.source.range(child.span()) else {
+            return;
+        };
+        self.module_items.insert(
+            child.clone(),
+            ModuleItemLayout {
+                parent: parent.clone(),
+                item_range,
+                binding_range,
+            },
+        );
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
