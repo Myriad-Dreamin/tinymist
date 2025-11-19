@@ -117,7 +117,7 @@ export class Context {
     });
     assert.ok(
       vscode.workspace.workspaceFolders?.length === 1 &&
-      vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
+        vscode.workspace.workspaceFolders[0].uri.toString() == resolved.toString(),
       // eslint-disable-next-line @typescript-eslint/no-base-to-string
       `Expected workspace folder to be ${resolved.toString()}, got ${vscode.workspace.workspaceFolders}`,
     );

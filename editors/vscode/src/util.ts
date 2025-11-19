@@ -118,7 +118,7 @@ export async function loadHTMLFile(context: vscode.ExtensionContext, relativePat
 export class DisposeList {
   disposes: (() => void)[] = [];
   disposed = false;
-  constructor() { }
+  constructor() {}
   add(d: (() => void) | vscode.Disposable) {
     if (this.disposed) {
       // console.error("disposed", this.taskId, "for", this.filePath);

@@ -1,5 +1,9 @@
 import { PreviewMode } from "typst-dom/typst-doc.mjs";
-import { TypstPreviewDocument as TypstDocument, TypstDomHookedElement, TypstDomWindowElement } from "typst-dom/index.preview.mjs";
+import {
+  TypstPreviewDocument as TypstDocument,
+  TypstDomHookedElement,
+  TypstDomWindowElement,
+} from "typst-dom/index.preview.mjs";
 import {
   rendererBuildInfo,
   createTypstRenderer,
@@ -33,7 +37,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (hookedElem) {
       hookedElem.innerHTML = "";
     }
-    return () => { };
+    return () => {};
   }
   const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
 
@@ -88,7 +92,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
       }),
     );
-
 
     const focusInput = () => {
       const inpPageSelector = document.getElementById("typst-page-selector") as
@@ -183,9 +186,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       // https://stackoverflow.com/questions/3464876/javascript-get-window-x-y-position-for-scroll
       let top = () => {
         let doc = document.documentElement;
-        return (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0)
+        return (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0);
       };
-      const scrollDelta = 50
+      const scrollDelta = 50;
 
       switch (e.key) {
         case "ArrowLeft":
