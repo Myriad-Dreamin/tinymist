@@ -1,5 +1,11 @@
 import { triggerRipple } from "./typst-animation.mjs";
-import { PreviewMode, TypstDomHookedElement, TypstDomWindowElement, type GConstructor, type TypstDocumentContext } from "./typst-doc.mjs";
+import {
+  PreviewMode,
+  TypstDomHookedElement,
+  TypstDomWindowElement,
+  type GConstructor,
+  type TypstDocumentContext,
+} from "./typst-doc.mjs";
 
 const enum SourceMappingType {
   Text = 0,
@@ -107,7 +113,8 @@ export function resolveSourceLeaf(
 
 export function installEditorJumpToHandler(
   windowElem: TypstDomWindowElement,
-  docRoot: TypstDomHookedElement) {
+  docRoot: TypstDomHookedElement,
+) {
   const getNthBackgroundRect = (elem: Element, pageNumber: string) => {
     let curElem: Element | null = elem;
     while (curElem) {
@@ -210,7 +217,7 @@ export function installEditorJumpToHandler(
   docRoot.addEventListener("click", sourceMappingHandler);
 }
 
-export interface TypstDebugJumpDocument { }
+export interface TypstDebugJumpDocument {}
 
 export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentContext>>(
   Base: TBase,
@@ -228,12 +235,7 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
       }
     }
 
-    scrollTo(
-      pageWidth: number,
-      pageNo: number,
-      innerLeft: number,
-      innerTop: number,
-    ) {
+    scrollTo(pageWidth: number, pageNo: number, innerLeft: number, innerTop: number) {
       const scrollElem = this.hookedElem.parentElement!;
 
       if (this.previewMode === PreviewMode.Slide) {
@@ -270,8 +272,7 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
         // for double-column layout
         // console.log('occupied adjustment', widthOccupied, page);
 
-        const xOffsetAdjsut =
-          xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
+        const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
 
         scrollElem.scrollTo({
           behavior: "smooth",
@@ -320,4 +321,3 @@ export function provideDebugJumpDoc<TBase extends GConstructor<TypstDocumentCont
     }
   };
 }
-

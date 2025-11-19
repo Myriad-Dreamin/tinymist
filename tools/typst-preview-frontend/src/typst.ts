@@ -38,11 +38,11 @@ var overLapping = function (a: Element, b: Element) {
     ) &&
     /// determine overlapping by area
     (Math.abs(aRect.left - bRect.left) + Math.abs(aRect.right - bRect.right)) /
-    Math.max(aRect.width, bRect.width) <
-    0.5 &&
+      Math.max(aRect.width, bRect.width) <
+      0.5 &&
     (Math.abs(aRect.bottom - bRect.bottom) + Math.abs(aRect.top - bRect.top)) /
-    Math.max(aRect.height, bRect.height) <
-    0.5
+      Math.max(aRect.height, bRect.height) <
+      0.5
   );
 };
 

@@ -43,7 +43,7 @@ class GenElem {
     public tag: string,
     public container: HTMLElement,
     public additions?: Record<string, any>,
-  ) { }
+  ) {}
 
   push(child: GenNode) {
     this.children.push(child);
@@ -88,7 +88,10 @@ class GenContext {
   allElemList: GenElem[] = [];
   windowElem: TypstDomWindowElement;
 
-  constructor(public pages: CanvasPage[], windowElem: TypstDomWindowElement) {
+  constructor(
+    public pages: CanvasPage[],
+    windowElem: TypstDomWindowElement,
+  ) {
     this.insertionPoint = new GenElem("outline", document.createElement("div"));
     this.parent = this.insertionPoint;
     this.windowElem = windowElem;
@@ -174,7 +177,7 @@ export function patchOutlineEntry(
   prev: HTMLDivElement,
   pages: CanvasPage[],
   items: OutlineItemData[],
-  windowElem: TypstDomWindowElement
+  windowElem: TypstDomWindowElement,
 ) {
   const ctx = new GenContext(pages, windowElem);
   // the root element of the generated outline
