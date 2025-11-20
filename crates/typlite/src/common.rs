@@ -208,17 +208,36 @@ impl InlineNode {
     }
 }
 
-/// Verbatim node for raw text output
+/// Inline verbatim node for raw text output
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = false, html_impl = true)]
 pub struct VerbatimNode {
-    /// The content to directly output
+    /// The content to directly output inline
     pub content: EcoString,
 }
 
 impl VerbatimNode {
     fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
         writer.write_str(&self.content)
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.write_trusted_html(&self.content)
+    }
+}
+
+/// Block verbatim node for raw text output without paragraph wrapping
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = true, html_impl = true)]
+pub struct BlockVerbatimNode {
+    /// The content to directly output as a block
+    pub content: EcoString,
+}
+
+impl BlockVerbatimNode {
+    fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
+        writer.write_str(&self.content)?;
+        Ok(())
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
