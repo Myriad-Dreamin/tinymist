@@ -19,26 +19,26 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Editor
 
-* feat: introspect and show complation statistics happening in the language server in https://github.com/Myriad-Dreamin/tinymist/pull/1958 and https://github.com/Myriad-Dreamin/tinymist/pull/2231
-* feat: export tool with page/text preview features by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2182
-* feat: customize paste behaviors in vscode in https://github.com/Myriad-Dreamin/tinymist/pull/2238 and https://github.com/Myriad-Dreamin/tinymist/pull/2239
+* Introspecting and showing complation statistics happening in the language server in https://github.com/Myriad-Dreamin/tinymist/pull/1958 and https://github.com/Myriad-Dreamin/tinymist/pull/2231
+* Added export tool with page/text preview features by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2182
+* Customizing paste behaviors in vscode in https://github.com/Myriad-Dreamin/tinymist/pull/2238 and https://github.com/Myriad-Dreamin/tinymist/pull/2239
 
 ### Code Analysis
 
-* feat: update symbol list and preserve definition order by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2217
-* fix: specially identify text that is starts with `@` in https://github.com/Myriad-Dreamin/tinymist/pull/2233
-* feat: add `PathAt` code context query in https://github.com/Myriad-Dreamin/tinymist/pull/2232
-* fix: destructuring pattern handling in ExprWorker by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2244
+* (Fix) Handling destructuring pattern in ExprWorker by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2244
+* Updated symbol list and preserving definition order by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2217
+* Specially identifying text that is starts with `@` in https://github.com/Myriad-Dreamin/tinymist/pull/2233
+* Added `PathAt` code context query in https://github.com/Myriad-Dreamin/tinymist/pull/2232
 
 ### Preview
 
-* feat: replace `window` global with `windowElem` in preview web frontend by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2145
-* feat: scroll preview with hjkl by @odilf in https://github.com/Myriad-Dreamin/tinymist/pull/2111
+* Replaced `window` global with `windowElem` in preview web frontend by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2145
+* Scrolling preview with hjkl by @odilf in https://github.com/Myriad-Dreamin/tinymist/pull/2111
 
 ### Misc
 
-* build: update to `macos-14` runner in https://github.com/Myriad-Dreamin/tinymist/pull/2234
-* fix: typo in helix docs by @CGMossa in https://github.com/Myriad-Dreamin/tinymist/pull/2251
+* (Fix) Corrected typo in helix docs by @CGMossa in https://github.com/Myriad-Dreamin/tinymist/pull/2251
+* Updated to `macos-14` runner in https://github.com/Myriad-Dreamin/tinymist/pull/2234
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.0...v0.14.2
 
