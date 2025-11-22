@@ -79,6 +79,8 @@ pub struct ExprInfoRepr {
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
     /// Map from declarations to their documentation strings.
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    /// Layout information for module import items in this file.
+    pub module_items: FxHashMap<Interned<Decl>, ModuleItemLayout>,
 }
 
 impl std::hash::Hash for ExprInfoRepr {
@@ -95,6 +97,13 @@ impl std::hash::Hash for ExprInfoRepr {
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
+        let mut module_items = self
+            .module_items
+            .iter()
+            .map(|(decl, layout)| (decl.clone(), layout.clone()))
+            .collect::<Vec<_>>();
+        module_items.sort_by_key(|(decl, _)| decl.span().into_raw());
+        module_items.hash(state);
     }
 }
 
@@ -162,6 +171,17 @@ impl ExprInfoRepr {
         std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
         std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
     }
+}
+
+/// Describes how an import item is laid out in the source text.
+#[derive(Debug, Clone, Hash)]
+pub struct ModuleItemLayout {
+    /// The module declaration that owns this item.
+    pub parent: Interned<Decl>,
+    /// The byte range covering the whole `foo as bar` clause.
+    pub item_range: Range<usize>,
+    /// The byte range covering the bound identifier (`bar` in `foo as bar`).
+    pub binding_range: Range<usize>,
 }
 
 /// Represents different kinds of expressions in the language.

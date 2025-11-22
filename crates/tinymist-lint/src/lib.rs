@@ -1,5 +1,9 @@
 //! A linter for Typst.
 
+mod dead_code;
+
+pub use dead_code::DeadCodeConfig;
+
 use std::sync::Arc;
 
 use tinymist_analysis::{
@@ -37,8 +41,14 @@ pub fn lint_file(
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
+    has_references: impl Fn(&Interned<Decl>) -> bool,
 ) -> LintInfo {
-    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+    let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+
+    let dead_code_diags =
+        dead_code::check_dead_code(world, ei, has_references, &DeadCodeConfig::default());
+    diagnostics.extend(dead_code_diags);
+
     LintInfo {
         revision: ei.revision,
         fid: ei.fid,
