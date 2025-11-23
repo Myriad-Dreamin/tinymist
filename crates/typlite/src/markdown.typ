@@ -132,38 +132,84 @@
     },
   ),
   (
+    grid,
+    it => elem(
+      "grid",
+      // TODO: we cannot access colspan/rowspan here.
+      // related: https://github.com/typst/typst/issues/7263
+      table(columns: it.columns, ..it
+          .children
+          .map(child => {
+            {
+              let func = child.func()
+              if func == grid.cell {
+                table.cell(
+                  child.body,
+                )
+              } else if func == grid.header {
+                table.header(..child.children.map(it => table.cell(
+                  it.body,
+                )))
+              } else if func == grid.footer {
+                table.footer(..child.children.map(it => table.cell(
+                  it.body,
+                )))
+              }
+            }
+          })
+          .flatten()),
+    ),
+  ),
+  (
     table,
     it => elem(
       "table",
-      columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
-      ..it.children.map(
-        child => if child.func() == table.cell {
-          elem(
-            "cell",
-            child.body,
-          )
-        } else if child.func() == table.header {
-          elem(
-            "header",
-            ..child.cells.map(
-              cell => elem(
-                "cell",
-                cell.body,
-              ),
-            ),
-          )
-        } else if child.func() == table.footer {
-          elem(
-            "footer",
-            ..child.cells.map(
-              cell => elem(
-                "cell",
-                cell.body,
-              ),
-            ),
-          )
-        },
-      ),
+      it,
+      // columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
+      // ..it.children.map(
+      //   child => {
+      //     let func = child.func()
+      //     if func == table.cell {
+      //       let named = child.fields()
+      //       named.remove("body")
+      //       elem(
+      //         "cell",
+      //         ..named,
+      //         child.body,
+      //       )
+      //     } else if func == table.header {
+      //       elem(
+      //         "header",
+      //         ..child.cells.map(
+      //           cell => {
+      //             let named = cell.fields()
+      //             named.remove("body")
+      //             elem(
+      //               "cell",
+      //               ..named,
+      //               cell.body,
+      //             )
+      //           },
+      //         ),
+      //       )
+      //     } else if func == table.footer {
+      //       elem(
+      //         "footer",
+      //         ..child.cells.map(
+      //           cell => {
+      //             let named = cell.fields()
+      //             named.remove("body")
+      //             elem(
+      //               "cell",
+      //               ..named,
+      //               cell.body,
+      //             )
+      //           },
+      //         ),
+      //       )
+      //     }
+      //   },
+      // ),
     ),
   ),
   (

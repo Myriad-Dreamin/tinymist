@@ -32,10 +32,7 @@ impl TableStructureFinder {
     pub fn is_structured_table(element: &HtmlElement) -> bool {
         element.children.iter().any(|child| {
             if let HtmlNode::Element(elem) = child {
-                matches!(
-                    elem.tag,
-                    md_tag::cell | md_tag::header | md_tag::footer
-                )
+                matches!(elem.tag, md_tag::cell | md_tag::header | md_tag::footer)
             } else {
                 false
             }
@@ -422,10 +419,7 @@ impl TableParser {
         Ok(cells)
     }
 
-    fn convert_structured_cell(
-        parser: &mut HtmlToAstParser,
-        cell: &HtmlElement,
-    ) -> Result<Node> {
+    fn convert_structured_cell(parser: &mut HtmlToAstParser, cell: &HtmlElement) -> Result<Node> {
         let (mut inline_nodes, block_nodes) = parser.capture_children(cell)?;
         if !block_nodes.is_empty() {
             inline_nodes.extend(block_nodes);
