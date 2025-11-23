@@ -61,6 +61,25 @@
   }
 }
 
+#let process-math-eq(item) = {
+  if type(item) == str {
+    return item
+  }
+  if type(item) == array {
+    if (
+      item.any(x => {
+        type(x) == content and x.func() == str
+      })
+    ) {
+      item.flatten()
+    } else {
+      item.map(x => process-math-eq(x)).flatten()
+    }
+  } else {
+    process-math-eq(item.fields().values().flatten().filter(x => type(x) == content or type(x) == str))
+  }
+}
+
 #let rules = (
   ..(
     strong,
@@ -231,10 +250,12 @@
   ),
   (
     math.equation,
-    it => if it.block {
-      elem("equation", html.frame(it))
+    it => if sys.inputs.at("x-remove-html", default: none) == "true" {
+      process-math-eq(it.body).flatten().join()
+    } else if it.block {
+      elem("equation", html.frame(block(inset: 0.5em, it)))
     } else {
-      html.span(elem("equation", html.frame(it)))
+      html.span(elem("equation", html.frame(block(inset: 0.5em, it))))
     },
   ),
   it => elem("document", it),
@@ -276,25 +297,6 @@
       "m1idoc",
       attrs: (src: compile, mode: mode),
     )
-  }
-}
-
-#let process-math-eq(item) = {
-  if type(item) == str {
-    return item
-  }
-  if type(item) == array {
-    if (
-      item.any(x => {
-        type(x) == content and x.func() == str
-      })
-    ) {
-      item.flatten()
-    } else {
-      item.map(x => process-math-eq(x)).flatten()
-    }
-  } else {
-    process-math-eq(item.fields().values().flatten().filter(x => type(x) == content or type(x) == str))
   }
 }
 
