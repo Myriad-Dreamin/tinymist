@@ -1,131 +1,150 @@
-#let bool-str(x) = {
-  if x {
-    "true"
-  } else {
-    "false"
-  }
-}
+#let elem(kind, ..args) = html.elem(
+  "m1" + kind,
+  attrs: args
+    .named()
+    .pairs()
+    .map(((k, v)) => (
+      k,
+      {
+        if type(v) == bool {
+          if (v) { "true" } else { "" }
+        } else if v == none {
+          ""
+        } else if v == auto {
+          "auto"
+        } else if type(v) == bytes {
+          // from digestify.typ
+          let bytes-to-hex(bytes, upper: false) = {
+            let res = array(bytes)
+              .map(x => {
+                let s = str(x, base: 16)
+                return "0" * (2 - s.len()) + s
+              })
+              .join()
 
-// typst doesn't allow things like `typParbreak`.
-#let md-parbreak = html.elem("m1parbreak", "")
-#let md-linebreak = html.elem("m1linebreak", "")
-#let md-strong(body, delta: 0) = html.elem("span", html.elem("m1strong", body))
-#let md-emph(body) = html.elem("span", html.elem("m1emph", body))
-#let md-raw(lang: none, block: false, text: "", body) = {
-  let body = html.elem(
-    "m1raw",
-    attrs: (
-      lang: if lang == none {
-        ""
-      } else {
-        lang
-      },
-      block: bool-str(block),
-      text: text,
-    ),
-    body,
-  )
-
-  if block {
-    return body
-  } else {
-    html.elem("span", body)
-  }
-}
-#let md-link(dest: none, body) = html.elem(
-  "span",
-  html.elem(
-    "m1link",
-    attrs: (dest: dest),
-    body,
-  ),
-)
-#let md-label(dest: none, body) = html.elem(
-  "m1label",
-  attrs: (dest: dest),
-  body,
-)
-#let md-ref(body) = {
-  show link: it => it.body
-  html.elem(
-    "span",
-    html.elem(
-      "m1ref",
-      body,
-    ),
-  )
-}
-#let md-heading(level: int, body) = html.elem(
-  "m1heading",
-  attrs: (level: str(level)),
-  box(body),
-)
-#let md-outline = html.elem.with("m1outline")
-#let md-outline-entry(level: int, body) = html.elem(
-  "m1outentry",
-  attrs: (level: str(level)),
-  body,
-)
-#let md-quote(/* attribution: none, */ body) = html.elem(
-  "m1quote",
-  // attrs: (attribution: attribution),
-  body,
-)
-#let md-table(it) = html.elem(
-  "m1table",
-  it,
-)
-#let md-grid(it) = html.elem(
-  "m1grid",
-  table(columns: it.columns, ..it
-      .children
-      .map(child => {
-        {
-          let func = child.func()
-          if func == grid.cell {
-            table.cell(
-              child.body,
-            )
-          } else if func == grid.header {
-            table.header(..child.children.map(it => table.cell(
-              it.body,
-            )))
-          } else if func == grid.footer {
-            table.footer(..child.children.map(it => table.cell(
-              it.body,
-            )))
+            if upper {
+              return std.upper(res)
+            } else {
+              return res
+            }
           }
-        }
-      })
-      .flatten()),
+          bytes-to-hex(v)
+        } else { str(v) }
+      },
+    ))
+    .to-dict(),
+  { args.pos().join() },
 )
-#let md-image(src: "", alt: none) = html.elem(
-  "m1image",
-  attrs: (
-    src: src,
-    alt: if alt == none {
-      ""
-    } else {
-      alt
+
+#let rules = (
+  ..(
+    linebreak,
+    parbreak,
+    pagebreak,
+  ).map(it => (
+    it,
+    it => elem(str(type(it))),
+  )),
+  ..(
+    strong,
+    emph,
+    footnote,
+    underline,
+    strike,
+    overline,
+    sub,
+    super,
+    highlight,
+    smallcaps,
+  ).map(it => (
+    it,
+    it => elem(str(type(it)), it.body),
+  )),
+  (list, it => elem("list", tight: it.tight, ..it.children.map(it => elem("item", it.body)))),
+  (
+    enum,
+    it => elem("enum", reversed: it.reversed, start: it.start, tight: it.tight, ..it.children.map(
+      it => elem("item", it.body),
+    )),
+  ),
+  (
+    terms,
+    it => elem("terms", tight: it.tight, ..it.children.map(
+      it => elem("item", elem("term", it.term), elem("description", it.description)),
+    )),
+  ),
+  (
+    link,
+    it => {
+      let kind = if type(it.dest) == str { "url" } else { repr(type(it.dest)) }
+      elem(
+        "link",
+        elem("dest", kind: kind, dest: if type(it.dest) == location { "location" } else { str(it.dest) }),
+        elem("body", it.body),
+      )
     },
   ),
-  "",
-)
-#let md-figure(body, caption: none) = html.elem(
-    "m1figure",
-  attrs: (
-    caption: if caption == none {
-      ""
-    } else {
-      if caption.body.func() == text {
-        caption.body.text
-      } else {
-        ""
-      }
-    },
+  (raw, it => elem("raw", text: it.text, block: it.block, lang: it.lang)),
+  (image, it => elem("image", source: it.source, alt: it.alt, width: it.width, height: it.height)),
+  (
+    table,
+    it => elem(
+      "table",
+      columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
+      ..it.children.map(
+        child => if type(child) == table.cell {
+          elem(
+            "cell",
+            child.body,
+          )
+        } else if type(child) == table.header {
+          elem(
+            "header",
+            ..child.cells.map(
+              cell => elem(
+                "cell",
+                cell.body,
+              ),
+            ),
+          )
+        } else if type(child) == table.footer {
+          elem(
+            "footer",
+            ..child.cells.map(
+              cell => elem(
+                "cell",
+                cell.body,
+              ),
+            ),
+          )
+        },
+      ),
+    ),
   ),
-  body,
-  )
+  (
+    figure,
+    it => elem("figure", elem("body", it.body), elem("caption", it.caption), kind: repr(
+      it.kind,
+    )),
+  ),
+  (quote, it => elem("quote", it.body, block: it.block)),
+  (ref, it => elem("ref", target: it.target, supplement: it.supplement)),
+  (cite, it => elem("cite", key: it.key, supplement: it.supplement)),
+  (
+    bibliography,
+    it => elem(
+      "bibliography",
+      // TODO: this place should not use join directly
+      elem("sources", it.sources.join()),
+      full: it.full,
+      title: it.title,
+      style: it.style,
+    ),
+  ),
+  (heading, it => elem("heading", it.body, level: it.level, numbering: it.numbering)),
+  (math.equation, it => elem("equation", html.frame(it))),
+  it => elem("document", it),
+)
 
 #let if-not-paged(it, act) = {
   if target() == "html" {
@@ -185,51 +204,19 @@
   }
 }
 
-#let md-doc(body) = context {
-  // distinguish parbreak from <p> tag
-  show parbreak: it => if-not-paged(it, md-parbreak)
-  show strong: it => if-not-paged(it, md-strong(it.body, delta: it.delta))
-  show emph: it => if-not-paged(it, md-emph(it.body))
-  // todo: icc?
-  show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
-
-  show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, text: it.text, it))
-  show link: it => if-not-paged(it, md-link(dest: it.dest, it.body))
-  show ref: it => if-not-paged(it, md-ref(it))
-
-  show heading: it => if-not-paged(it, md-heading(level: it.level, it.body))
-  show outline: it => if-not-paged(it, md-outline(it))
-  show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
-  show quote: it => if-not-paged(it, md-quote(it.body))
-  show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(it))
-
-  show math.equation.where(block: false): it => if-not-paged(
-    it,
-    html.elem(
-      "m1eqinline",
-      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(box(inset: 0.5em, it)) } else {
-        process-math-eq(it.body).flatten().join()
-      },
-    ),
-  )
-  show math.equation.where(block: true): it => if-not-paged(
-    it,
-    if sys.inputs.at("x-remove-html", default: none) != "true" {
-      html.elem(
-        "m1eqblock",
-        html.frame(block(inset: 0.5em, it)),
-      )
+#let md-doc = rules.fold(
+  it => it,
+  (acc, sr) => it => context {
+    if type(sr) == array {
+      let (selector, rule) = sr
+      if target() != "html" {
+        return it
+      }
+      show selector: rule
+      acc(it)
     } else {
-      html.elem(
-        "m1eqinline",
-        process-math-eq(it.body).flatten().join(),
-      )
-    },
-  )
-
-  show linebreak: it => if-not-paged(it, md-linebreak)
-  show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption))
-
-  html.elem("m1document", body)
-}
+      show: sr
+      acc(it)
+    }
+  },
+)
