@@ -29,9 +29,21 @@ pub use tinymist_project::LspUniverse;
 pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
+use crate::index::query::IndexQueryCtx;
 pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
+
+pub fn lsif_testing(name: &str, f: &impl Fn(&mut LocalContext, &mut IndexQueryCtx, PathBuf)) {
+    use crate::index::*;
+    snapshot_testing(name, &move |ctx, path| {
+        // todo: error test
+        let knowledge = knowledge(ctx).expect("failed to generate knowledge");
+        let res = knowledge.bind(ctx.shared()).to_string();
+        let mut index = IndexQueryCtx::read(&mut res.as_bytes()).expect("failed to read index");
+        f(ctx, &mut index, path);
+    });
+}
 
 #[derive(Default, Clone, Copy)]
 pub struct Opts {

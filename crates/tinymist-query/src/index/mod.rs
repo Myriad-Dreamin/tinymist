@@ -21,6 +21,7 @@ use tinymist_world::EntryReader;
 use typst::syntax::{FileId, LinkedNode, Source, Span};
 
 pub mod protocol;
+pub mod query;
 use protocol as p;
 
 /// The dumped knowledge.
@@ -58,10 +59,12 @@ impl fmt::Display for KnowledgeWithContext<'_> {
             results: FxHashMap::default(),
         };
 
-        encoder.emit_meta(&self.knowledge.meta).map_err(|err| {
-            log::error!("cannot write meta data: {err}");
-            fmt::Error
-        })?;
+        encoder
+            .emit_meta(self.knowledge.meta.clone())
+            .map_err(|err| {
+                log::error!("cannot write meta data: {err}");
+                fmt::Error
+            })?;
         encoder.emit_files(&self.knowledge.files).map_err(|err| {
             log::error!("cannot write files: {err}");
             fmt::Error
@@ -112,7 +115,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
             self.writer
                 .write_element(
                     id,
-                    p::Element::Vertex(p::Vertex::Document(&p::Document {
+                    p::Element::Vertex(p::Vertex::Document(p::Document {
                         uri: self.ctx.uri_for_id(fid).unwrap_or_else(|err| {
                             log::error!("cannot get uri for {fid:?}: {err}");
                             Url::parse("file:///unknown").unwrap()
@@ -147,7 +150,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
         Ok(id)
     }
 
-    fn emit_meta(&mut self, meta: &p::MetaData) -> tinymist_std::Result<()> {
+    fn emit_meta(&mut self, meta: p::MetaData) -> tinymist_std::Result<()> {
         let obj = p::Element::Vertex(p::Vertex::MetaData(meta));
         self.emit_element(obj).map(|_| ())
     }

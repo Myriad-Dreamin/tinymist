@@ -85,6 +85,17 @@ export async function buildL10n() {
   await genVscodeExt();
 }
 
+export async function buildIndexWasm() {
+  await spawnAsync(
+    "build:embedded:typst",
+    "cargo build -p tinymist-index --release --target wasm32-unknown-unknown",
+  );
+  await fs.copyFile(
+    path.resolve(cwd, "target/wasm32-unknown-unknown/release/tinymist_index.wasm"),
+    path.resolve(cwd, "typ/packages/tinymist-index/tinymist_index.wasm"),
+  );
+}
+
 export async function buildSyntax() {
   await generateTextmate();
   await installTextmate();
