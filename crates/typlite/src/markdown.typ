@@ -170,7 +170,14 @@
       style: it.style,
     ),
   ),
-  (math.equation, it => elem("equation", html.frame(it))),
+  (
+    math.equation,
+    it => if it.block {
+      elem("equation", html.frame(it))
+    } else {
+      html.span(elem("equation", html.frame(it)))
+    },
+  ),
   it => elem("document", it),
 )
 

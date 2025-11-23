@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/math_inline.typ
 ---
 <!DOCTYPE html>
@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/math_inline.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1eqinline>redacted-frame</m1eqinline></m1document></body>
+  <body><m1document><span><m1equation>redacted-frame</m1equation></span></m1document></body>
 </html>
 
 =====
