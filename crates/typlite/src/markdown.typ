@@ -36,15 +36,23 @@
   { args.pos().join() },
 )
 
+#let rewrap(tag) = {
+  return x => elem(tag, x.body)
+}
+
+#let attributed(tag, attrs) = {
+  return x => elem(tag, ..attrs.map(attr => (attr, x.fields().at(attr))).to-dict())
+}
+
+#let attributed-rewrap(tag, attrs) = {
+  return x => elem(tag, x.body, ..attrs.map(attr => (attr, x.fields().at(attr))).to-dict())
+}
+
+#let const-func(res) = {
+  return (..x) => res
+}
+
 #let rules = (
-  ..(
-    linebreak,
-    parbreak,
-    pagebreak,
-  ).map(it => (
-    it,
-    it => elem(str(type(it))),
-  )),
   ..(
     strong,
     emph,
@@ -56,9 +64,30 @@
     super,
     highlight,
     smallcaps,
-  ).map(it => (
-    it,
-    it => elem(str(type(it)), it.body),
+  ).map(x => (
+    x,
+    rewrap(repr(x)),
+  )),
+  ..(
+    linebreak,
+    pagebreak,
+    parbreak,
+  ).map(x => (x, const-func(elem(repr(x))))),
+  ..(
+    (heading, ("level", "numbering")),
+    (quote, ("block",)),
+  ).map(x => (
+    x.first(),
+    attributed-rewrap(repr(x.first()), x.last()),
+  )),
+  ..(
+    (ref, ("target", "supplement")),
+    (cite, ("key", "supplement")),
+    (raw, ("text", "block", "lang")),
+    (image, ("source", "alt", "width", "height")),
+  ).map(x => (
+    x.first(),
+    attributed(repr(x.first()), x.last()),
   )),
   (list, it => elem("list", tight: it.tight, ..it.children.map(it => elem("item", it.body)))),
   (
@@ -84,8 +113,6 @@
       )
     },
   ),
-  (raw, it => elem("raw", text: it.text, block: it.block, lang: it.lang)),
-  (image, it => elem("image", source: it.source, alt: it.alt, width: it.width, height: it.height)),
   (
     table,
     it => elem(
@@ -127,9 +154,6 @@
       it.kind,
     )),
   ),
-  (quote, it => elem("quote", it.body, block: it.block)),
-  (ref, it => elem("ref", target: it.target, supplement: it.supplement)),
-  (cite, it => elem("cite", key: it.key, supplement: it.supplement)),
   (
     bibliography,
     it => elem(
@@ -141,7 +165,6 @@
       style: it.style,
     ),
   ),
-  (heading, it => elem("heading", it.body, level: it.level, numbering: it.numbering)),
   (math.equation, it => elem("equation", html.frame(it))),
   it => elem("document", it),
 )
