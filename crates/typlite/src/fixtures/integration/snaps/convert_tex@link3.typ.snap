@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/link3.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><span><m1link dest="https://example.com">Reverse <span><m1strong>the World</m1strong></span></m1link></span></m1document></body>
+  <body><m1document><m1link><m1dest kind="url" dest="https://example.com"></m1dest><m1body>Reverse <span><m1strong>the World</m1strong></span></m1body></m1link></m1document></body>
 </html>
 
 =====

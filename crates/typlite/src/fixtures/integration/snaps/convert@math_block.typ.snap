@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1eqblock>redacted-frame</m1eqblock></m1document></body>
+  <body><m1document><m1equation>redacted-frame</m1equation></m1document></body>
 </html>
 
 =====

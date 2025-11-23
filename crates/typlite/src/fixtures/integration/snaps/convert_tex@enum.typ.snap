@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/enum.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><ol><li>A</li><li>B</li></ol></m1document></body>
+  <body><m1document><m1enum reversed start="auto" tight="true"><m1item>A</m1item><m1item>B</m1item></m1enum></m1document></body>
 </html>
 
 =====
