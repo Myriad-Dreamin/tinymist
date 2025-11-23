@@ -1,0 +1,44 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/main.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_unused.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:0:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "\"/u.typ\"",
+        "range": "2:8:2:15"
+       }
+      ]
+     }
+    },
+    "kind": "refactor.rewrite",
+    "title": "Convert to absolute path"
+   }
+  ],
+  "message": "unused module: `u`\nHint: imported modules should be used or the import should be removed",
+  "range": "2:8:2:15"
+ }
+]

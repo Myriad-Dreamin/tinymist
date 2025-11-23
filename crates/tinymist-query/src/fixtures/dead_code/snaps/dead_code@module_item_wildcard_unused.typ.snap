@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+assertion_line: 662
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_unused.typ
+---
+{
+ "main.typ": [
+  {
+   "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+   "range": "2:1:2:18",
+   "severity": 2,
+   "source": "typst"
+  }
+ ]
+}

@@ -647,4 +647,19 @@ mod lint_tests {
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }
+
+    #[test]
+    fn test_dead_code() {
+        snapshot_testing("dead_code", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.lint(&source, &KnownIssues::default());
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_uri_(&k), v))
+                .collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
 }
