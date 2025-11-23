@@ -81,10 +81,8 @@ Math inline: <img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted
 
 - First item
 - Second item
-  
   1. First sub-item
   2. Second sub-item
-     
      - First sub-sub-item
 
 **First term**: First definition

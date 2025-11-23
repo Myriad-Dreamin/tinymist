@@ -131,6 +131,7 @@ impl ListParser {
         ordered: bool,
     ) -> Result<Vec<ListItem>> {
         parser.list_level += 1;
+        let prev_buffer = std::mem::take(&mut parser.inline_buffer);
         let mut all_items = Vec::new();
 
         for child in &element.children {
@@ -138,36 +139,43 @@ impl ListParser {
                 && li.tag == md_tag::item
             {
                 let attrs = ListItemAttr::parse(&li.attrs)?;
-                let (mut inline_nodes, mut block_nodes) = parser.capture_children(li)?;
+                let mut item_content = Vec::new();
+                let mut li_buffer = Vec::new();
 
                 if parser.feat.annotate_elem {
-                    let level = parser.list_level - 1;
-                    let begin = Node::Custom(Box::new(super::core::Comment(eco_format!(
-                        "typlite:begin:list-item {level}"
-                    ))));
-                    let end = Node::Custom(Box::new(super::core::Comment(eco_format!(
-                        "typlite:end:list-item {level}"
-                    ))));
+                    li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
+                        "typlite:begin:list-item {}",
+                        parser.list_level - 1
+                    )))));
+                }
 
-                    if inline_nodes.is_empty() {
-                        if let Some(Node::Paragraph(nodes)) = block_nodes.first_mut() {
-                            nodes.insert(0, begin);
-                            nodes.push(end);
-                        } else {
-                            inline_nodes.push(begin);
-                            inline_nodes.push(end);
+                for li_child in &li.children {
+                    match li_child {
+                        HtmlNode::Text(text, _) => li_buffer.push(Node::Text(text.clone())),
+                        HtmlNode::Element(child_elem) => {
+                            let element_content = parser.process_list_item_element(child_elem)?;
+
+                            if !element_content.is_empty() {
+                                li_buffer.extend(element_content);
+                            }
                         }
-                    } else {
-                        inline_nodes.insert(0, begin);
-                        inline_nodes.push(end);
+                        HtmlNode::Frame(frame) => {
+                            li_buffer.push(parser.convert_frame(&frame.inner));
+                        }
+                        HtmlNode::Tag(..) => {}
                     }
                 }
 
-                let mut item_content = Vec::new();
-                if !inline_nodes.is_empty() {
-                    item_content.push(Node::Paragraph(inline_nodes));
+                if parser.feat.annotate_elem {
+                    li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
+                        "typlite:end:list-item {}",
+                        parser.list_level - 1
+                    )))));
                 }
-                item_content.append(&mut block_nodes);
+
+                if !li_buffer.is_empty() {
+                    item_content.push(Node::Paragraph(std::mem::take(&mut li_buffer)));
+                }
 
                 if !item_content.is_empty() {
                     if ordered {
@@ -185,6 +193,7 @@ impl ListParser {
         }
 
         parser.list_level -= 1;
+        parser.inline_buffer = prev_buffer;
 
         Ok(all_items)
     }

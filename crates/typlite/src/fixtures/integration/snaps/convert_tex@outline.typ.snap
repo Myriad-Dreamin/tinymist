@@ -76,9 +76,13 @@ Math inline:  and block:
 
 \begin{itemize}
 \item First item
-\item Second item\begin{enumerate}
+\item Second item
+
+\begin{enumerate}
 \item First sub-item
-\item Second sub-item\begin{itemize}
+\item Second sub-item
+
+\begin{itemize}
 \item First sub-sub-item
 \end{itemize}
 

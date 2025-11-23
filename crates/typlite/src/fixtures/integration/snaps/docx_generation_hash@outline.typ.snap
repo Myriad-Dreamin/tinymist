@@ -3,4 +3,4 @@ source: crates/typlite/src/tests.rs
 expression: hash
 input_file: crates/typlite/src/fixtures/integration/outline.typ
 ---
-siphash128_13:2d518906744b32d4948c0a524719e115
+siphash128_13:e9fdcf3c7103fae7ca2b398973ca65ad
