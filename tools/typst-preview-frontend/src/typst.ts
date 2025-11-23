@@ -199,8 +199,9 @@ windowElem.currentPosition = function (elem: Element) {
 
   let result: TypstPosition | undefined = undefined;
   // The center of the window
-  const cx = window.innerWidth * 0.5;
-  const cy = window.innerHeight * 0.5;
+  const vpRect = windowElem.getBoundingClientRect();
+  const cx = vpRect.left + vpRect.width / 2;
+  const cy = vpRect.top + vpRect.height / 2;
   type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
   const handlePage = (pageBBox: ScrollRect, page: number) => {
     const x = pageBBox.left;
