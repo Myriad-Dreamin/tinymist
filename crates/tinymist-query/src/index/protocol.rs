@@ -21,24 +21,24 @@ pub enum LocationOrRangeId {
     RangeId(Id),
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Entry<'a> {
+pub struct Entry {
     pub id: Id,
     #[serde(flatten)]
-    pub data: Element<'a>,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "type")]
-#[allow(clippy::large_enum_variant)]
-pub enum Element<'a> {
-    Vertex(Vertex<'a>),
-    Edge(Edge),
+    pub data: Element,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type")]
+#[allow(clippy::large_enum_variant)]
+pub enum Element {
+    Vertex(Vertex),
+    Edge(Edge),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolInfo {
     pub name: String,
     #[serde(default = "Default::default")]
@@ -132,14 +132,14 @@ pub enum RangeTag {
     Unknown(UnknownTag),
 }
 
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "label")]
-pub enum Vertex<'a> {
-    MetaData(&'a MetaData),
+pub enum Vertex {
+    MetaData(MetaData),
     /// <https://github.com/Microsoft/language-server-protocol/blob/master/indexFormat/specification.md#the-project-vertex>
     Project(Project),
-    Document(&'a Document),
+    Document(Document),
     /// <https://github.com/Microsoft/language-server-protocol/blob/master/indexFormat/specification.md#ranges>
     Range {
         #[serde(flatten)]
@@ -237,6 +237,30 @@ pub enum Edge {
     SemanticTokens(EdgeData),
 }
 
+impl Edge {
+    pub fn out_v(&self) -> Id {
+        match self {
+            Edge::Contains(data) => data.out_v,
+            Edge::Item(item) => item.edge_data.out_v,
+            Edge::Moniker(data)
+            | Edge::NextMoniker(data)
+            | Edge::Next(data)
+            | Edge::PackageInformation(data)
+            | Edge::Definition(data)
+            | Edge::Declaration(data)
+            | Edge::Hover(data)
+            | Edge::References(data)
+            | Edge::Implementation(data)
+            | Edge::TypeDefinition(data)
+            | Edge::FoldingRange(data)
+            | Edge::DocumentLink(data)
+            | Edge::DocumentSymbol(data)
+            | Edge::Diagnostic(data)
+            | Edge::SemanticTokens(data) => data.out_v,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EdgeData {
@@ -304,7 +328,7 @@ pub struct Project {
     pub kind: String,
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetaData {
     /// The version of the LSIF format using semver notation. See <https://semver.org/>. Please note
