@@ -150,7 +150,9 @@ impl TextWriter {
                     Self::write_node(&figure_node.body, output)?;
                     if !figure_node.caption.is_empty() {
                         output.push_str("\n");
-                        output.push_str(&figure_node.caption);
+                        for inline in &figure_node.caption {
+                            Self::write_node(inline, output)?;
+                        }
                     }
                 }
             }

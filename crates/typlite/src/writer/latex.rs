@@ -242,7 +242,7 @@ impl LaTeXWriter {
                 // Add caption if present
                 if !figure_node.caption.is_empty() {
                     output.push_str("\\caption{");
-                    output.push_str(&escape_latex(&figure_node.caption));
+                    self.write_inline_nodes(&figure_node.caption, output)?;
                     output.push_str("}\n");
                 }
 

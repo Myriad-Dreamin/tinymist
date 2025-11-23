@@ -18,7 +18,11 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 <figure class="figure">
 
 <p><img src="./fig.svg" alt="Content" /></p>
+<figcaption>
 
+Figure 1: Caption
+
+</figcaption>
 
 </figure>
 

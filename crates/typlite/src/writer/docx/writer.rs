@@ -85,21 +85,14 @@ impl DocxWriter {
                     {
                         // Process the image
                         if let Ok(img_data) = fs::read(url.as_str()) {
-                            let alt_text = figure_node.caption.clone();
                             // Add the image with caption
-                            docx = self.image_processor.process_image_data(
-                                docx,
-                                &img_data,
-                                Some(&alt_text),
-                                None,
-                            );
+                            docx = self
+                                .image_processor
+                                .process_image_data(docx, &img_data, None, None);
 
-                            // Add caption as a separate paragraph with Caption style
-                            if !figure_node.caption.is_empty() {
-                                let caption_text = format!("Figure: {}", figure_node.caption);
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(caption_text));
+                            if let Some(caption_para) = self
+                                .build_caption_paragraph(Some("Figure: "), &figure_node.caption)?
+                            {
                                 docx = docx.add_paragraph(caption_para);
                             }
                         } else {
@@ -109,10 +102,9 @@ impl DocxWriter {
                             docx = docx.add_paragraph(para);
 
                             // Still add caption
-                            if !figure_node.caption.is_empty() {
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(&figure_node.caption));
+                            if let Some(caption_para) =
+                                self.build_caption_paragraph(None, &figure_node.caption)?
+                            {
                                 docx = docx.add_paragraph(caption_para);
                             }
                         }
@@ -126,11 +118,9 @@ impl DocxWriter {
                             docx = docx.add_paragraph(para);
                         }
 
-                        // Add caption as a separate paragraph
-                        if !figure_node.caption.is_empty() {
-                            let caption_para = Paragraph::new()
-                                .style("Caption")
-                                .add_run(Run::new().add_text(&figure_node.caption));
+                        if let Some(caption_para) =
+                            self.build_caption_paragraph(None, &figure_node.caption)?
+                        {
                             docx = docx.add_paragraph(caption_para);
                         }
                     }
@@ -141,11 +131,9 @@ impl DocxWriter {
                 // Process the content using standard node processing
                 docx = self.process_node(docx, &figure_node.body)?;
 
-                // Add caption as a separate paragraph
-                if !figure_node.caption.is_empty() {
-                    let caption_para = Paragraph::new()
-                        .style("Caption")
-                        .add_run(Run::new().add_text(&figure_node.caption));
+                if let Some(caption_para) =
+                    self.build_caption_paragraph(None, &figure_node.caption)?
+                {
                     docx = docx.add_paragraph(caption_para);
                 }
             }
@@ -265,6 +253,31 @@ impl DocxWriter {
         }
 
         Ok(run)
+    }
+
+    fn build_caption_paragraph(
+        &self,
+        prefix: Option<&str>,
+        nodes: &[Node],
+    ) -> Result<Option<Paragraph>> {
+        if nodes.is_empty() {
+            return Ok(None);
+        }
+
+        let mut para = Paragraph::new().style("Caption");
+
+        if let Some(prefix_text) = prefix {
+            para = para.add_run(Run::new().add_text(prefix_text));
+        }
+
+        for node in nodes {
+            let run = self.process_inline_to_run(Run::new(), node)?;
+            if !run.children.is_empty() {
+                para = para.add_run(run);
+            }
+        }
+
+        Ok(Some(para))
     }
 
     /// Process paragraph and add to document

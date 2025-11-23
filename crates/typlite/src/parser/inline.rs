@@ -55,8 +55,7 @@ impl HtmlToAstParser {
                 HtmlNode::Element(child_elem) => {
                     if child_elem.tag == md_tag::link_body || child_elem.tag == md_tag::body {
                         self.convert_children_into(&mut content, child_elem)?;
-                    } else if child_elem.tag == md_tag::link_dest
-                    {
+                    } else if child_elem.tag == md_tag::link_dest {
                         if let Some((_, value)) = child_elem
                             .attrs
                             .0
@@ -133,15 +132,6 @@ impl HtmlToAstParser {
             }
             block_content.append(&mut blocks);
         }
-
-        let caption = caption_nodes
-            .iter()
-            .filter_map(|node| match node {
-                Node::Text(text) => Some(text.as_str()),
-                _ => None,
-            })
-            .collect::<String>();
-
         let mut content_nodes = Vec::new();
         if !inline_segments.is_empty() {
             for segment in inline_segments {
@@ -159,7 +149,10 @@ impl HtmlToAstParser {
         };
 
         // Create figure node with centering
-        let figure_node = Box::new(FigureNode { body, caption });
+        let figure_node = Box::new(FigureNode {
+            body,
+            caption: caption_nodes,
+        });
         let centered_node = CenterNode::new(vec![Node::Custom(figure_node)]);
 
         // Add the centered figure to blocks
