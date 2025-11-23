@@ -636,8 +636,8 @@ export function provideSvgDoc<
       const computedRevScale = containerWidth ? this.docWidth / containerWidth : 1;
       // respect current scale ratio
       const revScale = computedRevScale / this.currentScaleRatio;
-      const left = (this.windowElem.offsetLeft - containerBRect.left) * revScale;
-      const top = (this.windowElem.offsetTop - containerBRect.top) * revScale;
+      const left = (this.hookedElem.parentElement!.scrollLeft - containerBRect.left) * revScale;
+      const top = (this.hookedElem.parentElement!.scrollTop - containerBRect.top) * revScale;
       const width = this.windowElem.clientWidth * revScale;
       const height = this.windowElem.clientHeight * revScale;
 
