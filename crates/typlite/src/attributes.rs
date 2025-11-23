@@ -23,8 +23,12 @@ pub mod md_attr {
         media -> media
         src -> src
         alt -> alt
+        source -> source
+        width -> width
+        height -> height
         level -> level
         dest -> dest
+        kind -> kind
         lang -> lang
         block -> block
         text -> text
@@ -33,6 +37,17 @@ pub mod md_attr {
         caption -> caption
         class -> class
         id -> id
+        tight -> tight
+        reversed -> reversed
+        start -> start
+        columns -> columns
+        numbering -> numbering
+        target -> target
+        supplement -> supplement
+        key -> key
+        full -> full
+        title -> title
+        style -> style
     }
 }
 
@@ -46,19 +61,22 @@ pub struct IdocAttr {
 pub struct HeadingAttr {
     pub id: EcoString,
     pub level: usize,
+    pub numbering: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
 pub struct ImageAttr {
     pub id: EcoString,
-    pub src: EcoString,
+    pub source: EcoString,
     pub alt: EcoString,
+    pub width: EcoString,
+    pub height: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
 pub struct FigureAttr {
     pub id: EcoString,
-    pub caption: EcoString,
+    pub kind: EcoString,
 }
 
 #[derive(TypliteAttr, Default)]
@@ -80,8 +98,30 @@ pub struct ListItemAttr {
 }
 
 #[derive(TypliteAttr, Default)]
+pub struct ListAttr {
+    pub tight: bool,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct EnumAttr {
+    pub tight: bool,
+    pub start: Option<u32>,
+    pub reversed: bool,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct TermsAttr {
+    pub tight: bool,
+}
+
+#[derive(TypliteAttr, Default)]
 pub struct AlertsAttr {
     pub class: EcoString,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct TableAttr {
+    pub columns: Option<usize>,
 }
 
 pub trait TypliteAttrsParser {
@@ -114,6 +154,10 @@ impl TypliteAttrParser for u32 {
 
 impl TypliteAttrParser for bool {
     fn parse_attr(content: &EcoString) -> Result<Self> {
+        if content.is_empty() {
+            return Ok(false);
+        }
+
         Ok(content
             .parse::<bool>()
             .map_err(|_| format!("cannot parse {content} as bool"))?)
@@ -131,7 +175,7 @@ where
     T: TypliteAttrParser,
 {
     fn parse_attr(content: &EcoString) -> Result<Self> {
-        if content.is_empty() {
+        if content.is_empty() || content.as_str() == "auto" {
             Ok(None)
         } else {
             T::parse_attr(content).map(Some)

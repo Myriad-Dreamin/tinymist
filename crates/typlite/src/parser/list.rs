@@ -5,12 +5,21 @@ use ecow::eco_format;
 use typst_html::{HtmlElement, HtmlNode, tag};
 
 use crate::Result;
-use crate::attributes::{ListItemAttr, TypliteAttrsParser};
+use crate::attributes::{EnumAttr, ListAttr, ListItemAttr, TypliteAttrsParser};
+use crate::tags::md_tag;
 
 use super::core::HtmlToAstParser;
 
 /// List parser
 pub struct ListParser;
+
+enum StructuredListKind {
+    Unordered,
+    Ordered {
+        start: Option<u32>,
+        reversed: bool,
+    },
+}
 
 impl ListParser {
     /// Convert HTML list to ListItem vector
@@ -85,5 +94,139 @@ impl ListParser {
         parser.list_level -= 1;
 
         Ok(all_items)
+    }
+
+    fn convert_structured_list(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+        kind: StructuredListKind,
+    ) -> Result<Node> {
+        let ordered = matches!(kind, StructuredListKind::Ordered { .. });
+        let mut items = Self::convert_structured_list_items(parser, element, ordered)?;
+
+        if let StructuredListKind::Ordered { start, reversed } = kind {
+            if reversed {
+                let mut current = start.unwrap_or(items.len().max(1) as u32);
+                for item in items.iter_mut() {
+                    if let ListItem::Ordered { number, .. } = item {
+                        *number = Some(current);
+                        current = current.saturating_sub(1);
+                    }
+                }
+                return Ok(Node::OrderedList {
+                    start: start.unwrap_or(items.len().max(1) as u32),
+                    items,
+                });
+            } else {
+                return Ok(Node::OrderedList {
+                    start: start.unwrap_or(1),
+                    items,
+                });
+            }
+        }
+
+        Ok(Node::UnorderedList(items))
+    }
+
+    fn convert_structured_list_items(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+        ordered: bool,
+    ) -> Result<Vec<ListItem>> {
+        parser.list_level += 1;
+        let prev_buffer = std::mem::take(&mut parser.inline_buffer);
+        let mut all_items = Vec::new();
+
+        for child in &element.children {
+            if let HtmlNode::Element(li) = child
+                && li.tag == md_tag::item
+            {
+                let mut item_content = Vec::new();
+                let mut li_buffer = Vec::new();
+
+                if parser.feat.annotate_elem {
+                    li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
+                        "typlite:begin:list-item {}",
+                        parser.list_level - 1
+                    )))));
+                }
+
+                for li_child in &li.children {
+                    match li_child {
+                        HtmlNode::Text(text, _) => li_buffer.push(Node::Text(text.clone())),
+                        HtmlNode::Element(child_elem) => {
+                            let element_content =
+                                parser.process_list_item_element(child_elem)?;
+
+                            if !li_buffer.is_empty() {
+                                item_content
+                                    .push(Node::Paragraph(std::mem::take(&mut li_buffer)));
+                            }
+
+                            if !element_content.is_empty() {
+                                item_content.extend(element_content);
+                            }
+                        }
+                        HtmlNode::Frame(frame) => {
+                            li_buffer.push(parser.convert_frame(&frame.inner));
+                        }
+                        HtmlNode::Tag(..) => {}
+                    }
+                }
+
+                if parser.feat.annotate_elem {
+                    li_buffer.push(Node::Custom(Box::new(super::core::Comment(eco_format!(
+                        "typlite:end:list-item {}",
+                        parser.list_level - 1
+                    )))));
+                }
+
+                if !li_buffer.is_empty() {
+                    item_content.push(Node::Paragraph(std::mem::take(&mut li_buffer)));
+                }
+
+                if !item_content.is_empty() {
+                    if ordered {
+                        all_items.push(ListItem::Ordered {
+                            number: None,
+                            content: item_content,
+                        });
+                    } else {
+                        all_items.push(ListItem::Unordered {
+                            content: item_content,
+                        });
+                    }
+                }
+            }
+        }
+
+        parser.inline_buffer = prev_buffer;
+        parser.list_level -= 1;
+
+        Ok(all_items)
+    }
+
+    pub fn convert_m1_list(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+        attrs: &ListAttr,
+    ) -> Result<Node> {
+        let _ = attrs;
+        Self::convert_structured_list(parser, element, StructuredListKind::Unordered)
+    }
+
+    pub fn convert_m1_enum(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+        attrs: &EnumAttr,
+    ) -> Result<Node> {
+        Self::convert_structured_list(
+            parser,
+            element,
+            StructuredListKind::Ordered {
+                start: attrs.start,
+                reversed: attrs.reversed,
+            },
+        )
     }
 }

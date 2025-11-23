@@ -8,6 +8,7 @@ use typst_html::{HtmlElement, HtmlNode, tag};
 use typst_syntax::Span;
 
 use crate::Result;
+use crate::attributes::{TableAttr, TypliteAttrsParser};
 use crate::common::InlineNode;
 use crate::tags::md_tag;
 
@@ -26,6 +27,19 @@ impl TableStructureFinder {
             // For m1table -> table
             Self::find_table_direct(element)
         }
+    }
+
+    pub fn is_structured_table(element: &HtmlElement) -> bool {
+        element.children.iter().any(|child| {
+            if let HtmlNode::Element(elem) = child {
+                matches!(
+                    elem.tag,
+                    md_tag::cell | md_tag::header | md_tag::footer
+                )
+            } else {
+                false
+            }
+        })
     }
 
     fn find_table_in_grid(grid_element: &HtmlElement) -> Option<&HtmlElement> {
@@ -277,6 +291,10 @@ impl TableParser {
         parser: &mut HtmlToAstParser,
         element: &HtmlElement,
     ) -> Result<Option<Node>> {
+        if element.tag == md_tag::table && TableStructureFinder::is_structured_table(element) {
+            return Self::convert_structured_table(parser, element);
+        }
+
         // Find the real table element
         let real_table_elem = TableStructureFinder::find_real_table_element(element);
 
@@ -321,6 +339,98 @@ impl TableParser {
         }
 
         Ok(None)
+    }
+
+    fn convert_structured_table(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+    ) -> Result<Option<Node>> {
+        let attrs = TableAttr::parse(&element.attrs)?;
+        let mut header_row: Vec<Node> = Vec::new();
+        let mut extra_header_rows: Vec<Vec<Node>> = Vec::new();
+        let mut footer_rows: Vec<Vec<Node>> = Vec::new();
+        let mut body_cells: Vec<Node> = Vec::new();
+
+        for child in &element.children {
+            if let HtmlNode::Element(child_elem) = child {
+                match child_elem.tag {
+                    md_tag::header => {
+                        let row = Self::convert_structured_row(parser, child_elem)?;
+                        if header_row.is_empty() {
+                            header_row = row;
+                        } else {
+                            extra_header_rows.push(row);
+                        }
+                    }
+                    md_tag::footer => {
+                        footer_rows.push(Self::convert_structured_row(parser, child_elem)?);
+                    }
+                    md_tag::cell => {
+                        body_cells.push(Self::convert_structured_cell(parser, child_elem)?);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let columns = attrs.columns.unwrap_or(header_row.len().max(1)).max(1);
+
+        let mut rows = Vec::new();
+        if !body_cells.is_empty() {
+            for chunk in body_cells.chunks(columns) {
+                rows.push(chunk.to_vec());
+            }
+        }
+
+        if header_row.is_empty() && !rows.is_empty() {
+            header_row = rows.remove(0);
+        }
+
+        if !extra_header_rows.is_empty() {
+            for row in extra_header_rows.into_iter().rev() {
+                rows.insert(0, row);
+            }
+        }
+
+        rows.extend(footer_rows);
+
+        if header_row.is_empty() && rows.is_empty() {
+            return Ok(None);
+        }
+
+        let alignment_len = header_row.len().max(1);
+
+        Ok(Some(Node::Table {
+            headers: header_row,
+            alignments: vec![TableAlignment::None; alignment_len],
+            rows,
+        }))
+    }
+
+    fn convert_structured_row(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+    ) -> Result<Vec<Node>> {
+        let mut cells = Vec::new();
+        for child in &element.children {
+            if let HtmlNode::Element(cell) = child
+                && cell.tag == md_tag::cell
+            {
+                cells.push(Self::convert_structured_cell(parser, cell)?);
+            }
+        }
+        Ok(cells)
+    }
+
+    fn convert_structured_cell(
+        parser: &mut HtmlToAstParser,
+        cell: &HtmlElement,
+    ) -> Result<Node> {
+        let (mut inline_nodes, block_nodes) = parser.capture_children(cell)?;
+        if !block_nodes.is_empty() {
+            inline_nodes.extend(block_nodes);
+        }
+        Ok(TableContentExtractor::merge_cell_content(inline_nodes))
     }
 }
 

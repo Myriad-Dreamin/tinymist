@@ -37,7 +37,7 @@
 )
 
 #let rewrap(tag) = {
-  return x => elem(tag, x.body)
+  return x => html.span(elem(tag, x.body))
 }
 
 #let attributed(tag, attrs) = {
@@ -83,12 +83,17 @@
   ..(
     (ref, ("target", "supplement")),
     (cite, ("key", "supplement")),
-    (raw, ("text", "block", "lang")),
     (image, ("source", "alt", "width", "height")),
   ).map(x => (
     x.first(),
     attributed(repr(x.first()), x.last()),
   )),
+  (
+    raw,
+    it => if it.block { elem("raw", text: it.text, block: it.block, lang: it.lang) } else {
+      html.span(elem("raw", text: it.text, block: it.block, lang: it.lang))
+    },
+  ),
   (list, it => elem("list", tight: it.tight, ..it.children.map(it => elem("item", it.body)))),
   (
     enum,
