@@ -69,8 +69,8 @@ impl HtmlToAstParser {
 
             tag::strong | md_tag::strong => self.convert_strong(element),
             tag::em | md_tag::emph => self.convert_emphasis(element),
-            tag::mark => self.convert_highlight(element),
-            tag::s => self.convert_strikethrough(element),
+            tag::mark | md_tag::highlight => self.convert_highlight(element),
+            tag::s | md_tag::strike => self.convert_strikethrough(element),
 
             tag::br => {
                 self.inline_buffer.push(Node::HardBreak);

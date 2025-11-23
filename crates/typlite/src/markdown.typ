@@ -52,6 +52,15 @@
   return (..x) => res
 }
 
+#let child-number(it) = {
+  let value = it.fields().at("number", default: none)
+  if value == auto {
+    none
+  } else {
+    value
+  }
+}
+
 #let rules = (
   ..(
     strong,
@@ -94,12 +103,16 @@
       html.span(elem("raw", text: it.text, block: it.block, lang: it.lang))
     },
   ),
-  (list, it => elem("list", tight: it.tight, ..it.children.map(it => elem("item", it.body)))),
+  (list, it => elem("list", tight: it.tight, ..it.children.map(child => elem("item", child.body)))),
   (
     enum,
-    it => elem("enum", reversed: it.reversed, start: it.start, tight: it.tight, ..it.children.map(
-      it => elem("item", it.body),
-    )),
+    it => elem(
+      "enum",
+      reversed: it.reversed,
+      start: it.start,
+      tight: it.tight,
+      ..it.children.map(child => elem("item", value: child-number(child), child.body)),
+    ),
   ),
   (
     terms,
@@ -124,12 +137,12 @@
       "table",
       columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
       ..it.children.map(
-        child => if type(child) == table.cell {
+        child => if child.func() == table.cell {
           elem(
             "cell",
             child.body,
           )
-        } else if type(child) == table.header {
+        } else if child.func() == table.header {
           elem(
             "header",
             ..child.cells.map(
@@ -139,7 +152,7 @@
               ),
             ),
           )
-        } else if type(child) == table.footer {
+        } else if child.func() == table.footer {
           elem(
             "footer",
             ..child.cells.map(
