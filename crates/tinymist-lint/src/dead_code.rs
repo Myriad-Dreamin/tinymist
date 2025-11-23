@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use tinymist_analysis::{
     adt::interner::Interned,
-    syntax::{Decl, Expr, ExprInfo},
+    syntax::{Decl, Expr, ExprInfo, RefExpr},
 };
 use tinymist_project::LspWorld;
 use typst::{ecow::EcoVec, syntax::FileId};
@@ -154,9 +154,7 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
 
     for r in ei.resolves.values() {
         if matches!(r.decl.as_ref(), Decl::IdentRef(_)) {
-            if let Some(Expr::Decl(step_decl)) = r.step.as_ref() {
-                used.insert(step_decl.clone());
-            }
+            collect_used_decls(r.as_ref(), &mut used);
         }
     }
 
@@ -184,6 +182,42 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         module_children,
         module_targets,
         used_module_files,
+    }
+}
+
+fn collect_used_decls(reference: &RefExpr, used: &mut HashSet<Interned<Decl>>) {
+    let mut visited_refs = HashSet::new();
+    if let Some(step) = reference.step.as_ref() {
+        collect_decl_from_expr(step, used, &mut visited_refs);
+    }
+    if let Some(root) = reference.root.as_ref() {
+        collect_decl_from_expr(root, used, &mut visited_refs);
+    }
+}
+
+fn collect_decl_from_expr(
+    expr: &Expr,
+    used: &mut HashSet<Interned<Decl>>,
+    visited_refs: &mut HashSet<Interned<RefExpr>>,
+) {
+    match expr {
+        Expr::Decl(decl) => {
+            used.insert(decl.clone());
+        }
+        Expr::Ref(reference) => {
+            if visited_refs.insert(reference.clone()) {
+                if let Some(step) = reference.step.as_ref() {
+                    collect_decl_from_expr(step, used, visited_refs);
+                }
+                if let Some(root) = reference.root.as_ref() {
+                    collect_decl_from_expr(root, used, visited_refs);
+                }
+            }
+        }
+        Expr::Select(select) => {
+            collect_decl_from_expr(&select.lhs, used, visited_refs);
+        }
+        _ => {}
     }
 }
 
@@ -235,6 +269,7 @@ fn matches_pattern(name: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     #[test]
     fn test_pattern_matching() {
@@ -243,5 +278,26 @@ mod tests {
         assert!(matches_pattern("my_test", "*_test"));
         assert!(matches_pattern("foo_test_bar", "*_test_*"));
         assert!(!matches_pattern("foo", "bar"));
+    }
+
+    #[test]
+    fn collect_used_decls_marks_root_and_step() {
+        use tinymist_analysis::adt::interner::Interned;
+
+        let module_decl = Interned::new(Decl::lit_(Interned::new_str("module")));
+        let import_decl = Interned::new(Decl::lit_(Interned::new_str("imported")));
+
+        let reference = RefExpr {
+            decl: import_decl.clone(),
+            step: Some(Expr::Decl(import_decl.clone())),
+            root: Some(Expr::Decl(module_decl.clone())),
+            term: None,
+        };
+
+        let mut used = HashSet::new();
+        collect_used_decls(&reference, &mut used);
+
+        assert!(used.contains(&module_decl));
+        assert!(used.contains(&import_decl));
     }
 }
