@@ -458,7 +458,8 @@ impl HtmlToAstParser {
     }
 
     fn is_inline_equation_context(&self) -> bool {
-        match self.element_stack.last() {
+        matches!(
+            self.element_stack.last(),
             Some(parent)
                 if *parent == tag::p
                     || *parent == tag::span
@@ -467,12 +468,8 @@ impl HtmlToAstParser {
                     || *parent == tag::em
                     || *parent == tag::strong
                     || *parent == md_tag::item
-                    || *parent == md_tag::body =>
-            {
-                true
-            }
-            _ => false,
-        }
+                    || *parent == md_tag::body
+        )
     }
 
     pub fn is_block_element(element: &HtmlElement) -> bool {
