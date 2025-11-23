@@ -15,7 +15,7 @@ use typst_html::{HtmlElement, HtmlNode, HtmlTag, tag};
 use crate::Result;
 use crate::TypliteFeat;
 use crate::attributes::{
-    AlertsAttr, EnumAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr, TypliteAttrsParser, md_attr,
+    AlertsAttr, EnumAttr, EquationAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr, TypliteAttrsParser, md_attr,
 };
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
@@ -445,31 +445,17 @@ impl HtmlToAstParser {
     }
 
     pub fn convert_equation(&mut self, element: &HtmlElement) -> Result<()> {
-        if self.is_inline_equation_context() {
-            self.convert_children(element)?;
-        } else {
+        let attrs = EquationAttr::parse(&element.attrs)?;
+        if attrs.block {
             self.flush_inline_buffer();
             self.convert_children(element)?;
             let content = std::mem::take(&mut self.inline_buffer);
             self.blocks
                 .push(Node::Custom(Box::new(CenterNode::new(content))));
+        } else {
+            self.convert_children(element)?;
         }
         Ok(())
-    }
-
-    fn is_inline_equation_context(&self) -> bool {
-        matches!(
-            self.element_stack.last(),
-            Some(parent)
-                if *parent == tag::p
-                    || *parent == tag::span
-                    || *parent == tag::li
-                    || *parent == tag::a
-                    || *parent == tag::em
-                    || *parent == tag::strong
-                    || *parent == md_tag::item
-                    || *parent == md_tag::body
-        )
     }
 
     pub fn is_block_element(element: &HtmlElement) -> bool {

@@ -93,6 +93,11 @@ pub struct RawAttr {
 }
 
 #[derive(TypliteAttr, Default)]
+pub struct EquationAttr {
+    pub block: bool,
+}
+
+#[derive(TypliteAttr, Default)]
 pub struct ListItemAttr {
     pub value: Option<u32>,
 }

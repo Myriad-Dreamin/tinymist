@@ -253,9 +253,9 @@
     it => if sys.inputs.at("x-remove-html", default: none) == "true" {
       process-math-eq(it.body).flatten().join()
     } else if it.block {
-      elem("equation", html.frame(block(inset: 0.5em, it)))
+      elem("equation", block: it.block, html.frame(block(inset: 0.5em, it)))
     } else {
-      html.span(elem("equation", html.frame(block(inset: 0.5em, it))))
+      html.span(elem("equation", block: it.block, html.frame(block(inset: 0.5em, it))))
     },
   ),
   it => elem("document", it),
