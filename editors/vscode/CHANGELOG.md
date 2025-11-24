@@ -9,6 +9,15 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.4 - [2025-11-25]
+
+### Preview
+
+* (Fixed) fix irresponsive preview caused by incorrect scroll handling by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2269
+  * This was introduced in https://github.com/Myriad-Dreamin/tinymist/pull/2145
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.2...v0.14.4
+
 ## v0.14.2 - [2025-11-22]
 
 ### Server
