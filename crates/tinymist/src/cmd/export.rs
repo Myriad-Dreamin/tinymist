@@ -34,7 +34,7 @@ struct ExportPdfOpts {
     /// document is written to provide a baseline of accessibility. In some
     /// circumstances (for example when trying to reduce the size of a document)
     /// it can be desirable to disable tagged PDF.
-    pub no_pdf_tags: bool,
+    pub no_pdf_tags: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -103,6 +103,7 @@ impl ServerState {
         } else {
             self.config.creation_timestamp()
         };
+        let no_pdf_tags = opts.no_pdf_tags.unwrap_or(self.config.no_pdf_tags());
         let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
 
         let export = self.config.export_task();
@@ -111,7 +112,7 @@ impl ServerState {
                 export,
                 pages: opts.pages,
                 pdf_standards: pdf_standards.unwrap_or_default(),
-                no_pdf_tags: opts.no_pdf_tags,
+                no_pdf_tags,
                 creation_timestamp,
             }),
             args,
