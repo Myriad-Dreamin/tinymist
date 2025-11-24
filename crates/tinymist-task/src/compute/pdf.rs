@@ -1,6 +1,7 @@
 //! The computation for pdf export.
 
 use tinymist_std::time::ToUtcDateTime;
+use tinymist_world::args::PdfStandard;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
 pub use typst_pdf::pdf;
 
@@ -64,21 +65,41 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
                 "the resulting PDF will be inaccessible because using --pages implies --no-pdf-tags"
             );
         }
+        if !tagged {
+            const ACCESSIBLE: &[(PdfStandard, &str)] = &[
+                (PdfStandard::A_1a, "PDF/A-1a"),
+                (PdfStandard::A_2a, "PDF/A-2a"),
+                (PdfStandard::A_3a, "PDF/A-3a"),
+                (PdfStandard::Ua_1, "PDF/UA-1"),
+            ];
+
+            for (standard, name) in ACCESSIBLE {
+                if config.pdf_standards.contains(standard) {
+                    if config.no_pdf_tags {
+                        log::warn!("cannot disable PDF tags when exporting a {name} document");
+                    } else {
+                        log::warn!(
+                            "cannot disable PDF tags when exporting a {name} document. Hint: using --pages implies --no-pdf-tags"
+                        );
+                    }
+                }
+            }
+        }
+
+        let options = PdfOptions {
+            page_ranges: config
+                .pages
+                .as_ref()
+                .map(|pages| exported_page_ranges(pages)),
+            timestamp: Some(timestamp),
+            standards,
+            tagged,
+            ..Default::default()
+        };
+        // log::info!("used options for pdf export: {options:?}");
 
         // todo: Some(pdf_uri.as_str())
         // todo: ident option
-        Ok(Bytes::new(typst_pdf::pdf(
-            doc,
-            &PdfOptions {
-                page_ranges: config
-                    .pages
-                    .as_ref()
-                    .map(|pages| exported_page_ranges(pages)),
-                timestamp: Some(timestamp),
-                standards,
-                tagged,
-                ..Default::default()
-            },
-        )?))
+        Ok(Bytes::new(typst_pdf::pdf(doc, &options)?))
     }
 }
