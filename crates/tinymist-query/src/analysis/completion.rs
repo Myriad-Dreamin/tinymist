@@ -16,13 +16,11 @@ use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use typst::World;
 use typst::foundations::{
-    AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str,
-    repr,
+    AutoValue, Func, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str, repr,
 };
 use typst::syntax::ast::{self, AstNode, Param};
 use typst::syntax::{is_id_continue, is_id_start, is_ident};
 use typst::text::RawElem;
-use typst::visualize::Color;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 

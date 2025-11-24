@@ -31,8 +31,8 @@ percent-encoding.workspace = true
 rayon.workspace = true
 regex.workspace = true
 rpds.workspace = true
-rust_iso639.workspace = true
-rust_iso3166.workspace = true
+rust_iso639 = { workspace = true, optional = true }
+rust_iso3166 = { workspace = true, optional = true }
 rustc-hash.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -71,6 +71,7 @@ hex = { version = "0.4" }
 [features]
 local-registry = ["tinymist-world/system"]
 system = ["tinymist-project/system"]
+lsp = ["rust_iso639", "rust_iso3166"]
 
 [lints]
 workspace = true

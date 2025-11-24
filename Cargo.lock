@@ -2529,6 +2529,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mini-internal"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "560f32b6891d8d9bade8942c45a27694f16d789d3b4b8e6b7135a5240de0a8af"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "miniserde"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac79f4123c070de643a7a93b9339abf18c30005c622bf4b1c29c2c0960f52d39"
+dependencies = [
+ "itoa",
+ "mini-internal",
+ "ryu",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4653,6 +4675,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "tinymist-index"
+version = "0.14.2"
+dependencies = [
+ "comemo",
+ "lsp-types",
+ "miniserde",
+ "serde_json",
+ "tinymist-analysis",
+ "tinymist-project",
+ "tinymist-query",
+ "tinymist-std",
+ "wasm-minimal-protocol",
+]
+
+[[package]]
 name = "tinymist-l10n"
 version = "0.14.0"
 dependencies = [
@@ -5912,6 +5949,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "venial"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61584a325b16f97b5b25fcc852eb9550843a251057a5e3e5992d2376f3df4bb2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "vergen"
 version = "8.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6035,6 +6082,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a05d73b933a847d6cccdda8f838a22ff101ad9bf93e33684f39c1f5f0eece3d"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "wasm-minimal-protocol"
+version = "0.1.0"
+source = "git+https://github.com/astrale-sharp/wasm-minimal-protocol#c51acd43095fe9da8fa943e064618e486fd2b58d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "venial",
 ]
 
 [[package]]
