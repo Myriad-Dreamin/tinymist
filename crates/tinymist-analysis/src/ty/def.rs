@@ -535,10 +535,191 @@ impl PartialOrd for InsTy {
 
 impl Ord for InsTy {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.val
-            .partial_cmp(&other.val)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        cmp_value(&self.val, &other.val)
     }
+}
+
+fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
+    match x.partial_cmp(y) {
+        Some(order) => order,
+        None => {
+            let x_dis = val_discriminant(x);
+            let y_dis = val_discriminant(y);
+            if x_dis == y_dis {
+                match (&x, &y) {
+                    (Value::Str(x), Value::Str(y)) => x.cmp(y),
+                    (Value::Bool(x), Value::Bool(y)) => x.cmp(y),
+                    (Value::Int(x), Value::Int(y)) => x.cmp(y),
+                    (Value::Decimal(x), Value::Decimal(y)) => x.cmp(y),
+                    (Value::Angle(x), Value::Angle(y)) => x.cmp(y),
+                    (Value::Ratio(x), Value::Ratio(y)) => x.cmp(y),
+                    (Value::Fraction(x), Value::Fraction(y)) => x.cmp(y),
+                    (Value::Version(x), Value::Version(y)) => x.cmp(y),
+                    (Value::Bytes(x), Value::Bytes(y)) => x.cmp(y),
+                    (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
+                    (Value::Type(x), Value::Type(y)) => x.cmp(y),
+                    (Value::None, Value::None) | (Value::Auto, Value::Auto) => {
+                        std::cmp::Ordering::Equal
+                    }
+                    (Value::Array(x), Value::Array(y)) => {
+                        cmp_by(x.iter(), y.iter(), cmp_value, || x.len().cmp(&y.len()))
+                    }
+                    (Value::Dict(x), Value::Dict(y)) => cmp_by(
+                        x.iter(),
+                        y.iter(),
+                        |(xk, xv), (yk, yv)| xk.cmp(yk).then_with(|| cmp_value(xv, yv)),
+                        || x.len().cmp(&y.len()),
+                    ),
+                    (Value::Label(x), Value::Label(y)) => x.resolve().cmp(&y.resolve()),
+                    (Value::Float(x), Value::Float(y)) => x.to_bits().cmp(&y.to_bits()),
+                    (Value::Length(x), Value::Length(y)) => {
+                        x.abs.cmp(&y.abs).then_with(|| x.em.cmp(&y.em))
+                    }
+                    (Value::Relative(x), Value::Relative(y)) => x.rel.cmp(&y.rel).then_with(|| {
+                        x.abs
+                            .abs
+                            .cmp(&y.abs.abs)
+                            .then_with(|| x.abs.em.cmp(&y.abs.em))
+                    }),
+                    (Value::Func(x), Value::Func(y)) => {
+                        if !x.span().is_detached() && !y.span().is_detached() {
+                            return x.span().into_raw().cmp(&y.span().into_raw());
+                        }
+
+                        use typst::foundations::func::Repr;
+                        match (x.inner(), y.inner()) {
+                            (Repr::Element(x), Repr::Element(y)) => x.cmp(y),
+                            _ => tinymist_std::hash::hash128(&x)
+                                .cmp(&tinymist_std::hash::hash128(&y)),
+                        }
+                    }
+                    (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
+                        (Some(x), Some(y)) => x.cmp(&y),
+                        (Some(..), None) => std::cmp::Ordering::Less,
+                        (None, Some(..)) => std::cmp::Ordering::Greater,
+                        (None, None) => {
+                            tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                        }
+                    },
+                    (Value::Args(x), Value::Args(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Color(x), Value::Color(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Gradient(x), Value::Gradient(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Tiling(x), Value::Tiling(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Symbol(x), Value::Symbol(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Datetime(x), Value::Datetime(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Content(x), Value::Content(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Styles(x), Value::Styles(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    (Value::Dyn(x), Value::Dyn(y)) => {
+                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                    }
+                    _ => tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y)),
+                }
+            } else {
+                x_dis.cmp(&y_dis)
+            }
+        }
+    }
+}
+
+fn cmp_by<T>(
+    mut x_iter: impl Iterator<Item = T>,
+    mut y_iter: impl Iterator<Item = T>,
+    cmp: impl Fn(T, T) -> std::cmp::Ordering,
+    cmp_len: impl Fn() -> std::cmp::Ordering,
+) -> std::cmp::Ordering {
+    while let (Some(x_item), Some(y_item)) = (x_iter.next(), y_iter.next()) {
+        let cmp = cmp(x_item, y_item);
+        if cmp != std::cmp::Ordering::Equal {
+            return cmp;
+        }
+    }
+
+    cmp_len()
+}
+
+fn val_discriminant(val: &Value) -> TypstValueEnum {
+    match val {
+        Value::Str(..) => TypstValueEnum::Str,
+        Value::None => TypstValueEnum::None,
+        Value::Auto => TypstValueEnum::Auto,
+        Value::Array(..) => TypstValueEnum::Array,
+        Value::Args(..) => TypstValueEnum::Args,
+        Value::Dict(..) => TypstValueEnum::Dict,
+        Value::Module(..) => TypstValueEnum::Module,
+        Value::Func(..) => TypstValueEnum::Func,
+        Value::Label(..) => TypstValueEnum::Label,
+        Value::Bool(..) => TypstValueEnum::Bool,
+        Value::Int(..) => TypstValueEnum::Int,
+        Value::Float(..) => TypstValueEnum::Float,
+        Value::Decimal(..) => TypstValueEnum::Decimal,
+        Value::Length(..) => TypstValueEnum::Length,
+        Value::Angle(..) => TypstValueEnum::Angle,
+        Value::Ratio(..) => TypstValueEnum::Ratio,
+        Value::Relative(..) => TypstValueEnum::Relative,
+        Value::Fraction(..) => TypstValueEnum::Fraction,
+        Value::Color(..) => TypstValueEnum::Color,
+        Value::Gradient(..) => TypstValueEnum::Gradient,
+        Value::Tiling(..) => TypstValueEnum::Tiling,
+        Value::Symbol(..) => TypstValueEnum::Symbol,
+        Value::Version(..) => TypstValueEnum::Version,
+        Value::Bytes(..) => TypstValueEnum::Bytes,
+        Value::Datetime(..) => TypstValueEnum::Datetime,
+        Value::Duration(..) => TypstValueEnum::Duration,
+        Value::Content(..) => TypstValueEnum::Content,
+        Value::Styles(..) => TypstValueEnum::Styles,
+        Value::Type(..) => TypstValueEnum::Type,
+        Value::Dyn(..) => TypstValueEnum::Dyn,
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum TypstValueEnum {
+    Str,
+    None,
+    Auto,
+    Array,
+    Args,
+    Dict,
+    Module,
+    Func,
+    Label,
+    Bool,
+    Int,
+    Float,
+    Decimal,
+    Length,
+    Angle,
+    Ratio,
+    Relative,
+    Fraction,
+    Color,
+    Gradient,
+    Tiling,
+    Symbol,
+    Version,
+    Bytes,
+    Datetime,
+    Duration,
+    Content,
+    Styles,
+    Type,
+    Dyn,
 }
 
 impl InsTy {
