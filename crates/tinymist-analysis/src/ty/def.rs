@@ -589,46 +589,33 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                         use typst::foundations::func::Repr;
                         match (x.inner(), y.inner()) {
                             (Repr::Element(x), Repr::Element(y)) => x.cmp(y),
-                            _ => tinymist_std::hash::hash128(&x)
-                                .cmp(&tinymist_std::hash::hash128(&y)),
+                            _ => ptr_cmp(x, y),
                         }
+                    }
+                    (Value::Args(x), Value::Args(y)) => {
+                        if !x.span.is_detached() && !y.span.is_detached() {
+                            return x.span.into_raw().cmp(&y.span.into_raw());
+                        }
+
+                        ptr_cmp(x, y)
                     }
                     (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
                         (Some(x), Some(y)) => x.cmp(&y),
                         (Some(..), None) => std::cmp::Ordering::Less,
                         (None, Some(..)) => std::cmp::Ordering::Greater,
-                        (None, None) => {
-                            tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                        }
+                        (None, None) => ptr_cmp(x, y),
                     },
-                    (Value::Args(x), Value::Args(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Color(x), Value::Color(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Gradient(x), Value::Gradient(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Tiling(x), Value::Tiling(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Symbol(x), Value::Symbol(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
                     (Value::Datetime(x), Value::Datetime(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
+                        x.partial_cmp(y).unwrap_or_else(|| ptr_cmp(x, y))
                     }
-                    (Value::Content(x), Value::Content(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Styles(x), Value::Styles(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    (Value::Dyn(x), Value::Dyn(y)) => {
-                        tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y))
-                    }
-                    _ => tinymist_std::hash::hash128(&x).cmp(&tinymist_std::hash::hash128(&y)),
+                    (Value::Color(x), Value::Color(y)) => ptr_cmp(x, y),
+                    (Value::Gradient(x), Value::Gradient(y)) => ptr_cmp(x, y),
+                    (Value::Tiling(x), Value::Tiling(y)) => ptr_cmp(x, y),
+                    (Value::Symbol(x), Value::Symbol(y)) => ptr_cmp(x, y),
+                    (Value::Content(x), Value::Content(y)) => ptr_cmp(x, y),
+                    (Value::Styles(x), Value::Styles(y)) => ptr_cmp(x, y),
+                    (Value::Dyn(x), Value::Dyn(y)) => ptr_cmp(x, y),
+                    _ => ptr_cmp(x, y),
                 }
             } else {
                 x_dis.cmp(&y_dis)
@@ -685,6 +672,16 @@ fn val_discriminant(val: &Value) -> TypstValueEnum {
         Value::Styles(..) => TypstValueEnum::Styles,
         Value::Type(..) => TypstValueEnum::Type,
         Value::Dyn(..) => TypstValueEnum::Dyn,
+    }
+}
+
+fn ptr_cmp<T: PartialEq>(x: &T, y: &T) -> std::cmp::Ordering {
+    if x == y {
+        std::cmp::Ordering::Equal
+    } else {
+        let x = std::ptr::from_ref(x);
+        let y = std::ptr::from_ref(y);
+        x.cmp(&y)
     }
 }
 
