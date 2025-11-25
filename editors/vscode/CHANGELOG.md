@@ -11,6 +11,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ## v0.14.4 - [2025-11-25]
 
+### Server
+
+ * (Fix) Inheriting `no-pdf-tags` flag when running `exportPdf` command in https://github.com/Myriad-Dreamin/tinymist/pull/2277
+
 ### Preview
 
 * (Fixed) fix irresponsive preview caused by incorrect scroll handling by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2269
