@@ -7,13 +7,17 @@ export interface OptionSchema {
   type: "string" | "number" | "boolean" | "color" | "select";
   label: string;
   description?: string;
-  default: Scalar;
+  // default can be a single scalar or an array of scalars for multi-select
+  default: Scalar | Scalar[];
   options?: Array<{ value: Scalar; label: string }>;
+  // when true and type === 'select', UI should render a multi-select
+  multiple?: boolean;
   min?: number;
   max?: number;
   dependsOn?: string; // Key of another option that this option depends on
-  // Custom validation function for string fields
-  validate?: (value: string) => string | undefined; // Returns error message or undefined if valid
+  // Custom validation function for string fields.
+  // Returns a string error message when invalid, or undefined when valid.
+  validate?: (value: string) => string | undefined;
 }
 
 export interface ExportFormat {

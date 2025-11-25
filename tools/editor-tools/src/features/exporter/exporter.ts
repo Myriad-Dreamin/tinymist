@@ -9,7 +9,8 @@ export function useExporter() {
   const inputPath = van.state("");
   const outputPath = van.state("");
   const format = van.state(EXPORT_FORMATS[0]);
-  const optionStates: Record<string, State<Scalar>> = {};
+  // option value may be scalar or an array (multi-select)
+  const optionStates: Record<string, State<Scalar | Scalar[] | undefined>> = {};
 
   let previewVersion = 0;
   const previewGenerating = van.state(false);
@@ -20,7 +21,10 @@ export function useExporter() {
     const extraOpts = Object.fromEntries(
       format.val.options.map((option) => {
         const val = optionStates[option.key]?.val;
-        return [option.key, val === "" ? undefined : val];
+        // treat empty strings or empty arrays as undefined so the server can pick defaults
+        if (val === "") return [option.key, undefined];
+        if (Array.isArray(val) && val.length === 0) return [option.key, undefined];
+        return [option.key, val];
       }),
     );
     return {

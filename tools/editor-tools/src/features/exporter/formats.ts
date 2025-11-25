@@ -9,6 +9,18 @@ const PAGES_OPT: OptionSchema = {
   validate: validatePageRanges,
 };
 
+const IMAGE_PAGES_OPTS: OptionSchema[] = [
+  PAGES_OPT,
+  {
+    key: "png.pageNumberTemplate",
+    type: "string",
+    label: "Page Number Template",
+    description:
+      'Template used to render page numbers when exporting multiple pages (e.g., "Page {n}")',
+    default: "",
+  },
+];
+
 const MERGE_OPTS: OptionSchema[] = [
   {
     key: "merged",
@@ -54,6 +66,40 @@ export const EXPORT_FORMATS: ExportFormat[] = [
           }
         },
       },
+      {
+        key: "pdf.pdfStandards",
+        type: "select",
+        label: "PDF Standards",
+        description: "Optional multiple PDF standards to enforce (e.g. PDF/A, PDF/UA)",
+        default: [],
+        multiple: true,
+        options: [
+          { value: "V_1_4", label: "PDF 1.4" },
+          { value: "V_1_5", label: "PDF 1.5" },
+          { value: "V_1_6", label: "PDF 1.6" },
+          { value: "V_1_7", label: "PDF 1.7" },
+          { value: "V_2_0", label: "PDF 2.0" },
+          { value: "A_1b", label: "PDF/A-1b" },
+          { value: "A_1a", label: "PDF/A-1a" },
+          { value: "A_2b", label: "PDF/A-2b" },
+          { value: "A_2u", label: "PDF/A-2u" },
+          { value: "A_2a", label: "PDF/A-2a" },
+          { value: "A_3b", label: "PDF/A-3b" },
+          { value: "A_3u", label: "PDF/A-3u" },
+          { value: "A_3a", label: "PDF/A-3a" },
+          { value: "A_4", label: "PDF/A-4" },
+          { value: "A_4f", label: "PDF/A-4f" },
+          { value: "A_4e", label: "PDF/A-4e" },
+          { value: "Ua_1", label: "PDF/UA-1" },
+        ],
+      },
+      {
+        key: "pdf.noPdfTags",
+        type: "boolean",
+        label: "Disable PDF Tags",
+        description: "Do not include tagged structure in the PDF (may reduce accessibility).",
+        default: false,
+      },
     ],
   },
   {
@@ -61,7 +107,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     label: "PNG",
     fileExtension: "png",
     options: [
-      PAGES_OPT,
+      ...IMAGE_PAGES_OPTS,
       ...MERGE_OPTS,
       {
         key: "png.ppi",
@@ -90,7 +136,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     id: "svg",
     label: "SVG",
     fileExtension: "svg",
-    options: [PAGES_OPT, ...MERGE_OPTS],
+    options: [...IMAGE_PAGES_OPTS, ...MERGE_OPTS],
   },
   {
     id: "html",
