@@ -34,12 +34,12 @@ impl CompletionPair<'_, '_, '_> {
         #[cfg(feature = "local-registry")]
         {
             let local_packages_refs = self.worker.ctx.local_packages();
-            packages.extend(local_packages_refs.iter().map(|entry| entry.clone()));
+            packages.extend(local_packages_refs);
         }
 
         packages.sort_by_key(|entry| {
             (
-                entry.namespace.clone(),
+                entry.namespace.clone(), // FIXEME: lifetime issues if using ref
                 entry.package.name.clone(),
                 Reverse(entry.package.version),
             )

@@ -370,7 +370,15 @@ impl HoverWorker<'_> {
                             package_spec.namespace, package_spec.name, version
                         )
                     });
-                    let json_str = serde_json::to_string(&args).unwrap_or_default();
+                    let json_str = match serde_json::to_string(&args) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            log::error!(
+                                "Failed to serialize arguments for replaceText command: {e}"
+                            );
+                            continue;
+                        }
+                    };
                     let encoded = percent_encoding::utf8_percent_encode(
                         &json_str,
                         percent_encoding::NON_ALPHANUMERIC,

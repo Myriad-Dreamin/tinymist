@@ -92,8 +92,6 @@ where
     D: serde::Deserializer<'de>,
 {
     let timestamp = i64::deserialize(deserializer)?;
-    // Assuming UtcDateTime can be created from a Unix timestamp
-    // Adjust this based on the actual UtcDateTime API (e.g., if it's chrono::DateTime<Utc>)
     Ok(UtcDateTime::from_unix_timestamp(timestamp).ok())
 }
 
