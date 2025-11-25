@@ -12,7 +12,7 @@ const PAGES_OPT: OptionSchema = {
 const IMAGE_PAGES_OPTS: OptionSchema[] = [
   PAGES_OPT,
   {
-    key: "png.pageNumberTemplate",
+    key: "pageNumberTemplate",
     type: "string",
     label: "Page Number Template",
     description:
@@ -94,11 +94,11 @@ export const EXPORT_FORMATS: ExportFormat[] = [
         ],
       },
       {
-        key: "pdf.noPdfTags",
+        key: "pdf.pdfTags",
         type: "boolean",
-        label: "Disable PDF Tags",
-        description: "Do not include tagged structure in the PDF (may reduce accessibility).",
-        default: false,
+        label: "PDF Tags",
+        description: "Include tagged structure in the PDF for better accessibility.",
+        default: true,
       },
     ],
   },

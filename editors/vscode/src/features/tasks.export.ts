@@ -39,7 +39,7 @@ export interface ExportArgs {
 
   "pdf.creationTimestamp"?: string | null;
   "pdf.pdfStandards"?: string[];
-  "pdf.noPdfTags"?: boolean;
+  "pdf.pdfTags"?: boolean;
 
   "png.ppi"?: number;
 
@@ -146,7 +146,7 @@ export const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArg
         pages: ops.resolvePagesOpts("pdf"),
         creationTimestamp: exportArgs["pdf.creationTimestamp"],
         pdfStandards: exportArgs["pdf.pdfStandards"],
-        noPdfTags: exportArgs["pdf.noPdfTags"],
+        noPdfTags: !exportArgs["pdf.pdfTags"], // invert to noPdfTags
       };
     },
     export: tinymist.exportPdf,
