@@ -1,4 +1,6 @@
-use crate::{create_change_annotation, do_rename_file, edits_to_document_changes, prelude::*};
+use lsp_types::ChangeAnnotation;
+
+use crate::{do_rename_file, edits_to_document_changes, prelude::*};
 
 /// Handle [`workspace/willRenameFiles`] request is sent from the client to the
 /// server.
@@ -10,10 +12,10 @@ pub struct WillRenameFilesRequest {
     pub paths: Vec<(PathBuf, PathBuf)>,
 }
 
-impl StatefulRequest for WillRenameFilesRequest {
+impl SemanticRequest for WillRenameFilesRequest {
     type Response = WorkspaceEdit;
 
-    fn request(self, ctx: &mut LocalContext, _graph: LspComputeGraph) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
         self.paths
@@ -35,21 +37,25 @@ impl StatefulRequest for WillRenameFilesRequest {
             })
             .collect::<Option<Vec<()>>>()?;
         log::info!("did rename edits: {edits:?}");
-        let document_changes = edits_to_document_changes(edits, None);
+        let document_changes = edits_to_document_changes(edits);
         if document_changes.is_empty() {
             return None;
         }
 
-        let change_annotations = Some(create_change_annotation(
-            "Typst Rename Files",
-            true,
-            Some("Renaming files should update imports".to_string()),
-        ));
+        let mut change_annotations = HashMap::new();
+        change_annotations.insert(
+            "Typst Rename Files".to_string(),
+            ChangeAnnotation {
+                label: "Typst Rename Files".to_string(),
+                needs_confirmation: Some(true),
+                description: Some("Rename files should update imports".to_string()),
+            },
+        );
 
         Some(WorkspaceEdit {
             changes: None,
             document_changes: Some(lsp_types::DocumentChanges::Operations(document_changes)),
-            change_annotations,
+            change_annotations: Some(change_annotations),
         })
     }
 }

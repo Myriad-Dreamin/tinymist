@@ -1,4 +1,6 @@
 #![doc = include_str!("../README.md")]
+// todo: remove me
+#![allow(missing_docs)]
 
 use std::{
     io::Write,
@@ -50,6 +52,7 @@ pub struct CompileArgs {
 }
 
 fn main() -> Result<()> {
+    let _ = env_logger::try_init();
     // Parse command line arguments
     let args = CompileArgs::parse();
 
@@ -79,10 +82,10 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
         _ => Format::Md,
     };
 
-    if let Some(assets_path) = args.assets_path.as_ref() {
-        if !assets_path.exists() {
-            std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
-        }
+    if let Some(assets_path) = args.assets_path.as_ref()
+        && !assets_path.exists()
+    {
+        std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
     }
 
     let doc = Typlite::new(world.clone())
@@ -101,12 +104,19 @@ fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
         Format::Docx => Bytes::new(doc.to_docx()?),
     };
 
+    let warnings = doc.warnings();
+
     if is_stdout {
         std::io::stdout()
             .write_all(result.as_slice())
             .context("failed to write to stdout")?;
     } else if let Err(err) = std::fs::write(&output_path, result.as_slice()) {
         bail!("failed to write file {output_path:?}: {err}");
+    }
+
+    if !warnings.is_empty() {
+        print_diagnostics(world.as_ref(), warnings.iter(), DiagnosticFormat::Human)
+            .context_ut("print warnings")?;
     }
 
     Ok(())

@@ -13,6 +13,7 @@ rust-version.workspace = true
 
 [dependencies]
 typst-library.workspace = true
+typst-shim.workspace = true
 typst.workspace = true
 tinymist-std.workspace = true
 tinymist-analysis.workspace = true

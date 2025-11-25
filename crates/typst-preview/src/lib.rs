@@ -1,3 +1,6 @@
+// todo: remove me
+#![allow(missing_docs)]
+
 mod actor;
 mod debug_loc;
 mod outline;
@@ -11,6 +14,7 @@ pub use crate::outline::Outline;
 use std::sync::{Arc, OnceLock};
 use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
+use bytes::Bytes;
 use futures::sink::SinkExt;
 use reflexo_typst::Error;
 use reflexo_typst::args::TaskWhen;
@@ -28,31 +32,31 @@ use crate::debug_loc::SpanInterner;
 
 type StopFuture = Pin<Box<dyn Future<Output = ()> + Send + Sync>>;
 
-// enum Preview Mode
+/// Configure the preview mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum PreviewMode {
-    /// Preview mode for regular document
+    /// Would like to preview a regular document.
     #[cfg_attr(feature = "clap", clap(name = "document"))]
     Document,
 
-    /// Preview mode for slide
+    /// Would like to preview slides.
     #[cfg_attr(feature = "clap", clap(name = "slide"))]
     Slide,
 }
 
-/// The configurations about the preview.
+/// Configure the preview service.
 #[derive(Debug, Clone, Default)]
 pub struct PreviewConfig {
-    /// Whether to enable partial rendering.
+    /// Enable partial rendering.
     pub enable_partial_rendering: bool,
-    /// The refresh style of the preview.
+    /// Configure the refresh style of the preview.
     pub refresh_style: TaskWhen,
     /// The invert colors setting for the preview.
     pub invert_colors: String,
 }
 
-/// Get the HTML for the frontend by a given preview mode and server to connect
+/// Gets the HTML for the frontend by a given preview mode and server to connect
 pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
     let mode = match mode {
         PreviewMode::Document => "Doc",
@@ -65,7 +69,7 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
     )
 }
 
-/// Shortcut to create a previewer.
+/// Simply creates a previewer.
 pub async fn preview(
     config: PreviewConfig,
     conn: ControlPlaneTx,
@@ -74,6 +78,7 @@ pub async fn preview(
     PreviewBuilder::new(config).build(conn, server).await
 }
 
+/// The previewer service.
 pub struct Previewer {
     stop: Option<Box<dyn FnOnce() -> StopFuture + Send + Sync>>,
     data_plane_handle: Option<tokio::task::JoinHandle<()>>,
@@ -82,20 +87,22 @@ pub struct Previewer {
 }
 
 impl Previewer {
-    /// Send stop requests to preview actors.
+    /// Sends stop requests to preview actors.
     pub async fn stop(&mut self) {
         if let Some(stop) = self.stop.take() {
             let _ = stop().await;
         }
     }
 
-    /// Join all the previewer actors. Note: send stop request first.
+    /// Joins all the previewer actors.
+    ///
+    /// Note: send stop request first.
     pub async fn join(mut self) {
         let data_plane_handle = self.data_plane_handle.take().expect("must bind data plane");
         let _ = tokio::join!(data_plane_handle, self.control_plane_handle);
     }
 
-    /// Listen streams that accepting data plane messages.
+    /// Listens streams that accepting data plane messages.
     pub fn start_data_plane<
         C: futures::Sink<WsMessage, Error = reflexo_typst::Error>
             + futures::Stream<Item = Result<WsMessage, reflexo_typst::Error>>
@@ -307,7 +314,7 @@ pub enum WsMessage {
     /// A text WebSocket message
     Text(String),
     /// A binary WebSocket message
-    Binary(Vec<u8>),
+    Binary(Bytes),
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
@@ -360,7 +367,8 @@ pub struct ResolveSourceLocRequest {
 
 impl ResolveSourceLocRequest {
     pub fn to_byte_offset(&self, src: &typst::syntax::Source) -> Option<usize> {
-        src.line_column_to_byte(self.line as usize, self.character as usize)
+        src.lines()
+            .line_column_to_byte(self.line as usize, self.character as usize)
     }
 }
 

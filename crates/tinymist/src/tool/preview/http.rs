@@ -174,8 +174,16 @@ fn is_valid_origin(h: &HeaderValue, static_file_addr: &str, expected_port: u16) 
         let cluster_host = std::env::var("GITPOD_WORKSPACE_CLUSTER_HOST").ok();
         workspace_id.zip(cluster_host)
     });
+    static VSCODE_PROXY_URI: LazyLock<Option<String>> =
+        LazyLock::new(|| std::env::var("VSCODE_PROXY_URI").ok());
 
-    is_valid_origin_impl(h, static_file_addr, expected_port, &GITPOD_ID_AND_HOST)
+    is_valid_origin_impl(
+        h,
+        static_file_addr,
+        expected_port,
+        &GITPOD_ID_AND_HOST,
+        &VSCODE_PROXY_URI,
+    )
 }
 
 // Separate function so we can do gitpod-related tests without relying on env
@@ -185,6 +193,7 @@ fn is_valid_origin_impl(
     static_file_addr: &str,
     expected_port: u16,
     gitpod_id_and_host: &Option<(String, String)>,
+    vscode_proxy_url: &Option<String>,
 ) -> bool {
     let Ok(Ok(origin_url)) = origin_header.to_str().map(Url::parse) else {
         return false;
@@ -210,6 +219,16 @@ fn is_valid_origin_impl(
             format!("https://{expected_port}-{workspace_id}.{cluster_host}")
         });
 
+    let vscode_expected_origin = vscode_proxy_url.as_ref().and_then(|template| {
+        let url_with_port = template.replace("{{port}}", &expected_port.to_string());
+        Some(
+            Url::parse(&url_with_port)
+                .ok()?
+                .origin()
+                .unicode_serialization(),
+        )
+    });
+
     *origin_header == expected_origin
         // tmistele (PR #1382): The VSCode webview panel needs an exception: It doesn't send `http://{static_file_addr}`
         // as `Origin`. Instead it sends `vscode-webview://<random>`. Thus, we allow any
@@ -230,6 +249,7 @@ fn is_valid_origin_impl(
         // and proxies requests through to tinymist (which runs as `127.0.0.1:<port>`).
         // We can detect this by looking at the env variables (see `GITPOD_ID_AND_HOST` in `is_valid_origin(..)`)
         || gitpod_expected_origin.is_some_and(|o| o == *origin_header)
+        || vscode_expected_origin.is_some_and(|o| o == *origin_header)
 }
 
 #[cfg(test)]
@@ -345,6 +365,7 @@ mod tests {
                 static_file_addr,
                 port,
                 &Some((workspace.to_owned(), cluster_host.to_owned())),
+                &None,
             )
         }
 
@@ -373,5 +394,62 @@ mod tests {
         assert!(!check_gitpod_origin1("https://42-workspace_id2.gitpod.typ"));
         assert!(!check_gitpod_origin1("http://huh.io"));
         assert!(!check_gitpod_origin1("https://huh.io"));
+    }
+
+    #[test]
+    fn test_valid_origin_vscode_proxy() {
+        fn check_vscode_origin(
+            origin: &'static str,
+            static_file_addr: &str,
+            port: u16,
+            proxy_url: &str,
+        ) -> bool {
+            is_valid_origin_impl(
+                &HeaderValue::from_static(origin),
+                static_file_addr,
+                port,
+                &None,
+                &Some(proxy_url.to_owned()),
+            )
+        }
+
+        let check_vscode_origin1 = |origin: &'static str, url_template: &'static str| {
+            let explicit = check_vscode_origin(origin, "127.0.0.1:42", 42, url_template);
+            let implicit = check_vscode_origin(origin, "127.0.0.1:0", 42, url_template);
+
+            assert_eq!(explicit, implicit, "failed port binding");
+            explicit
+        };
+
+        let url_path = "https://vscode.typ/proxy/{{port}}";
+        let url_subdomain = "https://{{port}}.vscode.typ";
+        let url_subdomain_port = "https://{{port}}.vscode.typ:1234";
+
+        assert!(check_vscode_origin1("http://127.0.0.1:42", url_path));
+        assert!(check_vscode_origin1("http://127.0.0.1:42", url_subdomain));
+
+        assert!(check_vscode_origin1("https://vscode.typ", url_path));
+        assert!(check_vscode_origin1("https://42.vscode.typ", url_subdomain));
+        assert!(check_vscode_origin1(
+            "https://42.vscode.typ:1234",
+            url_subdomain_port
+        ));
+        // Port must match
+        assert!(!check_vscode_origin1(
+            "https://42.vscode.typ",
+            url_subdomain_port
+        ));
+        assert!(!check_vscode_origin1(
+            "https://42.vscode.typ:1234",
+            url_subdomain
+        ));
+
+        assert!(!check_vscode_origin1(
+            // A path is not allowed in Origin header
+            "https://42.vscode.typ/path",
+            url_subdomain
+        ));
+
+        assert!(!check_vscode_origin1("http://huh.io", url_path));
     }
 }

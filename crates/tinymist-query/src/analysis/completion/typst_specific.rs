@@ -34,16 +34,15 @@ impl CompletionPair<'_, '_, '_> {
             .iter()
             .map(|(spec, desc)| (spec, desc.clone()))
             .collect();
-        #[cfg(feature = "http-registry")]
-        {
-            // local_packages to references and add them to the packages
-            let local_packages_refs = self.worker.ctx.local_packages();
-            packages.extend(
-                local_packages_refs
-                    .iter()
-                    .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
-            );
-        }
+        // local_packages to references and add them to the packages
+        #[cfg(feature = "local-registry")]
+        let local_packages_refs = self.worker.ctx.local_packages();
+        #[cfg(feature = "local-registry")]
+        packages.extend(
+            local_packages_refs
+                .iter()
+                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
+        );
 
         packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
         if !all_versions {
@@ -226,16 +225,18 @@ impl CompletionPair<'_, '_, '_> {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
             let apply_label = &mut label.as_str();
-            if apply_label.ends_with('"') && self.cursor.after.starts_with('"') {
-                if let Some(trimmed) = apply_label.strip_suffix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.ends_with('"')
+                && self.cursor.after.starts_with('"')
+                && let Some(trimmed) = apply_label.strip_suffix('"')
+            {
+                *apply_label = trimmed;
             }
             let from_before = slice_at(self.cursor.text, 0..self.cursor.from);
-            if apply_label.starts_with('"') && from_before.ends_with('"') {
-                if let Some(trimmed) = apply_label.strip_prefix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.starts_with('"')
+                && from_before.ends_with('"')
+                && let Some(trimmed) = apply_label.strip_prefix('"')
+            {
+                *apply_label = trimmed;
             }
 
             if apply_label.len() != label.len() {
@@ -254,13 +255,13 @@ impl CompletionPair<'_, '_, '_> {
     }
 
     pub fn symbol_completions(&mut self, label: EcoString, symbol: &Symbol) {
-        let ch = symbol.get();
-        let kind = CompletionKind::Symbol(ch);
+        let sym_val = symbol.get();
+        let kind = CompletionKind::Symbol(sym_val.into());
         self.push_completion(Completion {
             kind,
             label: label.clone(),
-            label_details: Some(symbol_label_detail(ch)),
-            detail: Some(symbol_detail(ch)),
+            label_details: Some(symbol_label_detail(sym_val)),
+            detail: Some(symbol_detail(sym_val)),
             ..Completion::default()
         });
 
@@ -272,7 +273,7 @@ impl CompletionPair<'_, '_, '_> {
 
     pub fn symbol_var_completions(&mut self, symbol: &Symbol, prefix: Option<&str>) {
         for modifier in symbol.modifiers() {
-            if let Ok(modified) = symbol.clone().modified(modifier) {
+            if let Ok(modified) = symbol.clone().modified((), modifier) {
                 let label = match &prefix {
                     Some(prefix) => eco_format!("{prefix}.{modifier}"),
                     None => modifier.into(),

@@ -14,10 +14,10 @@ pub struct ShowFullValueRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for ShowFullValueRequest {
+impl SemanticRequest for ShowFullValueRequest {
     type Response = String;
 
-    fn request(self, ctx: &mut LocalContext, _graph: LspComputeGraph) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset

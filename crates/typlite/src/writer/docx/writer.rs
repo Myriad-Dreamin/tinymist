@@ -4,6 +4,7 @@ use base64::Engine;
 use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
+use log::{debug, warn};
 use std::fs;
 use std::io::Cursor;
 
@@ -252,11 +253,14 @@ impl DocxWriter {
             }
             node if node.is_custom_type::<VerbatimNode>() => {
                 let node = node.as_custom_type::<VerbatimNode>().unwrap();
-                eprintln!("Warning: `m1verbatim` is ignored {:?}.", node.content);
+                warn!(
+                    "ignoring `m1verbatim` content in DOCX export: {:?}",
+                    node.content
+                );
             }
             // Other inline element types
             _ => {
-                eprintln!("other inline element: {node:?}");
+                debug!("unhandled inline node in DOCX export: {node:?}");
             }
         }
 
@@ -397,13 +401,13 @@ impl DocxWriter {
                 block_type: _,
             } => {
                 // Add language information
-                if let Some(lang) = language {
-                    if !lang.is_empty() {
-                        let lang_para = Paragraph::new()
-                            .style("CodeBlock")
-                            .add_run(Run::new().add_text(lang));
-                        docx = docx.add_paragraph(lang_para);
-                    }
+                if let Some(lang) = language
+                    && !lang.is_empty()
+                {
+                    let lang_para = Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(Run::new().add_text(lang));
+                    docx = docx.add_paragraph(lang_para);
                 }
 
                 // Process code line by line, preserving line breaks
@@ -446,6 +450,17 @@ impl DocxWriter {
                             docx.document.children.last_mut()
                         {
                             para.property = para.property.clone().align(AlignmentType::Center);
+                        }
+                    }
+                    Node::HtmlElement(element) => {
+                        let start_idx = docx.document.children.len();
+                        for child in &element.children {
+                            docx = self.process_node(docx, child)?;
+                        }
+                        for child in docx.document.children.iter_mut().skip(start_idx) {
+                            if let DocumentChild::Paragraph(para) = child {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
                         }
                     }
                     other => {

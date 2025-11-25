@@ -17,8 +17,6 @@
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
 
-#![allow(missing_docs)]
-
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -32,7 +30,7 @@ use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
-    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest,
+    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest, GLOBAL_STATS,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
@@ -44,6 +42,7 @@ use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 #[cfg(feature = "export")]
 use crate::task::ExportUserConfig;
+use crate::vfs::notify::NotifyMessage;
 use crate::Config;
 #[cfg(feature = "preview")]
 use crate::ServerEvent;
@@ -94,8 +93,17 @@ impl ServerState {
             &self.config,
             editor_tx,
             self.client.clone(),
+            self.dep_tx.clone(),
             #[cfg(feature = "preview")]
             self.preview.watchers.clone(),
+            #[cfg(all(not(feature = "system"), feature = "web"))]
+            if let sync_ls::TransportHost::Js { sender, .. } =
+                self.client.clone().to_untyped().sender
+            {
+                sender.resolve_fn
+            } else {
+                panic!("Expected Js TransportHost")
+            },
         );
 
         let mut old_project = std::mem::replace(&mut self.project, new_project);
@@ -115,7 +123,7 @@ impl ServerState {
         self.project
             .interrupt(Interrupt::Memory(MemoryEvent::Update(snapshot)));
 
-        rayon::spawn(move || {
+        spawn_cpu(move || {
             old_project.stop();
         });
 
@@ -137,7 +145,9 @@ impl ServerState {
         config: &Config,
         editor_tx: mpsc::UnboundedSender<EditorRequest>,
         client: TypedLspClient<ServerState>,
+        dep_tx: mpsc::UnboundedSender<NotifyMessage>,
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
+        #[cfg(all(not(feature = "system"), feature = "web"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
 
@@ -164,6 +174,7 @@ impl ServerState {
                 allow_overlapping_token: const_config.tokens_overlapping_token_support,
                 allow_multiline_token: const_config.tokens_multiline_token_support,
                 remove_html: !config.support_html_in_markdown,
+                support_client_codelens: true,
                 extended_code_action: config.extended_code_action,
                 completion_feat: config.completion.clone(),
                 color_theme: match config.color_theme.as_deref() {
@@ -198,7 +209,13 @@ impl ServerState {
         log::info!("ServerState: creating ProjectState, entry: {entry:?}, inputs: {inputs:?}");
 
         let fonts = config.fonts();
+
+        #[cfg(all(not(feature = "system"), feature = "web"))]
+        let packages =
+            LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package), resolve_fn);
+        #[cfg(any(feature = "system", not(feature = "web")))]
         let packages = LspUniverseBuilder::resolve_package(cert_path.clone(), Some(&package));
+
         let creation_timestamp = config.creation_timestamp();
         let verse = LspUniverseBuilder::build(
             entry,
@@ -211,24 +228,7 @@ impl ServerState {
             access_model,
         );
 
-        // todo: unify filesystem watcher
-        let (dep_tx, dep_rx) = mpsc::unbounded_channel();
-        // todo: notify feature?
-        #[cfg(feature = "system")]
-        {
-            let fs_client = client.clone().to_untyped();
-            let async_handle = client.handle.clone();
-            async_handle.spawn(watch_deps(dep_rx, move |event| {
-                fs_client.send_event(LspInterrupt::Fs(event));
-            }));
-        }
-        #[cfg(not(feature = "system"))]
-        {
-            let _ = dep_rx;
-            log::warn!("Project: system watcher is not enabled, file changes will not be watched");
-        }
-
-        // Create the actor
+        // Creates the actor
         let compile_handle = handle.clone();
         let compiler = ProjectCompiler::new(
             verse,
@@ -236,6 +236,7 @@ impl ServerState {
             CompileServerOpts {
                 handler: compile_handle,
                 export_target: config.export_target,
+                syntax_only: config.syntax_only,
                 ignore_first_sync: true,
             },
         );
@@ -252,12 +253,18 @@ impl ServerState {
     }
 }
 
+/// The extra state of a project instance.
 #[derive(Default)]
 pub struct ProjectInsStateExt {
+    /// The revision notified to the compile handler.
     pub notified_revision: usize,
+    /// The pending reasons that are not emitted yet during compilation.
     pub pending_reasons: CompileSignal,
+    /// The emitted reasons that are emitted after the last compilation.
     pub emitted_reasons: CompileSignal,
+    /// The compiling since the last compilation.
     pub compiling_since: Option<tinymist_std::time::Time>,
+    /// The last compilation.
     pub last_compilation: Option<LspCompiledArtifact>,
 }
 
@@ -313,33 +320,40 @@ impl ProjectInsStateExt {
     }
 }
 
+/// A project state.
 pub struct ProjectState {
+    /// The compiler instance.
     pub compiler: LspProjectCompiler,
+    /// The analysis data.
     pub analysis: Arc<Analysis>,
+    /// The query statistics.
     pub stats: CompilerQueryStats,
+    /// The preview state.
     #[cfg(feature = "preview")]
     pub preview: ProjectPreviewState,
+    /// The export task.
     #[cfg(feature = "export")]
     pub export: crate::task::ExportTask,
 }
 
 impl ProjectState {
-    /// The primary instance id
+    /// The primary instance id.
     pub fn primary_id(&self) -> &ProjectInsId {
         &self.compiler.primary.id
     }
 
-    /// Snapshot the compiler thread for tasks
+    /// Snapshots the compiler thread for tasks.
     pub fn snapshot(&mut self) -> Result<LspComputeGraph> {
         Ok(self.compiler.snapshot())
     }
 
-    /// Snapshot the compiler thread for language queries
+    /// Snapshots the compiler thread for language queries.
     pub fn query_snapshot(&mut self, q: Option<&CompilerQueryRequest>) -> Result<LspQuerySnapshot> {
         let snap = self.snapshot()?;
         Ok(self.analysis.clone().query_snapshot(snap, q))
     }
 
+    /// Handles an interrupt.
     pub fn do_interrupt(compiler: &mut LspProjectCompiler, intr: Interrupt<LspCompilerFeat>) {
         if let Interrupt::Compiled(compiled) = &intr {
             let proj = compiler.projects().find(|p| &p.id == compiled.id());
@@ -357,14 +371,17 @@ impl ProjectState {
         compiler.process(intr);
     }
 
+    /// Interrupts the compiler.
     pub fn interrupt(&mut self, intr: Interrupt<LspCompilerFeat>) {
         Self::do_interrupt(&mut self.compiler, intr);
     }
 
+    /// Stops the project.
     pub(crate) fn stop(&mut self) {
         // todo: stop all compilations
     }
 
+    /// Restarts a dedicate project.
     pub(crate) fn restart_dedicate(
         &mut self,
         group: &str,
@@ -374,10 +391,11 @@ impl ProjectState {
     }
 }
 
+/// The implementation of the periscope provider.
 struct TypstPeriscopeProvider(PeriscopeRenderer);
 
 impl PeriscopeProvider for TypstPeriscopeProvider {
-    /// Resolve periscope image at the given position.
+    /// Resolves the periscope image at the given position.
     fn periscope_at(
         &self,
         ctx: &mut LocalContext,
@@ -388,14 +406,17 @@ impl PeriscopeProvider for TypstPeriscopeProvider {
     }
 }
 
+/// The preview state of a project.
 #[derive(Default, Clone)]
 pub struct ProjectPreviewState {
+    /// The inner state.
     #[cfg(feature = "preview")]
     pub(crate) inner: Arc<Mutex<FxHashMap<ProjectInsId, Arc<tinymist_preview::CompileWatcher>>>>,
 }
 
 #[cfg(feature = "preview")]
 impl ProjectPreviewState {
+    /// Registers a compile watcher.
     #[must_use]
     pub fn register(
         &self,
@@ -413,18 +434,22 @@ impl ProjectPreviewState {
         true
     }
 
+    /// Unregisters a compile watcher.
     #[must_use]
     pub fn unregister(&self, task_id: &ProjectInsId) -> bool {
         self.inner.lock().remove(task_id).is_some()
     }
 
+    /// Gets a compile watcher.
     #[must_use]
     pub fn get(&self, task_id: &ProjectInsId) -> Option<Arc<tinymist_preview::CompileWatcher>> {
         self.inner.lock().get(task_id).cloned()
     }
 }
 
+/// The implementation of the compile handler.
 pub struct CompileHandlerImpl {
+    /// The analysis data.
     pub(crate) analysis: Arc<Analysis>,
 
     #[cfg(feature = "preview")]
@@ -432,20 +457,28 @@ pub struct CompileHandlerImpl {
     /// Whether the compile server is running in standalone CLI (not as a
     /// language server).
     pub is_standalone: bool,
-
+    /// The export task.
     #[cfg(feature = "export")]
     pub(crate) export: crate::task::ExportTask,
+    /// The editor sender, used to send editor requests to the editor.
     pub(crate) editor_tx: EditorSender,
+    /// The client used to send events back to the server itself or the clients.
     pub(crate) client: Arc<dyn ProjectClient>,
-
+    /// The status revision map, used to track the status of the projects.
     pub(crate) status_revision: Mutex<FxHashMap<ProjectInsId, usize>>,
+    /// The notified revision map, used to track the notified revisions of the
+    /// projects.
     pub(crate) notified_revision: Mutex<FxHashMap<ProjectInsId, (usize, CompileSignal)>>,
 }
 
+/// The client of the project.
 pub trait ProjectClient: Send + Sync + 'static {
+    /// Sends an interrupt event back to the server.
     fn interrupt(&self, event: LspInterrupt);
+    /// Sends a server event back to the server.
     #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent);
+    /// Sends a dev event to the client, used for neovim's E2E testing.
     #[cfg(feature = "export")]
     fn dev_event(&self, event: DevEvent);
 }
@@ -485,12 +518,14 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
+    /// Pushes diagnostics to the editor.
     fn push_diagnostics(&self, dv: ProjVersion, diagnostics: Option<DiagnosticsMap>) {
         self.editor_tx
             .send(EditorRequest::Diag(dv, diagnostics))
             .log_error("failed to send diagnostics");
     }
 
+    /// Notifies the diagnostics.
     fn notify_diagnostics(&self, art: &LspCompiledArtifact) {
         let dv = ProjVersion {
             id: art.id().clone(),
@@ -516,7 +551,7 @@ impl CompileHandlerImpl {
         if !should_lint {
             let enc = self.analysis.position_encoding;
             let diagnostics =
-                tinymist_query::convert_diagnostics(art.world(), art.diagnostics(), enc);
+                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
@@ -527,9 +562,8 @@ impl CompileHandlerImpl {
             let snap = art.clone();
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
-            rayon::spawn(move || {
-                let world = snap.world().clone();
-                let mut ctx = analysis.enter(world);
+            spawn_cpu(move || {
+                let mut ctx = analysis.enter(snap.graph.clone());
 
                 // todo: check all errors in this file
                 let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
@@ -630,8 +664,11 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             let Some(compile_fn) = s.may_compile(&c.handler) else {
                 continue;
             };
+            let id = s.snapshot().world().main_id();
+
             s.ext.compiling_since = Some(tinymist_std::time::now());
-            rayon::spawn(move || {
+            spawn_cpu(move || {
+                let _guard = GLOBAL_STATS.stat(id, "main_compile");
                 compile_fn();
             });
         }
@@ -747,21 +784,34 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
     }
 }
 
+/// A query snapshot with statistics.
 pub type QuerySnapWithStat = (LspQuerySnapshot, QueryStatGuard);
 
+/// A notification event that an export was checked.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DevExportEvent {
+    /// The project id.
     pub id: String,
+    /// The configured timing to execute the export.
     pub when: TaskWhen,
+    /// Whether the export is needed.
     pub need_export: bool,
+    /// The signal to check if the export is needed.
     pub signal: CompileSignal,
+    /// The path to write the exported artifact.
+    ///
+    /// If `None`, the artifact will be written to the default path according
+    /// to the input path.
     pub path: Option<String>,
 }
 
+/// A notification event that a dev event was triggered, used for neovim's E2E
+/// testing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum DevEvent {
+    /// A notification event that an export was triggered.
     Export(DevExportEvent),
 }
 

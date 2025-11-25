@@ -13,13 +13,13 @@ import * as path from "path";
 import { loadTinymistConfig } from "./config";
 import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
-import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { SymbolViewProvider } from "./features/tool/views";
 import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
-import { activeTypstEditor, isTypstDocument } from "./util";
+import { activeTypstEditor, isTypstDocument, statusBarFormatString } from "./util";
 import { LanguageClient } from "vscode-languageclient/node";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
@@ -33,7 +33,7 @@ import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste
 import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
-import { commandShow, exportActivate, quickExports } from "./features/export";
+import { askPageSelection, commandShow, exportActivate, quickExports } from "./features/export";
 import { resolveCodeAction } from "./lsp.code-action";
 import { HoverTmpStorage } from "./features/hover-storage.tmp";
 
@@ -649,6 +649,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
       void vscode.commands.executeCommand(`typst-preview.preview`);
       return;
     }
+    case "export": {
+      void vscode.commands.executeCommand(`tinymist.openExportTool`);
+      break;
+    }
     case "export-html": {
       await commandShow("Html");
       break;
@@ -704,17 +708,20 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
         void vscode.commands.executeCommand(`typst-preview.${command}`);
         return;
       }
+      case kProfileServer: {
+        void vscode.commands.executeCommand(`tinymist.profileServer`);
+        return;
+      }
       default: {
         if (!moreAction || !("exportKind" in moreAction)) {
           return;
         }
 
         // A quick export action
+        if (!(await askPageSelection(moreAction))) {
+          return; // cancelled
+        }
         await commandShow(moreAction.exportKind, moreAction.extraOpts);
-        return;
-      }
-      case kProfileServer: {
-        void vscode.commands.executeCommand(`tinymist.profileServer`);
         return;
       }
     }
@@ -724,12 +731,4 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
-}
-
-export function statusBarFormatString() {
-  const formatter = (
-    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
-  ).trim();
-
-  return formatter;
 }

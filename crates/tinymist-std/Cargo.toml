@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.13.16"
+version = "0.14.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -29,10 +29,11 @@ serde_json.workspace = true
 serde_with.workspace = true
 siphasher.workspace = true
 web-time = { workspace = true, optional = true }
-time.workspace = true
+time = { workspace = true, features = ["formatting"] }
 lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
 same-file = { workspace = true, optional = true }
+battery = { workspace = true, optional = true }
 
 # feature = "web"
 js-sys = { workspace = true, optional = true }
@@ -43,6 +44,7 @@ rkyv = { workspace = true, optional = true }
 
 # feature = "typst"
 typst = { workspace = true, optional = true }
+typst-html = { workspace = true, optional = true }
 typst-shim = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -70,14 +72,14 @@ hex.workspace = true
 default = ["full"]
 full = ["web", "rkyv", "typst"]
 
-typst = ["dep:typst", "dep:typst-shim"]
+typst = ["dep:typst", "dep:typst-shim", "dep:typst-html"]
 
 rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]
 
 __web = ["wasm-bindgen", "js-sys", "web-time"]
 web = ["__web"]
-system = ["tempfile", "same-file"]
+system = ["tempfile", "same-file", "battery"]
 bi-hash = []
 
 [lints]

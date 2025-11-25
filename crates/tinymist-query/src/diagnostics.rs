@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use tinymist_project::LspWorld;
+use tinymist_lint::KnownIssues;
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
 
@@ -17,7 +17,7 @@ type TypstSeverity = typst::diag::Severity;
 /// Converts a list of Typst diagnostics to LSP diagnostics,
 /// with potential refinements on the error messages.
 pub fn convert_diagnostics<'a>(
-    world: &LspWorld,
+    graph: LspComputeGraph,
     errors: impl IntoIterator<Item = &'a TypstDiagnostic>,
     position_encoding: PositionEncoding,
 ) -> DiagnosticsMap {
@@ -25,7 +25,7 @@ pub fn convert_diagnostics<'a>(
         position_encoding,
         ..Analysis::default()
     };
-    let mut ctx = analysis.enter(world.clone());
+    let mut ctx = analysis.enter(graph);
     DiagWorker::new(&mut ctx).convert_all(errors)
 }
 
@@ -33,6 +33,7 @@ pub fn convert_diagnostics<'a>(
 pub(crate) struct DiagWorker<'a> {
     /// The world surface for Typst compiler.
     pub ctx: &'a mut LocalContext,
+    pub source: &'static str,
     /// Results
     pub results: DiagnosticsMap,
 }
@@ -42,25 +43,29 @@ impl<'w> DiagWorker<'w> {
     pub fn new(ctx: &'w mut LocalContext) -> Self {
         Self {
             ctx,
+            source: "typst",
             results: DiagnosticsMap::default(),
         }
     }
 
-    /// Runs code check on the document.
-    pub fn check(mut self) -> Self {
-        for dep in self.ctx.world.depended_files() {
+    /// Runs code check on the main document and all its dependencies.
+    pub fn check(mut self, known_issues: &KnownIssues) -> Self {
+        let source = self.source;
+        self.source = "tinymist-lint";
+        for dep in self.ctx.world().depended_files() {
             if WorkspaceResolver::is_package_file(dep) {
                 continue;
             }
 
-            let Ok(source) = self.ctx.world.source(dep) else {
+            let Ok(source) = self.ctx.world().source(dep) else {
                 continue;
             };
 
-            for diag in self.ctx.lint(&source) {
+            for diag in self.ctx.lint(&source, known_issues) {
                 self.handle(&diag);
             }
         }
+        self.source = source;
 
         self
     }
@@ -121,7 +126,7 @@ impl<'w> DiagWorker<'w> {
             range: lsp_range,
             severity: Some(lsp_severity),
             message: lsp_message,
-            source: Some("typst".to_owned()),
+            source: Some(self.source.to_owned()),
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
                     .trace
@@ -160,7 +165,7 @@ impl<'w> DiagWorker<'w> {
         iter::once(typst_diagnostic.span)
             .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
             .find_map(|span| Some((span.id()?, span)))
-            .unwrap_or_else(|| (self.ctx.world.main(), Span::detached()))
+            .unwrap_or_else(|| (self.ctx.world().main(), Span::detached()))
     }
 
     fn diagnostic_range(&self, source: &Source, typst_span: Span) -> LspRange {

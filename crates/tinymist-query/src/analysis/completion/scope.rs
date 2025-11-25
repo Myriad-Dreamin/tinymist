@@ -139,10 +139,10 @@ impl CompletionPair<'_, '_, '_> {
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
                     for func in &checker.functions {
-                        if let Some(elem) = func.element() {
-                            if elem.params().iter().any(|param| param.settable) {
-                                break 'set_rule true;
-                            }
+                        if let Some(elem) = func.element()
+                            && elem.params().iter().any(|param| param.settable)
+                        {
+                            break 'set_rule true;
                         }
                     }
 
@@ -196,14 +196,13 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn analyze_import_source(ctx: &LocalContext, types: &TypeInfo, s: ast::Expr) -> Option<Ty> {
-    if let Some(res) = types.type_of_span(s.span()) {
-        if !matches!(res.value(), Some(Value::Str(..))) {
-            return Some(types.simplify(res, false));
-        }
+    if let Some(res) = types.type_of_span(s.span())
+        && !matches!(res.value(), Some(Value::Str(..)))
+    {
+        return Some(types.simplify(res, false));
     }
 
-    let m = ctx.module_by_syntax(s.to_untyped())?;
-    Some(Ty::Value(InsTy::new_at(m, s.span())))
+    ctx.module_term_by_syntax(s.to_untyped(), false)
 }
 
 pub(crate) enum ScopeCheckKind {

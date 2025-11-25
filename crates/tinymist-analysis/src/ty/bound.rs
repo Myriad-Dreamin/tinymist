@@ -4,13 +4,17 @@ use typst::foundations::{self, Func};
 
 use crate::ty::prelude::*;
 
+/// A trait for checking the bounds of a type.
 pub trait BoundChecker: Sized + TyCtx {
+    /// Collects the bounds of a type.
     fn collect(&mut self, ty: &Ty, pol: bool);
 
+    /// Checks the bounds of a variable.
     fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
         self.check_var_rec(u, pol);
     }
 
+    /// Checks the bounds of a variable recursively.
     fn check_var_rec(&mut self, u: &Interned<TypeVar>, pol: bool) {
         let Some(w) = self.global_bounds(u, pol) else {
             return;
@@ -21,11 +25,13 @@ pub trait BoundChecker: Sized + TyCtx {
     }
 }
 
+/// A predicate for checking the bounds of a type.
 #[derive(BindTyCtx)]
 #[bind(0)]
 pub struct BoundPred<'a, T: TyCtx, F>(pub &'a T, pub F);
 
 impl<'a, T: TyCtx, F> BoundPred<'a, T, F> {
+    /// Creates a new bound predicate.
     pub fn new(t: &'a T, f: F) -> Self {
         Self(t, f)
     }
@@ -40,15 +46,19 @@ where
     }
 }
 
+/// A source of documentation.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DocSource {
+    /// A variable source.
     Var(Interned<TypeVar>),
+    /// An (value) instance source.
     Ins(Interned<InsTy>),
+    /// A builtin type source.
     Builtin(BuiltinTy),
 }
 
 impl DocSource {
-    /// Regard doc source as function.
+    /// Casts doc source to a function.
     pub fn as_func(&self) -> Option<Func> {
         match self {
             Self::Var(..) => None,
@@ -65,12 +75,12 @@ impl DocSource {
 }
 
 impl Ty {
-    /// Check if the given type has bounds (is combinated).
+    /// Checks if the given type has bounds (is combinated).
     pub fn has_bounds(&self) -> bool {
         matches!(self, Ty::Union(_) | Ty::Let(_) | Ty::Var(_))
     }
 
-    /// Convert type to doc source
+    /// Converts a type to doc source.
     pub fn as_source(&self) -> Option<DocSource> {
         match self {
             Ty::Builtin(ty @ (BuiltinTy::Type(..) | BuiltinTy::Element(..))) => {
@@ -86,7 +96,7 @@ impl Ty {
         }
     }
 
-    /// Get the sources of the given type.
+    /// Gets the sources of the given type.
     pub fn sources(&self) -> Vec<DocSource> {
         let mut results = vec![];
         fn collect(ty: &Ty, results: &mut Vec<DocSource>) {
@@ -135,21 +145,24 @@ impl Ty {
         results
     }
 
-    /// Profile the bounds of the given type.
+    /// Profiles the bounds of the given type.
     pub fn bounds(&self, pol: bool, checker: &mut impl BoundChecker) {
         BoundCheckContext.ty(self, pol, checker);
     }
 }
 
+/// A context for checking the bounds of a type.
 pub struct BoundCheckContext;
 
 impl BoundCheckContext {
+    /// Checks the bounds of multiple types.
     fn tys<'a>(&mut self, tys: impl Iterator<Item = &'a Ty>, pol: bool, c: &mut impl BoundChecker) {
         for ty in tys {
             self.ty(ty, pol, c);
         }
     }
 
+    /// Checks the bounds of a type.
     fn ty(&mut self, ty: &Ty, pol: bool, checker: &mut impl BoundChecker) {
         match ty {
             Ty::Union(u) => {

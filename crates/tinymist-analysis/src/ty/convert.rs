@@ -4,6 +4,7 @@ use crate::func_signature;
 
 use super::*;
 
+/// Checks if a value is a plain value.
 pub fn is_plain_value(value: &Value) -> bool {
     matches!(
         value,
@@ -69,6 +70,7 @@ pub fn term_value(value: &Value) -> Ty {
     }
 }
 
+/// Gets the type of a value recursively.
 pub fn term_value_rec(value: &Value, s: Span) -> Ty {
     match value {
         Value::Type(ty) => Ty::Builtin(BuiltinTy::TypeType(*ty)),

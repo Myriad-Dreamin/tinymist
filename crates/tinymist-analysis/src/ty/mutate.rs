@@ -1,9 +1,13 @@
 use crate::ty::def::*;
 
+/// A trait to mutate a type.
 pub trait TyMutator {
+    /// Mutates the given type.
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         self.mutate_rec(ty, pol)
     }
+
+    /// Mutates the given type recursively.
     fn mutate_rec(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         use Ty::*;
         match ty {
@@ -25,6 +29,7 @@ pub trait TyMutator {
         }
     }
 
+    /// Mutates the given vector of types.
     fn mutate_vec(&mut self, ty: &[Ty], pol: bool) -> Option<Interned<Vec<Ty>>> {
         let mut mutated = false;
 
@@ -42,6 +47,7 @@ pub trait TyMutator {
         if mutated { Some(types.into()) } else { None }
     }
 
+    /// Mutates the given option of type.
     fn mutate_option(&mut self, ty: Option<&Ty>, pol: bool) -> Option<Option<Ty>> {
         match ty {
             Some(ty) => self.mutate(ty, pol).map(Some),
@@ -49,6 +55,7 @@ pub trait TyMutator {
         }
     }
 
+    /// Mutates the given function signature.
     fn mutate_func(&mut self, ty: &Interned<SigTy>, pol: bool) -> Option<SigTy> {
         let types = self.mutate_vec(&ty.inputs, pol);
         let ret = self.mutate_option(ty.body.as_ref(), pol);
@@ -67,6 +74,7 @@ pub trait TyMutator {
         })
     }
 
+    /// Mutates the given parameter type.
     fn mutate_param(&mut self, param: &Interned<ParamTy>, pol: bool) -> Option<ParamTy> {
         let ty = self.mutate(&param.ty, pol)?;
         let mut param = param.as_ref().clone();
@@ -74,6 +82,7 @@ pub trait TyMutator {
         Some(param)
     }
 
+    /// Mutates the given record type.
     fn mutate_record(&mut self, record: &Interned<RecordTy>, pol: bool) -> Option<RecordTy> {
         let types = self.mutate_vec(&record.types, pol)?;
 
@@ -81,6 +90,7 @@ pub trait TyMutator {
         Some(RecordTy { types, ..rec })
     }
 
+    /// Mutates the given function signature with type.
     fn mutate_with_sig(&mut self, ty: &Interned<SigWithTy>, pol: bool) -> Option<SigWithTy> {
         let sig = self.mutate(ty.sig.as_ref(), pol);
         let with = self.mutate_func(&ty.with, pol);
@@ -95,12 +105,14 @@ pub trait TyMutator {
         Some(SigWithTy { sig, with })
     }
 
+    /// Mutates the given unary type.
     fn mutate_unary(&mut self, ty: &Interned<TypeUnary>, pol: bool) -> Option<TypeUnary> {
         let lhs = self.mutate(&ty.lhs, pol)?;
 
         Some(TypeUnary { lhs, op: ty.op })
     }
 
+    /// Mutates the given binary type.
     fn mutate_binary(&mut self, ty: &Interned<TypeBinary>, pol: bool) -> Option<TypeBinary> {
         let (lhs, rhs) = &ty.operands;
 
@@ -120,6 +132,7 @@ pub trait TyMutator {
         })
     }
 
+    /// Mutates the given if type.
     fn mutate_if(&mut self, ty: &Interned<IfTy>, pol: bool) -> Option<IfTy> {
         let cond = self.mutate(ty.cond.as_ref(), pol);
         let then = self.mutate(ty.then.as_ref(), pol);
@@ -136,6 +149,7 @@ pub trait TyMutator {
         Some(IfTy { cond, then, else_ })
     }
 
+    /// Mutates the given select type.
     fn mutate_select(&mut self, ty: &Interned<SelectTy>, pol: bool) -> Option<SelectTy> {
         let target = self.mutate(ty.ty.as_ref(), pol)?.into();
 
@@ -156,7 +170,7 @@ where
 }
 
 impl Ty {
-    /// Mutate the given type.
+    /// Mutates the given type.
     pub fn mutate(&self, pol: bool, checker: &mut impl TyMutator) -> Option<Ty> {
         checker.mutate(self, pol)
     }

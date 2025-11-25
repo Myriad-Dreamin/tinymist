@@ -2,9 +2,6 @@
 //!
 //! This module must hide all **AST details** from the rest of the codebase.
 
-// todo: remove this
-#![allow(missing_docs)]
-
 pub mod import;
 pub use import::*;
 pub mod comment;

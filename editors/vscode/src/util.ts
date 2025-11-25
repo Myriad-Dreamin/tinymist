@@ -22,13 +22,19 @@ export function assert(condition: boolean, explanation: string): asserts conditi
 const bytes2utf8 = new TextDecoder("utf-8");
 const utf82bytes = new TextEncoder();
 
+/** Base64 to bytes
+ * @param encoded Base64 encoded string
+ * @returns bytes
+ */
+export const base64DecodeToBytes = (encoded: string) =>
+  Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0));
+
 /**
  * Base64 to UTF-8
  * @param encoded Base64 encoded string
  * @returns UTF-8 string
  */
-export const base64Decode = (encoded: string) =>
-  bytes2utf8.decode(Uint8Array.from(atob(encoded), (m) => m.charCodeAt(0)));
+export const base64Decode = (encoded: string) => bytes2utf8.decode(base64DecodeToBytes(encoded));
 
 /**
  * bytes to Base64
@@ -44,6 +50,13 @@ export const bytesBase64Encode = (bytes: Uint8Array) =>
  * @returns Base64 encoded string
  */
 export const base64Encode = (utf8Str: string) => bytesBase64Encode(utf82bytes.encode(utf8Str));
+
+export function substituteTemplateString(html: string, entries: { [key: string]: string }) {
+  for (const [key, value] of Object.entries(entries)) {
+    html = html.replace(key, base64Encode(value));
+  }
+  return html;
+}
 
 export function translateExternalURL(urlStr: string): string {
   if (isGitpod()) {
@@ -86,6 +99,14 @@ export function getSensibleTextEditorColumn(): ViewColumn {
     }
   }
   return editor?.viewColumn !== undefined ? editor.viewColumn : ViewColumn.Beside;
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }
 
 export async function loadHTMLFile(context: vscode.ExtensionContext, relativePath: string) {

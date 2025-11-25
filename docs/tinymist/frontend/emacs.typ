@@ -38,6 +38,10 @@ your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-
 You can either use `eglot-workspace-configuration` or specifying launch
 arguments for `tinymist`.
 
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+#include "syntax-only.typ"
+
 === eglot-workspace-configuration
 <eglot-workspace-configuration>
 

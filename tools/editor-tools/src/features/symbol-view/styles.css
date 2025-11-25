@@ -1,0 +1,152 @@
+/* Symbol View Styles */
+
+/* Main container */
+.tinymist-symbol-view {
+  margin: auto;
+  max-width: 80rem;
+  align-items: start;
+}
+
+/* Stroke canvas */
+.stroke-canvas {
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 0.25rem;
+  background: var(--vscode-input-background, #2d2d30);
+}
+
+/* Detailed picker styles */
+.symbol-picker.detailed .symbol-grid {
+  gap: 0.5rem;
+}
+
+/* Symbol cell base styles */
+.symbol-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: var(--vscode-list-inactiveSelectionBackground, rgba(201, 209, 217, 0.15));
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.symbol-cell:hover {
+  overflow: visible
+}
+
+.symbol-picker.detailed .symbol-cell {
+  width: 4rem;
+  height: 4rem;
+  padding: 0.5rem;
+}
+
+.symbol-cell:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+  border-color: var(--vscode-list-hoverForeground, rgba(255, 255, 255, 0.2));
+}
+
+.symbol-cell:active {
+  background-color: var(--vscode-inputOption-activeBackground, #094771);
+  animation: all 0.1s ease;
+}
+
+/* Symbol glyph */
+.symbol-glyph {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Symbol glyph mask */
+div.symbol-glyph svg {
+  width: 2rem;
+  height: 2rem;
+  fill: currentColor;
+  transition: fill 200ms;
+}
+
+.symbol-cell:hover div.symbol-glyph svg {
+  fill: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Symbol glyph fallback text */
+span.symbol-glyph {
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 500;
+}
+
+.symbol-cell:hover span.symbol-glyph {
+  color: var(--vscode-button-hoverBackground, #1177bb);
+}
+
+/* Symbol details */
+.symbol-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 0;
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+/* Hide details when not detailed */
+.symbol-picker:not(.detailed) .symbol-details {
+  display: none;
+}
+
+.symbol-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-unicode {
+  font-size: 0.625rem;
+  color: var(--vscode-descriptionForeground, #999999);
+  font-family: monospace;
+}
+
+/* Clickable elements */
+.symbol-name.clickable,
+.symbol-unicode.clickable {
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+  margin: -0.125rem -0.25rem;
+  border-radius: 0.125rem;
+  transition: background-color 0.15s ease;
+}
+
+.symbol-name.clickable:hover,
+.symbol-unicode.clickable:hover {
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+.symbol-name.clickable:active,
+.symbol-unicode.clickable:active {
+  background-color: var(--vscode-inputOption-activeBackground, #094771);
+}
+
+/* Responsive adjustments */
+@media (max-width: 40rem) {
+  .tinymist-symbol-view {
+    flex-direction: column;
+  }
+
+  .symbol-toolbox {
+    align-self: center;
+    min-width: unset;
+    position: relative;
+  }
+}

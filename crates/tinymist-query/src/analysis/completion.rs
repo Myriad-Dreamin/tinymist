@@ -5,7 +5,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
 use ecow::{EcoString, eco_format};
-use if_chain::if_chain;
 use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
@@ -28,7 +27,7 @@ use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
+use crate::analysis::{BuiltinTy, LocalContext, PathKind, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
     DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoTextEdit, ParsedSnippet, PostfixSnippet,
@@ -300,10 +299,10 @@ impl<'a> CompletionCursor<'a> {
     /// Gets the LSP range of a given range with caching.
     fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
         // self.ctx.to_lsp_range(rng, &self.source)
-        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
-            if *last_rng == rng {
-                return *last_lsp_rng;
-            }
+        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair
+            && *last_rng == rng
+        {
+            return *last_lsp_rng;
         }
 
         let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
@@ -358,7 +357,7 @@ impl<'a> CompletionCursor<'a> {
 
         LspCompletion {
             label: item.label.clone(),
-            kind: item.kind,
+            kind: item.kind.clone(),
             detail: item.detail.clone(),
             sort_text: item.sort_text.clone(),
             filter_text: item.filter_text.clone(),
@@ -632,7 +631,7 @@ impl CompletionPair<'_, '_, '_> {
                     self.package_completions(all_versions);
                     return Some(());
                 } else {
-                    let paths = self.complete_path(&crate::analysis::PathPreference::Source {
+                    let paths = self.complete_path(&crate::analysis::PathKind::Source {
                         allow_package: true,
                     });
                     // todo: remove ctx.completions
@@ -854,17 +853,46 @@ impl CompletionPair<'_, '_, '_> {
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode detailed description.
-pub fn symbol_detail(ch: char) -> EcoString {
-    let ld = symbol_label_detail(ch);
+pub fn symbol_detail(s: &str) -> EcoString {
+    let ld = symbol_label_detail(s);
     if ld.starts_with("\\u") {
         return ld;
     }
-    format!("{}, unicode: `\\u{{{:04x}}}`", ld, ch as u32).into()
+
+    let mut chars = s.chars();
+    let unicode_repr = if let (Some(ch), None) = (chars.next(), chars.next()) {
+        format!("\\u{{{:04x}}}", ch as u32)
+    } else {
+        let codes: Vec<String> = s
+            .chars()
+            .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+            .collect();
+        codes.join(" + ")
+    };
+
+    format!("{ld}, unicode: `{unicode_repr}`").into()
 }
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode description.
-pub fn symbol_label_detail(ch: char) -> EcoString {
+pub fn symbol_label_detail(s: &str) -> EcoString {
+    let mut chars = s.chars();
+    if let (Some(ch), None) = (chars.next(), chars.next()) {
+        return symbol_label_detail_single_char(ch);
+    }
+
+    if s.chars().all(|ch| !ch.is_whitespace() && !ch.is_control()) {
+        return s.into();
+    }
+
+    let codes: Vec<String> = s
+        .chars()
+        .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+        .collect();
+    codes.join(" + ").into()
+}
+
+fn symbol_label_detail_single_char(ch: char) -> EcoString {
     if !ch.is_whitespace() && !ch.is_control() {
         return ch.into();
     }

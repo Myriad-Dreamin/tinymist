@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
-use ecow::{EcoVec, eco_vec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use tinymist_std::error::prelude::Result;
 use tinymist_std::{ImmutPath, typst::TypstDocument};
 use tinymist_task::ExportTarget;
@@ -19,6 +19,9 @@ use tinymist_world::{
     WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
+use typst::World;
+use typst::diag::{At, FileError};
+use typst::syntax::Span;
 
 /// A compiled artifact.
 pub struct CompiledArtifact<F: CompilerFeat> {
@@ -169,15 +172,14 @@ pub struct CompileStatusResult {
     elapsed: tinymist_std::time::Duration,
 }
 
-#[allow(missing_docs)]
 impl CompileReport {
-    /// Get the status message.
+    /// Gets the status message.
     pub fn message(&self) -> CompileReportMsg<'_> {
         CompileReportMsg(self)
     }
 }
 
-#[allow(missing_docs)]
+/// A message of the compilation status.
 pub struct CompileReportMsg<'a>(&'a CompileReport);
 
 impl fmt::Display for CompileReportMsg<'_> {
@@ -196,7 +198,10 @@ impl fmt::Display for CompileReportMsg<'_> {
             CompileError(res) => ("compilation failed", res),
             ExportError(res) => ("export failed", res),
         };
-        write!(f, "{input:?}: {stage} with {diag} warnings in {elapsed:?}")
+        write!(
+            f,
+            "{input:?}: {stage} with {diag} warnings and errors in {elapsed:?}"
+        )
     }
 }
 
@@ -306,6 +311,8 @@ pub struct CompileServerOpts<F: CompilerFeat, Ext> {
     pub ignore_first_sync: bool,
     /// Specifies the current export target.
     pub export_target: ExportTarget,
+    /// Whether to run in syntax-only mode.
+    pub syntax_only: bool,
 }
 
 impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileServerOpts<F, Ext> {
@@ -313,10 +320,15 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: 'static> Default for CompileS
         Self {
             handler: Arc::new(std::marker::PhantomData),
             ignore_first_sync: false,
+            syntax_only: false,
             export_target: ExportTarget::Paged,
         }
     }
 }
+
+const FILE_MISSING_ERROR_MSG: EcoString = EcoString::inline("t-file-missing");
+/// The file missing error constant.
+pub const FILE_MISSING_ERROR: FileError = FileError::Other(Some(FILE_MISSING_ERROR_MSG));
 
 /// The synchronous compiler that runs on one project or multiple projects.
 pub struct ProjectCompiler<F: CompilerFeat, Ext> {
@@ -324,6 +336,8 @@ pub struct ProjectCompiler<F: CompilerFeat, Ext> {
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// Specifies the current export target.
     export_target: ExportTarget,
+    /// Whether to run in syntax-only mode.
+    syntax_only: bool,
     /// Channel for sending interrupts to the compiler actor.
     dep_tx: mpsc::UnboundedSender<NotifyMessage>,
     /// Whether to ignore the first sync event.
@@ -353,18 +367,21 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             handler,
             ignore_first_sync,
             export_target,
+            syntax_only,
         }: CompileServerOpts<F, Ext>,
     ) -> Self {
         let primary = Self::create_project(
             ProjectInsId("primary".into()),
             verse,
             export_target,
+            syntax_only,
             handler.clone(),
         );
         Self {
             handler,
             dep_tx,
             export_target,
+            syntax_only,
 
             logical_tick: 1,
             dirty_shadow_logical_tick: 0,
@@ -386,7 +403,12 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
     /// Compiles the document once.
     pub fn compile_once(&mut self) -> CompiledArtifact<F> {
         let snap = self.primary.make_snapshot();
-        ProjectInsState::run_compile(self.handler.clone(), snap, self.export_target)()
+        ProjectInsState::run_compile(
+            self.handler.clone(),
+            snap,
+            self.export_target,
+            self.syntax_only,
+        )()
     }
 
     /// Gets the iterator of all projects.
@@ -398,17 +420,19 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
         id: ProjectInsId,
         verse: CompilerUniverse<F>,
         export_target: ExportTarget,
+        syntax_only: bool,
         handler: Arc<dyn CompileHandler<F, Ext>>,
     ) -> ProjectInsState<F, Ext> {
         ProjectInsState {
             id,
             ext: Default::default(),
+            syntax_only,
             verse,
             reason: no_reason(),
-            snapshot: None,
+            cached_snapshot: None,
             handler,
             export_target,
-            compilation: OnceLock::default(),
+            latest_compilation: OnceLock::default(),
             latest_success_doc: None,
             deps: Default::default(),
             committed_revision: 0,
@@ -447,8 +471,13 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
             self.primary.verse.creation_timestamp,
         );
 
-        let mut proj =
-            Self::create_project(id.clone(), verse, self.export_target, self.handler.clone());
+        let mut proj = Self::create_project(
+            id.clone(),
+            verse,
+            self.export_target,
+            self.syntax_only,
+            self.handler.clone(),
+        );
         proj.reason.merge(reason_by_entry_change());
 
         self.remove_dedicates(&id);
@@ -544,7 +573,7 @@ impl<F: CompilerFeat + Send + Sync + 'static, Ext: Default + 'static> ProjectCom
                         });
                     }
 
-                    // Reset the watch state and document state.
+                    // Forget the document state of previous entry.
                     proj.latest_success_doc = None;
                 }
 
@@ -742,36 +771,40 @@ pub struct ProjectInsState<F: CompilerFeat, Ext> {
     pub verse: CompilerUniverse<F>,
     /// Specifies the current export target.
     pub export_target: ExportTarget,
+    /// Whether to run in syntax-only mode.
+    pub syntax_only: bool,
     /// The reason to compile.
     pub reason: CompileSignal,
-    /// The latest compute graph (snapshot).
-    snapshot: Option<Arc<WorldComputeGraph<F>>>,
-    /// The latest compilation.
-    pub compilation: OnceLock<CompiledArtifact<F>>,
     /// The compilation handle.
     pub handler: Arc<dyn CompileHandler<F, Ext>>,
     /// The file dependencies.
     deps: EcoVec<ImmutPath>,
 
+    /// The latest compute graph (snapshot), derived lazily from
+    /// `latest_compilation` as needed.
+    pub cached_snapshot: Option<Arc<WorldComputeGraph<F>>>,
+    /// The latest compilation.
+    pub latest_compilation: OnceLock<CompiledArtifact<F>>,
     /// The latest successly compiled document.
-    latest_success_doc: Option<TypstDocument>,
+    pub latest_success_doc: Option<TypstDocument>,
 
     committed_revision: usize,
 }
 
 impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
-    /// Creates a snapshot of the project.
+    /// Gets a snapshot of the project.
     pub fn snapshot(&mut self) -> Arc<WorldComputeGraph<F>> {
-        match self.snapshot.as_ref() {
+        match self.cached_snapshot.as_ref() {
             Some(snap) if snap.world().revision() == self.verse.revision => snap.clone(),
             _ => {
                 let snap = self.make_snapshot();
-                self.snapshot = Some(snap.clone());
+                self.cached_snapshot = Some(snap.clone());
                 snap
             }
         }
     }
 
+    /// Creates a new snapshot of the project derived from `latest_compilation`.
     fn make_snapshot(&self) -> Arc<WorldComputeGraph<F>> {
         let world = self.verse.snapshot();
         let snap = CompileSnapshot {
@@ -783,13 +816,13 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         WorldComputeGraph::new(snap)
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active. (this is used for experimenting typst.node compilations)
     #[must_use]
-    pub fn may_compile2(
+    pub fn may_compile2<'a>(
         &mut self,
-        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>),
-    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>>> {
+        compute: impl FnOnce(&Arc<WorldComputeGraph<F>>) + 'a,
+    ) -> Option<impl FnOnce() -> Arc<WorldComputeGraph<F>> + 'a> {
         if !self.reason.any() || self.verse.entry_state().is_inactive() {
             return None;
         }
@@ -802,7 +835,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         })
     }
 
-    /// Compile the document once if there is any reason and the entry is
+    /// Compiles the document once if there is any reason and the entry is
     /// active.
     #[must_use]
     pub fn may_compile(
@@ -816,7 +849,12 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let snap = self.snapshot();
         self.reason = Default::default();
 
-        Some(Self::run_compile(handler.clone(), snap, self.export_target))
+        Some(Self::run_compile(
+            handler.clone(),
+            snap,
+            self.export_target,
+            self.syntax_only,
+        ))
     }
 
     /// Compile the document once.
@@ -824,6 +862,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         h: Arc<dyn CompileHandler<F, Ext>>,
         graph: Arc<WorldComputeGraph<F>>,
         export_target: ExportTarget,
+        syntax_only: bool,
     ) -> impl FnOnce() -> CompiledArtifact<F> {
         let start = tinymist_std::time::Instant::now();
 
@@ -841,8 +880,28 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         });
 
         move || {
-            let compiled =
-                CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html));
+            let compiled = if syntax_only {
+                let main = graph.snap.world.main();
+                let source_res = graph.world().source(main).at(Span::from_range(main, 0..0));
+                let syntax_res = source_res.and_then(|source| {
+                    let errors = source.root().errors();
+                    if errors.is_empty() {
+                        Ok(())
+                    } else {
+                        Err(errors.into_iter().map(|s| s.into()).collect())
+                    }
+                });
+                let diag = Arc::new(DiagnosticsTask::from_errors(syntax_res.err()));
+
+                CompiledArtifact {
+                    diag,
+                    graph,
+                    doc: None,
+                    deps: OnceLock::default(),
+                }
+            } else {
+                CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html))
+            };
 
             let res = CompileStatusResult {
                 diag: (compiled.warning_cnt() + compiled.error_cnt()) as u32,
@@ -854,6 +913,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 page_count: compiled.doc.as_ref().map_or(0, |doc| doc.num_of_pages()),
                 status: match &compiled.doc {
                     Some(..) => CompileStatusEnum::CompileSuccess(res),
+                    None if res.diag == 0 => CompileStatusEnum::CompileSuccess(res),
                     None => CompileStatusEnum::CompileError(res),
                 },
             };
@@ -861,9 +921,15 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             // todo: we need to check revision for really concurrent compilation
             log_compile_report(&rep);
 
+            if compiled
+                .diagnostics()
+                .any(|d| d.message == FILE_MISSING_ERROR_MSG)
+            {
+                return compiled;
+            }
+
             h.status(revision, rep);
             h.notify_compile(&compiled);
-
             compiled
         }
     }
@@ -875,14 +941,15 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
             return false;
         }
 
-        // Update state.
+        // Updates state.
         let doc = artifact.doc.clone();
         self.committed_revision = compiled_revision;
         if doc.is_some() {
             self.latest_success_doc = doc;
         }
+        self.cached_snapshot = None; // invalidate; will be recomputed on demand
 
-        // Notify the new file dependencies.
+        // Notifies the new file dependencies.
         let mut deps = eco_vec![];
         world.iter_dependencies(&mut |dep| {
             if let Ok(x) = world.file_path(dep).and_then(|e| e.to_err()) {
@@ -897,7 +964,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         let is_primary = self.id == ProjectInsId("primary".into());
 
         // Trigger an evict task.
-        rayon::spawn(move || {
+        spawn_cpu(move || {
             let evict_start = tinymist_std::time::Instant::now();
             if is_primary {
                 comemo::evict(10);
@@ -936,4 +1003,23 @@ impl NotifyDeps for ProjectDeps {
             f(deps);
         }
     }
+}
+
+// todo: move me to tinymist-std
+#[cfg(not(target_arch = "wasm32"))]
+/// Spawns a CPU thread to run a computing-heavy task.
+pub fn spawn_cpu<F>(func: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    rayon::spawn(func);
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Spawns a CPU thread to run a computing-heavy task.
+pub fn spawn_cpu<F>(func: F)
+where
+    F: FnOnce() + Send + 'static,
+{
+    func();
 }

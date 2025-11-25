@@ -6,81 +6,78 @@ impl CompletionPair<'_, '_, '_> {
     pub fn complete_imports(&mut self) -> bool {
         // On the colon marker of an import list:
         // "#import "path.typ":|"
-        if_chain! {
-            if matches!(self.cursor.leaf.kind(), SyntaxKind::Colon);
-            if let Some(parent) = self.cursor.leaf.clone().parent();
-            if let Some(ast::Expr::Import(import)) = parent.get().cast();
-            if !matches!(import.imports(), Some(ast::Imports::Wildcard));
-            if let Some(source) = parent.children().find(|child| child.is::<ast::Expr>());
-            then {
-                let items = match import.imports() {
-                    Some(ast::Imports::Items(items)) => items,
-                    _ => Default::default(),
-                };
+        if matches!(self.cursor.leaf.kind(), SyntaxKind::Colon)
+            && let Some(parent) = self.cursor.leaf.clone().parent()
+            && let Some(ast::Expr::ModuleImport(import)) = parent.get().cast()
+            && !matches!(import.imports(), Some(ast::Imports::Wildcard))
+            && let Some(source) = parent.children().find(|child| child.is::<ast::Expr>())
+        {
+            let items = match import.imports() {
+                Some(ast::Imports::Items(items)) => items,
+                _ => Default::default(),
+            };
 
-                self.cursor.from = self.cursor.cursor;
+            self.cursor.from = self.cursor.cursor;
 
-                self.import_item_completions(items, vec![], &source);
-                if items.iter().next().is_some() {
-                    self.worker.enrich("", ", ");
-                }
-                return true;
+            self.import_item_completions(items, vec![], &source);
+            if items.iter().next().is_some() {
+                self.worker.enrich("", ", ");
             }
+            return true;
         }
 
         // Behind an import list:
         // "#import "path.typ": |",
         // "#import "path.typ": a, b, |".
-        if_chain! {
-            if let Some(prev) = self.cursor.leaf.prev_sibling();
-            if let Some(ast::Expr::Import(import)) = prev.get().cast();
-            if !self.cursor.text[prev.offset()..self.cursor.cursor].contains('\n');
-            if let Some(ast::Imports::Items(items)) = import.imports();
-            if let Some(source) = prev.children().find(|child| child.is::<ast::Expr>());
-            then {
-                self.  cursor.from = self.cursor.cursor;
-                self.import_item_completions(items, vec![], &source);
-                return true;
-            }
+
+        if let Some(prev) = self.cursor.leaf.prev_sibling()
+            && let Some(ast::Expr::ModuleImport(import)) = prev.get().cast()
+            && !self.cursor.text[prev.offset()..self.cursor.cursor].contains('\n')
+            && let Some(ast::Imports::Items(items)) = import.imports()
+            && let Some(source) = prev.children().find(|child| child.is::<ast::Expr>())
+        {
+            self.cursor.from = self.cursor.cursor;
+            self.import_item_completions(items, vec![], &source);
+            return true;
         }
 
         // Behind a comma in an import list:
         // "#import "path.typ": this,|".
-        if_chain! {
-            if matches!(self.cursor.leaf.kind(), SyntaxKind::Comma);
-            if let Some(parent) = self.cursor.leaf.clone().parent();
-            if parent.kind() == SyntaxKind::ImportItems;
-            if let Some(grand) = parent.parent();
-            if let Some(ast::Expr::Import(import)) = grand.get().cast();
-            if let Some(ast::Imports::Items(items)) = import.imports();
-            if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
-            then {
-                self.import_item_completions(items, vec![], &source);
-                self.worker.enrich(" ", "");
-                return true;
-            }
+        if matches!(self.cursor.leaf.kind(), SyntaxKind::Comma)
+            && let Some(parent) = self.cursor.leaf.clone().parent()
+            && parent.kind() == SyntaxKind::ImportItems
+            && let Some(grand) = parent.parent()
+            && let Some(ast::Expr::ModuleImport(import)) = grand.get().cast()
+            && let Some(ast::Imports::Items(items)) = import.imports()
+            && let Some(source) = grand.children().find(|child| child.is::<ast::Expr>())
+        {
+            self.import_item_completions(items, vec![], &source);
+            self.worker.enrich(" ", "");
+            return true;
         }
 
         // Behind a half-started identifier in an import list:
         // "#import "path.typ": th|".
-        if_chain! {
-            if matches!(self.cursor.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot);
-            if let Some(path_ctx) = self.cursor.leaf.clone().parent();
-            if path_ctx.kind() == SyntaxKind::ImportItemPath;
-            if let Some(parent) = path_ctx.parent();
-            if parent.kind() == SyntaxKind::ImportItems;
-            if let Some(grand) = parent.parent();
-            if let Some(ast::Expr::Import(import)) = grand.get().cast();
-            if let Some(ast::Imports::Items(items)) = import.imports();
-            if let Some(source) = grand.children().find(|child| child.is::<ast::Expr>());
-            then {
-                if self.cursor.leaf.kind() == SyntaxKind::Ident {
-                    self.cursor.from = self.cursor.leaf.offset();
-                }
-                let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| path.iter().take_while(|ident| ident.span() != self.cursor.leaf.span()).collect());
-                self.import_item_completions( items, path.unwrap_or_default(), &source);
-                return true;
+        if matches!(self.cursor.leaf.kind(), SyntaxKind::Ident | SyntaxKind::Dot)
+            && let Some(path_ctx) = self.cursor.leaf.clone().parent()
+            && path_ctx.kind() == SyntaxKind::ImportItemPath
+            && let Some(parent) = path_ctx.parent()
+            && parent.kind() == SyntaxKind::ImportItems
+            && let Some(grand) = parent.parent()
+            && let Some(ast::Expr::ModuleImport(import)) = grand.get().cast()
+            && let Some(ast::Imports::Items(items)) = import.imports()
+            && let Some(source) = grand.children().find(|child| child.is::<ast::Expr>())
+        {
+            if self.cursor.leaf.kind() == SyntaxKind::Ident {
+                self.cursor.from = self.cursor.leaf.offset();
             }
+            let path = path_ctx.cast::<ast::ImportItemPath>().map(|path| {
+                path.iter()
+                    .take_while(|ident| ident.span() != self.cursor.leaf.span())
+                    .collect()
+            });
+            self.import_item_completions(items, path.unwrap_or_default(), &source);
+            return true;
         }
 
         false

@@ -104,14 +104,13 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("symbols", &|ctx, path| {
+        // need to compile the doc to get the dependencies
+        let opts = Opts { need_compile: true };
+        snapshot_testing_with("symbols", opts, &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
             let docs = find_module_level_docs(&source).unwrap_or_default();
-            let mut properties = get_test_properties(&docs);
-            // need to compile the doc to get the dependencies
-            properties.insert("compile", "true");
-            let _doc = compile_doc_for_test(ctx, &properties);
+            let properties = get_test_properties(&docs);
 
             let request = SymbolRequest {
                 pattern: properties.get("pattern").copied().map(str::to_owned),

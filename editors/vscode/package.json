@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.13.24-rc1",
+  "version": "0.14.4-rc1",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -341,6 +341,24 @@
             "%extension.tinymist.config.tinymist.projectResolution.string.enum.lockDatabase%"
           ]
         },
+        "tinymist.syntaxOnly": {
+          "title": "%extension.tinymist.config.tinymist.syntaxOnly.title%",
+          "type": "string",
+          "default": "auto",
+          "markdownDescription": "%extension.tinymist.config.tinymist.syntaxOnly.desc%",
+          "enum": [
+            "auto",
+            "onPowerSaving",
+            "enable",
+            "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.auto%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.onPowerSaving%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.disable%"
+          ]
+        },
         "tinymist.outputPath": {
           "title": "%extension.tinymist.config.tinymist.outputPath.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.outputPath.desc%",
@@ -592,6 +610,12 @@
             "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.enable%",
             "%extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable%"
           ]
+        },
+        "tinymist.onPaste": {
+          "title": "%extension.tinymist.config.tinymist.onPaste.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.onPaste.desc%",
+          "type": "string",
+          "default": "$root/assets"
         },
         "tinymist.renderDocs": {
           "title": "%extension.tinymist.config.tinymist.renderDocs.title%",
@@ -1427,15 +1451,8 @@
     "onWebviewPanel:typst-preview"
   ],
   "scripts": {
-    "build:frontend": "cd ../../ && yarn build:preview && yarn build:editor-tools",
-    "build:syntax": "cd ../../syntaxes/textmate && yarn run compile && yarn run bundle",
-    "build:l10n": "cd ../../ && yarn build:l10n",
-    "build-web-base": "node esbuild.web.mjs",
-    "build-system-base": "node esbuild.system.mjs",
-    "build-base": "yarn run build-web-base && yarn run build-system-base",
-    "compile-shared": "yarn run build:syntax && yarn run build:l10n && yarn run build:frontend && node scripts/check-version.mjs && node scripts/postinstall.cjs",
-    "compile:web": "yarn run build-web-base -- --minify && yarn run compile-shared",
-    "compile:system": "yarn run build-system-base -- --minify && yarn run compile-shared",
+    "compile:web": "cd ../../ && node scripts/build.mjs build:vscode:web",
+    "compile:system": "cd ../../ && node scripts/build.mjs build:vscode:system",
     "package": "npx @vscode/vsce package --yarn",
     "compile": "yarn run compile:system",
     "watch": "yarn run build-system-base -- --sourcemap --watch",
@@ -1443,7 +1460,8 @@
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
-    "test": "vitest && rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js"
+    "test:vsc": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js",
+    "test": "vitest run && yarn test:vsc"
   },
   "dependencies": {
     "cpr": "^3.0.1",

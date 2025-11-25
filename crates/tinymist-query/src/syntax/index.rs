@@ -5,13 +5,18 @@ use tinymist_world::package::PackageSpec;
 
 use crate::{adt::interner::Interned, prelude::*};
 
+/// The information for the index.
 #[derive(Default)]
 pub struct IndexInfo {
+    /// The paths in the source.
     pub(crate) paths: FxHashSet<Interned<str>>,
+    /// The packages in the source.
     pub(crate) packages: FxHashSet<PackageSpec>,
+    /// The identifiers in the source.
     pub(crate) identifiers: FxHashSet<Interned<str>>,
 }
 
+/// Gets the index information for the source.
 #[typst_macros::time(span = src.root().span())]
 #[comemo::memoize]
 pub fn get_index_info(src: &Source) -> Arc<IndexInfo> {
@@ -23,11 +28,13 @@ pub fn get_index_info(src: &Source) -> Arc<IndexInfo> {
     Arc::new(worker.info)
 }
 
+/// The worker for the index.
 struct IndexWorker {
     info: IndexInfo,
 }
 
 impl IndexWorker {
+    /// Visits the node.
     fn visit(&mut self, node: &SyntaxNode) {
         match node.cast::<ast::Expr>() {
             Some(ast::Expr::Str(path_str)) => {

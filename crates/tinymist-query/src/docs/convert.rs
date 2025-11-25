@@ -21,10 +21,10 @@ pub(crate) fn convert_docs(
     content: &str,
     source_fid: Option<FileId>,
 ) -> StrResult<EcoString> {
-    let mut entry = ctx.world.entry_state();
+    let mut entry = ctx.world().entry_state();
     let import_context = source_fid.map(|fid| {
         let root = ctx
-            .world
+            .world()
             .vfs()
             .file_path(fid.join("/"))
             .ok()
@@ -34,12 +34,12 @@ pub(crate) fn convert_docs(
         }
 
         let mut imports = Vec::new();
-        if WorkspaceResolver::is_package_file(fid) {
-            if let Some(pkg) = fid.package() {
-                let pkg_spec = pkg.to_string();
-                imports.push(format!("#import {pkg_spec:?}"));
-                imports.push(format!("#import {pkg_spec:?}: *"));
-            }
+        if WorkspaceResolver::is_package_file(fid)
+            && let Some(pkg) = fid.package()
+        {
+            let pkg_spec = pkg.to_string();
+            imports.push(format!("#import {pkg_spec:?}"));
+            imports.push(format!("#import {pkg_spec:?}: *"));
         }
         imports.push(format!(
             "#import {:?}: *",
@@ -47,7 +47,7 @@ pub(crate) fn convert_docs(
         ));
         imports.join("; ")
     });
-    let feat = TypliteFeat {
+    let mut feat = TypliteFeat {
         color_theme: Some(ctx.analysis.color_theme),
         annotate_elem: true,
         soft_error: true,
@@ -58,7 +58,7 @@ pub(crate) fn convert_docs(
 
     let entry = entry.select_in_workspace(Path::new("__tinymist_docs__.typ"));
 
-    let mut w = ctx.world.task(TaskInputs {
+    let mut w = ctx.world().task(TaskInputs {
         entry: Some(entry),
         inputs: None,
     });
@@ -67,9 +67,11 @@ pub(crate) fn convert_docs(
     w.map_shadow_by_id(w.main(), Bytes::from_string(content.to_owned()))?;
     // todo: bad performance
     w.take_db();
-    let w = feat
+    let (w, wrap_info) = feat
         .prepare_world(&w, Format::Md)
         .map_err(|e| eco_format!("failed to prepare world: {e}"))?;
+
+    feat.wrap_info = wrap_info;
 
     let w = Arc::new(w);
     let res = typlite::Typlite::new(w.clone())

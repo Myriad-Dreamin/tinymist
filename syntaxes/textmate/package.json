@@ -1,10 +1,10 @@
 {
   "name": "typst-textmate",
-  "version": "0.13.24-rc1",
+  "version": "0.14.4-rc1",
   "private": true,
+  "type": "module",
   "scripts": {
-    "compile": "npx tsc && node ./dist/main.mjs",
-    "bundle": "node scripts/install.cjs",
+    "compile": "node scripts/build.ts --compile",
     "test": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/unit/**/*.typ",
     "test:packages": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/packages/**/*.typ",
     "test:official": "yarn compile && npx vscode-tmgrammar-snap --updateSnapshot tests/official-testing/**/*.typ"

@@ -62,14 +62,13 @@ impl<'a> CodeActionWorker<'a> {
         range: &Range<usize>,
         context: &lsp_types::CodeActionContext,
     ) -> Option<()> {
-        if let Some(only) = &context.only {
-            if !only.is_empty()
-                && !only
-                    .iter()
-                    .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
-            {
-                return None;
-            }
+        if let Some(only) = &context.only
+            && !only.is_empty()
+            && !only
+                .iter()
+                .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
+        {
+            return None;
         }
 
         for diag in &context.diagnostics {
@@ -99,7 +98,16 @@ impl<'a> CodeActionWorker<'a> {
     ) -> Option<()> {
         let cursor = (range.start + 1).min(self.source.text().len());
         let node = root.leaf_at_compat(cursor)?;
+        self.create_missing_variable(root, &node);
+        self.add_spaces_to_math_unknown_variable(&node);
+        Some(())
+    }
 
+    fn create_missing_variable(
+        &mut self,
+        root: &LinkedNode<'_>,
+        node: &LinkedNode<'_>,
+    ) -> Option<()> {
         let ident = 'determine_ident: {
             if let Some(ident) = node.cast::<ast::Ident>() {
                 break 'determine_ident ident.get().clone();
@@ -117,7 +125,7 @@ impl<'a> CodeActionWorker<'a> {
             Bad,
         }
 
-        let previous_decl = previous_items(node, |item| {
+        let previous_decl = previous_items(node.clone(), |item| {
             match item {
                 PreviousItem::Parent(parent, ..) => match parent.kind() {
                     SyntaxKind::LetBinding => {
@@ -190,6 +198,35 @@ impl<'a> CodeActionWorker<'a> {
         let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
         let action = CodeAction {
             title: "Create missing variable".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+        Some(())
+    }
+
+    /// Add spaces between letters in an unknown math identifier: `$xyz$` -> `$x
+    /// y z$`.
+    fn add_spaces_to_math_unknown_variable(&mut self, node: &LinkedNode<'_>) -> Option<()> {
+        let ident = node.cast::<ast::MathIdent>()?.get();
+
+        // Rewrite `a_ij` as `a_(i j)`, not `a_i j`.
+        // Likewise rewrite `ab/c` as `(a b)/c`, not `a b/c`.
+        let needs_parens = matches!(
+            node.parent_kind(),
+            Some(SyntaxKind::MathAttach | SyntaxKind::MathFrac)
+        );
+        let new_text = if needs_parens {
+            eco_format!("({})", ident.chars().join(" "))
+        } else {
+            ident.chars().join(" ").into()
+        };
+
+        let range = self.ctx.to_lsp_range(node.range(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
+        let action = CodeAction {
+            title: "Add spaces between letters".to_string(),
             kind: Some(CodeActionKind::QUICKFIX),
             edit: Some(edit),
             ..CodeAction::default()
@@ -509,10 +546,10 @@ impl<'a> CodeActionWorker<'a> {
                 ),
             ];
 
-            if !new_text.is_empty() {
-                if let Some((_, edit)) = &punc_modify {
-                    edits.push(edit.clone());
-                }
+            if !new_text.is_empty()
+                && let Some((_, edit)) = &punc_modify
+            {
+                edits.push(edit.clone());
             }
 
             Some(CodeAction {
@@ -577,7 +614,7 @@ enum AutofixKind {
 
 fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
     static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable),
+        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
         ("file not found", AutofixKind::FileNotFound),
     ];
 

@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
@@ -32,8 +30,17 @@ pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>
 
 /// Analyzes expressions in a source file and produces expression information.
 ///
-/// Processes the source file to extract expression analysis data including
-/// resolves, imports, docstrings, and lexical scoping information.
+/// This is the core function for expression analysis, which powers features
+/// like go-to-definition, hover, and completion. It performs a two-pass
+/// analysis:
+///
+/// 1. **First pass (init_stage)**: Builds the root lexical scope by scanning
+///    top-level definitions without resolving them. This handles forward
+///    references and circular dependencies.
+///
+/// 2. **Second pass**: Performs full expression analysis, resolving
+///    identifiers, tracking imports, and building the expression tree with type
+///    information.
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
@@ -47,7 +54,7 @@ pub(crate) fn expr_of(
     route.insert(source.id(), None);
 
     let cache_hit = prev.and_then(|prev| {
-        if prev.source.len_bytes() != source.len_bytes()
+        if prev.source.lines().len_bytes() != source.lines().len_bytes()
             || hash128(&prev.source) != hash128(&source)
         {
             return None;
@@ -57,12 +64,11 @@ pub(crate) fn expr_of(
 
             // If there is a cycle, the expression will be stable as the source is
             // unchanged.
-            if let Some(exports) = ei {
-                if prev_exports.size() != exports.size()
-                    || hash128(&prev_exports) != hash128(&exports)
-                {
-                    return None;
-                }
+            if let Some(exports) = ei
+                && (prev_exports.size() != exports.size()
+                    || hash128(&prev_exports) != hash128(&exports))
+            {
+                return None;
             }
         }
 
@@ -94,37 +100,38 @@ pub(crate) fn expr_of(
         .and_then(|docs| ctx.compute_docstring(source.id(), docs, DefKind::Module))
         .unwrap_or_default();
 
-    let (exports, root) = {
-        let mut w = ExprWorker {
-            fid: source.id(),
-            ctx,
-            imports,
-            docstrings,
-            exprs,
-            import_buffer: Vec::new(),
-            lexical: LexicalContext::default(),
-            resolves,
-            buffer: vec![],
-            init_stage: true,
-            comment_matcher: DocCommentMatcher::default(),
-            route,
-        };
-
-        let root = source.root().cast::<ast::Markup>().unwrap();
-        w.check_root_scope(root.to_untyped().children());
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-        w.route.insert(w.fid, Some(root_scope.clone()));
-
-        w.lexical = LexicalContext::default();
-        w.comment_matcher.reset();
-        w.buffer.clear();
-        w.import_buffer.clear();
-        let root = w.check_in_mode(root.to_untyped().children(), InterpretMode::Markup);
-        let root_scope = Arc::new(LazyHash::new(w.summarize_scope()));
-
-        w.collect_buffer();
-        (root_scope, root)
+    let mut worker = ExprWorker {
+        fid: source.id(),
+        source: source.clone(),
+        ctx,
+        imports,
+        docstrings,
+        exprs,
+        import_buffer: Vec::new(),
+        lexical: LexicalContext::default(),
+        resolves,
+        buffer: vec![],
+        module_items: FxHashMap::default(),
+        init_stage: true,
+        comment_matcher: DocCommentMatcher::default(),
+        route,
     };
+
+    let root_markup = source.root().cast::<ast::Markup>().unwrap();
+    worker.check_root_scope(root_markup.to_untyped().children());
+    let first_scope = Arc::new(LazyHash::new(worker.summarize_scope()));
+    worker.route.insert(worker.fid, Some(first_scope.clone()));
+
+    worker.lexical = LexicalContext::default();
+    worker.comment_matcher.reset();
+    worker.buffer.clear();
+    worker.import_buffer.clear();
+    worker.module_items.clear();
+    let root = worker.check_in_mode(root_markup.to_untyped().children(), InterpretMode::Markup);
+    let exports = Arc::new(LazyHash::new(worker.summarize_scope()));
+
+    worker.collect_buffer();
+    let module_items = std::mem::take(&mut worker.module_items);
 
     let info = ExprInfoRepr {
         fid: source.id(),
@@ -137,6 +144,7 @@ pub(crate) fn expr_of(
         exports,
         exprs: std::mem::take(exprs_base.lock().deref_mut()),
         root,
+        module_items,
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
@@ -168,6 +176,7 @@ impl Default for LexicalContext {
 /// Worker for processing expressions during source file analysis.
 pub(crate) struct ExprWorker<'a> {
     fid: TypstFileId,
+    source: Source,
     ctx: Arc<SharedContext>,
     imports: Arc<Mutex<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>>,
     import_buffer: Vec<(TypstFileId, Arc<LazyHash<LexicalScope>>)>,
@@ -176,6 +185,7 @@ pub(crate) struct ExprWorker<'a> {
     resolves: Arc<Mutex<ResolveVec>>,
     buffer: ResolveVec,
     lexical: LexicalContext,
+    module_items: FxHashMap<DeclExpr, ModuleItemLayout>,
     init_stage: bool,
 
     route: &'a mut ExprRoute,
@@ -234,7 +244,12 @@ impl ExprWorker<'_> {
 
     fn summarize_scope(&self) -> LexicalScope {
         let mut exports = LexicalScope::default();
-        for scope in std::iter::once(&self.lexical.last).chain(self.lexical.scopes.iter()) {
+        for scope in self
+            .lexical
+            .scopes
+            .iter()
+            .chain(std::iter::once(&self.lexical.last))
+        {
             scope.merge_into(&mut exports);
         }
         exports
@@ -260,18 +275,18 @@ impl ExprWorker<'_> {
 
             Equation(equation) => self.check_math(equation.body().to_untyped().children()),
             Math(math) => self.check_math(math.to_untyped().children()),
-            Code(code_block) => self.check_code(code_block.body()),
-            Content(content_block) => self.check_markup(content_block.body()),
+            CodeBlock(code_block) => self.check_code(code_block.body()),
+            ContentBlock(content_block) => self.check_markup(content_block.body()),
 
             Ident(ident) => self.check_ident(ident),
             MathIdent(math_ident) => self.check_math_ident(math_ident),
             Label(label) => self.check_label(label),
             Ref(ref_node) => self.check_ref(ref_node),
 
-            Let(let_binding) => self.check_let(let_binding),
+            LetBinding(let_binding) => self.check_let(let_binding),
             Closure(closure) => self.check_closure(closure),
-            Import(module_import) => self.check_module_import(module_import),
-            Include(module_include) => self.check_module_include(module_include),
+            ModuleImport(module_import) => self.check_module_import(module_import),
+            ModuleInclude(module_include) => self.check_module_include(module_include),
 
             Parenthesized(paren_expr) => self.check(paren_expr.expr()),
             Array(array) => self.check_array(array),
@@ -280,18 +295,20 @@ impl ExprWorker<'_> {
             Binary(binary) => self.check_binary(binary),
             FieldAccess(field_access) => self.check_field_access(field_access),
             FuncCall(func_call) => self.check_func_call(func_call),
-            DestructAssign(destruct_assignment) => self.check_destruct_assign(destruct_assignment),
-            Set(set_rule) => self.check_set(set_rule),
-            Show(show_rule) => self.check_show(show_rule),
+            DestructAssignment(destruct_assignment) => {
+                self.check_destruct_assign(destruct_assignment)
+            }
+            SetRule(set_rule) => self.check_set(set_rule),
+            ShowRule(show_rule) => self.check_show(show_rule),
             Contextual(contextual) => {
                 Expr::Unary(UnInst::new(UnaryOp::Context, self.defer(contextual.body())))
             }
             Conditional(conditional) => self.check_conditional(conditional),
-            While(while_loop) => self.check_while_loop(while_loop),
-            For(for_loop) => self.check_for_loop(for_loop),
-            Break(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
-            Continue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
-            Return(func_return) => Expr::Unary(UnInst::new(
+            WhileLoop(while_loop) => self.check_while_loop(while_loop),
+            ForLoop(for_loop) => self.check_for_loop(for_loop),
+            LoopBreak(..) => Expr::Type(Ty::Builtin(BuiltinTy::Break)),
+            LoopContinue(..) => Expr::Type(Ty::Builtin(BuiltinTy::Continue)),
+            FuncReturn(func_return) => Expr::Unary(UnInst::new(
                 UnaryOp::Return,
                 func_return
                     .body()
@@ -342,15 +359,15 @@ impl ExprWorker<'_> {
                 let body = self.check_markup(heading.body());
                 self.check_element::<HeadingElem>(eco_vec![body])
             }
-            List(item) => {
+            ListItem(item) => {
                 let body = self.check_markup(item.body());
                 self.check_element::<ListElem>(eco_vec![body])
             }
-            Enum(item) => {
+            EnumItem(item) => {
                 let body = self.check_markup(item.body());
                 self.check_element::<EnumElem>(eco_vec![body])
             }
-            Term(item) => {
+            TermItem(item) => {
                 let term = self.check_markup(item.term());
                 let description = self.check_markup(item.description());
                 self.check_element::<TermsElem>(eco_vec![term, description])
@@ -501,7 +518,7 @@ impl ExprWorker<'_> {
                         }
                         ast::DestructuringItem::Named(named) => {
                             let key = Decl::var(named.name()).into();
-                            let val = self.check_pattern_expr(named.expr());
+                            let val = self.check_pattern(named.pattern());
                             names.push((key, val));
                         }
                         ast::DestructuringItem::Spread(spreading) => {
@@ -510,14 +527,17 @@ impl ExprWorker<'_> {
                             } else {
                                 Decl::spread(spreading.span()).into()
                             };
+                            let pattern = Pattern::Expr(Expr::Star).into();
 
                             if inputs.is_empty() {
-                                spread_left =
-                                    Some((decl, self.check_pattern_expr(spreading.expr())));
+                                spread_left = Some((decl.clone(), pattern));
                             } else {
-                                spread_right =
-                                    Some((decl, self.check_pattern_expr(spreading.expr())));
+                                spread_right = Some((decl.clone(), pattern));
                             }
+
+                            self.resolve_as(Decl::as_def(&decl, None));
+                            self.scope_mut()
+                                .insert_mut(decl.name().clone(), decl.into());
                         }
                     }
                 }
@@ -574,6 +594,11 @@ impl ExprWorker<'_> {
 
         let creating_mod_var = mod_var.is_some();
         let mod_var = Interned::new(mod_var.unwrap_or_else(|| Decl::module_import(typed.span())));
+
+        // Create a RefExpr for the module import variable.
+        // - decl: The import variable (e.g., "foo" in "import 'file.typ' as foo")
+        // - step & root: Both point to the module expression (same for imports)
+        // - term: None because module types are complex and not stored here
         let mod_ref = RefExpr {
             decl: mod_var.clone(),
             step: mod_expr.clone(),
@@ -648,7 +673,7 @@ impl ExprWorker<'_> {
                 }
                 ast::Imports::Items(items) => {
                     let module = Expr::Decl(mod_var.clone());
-                    self.import_decls(&scope, module, items);
+                    self.import_decls(&scope, Some(mod_var.clone()), module, items);
                 }
             }
         };
@@ -698,7 +723,7 @@ impl ExprWorker<'_> {
                 // todo: dyn resolve src_expr
                 match m.file_id() {
                     Some(fid) => Some(Expr::Decl(
-                        Decl::module(m.name().unwrap().into(), fid).into(),
+                        Decl::module_with_name(m.name().unwrap().into(), fid).into(),
                     )),
                     None => Some(Expr::Type(Ty::Value(InsTy::new(Value::Module(m))))),
                 }
@@ -731,9 +756,9 @@ impl ExprWorker<'_> {
         src: &str,
         is_import: bool,
     ) -> Option<Expr> {
-        let fid = resolve_id_by_path(&self.ctx.world, self.fid, src)?;
+        let fid = resolve_id_by_path(&self.ctx.world(), self.fid, src)?;
         let name = Decl::calc_path_stem(src);
-        let module = Expr::Decl(Decl::module(name.clone(), fid).into());
+        let module = Expr::Decl(Decl::module_with_name(name.clone(), fid).into());
 
         let import_path = if is_import {
             Decl::import_path(source.span(), name)
@@ -741,6 +766,10 @@ impl ExprWorker<'_> {
             Decl::include_path(source.span(), name)
         };
 
+        // Create a RefExpr for the import/include path.
+        // - decl: The path declaration (tracks the file path being imported)
+        // - step & root: Both point to the loaded module
+        // - term: None (module types not stored directly)
         let ref_expr = RefExpr {
             decl: import_path.into(),
             step: Some(module.clone()),
@@ -759,7 +788,13 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn import_decls(&mut self, scope: &ExprScope, module: Expr, items: ast::ImportItems) {
+    fn import_decls(
+        &mut self,
+        scope: &ExprScope,
+        module_decl: Option<DeclExpr>,
+        module: Expr,
+        items: ast::ImportItems,
+    ) {
         crate::log_debug_ct!("import scope {scope:?}");
 
         for item in items.iter() {
@@ -775,6 +810,18 @@ impl ExprWorker<'_> {
                     (path, old, Some(new))
                 }
             };
+
+            let item_span = match item {
+                ast::ImportItem::Simple(path) => path.span(),
+                ast::ImportItem::Renamed(renamed) => renamed.span(),
+            };
+
+            if let Some(parent) = module_decl.as_ref() {
+                self.record_module_item(parent, &old, item_span);
+                if let Some(rename_decl) = &rename {
+                    self.record_module_item(parent, rename_decl, item_span);
+                }
+            }
 
             let mut path = Vec::with_capacity(1);
             for seg in path_ast.iter() {
@@ -797,6 +844,12 @@ impl ExprWorker<'_> {
             }
 
             let (root, step) = extract_ref(root);
+
+            // Create RefExpr for the original name in the import.
+            // - decl: The original identifier (e.g., "old" in "import: old as new")
+            // - root: The module or selection expression where the value comes from
+            // - step: Intermediate expression (from extract_ref, handles reference chains)
+            // - term: The type if it was found in the scope
             let mut ref_expr = Interned::new(RefExpr {
                 decl: old.clone(),
                 root,
@@ -805,7 +858,13 @@ impl ExprWorker<'_> {
             });
             self.resolve_as(ref_expr.clone());
 
+            // If renamed, create a second RefExpr for the new name that chains to the old
+            // one. This builds the chain: new -> old -> root
             if let Some(new) = &rename {
+                // - decl: The new name (e.g., "new" in "import: old as new")
+                // - root: Same as original (ultimate source of the value)
+                // - step: Points to the old name (intermediate link in the chain)
+                // - term: Same type as original
                 ref_expr = Interned::new(RefExpr {
                     decl: new.clone(),
                     root: ref_expr.root.clone(),
@@ -820,6 +879,26 @@ impl ExprWorker<'_> {
             let expr = Expr::Ref(ref_expr);
             self.scope_mut().insert_mut(name, expr.clone());
         }
+    }
+
+    fn record_module_item(&mut self, parent: &DeclExpr, child: &DeclExpr, span: Span) {
+        if self.init_stage || span.is_detached() || span.id() != Some(self.fid) {
+            return;
+        }
+        let Some(item_range) = self.source.range(span) else {
+            return;
+        };
+        let Some(binding_range) = self.source.range(child.span()) else {
+            return;
+        };
+        self.module_items.insert(
+            child.clone(),
+            ModuleItemLayout {
+                parent: parent.clone(),
+                item_range,
+                binding_range,
+            },
+        );
     }
 
     fn check_module_include(&mut self, typed: ast::ModuleInclude) -> Expr {
@@ -1030,7 +1109,7 @@ impl ExprWorker<'_> {
         let ident = Interned::new(Decl::ref_(ref_node));
         let body = ref_node
             .supplement()
-            .map(|block| self.check(ast::Expr::Content(block)));
+            .map(|block| self.check(ast::Expr::ContentBlock(block)));
         let ref_expr = ContentRefExpr {
             ident: ident.clone(),
             of: None,
@@ -1071,6 +1150,37 @@ impl ExprWorker<'_> {
         Expr::Ref(r)
     }
 
+    /// Resolves an identifier to a reference expression.
+    ///
+    /// This function looks up an identifier in the lexical scope and creates
+    /// a `RefExpr` that tracks the resolution chain.
+    ///
+    /// # Resolution Process
+    ///
+    /// 1. Evaluates the identifier to get its expression and type
+    ///    (`eval_ident`)
+    /// 2. If the result is itself a `RefExpr`, extracts its `root` and uses the
+    ///    RefExpr's `decl` as the `step` (building a reference chain)
+    /// 3. Otherwise, uses the expression as both `root` and `step`
+    ///
+    /// # Field Assignment
+    ///
+    /// - `decl`: The identifier being resolved
+    /// - `root`: The ultimate source of the value (extracted from chain or the
+    ///   expression itself)
+    /// - `step`: The immediate resolution (extracted from chain or the
+    ///   expression itself)
+    /// - `term`: The resolved type (if available from evaluation)
+    ///
+    /// # Example
+    ///
+    /// For `let x = 1; let y = x; let z = y`:
+    /// - Resolving `x` gives: `RefExpr { decl: x, root: None, step: None, term:
+    ///   Some(int) }`
+    /// - Resolving `y` gives: `RefExpr { decl: y, root: Some(x), step: Some(x),
+    ///   term: Some(int) }`
+    /// - Resolving `z` gives: `RefExpr { decl: z, root: Some(x), step: Some(y),
+    ///   term: Some(int) }`
     fn resolve_ident_(&mut self, decl: DeclExpr, mode: InterpretMode) -> RefExpr {
         let (step, val) = self.eval_ident(decl.name(), mode);
         let (root, step) = extract_ref(step);
@@ -1136,6 +1246,19 @@ impl ExprWorker<'_> {
         }
     }
 
+    /// Evaluates an identifier by looking it up in the lexical scope.
+    ///
+    /// Returns a tuple of `(expression, type)` where:
+    /// - `expression`: The expression the identifier resolves to (may be a
+    ///   `RefExpr`)
+    /// - `type`: The type of the value (if known)
+    ///
+    /// # Lookup Order
+    ///
+    /// 1. Current scope (`self.lexical.last`) - for block-local variables
+    /// 2. Parent scopes (`self.lexical.scopes`) - for outer scope variables
+    /// 3. Global/Math library scope - for built-in functions and constants
+    /// 4. Special case: "std" module
     fn eval_ident(&self, name: &Interned<str>, mode: InterpretMode) -> ConcolicExpr {
         let res = self.lexical.last.get(name);
         if res.0.is_some() || res.1.is_some() {
@@ -1150,8 +1273,8 @@ impl ExprWorker<'_> {
         }
 
         let scope = match mode {
-            InterpretMode::Math => self.ctx.world.library.math.scope(),
-            InterpretMode::Markup | InterpretMode::Code => self.ctx.world.library.global.scope(),
+            InterpretMode::Math => self.ctx.world().library.math.scope(),
+            InterpretMode::Markup | InterpretMode::Code => self.ctx.world().library.global.scope(),
             _ => return (None, None),
         };
 
@@ -1164,7 +1287,7 @@ impl ExprWorker<'_> {
         }
 
         if name.as_ref() == "std" {
-            let val = Ty::Value(InsTy::new(self.ctx.world.library.std.read().clone()));
+            let val = Ty::Value(InsTy::new(self.ctx.world().library.std.read().clone()));
             return (None, Some(val));
         }
 
@@ -1210,6 +1333,7 @@ impl ExprWorker<'_> {
                 Decl::Module(module) => {
                     let exports = self.exports_of(module.fid);
                     let selected = exports.get(key.name())?;
+
                     let select_ref = Interned::new(RefExpr {
                         decl: key.clone(),
                         root: Some(lhs.clone()),
@@ -1239,6 +1363,17 @@ impl ExprWorker<'_> {
     }
 }
 
+/// Extracts the root and step from a potential reference expression.
+///
+/// This is a key helper function for building reference chains. It handles
+/// the case where an identifier resolves to another reference.
+///
+/// # Returns
+///
+/// A tuple of `(root, step)`:
+/// - If `step` is a `RefExpr`: Returns `(ref.root, Some(ref.decl))` -
+///   propagates the root forward and uses the ref's declaration as the new step
+/// - Otherwise: Returns `(step, step)` - the expression is both root and step
 fn extract_ref(step: Option<Expr>) -> (Option<Expr>, Option<Expr>) {
     match step {
         Some(Expr::Ref(r)) => (r.root.clone(), Some(r.decl.clone().into())),

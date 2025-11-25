@@ -1,3 +1,5 @@
+//! Definitions of syntax structures.
+
 use core::fmt;
 use std::{
     collections::BTreeMap,
@@ -57,26 +59,28 @@ impl Deref for ExprInfo {
 /// documentation strings, imports, and exports.
 #[derive(Debug)]
 pub struct ExprInfoRepr {
-    /// The file ID this expression information belongs to
+    /// The file ID this expression information belongs to.
     pub fid: TypstFileId,
-    /// Revision number for tracking changes to the file
+    /// Revision number for tracking changes to the file.
     pub revision: usize,
-    /// The source code content
+    /// The source code content.
     pub source: Source,
-    /// The root expression of the file
+    /// The root expression of the file.
     pub root: Expr,
-    /// Documentation string for the module
+    /// Documentation string for the module.
     pub module_docstring: Arc<DocString>,
-    /// The lexical scope of exported symbols from this file
+    /// The lexical scope of exported symbols from this file.
     pub exports: Arc<LazyHash<LexicalScope>>,
-    /// Map from file IDs to imported lexical scopes
+    /// Map from file IDs to imported lexical scopes.
     pub imports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
-    /// Map from spans to expressions for scope analysis
+    /// Map from spans to expressions for scope analysis.
     pub exprs: FxHashMap<Span, Expr>,
-    /// Map from spans to resolved reference expressions
+    /// Map from spans to resolved reference expressions.
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
-    /// Map from declarations to their documentation strings
+    /// Map from declarations to their documentation strings.
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    /// Layout information for module import items in this file.
+    pub module_items: FxHashMap<Interned<Decl>, ModuleItemLayout>,
 }
 
 impl std::hash::Hash for ExprInfoRepr {
@@ -93,6 +97,9 @@ impl std::hash::Hash for ExprInfoRepr {
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
+        let mut module_items = self.module_items.iter().collect::<Vec<_>>();
+        module_items.sort_by_key(|(decl, _)| decl.span().into_raw());
+        module_items.hash(state);
     }
 }
 
@@ -133,6 +140,7 @@ impl ExprInfoRepr {
             })
     }
 
+    /// Shows the expression information.
     #[allow(dead_code)]
     fn show(&self) {
         use std::io::Write;
@@ -161,61 +169,72 @@ impl ExprInfoRepr {
     }
 }
 
+/// Describes how an import item is laid out in the source text.
+#[derive(Debug, Clone, Hash)]
+pub struct ModuleItemLayout {
+    /// The module declaration that owns this item.
+    pub parent: Interned<Decl>,
+    /// The byte range covering the whole `foo as bar` clause.
+    pub item_range: Range<usize>,
+    /// The byte range covering the bound identifier (`bar` in `foo as bar`).
+    pub binding_range: Range<usize>,
+}
+
 /// Represents different kinds of expressions in the language.
 ///
 /// This enum covers all possible expression types that can appear in Typst
 /// source code, from basic literals to complex control flow constructs.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Expr {
-    /// A sequence of expressions
+    /// A sequence of expressions: `{ x; y; z }`
     Block(Interned<Vec<Expr>>),
-    /// An array literal
+    /// An array literal: `(1, 2, 3)`
     Array(Interned<ArgsExpr>),
-    /// A dict literal
+    /// A dict literal: `(a: 1, b: 2)`
     Dict(Interned<ArgsExpr>),
-    /// An args literal
+    /// An args literal: `(1, 2, 3)`
     Args(Interned<ArgsExpr>),
-    /// A pattern
+    /// A pattern: `(x, y, ..z)`
     Pattern(Interned<Pattern>),
-    /// An element literal
+    /// An element literal: `[*Hi* there!]`
     Element(Interned<ElementExpr>),
-    /// An unary operation
+    /// An unary operation: `-x`
     Unary(Interned<UnExpr>),
-    /// A binary operation
+    /// A binary operation: `x + y`
     Binary(Interned<BinExpr>),
-    /// A function call
+    /// A function call: `f(x, y)`
     Apply(Interned<ApplyExpr>),
-    /// A function
+    /// A function: `(x, y) => x + y`
     Func(Interned<FuncExpr>),
-    /// A let
+    /// A let: `let x = 1`
     Let(Interned<LetExpr>),
-    /// A show
+    /// A show: `show heading: it => emph(it.body)`
     Show(Interned<ShowExpr>),
-    /// A set
+    /// A set: `set text(...)`
     Set(Interned<SetExpr>),
-    /// A reference
+    /// A reference: `#x`
     Ref(Interned<RefExpr>),
-    /// A content reference
+    /// A content reference: `@x`
     ContentRef(Interned<ContentRefExpr>),
-    /// A select
+    /// A select: `x.y`
     Select(Interned<SelectExpr>),
-    /// An import
+    /// An import expression: `import "path.typ": x`
     Import(Interned<ImportExpr>),
-    /// An include
+    /// An include expression: `include "path.typ"`
     Include(Interned<IncludeExpr>),
-    /// A contextual
+    /// A contextual expression: `context text.lang`
     Contextual(Interned<Expr>),
-    /// A conditional
+    /// A conditional expression: `if x { y } else { z }`
     Conditional(Interned<IfExpr>),
-    /// A while loop
+    /// A while loop: `while x { y }`
     WhileLoop(Interned<WhileExpr>),
-    /// A for loop
+    /// A for loop: `for x in y { z }`
     ForLoop(Interned<ForExpr>),
-    /// A type
+    /// A type: `str`
     Type(Ty),
-    /// A declaration
+    /// A declaration: `x`
     Decl(DeclExpr),
-    /// A star import
+    /// A star import: `*`
     Star,
 }
 
@@ -244,6 +263,16 @@ impl Expr {
             _ => self.span().id(),
         }
     }
+
+    /// Returns whether the expression is definitely defined.
+    pub fn is_defined(&self) -> bool {
+        match self {
+            Expr::Ref(refs) => refs.root.is_some() || refs.term.is_some(),
+            Expr::Decl(decl) => decl.is_def(),
+            // There are unsure cases, like `x.y`, which may be defined or not.
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Expr {
@@ -263,9 +292,13 @@ pub type LexicalScope = rpds::RedBlackTreeMapSync<Interned<str>, Expr>;
 /// including lexical scopes, modules, functions, and types.
 #[derive(Debug, Clone)]
 pub enum ExprScope {
+    /// A lexical scope extracted from a source file.
     Lexical(LexicalScope),
+    /// A module instance which is either built-in or evaluated during analysis.
     Module(Module),
+    /// A scope bound to a function.
     Func(Func),
+    /// A scope bound to a type.
     Type(Type),
 }
 
@@ -358,18 +391,18 @@ fn select_of(source: Interned<Ty>, name: Interned<str>) -> Expr {
 #[derive(Debug, Default, Clone, Copy, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DefKind {
-    /// A definition for some constant.
+    /// A definition for some constant: `let x = 1`
     #[default]
     Constant,
-    /// A definition for some function.
+    /// A definition for some function: `(x, y) => x + y`
     Function,
-    /// A definition for some variable.
+    /// A definition for some variable: `let x = (x, y) => x + y`
     Variable,
     /// A definition for some module.
     Module,
-    /// A definition for some struct.
+    /// A definition for some struct (type).
     Struct,
-    /// A definition for some reference.
+    /// A definition for some reference: `<label>`
     Reference,
 }
 
@@ -392,27 +425,49 @@ pub type DeclExpr = Interned<Decl>;
 /// Represents different kinds of declarations in the language.
 #[derive(Clone, PartialEq, Eq, Hash, DeclEnum)]
 pub enum Decl {
+    /// A function declaration: `(x, y) => x + y`
     Func(SpannedDecl),
+    /// An import alias declaration: `import "path.typ": x`
     ImportAlias(SpannedDecl),
+    /// A variable declaration: `let x = 1`
     Var(SpannedDecl),
+    /// An identifier reference declaration: `x`
     IdentRef(SpannedDecl),
+    /// A module declaration: `import calc`
     Module(ModuleDecl),
+    /// A module alias declaration: `import "path.typ" as x`
     ModuleAlias(SpannedDecl),
+    /// A path stem declaration: `path.typ`
     PathStem(SpannedDecl),
+    /// An import path declaration: `import "path.typ"`
     ImportPath(SpannedDecl),
+    /// An include path declaration: `include "path.typ"`
     IncludePath(SpannedDecl),
+    /// An import declaration: `import "path.typ"`
     Import(SpannedDecl),
+    /// A content reference declaration: `@x`
     ContentRef(SpannedDecl),
+    /// A label declaration: `label`
     Label(SpannedDecl),
+    /// A string name declaration: `"x"`
     StrName(SpannedDecl),
+    /// A module import declaration: `import "path.typ": *`
     ModuleImport(SpanDecl),
+    /// A closure declaration: `(x, y) => x + y`
     Closure(SpanDecl),
+    /// A pattern declaration: `let (x, y, ..z) = 1`
     Pattern(SpanDecl),
+    /// A spread declaration: `..z`
     Spread(SpanDecl),
+    /// A content declaration: `#[text]`
     Content(SpanDecl),
+    /// A constant declaration: `let x = 1`
     Constant(SpanDecl),
+    /// A bib entry declaration: `@entry`
     BibEntry(NameRangeDecl),
+    /// A docs declaration created by the compiler.
     Docs(DocsDecl),
+    /// A generated declaration created by the compiler.
     Generated(GeneratedDecl),
 }
 
@@ -473,8 +528,18 @@ impl Decl {
         })
     }
 
-    /// Creates a module declaration with a name and file ID.
-    pub fn module(name: Interned<str>, fid: TypstFileId) -> Self {
+    /// Creates a module declaration with a file ID.
+    pub fn module(fid: TypstFileId) -> Self {
+        let name = {
+            let stem = fid.vpath().as_rooted_path().file_stem();
+            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
+                .unwrap_or_default()
+        };
+        Self::Module(ModuleDecl { name, fid })
+    }
+
+    /// Creates a module declaration with a name and a file ID.
+    pub fn module_with_name(name: Interned<str>, fid: TypstFileId) -> Self {
         Self::Module(ModuleDecl { name, fid })
     }
 
@@ -755,15 +820,19 @@ impl From<DeclExpr> for Expr {
 /// A declaration with an associated name and span location.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SpannedDecl {
+    /// The name of the declaration.
     name: Interned<str>,
+    /// The span location of the declaration.
     at: Span,
 }
 
 impl SpannedDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         &self.name
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         self.at
     }
@@ -778,17 +847,19 @@ impl fmt::Debug for SpannedDecl {
 /// A declaration with a name and range information.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct NameRangeDecl {
-    /// The name of the declaration
+    /// The name of the declaration.
     pub name: Interned<str>,
-    /// Boxed tuple containing (file_id, name_range, full_range)
+    /// Boxed tuple containing (file_id, name_range, full_range).
     pub at: Box<(TypstFileId, Range<usize>, Option<Range<usize>>)>,
 }
 
 impl NameRangeDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         &self.name
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         Span::detached()
     }
@@ -803,17 +874,19 @@ impl fmt::Debug for NameRangeDecl {
 /// A module declaration with name and file ID.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDecl {
-    /// The name of the module
+    /// The name of the module.
     pub name: Interned<str>,
-    /// The file ID where the module is defined
+    /// The file ID where the module is defined.
     pub fid: TypstFileId,
 }
 
 impl ModuleDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         &self.name
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         Span::detached()
     }
@@ -833,10 +906,12 @@ pub struct DocsDecl {
 }
 
 impl DocsDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         Interned::empty()
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         Span::detached()
     }
@@ -853,10 +928,12 @@ impl fmt::Debug for DocsDecl {
 pub struct SpanDecl(Span);
 
 impl SpanDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         Interned::empty()
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         self.0
     }
@@ -873,10 +950,12 @@ impl fmt::Debug for SpanDecl {
 pub struct GeneratedDecl(DefId);
 
 impl GeneratedDecl {
+    /// Gets the name of the declaration.
     fn name(&self) -> &Interned<str> {
         Interned::empty()
     }
 
+    /// Gets the span location of the declaration.
     fn span(&self) -> Span {
         Span::detached()
     }
@@ -903,17 +982,25 @@ pub type ExportMap = BTreeMap<Interned<str>, Expr>;
 /// Covers positional arguments, named arguments, and spread arguments.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ArgExpr {
+    /// A positional argument: `x`
     Pos(Expr),
+    /// A named argument: `a: x`
     Named(Box<(DeclExpr, Expr)>),
+    /// A named argument with a default value: `((a): x)`
     NamedRt(Box<(Expr, Expr)>),
+    /// A spread argument: `..x`
     Spread(Expr),
 }
 
 /// Represents different kinds of patterns for destructuring.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
+    /// A general pattern expression can occur in right-hand side of a
+    /// function signature.
     Expr(Expr),
+    /// A simple pattern: `x`
     Simple(Interned<Decl>),
+    /// A pattern signature: `(x, y: val, ..z)`
     Sig(Box<PatternSig>),
 }
 
@@ -938,13 +1025,13 @@ impl Pattern {
 /// named, and spread parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PatternSig {
-    /// Positional parameters in order
+    /// Positional parameters in order.
     pub pos: EcoVec<Interned<Pattern>>,
-    /// Named parameters with their default patterns
+    /// Named parameters with their default patterns.
     pub named: EcoVec<(DeclExpr, Interned<Pattern>)>,
-    /// Left spread parameter (collects extra positional arguments)
+    /// Left spread parameter (collects extra positional arguments).
     pub spread_left: Option<(DeclExpr, Interned<Pattern>)>,
-    /// Right spread parameter (collects remaining arguments)
+    /// Right spread parameter (collects remaining arguments).
     pub spread_right: Option<(DeclExpr, Interned<Pattern>)>,
 }
 
@@ -963,40 +1050,101 @@ pub struct ContentSeqExpr {
 
 /// Represents a reference expression.
 ///
-/// The step resolution is the intermediate step in resolution (if any).
-/// The root expression is the root expression of the reference chain.
-/// The term is the final resolved type of the reference.
+/// A reference expression tracks how an identifier resolves through the lexical
+/// scope, imports, and field accesses. It maintains a chain of resolution steps
+/// to support features like go-to-definition, go-to-reference, and type
+/// inference.
+///
+/// # Resolution Chain
+///
+/// The fields form a resolution chain: `root` -> `step` -> `decl`, where:
+/// - `root` is the original source of the value
+/// - `step` is any intermediate transformation
+/// - `decl` is the final identifier being referenced
+/// - `term` is the resolved type (if known)
+///   - Hint: A value `1`'s typst type is `int`, but here we keep the type as
+///     `1` to improve the type inference.
+///
+/// # Examples
+///
+/// ## Simple identifier reference
+/// ```rust,ignore
+/// // For: let x = value; let y = x;
+/// RefExpr {
+///     decl: y,           // The identifier 'y'
+///     root: Some(x),     // Points back to 'x'
+///     step: Some(x),     // Same as root for simple refs
+///     term: None,        // Type may not be known yet
+/// }
+/// ```
+///
+/// ## Import with rename
+/// ```rust,ignore
+/// // For: import "mod.typ": old as new
+/// // First creates ref for 'old':
+/// RefExpr { decl: old, root: Some(mod.old), step: Some(field), term: Some(Func(() -> dict)) }
+/// // Then creates ref for 'new':
+/// RefExpr { decl: new, root: Some(mod.old), step: Some(old), term: Some(Func(() -> dict)) }
+/// ```
+///
+/// ## Builtin definitions
+/// ```rust,ignore
+/// // For: std.length
+/// RefExpr { decl: length, root: None, step: None, term: Some(Type(length)) }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
-    /// The declaration being referenced
+    /// The declaration being referenced (the final identifier in the chain).
+    ///
+    /// This is always set and represents the identifier at the current point
+    /// of reference (e.g., the variable name, import alias, or field name).
     pub decl: DeclExpr,
-    /// The intermediate step in resolution (if any)
+
+    /// The intermediate expression in the resolution chain.
+    ///
+    /// Set in the following cases:
+    /// - **Import/include**: The module expression being imported
+    /// - **Field access**: The selected field's expression
+    /// - **Scope resolution**: The scope expression being resolved
+    /// - **Renamed imports**: The original name before renaming
+    ///
+    /// `None` when the identifier is an undefined reference.
     pub step: Option<Expr>,
-    /// The root expression of the reference chain
+
+    /// The root expression at the start of the reference chain.
+    ///
+    /// A root definition never references another root definition.
     pub root: Option<Expr>,
-    /// The final resolved type of the reference
+
+    /// The final resolved type of the referenced value.
+    ///
+    /// Set whenever a type is known for the referenced value.
+    ///
+    /// Some reference doesn't have a root definition, but has a term. For
+    /// example, `std.length` is termed as `Type(length)` while has no a
+    /// definition.
     pub term: Option<Ty>,
 }
 
 /// Represents a content reference expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ContentRefExpr {
-    /// The identifier being referenced
+    /// The identifier being referenced.
     pub ident: DeclExpr,
-    /// The declaration this reference points to (if resolved)
+    /// The declaration this reference points to (if resolved).
     pub of: Option<DeclExpr>,
-    /// The body content associated with the reference
+    /// The body content associated with the reference.
     pub body: Option<Expr>,
 }
 
 /// Represents a field selection expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SelectExpr {
-    /// The left-hand side expression being selected from
+    /// The left-hand side expression being selected from.
     pub lhs: Expr,
-    /// The key or field name being selected
+    /// The key or field name being selected.
     pub key: DeclExpr,
-    /// The span location of this selection
+    /// The span location of this selection.
     pub span: Span,
 }
 
@@ -1014,9 +1162,9 @@ impl SelectExpr {
 /// Represents an arguments expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ArgsExpr {
-    /// The list of arguments
+    /// The list of arguments.
     pub args: Vec<ArgExpr>,
-    /// The span location of the argument list
+    /// The span location of the argument list.
     pub span: Span,
 }
 
@@ -1030,138 +1178,138 @@ impl ArgsExpr {
 /// Represents an element expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementExpr {
-    /// The Typst element type
+    /// The Typst element type.
     pub elem: Element,
-    /// The content expressions within this element
+    /// The content expressions within this element.
     pub content: EcoVec<Expr>,
 }
 
 /// Represents a function application expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ApplyExpr {
-    /// The function expression being called
+    /// The function expression being called.
     pub callee: Expr,
-    /// The arguments passed to the function
+    /// The arguments passed to the function.
     pub args: Expr,
-    /// The span location of the function call
+    /// The span location of the function call.
     pub span: Span,
 }
 
 /// Represents a function expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FuncExpr {
-    /// The declaration for this function
+    /// The declaration for this function.
     pub decl: DeclExpr,
-    /// The parameter signature defining function inputs
+    /// The parameter signature defining function inputs.
     pub params: PatternSig,
-    /// The function body expression
+    /// The function body expression.
     pub body: Expr,
 }
 
 /// Represents a let binding expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LetExpr {
-    /// Span of the pattern
+    /// Span of the pattern.
     pub span: Span,
-    /// The pattern being bound (left side of assignment)
+    /// The pattern being bound (left side of assignment).
     pub pattern: Interned<Pattern>,
-    /// The optional body expression (right side of assignment)
+    /// The optional body expression (right side of assignment).
     pub body: Option<Expr>,
 }
 
 /// Represents a show rule expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ShowExpr {
-    /// Optional selector expression to determine what to show
+    /// Optional selector expression to determine what to show.
     pub selector: Option<Expr>,
-    /// The edit function to apply to selected elements
+    /// The edit function to apply to selected elements.
     pub edit: Expr,
 }
 
 /// Represents a set rule expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SetExpr {
-    /// The target element or function to set
+    /// The target element or function to set.
     pub target: Expr,
-    /// The arguments to apply to the target
+    /// The arguments to apply to the target.
     pub args: Expr,
-    /// Optional condition for when to apply the set rule
+    /// Optional condition for when to apply the set rule.
     pub cond: Option<Expr>,
 }
 
 /// Represents an import expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
-    /// The reference expression for what is being imported
+    /// The reference expression for what is being imported.
     pub decl: Interned<RefExpr>,
 }
 
 /// Represents an include expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeExpr {
-    /// The source expression indicating what file or content to include
+    /// The source expression indicating what file or content to include.
     pub source: Expr,
 }
 
 /// Represents a conditional (if) expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IfExpr {
-    /// The condition expression to evaluate
+    /// The condition expression to evaluate.
     pub cond: Expr,
-    /// The expression to evaluate if condition is true
+    /// The expression to evaluate if condition is true.
     pub then: Expr,
-    /// The expression to evaluate if condition is false
+    /// The expression to evaluate if condition is false.
     pub else_: Expr,
 }
 
 /// Represents a while loop expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WhileExpr {
-    /// The condition expression evaluated each iteration
+    /// The condition expression evaluated each iteration.
     pub cond: Expr,
-    /// The body expression executed while condition is true
+    /// The body expression executed while condition is true.
     pub body: Expr,
 }
 
 /// Represents a for loop expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ForExpr {
-    /// The pattern to match each iteration value against
+    /// The pattern to match each iteration value against.
     pub pattern: Interned<Pattern>,
-    /// The expression that produces values to iterate over
+    /// The expression that produces values to iterate over.
     pub iter: Expr,
-    /// The body expression executed for each iteration
+    /// The body expression executed for each iteration.
     pub body: Expr,
 }
 
 /// The kind of unary operation.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum UnaryOp {
-    /// The (arithmetic) positive operation
+    /// The (arithmetic) positive operation.
     /// `+t`
     Pos,
-    /// The (arithmetic) negate operation
+    /// The (arithmetic) negate operation.
     /// `-t`
     Neg,
-    /// The (logical) not operation
+    /// The (logical) not operation.
     /// `not t`
     Not,
-    /// The return operation
+    /// The return operation.
     /// `return t`
     Return,
-    /// The typst context operation
+    /// The typst context operation.
     /// `context t`
     Context,
-    /// The spreading operation
+    /// The spreading operation.
     /// `..t`
     Spread,
-    /// The not element of operation
+    /// The not element of operation.
     /// `not in t`
     NotElementOf,
-    /// The element of operation
+    /// The element of operation.
     /// `in t`
     ElementOf,
-    /// The type of operation
+    /// The type of operation.
     /// `type(t)`
     TypeOf,
 }
@@ -1169,9 +1317,9 @@ pub enum UnaryOp {
 /// A unary operation type.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct UnInst<T> {
-    /// The operand of the unary operation
+    /// The operand of the unary operation.
     pub lhs: T,
-    /// The kind of the unary operation
+    /// The kind of the unary operation.
     pub op: UnaryOp,
 }
 
@@ -1211,9 +1359,9 @@ pub type BinaryOp = ast::BinOp;
 /// A binary operation type.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub struct BinInst<T> {
-    /// The operands of the binary operation (left, right)
+    /// The operands of the binary operation (left, right).
     pub operands: (T, T),
-    /// The kind of the binary operation
+    /// The kind of the binary operation.
     pub op: BinaryOp,
 }
 
@@ -1250,6 +1398,7 @@ impl<T> BinInst<T> {
     }
 }
 
+/// Checks if a scope is empty.
 fn is_empty_scope(scope: &typst::foundations::Scope) -> bool {
     scope.iter().next().is_none()
 }

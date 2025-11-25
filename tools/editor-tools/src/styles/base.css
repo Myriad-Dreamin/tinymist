@@ -1,0 +1,13 @@
+*,
+::before,
+::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  border: 0 solid;
+}
+
+/* aria-hidden */
+span[aria-hidden="true"] {
+  display: none;
+}

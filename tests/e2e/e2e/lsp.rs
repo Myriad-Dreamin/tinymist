@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:8da05d2505df482442dccd7c7b200542");
+        insta::assert_snapshot!(hash, @"siphash128_13:f5a120d5d309c539e88e532d99cb843c");
     }
 
     {
@@ -33,7 +33,18 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:8d1a21c367978b11c464a58953f0a756");
+        insta::assert_snapshot!(hash, @"siphash128_13:bff2030a6c8d2038662fcbb443af583d");
+    }
+
+    {
+        gen_smoke(SmokeArgs {
+            root: root.join("vscode-syntax-only"),
+            init: "initialization/vscode-syntax-only-1.87.2".to_owned(),
+            log: "tests/fixtures/editions/base.log".to_owned(),
+        });
+
+        let hash = replay_log(&root.join("vscode-syntax-only"));
+        insta::assert_snapshot!(hash, @"siphash128_13:bff2030a6c8d2038662fcbb443af583d");
     }
 }
 
@@ -396,6 +407,15 @@ fn sort_and_redact_value(v: Value) -> Value {
                                         Err(_) => Value::String(uri.to_string()),
                                     }
                                 }
+                            } else if k == "serverInfo" {
+                                // Redact server info to avoid unstable version information
+                                Value::Object(serde_json::Map::from_iter([
+                                    ("name".to_string(), Value::String("tinymist".to_string())),
+                                    (
+                                        "version".to_string(),
+                                        Value::String("<redacted>".to_string()),
+                                    ),
+                                ]))
                             } else {
                                 sort_and_redact_value(v.clone())
                             }

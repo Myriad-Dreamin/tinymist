@@ -337,7 +337,7 @@ fn analyze_dyn_signature(
         SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
         SignatureTarget::Syntax(source, span) => {
-            let def = ctx.def_of_span(source, None, *span)?;
+            let def = ctx.def_of_span(source, *span)?;
             def.value()?.to_func()?
         }
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),

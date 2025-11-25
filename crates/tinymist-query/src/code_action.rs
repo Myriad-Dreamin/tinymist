@@ -77,7 +77,7 @@ impl SemanticRequest for CodeActionRequest {
     type Response = Vec<CodeAction>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        log::info!("requested code action: {self:?}");
+        log::trace!("requested code action: {self:?}");
 
         let source = ctx.source_by_path(&self.path).ok()?;
         let range = ctx.to_typst_range(self.range, &source)?;
@@ -93,18 +93,23 @@ impl SemanticRequest for CodeActionRequest {
 
 #[cfg(test)]
 mod tests {
+    use tinymist_lint::KnownIssues;
+    use typst::{diag::Warned, layout::PagedDocument};
+
     use super::*;
-    use crate::tests::*;
+    use crate::{DiagWorker, tests::*};
 
     #[test]
     fn test() {
         snapshot_testing("code_action", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
+            let request_range = find_test_range(&source);
+            let code_action_ctx = compute_code_action_context(ctx, &source, &request_range);
             let request = CodeActionRequest {
                 path: path.clone(),
-                range: find_test_range(&source),
-                context: CodeActionContext::default(),
+                range: request_range,
+                context: code_action_ctx,
             };
 
             let result = request.request(ctx);
@@ -115,5 +120,42 @@ mod tests {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             })
         });
+    }
+
+    fn compute_code_action_context(
+        ctx: &mut LocalContext,
+        source: &Source,
+        request_range: &LspRange,
+    ) -> CodeActionContext {
+        // todo: reuse world compute graph APIs.
+        let Warned {
+            output,
+            warnings: compiler_warnings,
+        } = typst_shim::compile_opt::<PagedDocument>(ctx.world());
+        let compiler_errors = output.err().unwrap_or_default();
+        let compiler_diags = compiler_warnings.iter().chain(compiler_errors.iter());
+
+        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
+        let lint_warnings = ctx.lint(source, &known_issues);
+
+        let diagnostics = DiagWorker::new(ctx)
+            .convert_all(compiler_diags.chain(lint_warnings.iter()))
+            .into_values()
+            .flatten();
+        CodeActionContext {
+            // The filtering here matches the LSP specification and VS Code behavior;
+            // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
+            //   `diagnostics`: An array of diagnostics known on the client side overlapping the
+            // range   provided to the textDocument/codeAction request [...]
+            diagnostics: diagnostics
+                .filter(|diag| ranges_overlap(&diag.range, request_range))
+                .collect(),
+            only: None,
+            trigger_kind: None,
+        }
+    }
+
+    fn ranges_overlap(r1: &LspRange, r2: &LspRange) -> bool {
+        !(r1.end <= r2.start || r2.end <= r1.start)
     }
 }

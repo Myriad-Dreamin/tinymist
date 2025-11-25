@@ -4,7 +4,7 @@ description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.13.16"
+version = "0.14.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -44,6 +44,7 @@ tar.workspace = true
 tinymist-package.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
+typst-shim.workspace = true
 typst.workspace = true
 typst-assets.workspace = true
 ttf-parser.workspace = true

@@ -33,14 +33,18 @@ tinymist-std.workspace = true
 tinymist-project = { workspace = true, features = ["lsp"] }
 typst.workspace = true
 typst-syntax.workspace = true
+half.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
 
 [features]
 default = ["cli", "embed-fonts", "no-content-hint"]
-cli = ["clap", "clap/wrap_help"]
+cli = ["clap", "clap/wrap_help", "system"]
 no-content-hint = ["tinymist-project/no-content-hint"]
+
+system = ["tinymist-project/system"]
+web = ["tinymist-project/web"]
 
 # Embeds Typst's default fonts for
 # - text (Linux Libertine),

@@ -14,6 +14,7 @@ use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
+use typst::layout::PageRanges;
 use typst::syntax::FileId;
 
 /// A scalar that is not NaN.
@@ -176,6 +177,7 @@ impl PathPattern {
 
         let w = root.to_string_lossy();
         let f = file_name.to_string_lossy();
+        let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
 
         // replace all $root
         let mut path = self.0.replace("$root", &w);
@@ -183,7 +185,7 @@ impl PathPattern {
             let d = dir.to_string_lossy();
             path = path.replace("$dir", &d);
         }
-        path = path.replace("$name", &f);
+        path = path.replace("$name", f);
 
         Some(Path::new(path.as_str()).clean().into())
     }
@@ -199,7 +201,7 @@ pub struct Pages(pub RangeInclusive<Option<NonZeroUsize>>);
 
 impl Pages {
     /// Selects the first page.
-    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=None);
+    pub const FIRST: Pages = Pages(NonZeroUsize::new(1)..=NonZeroUsize::new(1));
 }
 
 impl FromStr for Pages {
@@ -232,6 +234,11 @@ impl FromStr for Pages {
             [_, _, _, ..] => Err("page export range must have a single hyphen"),
         }
     }
+}
+
+/// The ranges of the pages to be exported as specified by the user.
+pub fn exported_page_ranges(pages: &[Pages]) -> PageRanges {
+    PageRanges::new(pages.iter().map(|p| p.0.clone()).collect())
 }
 
 impl fmt::Display for Pages {
@@ -320,6 +327,7 @@ impl<'de> serde::Deserialize<'de> for ResourcePath {
     }
 }
 
+/// The path context.
 // todo: The ctx path looks not quite maintainable. But we only target to make
 // things correct, then back to make code good.
 pub type CtxPath<'a, 'b> = (/* cwd */ &'a Path, /* lock_dir */ &'b Path);
@@ -358,6 +366,8 @@ impl ResourcePath {
         }
     }
 
+    /// Converts the resource path to a path relative to the `base` (usually the
+    /// directory storing the lockfile).
     pub fn relative_to(&self, base: &Path) -> Option<Self> {
         if self.0 == "file" {
             let path = Path::new(&self.1);
@@ -399,6 +409,40 @@ impl ResourcePath {
         } else {
             None
         }
+    }
+}
+
+/// Utilities for output template processing.
+/// Copied from typst-cli.
+pub mod output_template {
+    const INDEXABLE: [&str; 3] = ["{p}", "{0p}", "{n}"];
+
+    /// Checks if the output template has indexable templates.
+    pub fn has_indexable_template(output: &str) -> bool {
+        INDEXABLE.iter().any(|template| output.contains(template))
+    }
+
+    /// Formats the output template with the given page number and total pages.
+    /// Note: `this_page` is 1-based.
+    pub fn format(output: &str, this_page: usize, total_pages: usize) -> String {
+        // Find the base 10 width of number `i`
+        fn width(i: usize) -> usize {
+            1 + i.checked_ilog10().unwrap_or(0) as usize
+        }
+
+        let other_templates = ["{t}"];
+        INDEXABLE
+            .iter()
+            .chain(other_templates.iter())
+            .fold(output.to_string(), |out, template| {
+                let replacement = match *template {
+                    "{p}" => format!("{this_page}"),
+                    "{0p}" | "{n}" => format!("{:01$}", this_page, width(total_pages)),
+                    "{t}" => format!("{total_pages}"),
+                    _ => unreachable!("unhandled template placeholder {template}"),
+                };
+                out.replace(template, replacement.as_str())
+            })
     }
 }
 

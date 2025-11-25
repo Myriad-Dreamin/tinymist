@@ -102,10 +102,10 @@ pub struct ProjectInput {
 impl ProjectInput {
     /// Returns a new project input relative to the provided lock directory.
     pub fn relative_to(&self, that: &Path) -> Self {
-        if let Some(lock_dir) = &self.lock_dir {
-            if lock_dir == that {
-                return self.clone();
-            }
+        if let Some(lock_dir) = &self.lock_dir
+            && lock_dir == that
+        {
+            return self.clone();
         }
 
         todo!()

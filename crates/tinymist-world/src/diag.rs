@@ -1,3 +1,5 @@
+//! The diagnostic utilities.
+
 use ecow::EcoString;
 
 use std::str::FromStr;
@@ -12,7 +14,7 @@ use typst::syntax::Span;
 
 use crate::{CodeSpanReportWorld, DiagnosticFormat, SourceWorld};
 
-/// Prints diagnostic messages to the terminal.
+/// Prints diagnostic messages to a string.
 pub fn print_diagnostics_to_string<'d, 'files>(
     world: &'files dyn SourceWorld,
     errors: impl Iterator<Item = &'d SourceDiagnostic>,
@@ -30,7 +32,7 @@ pub fn print_diagnostics_to_string<'d, 'files>(
     Ok(output)
 }
 
-/// Prints diagnostic messages to the terminal.
+/// Prints diagnostic messages to a writer.
 pub fn print_diagnostics_to<'d, 'files>(
     world: &'files dyn SourceWorld,
     errors: impl Iterator<Item = &'d SourceDiagnostic>,

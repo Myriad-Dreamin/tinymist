@@ -1,6 +1,25 @@
-//! Tinymist Core Library
+//! # tinymist
+//!
+//! This crate provides a CLI that starts services for [Typst](https://typst.app/). It provides:
+//! + `tinymist lsp`: A language server following the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/).
+//! + `tinymist preview`: A preview server for Typst.
+//!
+//! ## Usage
+//!
+//! See [Features: Command Line Interface](https://myriad-dreamin.github.io/tinymist/feature/cli.html).
+//!
+//! ## Documentation
+//!
+//! See [Crate Docs](https://myriad-dreamin.github.io/tinymist/rs/tinymist/index.html).
+//!
+//! Also see [Developer Guide: Tinymist LSP](https://myriad-dreamin.github.io/tinymist/module/lsp.html).
+//!
+//! ## Contributing
+//!
+//! See [CONTRIBUTING.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CONTRIBUTING.md).
 
 pub use config::*;
+pub use log_::*;
 pub use lsp::init::*;
 pub use server::*;
 pub use sync_ls::LspClient;
@@ -23,21 +42,26 @@ pub use dap::SuperInit as DapSuperInit;
 pub mod project;
 pub mod tool;
 
-pub(crate) mod config;
-#[cfg(feature = "dap")]
-pub(crate) mod dap;
-pub(crate) mod input;
-pub(crate) mod lsp;
-#[cfg(feature = "lock")]
-pub(crate) mod route;
+#[cfg(feature = "web")]
+pub mod web;
 
 mod actor;
 mod cmd;
+mod config;
+mod input;
+#[path = "log.rs"]
+mod log_;
+mod lsp;
 mod resource;
 mod server;
 mod stats;
 mod task;
 mod utils;
+
+#[cfg(feature = "dap")]
+mod dap;
+#[cfg(feature = "lock")]
+mod route;
 
 use std::sync::LazyLock;
 
@@ -70,6 +94,3 @@ Typst Source:        {}
         env!("TYPST_SOURCE"),
     )
 });
-
-#[cfg(feature = "web")]
-pub mod web;

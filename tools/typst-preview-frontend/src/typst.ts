@@ -4,6 +4,9 @@
 // @param (delay): integer in milliseconds
 // @param (id): string value of a unique event id
 // @doc (event.timeStamp): http://api.jquery.com/event.timeStamp/
+
+import { TypstDomWindowElement } from "typst-dom";
+
 // @bug (event.currentTime): https://bugzilla.mozilla.org/show_bug.cgi?id=238041
 let ignoredEvent = (function () {
   let last: Record<string, any> = {},
@@ -89,7 +92,9 @@ function findAncestor(el: Element, cls: string) {
   return el;
 }
 
-window.initTypstSvg = function (docRoot: SVGElement) {
+const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
+
+windowElem.initTypstSvg = function (docRoot: SVGElement) {
   /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
   for (var i = 0; i < elements.length; i++) {
@@ -178,7 +183,7 @@ function layoutText(svg: SVGElement) {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 }
 
-window.currentPosition = function (elem: Element) {
+windowElem.currentPosition = function (elem: Element) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
@@ -194,8 +199,9 @@ window.currentPosition = function (elem: Element) {
 
   let result: TypstPosition | undefined = undefined;
   // The center of the window
-  const cx = window.innerWidth * 0.5;
-  const cy = window.innerHeight * 0.5;
+  const vpRect = windowElem.getBoundingClientRect();
+  const cx = vpRect.left + vpRect.width / 2;
+  const cy = vpRect.top + vpRect.height / 2;
   type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
   const handlePage = (pageBBox: ScrollRect, page: number) => {
     const x = pageBBox.left;
@@ -238,8 +244,7 @@ window.currentPosition = function (elem: Element) {
   return result;
 };
 
-type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
-window.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
+windowElem.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
@@ -248,14 +253,15 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
 
   // scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number)
 
-  const scrollTo = (pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number) => {
-    for (const doc of window.documents) {
-      doc.impl.scrollTo(pageRect, pageNo, innerLeft, innerTop);
+  const scrollTo = (pageWidth: number, pageNo: number, innerLeft: number, innerTop: number) => {
+    for (const doc of windowElem.documents) {
+      doc.impl.scrollTo(pageWidth, pageNo, innerLeft, innerTop);
     }
   };
 
   const renderMode = docRoot.getAttribute("data-render-mode");
   if (renderMode === "canvas") {
+    const hookedElem = docRoot.parentElement!;
     const pages = docRoot.querySelectorAll<HTMLDivElement>(".typst-page");
 
     const pageMapping = new Map<number, HTMLDivElement>();
@@ -275,11 +281,12 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
 
     const canvasContainer = pageMapping.get(pageNo)!.firstElementChild!;
     const canvasRectBase = canvasContainer.getBoundingClientRect();
+    const hookedElemBase = hookedElem.getBoundingClientRect();
     const appliedScale =
       Number.parseFloat(canvasContainer.getAttribute("data-applied-scale") || "1") || 1;
     const canvasRect = {
-      left: canvasRectBase.left,
-      top: canvasRectBase.top,
+      left: canvasRectBase.left - hookedElemBase.left,
+      top: canvasRectBase.top - hookedElemBase.top,
       width: canvasRectBase.width / appliedScale,
       height: canvasRectBase.height / appliedScale,
     };
@@ -294,7 +301,7 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
 
     console.log("canvas mode jump", left, top, canvasRect, dataWidth, dataHeight, x, y);
 
-    scrollTo(canvasRect, pageNo, left, top);
+    scrollTo(canvasRect.width, pageNo, left, top);
     return;
   }
 
@@ -311,8 +318,8 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
       // console.log(page, vw, vh, x, y, dataWidth, dataHeight, docRoot);
       const svgRectBase = docRoot.getBoundingClientRect();
       const svgRect = {
-        left: svgRectBase.left,
-        top: svgRectBase.top,
+        left: 0,
+        top: 0,
         width: svgRectBase.width,
         height: svgRectBase.height,
       };
@@ -329,7 +336,7 @@ window.handleTypstLocation = function (elem: Element, pageNo: number, x: number,
       const left = svgRect.left + (x / dataWidth) * svgRect.width;
       const top = svgRect.top + (y / dataHeight) * svgRect.height;
 
-      scrollTo(pageRect, pageNo, left, top);
+      scrollTo(pageRect.width, pageNo, left, top);
       return;
     }
   }

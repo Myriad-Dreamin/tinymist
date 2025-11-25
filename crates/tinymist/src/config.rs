@@ -22,8 +22,10 @@ use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
 use typst::Features;
 use typst_shim::utils::LazyHash;
+use typst_shim::SYNTAX_ONLY;
 
 use super::*;
+use crate::input::WatchAccessModel;
 use crate::project::{
     EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
@@ -55,6 +57,7 @@ const CONFIG_ITEMS: &[&str] = &[
     "hoverPeriscope",
     "onEnter",
     "outputPath",
+    "syntaxOnly",
     "preview",
     "projectResolution",
     "rootPath",
@@ -91,6 +94,8 @@ pub struct Config {
     pub extended_code_action: bool,
     /// Whether to run the server in development mode.
     pub development: bool,
+    /// Whether to run the server in syntax-only mode.
+    pub syntax_only: bool,
 
     /// The preferred color theme for rendering.
     pub color_theme: Option<String>,
@@ -120,10 +125,13 @@ pub struct Config {
     pub font_paths: Vec<PathBuf>,
     /// Computed fonts based on configuration.
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
-    /// Computed fonts based on configuration.
-    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
+
+    /// Computed watch access model based on configuration.
+    pub watch_access_model: OnceLock<Derived<Arc<WatchAccessModel>>>,
+    /// Computed access model based on configuration.
+    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
 
     /// Tinymist's default export target.
     pub export_target: ExportTarget,
@@ -198,6 +206,7 @@ impl Config {
         if let Some(locale) = config.const_config.locale.as_ref() {
             tinymist_l10n::set_locale(locale);
         }
+        config.configure_syntax_only();
 
         let err = params
             .initialization_options
@@ -368,6 +377,20 @@ impl Config {
                 false
             }
         };
+        self.syntax_only = match try_(|| update.get("syntaxOnly")?.as_str()) {
+            Some("onPowerSaving") => tinymist_std::battery::is_power_saving(),
+            Some("enable") => true,
+            Some("disable" | "auto") | None => false,
+            Some(value) => {
+                self.warnings.push(tinymist_l10n::t!(
+                    "tinymist.config.badSyntaxOnly",
+                    "syntaxOnly must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}",
+                    value = value.debug_l10n(),
+                ));
+
+                false
+            }
+        };
 
         // periscope_args
         self.periscope_args = match update.get("hoverPeriscope") {
@@ -443,7 +466,9 @@ impl Config {
                 root_dir: args.root.as_ref().map(|r| r.as_path().into()),
                 font: args.font,
                 package: args.package,
-                pdf_standard: args.pdf_standard,
+                pdf_standard: args.pdf.standard,
+                no_pdf_tags: args.pdf.no_tags,
+                ppi: args.png.ppi,
                 features: args.features,
                 creation_timestamp: args.creation_timestamp,
                 cert: args.cert.as_deref().map(From::from),
@@ -489,6 +514,17 @@ impl Config {
         self.entry_resolver.validate()?;
 
         Ok(())
+    }
+
+    /// Configures the syntax-only mode.
+    pub fn configure_syntax_only(&self) {
+        if self.syntax_only {
+            log::info!("Server: running lsp in syntax-only mode, some features may be disabled");
+            SYNTAX_ONLY.store(true, std::sync::atomic::Ordering::SeqCst);
+        } else {
+            log::info!("Server: running lsp in full mode");
+            SYNTAX_ONLY.store(false, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 
     /// Gets the formatter configuration.
@@ -556,7 +592,9 @@ impl Config {
             // },
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export,
+                pages: None, // todo: set pages
                 pdf_standards: self.pdf_standards().unwrap_or_default(),
+                no_pdf_tags: self.no_pdf_tags(),
                 creation_timestamp: self.creation_timestamp(),
             }),
             count_words: self.notify_status,
@@ -656,6 +694,18 @@ impl Config {
         Some(self.typst_extra_args.as_ref()?.pdf_standard.clone())
     }
 
+    /// Determines the no pdf tags.
+    pub fn no_pdf_tags(&self) -> bool {
+        self.typst_extra_args
+            .as_ref()
+            .is_some_and(|x| x.no_pdf_tags)
+    }
+
+    /// Determines the ppi.
+    pub fn ppi(&self) -> Option<f32> {
+        Some(self.typst_extra_args.as_ref()?.ppi)
+    }
+
     /// Determines the creation timestamp.
     pub fn creation_timestamp(&self) -> Option<i64> {
         self.typst_extra_args.as_ref()?.creation_timestamp
@@ -671,17 +721,42 @@ impl Config {
     pub fn primary_opts(
         &self,
     ) -> (
+        bool,
+        ImmutDict,
+        ExportTarget,
+        Option<Vec<typst::Feature>>,
+        Option<ImmutPath>,
+        CompilePackageArgs,
         Option<bool>,
-        &Vec<PathBuf>,
-        Option<&CompileFontArgs>,
+        CompileFontArgs,
         Option<i64>,
         Option<Arc<Path>>,
     ) {
         (
+            // server
+            self.syntax_only,
+            // typst library
+            self.user_inputs(),
+            self.export_target,
+            self.typst_features().map(|feat| {
+                let mut features = vec![];
+                if feat.is_enabled(typst::Feature::Html) {
+                    features.push(typst::Feature::Html);
+                }
+                if feat.is_enabled(typst::Feature::A11yExtras) {
+                    features.push(typst::Feature::A11yExtras);
+                }
+
+                features
+            }),
+            // typst package
+            self.certification_path(),
+            self.package_opts(),
+            // typst font
             self.system_fonts,
-            &self.font_paths,
-            self.typst_extra_args.as_ref().map(|e| &e.font),
+            self.font_opts(),
             self.creation_timestamp(),
+            // typst root
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )
@@ -692,7 +767,7 @@ impl Config {
         &self,
         client: &TypedLspClient<ServerState>,
     ) -> Arc<dyn LspAccessModel> {
-        self.create_delegate_access_model(client)
+        self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>
     }
 
     #[cfg(feature = "system")]
@@ -704,12 +779,15 @@ impl Config {
         Arc::new(SystemAccessModel {})
     }
 
-    fn create_delegate_access_model(
+    pub(crate) fn watch_access_model(
         &self,
         client: &TypedLspClient<ServerState>,
-    ) -> Arc<dyn LspAccessModel> {
+    ) -> &Arc<WatchAccessModel> {
         let client = client.clone();
-        Arc::new(crate::input::ClientAccessModel::new(client))
+        &self
+            .watch_access_model
+            .get_or_init(|| Derived(Arc::new(WatchAccessModel::new(client))))
+            .0
     }
 
     pub(crate) fn access_model(&self, client: &TypedLspClient<ServerState>) -> DynAccessModel {
@@ -719,7 +797,7 @@ impl Config {
                 self.delegate_fs_requests
             );
             if self.delegate_fs_requests {
-                Derived(self.create_delegate_access_model(client))
+                Derived(self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>)
             } else {
                 Derived(self.create_physical_access_model(client))
             }
@@ -761,18 +839,22 @@ impl Default for ConstConfig {
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
-        const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
+        // const DEFAULT_ENCODING: &[PositionEncodingKind] =
+        // &[PositionEncodingKind::UTF16];
 
+        // todo: respect position encoding.
         let position_encoding = {
-            let general = params.capabilities.general.as_ref();
-            let encodings = try_(|| Some(general?.position_encodings.as_ref()?.as_slice()));
-            let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
+            // let general = params.capabilities.general.as_ref();
+            // let encodings = try_(||
+            // Some(general?.position_encodings.as_ref()?.as_slice()));
+            // let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
 
-            if encodings.contains(&PositionEncodingKind::UTF8) {
-                PositionEncoding::Utf8
-            } else {
-                PositionEncoding::Utf16
-            }
+            // if encodings.contains(&PositionEncodingKind::UTF8) {
+            //     PositionEncoding::Utf8
+            // } else {
+            //     PositionEncoding::Utf16
+            // }
+            PositionEncoding::Utf16
         };
 
         let workspace = params.capabilities.workspace.as_ref();
@@ -912,6 +994,7 @@ impl LintFeat {
 }
 /// The lint features.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OnEnterFeat {
     /// Whether to handle list.
     #[serde(default, deserialize_with = "deserialize_null_default")]
@@ -958,6 +1041,13 @@ pub struct TypstExtraArgs {
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.
     pub pdf_standard: Vec<PdfStandard>,
+    /// The PPI (pixels per inch) to use for PNG export.
+    pub ppi: f32,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    pub no_pdf_tags: bool,
     /// The creation timestamp for various outputs (in seconds).
     pub creation_timestamp: Option<i64>,
     /// The path to the certification file.
@@ -1050,6 +1140,7 @@ mod tests {
             config.typst_extra_args,
             Some(TypstExtraArgs {
                 root_dir: Some(ImmutPath::from(root_path)),
+                ppi: 144.0,
                 ..TypstExtraArgs::default()
             })
         );

@@ -211,13 +211,13 @@ pub fn __cov_pc(span: Span, pc: i64) {
         return;
     };
     let mut map = COVERAGE_MAP.lock();
-    if let Some(last_hit) = map.last_hit.as_ref() {
-        if last_hit.0 == fid {
-            let mut hits = last_hit.1.hits.lock();
-            let c = &mut hits[pc as usize];
-            *c = c.saturating_add(1);
-            return;
-        }
+    if let Some(last_hit) = map.last_hit.as_ref()
+        && last_hit.0 == fid
+    {
+        let mut hits = last_hit.1.hits.lock();
+        let c = &mut hits[pc as usize];
+        *c = c.saturating_add(1);
+        return;
     }
 
     let region = map.regions.entry(fid).or_default();
@@ -274,15 +274,15 @@ impl InstrumentWorker {
     fn visit_node(&mut self, node: &SyntaxNode) {
         if let Some(expr) = node.cast::<ast::Expr>() {
             match expr {
-                ast::Expr::Code(..) => {
+                ast::Expr::CodeBlock(..) => {
                     self.instrument_block(node);
                     return;
                 }
-                ast::Expr::While(while_expr) => {
+                ast::Expr::WhileLoop(while_expr) => {
                     self.instrument_block_child(node, while_expr.body().span(), Span::detached());
                     return;
                 }
-                ast::Expr::For(for_expr) => {
+                ast::Expr::ForLoop(for_expr) => {
                     self.instrument_block_child(node, for_expr.body().span(), Span::detached());
                     return;
                 }
@@ -298,9 +298,9 @@ impl InstrumentWorker {
                     self.instrument_block_child(node, closure.body().span(), Span::detached());
                     return;
                 }
-                ast::Expr::Show(show_rule) => {
+                ast::Expr::ShowRule(show_rule) => {
                     let transform = show_rule.transform().to_untyped().span();
-                    let is_set = matches!(show_rule.transform(), ast::Expr::Set(..));
+                    let is_set = matches!(show_rule.transform(), ast::Expr::SetRule(..));
 
                     for child in node.children() {
                         if transform == child.span() {
@@ -335,9 +335,9 @@ impl InstrumentWorker {
                 | ast::Expr::Label(..)
                 | ast::Expr::Ref(..)
                 | ast::Expr::Heading(..)
-                | ast::Expr::List(..)
-                | ast::Expr::Enum(..)
-                | ast::Expr::Term(..)
+                | ast::Expr::ListItem(..)
+                | ast::Expr::EnumItem(..)
+                | ast::Expr::TermItem(..)
                 | ast::Expr::Equation(..)
                 | ast::Expr::Math(..)
                 | ast::Expr::MathText(..)
@@ -357,7 +357,7 @@ impl InstrumentWorker {
                 | ast::Expr::Float(..)
                 | ast::Expr::Numeric(..)
                 | ast::Expr::Str(..)
-                | ast::Expr::Content(..)
+                | ast::Expr::ContentBlock(..)
                 | ast::Expr::Parenthesized(..)
                 | ast::Expr::Array(..)
                 | ast::Expr::Dict(..)
@@ -365,14 +365,14 @@ impl InstrumentWorker {
                 | ast::Expr::Binary(..)
                 | ast::Expr::FieldAccess(..)
                 | ast::Expr::FuncCall(..)
-                | ast::Expr::Let(..)
-                | ast::Expr::DestructAssign(..)
-                | ast::Expr::Set(..)
-                | ast::Expr::Import(..)
-                | ast::Expr::Include(..)
-                | ast::Expr::Break(..)
-                | ast::Expr::Continue(..)
-                | ast::Expr::Return(..) => {}
+                | ast::Expr::LetBinding(..)
+                | ast::Expr::DestructAssignment(..)
+                | ast::Expr::SetRule(..)
+                | ast::Expr::ModuleImport(..)
+                | ast::Expr::ModuleInclude(..)
+                | ast::Expr::LoopBreak(..)
+                | ast::Expr::LoopContinue(..)
+                | ast::Expr::FuncReturn(..) => {}
             }
         }
 

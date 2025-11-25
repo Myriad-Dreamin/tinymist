@@ -15,7 +15,7 @@ RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovi
 USER root
 RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
 
-FROM myriaddreamin/tinymist:0.13.24-rc1 as tinymist
+FROM myriaddreamin/tinymist:0.14.4-rc1 as tinymist
 
 FROM debian:12
 
@@ -24,7 +24,7 @@ COPY --from=builder /neovim/build/nvim-linux-x86_64.deb /tmp/nvim-linux-x86_64.d
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && apt-get install -y curl git ripgrep build-essential unzip
+    apt-get update && apt-get install -y curl wget git ripgrep build-essential unzip
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \

@@ -1,7 +1,5 @@
 //! Types and type operations for Typst.
 
-#![allow(missing_docs)]
-
 mod apply;
 mod bound;
 mod builtin;

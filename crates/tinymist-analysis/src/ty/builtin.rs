@@ -16,25 +16,44 @@ use typst::{
 use crate::syntax::Decl;
 use crate::ty::*;
 
+/// A kind of path recognized by the analyzer.
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, EnumIter)]
-pub enum PathPreference {
-    Source { allow_package: bool },
+pub enum PathKind {
+    /// A source path: `import "foo.typ"`.
+    Source {
+        /// Whether to allow package imports.
+        allow_package: bool,
+    },
+    /// A WASM path: `plugin("foo.wasm")`.
     Wasm,
+    /// A CSV path: `csv("foo.csv")`.
     Csv,
+    /// An image path: `image("foo.png")`.
     Image,
+    /// A JSON path: `json("foo.json")`.
     Json,
+    /// A YAML path: `yaml("foo.yml")`.
     Yaml,
+    /// A XML path: `xml("foo.xml")`.
     Xml,
+    /// A TOML path: `toml("foo.toml")`.
     Toml,
+    /// A CSL path: `bibliography(csl: "foo.csl")`.
     Csl,
+    /// A bibliography path: `bibliography("foo.bib")`.
     Bibliography,
+    /// A raw theme path: `raw(theme: "foo.tmTheme")`.
     RawTheme,
+    /// A raw syntaxes path: `raw(syntaxes: "foo.tmLanguage")`.
     RawSyntax,
+    /// All of the above kinds.
     Special,
+    /// Merely known as a path.
     None,
 }
 
-impl PathPreference {
+impl PathKind {
+    /// Matches the extension of the path by kind.
     pub fn ext_matcher(&self) -> &'static RegexSet {
         type RegSet = LazyLock<RegexSet>;
 
@@ -48,6 +67,7 @@ impl PathPreference {
         static IMAGE_REGSET: RegSet = RegSet::new(|| {
             make_regex(&[
                 "ico", "bmp", "png", "webp", "jpg", "jpeg", "jfif", "tiff", "gif", "svg", "svgz",
+                "pdf",
             ])
         });
         static JSON_REGSET: RegSet = RegSet::new(|| make_regex(&["json", "jsonc", "json5"]));
@@ -81,34 +101,37 @@ impl PathPreference {
         });
 
         match self {
-            PathPreference::Source { .. } => &SOURCE_REGSET,
-            PathPreference::Wasm => &WASM_REGSET,
-            PathPreference::Csv => &CSV_REGSET,
-            PathPreference::Image => &IMAGE_REGSET,
-            PathPreference::Json => &JSON_REGSET,
-            PathPreference::Yaml => &YAML_REGSET,
-            PathPreference::Xml => &XML_REGSET,
-            PathPreference::Toml => &TOML_REGSET,
-            PathPreference::Csl => &CSL_REGSET,
-            PathPreference::Bibliography => &BIB_REGSET,
-            PathPreference::RawTheme => &RAW_THEME_REGSET,
-            PathPreference::RawSyntax => &RAW_SYNTAX_REGSET,
-            PathPreference::Special => &ALL_SPECIAL_REGSET,
-            PathPreference::None => &ALL_REGSET,
+            PathKind::Source { .. } => &SOURCE_REGSET,
+            PathKind::Wasm => &WASM_REGSET,
+            PathKind::Csv => &CSV_REGSET,
+            PathKind::Image => &IMAGE_REGSET,
+            PathKind::Json => &JSON_REGSET,
+            PathKind::Yaml => &YAML_REGSET,
+            PathKind::Xml => &XML_REGSET,
+            PathKind::Toml => &TOML_REGSET,
+            PathKind::Csl => &CSL_REGSET,
+            PathKind::Bibliography => &BIB_REGSET,
+            PathKind::RawTheme => &RAW_THEME_REGSET,
+            PathKind::RawSyntax => &RAW_SYNTAX_REGSET,
+            PathKind::Special => &ALL_SPECIAL_REGSET,
+            PathKind::None => &ALL_REGSET,
         }
     }
 
+    /// Checks if the path matches the kind.
     pub fn is_match(&self, path: &Path) -> bool {
         let ext = path.extension().and_then(|ext| ext.to_str());
         ext.is_some_and(|ext| self.ext_matcher().is_match(ext))
     }
 
+    /// Gets the kind of the path by extension.
     pub fn from_ext(path: &str) -> Option<Self> {
-        PathPreference::iter().find(|preference| preference.is_match(std::path::Path::new(path)))
+        PathKind::iter().find(|preference| preference.is_match(std::path::Path::new(path)))
     }
 }
 
 impl Ty {
+    /// Converts a cast info to a type.
     pub fn from_cast_info(ty: &CastInfo) -> Ty {
         match &ty {
             CastInfo::Any => Ty::Any,
@@ -120,6 +143,7 @@ impl Ty {
         }
     }
 
+    /// Converts a parameter site to a type.
     pub fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
         use typst::foundations::func::Repr;
         match func.inner() {
@@ -135,6 +159,7 @@ impl Ty {
         Self::from_cast_info(&param.input)
     }
 
+    /// Converts a return site to a type.
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
         use typst::foundations::func::Repr;
         match func.inner() {
@@ -148,6 +173,7 @@ impl Ty {
     }
 }
 
+/// An iterator over a union of cast infos.
 struct UnionIter<'a>(Vec<std::slice::Iter<'a, CastInfo>>);
 
 impl<'a> Iterator for UnionIter<'a> {
@@ -171,18 +197,21 @@ impl<'a> Iterator for UnionIter<'a> {
 }
 
 // todo: we can write some proto files for builtin sigs
+/// A builtin signature.
 #[derive(Debug, Clone, Copy)]
 pub enum BuiltinSig<'a> {
-    /// Map a function over a tuple.
+    /// Maps a function over a tuple: `(a, b, c).map`
     TupleMap(&'a Ty),
-    /// Get element of a tuple.
+    /// Gets element of a tuple: `(a, b, c).at`
     TupleAt(&'a Ty),
 }
 
 /// A package identifier.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PackageId {
+    /// The namespace of the package.
     pub namespace: StrRef,
+    /// The name of the package.
     pub name: StrRef,
 }
 
@@ -206,52 +235,84 @@ impl TryFrom<FileId> for PackageId {
     }
 }
 
+/// A builtin type.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BuiltinTy {
+    /// A clause type.
     Clause,
+    /// An undefined type.
     Undef,
+    /// A space type: `[ ]`
     Space,
+    /// A none type: `none`
     None,
+    /// A break type: `break`
     Break,
+    /// A continue type: `continue`
     Continue,
+    /// An infer type: `any`
     Infer,
+    /// A flow none type: `none`
     FlowNone,
+    /// An auto type: `auto`
     Auto,
 
+    /// Arguments: `arguments(a, b: c, ..d)`
     Args,
+    /// A color type: `rgb(r, g, b)`
     Color,
+    /// A text size type: `text.size`
     TextSize,
+    /// A text font type: `text.font`
     TextFont,
+    /// A text feature type: `text.feature`
     TextFeature,
+    /// A text language type: `text.lang`
     TextLang,
+    /// A text region type: `text.region`
     TextRegion,
-
-    Label,
-    CiteLabel,
-    RefLabel,
+    /// A dir type: `left`
     Dir,
+    /// A label type: `<label>`
+    Label,
+    /// A cite label type: `#cite(<label>)`
+    CiteLabel,
+    /// A ref label type: `@label`
+    RefLabel,
+    /// A length type: `10pt`
     Length,
+    /// A float type: `1.0`
     Float,
-
+    /// A stroke type: `stroke(paint: red)`
     Stroke,
+    /// A margin type: `page(margin: 10pt)`
     Margin,
+    /// An inset type: `box(inset: 10pt)`
     Inset,
+    /// An outset type: `box(outset: 10pt)`
     Outset,
+    /// A radius type: `box(radius: 10pt)`
     Radius,
 
+    /// A tag type: `tag`
     Tag(Box<(StrRef, Option<Interned<PackageId>>)>),
 
-    /// A value having a specific type.
+    /// The type of a value: `int` of `10`
     Type(typst::foundations::Type),
-    /// A value of some type.
+    /// The type of a type: `type(int)`
     TypeType(typst::foundations::Type),
-    /// A content having a specific element type.
+    /// The element type of a content value. For example, `#[text]` has
+    /// element type `text`.
+    ///
+    /// If the element is not specified, the element type is `content`.
     Content(Option<typst::foundations::Element>),
-    /// A value of some element type.
+    /// The type of an element: `text`
     Element(typst::foundations::Element),
 
+    /// A module type: `module(foo)`
     Module(Interned<Decl>),
-    Path(PathPreference),
+    /// A path type: `import "foo.typ"`
+    Path(PathKind),
 }
 
 impl fmt::Debug for BuiltinTy {
@@ -310,6 +371,7 @@ impl fmt::Debug for BuiltinTy {
 }
 
 impl BuiltinTy {
+    /// Converts a value to a type.
     pub fn from_value(builtin: &Value) -> Ty {
         if let Value::Bool(v) = builtin {
             return Ty::Boolean(Some(*v));
@@ -318,6 +380,7 @@ impl BuiltinTy {
         Self::from_builtin(builtin.ty())
     }
 
+    /// Converts a builtin type to a type.
     pub fn from_builtin(builtin: Type) -> Ty {
         if builtin == Type::of::<AutoValue>() {
             return Ty::Builtin(BuiltinTy::Auto);
@@ -344,6 +407,7 @@ impl BuiltinTy {
         BuiltinTy::Type(builtin).literally()
     }
 
+    /// Describes the builtin type.
     pub(crate) fn describe(&self) -> EcoString {
         let res = match self {
             BuiltinTy::Clause => "any",
@@ -394,20 +458,20 @@ impl BuiltinTy {
             }
             BuiltinTy::Module(m) => return eco_format!("module({})", m.name()),
             BuiltinTy::Path(s) => match s {
-                PathPreference::None => "[any]",
-                PathPreference::Special => "[any]",
-                PathPreference::Source { .. } => "[source]",
-                PathPreference::Wasm => "[wasm]",
-                PathPreference::Csv => "[csv]",
-                PathPreference::Image => "[image]",
-                PathPreference::Json => "[json]",
-                PathPreference::Yaml => "[yaml]",
-                PathPreference::Xml => "[xml]",
-                PathPreference::Toml => "[toml]",
-                PathPreference::Csl => "[csl]",
-                PathPreference::Bibliography => "[bib]",
-                PathPreference::RawTheme => "[theme]",
-                PathPreference::RawSyntax => "[syntax]",
+                PathKind::None => "[any]",
+                PathKind::Special => "[any]",
+                PathKind::Source { .. } => "[source]",
+                PathKind::Wasm => "[wasm]",
+                PathKind::Csv => "[csv]",
+                PathKind::Image => "[image]",
+                PathKind::Json => "[json]",
+                PathKind::Yaml => "[yaml]",
+                PathKind::Xml => "[xml]",
+                PathKind::Toml => "[toml]",
+                PathKind::Csl => "[csl]",
+                PathKind::Bibliography => "[bib]",
+                PathKind::RawTheme => "[theme]",
+                PathKind::RawSyntax => "[syntax]",
             },
         };
 
@@ -417,10 +481,12 @@ impl BuiltinTy {
 
 use BuiltinTy::*;
 
+/// Converts a flow builtin to a type.
 fn literally(s: impl FlowBuiltinLiterally) -> Ty {
     s.literally()
 }
 
+/// A trait for converting a flow builtin to a type.
 trait FlowBuiltinLiterally {
     fn literally(self) -> Ty;
 }
@@ -443,7 +509,7 @@ impl FlowBuiltinLiterally for Ty {
     }
 }
 
-// separate by middle
+/// A macro for converting a flow builtin to a type.
 macro_rules! flow_builtin_union_inner {
     ($literal_kind:expr) => {
         literally($literal_kind)
@@ -455,6 +521,7 @@ macro_rules! flow_builtin_union_inner {
     };
 }
 
+/// A macro for converting a flow builtin to a type.
 macro_rules! flow_union {
     // the first one is string
     ($($b:tt)*) => {
@@ -463,6 +530,7 @@ macro_rules! flow_union {
 
 }
 
+/// A macro for converting a flow builtin to a type.
 macro_rules! flow_record {
     ($($name:expr => $ty:expr),* $(,)?) => {
         RecordTy::new(vec![
@@ -476,24 +544,25 @@ macro_rules! flow_record {
     };
 }
 
+/// Maps a function parameter to a type.
 pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
     // todo: remove path params which is compatible with 0.12.0
     match (func.name()?, param.name) {
         // todo: pdf.embed
-        ("embed", "path") => Some(literally(Path(PathPreference::None))),
-        ("cbor", "path" | "source") => Some(literally(Path(PathPreference::None))),
-        ("plugin", "source") => Some(literally(Path(PathPreference::Wasm))),
-        ("csv", "path" | "source") => Some(literally(Path(PathPreference::Csv))),
-        ("image", "path" | "source") => Some(literally(Path(PathPreference::Image))),
-        ("read", "path" | "source") => Some(literally(Path(PathPreference::None))),
-        ("json", "path" | "source") => Some(literally(Path(PathPreference::Json))),
-        ("yaml", "path" | "source") => Some(literally(Path(PathPreference::Yaml))),
-        ("xml", "path" | "source") => Some(literally(Path(PathPreference::Xml))),
-        ("toml", "path" | "source") => Some(literally(Path(PathPreference::Toml))),
-        ("raw", "theme") => Some(literally(Path(PathPreference::RawTheme))),
-        ("raw", "syntaxes") => Some(literally(Path(PathPreference::RawSyntax))),
+        ("embed", "path") => Some(literally(Path(PathKind::None))),
+        ("cbor", "path" | "source") => Some(literally(Path(PathKind::None))),
+        ("plugin", "source") => Some(literally(Path(PathKind::Wasm))),
+        ("csv", "path" | "source") => Some(literally(Path(PathKind::Csv))),
+        ("image", "path" | "source") => Some(literally(Path(PathKind::Image))),
+        ("read", "path" | "source") => Some(literally(Path(PathKind::None))),
+        ("json", "path" | "source") => Some(literally(Path(PathKind::Json))),
+        ("yaml", "path" | "source") => Some(literally(Path(PathKind::Yaml))),
+        ("xml", "path" | "source") => Some(literally(Path(PathKind::Xml))),
+        ("toml", "path" | "source") => Some(literally(Path(PathKind::Toml))),
+        ("raw", "theme") => Some(literally(Path(PathKind::RawTheme))),
+        ("raw", "syntaxes") => Some(literally(Path(PathKind::RawSyntax))),
         ("bibliography" | "cite", "style") => Some(Ty::iter_union([
-            literally(Path(PathPreference::Csl)),
+            literally(Path(PathKind::Csl)),
             Ty::from_cast_info(&param.input),
         ])),
         ("cite", "key") => Some(Ty::iter_union([literally(CiteLabel)])),
@@ -518,7 +587,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         }
         ("bibliography", "path" | "sources") => {
             static BIB_PATH_TYPE: LazyLock<Ty> = LazyLock::new(|| {
-                let bib_path_ty = literally(Path(PathPreference::Bibliography));
+                let bib_path_ty = literally(Path(PathKind::Bibliography));
                 Ty::iter_union([bib_path_ty.clone(), Ty::Array(bib_path_ty.into())])
             });
             Some(BIB_PATH_TYPE.clone())
@@ -615,6 +684,7 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
     }
 }
 
+/// The record component of a stroke type.
 static FLOW_STROKE_DASH_TYPE: LazyLock<Ty> = LazyLock::new(|| {
     flow_union!(
         "solid",
@@ -635,6 +705,7 @@ static FLOW_STROKE_DASH_TYPE: LazyLock<Ty> = LazyLock::new(|| {
     )
 });
 
+/// The record component of a stroke type.
 pub static FLOW_STROKE_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "paint" => literally(Color),
@@ -646,6 +717,7 @@ pub static FLOW_STROKE_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     )
 });
 
+/// The record component of a margin type.
 pub static FLOW_MARGIN_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
@@ -660,6 +732,7 @@ pub static FLOW_MARGIN_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     )
 });
 
+/// The record component of an inset type.
 pub static FLOW_INSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
@@ -672,6 +745,7 @@ pub static FLOW_INSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     )
 });
 
+/// The record component of an outset type.
 pub static FLOW_OUTSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
@@ -684,6 +758,7 @@ pub static FLOW_OUTSET_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     )
 });
 
+/// The record component of a radius type.
 pub static FLOW_RADIUS_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "top" => literally(Length),
@@ -698,6 +773,7 @@ pub static FLOW_RADIUS_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     )
 });
 
+/// The record component of a text font type.
 pub static FLOW_TEXT_FONT_DICT: LazyLock<Interned<RecordTy>> = LazyLock::new(|| {
     flow_record!(
         "name" => literally(TextFont),
@@ -733,15 +809,15 @@ mod tests {
     #[test]
     fn test_image_extension() {
         let path = "test.png";
-        let preference = super::PathPreference::from_ext(path).unwrap();
-        assert_eq!(preference, super::PathPreference::Image);
+        let preference = super::PathKind::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathKind::Image);
     }
 
     #[test]
     fn test_image_extension_uppercase() {
         let path = "TEST.PNG";
-        let preference = super::PathPreference::from_ext(path).unwrap();
-        assert_eq!(preference, super::PathPreference::Image);
+        let preference = super::PathKind::from_ext(path).unwrap();
+        assert_eq!(preference, super::PathKind::Image);
     }
 
     // todo: map function

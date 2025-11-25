@@ -361,20 +361,15 @@ export async function openPreviewInWebView({
   );
   html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
-  html = html.replace(
-    "ws://127.0.0.1:23625",
-    translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
-  );
+  // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
+  // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
+  let wsURI = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+  let wsURIString = wsURI.toString().replace(/^http/, "ws");
+  html = html.replace("ws://127.0.0.1:23625", wsURIString);
 
   // Sets the HTML content to the webview panel.
   // This will reload the webview panel if it's already opened.
   panel.webview.html = html;
-
-  // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
-  // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
-  await vscode.env.asExternalUri(
-    vscode.Uri.parse(translateExternalURL(`http://127.0.0.1:${dataPlanePort}`)),
-  );
   return panel;
 }
 

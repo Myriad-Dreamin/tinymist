@@ -3,28 +3,29 @@ use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+pub(crate) use futures::Future;
 use lsp_types::request::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
-use tinymist_query::ServerInfoResponse;
+use tinymist_query::{ServerInfoResponse, GLOBAL_STATS};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use tokio::sync::mpsc;
 use typst::syntax::Source;
 
 use crate::actor::editor::{EditorActor, EditorRequest};
+use crate::input::FsChange;
 use crate::lsp::query::OnEnter;
 use crate::project::{EntryResolver, LspInterrupt, ProjectInsId, ProjectState};
 use crate::task::FormatTask;
+use crate::vfs::notify::NotifyMessage;
 use crate::{lsp::init::*, *};
 
 #[cfg(feature = "lock")]
 use crate::route::ProjectRouteState;
 #[cfg(feature = "trace")]
 use crate::task::{ServerTraceTask, UserActionTask};
-
-pub(crate) use futures::Future;
 
 pub(crate) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(&inp.uri)
@@ -97,6 +98,10 @@ pub struct ServerState {
     pub editor_tx: mpsc::UnboundedSender<EditorRequest>,
     /// The editor actor state
     editor_actor: Option<EditorActor>,
+    /// The dependency sender to send dependency changes to the project.
+    pub dep_tx: mpsc::UnboundedSender<NotifyMessage>,
+    /// The dependency receiver to receive dependency changes from the project.
+    pub dep_rx: Option<mpsc::UnboundedReceiver<NotifyMessage>>,
 }
 
 /// Getters and the main loop.
@@ -109,14 +114,37 @@ impl ServerState {
     ) -> Self {
         let formatter = FormatTask::new(config.formatter());
 
+        // todo: unify filesystem watcher
+        let (dep_tx, rx) = mpsc::unbounded_channel();
+        // todo: notify feature?
+        #[cfg(feature = "system")]
+        let dep_rx = {
+            let fs_client = client.clone().to_untyped();
+            let async_handle = client.handle.clone();
+            async_handle.spawn(crate::project::watch_deps(rx, move |event| {
+                fs_client.send_event(LspInterrupt::Fs(event));
+            }));
+            None
+        };
+        #[cfg(not(feature = "system"))]
+        let dep_rx = Some(rx);
+
         #[cfg(feature = "preview")]
         let watchers = crate::project::ProjectPreviewState::default();
+
         let handle = Self::project(
             &config,
             editor_tx.clone(),
             client.clone(),
+            dep_tx.clone(),
             #[cfg(feature = "preview")]
             watchers.clone(),
+            #[cfg(all(not(feature = "system"), feature = "web"))]
+            if let TransportHost::Js { sender, .. } = client.clone().to_untyped().sender {
+                sender.resolve_fn
+            } else {
+                panic!("Expected Js TransportHost")
+            },
         );
 
         Self {
@@ -151,6 +179,8 @@ impl ServerState {
             implicit_position: None,
             formatter,
             editor_actor: None,
+            dep_tx,
+            dep_rx,
         }
     }
 
@@ -285,6 +315,7 @@ impl ServerState {
             .with_request_::<WorkspaceSymbolRequest>(State::symbol)
             .with_request_::<OnEnter>(State::on_enter)
             .with_request_::<WillRenameFiles>(State::will_rename_files)
+            .with_request_::<FsChange>(State::fs_change)
             // notifications
             .with_notification::<Initialized>(State::initialized)
             .with_notification::<DidOpenTextDocument>(State::did_open)
@@ -360,11 +391,13 @@ impl ServerState {
         if let Some(editor_actor) = self.editor_actor.as_mut() {
             editor_actor.step();
         }
+        self.handle_deps();
     }
 
     #[cfg(feature = "system")]
-    #[inline(always)]
-    pub(crate) fn schedule_async(&mut self) {}
+    pub(crate) fn schedule_async(&mut self) {
+        self.handle_deps();
+    }
 
     /// Handles the project interrupts.
     fn compile_interrupt<T: Initializer<S = Self>>(
@@ -465,6 +498,7 @@ impl ServerState {
         let dg = self.project.primary_id().to_string();
         let api_stats = self.project.stats.report();
         let query_stats = self.project.analysis.report_query_stats();
+        let global_stats = GLOBAL_STATS.report();
         let alloc_stats = self.project.analysis.report_alloc_stats();
 
         let snap = self.snapshot().map_err(internal_error)?;
@@ -477,6 +511,7 @@ impl ServerState {
                 inputs: w.inputs().as_ref().deref().clone(),
                 stats: HashMap::from_iter([
                     ("api".to_owned(), api_stats),
+                    ("global".to_owned(), global_stats),
                     ("query".to_owned(), query_stats),
                     ("alloc".to_owned(), alloc_stats),
                 ]),

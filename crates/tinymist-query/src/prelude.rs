@@ -28,6 +28,7 @@ pub use typst::syntax::{
 };
 pub use typst_shim::syntax::LinkedNodeExt;
 
+pub use crate::SemanticRequest;
 pub use crate::analysis::{Definition, LocalContext};
 pub use crate::code_action::proto::*;
 pub use crate::docs::DefDocs;
@@ -36,5 +37,4 @@ pub use crate::lsp_typst_boundary::{
     to_typst_range,
 };
 pub use crate::syntax::{Decl, DefKind, classify_syntax};
-pub(crate) use crate::ty::PathPreference;
-pub use crate::{SemanticRequest, StatefulRequest};
+pub(crate) use crate::ty::PathKind;

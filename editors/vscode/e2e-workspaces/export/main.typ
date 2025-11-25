@@ -1,4 +1,4 @@
 
-== A Hello World Example of Export Typst Document to Various Formats
+= Hello *Typst* _Export_
 
-Hello World.
+- The `World`!

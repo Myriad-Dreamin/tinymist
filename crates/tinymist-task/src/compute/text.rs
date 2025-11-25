@@ -1,15 +1,19 @@
+//! The computation for text export.
+
 use core::fmt;
 use std::sync::Arc;
-use typst::html::{HtmlNode::*, tag};
+use typst_html::{HtmlNode::*, tag};
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 
+/// The computation for text export.
 pub struct TextExport;
 
 impl TextExport {
+    /// Runs the computation on a document.
     pub fn run_on_doc(doc: &TypstDocument) -> Result<String> {
         Ok(format!("{}", FullTextDigest(doc)))
     }
@@ -57,14 +61,14 @@ impl FullTextDigest<'_> {
         }
     }
 
-    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst::html::HtmlElement) -> fmt::Result {
+    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst_html::HtmlElement) -> fmt::Result {
         for child in elem.children.iter() {
             Self::export_html_node(f, child)?;
         }
         Ok(())
     }
 
-    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst::html::HtmlNode) -> fmt::Result {
+    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst_html::HtmlNode) -> fmt::Result {
         match node {
             Tag(_) => Ok(()),
             Element(elem) => {
@@ -76,7 +80,7 @@ impl FullTextDigest<'_> {
                 }
             }
             Text(t, _) => f.write_str(t.as_str()),
-            Frame(frame) => Self::export_frame(f, frame),
+            Frame(frame) => Self::export_frame(f, &frame.inner),
         }
     }
 }

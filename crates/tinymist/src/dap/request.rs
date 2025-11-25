@@ -8,9 +8,9 @@ use serde::Deserialize;
 use sync_ls::{internal_error, invalid_params, invalid_request, just_ok, SchedulableResponse};
 use tinymist_std::error::prelude::*;
 use typst::{
+    engine::Sink,
     foundations::Repr,
-    routines::EvalMode,
-    syntax::{LinkedNode, Span},
+    syntax::{LinkedNode, Span, SyntaxMode},
     World,
 };
 use typst_shim::syntax::LinkedNodeExt;
@@ -213,9 +213,10 @@ impl ServerState {
         let val = typst_shim::eval::eval_string(
             &typst::ROUTINES,
             (world as &dyn World).track(),
+            Sink::new().track_mut(),
             &args.expression,
             span,
-            EvalMode::Code,
+            SyntaxMode::Code,
             source.scope().clone(),
         )
         .map_err(|e| invalid_params(format!("{e:?}")))?;

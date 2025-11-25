@@ -2,7 +2,7 @@
 name = "tinymist"
 description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
-keywords = ["api", "language", "typst"]
+keywords = ["api", "lsp", "language", "typst"]
 authors.workspace = true
 version.workspace = true
 license.workspace = true
@@ -90,6 +90,8 @@ hyper-tungstenite = { workspace = true, optional = true }
 console_error_panic_hook = { version = "0.1.2", optional = true }
 js-sys = { version = "0.3.77", optional = true }
 wasm-bindgen = { version = "0.2.100", optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+wasm-bindgen-futures = { version = "0.4.50", optional = true }
 
 [dev-dependencies]
 temp-env.workspace = true
@@ -119,8 +121,11 @@ web = [
     "console_error_panic_hook",
     "js-sys",
     "wasm-bindgen",
+    "serde-wasm-bindgen",
+    "wasm-bindgen-futures",
     "reflexo-typst/web",
     "tinymist-project/web",
+    "sync-ls/web",
 ]
 open = ["dep:open"]
 system = [

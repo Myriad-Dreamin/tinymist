@@ -2,9 +2,10 @@
 
 use cmark_writer::ast::Node;
 use cmark_writer::gfm::TableAlignment;
-use ecow::EcoString;
-use typst::html::{HtmlElement, HtmlNode, tag};
+use ecow::{EcoString, eco_format};
 use typst::utils::PicoStr;
+use typst_html::{HtmlElement, HtmlNode, tag};
+use typst_syntax::Span;
 
 use crate::Result;
 use crate::common::InlineNode;
@@ -12,42 +13,12 @@ use crate::tags::md_tag;
 
 use super::core::HtmlToAstParser;
 
-/// Table parser
-pub struct TableParser;
+/// Responsible for finding HTML table elements in the DOM structure.
+pub struct TableStructureFinder;
 
-impl TableParser {
-    /// Convert HTML table to CommonMark AST
-    pub fn convert_table(
-        parser: &mut HtmlToAstParser,
-        element: &HtmlElement,
-    ) -> Result<Option<Node>> {
-        // Find the real table element
-        let real_table_elem = Self::find_real_table_element(element);
-
-        // Process the table (if found)
-        if let Some(table) = real_table_elem {
-            // Check if the table contains rowspan or colspan attributes
-            // If it does, fall back to using HtmlElement
-            if Self::table_has_complex_cells(table) {
-                if let Ok(html_node) = parser.create_html_element(table) {
-                    return Ok(Some(html_node));
-                }
-                return Ok(None);
-            }
-
-            let mut headers = Vec::new();
-            let mut rows = Vec::new();
-            let mut is_header = true;
-
-            Self::extract_table_content(parser, table, &mut headers, &mut rows, &mut is_header)?;
-            return Self::create_table_node(headers, rows);
-        }
-
-        Ok(None)
-    }
-
+impl TableStructureFinder {
     /// Find the real table element in the HTML structure
-    fn find_real_table_element(element: &HtmlElement) -> Option<&HtmlElement> {
+    pub fn find_real_table_element(element: &HtmlElement) -> Option<&HtmlElement> {
         if element.tag == md_tag::grid {
             // For grid: grid -> table -> table
             Self::find_table_in_grid(element)
@@ -59,15 +30,15 @@ impl TableParser {
 
     fn find_table_in_grid(grid_element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &grid_element.children {
-            if let HtmlNode::Element(table_elem) = child {
-                if table_elem.tag == md_tag::table {
-                    // Find table tag within m1table
-                    for inner_child in &table_elem.children {
-                        if let HtmlNode::Element(inner) = inner_child {
-                            if inner.tag == tag::table {
-                                return Some(inner);
-                            }
-                        }
+            if let HtmlNode::Element(table_elem) = child
+                && table_elem.tag == md_tag::table
+            {
+                // Find table tag within m1table
+                for inner_child in &table_elem.children {
+                    if let HtmlNode::Element(inner) = inner_child
+                        && inner.tag == tag::table
+                    {
+                        return Some(inner);
                     }
                 }
             }
@@ -77,46 +48,89 @@ impl TableParser {
 
     fn find_table_direct(element: &HtmlElement) -> Option<&HtmlElement> {
         for child in &element.children {
-            if let HtmlNode::Element(table_elem) = child {
-                if table_elem.tag == tag::table {
-                    return Some(table_elem);
-                }
+            if let HtmlNode::Element(table_elem) = child
+                && table_elem.tag == tag::table
+            {
+                return Some(table_elem);
             }
         }
         None
     }
+}
 
+/// Responsible for extracting and processing table content from HTML elements.
+pub struct TableContentExtractor;
+
+impl TableContentExtractor {
     // Extract table content from the table element
-    fn extract_table_content(
+    pub fn extract_table_content(
         parser: &mut HtmlToAstParser,
         table: &HtmlElement,
-        headers: &mut Vec<Node>,
-        rows: &mut Vec<Vec<Node>>,
-        is_header: &mut bool,
+        state: &mut TableParseState,
     ) -> Result<()> {
+        if state.fallback_to_html {
+            return Ok(());
+        }
         // Process table structure (direct rows or thead/tbody)
         for child_node in &table.children {
             if let HtmlNode::Element(element) = child_node {
                 match element.tag {
                     tag::thead => {
+                        if state.has_data_rows {
+                            parser.warn_at(
+                                Some(element.span),
+                                eco_format!(
+                                    "table header appears after data rows; exported original HTML table"
+                                ),
+                            );
+                            state.fallback_to_html = true;
+                            return Ok(());
+                        }
                         // Process header rows
-                        Self::process_table_section(parser, element, headers, rows, true)?;
-                        *is_header = false;
+                        Self::process_table_section(
+                            parser,
+                            element,
+                            &mut state.headers,
+                            &mut state.rows,
+                            true,
+                            &mut state.fallback_to_html,
+                            state.has_data_rows,
+                        )?;
+                        state.is_header = false;
                     }
                     tag::tbody => {
+                        // Mark that we have data rows
+                        state.has_data_rows = true;
                         // Process body rows
-                        Self::process_table_section(parser, element, headers, rows, false)?;
+                        Self::process_table_section(
+                            parser,
+                            element,
+                            &mut state.headers,
+                            &mut state.rows,
+                            false,
+                            &mut state.fallback_to_html,
+                            state.has_data_rows,
+                        )?;
                     }
                     tag::tr => {
                         // Direct row (no thead/tbody structure)
-                        let current_row =
-                            Self::process_table_row(parser, element, *is_header, headers)?;
+                        let current_row = Self::process_table_row(
+                            parser,
+                            element,
+                            state.is_header,
+                            &mut state.headers,
+                            &mut state.fallback_to_html,
+                            state.has_data_rows,
+                        )?;
 
                         // After the first row, treat remaining rows as data rows
-                        if *is_header {
-                            *is_header = false;
+                        if state.fallback_to_html {
+                            return Ok(());
+                        } else if state.is_header {
+                            state.is_header = false;
                         } else if !current_row.is_empty() {
-                            rows.push(current_row);
+                            state.has_data_rows = true;
+                            state.rows.push(current_row);
                         }
                     }
                     _ => {}
@@ -132,16 +146,31 @@ impl TableParser {
         headers: &mut Vec<Node>,
         rows: &mut Vec<Vec<Node>>,
         is_header_section: bool,
+        fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<()> {
+        if *fallback_to_html {
+            return Ok(());
+        }
         for row_node in &section.children {
-            if let HtmlNode::Element(row_elem) = row_node {
-                if row_elem.tag == tag::tr {
-                    let current_row =
-                        Self::process_table_row(parser, row_elem, is_header_section, headers)?;
+            if let HtmlNode::Element(row_elem) = row_node
+                && row_elem.tag == tag::tr
+            {
+                let current_row = Self::process_table_row(
+                    parser,
+                    row_elem,
+                    is_header_section,
+                    headers,
+                    fallback_to_html,
+                    has_data_rows,
+                )?;
 
-                    if !is_header_section && !current_row.is_empty() {
-                        rows.push(current_row);
-                    }
+                if *fallback_to_html {
+                    return Ok(());
+                }
+
+                if !is_header_section && !current_row.is_empty() {
+                    rows.push(current_row);
                 }
             }
         }
@@ -153,25 +182,53 @@ impl TableParser {
         row_elem: &HtmlElement,
         is_header: bool,
         headers: &mut Vec<Node>,
+        fallback_to_html: &mut bool,
+        has_data_rows: bool,
     ) -> Result<Vec<Node>> {
+        if *fallback_to_html {
+            return Ok(Vec::new());
+        }
         let mut current_row = Vec::new();
 
         // Process cells in this row
         for cell_node in &row_elem.children {
-            if let HtmlNode::Element(cell) = cell_node {
-                if cell.tag == tag::td || cell.tag == tag::th {
-                    let mut cell_content = Vec::new();
-                    parser.convert_children_into(&mut cell_content, cell)?;
+            if let HtmlNode::Element(cell) = cell_node
+                && (cell.tag == tag::td || cell.tag == tag::th)
+            {
+                let (cell_content, block_content) = parser.capture_children(cell)?;
 
-                    // Merge cell content into a single node
-                    let merged_cell = Self::merge_cell_content(cell_content);
+                if !block_content.is_empty() {
+                    parser.warn_at(
+                        Some(cell.span),
+                        eco_format!(
+                            "block content detected inside table cell; exported original HTML table"
+                        ),
+                    );
+                    *fallback_to_html = true;
+                    TableSpanResolver::emit_table_fallback_warning(parser, cell);
+                    return Ok(Vec::new());
+                }
 
-                    // Add to appropriate section
-                    if is_header || cell.tag == tag::th {
-                        headers.push(merged_cell);
-                    } else {
-                        current_row.push(merged_cell);
-                    }
+                // Merge cell content into a single node
+                let merged_cell = Self::merge_cell_content(cell_content);
+
+                // Check if this is a header cell appearing after data rows
+                if cell.tag == tag::th && has_data_rows && !is_header {
+                    parser.warn_at(
+                            Some(cell.span),
+                            eco_format!(
+                                "table header cell appears after data rows; exported original HTML table"
+                            ),
+                        );
+                    *fallback_to_html = true;
+                    return Ok(Vec::new());
+                }
+
+                // Add to appropriate section
+                if is_header || cell.tag == tag::th {
+                    headers.push(merged_cell);
+                } else {
+                    current_row.push(merged_cell);
                 }
             }
         }
@@ -180,63 +237,74 @@ impl TableParser {
     }
 
     /// Merge cell content nodes into a single node
-    fn merge_cell_content(content: Vec<Node>) -> Node {
+    pub fn merge_cell_content(content: Vec<Node>) -> Node {
         match content.len() {
             0 => Node::Text(EcoString::new()),
             1 => content.into_iter().next().unwrap(),
             _ => Node::Custom(Box::new(InlineNode { content })),
         }
     }
+}
 
-    /// Check if the table has complex cells (rowspan/colspan)
-    fn table_has_complex_cells(table: &HtmlElement) -> bool {
-        for child_node in &table.children {
-            if let HtmlNode::Element(element) = child_node {
-                match element.tag {
-                    tag::thead | tag::tbody => {
-                        // Check rows within thead/tbody
-                        if Self::check_section_for_complex_cells(element) {
-                            return true;
-                        }
-                    }
-                    tag::tr => {
-                        // Direct row
-                        if Self::check_row_for_complex_cells(element) {
-                            return true;
-                        }
-                    }
-                    _ => {}
-                }
-            }
+/// Table parser
+pub struct TableParser;
+
+/// State for table parsing operations
+pub struct TableParseState {
+    pub headers: Vec<Node>,
+    pub rows: Vec<Vec<Node>>,
+    pub is_header: bool,
+    pub fallback_to_html: bool,
+    /// Track whether we have encountered any data rows
+    pub has_data_rows: bool,
+}
+
+impl TableParseState {
+    pub fn new() -> Self {
+        Self {
+            headers: Vec::new(),
+            rows: Vec::new(),
+            is_header: true,
+            fallback_to_html: false,
+            has_data_rows: false,
         }
-        false
     }
+}
 
-    fn check_section_for_complex_cells(section: &HtmlElement) -> bool {
-        for row_node in &section.children {
-            if let HtmlNode::Element(row_elem) = row_node {
-                if row_elem.tag == tag::tr && Self::check_row_for_complex_cells(row_elem) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
+impl TableParser {
+    /// Convert HTML table to CommonMark AST
+    pub fn convert_table(
+        parser: &mut HtmlToAstParser,
+        element: &HtmlElement,
+    ) -> Result<Option<Node>> {
+        // Find the real table element
+        let real_table_elem = TableStructureFinder::find_real_table_element(element);
 
-    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> bool {
-        for cell_node in &row_elem.children {
-            if let HtmlNode::Element(cell) = cell_node {
-                if (cell.tag == tag::td || cell.tag == tag::th)
-                    && cell.attrs.0.iter().any(|(name, _)| {
-                        let name = name.into_inner();
-                        name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
-                    })
-                {
-                    return true;
-                }
+        // Process the table (if found)
+        if let Some(table) = real_table_elem {
+            // Check if the table contains rowspan or colspan attributes
+            // If it does, fall back to using HtmlElement
+            if let Some(cell_span) = TableValidator::find_complex_cell(table) {
+                parser.warn_at(
+                    Some(cell_span),
+                    eco_format!(
+                        "table contains rowspan or colspan attributes; exported original HTML table"
+                    ),
+                );
+                return parser.create_html_element(table).map(Some);
             }
+
+            let mut state = TableParseState::new();
+            TableContentExtractor::extract_table_content(parser, table, &mut state)?;
+
+            if state.fallback_to_html {
+                return parser.create_html_element(table).map(Some);
+            }
+
+            return Self::create_table_node(state.headers, state.rows);
         }
-        false
+
+        Ok(None)
     }
 
     fn create_table_node(headers: Vec<Node>, rows: Vec<Vec<Node>>) -> Result<Option<Node>> {
@@ -253,5 +321,107 @@ impl TableParser {
         }
 
         Ok(None)
+    }
+}
+
+/// Responsible for resolving spans and emitting warnings for table parsing.
+pub struct TableSpanResolver;
+
+impl TableSpanResolver {
+    pub fn emit_table_fallback_warning(parser: &mut HtmlToAstParser, cell: &HtmlElement) {
+        if let Some(block_elem) = Self::find_block_child(cell) {
+            let (span, tag_name) = Self::resolve_span_and_tag(cell, block_elem);
+            parser.warn_at(
+                Some(span),
+                eco_format!(
+                    "block element `<{tag_name}>` detected inside table cell; exported original HTML table"
+                ),
+            );
+        } else {
+            parser.warn_at(
+                Some(cell.span),
+                eco_format!(
+                    "block content detected inside table cell; exported original HTML table"
+                ),
+            );
+        }
+    }
+
+    fn find_block_child(cell: &HtmlElement) -> Option<&HtmlElement> {
+        // table.cell has only one child (the body element)
+        cell.children.first().and_then(|node| {
+            if let HtmlNode::Element(elem) = node {
+                if HtmlToAstParser::is_block_element(elem) {
+                    return Some(elem);
+                }
+            }
+            None
+        })
+    }
+
+    fn resolve_span_and_tag(cell: &HtmlElement, block_elem: &HtmlElement) -> (Span, EcoString) {
+        let span = if !block_elem.span.is_detached() {
+            block_elem.span
+        } else {
+            cell.span
+        };
+        (span, block_elem.tag.resolve().to_string().into())
+    }
+}
+
+/// Responsible for validating table structure and content.
+pub struct TableValidator;
+
+impl TableValidator {
+    /// Check if the table has complex cells (rowspan/colspan), returns the span of the first complex cell
+    pub fn find_complex_cell(table: &HtmlElement) -> Option<Span> {
+        for child_node in &table.children {
+            if let HtmlNode::Element(element) = child_node {
+                match element.tag {
+                    tag::thead | tag::tbody => {
+                        // Check rows within thead/tbody
+                        if let Some(span) = Self::check_section_for_complex_cells(element) {
+                            return Some(span);
+                        }
+                    }
+                    tag::tr => {
+                        // Direct row
+                        if let Some(span) = Self::check_row_for_complex_cells(element) {
+                            return Some(span);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None
+    }
+
+    fn check_section_for_complex_cells(section: &HtmlElement) -> Option<Span> {
+        for row_node in &section.children {
+            if let HtmlNode::Element(row_elem) = row_node
+                && row_elem.tag == tag::tr
+            {
+                if let Some(span) = Self::check_row_for_complex_cells(row_elem) {
+                    return Some(span);
+                }
+            }
+        }
+        None
+    }
+
+    fn check_row_for_complex_cells(row_elem: &HtmlElement) -> Option<Span> {
+        for cell_node in &row_elem.children {
+            if let HtmlNode::Element(cell) = cell_node
+                && (cell.tag == tag::td || cell.tag == tag::th)
+                && cell.attrs.0.iter().any(|(name, _)| {
+                    let name = name.into_inner();
+                    name == PicoStr::constant("colspan") || name == PicoStr::constant("rowspan")
+                })
+            {
+                return Some(cell.span);
+            }
+        }
+        None
     }
 }

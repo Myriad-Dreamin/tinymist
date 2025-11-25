@@ -1,9 +1,22 @@
+//! Derives for tinymist.
+
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, parse_macro_input};
 
+/// Derives the `BindTyCtx` trait.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(BindTyCtx)]
+/// struct MyStruct {
+///     #[bind]
+///     tyctx: TyCtx,
+/// }
+/// ```
 #[proc_macro_derive(BindTyCtx, attributes(bind))]
 pub fn bind_ty_ctx(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
@@ -47,6 +60,17 @@ pub fn bind_ty_ctx(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Derives the `DeclEnum` trait.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(DeclEnum)]
+/// enum MyEnum {
+///     Sub1(SpannedDecl),
+///     Sub2(SpannedDecl),
+/// }
+/// ```
 #[proc_macro_derive(DeclEnum)]
 pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
     // In form of
@@ -71,12 +95,13 @@ pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl #input_name {
+            /// Gets the name of the item.
             pub fn name(&self) -> &Interned<str> {
                 match self {
                     #(Self::#names(x) => x.name()),*
                 }
             }
-
+            /// Gets the span of the item.
             pub fn span(&self) -> Span {
                 match self {
                     #(Self::#names(x) => x.span()),*
@@ -97,6 +122,16 @@ pub fn gen_decl_enum(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// Derives the `TypliteAttr` trait.
+///
+/// # Example
+///
+/// ```ignore
+/// #[derive(TypliteAttr, Default)]
+/// pub struct FigureAttr {
+///     pub caption: EcoString,
+/// }
+/// ```
 #[proc_macro_derive(TypliteAttr)]
 pub fn gen_typlite_element(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree

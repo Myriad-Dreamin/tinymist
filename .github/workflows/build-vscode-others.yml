@@ -47,7 +47,7 @@ jobs:
 
       - name: Install dependencies
         # bash is required by setup-rust-toolchain
-        run: apk add --no-cache git clang lld musl-dev nodejs npm yarn binutils bash
+        run: apk add --no-cache git clang lld musl-dev nodejs-current npm yarn binutils bash
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -56,21 +56,15 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install deps
         run: yarn install
-
       - name: Build typst-preview vscode extension
-        run: |
-          yarn
-          yarn run compile
+        run: yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
       - name: Build tinymist vscode extension
-        run: |
-          yarn
-          yarn run compile
+        run: yarn run compile
         working-directory: ./editors/vscode
-
       - name: Build tinymist binary
         run: |
-          cargo build --profile=gh-release -p tinymist --target $RUST_TARGET
+          cargo build --profile=gh-release --bin tinymist --target $RUST_TARGET
       - name: Split debug symbols
         run: |
           cd target/$RUST_TARGET/gh-release
@@ -144,17 +138,17 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'yarn'
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - uses: jetli/wasm-pack-action@v0.4.0
         with:
           version: "v0.13.1"
       - name: Install deps
         run: yarn install
-      - name: Build tinymist vscode extension
-        run: |
-          yarn
-          yarn run compile:web
-        working-directory: ./editors/vscode
       - name: Build tinymist library
         run: yarn build:web
         working-directory: .

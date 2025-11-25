@@ -22,17 +22,16 @@ pub fn jump_from_click(
 ) -> Option<(SourceSpanOffset, SourceSpanOffset)> {
     // Try to find a link first.
     for (pos, item) in frame.items() {
-        if let FrameItem::Link(_dest, size) = item {
-            if is_in_rect(*pos, *size, click) {
-                // todo: url reaction
-                return None;
-            }
+        if let FrameItem::Link(_dest, size) = item
+            && is_in_rect(*pos, *size, click)
+        {
+            // todo: url reaction
+            return None;
         }
     }
 
     // If there's no link, search for a jump target.
-    for (pos, item) in frame.items().rev() {
-        let mut pos = *pos;
+    for &(mut pos, ref item) in frame.items().rev() {
         match item {
             FrameItem::Group(group) => {
                 // TODO: Handle transformation.
@@ -140,10 +139,10 @@ fn jump_from_cursor_(
                 // In a page, we try to find a closer span than the existing found one.
                 let mut p_dis = min_dis;
 
-                if let Some(point) = find_in_frame(&page.frame, span, &mut p_dis, &mut min_point) {
-                    if let Some(page) = NonZeroUsize::new(idx + 1) {
-                        positions.push(Position { page, point });
-                    }
+                if let Some(point) = find_in_frame(&page.frame, span, &mut p_dis, &mut min_point)
+                    && let Some(page) = NonZeroUsize::new(idx + 1)
+                {
+                    positions.push(Position { page, point });
                 }
 
                 // In this page, we found a closer span and update.
@@ -169,8 +168,7 @@ fn jump_from_cursor_(
 
 /// Finds the position of a span in a frame.
 fn find_in_frame(frame: &Frame, span: Span, min_dis: &mut u64, res: &mut Point) -> Option<Point> {
-    for (pos, item) in frame.items() {
-        let mut pos = *pos;
+    for &(mut pos, ref item) in frame.items() {
         if let FrameItem::Group(group) = item {
             // TODO: Handle transformation.
             if let Some(point) = find_in_frame(&group.frame, span, min_dis, res) {
@@ -224,11 +222,7 @@ mod tests {
     fn test() {
         snapshot_testing("jump_from_cursor", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-
-            let graph = compile_doc_for_test(ctx, &properties);
-            let document = graph.snap.success_doc.as_ref().unwrap();
+            let document = ctx.success_doc().unwrap();
 
             let cursors = find_test_range_(&source);
 

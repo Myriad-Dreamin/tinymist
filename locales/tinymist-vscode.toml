@@ -1031,13 +1031,37 @@ zh = "像在 Markdown 中一样管理 typst 文档。每个单独的文件都是
 en = "Manage typst documents like what we did in Rust. For each workspace, tinymist tracks your preview and compilation history, and stores the information in a lock file. Tinymist will automatically selects the main file to use according to the lock file. This also allows other tools push preview and export tasks to language server by updating the lock file."
 zh = "像在 Rust 中一样管理 typst 文档。对于每个工作区，tinymist 会跟踪您的预览和编译历史，并将信息存储在锁定文件中。Tinymist 将根据锁定文件自动选择要使用的主文件。这还允许其他工具通过更新锁定文件将预览和导出任务推送到语言服务器。"
 
+[extension.tinymist.config.tinymist.syntaxOnly.title]
+en = "Syntax Only Mode"
+zh = "仅语法模式"
+
+[extension.tinymist.config.tinymist.syntaxOnly.desc]
+en = "Configure whether to enable syntax-only mode for the language server. In syntax-only mode, the language server will only provide syntax checking and basic code completion, but will not perform full document compilation or code analysis. This can be useful for improving performance on low-end devices or when working with large documents."
+zh = "配置是否为扩展（语言服务器）启用仅语法模式。在仅语法模式下，语言服务器将仅提供语法检查和基本的代码补全，但不会执行完整的文档编译或代码分析。这对于提高低端设备的性能或处理大型文档时非常有用。"
+
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.auto]
+en = "Always disable syntax-only mode. The strategy may be changed in the future, for example, automatically enable syntax-only mode when the system is in power-saving mode."
+zh = "始终禁用仅语法模式。未来可能会更改策略，例如，当系统处于省电模式时自动启用仅语法模式。"
+
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.onPowerSaving]
+en = "Enable syntax-only mode when the system is in power-saving mode."
+zh = "当系统处于省电模式时，启用仅语法模式。"
+
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.enable]
+en = "Always enable syntax-only mode."
+zh = "始终启用仅语法模式。"
+
+[extension.tinymist.config.tinymist.syntaxOnly.string.enum.disable]
+en = "Always disable syntax-only mode."
+zh = "始终禁用仅语法模式。"
+
 [extension.tinymist.config.tinymist.outputPath.title]
 en = "Output Path"
 zh = "输出路径"
 
 [extension.tinymist.config.tinymist.outputPath.desc]
 en = "The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration, e.g. `$dir/$name` (default) and `$root/target/$dir/$name`."
-zh = "存储 Typst 产物的路径模式，您可以使用 `$root` 或 `$dir` 或 `$name` 来进行魔法配置，例如 `$dir/$name`（默认） 和 `$root/target/$dir/$name`。"
+zh = "存储 Typst 产物的路径模板，您可以使用 `$root` 或 `$dir` 或 `$name` 来进行魔法配置，例如 `$dir/$name`（默认） 和 `$root/target/$dir/$name`。"
 
 [extension.tinymist.config.tinymist.exportTarget.title]
 en = "Export target"
@@ -1298,6 +1322,14 @@ zh = "启用复制和粘贴。"
 [extension.tinymist.config.tinymist.copyAndPaste.string.enum.disable]
 en = "Disable copy-and-paste."
 zh = "禁用复制和粘贴。"
+
+[extension.tinymist.config.tinymist.onPaste.title]
+en = "The Script to Customize Paste Behavior"
+zh = "自定义粘贴行为的脚本"
+
+[extension.tinymist.config.tinymist.onPaste.desc]
+en = "The script to be executed when pasting resources into the editing typst document. If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression, e.g. `$root/x/$dir/$name` evaluated as `/path/to/root/x/dir/main`, otherwise it will be evaluated as a path pattern, e.g. `{ join(root, \"x\", dir, if name.ends-with(\".png\") (\"imgs\"), name) }` evaluated as `/path/to/root/x/dir/imgs/main`. The extra valid definitions are `root`, `dir`, `name`, and `join`. To learn more about the paste script, please visit [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html). Hint: you could import `@local` packages in the paste script. Note: restarting the editor is required to change this setting."
+zh = "将资源粘贴到正在编辑的 typst 文档时要执行的脚本。如果脚本代码以 `{` 开头并以 `}` 结尾，那么依 typst 代码表达式语法解释脚本，否则依路径模板解释脚本。路径模板例如 `$root/x/$dir/$name` 求解为 `/path/to/root/x/dir/main`；typst 代码表达式例如 `{ join(root, \"x\", dir, if name.ends-with(\".png\") (\"imgs\"), name) }` 求解为 `/path/to/root/x/dir/imgs/main`。额外的有效定义有 `root`、`dir`、`name` 和 `join`。要了解有关粘贴脚本的更多信息，请访问 [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html)。提示：您可以在粘贴脚本中导入 `@local` 包。注意：更改此设置需要重新启动编辑器。"
 
 [extension.tinymist.config.tinymist.renderDocs.title]
 en = "(Experimental) Render Docs"

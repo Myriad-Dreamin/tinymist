@@ -3,20 +3,24 @@ use core::fmt;
 use super::def::*;
 use crate::ty::{Interned, Ty};
 
+/// Prints an expression to a writer.
 pub(in crate::syntax) struct ExprPrinter<'a, T: fmt::Write> {
     f: &'a mut T,
     indent: usize,
 }
 
 impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
+    /// Creates a new expression printer.
     pub fn new(f: &'a mut T) -> Self {
         Self { f, indent: 0 }
     }
 
+    /// Writes a declaration.
     pub fn write_decl(&mut self, decl: &Decl) -> fmt::Result {
         write!(self.f, "{decl:?}")
     }
 
+    /// Writes an expression.
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(exprs) => self.write_seq(exprs),
@@ -47,10 +51,12 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         }
     }
 
+    /// Writes an indentation.
     fn write_indent(&mut self) -> fmt::Result {
         write!(self.f, "{:indent$}", "", indent = self.indent)
     }
 
+    /// Writes a sequence of expressions.
     fn write_seq(&mut self, exprs: &Interned<Vec<Expr>>) -> fmt::Result {
         writeln!(self.f, "[")?;
         self.indent += 1;
@@ -64,6 +70,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, "]")
     }
 
+    /// Writes an array.
     fn write_array(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         self.indent += 1;
@@ -77,6 +84,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a dictionary.
     fn write_dict(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(:")?;
         self.indent += 1;
@@ -90,6 +98,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a list of arguments.
     fn write_args(&mut self, args: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         for arg in args.iter() {
@@ -101,6 +110,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes an argument.
     fn write_arg(&mut self, arg: &ArgExpr) -> fmt::Result {
         match arg {
             ArgExpr::Pos(pos) => self.write_expr(pos),
@@ -122,6 +132,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         }
     }
 
+    /// Writes a pattern.
     pub fn write_pattern(&mut self, pat: &Pattern) -> fmt::Result {
         match pat {
             Pattern::Expr(expr) => self.write_expr(expr),
@@ -130,6 +141,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         }
     }
 
+    /// Writes a pattern signature.
     fn write_pattern_sig(&mut self, sig: &PatternSig) -> fmt::Result {
         self.f.write_str("pat(\n")?;
         self.indent += 1;
@@ -161,6 +173,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes an element.
     fn write_element(&mut self, elem: &Interned<ElementExpr>) -> fmt::Result {
         self.f.write_str("elem(\n")?;
         self.indent += 1;
@@ -174,12 +187,14 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a unary expression.
     fn write_unary(&mut self, unary: &Interned<UnExpr>) -> fmt::Result {
         write!(self.f, "un({:?})(", unary.op)?;
         self.write_expr(&unary.lhs)?;
         self.f.write_str(")")
     }
 
+    /// Writes a binary expression.
     fn write_binary(&mut self, binary: &Interned<BinExpr>) -> fmt::Result {
         let [lhs, rhs] = binary.operands();
         write!(self.f, "bin({:?})(", binary.op)?;
@@ -189,6 +204,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a function application ex
     fn write_apply(&mut self, apply: &Interned<ApplyExpr>) -> fmt::Result {
         write!(self.f, "apply(")?;
         self.write_expr(&apply.callee)?;
@@ -197,6 +213,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a function.
     fn write_func(&mut self, func: &Interned<FuncExpr>) -> fmt::Result {
         write!(self.f, "func[{:?}](", func.decl)?;
         self.write_pattern_sig(&func.params)?;
@@ -205,6 +222,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a let expression.
     fn write_let(&mut self, let_expr: &Interned<LetExpr>) -> fmt::Result {
         write!(self.f, "let(")?;
         self.write_pattern(&let_expr.pattern)?;
@@ -215,6 +233,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a show expression.
     fn write_show(&mut self, show: &Interned<ShowExpr>) -> fmt::Result {
         write!(self.f, "show(")?;
         if let Some(selector) = &show.selector {
@@ -225,6 +244,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a set expression.
     fn write_set(&mut self, set: &Interned<SetExpr>) -> fmt::Result {
         write!(self.f, "set(")?;
         self.write_expr(&set.target)?;
@@ -237,6 +257,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a reference expression.
     fn write_ref(&mut self, reference: &Interned<RefExpr>) -> fmt::Result {
         write!(self.f, "ref({:?}", reference.decl)?;
         if let Some(step) = &reference.step {
@@ -253,6 +274,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a content reference expression.
     fn write_content_ref(&mut self, content_ref: &Interned<ContentRefExpr>) -> fmt::Result {
         write!(self.f, "content_ref({:?}", content_ref.ident)?;
         if let Some(of) = &content_ref.of {
@@ -265,6 +287,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a select expression.
     fn write_select(&mut self, sel: &Interned<SelectExpr>) -> fmt::Result {
         write!(self.f, "(")?;
         self.write_expr(&sel.lhs)?;
@@ -272,24 +295,28 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.write_decl(&sel.key)
     }
 
+    /// Writes an import expression.
     fn write_import(&mut self, import: &Interned<ImportExpr>) -> fmt::Result {
         self.f.write_str("import(")?;
         self.write_decl(&import.decl.decl)?;
         self.f.write_str(")")
     }
 
+    /// Writes an include expression.
     fn write_include(&mut self, include: &Interned<IncludeExpr>) -> fmt::Result {
         self.f.write_str("include(")?;
         self.write_expr(&include.source)?;
         self.f.write_str(")")
     }
 
+    /// Writes a contextual expression.
     fn write_contextual(&mut self, contextual: &Interned<Expr>) -> fmt::Result {
         self.f.write_str("contextual(")?;
         self.write_expr(contextual)?;
         self.f.write_str(")")
     }
 
+    /// Writes a conditional expression.
     fn write_conditional(&mut self, if_expr: &Interned<IfExpr>) -> fmt::Result {
         self.f.write_str("if(")?;
         self.write_expr(&if_expr.cond)?;
@@ -300,6 +327,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a while loop expression.
     fn write_while_loop(&mut self, while_expr: &Interned<WhileExpr>) -> fmt::Result {
         self.f.write_str("while(")?;
         self.write_expr(&while_expr.cond)?;
@@ -308,6 +336,7 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a for loop expression.
     fn write_for_loop(&mut self, for_expr: &Interned<ForExpr>) -> fmt::Result {
         self.f.write_str("for(")?;
         self.write_pattern(&for_expr.pattern)?;
@@ -318,27 +347,32 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes a type.
     fn write_type(&mut self, ty: &Ty) -> fmt::Result {
         let formatted = ty.describe();
         let formatted = formatted.as_deref().unwrap_or("any");
         self.f.write_str(formatted)
     }
 
+    /// Writes a star expression.
     fn write_star(&mut self) -> fmt::Result {
         self.f.write_str("*")
     }
 }
 
+/// Describes an expression to a writer.
 pub(in crate::syntax) struct ExprDescriber<'a, T: fmt::Write> {
     f: &'a mut T,
     indent: usize,
 }
 
 impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
+    /// Creates a new expression describer.
     pub fn new(f: &'a mut T) -> Self {
         Self { f, indent: 0 }
     }
 
+    /// Writes a declaration.
     pub fn write_decl(&mut self, decl: &Decl) -> fmt::Result {
         use DefKind::*;
         let shorter = matches!(decl.kind(), Function | Variable | Module);
@@ -349,6 +383,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, "{decl:?}")
     }
 
+    /// Writes an expression.
     pub fn write_expr(&mut self, expr: &Expr) -> fmt::Result {
         match expr {
             Expr::Block(..) => self.f.write_str("Expr(..)"),
@@ -377,10 +412,12 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         }
     }
 
+    /// Writes an indentation.
     fn write_indent(&mut self) -> fmt::Result {
         write!(self.f, "{:indent$}", "", indent = self.indent)
     }
 
+    /// Writes an array.
     fn write_array(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         if elems.len() <= 1 {
             self.f.write_char('(')?;
@@ -403,6 +440,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a dictionary.
     fn write_dict(&mut self, elems: &[ArgExpr]) -> fmt::Result {
         if elems.len() <= 1 {
             self.f.write_char('(')?;
@@ -426,6 +464,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a list of arguments.
     fn write_args(&mut self, args: &[ArgExpr]) -> fmt::Result {
         writeln!(self.f, "(")?;
         for arg in args.iter() {
@@ -437,6 +476,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes an argument.
     fn write_arg(&mut self, arg: &ArgExpr) -> fmt::Result {
         match arg {
             ArgExpr::Pos(pos) => self.write_expr(pos),
@@ -459,6 +499,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         }
     }
 
+    /// Writes a pattern.
     pub fn write_pattern(&mut self, pat: &Pattern) -> fmt::Result {
         match pat {
             Pattern::Expr(expr) => self.write_expr(expr),
@@ -467,6 +508,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         }
     }
 
+    /// Writes a pattern signature.
     fn write_pattern_sig(&mut self, sig: &PatternSig) -> fmt::Result {
         self.f.write_str("pat(\n")?;
         self.indent += 1;
@@ -498,10 +540,12 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         self.f.write_str(")")
     }
 
+    /// Writes an element.
     fn write_element(&mut self, elem: &Interned<ElementExpr>) -> fmt::Result {
         write!(self.f, "{:?}", elem.elem.name())
     }
 
+    /// Writes a unary expression.
     fn write_unary(&mut self, unary: &Interned<UnExpr>) -> fmt::Result {
         use UnaryOp::*;
         match unary.op {
@@ -547,6 +591,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         }
     }
 
+    /// Writes a binary expression.
     fn write_binary(&mut self, binary: &Interned<BinExpr>) -> fmt::Result {
         let [lhs, rhs] = binary.operands();
         self.write_expr(lhs)?;
@@ -554,6 +599,7 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         self.write_expr(rhs)
     }
 
+    /// Writes a function application expression.
     fn write_apply(&mut self, apply: &Interned<ApplyExpr>) -> fmt::Result {
         self.write_expr(&apply.callee)?;
         write!(self.f, "(")?;
@@ -561,10 +607,12 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, ")")
     }
 
+    /// Writes a function expression.
     fn write_func(&mut self, func: &Interned<FuncExpr>) -> fmt::Result {
         self.write_decl(&func.decl)
     }
 
+    /// Writes a reference expression.
     fn write_ref(&mut self, resolved: &Interned<RefExpr>) -> fmt::Result {
         if let Some(root) = &resolved.root {
             return self.write_expr(root);
@@ -576,10 +624,12 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         write!(self.f, "undefined({:?})", resolved.decl)
     }
 
+    /// Writes a content reference expression.
     fn write_content_ref(&mut self, content_ref: &Interned<ContentRefExpr>) -> fmt::Result {
         write!(self.f, "@{:?}", content_ref.ident)
     }
 
+    /// Writes a select expression.
     fn write_select(&mut self, sel: &Interned<SelectExpr>) -> fmt::Result {
         write!(self.f, "")?;
         self.write_expr(&sel.lhs)?;
@@ -587,18 +637,21 @@ impl<'a, T: fmt::Write> ExprDescriber<'a, T> {
         self.write_decl(&sel.key)
     }
 
+    /// Writes an import expression.
     fn write_import(&mut self, import: &Interned<ImportExpr>) -> fmt::Result {
         self.f.write_str("import(")?;
         self.write_decl(&import.decl.decl)?;
         self.f.write_str(")")
     }
 
+    /// Writes an include expression.
     fn write_include(&mut self, include: &Interned<IncludeExpr>) -> fmt::Result {
         self.f.write_str("include(")?;
         self.write_expr(&include.source)?;
         self.f.write_str(")")
     }
 
+    /// Writes a type.
     fn write_type(&mut self, ty: &Ty) -> fmt::Result {
         let formatted = ty.describe();
         let formatted = formatted.as_deref().unwrap_or("any");

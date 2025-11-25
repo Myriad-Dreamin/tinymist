@@ -1,3 +1,5 @@
+//! Shared arguments to create a world.
+
 use core::fmt;
 use std::{
     path::{Path, PathBuf},
@@ -14,11 +16,14 @@ use crate::EntryOpts;
 
 const ENV_PATH_SEP: char = if cfg!(windows) { ';' } else { ':' };
 
-/// The font arguments for the compiler.
+/// The font arguments for the world to specify the way to search for fonts.
 #[derive(Debug, Clone, Default, Parser, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompileFontArgs {
-    /// Font paths
+    /// Add additional directories that are recursively searched for fonts.
+    ///
+    /// If multiple paths are specified, they are separated by the system's path
+    /// separator (`:` on Unix-like systems and `;` on Windows).
     #[clap(
         long = "font-path",
         value_name = "DIR",
@@ -28,20 +33,23 @@ pub struct CompileFontArgs {
     )]
     pub font_paths: Vec<PathBuf>,
 
-    /// Ensures system fonts won't be searched, unless explicitly included via
-    /// `--font-path`
+    /// Ensure system fonts won't be searched, unless explicitly included via
+    /// `--font-path`.
     #[clap(long, default_value = "false")]
     pub ignore_system_fonts: bool,
 }
 
-/// Arguments related to where packages are stored in the system.
+/// The package arguments for the world to specify where packages are stored in
+/// the system.
 #[derive(Debug, Clone, Parser, Default, PartialEq, Eq)]
 pub struct CompilePackageArgs {
-    /// Custom path to local packages, defaults to system-dependent location
+    /// Specify a custom path to local packages, defaults to system-dependent
+    /// location.
     #[clap(long = "package-path", env = "TYPST_PACKAGE_PATH", value_name = "DIR")]
     pub package_path: Option<PathBuf>,
 
-    /// Custom path to package cache, defaults to system-dependent location
+    /// Specify a custom path to package cache, defaults to system-dependent
+    /// location.
     #[clap(
         long = "package-cache-path",
         env = "TYPST_PACKAGE_CACHE_PATH",
@@ -50,31 +58,49 @@ pub struct CompilePackageArgs {
     pub package_cache_path: Option<PathBuf>,
 }
 
-/// Common arguments of compile, watch, and query.
+/// Common arguments to create a world (environment) to run typst tasks, e.g.
+/// `compile`, `watch`, and `query`.
 #[derive(Debug, Clone, Parser, Default)]
 pub struct CompileOnceArgs {
-    /// Path to input Typst file
+    /// Specify the path to input Typst file. If the path is relative, it will
+    /// be resolved relative to the current working directory (PWD).
     #[clap(value_name = "INPUT")]
     pub input: Option<String>,
 
-    /// Configures the project root (for absolute paths)
+    /// Configure the project root (for absolute paths).
     #[clap(long = "root", value_name = "DIR")]
     pub root: Option<PathBuf>,
 
-    /// Font related arguments.
+    /// Specify the font related arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
 
-    /// Package related arguments.
+    /// Specify the package related arguments.
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 
-    /// Enables in-development features that may be changed or removed at any
+    /// Specify the PDF export related arguments.
+    #[clap(flatten)]
+    pub pdf: PdfExportArgs,
+
+    /// Specify the PNG export related arguments.
+    #[clap(flatten)]
+    pub png: PngExportArgs,
+
+    /// Enable in-development features that may be changed or removed at any
     /// time.
     #[arg(long = "features", value_delimiter = ',', env = "TYPST_FEATURES")]
     pub features: Vec<Feature>,
 
-    /// Add a string key-value pair visible through `sys.inputs`
+    /// Add a string key-value pair visible through `sys.inputs`.
+    ///
+    /// ### Examples
+    ///
+    /// Tell the script that `sys.inputs.foo` is `"bar"` (type: `str`).
+    ///
+    /// ```bash
+    /// tinymist compile --input foo=bar
+    /// ```
     #[clap(
         long = "input",
         value_name = "key=value",
@@ -83,7 +109,8 @@ pub struct CompileOnceArgs {
     )]
     pub inputs: Vec<(String, String)>,
 
-    /// The document's creation date formatted as a UNIX timestamp (in seconds).
+    /// Configure the document's creation date formatted as a UNIX timestamp
+    /// (in seconds).
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
     #[clap(
@@ -95,22 +122,19 @@ pub struct CompileOnceArgs {
     )]
     pub creation_timestamp: Option<i64>,
 
-    /// One (or multiple comma-separated) PDF standards that Typst will enforce
-    /// conformance with.
-    #[arg(long = "pdf-standard", value_delimiter = ',')]
-    pub pdf_standard: Vec<PdfStandard>,
-
-    /// Path to CA certificate file for network access, especially for
-    /// downloading typst packages.
+    /// Specify the path to CA certificate file for network access, especially
+    /// for downloading typst packages.
     #[clap(long = "cert", env = "TYPST_CERT", value_name = "CERT_PATH")]
     pub cert: Option<PathBuf>,
 }
 
 impl CompileOnceArgs {
+    /// Resolves the features.
     pub fn resolve_features(&self) -> typst::Features {
         typst::Features::from_iter(self.features.iter().map(|f| (*f).into()))
     }
 
+    /// Resolves the inputs.
     pub fn resolve_inputs(&self) -> Option<ImmutDict> {
         if self.inputs.is_empty() {
             return None;
@@ -210,6 +234,31 @@ pub fn parse_source_date_epoch(raw: &str) -> Result<i64, String> {
         .map_err(|err| format!("timestamp must be decimal integer ({err})"))
 }
 
+/// Specify the PDF export related arguments.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct PdfExportArgs {
+    /// Specify the PDF standards that Typst will enforce conformance with.
+    ///
+    /// If multiple standards are specified, they are separated by commas.
+    #[arg(long = "pdf-standard", value_delimiter = ',')]
+    pub standard: Vec<PdfStandard>,
+
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    #[arg(long = "no-pdf-tags")]
+    pub no_tags: bool,
+}
+
+/// Specify the PNG export related arguments.
+#[derive(Debug, Clone, Parser, Default)]
+pub struct PngExportArgs {
+    /// Specify the PPI (pixels per inch) to use for PNG export.
+    #[arg(long = "ppi", default_value_t = 144.0)]
+    pub ppi: f32,
+}
+
 macro_rules! display_possible_values {
     ($ty:ty) => {
         impl fmt::Display for $ty {
@@ -223,7 +272,7 @@ macro_rules! display_possible_values {
     };
 }
 
-/// When to export an output file.
+/// Configure when to run a task.
 ///
 /// By default, a `tinymist compile` only provides input information and
 /// doesn't change the `when` field. However, you can still specify a `when`
@@ -265,7 +314,7 @@ impl TaskWhen {
 
 display_possible_values!(TaskWhen);
 
-/// Which format to use for the generated output file.
+/// Configure the format of the output file.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 pub enum OutputFormat {
     /// Export to PDF.
@@ -280,7 +329,7 @@ pub enum OutputFormat {
 
 display_possible_values!(OutputFormat);
 
-/// Specifies the current export target.
+/// Configure the current export target.
 ///
 /// The design of this configuration is not yet finalized and for this reason it
 /// is guarded behind the html feature. Visit the HTML documentation page for
@@ -299,18 +348,74 @@ pub enum ExportTarget {
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, ValueEnum, Serialize, Deserialize)]
 #[allow(non_camel_case_types)]
 pub enum PdfStandard {
+    /// PDF 1.4.
+    #[value(name = "1.4")]
+    #[serde(rename = "1.4")]
+    V_1_4,
+    /// PDF 1.5.
+    #[value(name = "1.5")]
+    #[serde(rename = "1.5")]
+    V_1_5,
+    /// PDF 1.6.
+    #[value(name = "1.6")]
+    #[serde(rename = "1.6")]
+    V_1_6,
     /// PDF 1.7.
     #[value(name = "1.7")]
     #[serde(rename = "1.7")]
     V_1_7,
+    /// PDF 2.0.
+    #[value(name = "2.0")]
+    #[serde(rename = "2.0")]
+    V_2_0,
+    /// PDF/A-1b.
+    #[value(name = "a-1b")]
+    #[serde(rename = "a-1b")]
+    A_1b,
+    /// PDF/A-1a.
+    #[value(name = "a-1a")]
+    #[serde(rename = "a-1a")]
+    A_1a,
     /// PDF/A-2b.
     #[value(name = "a-2b")]
     #[serde(rename = "a-2b")]
     A_2b,
+    /// PDF/A-2u.
+    #[value(name = "a-2u")]
+    #[serde(rename = "a-2u")]
+    A_2u,
+    /// PDF/A-2a.
+    #[value(name = "a-2a")]
+    #[serde(rename = "a-2a")]
+    A_2a,
     /// PDF/A-3b.
     #[value(name = "a-3b")]
     #[serde(rename = "a-3b")]
     A_3b,
+    /// PDF/A-3u.
+    #[value(name = "a-3u")]
+    #[serde(rename = "a-3u")]
+    A_3u,
+    /// PDF/A-3a.
+    #[value(name = "a-3a")]
+    #[serde(rename = "a-3a")]
+    A_3a,
+    /// PDF/A-4.
+    #[value(name = "a-4")]
+    #[serde(rename = "a-4")]
+    A_4,
+    /// PDF/A-4f.
+    #[value(name = "a-4f")]
+    #[serde(rename = "a-4f")]
+    A_4f,
+    /// PDF/A-4e.
+    #[value(name = "a-4e")]
+    #[serde(rename = "a-4e")]
+    A_4e,
+    /// PDF/UA-1.
+    #[value(name = "ua-1")]
+    #[serde(rename = "ua-1")]
+    Ua_1,
 }
 
 display_possible_values!(PdfStandard);
@@ -318,7 +423,10 @@ display_possible_values!(PdfStandard);
 /// An in-development feature that may be changed or removed at any time.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, ValueEnum)]
 pub enum Feature {
+    /// The HTML feature.
     Html,
+    /// The A11yExtras feature.
+    A11yExtras,
 }
 
 display_possible_values!(Feature);
@@ -327,6 +435,7 @@ impl From<Feature> for typst::Feature {
     fn from(f: Feature) -> typst::Feature {
         match f {
             Feature::Html => typst::Feature::Html,
+            Feature::A11yExtras => typst::Feature::A11yExtras,
         }
     }
 }

@@ -1,4 +1,4 @@
-import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
+import type { GConstructor, TypstDocumentContext, TypstDomWindowElement } from "./typst-doc.mjs";
 import {
   OriginViewInstruction,
   TypstPatchAttrs,
@@ -86,10 +86,15 @@ class GenContext {
   parent: GenElem;
   lastVisit?: GenElem;
   allElemList: GenElem[] = [];
+  windowElem: TypstDomWindowElement;
 
-  constructor(public pages: CanvasPage[]) {
+  constructor(
+    public pages: CanvasPage[],
+    windowElem: TypstDomWindowElement,
+  ) {
     this.insertionPoint = new GenElem("outline", document.createElement("div"));
     this.parent = this.insertionPoint;
+    this.windowElem = windowElem;
   }
 
   /// Populate canvas stubs from `this.populateCnt` to `until` (exclusive).
@@ -156,7 +161,7 @@ class GenContext {
       destSpan.style.cursor = "pointer";
 
       destSpan.addEventListener("click", () => {
-        window.typstWebsocket.send(`srclocation ${item.span}`);
+        this.windowElem.typstWebsocket.send(`srclocation ${item.span}`);
       });
     } else {
       destSpan.remove();
@@ -172,8 +177,9 @@ export function patchOutlineEntry(
   prev: HTMLDivElement,
   pages: CanvasPage[],
   items: OutlineItemData[],
+  windowElem: TypstDomWindowElement,
 ) {
-  const ctx = new GenContext(pages);
+  const ctx = new GenContext(pages, windowElem);
   // the root element of the generated outline
   const next = ctx.insertionPoint;
 
@@ -317,7 +323,7 @@ export function provideOutlineDoc<TBase extends GConstructor<TypstDocumentContex
 ): TBase & GConstructor<TypstOutlineDocument> {
   return class DebugJumpDocument extends Base {
     patchOutlineEntry(prev: HTMLDivElement, pages: CanvasPage[], items: OutlineItemData[]) {
-      patchOutlineEntry(prev, pages, items);
+      patchOutlineEntry(prev, pages, items, this.windowElem);
     }
   };
 }
