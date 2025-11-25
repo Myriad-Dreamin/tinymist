@@ -23,16 +23,15 @@ pub struct GotoDefinitionRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for GotoDefinitionRequest {
+impl SemanticRequest for GotoDefinitionRequest {
     type Response = GotoDefinitionResponse;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
         let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
 
-        let def = ctx.def_of_syntax_or_dyn(&source, doc, syntax)?;
+        let def = ctx.def_of_syntax_or_dyn(&source, syntax)?;
 
         let fid = def.file_id()?;
         let name_range = def.name_range(ctx.shared()).unwrap_or_default();
@@ -53,7 +52,6 @@ impl StatefulRequest for GotoDefinitionRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syntax::find_module_level_docs;
     use crate::tests::*;
 
     #[test]
@@ -61,16 +59,12 @@ mod tests {
         snapshot_testing("goto_definition", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-            let doc = compile_doc_for_test(ctx, &properties);
-
             let request = GotoDefinitionRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(ctx, doc.clone());
+            let result = request.request(ctx);
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }

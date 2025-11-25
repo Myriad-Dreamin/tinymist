@@ -73,7 +73,8 @@ aarch64-pc-windows-msvc = "windows-latest"
 [dist.github-custom-runners.x86_64-apple-darwin]
 # Use Intel Mac runner to build Intel binary.
 # This is the dist default but we want to explicitly pin it.
-runner = "macos-13"
+# The macOS 13 runner image will be retired by December 4th, 2025.
+runner = "macos-14"
 
 [dist.github-custom-runners.aarch64-apple-darwin]
 # Use ARM Mac runner to build ARM binary (not strictly required, but nice).

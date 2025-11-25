@@ -55,6 +55,7 @@ typst.workspace = true
 typst-macros.workspace = true
 typst-shim.workspace = true
 typst-timing.workspace = true
+typst-library.workspace = true
 unscanny.workspace = true
 walkdir.workspace = true
 yaml-rust2.workspace = true

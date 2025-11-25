@@ -303,7 +303,7 @@ impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
         };
 
         world.to_mut().set_is_compiling(true);
-        let compiled = ::typst::compile::<D>(world.as_ref());
+        let compiled = ::typst_shim::compile_opt::<D>(world.as_ref());
         world.to_mut().set_is_compiling(false);
 
         let exclude_html_warnings = if !is_html_compilation {
@@ -399,6 +399,20 @@ impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
 }
 
 impl DiagnosticsTask {
+    /// Creates diagnostics from errors.
+    pub fn from_errors(paged_errors: Option<EcoVec<typst::diag::SourceDiagnostic>>) -> Self {
+        Self {
+            paged: CompilationDiagnostics {
+                errors: paged_errors,
+                warnings: None,
+            },
+            html: CompilationDiagnostics {
+                errors: None,
+                warnings: None,
+            },
+        }
+    }
+
     /// Gets the number of errors.
     pub fn error_cnt(&self) -> usize {
         self.paged.errors.as_ref().map_or(0, |e| e.len())

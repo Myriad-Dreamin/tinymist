@@ -19,7 +19,7 @@ import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
-import { activeTypstEditor, isTypstDocument } from "./util";
+import { activeTypstEditor, isTypstDocument, statusBarFormatString } from "./util";
 import { LanguageClient } from "vscode-languageclient/node";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
@@ -557,6 +557,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
       void vscode.commands.executeCommand(`typst-preview.preview`);
       return;
     }
+    case "export": {
+      void vscode.commands.executeCommand(`tinymist.openExportTool`);
+      break;
+    }
     case "export-html": {
       await commandShow("Html");
       break;
@@ -635,14 +639,6 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
-}
-
-export function statusBarFormatString() {
-  const formatter = (
-    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
-  ).trim();
-
-  return formatter;
 }
 
 async function commandReplaceText(

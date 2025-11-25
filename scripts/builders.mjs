@@ -145,6 +145,14 @@ export async function buildTinymistVscodeWeb() {
   ]);
 }
 
+export async function testTinymistVscodeBase() {
+  await spawnAsync("vscode:test", "cd editors/vscode && yarn test:vsc");
+}
+
+export async function testTinymistVscode() {
+  await Promise.all([checkVersion(), buildLspBinary("release").then(testTinymistVscodeBase)]);
+}
+
 export async function buildTinymistVscodeSystemBase() {
   await spawnAsync("vscode:system", "cd editors/vscode && node esbuild.system.mjs");
 }

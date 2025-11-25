@@ -12,10 +12,10 @@ pub struct WillRenameFilesRequest {
     pub paths: Vec<(PathBuf, PathBuf)>,
 }
 
-impl StatefulRequest for WillRenameFilesRequest {
+impl SemanticRequest for WillRenameFilesRequest {
     type Response = WorkspaceEdit;
 
-    fn request(self, ctx: &mut LocalContext, _graph: LspComputeGraph) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
         self.paths

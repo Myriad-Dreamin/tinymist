@@ -30,6 +30,11 @@ struct ExportPdfOpts {
     creation_timestamp: Option<String>,
     /// A PDF standard that Typst can enforce conformance with.
     pdf_standard: Option<Vec<PdfStandard>>,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    pub no_pdf_tags: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -98,6 +103,7 @@ impl ServerState {
         } else {
             self.config.creation_timestamp()
         };
+        let no_pdf_tags = opts.no_pdf_tags.unwrap_or(self.config.no_pdf_tags());
         let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
 
         let export = self.config.export_task();
@@ -106,6 +112,7 @@ impl ServerState {
                 export,
                 pages: opts.pages,
                 pdf_standards: pdf_standards.unwrap_or_default(),
+                no_pdf_tags,
                 creation_timestamp,
             }),
             args,
@@ -198,7 +205,7 @@ impl ServerState {
     pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let opts = get_arg_or_default!(args[1] as ExportPngOpts);
 
-        let ppi = opts.ppi.unwrap_or(144.);
+        let ppi = opts.ppi.or_else(|| self.config.ppi()).unwrap_or(144.);
         let ppi = ppi
             .try_into()
             .context("cannot convert ppi")

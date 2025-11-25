@@ -8,7 +8,7 @@
 # https://stackoverflow.com/a/64528456
 # https://depot.dev/blog/rust-dockerfile-best-practices
 
-ARG RUST_VERSION=1.88.0
+ARG RUST_VERSION=1.89.0
 
 FROM rust:${RUST_VERSION}-bookworm AS base
 RUN apt-get install -y git
@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo +${RUST_VERSION} build -p tinymist --release
+    cargo +${RUST_VERSION} build --bin tinymist --release
 
 FROM debian:12
 WORKDIR /app/

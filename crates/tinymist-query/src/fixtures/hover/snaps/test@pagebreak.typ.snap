@@ -30,6 +30,15 @@ more details on compound theory.
 In 1984, the first ...
 ```
 
+Even without manual page breaks, content will be automatically paginated
+based on the configured page size. You can set [the page height](https://typst.app/docs/reference/layout/page/#parameters-height)
+to `auto` to let the page grow dynamically until a manual page break
+occurs.
+
+Pagination tries to avoid single lines of text at the top or bottom of a
+page (these are called _widows_ and _orphans_). You can adjust the
+[`text.costs`] parameter to disable this behavior.
+
 # Named Parameters
 
 ## to

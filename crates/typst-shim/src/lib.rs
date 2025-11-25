@@ -1,5 +1,8 @@
 //! # typst-shim
 
+mod syntax_only;
+pub use syntax_only::*;
+
 pub use cfg_if::cfg_if;
 
 cfg_if! {

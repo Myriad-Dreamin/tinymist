@@ -187,6 +187,15 @@ See
 #link("https://myriad-dreamin.github.io/tinymist/feature/export.html")[Docs: Exporting Documents]
 for more information.
 
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting, by:
++ Open settings.
++ Search for "Tinymist Syntax Only Mode".
++ Toggle the "Syntax Only Mode" setting to always enable, disable syntax only mode, or enable on power-saving mode.
+
+For more information about power-saving mode, see #cross-link("/feature/syntax-only-mode.typ")[Syntax-Only Mode].
+
 == Working with Multiple-File Projects
 <working-with-multiple-files-projects>
 You can pin a main file by command.

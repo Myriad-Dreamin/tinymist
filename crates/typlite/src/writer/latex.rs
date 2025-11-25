@@ -362,12 +362,153 @@ impl LaTeXWriter {
                 output.push_str("\\hrule\n\n");
             }
             Node::HtmlElement(element) => {
-                for child in &element.children {
-                    self.write_node(child, output)?;
+                if element.tag == "table" {
+                    self.write_html_table(element, output)?;
+                } else {
+                    for child in &element.children {
+                        self.write_node(child, output)?;
+                    }
                 }
             }
             _ => {}
         }
+
+        Ok(())
+    }
+
+    /// Write HTML table element to LaTeX format
+    fn write_html_table(
+        &mut self,
+        table_element: &cmark_writer::ast::HtmlElement,
+        output: &mut EcoString,
+    ) -> Result<()> {
+        // Collect rows and determine column count
+        let mut headers: Vec<Vec<Vec<Node>>> = Vec::new();
+        let mut rows: Vec<Vec<Vec<Node>>> = Vec::new();
+        let mut col_count = 0;
+
+        // Process table structure
+        for child in &table_element.children {
+            if let Node::HtmlElement(elem) = child {
+                match elem.tag.as_str() {
+                    "thead" => {
+                        for row_node in &elem.children {
+                            if let Node::HtmlElement(row) = row_node {
+                                if row.tag == "tr" {
+                                    let cells: Vec<Vec<Node>> = row
+                                        .children
+                                        .iter()
+                                        .filter_map(|cell_node| {
+                                            if let Node::HtmlElement(cell) = cell_node {
+                                                if cell.tag == "th" || cell.tag == "td" {
+                                                    return Some(cell.children.clone());
+                                                }
+                                            }
+                                            None
+                                        })
+                                        .collect();
+                                    col_count = col_count.max(cells.len());
+                                    headers.push(cells);
+                                }
+                            }
+                        }
+                    }
+                    "tbody" => {
+                        for row_node in &elem.children {
+                            if let Node::HtmlElement(row) = row_node {
+                                if row.tag == "tr" {
+                                    let cells: Vec<Vec<Node>> = row
+                                        .children
+                                        .iter()
+                                        .filter_map(|cell_node| {
+                                            if let Node::HtmlElement(cell) = cell_node {
+                                                if cell.tag == "th" || cell.tag == "td" {
+                                                    return Some(cell.children.clone());
+                                                }
+                                            }
+                                            None
+                                        })
+                                        .collect();
+                                    col_count = col_count.max(cells.len());
+                                    rows.push(cells);
+                                }
+                            }
+                        }
+                    }
+                    "tr" => {
+                        // Direct row without thead/tbody
+                        let cells: Vec<Vec<Node>> = elem
+                            .children
+                            .iter()
+                            .filter_map(|cell_node| {
+                                if let Node::HtmlElement(cell) = cell_node {
+                                    if cell.tag == "th" || cell.tag == "td" {
+                                        return Some(cell.children.clone());
+                                    }
+                                }
+                                None
+                            })
+                            .collect();
+                        col_count = col_count.max(cells.len());
+
+                        // First row with th elements is header
+                        if headers.is_empty()
+                            && elem.children.iter().any(|n| {
+                                if let Node::HtmlElement(e) = n {
+                                    e.tag == "th"
+                                } else {
+                                    false
+                                }
+                            })
+                        {
+                            headers.push(cells);
+                        } else {
+                            rows.push(cells);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if col_count == 0 {
+            return Ok(());
+        }
+
+        // Write LaTeX table
+        output.push_str("\\begin{table}[htbp]\n");
+        output.push_str("\\centering\n");
+        output.push_str("\\begin{tabular}{");
+        for _ in 0..col_count {
+            output.push('c');
+        }
+        output.push_str("}\n\\hline\n");
+
+        // Write headers
+        for header_row in &headers {
+            for (i, cell_nodes) in header_row.iter().enumerate() {
+                if i > 0 {
+                    output.push_str(" & ");
+                }
+                self.write_inline_nodes(cell_nodes, output)?;
+            }
+            output.push_str(" \\\\\n\\hline\n");
+        }
+
+        // Write rows
+        for row in &rows {
+            for (i, cell_nodes) in row.iter().enumerate() {
+                if i > 0 {
+                    output.push_str(" & ");
+                }
+                self.write_inline_nodes(cell_nodes, output)?;
+            }
+            output.push_str(" \\\\\n");
+        }
+
+        output.push_str("\\hline\n");
+        output.push_str("\\end{tabular}\n");
+        output.push_str("\\end{table}\n\n");
 
         Ok(())
     }

@@ -136,7 +136,7 @@ mod tests {
             .expect("failed to resolve system universe");
 
         let world = verse.snapshot();
-        let _res = typst::compile::<TypstPagedDocument>(&world);
+        let _res = typst_shim::compile_opt::<TypstPagedDocument>(&world);
     }
 
     static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);

@@ -15,4 +15,4 @@ input_file: crates/tinymist-query/src/fixtures/type_check/infer.typ
 80..83 -> Func(xml)
 80..95 -> Any
 98..102 -> Func(toml)
-98..115 -> Any
+98..115 -> Type(dictionary)

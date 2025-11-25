@@ -623,7 +623,9 @@ pub fn bind_streams(
     previewer.start_data_plane(
         websocket_rx,
         |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
-            let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
+            let conn: hyper_tungstenite::WebSocketStream<
+                hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>,
+            > = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
 
             Ok(conn
                 .sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
@@ -631,14 +633,14 @@ pub fn bind_streams(
                 .with(|msg| {
                     Box::pin(async move {
                         let msg = match msg {
-                            WsMessage::Text(msg) => Message::Text(msg),
+                            WsMessage::Text(msg) => Message::text(msg),
                             WsMessage::Binary(msg) => Message::Binary(msg),
                         };
                         Ok(msg)
                     })
                 })
                 .map_ok(|msg| match msg {
-                    Message::Text(msg) => WsMessage::Text(msg),
+                    Message::Text(msg) => WsMessage::Text(msg.as_str().to_owned()),
                     Message::Binary(msg) => WsMessage::Binary(msg),
                     _ => WsMessage::Text("unsupported message".to_owned()),
                 }))

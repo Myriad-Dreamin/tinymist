@@ -12,24 +12,22 @@ export const CATEGORY_NAMES = {
   calculus: "Calculus",
   logic: "Logic",
   functionAndCategoryTheory: "Function and category theory",
+  gameTheory: "Game Theory",
   numberTheory: "Number Theory",
   algebra: "algebra",
   geometry: "Geometry",
+  astronomical: "Astronomical",
   currency: "Currency",
+  music: "Music",
   shape: "Shape",
-  arrow: "Arrow",
-  harpoon: "Harpoon",
-  tack: "Tack",
+  arrow: "Arrows, harpoons, and tacks",
   greek: "Greek Letters",
+  cyrillic: "Cyrillic Letters",
   hebrew: "Hebrew Letters",
   doubleStruck: "Double Struck",
-  // mathsConstruct: "Maths Constructs",
-  // variableSizedSymbol: "Variable-sized symbols",
-  // operator: "Operators and Relations",
+  miscellany: "Miscellany",
   misc: "Miscellaneous",
-  // emoji: "Emoji",
-  // letterStyle: "Letter Styles",
-}; // note: commented ones are not used in upstream
+};
 
 export type SymbolCategory = keyof typeof CATEGORY_NAMES;
 
@@ -55,7 +53,7 @@ export type SymbolId = string;
 export interface SymbolItem {
   id: SymbolId;
   category: SymbolCategory;
-  unicode: number;
+  value: string;
   glyph?: string;
 }
 

@@ -9,7 +9,7 @@ use reflexo::ImmutPath;
 use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
 use sync_ls::{internal_error, just_future};
 use tinymist_project::LspWorld;
-use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse};
+use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse, GLOBAL_STATS};
 use tinymist_std::error::prelude::*;
 use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
@@ -73,6 +73,9 @@ impl ServerState {
                 entry: Some(entry),
                 ..TaskInputs::default()
             });
+
+            let id = snap.world().main_id();
+            let _guard = GLOBAL_STATS.stat(id, "export");
 
             let is_html = matches!(task, ProjectTask::ExportHtml { .. });
             // todo: we may get some file missing errors here
@@ -645,6 +648,7 @@ impl Default for ExportUserConfig {
                 },
                 pages: None,
                 pdf_standards: vec![],
+                no_pdf_tags: false,
                 creation_timestamp: None,
             }),
             count_words: false,

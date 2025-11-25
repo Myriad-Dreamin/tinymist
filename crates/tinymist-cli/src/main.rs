@@ -89,6 +89,7 @@ enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
     /// Run compile command like `typst-cli compile`
+    #[clap(alias = "c")]
     Compile(CompileArgs),
 
     /// Generate completion script to stdout

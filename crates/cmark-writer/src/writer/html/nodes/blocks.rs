@@ -1,16 +1,18 @@
+use ecow::EcoString;
+
 use super::super::core::GuardedHtmlElement;
 use super::super::{HtmlWriteResult, HtmlWriter};
 use crate::ast::{HtmlElement, ListItem, Node};
 #[cfg(feature = "gfm")]
 use crate::ast::{TableAlignment, TaskListStatus};
-use ecow::EcoString;
 
 impl HtmlWriter {
     pub(crate) fn write_document(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
         for child in children {
             self.write_node(child)?;
             if child.is_block() && !self.buffer.ends_with('\n') {
-                // Keep HTML output compact; intentionally skip inserting extra newlines by default.
+                // Keep HTML output compact; intentionally skip inserting extra
+                // newlines by default.
             }
         }
         Ok(())
@@ -87,9 +89,11 @@ impl HtmlWriter {
                 }
 
                 let mut body = guard.finish()?;
+                body.writer().buffer.push_str("\n\n");
                 for child in &element.children {
                     body.writer().write_node(child)?;
                 }
+                body.writer().buffer.push_str("\n\n");
                 body.end()?;
                 Ok(())
             }
@@ -111,9 +115,11 @@ impl HtmlWriter {
             self.text(" />")?;
         } else {
             self.text(">")?;
+            self.buffer.push_str("\n\n");
             for child in &element.children {
                 self.write_node(child)?;
             }
+            self.buffer.push_str("\n\n");
             self.text("</")?;
             self.text(&element.tag)?;
             self.text(">")?;
@@ -310,7 +316,9 @@ impl HtmlWriter {
                     }
                 }
                 self.finish_tag()?;
+                self.buffer.push_str("\n\n");
                 self.write_node(cell)?;
+                self.buffer.push_str("\n\n");
                 self.end_tag("td")?;
                 self.write_trusted_html("\n")?;
             }
@@ -362,7 +370,9 @@ impl HtmlWriter {
             for cell in row_cells.iter() {
                 self.start_tag("td")?;
                 self.finish_tag()?;
+                self.buffer.push_str("\n\n");
                 self.write_node(cell)?;
+                self.buffer.push_str("\n\n");
                 self.end_tag("td")?;
                 self.write_trusted_html("\n")?;
             }

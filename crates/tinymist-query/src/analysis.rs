@@ -1,7 +1,6 @@
 //! Semantic static and dynamic analysis of the source code.
 
 mod bib;
-
 pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
@@ -15,37 +14,37 @@ pub mod doc_highlight;
 pub use doc_highlight::*;
 pub mod link_expr;
 pub use link_expr::*;
-pub mod stats;
-pub use stats::*;
 pub mod definition;
 pub use definition::*;
 pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-use tinymist_std::error::WithContextUntyped;
-mod post_tyck;
-mod tyck;
-pub(crate) use crate::ty::*;
-pub(crate) use post_tyck::*;
-pub(crate) use tyck::*;
-mod prelude;
 
 mod global;
+mod post_tyck;
+mod prelude;
+mod tyck;
+
+pub(crate) use crate::ty::*;
 pub use global::*;
+pub(crate) use post_tyck::*;
+pub(crate) use tinymist_analysis::stats::{AnalysisStats, QueryStatGuard};
+pub(crate) use tyck::*;
 
 use std::sync::Arc;
 
 use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
+use tinymist_std::error::WithContextUntyped;
 use tinymist_std::{Result, bail};
 use tinymist_world::{EntryReader, EntryState, TaskInputs};
 use typst::diag::{FileError, FileResult, StrResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::{CompilerQueryResponse, SemanticRequest, StatefulRequest, path_res_to_url};
+use crate::{CompilerQueryResponse, SemanticRequest, path_res_to_url};
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -101,17 +100,6 @@ impl LspQuerySnapshot {
         self
     }
 
-    /// Runs a stateful query.
-    pub fn run_stateful<T: StatefulRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        let graph = self.snap.clone();
-        self.run_analysis(|ctx| query.request(ctx, graph))
-            .map(wrapper)
-    }
-
     /// Runs a semantic query.
     pub fn run_semantic<T: SemanticRequest>(
         self,
@@ -123,13 +111,13 @@ impl LspQuerySnapshot {
 
     /// Runs a query.
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world().clone();
-        let Some(..) = world.main_id() else {
+        let graph = self.snap.clone();
+        let Some(..) = graph.world().main_id() else {
             log::error!("Project: main file is not set");
             bail!("main file is not set");
         };
 
-        let mut ctx = self.analysis.enter_(world, self.rev_lock);
+        let mut ctx = self.analysis.enter_(graph, self.rev_lock);
         Ok(f(&mut ctx))
     }
 
@@ -654,7 +642,7 @@ mod lint_tests {
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
-                .map(|(k, v)| (file_path_(&k), v))
+                .map(|(k, v)| (file_uri_(&k), v))
                 .collect::<BTreeMap<_, _>>();
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });

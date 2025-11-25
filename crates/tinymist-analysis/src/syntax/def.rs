@@ -79,6 +79,8 @@ pub struct ExprInfoRepr {
     pub resolves: FxHashMap<Span, Interned<RefExpr>>,
     /// Map from declarations to their documentation strings.
     pub docstrings: FxHashMap<DeclExpr, Arc<DocString>>,
+    /// Layout information for module import items in this file.
+    pub module_items: FxHashMap<Interned<Decl>, ModuleItemLayout>,
 }
 
 impl std::hash::Hash for ExprInfoRepr {
@@ -95,6 +97,9 @@ impl std::hash::Hash for ExprInfoRepr {
         let mut imports = self.imports.iter().collect::<Vec<_>>();
         imports.sort_by_key(|(fid, _)| *fid);
         imports.hash(state);
+        let mut module_items = self.module_items.iter().collect::<Vec<_>>();
+        module_items.sort_by_key(|(decl, _)| decl.span().into_raw());
+        module_items.hash(state);
     }
 }
 
@@ -162,6 +167,17 @@ impl ExprInfoRepr {
         std::fs::create_dir_all(exports.parent().unwrap()).unwrap();
         std::fs::write(exports, format!("{:#?}", self.exports)).unwrap();
     }
+}
+
+/// Describes how an import item is laid out in the source text.
+#[derive(Debug, Clone, Hash)]
+pub struct ModuleItemLayout {
+    /// The module declaration that owns this item.
+    pub parent: Interned<Decl>,
+    /// The byte range covering the whole `foo as bar` clause.
+    pub item_range: Range<usize>,
+    /// The byte range covering the bound identifier (`bar` in `foo as bar`).
+    pub binding_range: Range<usize>,
 }
 
 /// Represents different kinds of expressions in the language.
@@ -512,8 +528,18 @@ impl Decl {
         })
     }
 
-    /// Creates a module declaration with a name and file ID.
-    pub fn module(name: Interned<str>, fid: TypstFileId) -> Self {
+    /// Creates a module declaration with a file ID.
+    pub fn module(fid: TypstFileId) -> Self {
+        let name = {
+            let stem = fid.vpath().as_rooted_path().file_stem();
+            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
+                .unwrap_or_default()
+        };
+        Self::Module(ModuleDecl { name, fid })
+    }
+
+    /// Creates a module declaration with a name and a file ID.
+    pub fn module_with_name(name: Interned<str>, fid: TypstFileId) -> Self {
         Self::Module(ModuleDecl { name, fid })
     }
 
@@ -1024,18 +1050,79 @@ pub struct ContentSeqExpr {
 
 /// Represents a reference expression.
 ///
-/// The step resolution is the intermediate step in resolution (if any).
-/// The root expression is the root expression of the reference chain.
-/// The term is the final resolved type of the reference.
+/// A reference expression tracks how an identifier resolves through the lexical
+/// scope, imports, and field accesses. It maintains a chain of resolution steps
+/// to support features like go-to-definition, go-to-reference, and type
+/// inference.
+///
+/// # Resolution Chain
+///
+/// The fields form a resolution chain: `root` -> `step` -> `decl`, where:
+/// - `root` is the original source of the value
+/// - `step` is any intermediate transformation
+/// - `decl` is the final identifier being referenced
+/// - `term` is the resolved type (if known)
+///   - Hint: A value `1`'s typst type is `int`, but here we keep the type as
+///     `1` to improve the type inference.
+///
+/// # Examples
+///
+/// ## Simple identifier reference
+/// ```rust,ignore
+/// // For: let x = value; let y = x;
+/// RefExpr {
+///     decl: y,           // The identifier 'y'
+///     root: Some(x),     // Points back to 'x'
+///     step: Some(x),     // Same as root for simple refs
+///     term: None,        // Type may not be known yet
+/// }
+/// ```
+///
+/// ## Import with rename
+/// ```rust,ignore
+/// // For: import "mod.typ": old as new
+/// // First creates ref for 'old':
+/// RefExpr { decl: old, root: Some(mod.old), step: Some(field), term: Some(Func(() -> dict)) }
+/// // Then creates ref for 'new':
+/// RefExpr { decl: new, root: Some(mod.old), step: Some(old), term: Some(Func(() -> dict)) }
+/// ```
+///
+/// ## Builtin definitions
+/// ```rust,ignore
+/// // For: std.length
+/// RefExpr { decl: length, root: None, step: None, term: Some(Type(length)) }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RefExpr {
-    /// The declaration being referenced.
+    /// The declaration being referenced (the final identifier in the chain).
+    ///
+    /// This is always set and represents the identifier at the current point
+    /// of reference (e.g., the variable name, import alias, or field name).
     pub decl: DeclExpr,
-    /// The intermediate step in resolution (if any).
+
+    /// The intermediate expression in the resolution chain.
+    ///
+    /// Set in the following cases:
+    /// - **Import/include**: The module expression being imported
+    /// - **Field access**: The selected field's expression
+    /// - **Scope resolution**: The scope expression being resolved
+    /// - **Renamed imports**: The original name before renaming
+    ///
+    /// `None` when the identifier is an undefined reference.
     pub step: Option<Expr>,
-    /// The root expression of the reference chain.
+
+    /// The root expression at the start of the reference chain.
+    ///
+    /// A root definition never references another root definition.
     pub root: Option<Expr>,
-    /// The final resolved type of the reference.
+
+    /// The final resolved type of the referenced value.
+    ///
+    /// Set whenever a type is known for the referenced value.
+    ///
+    /// Some reference doesn't have a root definition, but has a term. For
+    /// example, `std.length` is termed as `Type(length)` while has no a
+    /// definition.
     pub term: Option<Ty>,
 }
 

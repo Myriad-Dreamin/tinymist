@@ -202,8 +202,7 @@ fn analyze_import_source(ctx: &LocalContext, types: &TypeInfo, s: ast::Expr) -> 
         return Some(types.simplify(res, false));
     }
 
-    let m = ctx.module_by_syntax(s.to_untyped())?;
-    Some(Ty::Value(InsTy::new_at(m, s.span())))
+    ctx.module_term_by_syntax(s.to_untyped(), false)
 }
 
 pub(crate) enum ScopeCheckKind {

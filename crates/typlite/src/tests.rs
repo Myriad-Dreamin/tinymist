@@ -1,7 +1,8 @@
 use std::sync::OnceLock;
 
+use ecow::EcoVec;
 use regex::Regex;
-use typst::html::{HtmlNode, HtmlTag};
+use typst_html::{HtmlNode, HtmlTag};
 use typst_syntax::Span;
 
 use super::*;
@@ -30,13 +31,6 @@ fn convert_tex() {
 fn convert_docs() {
     snapshot_testing("docs", &|world, _path| {
         insta::assert_snapshot!(conv(world, ConvKind::Md { for_docs: true }));
-    });
-}
-
-#[test]
-fn convert_regression() {
-    snapshot_testing("regression", &|world, _path| {
-        insta::assert_snapshot!(conv(world, ConvKind::Md { for_docs: false }));
     });
 }
 
@@ -126,7 +120,7 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {
     let mut doc = doc;
-    for node in doc.root.children.iter_mut() {
+    for node in doc.root.children.make_mut().iter_mut() {
         redact_node(node);
     }
     doc
@@ -136,9 +130,9 @@ fn redact_node(node: &mut HtmlNode) {
     match node {
         HtmlNode::Element(elem) => {
             if elem.tag == HtmlTag::constant("svg") {
-                elem.children = vec![];
+                elem.children = EcoVec::new();
             } else {
-                for child in elem.children.iter_mut() {
+                for child in elem.children.make_mut().iter_mut() {
                     redact_node(child);
                 }
             }

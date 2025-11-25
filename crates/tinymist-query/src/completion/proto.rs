@@ -7,7 +7,7 @@ use crate::StrRef;
 use super::LspRange;
 
 /// A kind of item that can be completed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CompletionKind {
     /// A syntactical structure.
     Syntax,
@@ -25,7 +25,7 @@ pub enum CompletionKind {
     /// A reference.
     Reference,
     /// A symbol.
-    Symbol(char),
+    Symbol(EcoString),
     /// A variable.
     Variable,
     /// A module.
@@ -36,8 +36,8 @@ pub enum CompletionKind {
     Folder,
 }
 
-impl From<CompletionKind> for lsp_types::CompletionItemKind {
-    fn from(value: CompletionKind) -> Self {
+impl From<&CompletionKind> for lsp_types::CompletionItemKind {
+    fn from(value: &CompletionKind) -> Self {
         match value {
             CompletionKind::Syntax => Self::SNIPPET,
             CompletionKind::Func => Self::FUNCTION,
@@ -60,7 +60,7 @@ impl serde::Serialize for CompletionKind {
     where
         S: serde::Serializer,
     {
-        <Self as Into<lsp_types::CompletionItemKind>>::into(*self).serialize(serializer)
+        <&Self as Into<lsp_types::CompletionItemKind>>::into(self).serialize(serializer)
     }
 }
 

@@ -1,6 +1,5 @@
 //! Linked definition analysis
 
-use tinymist_std::typst::TypstDocument;
 use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
 
@@ -89,7 +88,6 @@ impl HasNameRange for Decl {
 pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
-    document: Option<&TypstDocument>,
     syntax: SyntaxClass,
 ) -> Option<Definition> {
     match syntax {
@@ -114,7 +112,7 @@ pub fn definition(
                 _ => return None,
             };
 
-            let introspector = &document?.introspector();
+            let introspector = ctx.success_doc()?.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }
@@ -200,13 +198,11 @@ fn ref_definition(
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::construct(name.into());
-    let sel = Selector::Label(label);
-
     // if it is a label, we put the selection range to itself
     let (decl, ty) = match ref_expr {
         ast::Expr::Label(label) => (Decl::label(name, label.span()), None),
         ast::Expr::Ref(..) => {
+            let sel = Selector::Label(Label::construct(name.into()).ok()?);
             let elem = introspector.query_first(&sel)?;
             let span = elem.labelled_at();
             let decl = if !span.is_detached() {
@@ -262,7 +258,7 @@ impl CallConvention {
 pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Option<CallConvention> {
     let callee = (|| {
         let source = ctx.source_by_id(node.span().id()?).ok()?;
-        let def = ctx.def_of_span(&source, None, node.span())?;
+        let def = ctx.def_of_span(&source, node.span())?;
         let func_ptr = match def.term.and_then(|val| val.value()) {
             Some(Value::Func(func)) => Some(func),
             Some(Value::Type(ty)) => ty.constructor().ok(),

@@ -23,6 +23,15 @@ class Suite {
     this.tests = [];
   }
 
+  private _skip: Suite | null = null;
+
+  public skip(): Suite {
+    if (this._skip) {
+      return this._skip;
+    }
+    return (this._skip = new Suite());
+  }
+
   public addTest(name: string, f: () => Promise<void>): void {
     const test = new Test(name, f);
     this.tests.push(test);

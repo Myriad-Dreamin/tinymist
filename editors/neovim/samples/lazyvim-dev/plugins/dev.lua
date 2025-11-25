@@ -3,6 +3,8 @@ local tinymist = require("others.tinymist")[2]
 -- set binary path
 tinymist.opts.servers.tinymist.cmd = { "tinymist" }
 
+vim.lsp.config("tinymist", tinymist.opts.servers.tinymist)
+
 
 return {
     { "mason-org/mason.nvim",           version = "^1.0.0" },

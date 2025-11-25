@@ -4,114 +4,114 @@
       "category": "accent",
       "glyph": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 -806 500 1000\" preserveAspectRatio=\"xMidYMid meet\">\n<g transform=\"scale(1 -1)\"><path id=\"\" class=\"outline_glyph\" d=\"M 336 698 C 324 698 313 692 304 680 L 187 531 L 208 509 L 356 628 C 368 637 374 648 374 660 C 374 680 356 698 336 698 Z \"/></g>\n</svg>",
       "id": "sym.acute",
-      "unicode": 180
+      "value": "´"
     },
     {
       "category": "misc",
       "glyph": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 -806 554 1000\" preserveAspectRatio=\"xMidYMid meet\">\n<g transform=\"scale(1 -1)\"><path id=\"\" class=\"outline_glyph\" d=\"M 377 536 C 432 565 484 604 534 651 L 519 673 C 480 636 446 618 419 618 C 406 618 389 623 368 633 C 295 668 244 686 215 686 C 156 686 109 650 76 578 C 58 540 42 502 27 464 L 51 449 C 69 499 91 537 117 564 C 137 584 162 594 193 594 C 210 594 228 590 248 583 Z M 462 510 C 475 533 494 555 517 576 L 498 587 C 452 558 405 517 357 463 C 356 448 355 436 355 428 C 355 407 358 375 363 333 C 370 282 373 240 373 208 C 373 148 356 82 330 56 C 310 35 289 25 266 25 C 241 25 219 34 201 53 C 181 86 166 114 155 137 L 128 109 C 87 67 57 32 37 4 L 45 -19 L 99 19 C 134 -12 165 -27 193 -27 C 268 -27 339 7 406 74 C 445 114 465 171 465 246 C 465 293 461 344 453 399 C 451 412 450 434 450 463 C 450 482 454 497 462 510 Z \"/></g>\n</svg>",
       "id": "sym.Im",
-      "unicode": 8465
+      "value": "ℑ"
     },
     {
       "category": "quote",
       "glyph": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 -806 556 1000\" preserveAspectRatio=\"xMidYMid meet\">\n<g transform=\"scale(1 -1)\"><path id=\"\" class=\"outline_glyph\" d=\"M 430 0 C 439 0 444 5 444 14 L 444 16 C 425 96 395 171 353 242 C 396 313 426 388 444 467 L 444 469 C 444 478 439 483 430 483 L 428 483 C 421 483 417 480 416 474 C 386 388 340 314 278 252 C 276 250 275 247 274 242 C 274 237 276 233 279 232 C 341 169 387 95 416 10 C 418 3 422 0 428 0 Z M 267 0 C 276 0 281 5 281 14 L 281 16 C 262 96 232 171 190 242 C 233 313 263 388 281 467 L 281 469 C 281 478 276 483 267 483 L 265 483 C 259 483 255 480 253 474 C 223 389 177 315 115 252 C 113 250 112 247 111 242 C 111 237 113 233 116 232 C 178 169 224 95 253 10 C 255 3 259 0 265 0 Z \"/></g>\n</svg>",
       "id": "sym.quote.angle.l.double",
-      "unicode": 171
+      "value": "«"
     },
     {
       "category": "control",
       "id": "sym.lrm",
-      "unicode": 8206
+      "value": "\u200E"
     },
     {
       "category": "control",
       "id": "sym.rlm",
-      "unicode": 8207
+      "value": "\u200F"
     },
     {
       "category": "control",
       "id": "sym.wj",
-      "unicode": 8288
+      "value": "\u2060"
     },
     {
       "category": "control",
       "id": "sym.zwj",
-      "unicode": 8205
+      "value": "\u200D"
     },
     {
       "category": "control",
       "id": "sym.zwnj",
-      "unicode": 8204
+      "value": "\u200C"
     },
     {
       "category": "control",
       "id": "sym.zws",
-      "unicode": 8203
+      "value": "\u200B"
     },
     {
       "category": "space",
       "id": "sym.space",
-      "unicode": 32
+      "value": "\u0020"
     },
     {
       "category": "space",
       "id": "sym.space.en",
-      "unicode": 8194
+      "value": "\u2002"
     },
     {
       "category": "space",
       "id": "sym.space.fig",
-      "unicode": 8199
+      "value": "\u2007"
     },
     {
       "category": "space",
       "id": "sym.space.hair",
-      "unicode": 8202
+      "value": "\u200A"
     },
     {
       "category": "space",
       "id": "sym.space.med",
-      "unicode": 8287
+      "value": "\u205F"
     },
     {
       "category": "space",
       "id": "sym.space.nobreak",
-      "unicode": 160
+      "value": "\u00A0"
     },
     {
       "category": "space",
       "id": "sym.space.nobreak.narrow",
-      "unicode": 8239
+      "value": "\u202F"
     },
     {
       "category": "space",
       "id": "sym.space.punct",
-      "unicode": 8200
+      "value": "\u2008"
     },
     {
       "category": "space",
       "id": "sym.space.quad",
-      "unicode": 8195
+      "value": "\u2003"
     },
     {
       "category": "space",
       "id": "sym.space.quarter",
-      "unicode": 8197
+      "value": "\u2005"
     },
     {
       "category": "space",
       "id": "sym.space.sixth",
-      "unicode": 8198
+      "value": "\u2006"
     },
     {
       "category": "space",
       "id": "sym.space.thin",
-      "unicode": 8201
+      "value": "\u2009"
     },
     {
       "category": "space",
       "id": "sym.space.third",
-      "unicode": 8196
+      "value": "\u2004"
     }
   ]
 }

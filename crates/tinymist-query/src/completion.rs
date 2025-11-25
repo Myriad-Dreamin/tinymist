@@ -38,10 +38,10 @@ pub struct CompletionRequest {
     pub trigger_character: Option<char>,
 }
 
-impl StatefulRequest for CompletionRequest {
+impl SemanticRequest for CompletionRequest {
     type Response = CompletionList;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         // These trigger characters are for completion on positional arguments,
         // which follows the configuration item
         // `tinymist.completion.triggerOnSnippetPlaceholders`.
@@ -51,7 +51,7 @@ impl StatefulRequest for CompletionRequest {
             return None;
         }
 
-        let document = graph.snap.success_doc.as_ref();
+        let document = ctx.success_doc().cloned();
         let source = ctx.source_by_path(&self.path).ok()?;
         let cursor = ctx.to_typst_pos_offset(&source, self.position, 0)?;
 
@@ -78,7 +78,8 @@ impl StatefulRequest for CompletionRequest {
         let explicit = false;
         let mut cursor = CompletionCursor::new(ctx.shared_(), &source, cursor)?;
 
-        let mut worker = CompletionWorker::new(ctx, document, explicit, self.trigger_character)?;
+        let mut worker =
+            CompletionWorker::new(ctx, document.as_ref(), explicit, self.trigger_character)?;
         worker.work(&mut cursor)?;
 
         // todo: define it well, we were needing it because we wanted to do interactive
@@ -127,8 +128,6 @@ mod tests {
 
             let mut includes = HashSet::new();
             let mut excludes = HashSet::new();
-
-            let graph = compile_doc_for_test(ctx, &properties);
 
             for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
                 // split first char
@@ -181,12 +180,10 @@ mod tests {
                     explicit,
                     trigger_character,
                 };
-                let result = request
-                    .request(ctx, graph.clone())
-                    .map(|list| CompletionList {
-                        is_incomplete: list.is_incomplete,
-                        items: get_items(list.items),
-                    });
+                let result = request.request(ctx).map(|list| CompletionList {
+                    is_incomplete: list.is_incomplete,
+                    items: get_items(list.items),
+                });
                 results.push(result);
             }
             with_settings!({

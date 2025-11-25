@@ -90,7 +90,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
             tokio::select! {
                 Some(resp) = lsp_rx.resp_rx.recv() => {
                     let r = ws
-                        .send(Message::Text(serde_json::to_string(&resp).unwrap()))
+                        .send(Message::text(serde_json::to_string(&resp).unwrap()))
                         .await;
                     let Err(err) = r else {
                         continue;

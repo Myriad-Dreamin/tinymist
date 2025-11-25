@@ -117,6 +117,10 @@ end, {})
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+#include "syntax-only.typ"
+
 == Working with Multiple-Files Projects
 <working-with-multiple-files-projects>
 

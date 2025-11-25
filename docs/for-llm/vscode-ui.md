@@ -67,7 +67,7 @@ You can find all syntatical labels in the workspaces in the [_Label View_](#labe
 
 ### Outline View
 
-You can get the document outline in the [_Outline View_](#outline-view) if [_Preview State_](#preview-state) is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP's syntax outline which shows language syntax structure in the current opened document.
+You can get the document outline in the [_Outline View_](#outline-view) if [_Preview State_](#preview-state) is enabled. The outline is strictly same as the outline that will show up in the PDF document. This is different from the LSP’s syntax outline which shows language syntax structure in the current opened document.
 
 ## Tools
 
@@ -283,6 +283,13 @@ Enable or disable [experimental/onEnter](https://github.com/rust-lang/rust-analy
 
 - **Type**: `boolean`
 - **Default**: `true`
+
+## `tinymist.onPaste`
+
+The script to be executed when pasting resources into the editing typst document. If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression, e.g. `$root/x/$dir/$name` evaluated as `/path/to/root/x/dir/main`, otherwise it will be evaluated as a path pattern, e.g. `{ join(root, "x", dir, if name.ends-with(".png") ("imgs"), name) }` evaluated as `/path/to/root/x/dir/imgs/main`. The extra valid definitions are `root`, `dir`, `name`, and `join`. To learn more about the paste script, please visit [Script Hooks](https://myriad-dreamin.github.io/tinymist/feature/script-hook.html). Hint: you could import `@local` packages in the paste script. Note: restarting the editor is required to change this setting.
+
+- **Type**: `string`
+- **Default**: `"$root/assets"`
 
 ## `tinymist.outputPath`
 

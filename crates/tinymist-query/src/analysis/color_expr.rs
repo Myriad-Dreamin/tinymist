@@ -106,7 +106,7 @@ impl<'a> ColorExprWorker<'a> {
 
     fn push_color(&mut self, range: Range<usize>, color: Color) -> Option<()> {
         let rng = self.ctx.to_lsp_range(range, &self.source);
-        let [r, g, b, a] = color.to_rgb().to_vec4();
+        let (r, g, b, a) = color.to_rgb().into_components();
 
         self.colors.push(ColorInformation {
             range: rng,

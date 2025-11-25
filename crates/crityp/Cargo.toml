@@ -33,6 +33,7 @@ tinymist-std.workspace = true
 tinymist-project = { workspace = true, features = ["lsp"] }
 typst.workspace = true
 typst-syntax.workspace = true
+half.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

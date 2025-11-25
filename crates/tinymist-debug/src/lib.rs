@@ -30,7 +30,7 @@ pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
     let (cov, result) = with_cov(base, |instr| {
-        if let Err(e) = typst::compile::<D>(&instr).output {
+        if let Err(e) = typst_shim::compile_opt::<D>(&instr).output {
             print_diagnostics(instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
                 .context_ut("failed to print diagnostics")?;
             bail!("");

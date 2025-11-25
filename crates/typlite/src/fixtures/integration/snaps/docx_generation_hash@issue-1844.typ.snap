@@ -1,0 +1,6 @@
+---
+source: crates/typlite/src/tests.rs
+expression: hash
+input_file: crates/typlite/src/fixtures/integration/issue-1844.typ
+---
+siphash128_13:5680ee2c48f93da5b40c162e391ef15

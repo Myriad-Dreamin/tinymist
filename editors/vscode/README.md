@@ -37,7 +37,7 @@ To initialize a Typst project:
 ### Configuring LSP-Enhanced Formatters
 
 1. Open settings.
-2. Search for "Tinymist Formatter" and modify the value.
+2. Search for “Tinymist Formatter” and modify the value.
    - Use `"formatterMode": "typstyle"` for [typstyle](https://github.com/Enter-tainer/typstyle).
    - Use `"formatterMode": "typstfmt"` for [typstfmt](https://github.com/astrale-sharp/typstfmt).
 
@@ -54,15 +54,15 @@ Tips: to enable formatting on save, you should add extra settings for typst lang
 ### Configuring Linter
 
 1. Open settings.
-2. Search for "Tinymist Lint" and modify the value.
-   1. Toggle "Enabled" to enable or disable the linter.
-   2. Change "When" to configure when the linter runs.
+2. Search for “Tinymist Lint” and modify the value.
+   1. Toggle “Enabled” to enable or disable the linter.
+   2. Change “When” to configure when the linter runs.
       - (Default) `onSave` run linting when you save the file.
       - `onType` run linting as you type.
 
 ### Configuring/Using Tinymist’s Activity Bar (Sidebar)
 
-If you don’t like the activity bar, you can right-click on the activity bar and uncheck "Tinymist" to hide it.
+If you don’t like the activity bar, you can right-click on the activity bar and uncheck “Tinymist” to hide it.
 
 #### Symbol View
 
@@ -123,8 +123,8 @@ To configure path to search fonts:
 1. Open settings.
    - File -\> Preferences -\> Settings (Linux, Windows).
    - Code -\> Preferences -\> Settings (Mac).
-2. Search for "Tinymist Font Paths" for providing paths to search fonts order-by-order.
-3. Search for "Tinymist System Fonts" for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
+2. Search for “Tinymist Font Paths” for providing paths to search fonts order-by-order.
+3. Search for “Tinymist System Fonts” for disabling system fonts to be searched, which is useful for reproducible rendering your PDF documents.
 4. Reload the window or restart the vscode editor to make the settings take effect.
 
 **Note:** you must provide absolute paths.
@@ -136,14 +136,14 @@ To configure path to search fonts:
 To configure the root path resolved for Typst compiler:
 
 1. Open settings.
-2. Search for "Tinymist Root Path" and modify the value.
+2. Search for “Tinymist Root Path” and modify the value.
 3. Reload the window or restart the vscode editor to make the settings take effect. **Note:** you must provide absolute paths.
 
 ### Managing Local Packages
 
 1. Use `Typst: Create Typst Local Package` command to create a local package.
 2. Use `Typst: Open Typst Local Package` command to open a local package.
-3. View and manage a list of available local packages in the "PACKAGE" view in the activity bar.
+3. View and manage a list of available local packages in the “PACKAGE” view in the activity bar.
 
 ### Compiling PDF
 
@@ -158,8 +158,8 @@ To find a way to compile PDF:
 To configure when PDFs are compiled:
 
 1. Open settings.
-2. Search for "Tinymist Export PDF".
-3. Change the "Export PDF" setting.
+2. Search for “Tinymist Export PDF”.
+3. Change the “Export PDF” setting.
    - `onSave` makes a PDF after saving the Typst file.
    - `onType` makes PDF files live, as you type.
    - `never` disables PDF compilation.
@@ -168,8 +168,8 @@ To configure when PDFs are compiled:
 To configure where PDFs are saved:
 
 1. Open settings.
-2. Search for "Tinymist Output Path".
-3. Change the "Output Path" setting. This is the path pattern to store artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration
+2. Search for “Tinymist Output Path”.
+3. Change the “Output Path” setting. This is the path pattern to store artifacts, you can use `$root` or `$dir` or `$name` to do magic configuration
    - e.g. `$root/$dir/$name` (default) for `$root/path/to/main.pdf`.
    - e.g. `$root/target/$dir/$name` for `$root/target/path/to/main.pdf`.
    - e.g. `$root/target/foo` for `$root/target/foo.pdf`. This will ensure that the output is always output to `target/foo.pdf`.
@@ -194,8 +194,7 @@ You can pin a main file by command.
 - Use command `Typst Unpin Main` (tinymist.unpinMain) to unset the main file.
 
 > [!NOTE]
-> 
-> `tinymist.pinMain` is a stateful command, and tinymist doesn't remember it between sessions (closing and opening the editor).
+> > `tinymist.pinMain` is a stateful command, and tinymist doesn’t remember it between sessions (closing and opening the editor).
 
 ### Passing Extra CLI Arguments
 

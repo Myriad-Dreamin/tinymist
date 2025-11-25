@@ -86,12 +86,12 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         let snap = state.snapshot().unwrap();
 
         RUNTIMES.tokio_runtime.block_on(async {
-            let w = snap.world().clone().task(TaskInputs {
+            let g = snap.task(TaskInputs {
                 entry: Some(entry),
                 inputs,
             });
 
-            UserActionTask::trace_main(client, state, &w, args.rpc_kind, req_id).await
+            UserActionTask::trace_main(client, state, g, args.rpc_kind, req_id).await
         });
 
         Ok(())
