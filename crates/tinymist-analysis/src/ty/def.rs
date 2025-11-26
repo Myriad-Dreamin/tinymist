@@ -564,15 +564,10 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
         (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
         (Value::Type(x), Value::Type(y)) => x.cmp(y),
         (Value::None, Value::None) | (Value::Auto, Value::Auto) => std::cmp::Ordering::Equal,
-        (Value::Array(x), Value::Array(y)) => {
-            cmp_by(x.iter(), y.iter(), cmp_value, || x.len().cmp(&y.len()))
-        }
-        (Value::Dict(x), Value::Dict(y)) => cmp_by(
-            x.iter(),
-            y.iter(),
-            |(xk, xv), (yk, yv)| xk.cmp(yk).then_with(|| cmp_value(xv, yv)),
-            || x.len().cmp(&y.len()),
-        ),
+        (Value::Array(x), Value::Array(y)) => cmp_by(x.iter(), y.iter(), cmp_value),
+        (Value::Dict(x), Value::Dict(y)) => cmp_by(x.iter(), y.iter(), |(xk, xv), (yk, yv)| {
+            xk.cmp(yk).then_with(|| cmp_value(xv, yv))
+        }),
         (Value::Label(x), Value::Label(y)) => x.resolve().cmp(&y.resolve()),
         (Value::Float(x), Value::Float(y)) => x.to_bits().cmp(&y.to_bits()),
         (Value::Length(x), Value::Length(y)) => x.abs.cmp(&y.abs).then_with(|| x.em.cmp(&y.em)),
@@ -623,17 +618,20 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
 fn cmp_by<T>(
     mut x_iter: impl Iterator<Item = T>,
     mut y_iter: impl Iterator<Item = T>,
-    cmp: impl Fn(T, T) -> std::cmp::Ordering,
-    cmp_len: impl Fn() -> std::cmp::Ordering,
+    mut cmp: impl FnMut(T, T) -> std::cmp::Ordering,
 ) -> std::cmp::Ordering {
-    while let (Some(x_item), Some(y_item)) = (x_iter.next(), y_iter.next()) {
-        let cmp = cmp(x_item, y_item);
-        if cmp != std::cmp::Ordering::Equal {
-            return cmp;
+    use std::cmp::Ordering;
+    loop {
+        match (x_iter.next(), y_iter.next()) {
+            (Some(x_item), Some(y_item)) => match cmp(x_item, y_item) {
+                Ordering::Equal => continue,
+                other => return other,
+            },
+            (Some(_), None) => return Ordering::Greater,
+            (None, Some(_)) => return Ordering::Less,
+            (None, None) => return Ordering::Equal,
         }
     }
-
-    cmp_len()
 }
 
 fn val_discriminant(val: &Value) -> TypstValueEnum {
