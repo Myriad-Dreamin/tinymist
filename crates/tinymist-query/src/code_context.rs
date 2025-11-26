@@ -112,7 +112,20 @@ impl SemanticRequest for InteractCodeContextRequest {
         for query in self.query {
             responses.push(query.and_then(|query| match query {
                 InteractCodeContextQuery::PathAt { code, inputs: base } => {
-                    let res = eval_path_expr(ctx, &code, base)?;
+                    let res = eval_path_expr(ctx, &code, base)
+                        .and_then(|res| {
+                            QueryResult::success(res.map(|mut res| {
+                                res.edits = resolve_edits(ctx, res.edits);
+                                res
+                            }))
+                        })
+                        .and_then(|res| match serde_json::to_value(res) {
+                            Ok(value) => QueryResult::success(value),
+                            Err(e) => QueryResult::error(eco_format!(
+                                "failed to serialize script result: {e}"
+                            )),
+                        });
+                    // serde_json::Value
                     Some(InteractCodeContextResponse::PathAt(res))
                 }
                 InteractCodeContextQuery::ModeAt { position } => {
@@ -217,16 +230,29 @@ impl InteractCodeContextRequest {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PathAtOutput {
+    dir: PathBuf,
+    edits: Option<serde_json::Value>,
+}
+
+impl PathAtOutput {
+    fn dir(dir: PathBuf) -> Self {
+        Self { dir, edits: None }
+    }
+}
+
 fn eval_path_expr(
     ctx: &mut LocalContext,
     code: &str,
     inputs: Dict,
-) -> Option<QueryResult<serde_json::Value>> {
+) -> QueryResult<Option<PathAtOutput>> {
     let entry = ctx.world().entry_state();
     let path = if code.starts_with("{") && code.ends_with("}") {
-        let id = entry
-            .select_in_workspace(Path::new("/__path__.typ"))
-            .main()?;
+        let id = match entry.select_in_workspace(Path::new("/__path__.typ")).main() {
+            Some(id) => id,
+            None => return QueryResult::error("main file not found".into()),
+        };
 
         let inputs = make_sys(&entry, ctx.world().inputs(), inputs);
         let (inputs, root, dir, name) = match inputs {
@@ -262,17 +288,28 @@ fn eval_path_expr(
             let expr = match expr.cast::<ast::Code>() {
                 Some(v) => v,
                 None => bail!(
-                    "code is not a valid code expression: kind={:?}",
+                    "script is not a valid code expression: kind={:?}",
                     expr.kind()
                 ),
             };
             match expr.eval(vm) {
-                Ok(value) => serde_json::to_value(value).context_ut("failed to serialize path"),
+                Ok(value) => match value {
+                    Value::None => Ok(None),
+                    Value::Str(s) => Ok(Some(PathAtOutput::dir(PathBuf::from(s.as_str())))),
+                    value @ Value::Dict(..) => {
+                        let s = serde_json::to_value(value)
+                            .context_ut("failed to serialize script result")?;
+                        serde_json::from_value::<PathAtOutput>(s)
+                            .context_ut("failed to deserialize script result")
+                            .map(Some)
+                    }
+                    _ => bail!("script result is not a string or dictionary: {value:?}"),
+                },
                 Err(e) => {
                     let res =
                         print_diagnostics_to_string(&world, e.iter(), DiagnosticFormat::Human);
                     let err = res.unwrap_or_else(|e| e);
-                    bail!("failed to evaluate path expression: {err}")
+                    bail!("failed to evaluate script: {err}")
                 }
             }
         })
@@ -280,11 +317,17 @@ fn eval_path_expr(
         PathPattern::new(code)
             .substitute(&entry)
             .context_ut("failed to substitute path pattern")
-            .and_then(|path| {
-                serde_json::to_value(path.deref()).context_ut("failed to serialize path")
-            })
+            .map(|dir| Some(PathAtOutput::dir(dir.as_ref().to_owned())))
     };
-    Some(path.into())
+    path.into()
+}
+
+// todo: implement this
+fn resolve_edits(
+    _ctx: &mut LocalContext,
+    edits: Option<serde_json::Value>,
+) -> Option<serde_json::Value> {
+    edits
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -392,6 +435,17 @@ impl<T> QueryResult<T> {
     pub fn error(error: EcoString) -> Self {
         Self::Error { error }
     }
+
+    /// Applies a function to the value of a successful result.
+    pub fn and_then<U, F>(self, f: F) -> QueryResult<U>
+    where
+        F: FnOnce(T) -> QueryResult<U>,
+    {
+        match self {
+            QueryResult::Success { value } => f(value),
+            QueryResult::Error { error } => QueryResult::error(error),
+        }
+    }
 }
 
 impl<T, E: std::error::Error> From<Result<T, E>> for QueryResult<T> {
@@ -411,7 +465,7 @@ mod tests {
     use crate::tests::*;
 
     #[test]
-    fn test() {
+    fn path() {
         snapshot_testing("code_context_path_at", &|ctx, path| {
             let patterns = [
                 "$root/$dir/$name",
@@ -459,5 +513,84 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
+    }
+
+    #[test]
+    fn snippet() {
+        // type ModeEdit = string | {
+        //   kind: "by-mode";
+        //   math?: string;
+        //   markup?: string;
+        //   code?: string;
+        //   comment?: string;
+        //   string?: string;
+        //   raw?: string;
+        //   rest?: string;
+        // };
+
+        // export async function createModeEdit(edit: ModeEdit) {
+        //   const {
+        //     kind,
+        //     math,
+        //     comment,
+        //     markup,
+        //     code,
+        //     string: stringContent,
+        //     raw,
+        //     rest,
+        //   }: Record<string, string> = edit.newText;
+        //   const newText = kind === "by-mode" ? rest || "" : "";
+
+        //   const res = await vscode.commands.executeCommand<
+        //     [{ mode: "math" | "markup" | "code" | "comment" | "string" |
+        // "raw" }]   >("tinymist.interactCodeContext", {
+        //     textDocument: {
+        //       uri: activeDocument.uri.toString(),
+        //     },
+        //     query: [
+        //       {
+        //         kind: "modeAt",
+        //         position: {
+        //           line: selectionStart.line,
+        //           character: selectionStart.character,
+        //         },
+        //       },
+        //     ],
+        //   });
+
+        //   const mode = res[0].mode;
+
+        //   await editor.edit((editBuilder) => {
+        //     if (mode === "math") {
+        //       // todo: whether to keep stupid
+        //       // if it is before an identifier character, then add a space
+        //       let replaceText = math || newText;
+        //       const range = new vscode.Range(
+        //         selectionStart.with(undefined, selectionStart.character - 1),
+        //         selectionStart,
+        //       );
+        //       const before = selectionStart.character > 0 ?
+        // activeDocument.getText(range) : "";       if (before.match(/
+        // [\p{XID_Start}\p{XID_Continue}_]/u)) {         replaceText =
+        // ` ${math}`;       }
+
+        //       editBuilder.replace(selection, replaceText);
+        //     } else if (mode === "markup") {
+        //       editBuilder.replace(selection, markup || newText);
+        //     } else if (mode === "comment") {
+        //       editBuilder.replace(selection, comment || markup || newText);
+        //     } else if (mode === "string") {
+        //       editBuilder.replace(selection, stringContent || raw ||
+        // newText);     } else if (mode === "raw") {
+        //       editBuilder.replace(selection, raw || stringContent ||
+        // newText);     } else if (mode === "code") {
+        //       editBuilder.replace(selection, code || newText);
+        //     } else {
+        //       editBuilder.replace(selection, newText);
+        //     }
+        //   });
+        // }
+
+        todo!()
     }
 }
