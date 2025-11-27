@@ -5,7 +5,8 @@ const { div, h3, label, input, select, option, span, p } = van.tags;
 
 interface OptionsPanelProps {
   format: ExportFormat;
-  optionStates: Record<string, State<Scalar>>;
+  // optionStates values can be scalar, an array (for multi-select), or undefined
+  optionStates: Record<string, State<Scalar | Scalar[] | undefined>>;
 }
 
 export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
@@ -50,7 +51,7 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
   );
 };
 
-const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
+const OptionField = (schema: OptionSchema, valueState: State<Scalar | Scalar[] | undefined>) => {
   const { key, label: optionLabel, description } = schema;
   const validationError = van.state<string | undefined>();
 
@@ -67,7 +68,7 @@ const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
 
 const renderInput = (
   schema: OptionSchema,
-  valueState: State<Scalar | undefined>,
+  valueState: State<Scalar | Scalar[] | undefined>,
   validationError: State<string | undefined>,
 ) => {
   const { type, key, options: selectOptions, min, max } = schema;
@@ -139,6 +140,40 @@ const renderInput = (
 
     case "select":
       if (!selectOptions) return span("No options available");
+      // multi-select
+      if (schema.multiple) {
+        return select(
+          {
+            class: "select",
+            id: key,
+            multiple: true,
+            onchange: (e: Event) => {
+              const target = e.target as HTMLSelectElement;
+              const values = Array.from(target.selectedOptions).map((o) => o.value);
+              const resolved = values
+                .map((v) => selectOptions.find((opt) => opt.value.toString() === v))
+                .filter((o): o is { value: Scalar; label: string } => Boolean(o))
+                .map((opt) => opt.value);
+              valueState.val = resolved;
+            },
+          },
+          ...selectOptions.map((opt) =>
+            option(
+              {
+                value: opt.value.toString(),
+                selected: () =>
+                  Array.isArray(valueState.val) &&
+                  (valueState.val as Scalar[])
+                    .map((v) => v?.toString())
+                    .includes(opt.value.toString()),
+              },
+              opt.label,
+            ),
+          ),
+        );
+      }
+
+      // single-select
       return select(
         {
           class: "select",
