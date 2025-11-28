@@ -10,8 +10,11 @@ pub mod tables;
 
 pub use self::custom::CustomNode;
 pub use self::html::{HtmlAttribute, HtmlElement};
-pub use self::node::{CodeBlockType, HeadingType, ListItem, Node};
+pub use self::node::{
+    CodeBlockType, HeadingType, ListItem, Node, TableAlignment, TableCell, TableCellKind, TableRow,
+    TableRowKind,
+};
 
 // Re-export GFM specific types when the GFM feature is enabled
 #[cfg(feature = "gfm")]
-pub use self::node::{TableAlignment, TaskListStatus};
+pub use self::node::TaskListStatus;

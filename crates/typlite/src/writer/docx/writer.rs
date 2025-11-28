@@ -1,7 +1,9 @@
 //! DOCX document writer implementation
 
 use base64::Engine;
-use cmark_writer::ast::{ListItem, Node};
+use cmark_writer::ast::{
+    ListItem, Node, TableAlignment, TableCell as AstTableCell, TableRow as AstTableRow,
+};
 use docx_rs::*;
 use ecow::EcoString;
 use log::{debug, warn};
@@ -85,21 +87,14 @@ impl DocxWriter {
                     {
                         // Process the image
                         if let Ok(img_data) = fs::read(url.as_str()) {
-                            let alt_text = figure_node.caption.clone();
                             // Add the image with caption
-                            docx = self.image_processor.process_image_data(
-                                docx,
-                                &img_data,
-                                Some(&alt_text),
-                                None,
-                            );
+                            docx = self
+                                .image_processor
+                                .process_image_data(docx, &img_data, None, None);
 
-                            // Add caption as a separate paragraph with Caption style
-                            if !figure_node.caption.is_empty() {
-                                let caption_text = format!("Figure: {}", figure_node.caption);
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(caption_text));
+                            if let Some(caption_para) = self
+                                .build_caption_paragraph(Some("Figure: "), &figure_node.caption)?
+                            {
                                 docx = docx.add_paragraph(caption_para);
                             }
                         } else {
@@ -109,10 +104,9 @@ impl DocxWriter {
                             docx = docx.add_paragraph(para);
 
                             // Still add caption
-                            if !figure_node.caption.is_empty() {
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(&figure_node.caption));
+                            if let Some(caption_para) =
+                                self.build_caption_paragraph(None, &figure_node.caption)?
+                            {
                                 docx = docx.add_paragraph(caption_para);
                             }
                         }
@@ -126,11 +120,9 @@ impl DocxWriter {
                             docx = docx.add_paragraph(para);
                         }
 
-                        // Add caption as a separate paragraph
-                        if !figure_node.caption.is_empty() {
-                            let caption_para = Paragraph::new()
-                                .style("Caption")
-                                .add_run(Run::new().add_text(&figure_node.caption));
+                        if let Some(caption_para) =
+                            self.build_caption_paragraph(None, &figure_node.caption)?
+                        {
                             docx = docx.add_paragraph(caption_para);
                         }
                     }
@@ -141,11 +133,9 @@ impl DocxWriter {
                 // Process the content using standard node processing
                 docx = self.process_node(docx, &figure_node.body)?;
 
-                // Add caption as a separate paragraph
-                if !figure_node.caption.is_empty() {
-                    let caption_para = Paragraph::new()
-                        .style("Caption")
-                        .add_run(Run::new().add_text(&figure_node.caption));
+                if let Some(caption_para) =
+                    self.build_caption_paragraph(None, &figure_node.caption)?
+                {
                     docx = docx.add_paragraph(caption_para);
                 }
             }
@@ -265,6 +255,31 @@ impl DocxWriter {
         }
 
         Ok(run)
+    }
+
+    fn build_caption_paragraph(
+        &self,
+        prefix: Option<&str>,
+        nodes: &[Node],
+    ) -> Result<Option<Paragraph>> {
+        if nodes.is_empty() {
+            return Ok(None);
+        }
+
+        let mut para = Paragraph::new().style("Caption");
+
+        if let Some(prefix_text) = prefix {
+            para = para.add_run(Run::new().add_text(prefix_text));
+        }
+
+        for node in nodes {
+            let run = self.process_inline_to_run(Run::new(), node)?;
+            if !run.children.is_empty() {
+                para = para.add_run(run);
+            }
+        }
+
+        Ok(Some(para))
     }
 
     /// Process paragraph and add to document
@@ -426,11 +441,11 @@ impl DocxWriter {
                 docx = self.process_unordered_list(docx, items)?;
             }
             Node::Table {
-                headers,
+                columns,
                 rows,
-                alignments: _,
+                alignments,
             } => {
-                docx = self.process_table(docx, headers, rows)?;
+                docx = self.process_table(docx, *columns, rows, alignments)?;
             }
             Node::Image { url, title: _, alt } => {
                 docx = self.process_image(docx, url, alt)?;
@@ -625,67 +640,103 @@ impl DocxWriter {
     }
 
     /// Process table
-    fn process_table(&self, mut docx: Docx, headers: &[Node], rows: &[Vec<Node>]) -> Result<Docx> {
-        let mut table = Table::new(vec![]).style("Table");
-
-        // Process table headers
-        if !headers.is_empty() {
-            let mut cells = Vec::new();
-
-            for header_node in headers {
-                let mut table_cell = TableCell::new();
-                let mut para = Paragraph::new();
-
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, header_node)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
-                }
-
-                if !para.children.is_empty() {
-                    table_cell = table_cell.add_paragraph(para);
-                }
-
-                cells.push(table_cell);
-            }
-
-            if !cells.is_empty() {
-                let header_row = TableRow::new(cells);
-                table = table.add_row(header_row);
-            }
+    fn process_table(
+        &self,
+        mut docx: Docx,
+        columns: usize,
+        rows: &[AstTableRow],
+        alignments: &[TableAlignment],
+    ) -> Result<Docx> {
+        if rows.is_empty() || columns == 0 {
+            return Ok(docx);
         }
 
-        // Process table rows
+        let mut table = Table::new(vec![]).style("Table");
+        let mut vmerge = vec![0usize; columns];
+
         for row in rows {
             let mut cells = Vec::new();
+            let mut col_index = 0;
+            let mut cell_iter = row.cells.iter();
 
-            for cell_node in row {
-                let mut table_cell = TableCell::new();
-                let mut para = Paragraph::new();
-
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, cell_node)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
+            while col_index < columns {
+                if vmerge[col_index] > 0 {
+                    cells.push(TableCell::new().vertical_merge(VMergeType::Continue));
+                    vmerge[col_index] -= 1;
+                    col_index += 1;
+                    continue;
                 }
 
-                if !para.children.is_empty() {
-                    table_cell = table_cell.add_paragraph(para);
+                if let Some(cell) = cell_iter.next() {
+                    let mut effective_align = cell.align.clone();
+                    if effective_align.is_none() {
+                        if let Some(column_align) = alignments.get(col_index).cloned() {
+                            if !matches!(column_align, TableAlignment::None) {
+                                effective_align = Some(column_align);
+                            }
+                        }
+                    }
+
+                    let mut table_cell = self.build_table_cell(cell, effective_align)?;
+                    if cell.colspan > 1 {
+                        table_cell = table_cell.grid_span(cell.colspan);
+                    }
+                    if cell.rowspan > 1 {
+                        table_cell = table_cell.vertical_merge(VMergeType::Restart);
+                        for offset in 0..cell.colspan {
+                            if col_index + offset < columns {
+                                vmerge[col_index + offset] =
+                                    vmerge[col_index + offset].max(cell.rowspan - 1);
+                            }
+                        }
+                    }
+                    cells.push(table_cell);
+                    col_index += cell.colspan;
+                } else {
+                    cells.push(TableCell::new());
+                    col_index += 1;
                 }
-
-                cells.push(table_cell);
             }
 
-            if !cells.is_empty() {
-                let data_row = TableRow::new(cells);
-                table = table.add_row(data_row);
-            }
+            table = table.add_row(TableRow::new(cells));
         }
 
-        // Add table to document
         docx = docx.add_table(table);
-
         Ok(docx)
+    }
+
+    fn build_table_cell(
+        &self,
+        cell: &AstTableCell,
+        align: Option<TableAlignment>,
+    ) -> Result<TableCell> {
+        let mut table_cell = TableCell::new();
+        let mut para = Paragraph::new();
+
+        let run = Run::new();
+        let run = self.process_inline_to_run(run, &cell.content)?;
+        if !run.children.is_empty() {
+            para = para.add_run(run);
+        }
+
+        if let Some(alignment) = align.and_then(Self::map_table_alignment) {
+            para.property = para.property.clone().align(alignment);
+        }
+
+        if !para.children.is_empty() {
+            table_cell = table_cell.add_paragraph(para);
+        }
+
+        Ok(table_cell)
+    }
+
+    fn map_table_alignment(alignment: TableAlignment) -> Option<AlignmentType> {
+        match alignment {
+            TableAlignment::Left => Some(AlignmentType::Left),
+            TableAlignment::Center => Some(AlignmentType::Center),
+            TableAlignment::Right => Some(AlignmentType::Right),
+            TableAlignment::None => None,
+        }
     }
 
     /// Generate DOCX document

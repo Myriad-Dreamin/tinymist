@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1figure caption="Caption"><m1image src="./fig.svg" alt="Content"></m1image></m1figure></m1document></body>
+  <body><m1document><m1figure kind="image"><m1body><m1image source="./fig.svg" alt="Content" width="auto" height="auto"></m1image></m1body><m1caption><figcaption>Figure 1: Caption</figcaption></m1caption></m1figure></m1document></body>
 </html>
 
 =====
@@ -18,7 +18,11 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 <figure class="figure">
 
 <p><img src="./fig.svg" alt="Content" /></p>
+<figcaption>
 
+Figure 1: Caption
+
+</figcaption>
 
 </figure>
 

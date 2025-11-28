@@ -10,11 +10,14 @@ use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlEleme
 use cmark_writer::writer::InlineWriterProxy;
 use ecow::EcoString;
 use tinymist_project::LspWorld;
-use typst_html::{HtmlElement, HtmlNode, tag};
+use typst_html::{HtmlElement, HtmlNode, HtmlTag, tag};
 
 use crate::Result;
 use crate::TypliteFeat;
-use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
+use crate::attributes::{
+    AlertsAttr, EnumAttr, EquationAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr,
+    TypliteAttrsParser, md_attr,
+};
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
 use crate::tags::md_tag;
@@ -29,6 +32,7 @@ pub struct HtmlToAstParser {
     pub list_level: usize,
     pub blocks: Vec<Node>,
     pub inline_buffer: Vec<Node>,
+    pub element_stack: Vec<HtmlTag>,
     pub(crate) warnings: WarningCollector,
 }
 
@@ -45,6 +49,7 @@ impl HtmlToAstParser {
             list_level: 0,
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
+            element_stack: Vec::new(),
             warnings,
         }
     }
@@ -65,11 +70,17 @@ impl HtmlToAstParser {
 
             tag::strong | md_tag::strong => self.convert_strong(element),
             tag::em | md_tag::emph => self.convert_emphasis(element),
-            tag::mark => self.convert_highlight(element),
-            tag::s => self.convert_strikethrough(element),
+            tag::mark | md_tag::highlight => self.convert_highlight(element),
+            tag::s | md_tag::strike => self.convert_strikethrough(element),
 
             tag::br => {
                 self.inline_buffer.push(Node::HardBreak);
+                Ok(())
+            }
+
+            md_tag::pagebreak => {
+                self.flush_inline_buffer();
+                self.blocks.push(Node::ThematicBreak);
                 Ok(())
             }
 
@@ -92,6 +103,29 @@ impl HtmlToAstParser {
 
             md_tag::parbreak => {
                 self.flush_inline_buffer();
+                Ok(())
+            }
+
+            md_tag::list => {
+                self.flush_inline_buffer();
+                let attrs = ListAttr::parse(&element.attrs)?;
+                let node = ListParser::convert_m1_list(self, element, &attrs)?;
+                self.blocks.push(node);
+                Ok(())
+            }
+
+            md_tag::r#enum => {
+                self.flush_inline_buffer();
+                let attrs = EnumAttr::parse(&element.attrs)?;
+                let node = ListParser::convert_m1_enum(self, element, &attrs)?;
+                self.blocks.push(node);
+                Ok(())
+            }
+
+            md_tag::terms => {
+                self.flush_inline_buffer();
+                let attrs = TermsAttr::parse(&element.attrs)?;
+                self.convert_terms(element, &attrs)?;
                 Ok(())
             }
 
@@ -171,6 +205,8 @@ impl HtmlToAstParser {
                 }
                 Ok(())
             }
+
+            md_tag::equation => self.convert_equation(element),
 
             md_tag::alerts => {
                 self.flush_inline_buffer();
@@ -265,7 +301,7 @@ impl HtmlToAstParser {
         }
     }
 
-    pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
+    fn convert_children_impl(&mut self, element: &HtmlElement) -> Result<()> {
         for child in &element.children {
             match child {
                 HtmlNode::Text(text, _) => {
@@ -282,6 +318,13 @@ impl HtmlToAstParser {
             }
         }
         Ok(())
+    }
+
+    pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
+        self.element_stack.push(element.tag);
+        let result = self.convert_children_impl(element);
+        self.element_stack.pop();
+        result
     }
 
     pub fn convert_children_into(
@@ -312,6 +355,7 @@ impl HtmlToAstParser {
         Ok((inline, blocks))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn warn_at(&mut self, span: Option<Span>, message: EcoString) {
         let span = span.unwrap_or_else(Span::detached);
         let span = self
@@ -367,6 +411,55 @@ impl CustomNode for Comment {
 }
 
 impl HtmlToAstParser {
+    pub fn convert_terms(&mut self, element: &HtmlElement, _attrs: &TermsAttr) -> Result<()> {
+        for child in &element.children {
+            if let HtmlNode::Element(item) = child
+                && item.tag == md_tag::item
+            {
+                let mut term_nodes = Vec::new();
+                let mut desc_nodes = Vec::new();
+
+                for part in &item.children {
+                    if let HtmlNode::Element(part_elem) = part {
+                        if part_elem.tag == md_tag::term_entry {
+                            self.convert_children_into(&mut term_nodes, part_elem)?;
+                        } else if part_elem.tag.resolve().as_str() == "m1description" {
+                            self.convert_children_into(&mut desc_nodes, part_elem)?;
+                        }
+                    }
+                }
+
+                if term_nodes.is_empty() && desc_nodes.is_empty() {
+                    continue;
+                }
+
+                let mut paragraph = Vec::new();
+                if !term_nodes.is_empty() {
+                    paragraph.push(Node::Strong(term_nodes));
+                    paragraph.push(Node::Text(EcoString::from(": ")));
+                }
+                paragraph.extend(desc_nodes);
+                self.blocks.push(Node::Paragraph(paragraph));
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn convert_equation(&mut self, element: &HtmlElement) -> Result<()> {
+        let attrs = EquationAttr::parse(&element.attrs)?;
+        if attrs.block {
+            self.flush_inline_buffer();
+            self.convert_children(element)?;
+            let content = std::mem::take(&mut self.inline_buffer);
+            self.blocks
+                .push(Node::Custom(Box::new(CenterNode::new(content))));
+        } else {
+            self.convert_children(element)?;
+        }
+        Ok(())
+    }
+
     pub fn is_block_element(element: &HtmlElement) -> bool {
         matches!(
             element.tag,
@@ -409,6 +502,18 @@ impl HtmlToAstParser {
             } else {
                 return Ok(vec![Node::OrderedList { start: 1, items }]);
             }
+        }
+
+        if element.tag == md_tag::list {
+            let attrs = ListAttr::parse(&element.attrs)?;
+            let node = super::list::ListParser::convert_m1_list(self, element, &attrs)?;
+            return Ok(vec![node]);
+        }
+
+        if element.tag == md_tag::r#enum {
+            let attrs = EnumAttr::parse(&element.attrs)?;
+            let node = super::list::ListParser::convert_m1_enum(self, element, &attrs)?;
+            return Ok(vec![node]);
         }
 
         let prev_blocks = std::mem::take(&mut self.blocks);

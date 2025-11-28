@@ -1,6 +1,6 @@
-#[cfg(feature = "gfm")]
-use crate::ast::TableAlignment;
-use crate::ast::{CodeBlockType, CustomNode, HeadingType, ListItem, Node};
+use crate::ast::{
+    CodeBlockType, CustomNode, HeadingType, ListItem, Node, TableAlignment, TableRow,
+};
 use crate::error::{WriteError, WriteResult};
 use crate::options::WriterOptions;
 use crate::writer::runtime::diagnostics::{Diagnostic, DiagnosticSink, NullSink};
@@ -241,19 +241,13 @@ impl NodeHandler for CommonMarkWriter {
         self.write_ordered_list(start, items)
     }
 
-    #[cfg(feature = "gfm")]
     fn table(
         &mut self,
-        headers: &[Node],
+        columns: usize,
+        rows: &[TableRow],
         alignments: &[TableAlignment],
-        rows: &[Vec<Node>],
     ) -> WriteResult<()> {
-        self.write_table_with_alignment(headers, alignments, rows)
-    }
-
-    #[cfg(not(feature = "gfm"))]
-    fn table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> WriteResult<()> {
-        self.write_table(headers, rows)
+        self.write_table_with_alignment(columns, alignments, rows)
     }
 
     fn link(
