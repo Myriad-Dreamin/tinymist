@@ -25,8 +25,7 @@ pub enum HeadingType {
     Setext,
 }
 
-/// Table column alignment options for GFM tables
-#[cfg(feature = "gfm")]
+/// Table column alignment options for tables
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum TableAlignment {
     /// Left alignment (default)
@@ -38,6 +37,63 @@ pub enum TableAlignment {
     Right,
     /// No specific alignment specified
     None,
+}
+
+/// Row classification for structured tables.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableRowKind {
+    /// Header rows rendered inside `<thead>`.
+    Head,
+    /// Body rows rendered inside `<tbody>`.
+    Body,
+    /// Footer rows rendered inside `<tfoot>`.
+    Foot,
+}
+
+/// Cell classification for structured tables.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TableCellKind {
+    /// Header cell rendered as `<th>`.
+    Header,
+    /// Data cell rendered as `<td>`.
+    Data,
+}
+
+/// Represents a single table cell with optional spans.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableCell {
+    /// Cell classification.
+    pub kind: TableCellKind,
+    /// Horizontal span (defaults to 1).
+    pub colspan: usize,
+    /// Vertical span (defaults to 1).
+    pub rowspan: usize,
+    /// Cell content.
+    pub content: Node,
+    /// Optional cell alignment override.
+    pub align: Option<TableAlignment>,
+}
+
+impl TableCell {
+    /// Creates a new cell with the given kind and content.
+    pub fn new(kind: TableCellKind, content: Node) -> Self {
+        Self {
+            kind,
+            colspan: 1,
+            rowspan: 1,
+            content,
+            align: None,
+        }
+    }
+}
+
+/// Represents a logical row inside a table.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TableRow {
+    /// Row classification.
+    pub kind: TableRowKind,
+    /// Row cells.
+    pub cells: Vec<TableCell>,
 }
 
 /// Task list item status for GFM task lists
@@ -123,13 +179,12 @@ pub enum Node {
 
     /// Table (extension to CommonMark)
     Table {
-        /// Header cells
-        headers: Vec<Node>,
+        /// Total number of columns in the logical grid
+        columns: usize,
+        /// Table rows in visual order
+        rows: Vec<TableRow>,
         /// Column alignments for the table
-        #[cfg(feature = "gfm")]
         alignments: Vec<TableAlignment>,
-        /// Table rows, each row containing multiple cells
-        rows: Vec<Vec<Node>>,
     },
 
     // Inlines
@@ -355,22 +410,21 @@ impl Node {
     /// Create a table with alignment
     ///
     /// # Arguments
-    /// * `headers` - Table header cells
+    /// * `columns` - Column count
     /// * `alignments` - Column alignments
     /// * `rows` - Table rows
     ///
     /// # Returns
     /// A new table node with alignment information
-    #[cfg(feature = "gfm")]
     pub fn table_with_alignment(
-        headers: Vec<Node>,
+        columns: usize,
+        rows: Vec<TableRow>,
         alignments: Vec<TableAlignment>,
-        rows: Vec<Vec<Node>>,
     ) -> Self {
         Node::Table {
-            headers,
-            alignments,
             rows,
+            columns,
+            alignments,
         }
     }
     /// Check if a custom node is of a specific type, and return a reference to that type

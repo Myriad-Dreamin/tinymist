@@ -1,7 +1,7 @@
 use super::{HtmlWriteError, HtmlWriteResult, HtmlWriterOptions};
-#[cfg(feature = "gfm")]
-use crate::ast::TableAlignment;
-use crate::ast::{CodeBlockType, CustomNode, HeadingType, HtmlElement, ListItem, Node};
+use crate::ast::{
+    CodeBlockType, CustomNode, HeadingType, HtmlElement, ListItem, Node, TableAlignment, TableRow,
+};
 use crate::writer::runtime::diagnostics::{Diagnostic, DiagnosticSink, NullSink};
 use crate::writer::runtime::visitor::{walk_node, NodeHandler};
 use ecow::EcoString;
@@ -409,19 +409,13 @@ impl NodeHandler for HtmlWriter {
         self.write_ordered_list(start, items)
     }
 
-    #[cfg(feature = "gfm")]
     fn table(
         &mut self,
-        headers: &[Node],
+        columns: usize,
+        rows: &[TableRow],
         alignments: &[TableAlignment],
-        rows: &[Vec<Node>],
     ) -> HtmlWriteResult<()> {
-        self.write_table(headers, alignments, rows)
-    }
-
-    #[cfg(not(feature = "gfm"))]
-    fn table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> HtmlWriteResult<()> {
-        self.write_table(headers, rows)
+        self.write_table(columns, rows, alignments)
     }
 
     fn link(

@@ -2,9 +2,11 @@ use ecow::EcoString;
 
 use super::super::core::GuardedHtmlElement;
 use super::super::{HtmlWriteResult, HtmlWriter};
-use crate::ast::{HtmlElement, ListItem, Node};
 #[cfg(feature = "gfm")]
-use crate::ast::{TableAlignment, TaskListStatus};
+use crate::ast::TaskListStatus;
+use crate::ast::{
+    HtmlElement, ListItem, Node, TableAlignment, TableCellKind, TableRow, TableRowKind,
+};
 
 impl HtmlWriter {
     pub(crate) fn write_document(&mut self, children: &[Node]) -> HtmlWriteResult<()> {
@@ -228,162 +230,119 @@ impl HtmlWriter {
         Ok(())
     }
 
-    #[cfg(feature = "gfm")]
     pub(crate) fn write_table(
         &mut self,
-        headers: &[Node],
+        _columns: usize,
+        rows: &[TableRow],
         alignments: &[TableAlignment],
-        rows: &[Vec<Node>],
     ) -> HtmlWriteResult<()> {
-        self.render_table(headers, Some(alignments), rows)
+        self.render_table(rows, alignments)
     }
 
-    #[cfg(not(feature = "gfm"))]
-    pub(crate) fn write_table(
-        &mut self,
-        headers: &[Node],
-        rows: &[Vec<Node>],
-    ) -> HtmlWriteResult<()> {
-        self.render_table(headers, rows)
-    }
-
-    #[cfg(feature = "gfm")]
     fn render_table(
         &mut self,
-        headers: &[Node],
-        alignments: Option<&[TableAlignment]>,
-        rows: &[Vec<Node>],
+        rows: &[TableRow],
+        alignments: &[TableAlignment],
     ) -> HtmlWriteResult<()> {
         self.start_tag("table")?;
         self.finish_tag()?;
         self.write_trusted_html("\n")?;
 
-        self.start_tag("thead")?;
-        self.finish_tag()?;
-        self.write_trusted_html("\n")?;
-        self.start_tag("tr")?;
-        self.finish_tag()?;
-        self.write_trusted_html("\n")?;
+        let (head_rows, body_rows, foot_rows) = Self::partition_rows(rows);
 
-        let align_iter = alignments;
-
-        for (col_index, header_cell) in headers.iter().enumerate() {
-            self.start_tag("th")?;
-            if let Some(alignments) = align_iter {
-                if self.options.enable_gfm && col_index < alignments.len() {
-                    match alignments[col_index] {
-                        TableAlignment::Left => self.attribute("style", "text-align: left;")?,
-                        TableAlignment::Center => self.attribute("style", "text-align: center;")?,
-                        TableAlignment::Right => self.attribute("style", "text-align: right;")?,
-                        TableAlignment::None => {}
-                    }
-                }
-            }
+        if !head_rows.is_empty() {
+            self.start_tag("thead")?;
             self.finish_tag()?;
-            self.write_node(header_cell)?;
-            self.end_tag("th")?;
+            self.write_trusted_html("\n")?;
+            for row in head_rows {
+                self.write_table_row(row, alignments)?;
+            }
+            self.end_tag("thead")?;
             self.write_trusted_html("\n")?;
         }
-
-        self.end_tag("tr")?;
-        self.write_trusted_html("\n")?;
-        self.end_tag("thead")?;
-        self.write_trusted_html("\n")?;
 
         self.start_tag("tbody")?;
         self.finish_tag()?;
         self.write_trusted_html("\n")?;
+        for row in body_rows {
+            self.write_table_row(row, alignments)?;
+        }
+        self.end_tag("tbody")?;
+        self.write_trusted_html("\n")?;
 
-        for row_cells in rows {
-            self.start_tag("tr")?;
+        if !foot_rows.is_empty() {
+            self.start_tag("tfoot")?;
             self.finish_tag()?;
             self.write_trusted_html("\n")?;
-
-            for (col_index, cell) in row_cells.iter().enumerate() {
-                self.start_tag("td")?;
-                if let Some(alignments) = align_iter {
-                    if self.options.enable_gfm && col_index < alignments.len() {
-                        match alignments[col_index] {
-                            TableAlignment::Left => self.attribute("style", "text-align: left;")?,
-                            TableAlignment::Center => {
-                                self.attribute("style", "text-align: center;")?
-                            }
-                            TableAlignment::Right => {
-                                self.attribute("style", "text-align: right;")?
-                            }
-                            TableAlignment::None => {}
-                        }
-                    }
-                }
-                self.finish_tag()?;
-                self.buffer.push_str("\n\n");
-                self.write_node(cell)?;
-                self.buffer.push_str("\n\n");
-                self.end_tag("td")?;
-                self.write_trusted_html("\n")?;
+            for row in foot_rows {
+                self.write_table_row(row, alignments)?;
             }
-            self.end_tag("tr")?;
+            self.end_tag("tfoot")?;
             self.write_trusted_html("\n")?;
         }
 
-        self.end_tag("tbody")?;
-        self.write_trusted_html("\n")?;
         self.end_tag("table")?;
         self.write_trusted_html("\n")?;
         Ok(())
     }
-    #[cfg(not(feature = "gfm"))]
-    fn render_table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> HtmlWriteResult<()> {
-        self.start_tag("table")?;
-        self.finish_tag()?;
-        self.write_trusted_html("\n")?;
 
-        self.start_tag("thead")?;
-        self.finish_tag()?;
-        self.write_trusted_html("\n")?;
+    fn partition_rows(
+        rows: &[TableRow],
+    ) -> (&[TableRow], &[TableRow], &[TableRow]) {
+        let mut head_end = 0;
+        while head_end < rows.len() && matches!(rows[head_end].kind, TableRowKind::Head) {
+            head_end += 1;
+        }
+
+        let mut foot_start = rows.len();
+        while foot_start > head_end && matches!(rows[foot_start - 1].kind, TableRowKind::Foot) {
+            foot_start -= 1;
+        }
+
+        let head = &rows[..head_end];
+        let body = &rows[head_end..foot_start];
+        let foot = &rows[foot_start..];
+        (head, body, foot)
+    }
+
+    fn write_table_row(
+        &mut self,
+        row: &TableRow,
+        alignments: &[TableAlignment],
+    ) -> HtmlWriteResult<()> {
         self.start_tag("tr")?;
         self.finish_tag()?;
         self.write_trusted_html("\n")?;
 
-        for header_cell in headers.iter() {
-            self.start_tag("th")?;
+        for (col_index, cell) in row.cells.iter().enumerate() {
+            let tag = match cell.kind {
+                TableCellKind::Header => "th",
+                TableCellKind::Data => "td",
+            };
+            self.start_tag(tag)?;
+            if cell.colspan > 1 {
+                self.attribute("colspan", &cell.colspan.to_string())?;
+            }
+            if cell.rowspan > 1 {
+                self.attribute("rowspan", &cell.rowspan.to_string())?;
+            }
+            if let Some(effective) = cell.align.as_ref().or_else(|| alignments.get(col_index)) {
+                match effective {
+                    TableAlignment::Left => self.attribute("style", "text-align: left;")?,
+                    TableAlignment::Center => self.attribute("style", "text-align: center;")?,
+                    TableAlignment::Right => self.attribute("style", "text-align: right;")?,
+                    TableAlignment::None => {}
+                }
+            }
             self.finish_tag()?;
-            self.write_node(header_cell)?;
-            self.end_tag("th")?;
+            self.buffer.push_str("\n\n");
+            self.write_node(&cell.content)?;
+            self.buffer.push_str("\n\n");
+            self.end_tag(tag)?;
             self.write_trusted_html("\n")?;
         }
 
         self.end_tag("tr")?;
-        self.write_trusted_html("\n")?;
-        self.end_tag("thead")?;
-        self.write_trusted_html("\n")?;
-
-        self.start_tag("tbody")?;
-        self.finish_tag()?;
-        self.write_trusted_html("\n")?;
-
-        for row_cells in rows {
-            self.start_tag("tr")?;
-            self.finish_tag()?;
-            self.write_trusted_html("\n")?;
-
-            for cell in row_cells.iter() {
-                self.start_tag("td")?;
-                self.finish_tag()?;
-                self.buffer.push_str("\n\n");
-                self.write_node(cell)?;
-                self.buffer.push_str("\n\n");
-                self.end_tag("td")?;
-                self.write_trusted_html("\n")?;
-            }
-
-            self.end_tag("tr")?;
-            self.write_trusted_html("\n")?;
-        }
-
-        self.end_tag("tbody")?;
-        self.write_trusted_html("\n")?;
-        self.end_tag("table")?;
         self.write_trusted_html("\n")?;
         Ok(())
     }

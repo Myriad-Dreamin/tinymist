@@ -1,4 +1,4 @@
-use crate::ast::Node;
+use crate::ast::{Node, TableRow};
 
 /// Check if the inline node contains a newline character recursively.
 pub(crate) fn node_contains_newline(node: &Node) -> bool {
@@ -19,12 +19,9 @@ pub(crate) fn node_contains_newline(node: &Node) -> bool {
 }
 
 /// Check if a table contains any block-level elements in headers or cells.
-pub(crate) fn table_contains_block_elements(headers: &[Node], rows: &[Vec<Node>]) -> bool {
-    if headers.iter().any(Node::is_block) {
-        return true;
-    }
-
-    rows.iter().any(|row| row.iter().any(Node::is_block))
+pub(crate) fn table_contains_block_elements(rows: &[TableRow]) -> bool {
+    rows.iter()
+        .any(|row| row.cells.iter().any(|cell| cell.content.is_block()))
 }
 
 /// Escapes a string using the specified escaping strategy.

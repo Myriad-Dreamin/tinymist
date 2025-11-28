@@ -3,7 +3,7 @@
 //! This module provides utilities for working with tables in CommonMark and GitHub Flavored Markdown.
 //! When the `gfm` feature is enabled, additional alignment functionality is available.
 
-use super::Node;
+use super::{Node, TableCell, TableCellKind, TableRow, TableRowKind};
 
 /// Table builder for creating tables with customized content
 ///
@@ -15,9 +15,38 @@ pub struct TableBuilder {
     headers: Vec<Node>,
     /// Table rows, each containing multiple cells
     rows: Vec<Vec<Node>>,
-    #[cfg(feature = "gfm")]
+    /// Explicit column count
+    columns: Option<usize>,
     /// Column alignments (left, center, right, or none)
     alignments: Vec<super::TableAlignment>,
+}
+
+fn convert_rows(headers: Vec<Node>, rows: Vec<Vec<Node>>) -> Vec<TableRow> {
+    let mut result = Vec::new();
+
+    if !headers.is_empty() {
+        let cells = headers
+            .into_iter()
+            .map(|node| TableCell::new(TableCellKind::Header, node))
+            .collect();
+        result.push(TableRow {
+            kind: TableRowKind::Head,
+            cells,
+        });
+    }
+
+    for row in rows {
+        let cells = row
+            .into_iter()
+            .map(|node| TableCell::new(TableCellKind::Data, node))
+            .collect();
+        result.push(TableRow {
+            kind: TableRowKind::Body,
+            cells,
+        });
+    }
+
+    result
 }
 
 impl TableBuilder {
@@ -26,7 +55,7 @@ impl TableBuilder {
         Self {
             headers: Vec::new(),
             rows: Vec::new(),
-            #[cfg(feature = "gfm")]
+            columns: None,
             alignments: Vec::new(),
         }
     }
@@ -58,28 +87,42 @@ impl TableBuilder {
         self
     }
 
-    /// Builds the final table node
-    ///
-    /// # Returns
-    /// A Node::Table with the specified headers and rows
-    #[cfg(not(feature = "gfm"))]
-    pub fn build(self) -> Node {
-        Node::Table {
-            headers: self.headers,
-            rows: self.rows,
-        }
+    /// Sets the total number of columns for the table.
+    pub fn columns(mut self, columns: usize) -> Self {
+        self.columns = Some(columns.max(1));
+        self
     }
 
     /// Builds the final table node with alignment information
     ///
     /// # Returns
     /// A Node::Table with the specified headers, alignments, and rows
-    #[cfg(feature = "gfm")]
     pub fn build(self) -> Node {
+        let TableBuilder {
+            headers,
+            rows,
+            columns,
+            alignments,
+        } = self;
+
+        let rows = convert_rows(headers, rows);
+        let columns = columns
+            .unwrap_or_else(|| rows.first().map(|row| row.cells.len()).unwrap_or(0))
+            .max(1);
+        let mut alignments = if alignments.is_empty() {
+            vec![super::TableAlignment::None; columns]
+        } else {
+            alignments
+        };
+        if alignments.len() < columns {
+            alignments.resize(columns, super::TableAlignment::None);
+        } else if alignments.len() > columns {
+            alignments.truncate(columns);
+        }
         Node::Table {
-            headers: self.headers,
-            alignments: self.alignments,
-            rows: self.rows,
+            columns,
+            rows,
+            alignments,
         }
     }
 
@@ -87,7 +130,6 @@ impl TableBuilder {
     ///
     /// # Arguments
     /// * `alignment` - Alignment to apply to all columns
-    #[cfg(feature = "gfm")]
     pub fn align_all(mut self, alignment: super::TableAlignment) -> Self {
         self.alignments = vec![alignment; self.headers.len().max(1)];
         self
@@ -98,7 +140,6 @@ impl TableBuilder {
     /// # Arguments
     /// * `column` - Zero-based column index
     /// * `alignment` - Alignment to apply to the column
-    #[cfg(feature = "gfm")]
     pub fn align_column(mut self, column: usize, alignment: super::TableAlignment) -> Self {
         if column >= self.alignments.len() {
             self.alignments
@@ -112,7 +153,6 @@ impl TableBuilder {
     ///
     /// # Arguments
     /// * `alignments` - Vector of alignments, one for each column
-    #[cfg(feature = "gfm")]
     pub fn alignments(mut self, alignments: Vec<super::TableAlignment>) -> Self {
         self.alignments = alignments;
         self
