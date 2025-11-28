@@ -267,7 +267,7 @@ impl TableParser {
 
     fn parse_cell_alignment(value: Option<&EcoString>) -> Option<TableAlignment> {
         value
-            .map(|val| Self::parse_alignment_token(val))
+            .map(Self::parse_alignment_token)
             .filter(|align| !matches!(align, TableAlignment::None))
     }
 
