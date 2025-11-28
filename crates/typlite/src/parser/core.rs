@@ -15,7 +15,8 @@ use typst_html::{HtmlElement, HtmlNode, HtmlTag, tag};
 use crate::Result;
 use crate::TypliteFeat;
 use crate::attributes::{
-    AlertsAttr, EnumAttr, EquationAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr, TypliteAttrsParser, md_attr,
+    AlertsAttr, EnumAttr, EquationAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr,
+    TypliteAttrsParser, md_attr,
 };
 use crate::common::{AlertNode, CenterNode, VerbatimNode};
 use crate::diagnostics::WarningCollector;
@@ -354,6 +355,7 @@ impl HtmlToAstParser {
         Ok((inline, blocks))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn warn_at(&mut self, span: Option<Span>, message: EcoString) {
         let span = span.unwrap_or_else(Span::detached);
         let span = self

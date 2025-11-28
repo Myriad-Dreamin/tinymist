@@ -41,6 +41,9 @@ pub mod md_attr {
         reversed -> reversed
         start -> start
         columns -> columns
+        align -> align
+        colspan -> colspan
+        rowspan -> rowspan
         numbering -> numbering
         target -> target
         supplement -> supplement
@@ -127,6 +130,14 @@ pub struct AlertsAttr {
 #[derive(TypliteAttr, Default)]
 pub struct TableAttr {
     pub columns: Option<usize>,
+    pub align: Option<EcoString>,
+}
+
+#[derive(TypliteAttr, Default)]
+pub struct TableCellAttr {
+    pub colspan: Option<usize>,
+    pub rowspan: Option<usize>,
+    pub align: Option<EcoString>,
 }
 
 pub trait TypliteAttrsParser {

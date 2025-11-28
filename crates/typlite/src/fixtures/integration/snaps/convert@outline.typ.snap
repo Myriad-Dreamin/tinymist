@@ -1,5 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
+assertion_line: 19
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/outline.typ
 ---
@@ -24,7 +25,7 @@ namespace MyApplication
             return new List<int>(new int[] { 1, 2, 3 })
         }
     }
-}" block="true" lang="cs"></m1raw><m1parbreak></m1parbreak><p>Math inline: <span><m1equation block>redacted-frame</m1equation></span> and block:</p><m1equation block="true">redacted-frame</m1equation><m1parbreak></m1parbreak><m1list tight="true"><m1item>First item</m1item><m1item><p>Second item</p><m1enum reversed start="auto" tight="true"><m1item value>First sub-item</m1item><m1item value><p>Second sub-item</p><m1list tight="true"><m1item>First sub-sub-item</m1item></m1list></m1item></m1enum></m1item></m1list><m1parbreak></m1parbreak><m1terms tight="true"><m1item><m1term>First term</m1term><m1description>First definition</m1description></m1item></m1terms><m1parbreak></m1parbreak><m1table><table><tr><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td></tr></table></m1table></m1document></body>
+}" block="true" lang="cs"></m1raw><m1parbreak></m1parbreak><p>Math inline: <span><m1equation block>redacted-frame</m1equation></span> and block:</p><m1equation block="true">redacted-frame</m1equation><m1parbreak></m1parbreak><m1list tight="true"><m1item>First item</m1item><m1item><p>Second item</p><m1enum reversed start="auto" tight="true"><m1item value>First sub-item</m1item><m1item value><p>Second sub-item</p><m1list tight="true"><m1item>First sub-sub-item</m1item></m1list></m1item></m1enum></m1item></m1list><m1parbreak></m1parbreak><m1terms tight="true"><m1item><m1term>First term</m1term><m1description>First definition</m1description></m1item></m1terms><m1parbreak></m1parbreak><m1table columns="20" align="auto"><m1cell colspan="1" rowspan="1" align="auto">0</m1cell><m1cell colspan="1" rowspan="1" align="auto">1</m1cell><m1cell colspan="1" rowspan="1" align="auto">2</m1cell><m1cell colspan="1" rowspan="1" align="auto">3</m1cell><m1cell colspan="1" rowspan="1" align="auto">4</m1cell><m1cell colspan="1" rowspan="1" align="auto">5</m1cell><m1cell colspan="1" rowspan="1" align="auto">6</m1cell><m1cell colspan="1" rowspan="1" align="auto">7</m1cell><m1cell colspan="1" rowspan="1" align="auto">8</m1cell><m1cell colspan="1" rowspan="1" align="auto">9</m1cell><m1cell colspan="1" rowspan="1" align="auto">10</m1cell><m1cell colspan="1" rowspan="1" align="auto">11</m1cell><m1cell colspan="1" rowspan="1" align="auto">12</m1cell><m1cell colspan="1" rowspan="1" align="auto">13</m1cell><m1cell colspan="1" rowspan="1" align="auto">14</m1cell><m1cell colspan="1" rowspan="1" align="auto">15</m1cell><m1cell colspan="1" rowspan="1" align="auto">16</m1cell><m1cell colspan="1" rowspan="1" align="auto">17</m1cell><m1cell colspan="1" rowspan="1" align="auto">18</m1cell><m1cell colspan="1" rowspan="1" align="auto">19</m1cell></m1table></m1document></body>
 </html>
 
 =====

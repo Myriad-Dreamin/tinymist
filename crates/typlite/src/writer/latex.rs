@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use cmark_writer::ast::Node;
+use cmark_writer::ast::{Node, TableAlignment};
 use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
@@ -160,49 +160,46 @@ impl LaTeXWriter {
                 self.list_state = previous_state;
             }
             Node::Table {
-                headers,
-                rows,
-                alignments: _,
+                rows, alignments, ..
             } => {
-                // Calculate column count
-                let col_count = headers
-                    .len()
-                    .max(rows.iter().map(|row| row.len()).max().unwrap_or(0));
+                if rows.is_empty() {
+                    return Ok(());
+                }
+                let header = &rows[0];
+                let col_count = header.cells.len();
 
                 output.push_str("\\begin{table}[htbp]\n");
                 output.push_str("\\centering\n");
                 output.push_str("\\begin{tabular}{");
-
-                // Add column format (centered alignment)
-                for _ in 0..col_count {
-                    output.push('c');
+                for idx in 0..col_count {
+                    let spec = match alignments.get(idx).unwrap_or(&TableAlignment::Center) {
+                        TableAlignment::Left => 'l',
+                        TableAlignment::Right => 'r',
+                        _ => 'c',
+                    };
+                    output.push(spec);
                 }
-                output.push_str("}\n\\hline\n");
+                output.push_str("}\n");
 
-                // Process header
-                if !headers.is_empty() {
-                    for (i, cell) in headers.iter().enumerate() {
-                        if i > 0 {
-                            output.push_str(" & ");
-                        }
-                        self.write_node(cell, output)?;
+                // Write header row
+                for (i, cell) in header.cells.iter().enumerate() {
+                    if i > 0 {
+                        output.push_str(" & ");
                     }
-                    output.push_str(" \\\\\n\\hline\n");
+                    self.write_node(&cell.content, output)?;
                 }
+                output.push_str(" \\\\\n");
 
-                // Process all rows
-                for row in rows {
-                    for (i, cell) in row.iter().enumerate() {
+                for row in rows.iter().skip(1) {
+                    for (i, cell) in row.cells.iter().enumerate() {
                         if i > 0 {
                             output.push_str(" & ");
                         }
-                        self.write_node(cell, output)?;
+                        self.write_node(&cell.content, output)?;
                     }
                     output.push_str(" \\\\\n");
                 }
 
-                // Close table environment
-                output.push_str("\\hline\n");
                 output.push_str("\\end{tabular}\n");
                 output.push_str("\\end{table}\n\n");
             }
@@ -482,7 +479,7 @@ impl LaTeXWriter {
         for _ in 0..col_count {
             output.push('c');
         }
-        output.push_str("}\n\\hline\n");
+        output.push_str("}\n");
 
         // Write headers
         for header_row in &headers {
@@ -492,7 +489,7 @@ impl LaTeXWriter {
                 }
                 self.write_inline_nodes(cell_nodes, output)?;
             }
-            output.push_str(" \\\\\n\\hline\n");
+            output.push_str(" \\\\\n");
         }
 
         // Write rows
@@ -506,7 +503,6 @@ impl LaTeXWriter {
             output.push_str(" \\\\\n");
         }
 
-        output.push_str("\\hline\n");
         output.push_str("\\end{tabular}\n");
         output.push_str("\\end{table}\n\n");
 

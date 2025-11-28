@@ -29,6 +29,8 @@
             }
           }
           bytes-to-hex(v)
+        } else if type(v) == alignment {
+          repr(v)
         } else { str(v) }
       },
     ))
@@ -117,10 +119,12 @@
     attributed(repr(x.first()), x.last()),
   )),
   (
-    raw,
-    it => if it.block { elem("raw", text: it.text, block: it.block, lang: it.lang) } else {
-      html.span(elem("raw", text: it.text, block: it.block, lang: it.lang))
-    },
+    raw.where(block: true),
+    it => elem("raw", text: it.text, block: it.block, lang: it.lang),
+  ),
+  (
+    raw.where(block: false),
+    it => html.span(elem("raw", text: it.text, block: it.block, lang: it.lang)),
   ),
   (list, it => elem("list", tight: it.tight, ..it.children.map(child => elem("item", child.body)))),
   (
@@ -154,9 +158,8 @@
     grid,
     it => elem(
       "grid",
-      // TODO: we cannot access colspan/rowspan here.
-      // related: https://github.com/typst/typst/issues/7263
-      table(columns: it.columns, ..it
+      // there may be a better way to represent grid
+      table(columns: it.columns, align: it.align, ..it
           .children
           .map(child => {
             {
@@ -183,52 +186,33 @@
     table,
     it => elem(
       "table",
-      it,
-      // columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
-      // ..it.children.map(
-      //   child => {
-      //     let func = child.func()
-      //     if func == table.cell {
-      //       let named = child.fields()
-      //       named.remove("body")
-      //       elem(
-      //         "cell",
-      //         ..named,
-      //         child.body,
-      //       )
-      //     } else if func == table.header {
-      //       elem(
-      //         "header",
-      //         ..child.cells.map(
-      //           cell => {
-      //             let named = cell.fields()
-      //             named.remove("body")
-      //             elem(
-      //               "cell",
-      //               ..named,
-      //               cell.body,
-      //             )
-      //           },
-      //         ),
-      //       )
-      //     } else if func == table.footer {
-      //       elem(
-      //         "footer",
-      //         ..child.cells.map(
-      //           cell => {
-      //             let named = cell.fields()
-      //             named.remove("body")
-      //             elem(
-      //               "cell",
-      //               ..named,
-      //               cell.body,
-      //             )
-      //           },
-      //         ),
-      //       )
-      //     }
-      //   },
-      // ),
+      columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
+      align: if it.align == auto { (it.align,) } else if type(it.align) == array { it.align }.map(repr).join(","),
+      ..it.children,
+    ),
+  ),
+  (
+    table.header,
+    it => elem(
+      "header",
+      ..it.children,
+    ),
+  ),
+  (
+    table.footer,
+    it => elem(
+      "footer",
+      ..it.children,
+    ),
+  ),
+  (
+    table.cell,
+    it => elem(
+      "cell",
+      colspan: it.colspan,
+      rowspan: it.rowspan,
+      align: it.align,
+      it.body,
     ),
   ),
   (

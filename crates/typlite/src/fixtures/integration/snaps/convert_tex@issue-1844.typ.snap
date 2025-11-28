@@ -56,7 +56,6 @@ Source in grid
 \begin{table}[htbp]
 \centering
 \begin{tabular}{cc}
-\hline
 Placeholder for\\
 separately rendered SVG & ````
 
@@ -69,6 +68,5 @@ Who loves to lie with me,
 ...
 ```)
 ```` \\
-\hline
 \end{tabular}
 \end{table}

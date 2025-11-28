@@ -78,27 +78,15 @@ impl TextWriter {
                     }
                 }
             }
-            Node::Table {
-                headers,
-                rows,
-                alignments: _,
-            } => {
-                // Write headers
-                for header in headers {
-                    Self::write_node(header, output)?;
-                    output.push(' ');
-                }
-                output.push_str("\n");
-
-                // Write rows
+            Node::Table { rows, .. } => {
                 for row in rows {
-                    for cell in row {
-                        Self::write_node(cell, output)?;
+                    for cell in &row.cells {
+                        Self::write_node(&cell.content, output)?;
                         output.push(' ');
                     }
-                    output.push_str("\n");
+                    output.push('\n');
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
             Node::Text(text) => {
                 output.push_str(text);
