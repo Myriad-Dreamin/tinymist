@@ -38,11 +38,11 @@ var overLapping = function (a: Element, b: Element) {
     ) &&
     /// determine overlapping by area
     (Math.abs(aRect.left - bRect.left) + Math.abs(aRect.right - bRect.right)) /
-      Math.max(aRect.width, bRect.width) <
-      0.5 &&
+    Math.max(aRect.width, bRect.width) <
+    0.5 &&
     (Math.abs(aRect.bottom - bRect.bottom) + Math.abs(aRect.top - bRect.top)) /
-      Math.max(aRect.height, bRect.height) <
-      0.5
+    Math.max(aRect.height, bRect.height) <
+    0.5
   );
 };
 
@@ -341,3 +341,6 @@ windowElem.handleTypstLocation = function (elem: Element, pageNo: number, x: num
     }
   }
 };
+// This global function is hardcoded in:
+// https://github.com/Myriad-Dreamin/typst.ts/blob/crates/conversion/typst2vec/src/pass/typst2vec.rs
+window.handleTypstLocation = windowElem.handleTypstLocation;
