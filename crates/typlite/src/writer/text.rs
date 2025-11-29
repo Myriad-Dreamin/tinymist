@@ -4,7 +4,7 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 
 use crate::Result;
-use crate::common::{ExternalFrameNode, FigureNode, FormatWriter};
+use crate::common::{BlockVerbatimNode, ExternalFrameNode, FigureNode, FormatWriter, VerbatimNode};
 
 /// Text writer implementation
 #[derive(Default)]
@@ -161,11 +161,22 @@ impl TextWriter {
                     output.push_str(&external_frame.alt_text);
                 }
             }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                if let Some(block_node) = node.as_custom_type::<BlockVerbatimNode>() {
+                    output.push_str(&block_node.content);
+                    output.push_str("\n\n");
+                }
+            }
             node if node.is_custom_type::<crate::common::HighlightNode>() => {
                 if let Some(highlight) = node.as_custom_type::<crate::common::HighlightNode>() {
                     for child in &highlight.content {
                         Self::write_node(child, output)?;
                     }
+                }
+            }
+            node if node.is_custom_type::<VerbatimNode>() => {
+                if let Some(inline_node) = node.as_custom_type::<VerbatimNode>() {
+                    output.push_str(&inline_node.content);
                 }
             }
             _ => {}

@@ -84,6 +84,12 @@ pub struct AlertsAttr {
     pub class: EcoString,
 }
 
+#[derive(TypliteAttr, Default)]
+pub struct VerbatimAttr {
+    pub block: bool,
+    pub src: EcoString,
+}
+
 pub trait TypliteAttrsParser {
     fn parse(attrs: &HtmlAttrs) -> Result<Self>
     where
