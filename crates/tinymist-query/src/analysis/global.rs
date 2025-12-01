@@ -683,15 +683,17 @@ impl SharedContext {
     }
 
     /// Gets the local packages and their descriptions.
-    #[cfg(feature = "local-registry")]
-    pub fn local_packages(&self) -> EcoVec<PackageIndexEntry> {
-        crate::package::list_package_by_namespace(self.world(), eco_format!("local"))
-    }
-
-    /// Gets the local packages and their descriptions.
-    #[cfg(not(feature = "local-registry"))]
-    pub fn local_packages(&self) -> EcoVec<PackageIndexEntry> {
-        eco_vec![]
+    pub fn local_packages(&self) -> &[PackageIndexEntry] {
+        self.analysis.caches.local_packages.get_or_init(|| {
+            #[cfg(feature = "local-registry")]
+            {
+                crate::package::list_package_by_namespace(self.world(), eco_format!("local"))
+            }
+            #[cfg(not(feature = "local-registry"))]
+            {
+                Default::default()
+            }
+        })
     }
 
     pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {
@@ -1290,6 +1292,7 @@ pub struct AnalysisGlobalCaches {
     signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     docstrings: CacheMap<DeferredCompute<Option<Arc<DocString>>>>,
     terms: CacheMap<(Value, Ty)>,
+    local_packages: DeferredCompute<Vec<PackageIndexEntry>>,
 }
 
 /// A local (lsp request spanned) cache for all level of analysis results of a
