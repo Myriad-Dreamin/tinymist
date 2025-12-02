@@ -527,13 +527,13 @@ pub struct InsTy {
 /// For example, a float instance which is NaN.
 impl Eq for InsTy {}
 
-impl PartialOrd for InsTy {
+impl PartialOrd for Interned<InsTy> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for InsTy {
+impl Ord for Interned<InsTy> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         cmp_value(&self.val, &other.val)
     }
