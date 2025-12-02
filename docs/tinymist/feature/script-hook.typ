@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [Hook Scripts])
 
-The hook script feature is available since `tinymist` v0.14.4.
+The hook script feature is available since `tinymist` v0.14.2.
 
 Hook Scripts allow you to hook and customize certain behaviors of tinymist by providing code snippets that will be executed at specific events.
 
