@@ -9,6 +9,19 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.6 - [2025-12-02]
+
+### Code Analysis
+* (Fix) Implemented total ordering for Typst values to ensure predictable sorting behavior in https://github.com/Myriad-Dreamin/tinymist/pull/2279
+  * This fixes panics that occurred when comparing certain Typst values (Issue typst/typst#6285).
+
+### Preview
+
+* (Fixed) fix intra-document links not working in preview by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2287
+  * This was introduced in https://github.com/Myriad-Dreamin/tinymist/pull/2145
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.4...v0.14.6
+
 ## v0.14.4 - [2025-11-25]
 
 ### Server
