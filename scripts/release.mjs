@@ -4,6 +4,8 @@
 import { spawn as spawnSync } from "child_process";
 import fs from "fs/promises";
 
+const REPO_PARAM = "--repo Myriad-Dreamin/tinymist";
+
 let tag = process.argv[2];
 if (tag.startsWith("v")) {
   tag = tag.slice(1);
@@ -100,7 +102,7 @@ const currentBranch = (await spawn("current-branch", "git rev-parse --abbrev-ref
 
 async function findWorkflowRunId(workflowId, branch) {
   const runs = JSON.parse(
-    await spawn("workflow-run-list", `gh run list -w ${workflowId} --json headBranch,databaseId`),
+    await spawn("workflow-run-list", `gh run list -w ${workflowId} ${REPO_PARAM} --json headBranch,databaseId`),
   );
 
   console.log(runs, branch);
@@ -122,7 +124,7 @@ async function tryFindWorkflowRunId(workflowId, branch) {
 async function createReleaseAsset() {
   await spawn(
     `workflow-run`,
-    `gh workflow run ${releaseAssetId} -r ${currentBranch.toString().trim()}`,
+    `gh workflow run ${releaseAssetId} ${REPO_PARAM} -r ${currentBranch.toString().trim()}`,
   );
 
   // get and wait last run id
@@ -135,7 +137,7 @@ async function createReleaseAsset() {
 
 await spawn(
   "pr-create",
-  `gh pr create --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
+  `gh pr create ${REPO_PARAM} --title "build: bump version to ${tag}" --body "+tag v${tag}"`,
 );
 await createReleaseAsset();
 const cargoToml = await fs.readFile("Cargo.toml", "utf-8");
