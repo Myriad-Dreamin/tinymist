@@ -78,27 +78,15 @@ impl TextWriter {
                     }
                 }
             }
-            Node::Table {
-                headers,
-                rows,
-                alignments: _,
-            } => {
-                // Write headers
-                for header in headers {
-                    Self::write_node(header, output)?;
-                    output.push(' ');
-                }
-                output.push_str("\n");
-
-                // Write rows
+            Node::Table { rows, .. } => {
                 for row in rows {
-                    for cell in row {
-                        Self::write_node(cell, output)?;
+                    for cell in &row.cells {
+                        Self::write_node(&cell.content, output)?;
                         output.push(' ');
                     }
-                    output.push_str("\n");
+                    output.push('\n');
                 }
-                output.push_str("\n");
+                output.push('\n');
             }
             Node::Text(text) => {
                 output.push_str(text);
@@ -150,7 +138,9 @@ impl TextWriter {
                     Self::write_node(&figure_node.body, output)?;
                     if !figure_node.caption.is_empty() {
                         output.push_str("\n");
-                        output.push_str(&figure_node.caption);
+                        for inline in &figure_node.caption {
+                            Self::write_node(inline, output)?;
+                        }
                     }
                 }
             }

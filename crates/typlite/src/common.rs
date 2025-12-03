@@ -38,8 +38,8 @@ pub enum Format {
 pub struct FigureNode {
     /// The main content of the figure, can be any block node
     pub body: Box<Node>,
-    /// The caption text for the figure
-    pub caption: String,
+    /// The caption content for the figure
+    pub caption: Vec<Node>,
 }
 
 impl FigureNode {
@@ -49,20 +49,26 @@ impl FigureNode {
             Ok(())
         })?;
         writer.write_str(&content)?;
-        writer.write_str("\n")?;
-        writer.write_str(&self.caption)?;
+        if !self.caption.is_empty() {
+            writer.write_str("\n")?;
+            writer.write_inline_nodes(&self.caption)?;
+        }
         Ok(())
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
         let body = self.body.clone();
+        let mut children = vec![*body];
+        if !self.caption.is_empty() {
+            children.extend(self.caption.clone());
+        }
         let node = Node::HtmlElement(HtmlElement {
             tag: EcoString::inline("figure"),
             attributes: vec![HtmlAttribute {
                 name: EcoString::inline("class"),
                 value: EcoString::inline("figure"),
             }],
-            children: vec![*body],
+            children,
             self_closing: false,
         });
         writer.write_node(&node)?;

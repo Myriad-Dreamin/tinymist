@@ -1,6 +1,6 @@
-use crate::ast::{CodeBlockType, HeadingType, ListItem, Node};
 #[cfg(feature = "gfm")]
-use crate::ast::{TableAlignment, TaskListStatus};
+use crate::ast::TaskListStatus;
+use crate::ast::{CodeBlockType, HeadingType, ListItem, Node, TableAlignment, TableRow};
 use crate::error::{WriteError, WriteResult};
 use ecow::EcoString;
 
@@ -308,44 +308,72 @@ impl CommonMarkWriter {
         Ok(())
     }
 
-    /// Write a table, falling back to HTML when block elements appear in cells.
-    pub(crate) fn write_table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> WriteResult<()> {
-        if table_contains_block_elements(headers, rows) {
+    /// Write a table, falling back to HTML when unsupported features appear.
+    pub(crate) fn write_table(&mut self, columns: usize, rows: &[TableRow]) -> WriteResult<()> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+
+        if table_contains_block_elements(rows) || Self::table_has_span(rows) {
             if self.is_strict_mode() {
                 return Err(WriteError::InvalidStructure(
-                    "Table contains block-level elements which are not allowed in strict mode"
+                    "Table contains content that cannot be represented in CommonMark tables"
                         .to_string()
                         .into(),
                 ));
             } else {
                 self.emit_info(
-                    "Table contains block-level elements, falling back to HTML output in soft mode",
+                    "Table contains unsupported features, falling back to HTML output in soft mode",
                 );
-                return self.write_table_as_html(headers, rows);
+                return self.write_table_as_html(columns, rows, &[]);
+            }
+        }
+
+        let (header, body) = rows.split_first().unwrap();
+        if header.cells.len() != columns {
+            if self.is_strict_mode() {
+                return Err(WriteError::InvalidStructure(
+                    "Table header does not match declared column count"
+                        .to_string()
+                        .into(),
+                ));
+            } else {
+                return self.write_table_as_html(columns, rows, &[]);
             }
         }
 
         self.write_char('|')?;
-        for header in headers {
-            self.check_no_newline(header, "Table Header")?;
+        for cell in &header.cells {
+            self.check_no_newline(&cell.content, "Table Header")?;
             self.write_char(' ')?;
-            self.write(header)?;
+            self.write(&cell.content)?;
             self.write_str(" |")?;
         }
         self.write_char('\n')?;
 
         self.write_char('|')?;
-        for _ in 0..headers.len() {
+        for _ in 0..columns {
             self.write_str(" --- |")?;
         }
         self.write_char('\n')?;
 
-        for row in rows {
+        for row in body {
+            if row.cells.len() != columns {
+                if self.is_strict_mode() {
+                    return Err(WriteError::InvalidStructure(
+                        "Table row does not match declared column count"
+                            .to_string()
+                            .into(),
+                    ));
+                } else {
+                    return self.write_table_as_html(columns, rows, &[]);
+                }
+            }
             self.write_char('|')?;
-            for cell in row {
-                self.check_no_newline(cell, "Table Cell")?;
+            for cell in &row.cells {
+                self.check_no_newline(&cell.content, "Table Cell")?;
                 self.write_char(' ')?;
-                self.write(cell)?;
+                self.write(&cell.content)?;
                 self.write_str(" |")?;
             }
             self.write_char('\n')?;
@@ -354,66 +382,110 @@ impl CommonMarkWriter {
         Ok(())
     }
 
-    /// Write a GFM table with per-column alignment when enabled.
-    #[cfg(feature = "gfm")]
+    /// Write a table with per-column alignment when enabled.
     pub(crate) fn write_table_with_alignment(
         &mut self,
-        headers: &[Node],
+        columns: usize,
         alignments: &[TableAlignment],
-        rows: &[Vec<Node>],
+        rows: &[TableRow],
     ) -> WriteResult<()> {
-        if !self.options.gfm_tables {
-            return self.write_table(headers, rows);
-        }
+        #[cfg(feature = "gfm")]
+        {
+            if !self.options.gfm_tables {
+                return self.write_table(columns, rows);
+            }
 
-        if table_contains_block_elements(headers, rows) {
-            if self.is_strict_mode() {
-                return Err(WriteError::InvalidStructure(
-                    "GFM table contains block-level elements which are not allowed in strict mode"
-                        .to_string()
-                        .into(),
-                ));
-            } else {
-                self.emit_info(
-                        "GFM table contains block-level elements, falling back to HTML output in soft mode",
+            if rows.is_empty() {
+                return Ok(());
+            }
+
+            if table_contains_block_elements(rows) || Self::table_has_span(rows) {
+                if self.is_strict_mode() {
+                    return Err(WriteError::InvalidStructure(
+                        "GFM table contains content that cannot be represented in Markdown"
+                            .to_string()
+                            .into(),
+                    ));
+                } else {
+                    self.emit_info(
+                        "GFM table contains unsupported features, falling back to HTML output in soft mode",
                     );
-                return self.write_table_as_html_with_alignment(headers, alignments, rows);
+                    return self.write_table_as_html(columns, rows, alignments);
+                }
             }
-        }
 
-        self.write_char('|')?;
-        for header in headers {
-            self.check_no_newline(header, "Table Header")?;
-            self.write_char(' ')?;
-            self.write(header)?;
-            self.write_str(" |")?;
-        }
-        self.write_char('\n')?;
-
-        self.write_char('|')?;
-        for index in 0..headers.len() {
-            let alignment = alignments.get(index).unwrap_or(&TableAlignment::Center);
-            match alignment {
-                TableAlignment::Left => self.write_str(" :--- |")?,
-                TableAlignment::Center => self.write_str(" :---: |")?,
-                TableAlignment::Right => self.write_str(" ---: |")?,
-                TableAlignment::None => self.write_str(" --- |")?,
+            let (header, body) = rows.split_first().unwrap();
+            if header.cells.len() != columns {
+                if self.is_strict_mode() {
+                    return Err(WriteError::InvalidStructure(
+                        "Table header does not match declared column count"
+                            .to_string()
+                            .into(),
+                    ));
+                } else {
+                    return self.write_table_as_html(columns, rows, alignments);
+                }
             }
-        }
-        self.write_char('\n')?;
 
-        for row in rows {
             self.write_char('|')?;
-            for cell in row {
-                self.check_no_newline(cell, "Table Cell")?;
+            for cell in &header.cells {
+                self.check_no_newline(&cell.content, "Table Header")?;
                 self.write_char(' ')?;
-                self.write(cell)?;
+                self.write(&cell.content)?;
                 self.write_str(" |")?;
             }
             self.write_char('\n')?;
+
+            self.write_char('|')?;
+            for index in 0..columns {
+                let alignment = alignments.get(index).unwrap_or(&TableAlignment::Center);
+                match alignment {
+                    TableAlignment::Left => self.write_str(" :--- |")?,
+                    TableAlignment::Center => self.write_str(" :---: |")?,
+                    TableAlignment::Right => self.write_str(" ---: |")?,
+                    TableAlignment::None => self.write_str(" --- |")?,
+                }
+            }
+            self.write_char('\n')?;
+
+            for row in body {
+                if row.cells.len() != columns {
+                    if self.is_strict_mode() {
+                        return Err(WriteError::InvalidStructure(
+                            "Table row does not match declared column count"
+                                .to_string()
+                                .into(),
+                        ));
+                    } else {
+                        return self.write_table_as_html(columns, rows, alignments);
+                    }
+                }
+                self.write_char('|')?;
+                for cell in &row.cells {
+                    self.check_no_newline(&cell.content, "Table Cell")?;
+                    self.write_char(' ')?;
+                    self.write(&cell.content)?;
+                    self.write_str(" |")?;
+                }
+                self.write_char('\n')?;
+            }
+
+            Ok(())
         }
 
-        Ok(())
+        #[cfg(not(feature = "gfm"))]
+        {
+            let _ = alignments;
+            self.write_table(columns, rows)
+        }
+    }
+
+    fn table_has_span(rows: &[TableRow]) -> bool {
+        rows.iter().any(|row| {
+            row.cells
+                .iter()
+                .any(|cell| cell.colspan > 1 || cell.rowspan > 1)
+        })
     }
 
     /// Write an HTML block verbatim.

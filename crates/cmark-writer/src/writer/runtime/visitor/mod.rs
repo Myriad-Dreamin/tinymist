@@ -5,11 +5,10 @@
 //! implement `NodeHandler` and reuse the traversal logic without
 //! copy-pasting large `match` expressions.
 
-use crate::ast::{CodeBlockType, CustomNode, HeadingType, HtmlElement, ListItem, Node};
+use crate::ast::{
+    CodeBlockType, CustomNode, HeadingType, HtmlElement, ListItem, Node, TableAlignment, TableRow,
+};
 use ecow::EcoString;
-
-#[cfg(feature = "gfm")]
-use crate::ast::TableAlignment;
 
 /// Trait implemented by writer backends that want to consume the AST.
 #[allow(missing_docs)]
@@ -97,18 +96,12 @@ pub trait NodeHandler {
         Ok(())
     }
 
-    #[cfg(feature = "gfm")]
     fn table(
         &mut self,
-        _headers: &[Node],
+        _columns: usize,
+        _rows: &[TableRow],
         _alignments: &[TableAlignment],
-        _rows: &[Vec<Node>],
     ) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    #[cfg(not(feature = "gfm"))]
-    fn table(&mut self, _headers: &[Node], _rows: &[Vec<Node>]) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -215,14 +208,11 @@ pub fn walk_node<H: NodeHandler + ?Sized>(handler: &mut H, node: &Node) -> Resul
         } => handler.link_reference_definition(label, destination, title),
         Node::ReferenceLink { label, content } => handler.reference_link(label, content),
         Node::Custom(custom_node) => handler.custom(custom_node.as_ref()),
-        #[cfg(feature = "gfm")]
         Node::Table {
-            headers,
-            alignments,
+            columns,
             rows,
-        } => handler.table(headers, alignments, rows),
-        #[cfg(not(feature = "gfm"))]
-        Node::Table { headers, rows, .. } => handler.table(headers, rows),
+            alignments,
+        } => handler.table(*columns, rows, alignments),
         #[cfg(feature = "gfm")]
         Node::Strikethrough(content) => handler.strikethrough(content),
         #[cfg(feature = "gfm")]

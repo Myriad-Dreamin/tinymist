@@ -1,8 +1,6 @@
 //! Utility functions for HTML writing.
 
-#[cfg(feature = "gfm")]
-use crate::ast::TableAlignment;
-use crate::ast::{HeadingType, HtmlElement, ListItem, Node};
+use crate::ast::{HeadingType, HtmlElement, ListItem, Node, TableAlignment, TableRow};
 use crate::writer::runtime::visitor::{walk_node, NodeHandler};
 use ecow::EcoString;
 use std::convert::Infallible;
@@ -140,25 +138,16 @@ impl NodeHandler for PlainTextCollector<'_> {
         Ok(())
     }
 
-    #[cfg(feature = "gfm")]
     fn table(
         &mut self,
-        headers: &[Node],
+        _columns: usize,
+        rows: &[TableRow],
         _alignments: &[TableAlignment],
-        rows: &[Vec<Node>],
     ) -> Result<(), Self::Error> {
-        NodeHandler::visit_nodes(self, headers)?;
         for row in rows {
-            NodeHandler::visit_nodes(self, row)?;
-        }
-        Ok(())
-    }
-
-    #[cfg(not(feature = "gfm"))]
-    fn table(&mut self, headers: &[Node], rows: &[Vec<Node>]) -> Result<(), Self::Error> {
-        NodeHandler::visit_nodes(self, headers)?;
-        for row in rows {
-            NodeHandler::visit_nodes(self, row)?;
+            for cell in &row.cells {
+                NodeHandler::visit_node(self, &cell.content)?;
+            }
         }
         Ok(())
     }
