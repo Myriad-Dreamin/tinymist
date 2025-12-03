@@ -4,8 +4,10 @@ use std::{io::Read, path::Path};
 
 use js_sys::Uint8Array;
 use tinymist_std::ImmutPath;
-use typst::diag::{EcoString, eco_format};
+use typst::diag::eco_format;
 use wasm_bindgen::{JsValue, prelude::*};
+
+use crate::registry::PackageIndexEntry;
 
 use super::{PackageError, PackageRegistry, PackageSpec};
 
@@ -116,7 +118,7 @@ impl PackageRegistry for JsRegistry {
     }
 
     // todo: provide package list for browser
-    fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    fn packages(&self) -> &[PackageIndexEntry] {
         &[]
     }
 }

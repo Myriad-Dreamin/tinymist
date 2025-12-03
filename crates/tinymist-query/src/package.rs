@@ -6,6 +6,7 @@ use ecow::eco_format;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::PackageSpec;
+use tinymist_world::package::registry::PackageIndexEntry;
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
@@ -26,10 +27,11 @@ pub struct PackageInfo {
     pub version: String,
 }
 
-impl From<(PathBuf, PackageSpec)> for PackageInfo {
-    fn from((path, spec): (PathBuf, PackageSpec)) -> Self {
+impl From<PackageIndexEntry> for PackageInfo {
+    fn from(entry: PackageIndexEntry) -> Self {
+        let spec = entry.spec();
         Self {
-            path,
+            path: entry.path.unwrap_or_default(),
             namespace: spec.namespace,
             name: spec.name,
             version: spec.version.to_string(),
@@ -76,15 +78,9 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 #[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
-    registry: &tinymist_world::package::registry::HttpRegistry,
+    world: &tinymist_project::LspWorld,
     ns: EcoString,
-) -> ecow::EcoVec<(PathBuf, PackageSpec)> {
-    use std::collections::HashSet;
-    use std::sync::OnceLock;
-
-    use ecow::eco_vec;
-    use parking_lot::Mutex;
-
+) -> Vec<PackageIndexEntry> {
     trait IsDirFollowLinks {
         fn is_dir_follow_links(&self) -> bool;
     }
@@ -99,25 +95,12 @@ pub fn list_package_by_namespace(
         }
     }
 
-    fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {
-        let err = match result {
-            Ok(value) => return Some(value),
-            Err(err) => err,
-        };
-
-        static ONCE: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-        let mut once = ONCE.get_or_init(Default::default).lock();
-        if once.insert(site) {
-            log::error!("failed to perform {site}: {err}");
-        }
-
-        None
-    }
+    let registry = &world.registry;
 
     // search packages locally. We only search in the data
     // directory and not the cache directory, because the latter is not
     // intended for storage of local packages.
-    let mut packages = eco_vec![];
+    let mut packages = vec![];
 
     log::info!(
         "searching for packages in namespace {ns} in paths {:?}",
@@ -138,7 +121,8 @@ pub fn list_package_by_namespace(
             let Some(package) = once_log(package, "read package name") else {
                 continue;
             };
-            if package.file_name().to_string_lossy().starts_with('.') {
+            let package_name = EcoString::from(package.file_name().to_string_lossy());
+            if package_name.starts_with('.') {
                 continue;
             }
 
@@ -152,31 +136,67 @@ pub fn list_package_by_namespace(
                 continue;
             };
             for version in versions {
-                let Some(version) = once_log(version, "read package version") else {
+                let Some(version_entry) = once_log(version, "read package version") else {
                     continue;
                 };
-                if version.file_name().to_string_lossy().starts_with('.') {
+                if version_entry.file_name().to_string_lossy().starts_with('.') {
                     continue;
                 }
-                let package_version_path = version.path();
+                let package_version_path = version_entry.path();
                 if !package_version_path.is_dir_follow_links() {
                     continue;
                 }
                 let Some(version) = once_log(
-                    version.file_name().to_string_lossy().parse(),
+                    version_entry.file_name().to_string_lossy().parse(),
                     "parse package version",
                 ) else {
                     continue;
                 };
                 let spec = PackageSpec {
                     namespace: ns.clone(),
-                    name: package.file_name().to_string_lossy().into(),
+                    name: package_name.clone(),
                     version,
                 };
-                packages.push((package_version_path, spec));
+                let manifest_id = typst::syntax::FileId::new(
+                    Some(spec.clone()),
+                    typst::syntax::VirtualPath::new("typst.toml"),
+                );
+                let Some(manifest) =
+                    once_log(get_manifest(world, manifest_id), "read package manifest")
+                else {
+                    continue;
+                };
+                packages.push(PackageIndexEntry {
+                    namespace: ns.clone(),
+                    package: manifest.package,
+                    template: manifest.template,
+                    updated_at: None,
+                    path: Some(package_version_path),
+                });
             }
         }
     }
 
     packages
+}
+
+#[cfg(feature = "local-registry")]
+fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {
+    use std::collections::HashSet;
+    use std::sync::OnceLock;
+
+    use parking_lot::Mutex;
+
+    let err = match result {
+        Ok(value) => return Some(value),
+        Err(err) => err,
+    };
+
+    static ONCE: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
+    let mut once = ONCE.get_or_init(Default::default).lock();
+    if once.insert(site) {
+        log::error!("failed to perform {site}: {err}");
+    }
+
+    None
 }
