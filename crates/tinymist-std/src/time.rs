@@ -61,3 +61,19 @@ pub fn to_typst_time(timestamp: UtcDateTime) -> typst::foundations::Datetime {
     let datetime = ::time::PrimitiveDateTime::new(timestamp.date(), timestamp.time());
     typst::foundations::Datetime::Datetime(datetime)
 }
+
+/// Creates a format description for yyyy-mm-dd.
+pub fn yyyy_mm_dd() -> Vec<::time::format_description::BorrowedFormatItem<'static>> {
+    ::time::format_description::parse_borrowed::<2>("[year]-[month]-[day]").unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_yyyy_mm_dd() {
+        let format = yyyy_mm_dd();
+        assert!(!format.is_empty(), "format should not be empty");
+    }
+}

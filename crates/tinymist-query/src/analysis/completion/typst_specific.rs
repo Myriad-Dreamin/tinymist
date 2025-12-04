@@ -29,31 +29,30 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
-        let mut packages: Vec<_> = w
-            .packages()
-            .iter()
-            .map(|(spec, desc)| (spec, desc.clone()))
-            .collect();
+        let mut packages = w.packages().to_vec();
         // local_packages to references and add them to the packages
         #[cfg(feature = "local-registry")]
-        let local_packages_refs = self.worker.ctx.local_packages();
-        #[cfg(feature = "local-registry")]
-        packages.extend(
-            local_packages_refs
-                .iter()
-                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
-        );
-
-        packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
-        if !all_versions {
-            packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
+        {
+            let local_packages_refs = self.worker.ctx.local_packages();
+            packages.extend(local_packages_refs);
         }
-        for (package, description) in packages {
+
+        packages.sort_by_key(|entry| {
+            (
+                entry.namespace.clone(), // FIXEME: lifetime issues if using ref
+                entry.package.name.clone(),
+                Reverse(entry.package.version),
+            )
+        });
+        if !all_versions {
+            packages.dedup_by_key(|entry| (entry.namespace.clone(), entry.package.name.clone()));
+        }
+        for entry in packages {
             self.value_completion(
                 None,
-                &Value::Str(format_str!("{package}")),
+                &Value::Str(format_str!("{}", entry.spec())),
                 false,
-                description.as_deref(),
+                entry.package.description.as_deref(),
             );
         }
     }

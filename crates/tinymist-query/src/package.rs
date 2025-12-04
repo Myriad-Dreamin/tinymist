@@ -5,10 +5,12 @@ use std::path::PathBuf;
 use ecow::eco_format;
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::PackageSpec;
+use tinymist_project::LspWorld;
+use tinymist_world::package::registry::PackageIndexEntry;
+use tinymist_world::package::{PackageRegistry, PackageSpec};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
-use typst::syntax::package::PackageManifest;
+use typst::syntax::package::{PackageManifest, VersionlessPackageSpec};
 use typst::syntax::{FileId, VirtualPath};
 
 use crate::LocalContext;
@@ -26,10 +28,11 @@ pub struct PackageInfo {
     pub version: String,
 }
 
-impl From<(PathBuf, PackageSpec)> for PackageInfo {
-    fn from((path, spec): (PathBuf, PackageSpec)) -> Self {
+impl From<PackageIndexEntry> for PackageInfo {
+    fn from(entry: PackageIndexEntry) -> Self {
+        let spec = entry.spec();
         Self {
-            path,
+            path: entry.path.unwrap_or_default(),
             namespace: spec.namespace,
             name: spec.name,
             version: spec.version.to_string(),
@@ -73,12 +76,44 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
     Ok(())
 }
 
+/// Get all the packages in the registry that match the spec.
+pub fn list_package_by_spec(
+    world: &LspWorld,
+    spec: &VersionlessPackageSpec,
+) -> Vec<PackageIndexEntry> {
+    let mut packages = vec![];
+    if spec.namespace == "preview" {
+        packages.extend(
+            world
+                .registry
+                .packages()
+                .iter()
+                .filter(|entry| {
+                    entry.namespace == spec.namespace && entry.package.name == spec.name
+                })
+                .cloned(),
+        );
+    }
+    #[cfg(feature = "local-registry")]
+    if spec.namespace != "preview" {
+        // todo: early filter by name
+        packages.extend(
+            list_package_by_namespace(world, spec.namespace.clone())
+                .into_iter()
+                .filter(|entry| {
+                    entry.namespace == spec.namespace && entry.package.name == spec.name
+                }),
+        );
+    }
+    packages
+}
+
 #[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package_by_namespace(
-    registry: &tinymist_world::package::registry::HttpRegistry,
+    world: &LspWorld,
     ns: EcoString,
-) -> ecow::EcoVec<(PathBuf, PackageSpec)> {
+) -> ecow::EcoVec<PackageIndexEntry> {
     use std::collections::HashSet;
     use std::sync::OnceLock;
 
@@ -113,6 +148,8 @@ pub fn list_package_by_namespace(
 
         None
     }
+
+    let registry = &world.registry;
 
     // search packages locally. We only search in the data
     // directory and not the cache directory, because the latter is not
@@ -173,7 +210,22 @@ pub fn list_package_by_namespace(
                     name: package.file_name().to_string_lossy().into(),
                     version,
                 };
-                packages.push((package_version_path, spec));
+                let manifest_id = typst::syntax::FileId::new(
+                    Some(spec.clone()),
+                    typst::syntax::VirtualPath::new("typst.toml"),
+                );
+                let Some(manifest) =
+                    once_log(get_manifest(world, manifest_id), "read package manifest")
+                else {
+                    continue;
+                };
+                packages.push(PackageIndexEntry {
+                    namespace: ns.clone(),
+                    package: manifest.package,
+                    template: manifest.template,
+                    updated_at: None,
+                    path: Some(package_version_path),
+                });
             }
         }
     }
