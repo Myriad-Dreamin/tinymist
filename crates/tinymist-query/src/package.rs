@@ -77,9 +77,9 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 
 #[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
-pub fn list_package_by_namespace(
+pub fn list_package(
     world: &tinymist_project::LspWorld,
-    ns: EcoString,
+    ns: Option<EcoString>,
 ) -> Vec<PackageIndexEntry> {
     trait IsDirFollowLinks {
         fn is_dir_follow_links(&self) -> bool;
@@ -103,19 +103,19 @@ pub fn list_package_by_namespace(
     let mut packages = vec![];
 
     log::info!(
-        "searching for packages in namespace {ns} in paths {:?}",
+        "searching for packages in namespace {ns:?} in paths {:?}",
         registry.paths()
     );
-    for dir in registry.paths() {
-        let local_path = dir.join(ns.as_str());
+
+    let mut search_in_dir = |local_path: PathBuf, ns: EcoString| {
         if !local_path.exists() || !local_path.is_dir_follow_links() {
-            continue;
+            return;
         }
         // namespace/package_name/version
         // 2. package_name
         let Some(package_names) = once_log(std::fs::read_dir(local_path), "read local package")
         else {
-            continue;
+            return;
         };
         for package in package_names {
             let Some(package) = once_log(package, "read package name") else {
@@ -173,6 +173,27 @@ pub fn list_package_by_namespace(
                     updated_at: None,
                     path: Some(package_version_path),
                 });
+            }
+        }
+    };
+
+    if let Some(ns) = ns {
+        for dir in registry.paths() {
+            let local_path = dir.join(ns.as_str());
+            search_in_dir(local_path, ns.clone());
+        }
+    } else {
+        for dir in registry.paths() {
+            let Some(namespaces) = once_log(std::fs::read_dir(dir), "read package directory")
+            else {
+                continue;
+            };
+            for dir in namespaces {
+                let Some(dir) = once_log(dir, "read ns directory") else {
+                    continue;
+                };
+                let local_path = dir.path();
+                search_in_dir(local_path, dir.file_name().to_string_lossy().into());
             }
         }
     }
