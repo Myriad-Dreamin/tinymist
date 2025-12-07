@@ -54,7 +54,10 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
 const OptionField = (schema: OptionSchema, valueState: State<Scalar | Scalar[] | undefined>) => {
   const { key, label: optionLabel, description, type: optionType } = schema;
   const validationError = van.state<string | undefined>();
-  const labelElem = optionType !== 'boolean' ? [label({ class: "text-sm font-medium", for: key }, optionLabel)] : [];
+  const labelElem =
+    optionType !== "boolean"
+      ? [label({ class: "text-sm font-medium", for: key }, optionLabel)]
+      : [];
 
   return div(
     { class: "flex flex-col gap-xs" },
@@ -132,6 +135,21 @@ const renderInput = (
         value: () => {
           const current = valueState.val;
           return typeof current === "string" && current ? current : "#ffffff";
+        },
+        onchange: (e: Event) => {
+          const target = e.target as HTMLInputElement;
+          valueState.val = target.value;
+        },
+      });
+
+    case "datetime":
+      return input({
+        class: "input",
+        type: "datetime-local",
+        id: key,
+        value: () => {
+          const current = valueState.val;
+          return typeof current === "string" ? current : "";
         },
         onchange: (e: Event) => {
           const target = e.target as HTMLInputElement;

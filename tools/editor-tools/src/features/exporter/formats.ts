@@ -48,10 +48,9 @@ export const EXPORT_FORMATS: ExportFormat[] = [
       PAGES_OPT,
       {
         key: "pdf.creationTimestamp",
-        type: "string",
+        type: "datetime",
         label: "Creation Timestamp",
-        description:
-          "The document's creation date formatted as a UNIX timestamp. (leave empty for current time)",
+        description: "The document's creation date (leave empty for current time)",
         default: "",
         validate: (value: string) => {
           if (value.trim() === "") {

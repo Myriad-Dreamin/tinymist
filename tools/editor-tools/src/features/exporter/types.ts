@@ -4,7 +4,7 @@ export type ExportFormatId = "pdf" | "png" | "svg" | "html" | "markdown" | "tex"
 
 export interface OptionSchema {
   key: string;
-  type: "string" | "number" | "boolean" | "color" | "select";
+  type: "string" | "number" | "boolean" | "color" | "datetime" | "select";
   label: string;
   description?: string;
   // default can be a single scalar or an array of scalars for multi-select
