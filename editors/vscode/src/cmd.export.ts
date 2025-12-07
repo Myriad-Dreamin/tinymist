@@ -1,7 +1,7 @@
 export interface ExportPdfOpts {
   pages?: string[];
   creationTimestamp?: string | null;
-  pdfStandards?: string[];
+  pdfStandard?: string[];
   noPdfTags?: boolean;
 }
 

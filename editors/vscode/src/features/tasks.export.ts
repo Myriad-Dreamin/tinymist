@@ -38,7 +38,7 @@ export interface ExportArgs {
   "svg.merged.gap"?: string;
 
   "pdf.creationTimestamp"?: string | null;
-  "pdf.pdfStandards"?: string[];
+  "pdf.pdfStandard"?: string[];
   "pdf.pdfTags"?: boolean;
 
   "png.ppi"?: number;
@@ -145,7 +145,7 @@ export const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArg
       return {
         pages: ops.resolvePagesOpts("pdf"),
         creationTimestamp: exportArgs["pdf.creationTimestamp"],
-        pdfStandards: exportArgs["pdf.pdfStandards"],
+        pdfStandard: exportArgs["pdf.pdfStandard"],
         noPdfTags: !exportArgs["pdf.pdfTags"], // invert to noPdfTags
       };
     },
