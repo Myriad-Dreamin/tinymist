@@ -484,7 +484,7 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let packages = tinymist_query::package::list_package_by_namespace(snap.world(), ns)
+            let packages = tinymist_query::package::list_package(snap.world(), Some(ns))
                 .into_iter()
                 .map(PackageInfo::from)
                 .collect::<Vec<_>>();

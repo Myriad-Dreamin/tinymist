@@ -687,7 +687,7 @@ impl SharedContext {
         self.analysis.caches.local_packages.get_or_init(|| {
             #[cfg(feature = "local-registry")]
             {
-                crate::package::list_package_by_namespace(self.world(), eco_format!("local"))
+                crate::package::list_package(self.world(), None)
             }
             #[cfg(not(feature = "local-registry"))]
             {
