@@ -33,10 +33,9 @@ impl CompletionPair<'_, '_, '_> {
         let mut packages = w.packages().iter().collect_vec();
         // local_packages to references and add them to the packages
         #[cfg(feature = "local-registry")]
-        {
-            let local_packages_refs = self.worker.ctx.local_packages();
-            packages.extend(local_packages_refs.iter().collect_vec());
-        }
+        let local_packages_refs = self.worker.ctx.local_packages();
+        #[cfg(feature = "local-registry")]
+        packages.extend(local_packages_refs.iter());
 
         packages.sort_by_key(|entry| {
             (
