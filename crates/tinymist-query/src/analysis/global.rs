@@ -18,6 +18,7 @@ use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::DataSource;
+use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
@@ -25,7 +26,7 @@ use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
 use typst::model::BibliographyElem;
-use typst::syntax::package::{PackageManifest, PackageSpec};
+use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
 
@@ -324,7 +325,7 @@ impl DerefMut for LocalContext {
 impl LocalContext {
     /// Set list of packages for LSP-based completion.
     #[cfg(test)]
-    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<(PackageSpec, Option<EcoString>)>) {
+    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<PackageIndexEntry>) {
         self.world().registry.test_package_list(f);
     }
 
@@ -682,18 +683,17 @@ impl SharedContext {
     }
 
     /// Gets the local packages and their descriptions.
-    #[cfg(feature = "local-registry")]
-    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
-        crate::package::list_package_by_namespace(&self.world().registry, eco_format!("local"))
-            .into_iter()
-            .map(|(_, spec)| spec)
-            .collect()
-    }
-
-    /// Gets the local packages and their descriptions.
-    #[cfg(not(feature = "local-registry"))]
-    pub fn local_packages(&self) -> EcoVec<PackageSpec> {
-        eco_vec![]
+    pub fn local_packages(&self) -> &[PackageIndexEntry] {
+        self.analysis.caches.local_packages.get_or_init(|| {
+            #[cfg(feature = "local-registry")]
+            {
+                crate::package::list_package_by_namespace(self.world(), eco_format!("local"))
+            }
+            #[cfg(not(feature = "local-registry"))]
+            {
+                Default::default()
+            }
+        })
     }
 
     pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {
@@ -1292,6 +1292,7 @@ pub struct AnalysisGlobalCaches {
     signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     docstrings: CacheMap<DeferredCompute<Option<Arc<DocString>>>>,
     terms: CacheMap<(Value, Ty)>,
+    local_packages: DeferredCompute<Vec<PackageIndexEntry>>,
 }
 
 /// A local (lsp request spanned) cache for all level of analysis results of a
