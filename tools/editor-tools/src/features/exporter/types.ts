@@ -8,7 +8,7 @@ export interface OptionSchema {
   label: string;
   description?: string;
   // default can be a single scalar or an array of scalars for multi-select
-  default: Scalar | Scalar[];
+  default?: Scalar | Scalar[];
   options?: Array<{ value: Scalar; label: string }>;
   // when true and type === 'select', UI should render a multi-select
   multiple?: boolean;

@@ -75,7 +75,7 @@ const renderInput = (
   valueState: State<Scalar | Scalar[] | undefined>,
   validationError: State<string | undefined>,
 ) => {
-  const { type, key, options: selectOptions, min, max, label: optionLabel } = schema;
+  const { type, key, options: selectOptions, label: optionLabel } = schema;
 
   switch (type) {
     case "string":
@@ -101,8 +101,8 @@ const renderInput = (
           const current = valueState.val;
           return current === undefined || current === null ? "" : String(current);
         },
-        min: min?.toString() ?? null,
-        max: max?.toString() ?? null,
+        min: schema.min?.toString() ?? null,
+        max: schema.max?.toString() ?? null,
         oninput: (e: Event) => {
           const target = e.target as HTMLInputElement;
           // Call custom validation function if provided
@@ -210,6 +210,7 @@ const renderInput = (
             valueState.val = newValue;
           },
         },
+        schema.default ? null : option({ value: "" }, "None"), // if no default, add a "None" option
         ...selectOptions.map((opt) =>
           option(
             {
