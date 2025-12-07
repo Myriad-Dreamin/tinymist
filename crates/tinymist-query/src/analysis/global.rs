@@ -164,12 +164,13 @@ impl Analysis {
     }
 
     /// Clear all cached resources.
-    pub fn clear_cache(&self) {
+    pub fn clear_cache(&mut self) {
         self.caches.signatures.clear();
         self.caches.docstrings.clear();
         self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
+        self.caches.local_packages = DeferredCompute::default();
         self.tokens_caches.lock().clear();
         self.analysis_rev_cache.lock().clear();
     }
