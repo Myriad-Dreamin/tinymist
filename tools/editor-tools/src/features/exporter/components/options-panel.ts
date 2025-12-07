@@ -52,12 +52,13 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
 };
 
 const OptionField = (schema: OptionSchema, valueState: State<Scalar | Scalar[] | undefined>) => {
-  const { key, label: optionLabel, description } = schema;
+  const { key, label: optionLabel, description, type: optionType } = schema;
   const validationError = van.state<string | undefined>();
+  const labelElem = optionType !== 'boolean' ? [label({ class: "text-sm font-medium", for: key }, optionLabel)] : [];
 
   return div(
     { class: "flex flex-col gap-xs" },
-    label({ class: "text-sm font-medium", for: key }, optionLabel),
+    ...labelElem,
     renderInput(schema, valueState, validationError),
     () =>
       validationError.val
@@ -71,7 +72,7 @@ const renderInput = (
   valueState: State<Scalar | Scalar[] | undefined>,
   validationError: State<string | undefined>,
 ) => {
-  const { type, key, options: selectOptions, min, max } = schema;
+  const { type, key, options: selectOptions, min, max, label: optionLabel } = schema;
 
   switch (type) {
     case "string":
@@ -120,7 +121,7 @@ const renderInput = (
             valueState.val = target.checked;
           },
         }),
-        span({ class: "text-sm" }, "Enable"),
+        label({ class: "text-sm font-medium", for: key }, optionLabel),
       );
 
     case "color":
