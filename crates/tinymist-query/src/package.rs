@@ -177,13 +177,11 @@ pub fn list_package(
         }
     };
 
-    if let Some(ns) = ns {
-        for dir in registry.paths() {
+    for dir in registry.paths() {
+        if let Some(ns) = &ns {
             let local_path = dir.join(ns.as_str());
             search_in_dir(local_path, ns.clone());
-        }
-    } else {
-        for dir in registry.paths() {
+        } else {
             let Some(namespaces) = once_log(std::fs::read_dir(dir), "read package directory")
             else {
                 continue;
