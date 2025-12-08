@@ -6,10 +6,15 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/underscore_prefix.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
    "message": "unused variable: `normal_unused`\nHint: consider removing this variable or prefixing with underscore: `_normal_unused`",
    "range": "4:5:4:18",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

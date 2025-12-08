@@ -6,28 +6,43 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/imported_unused.typ
 {
  "main.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "import",
+    "type": "dead-code"
+   },
    "message": "unused import: `Bbar`\nHint: consider removing this unused import",
    "range": "2:24:2:28",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]
   },
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "import",
+    "type": "dead-code"
+   },
    "message": "unused import: `foo`\nHint: consider removing this unused import",
    "range": "2:30:2:33",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]
   },
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "import",
+    "type": "dead-code"
+   },
    "message": "unused module import\nHint: imported modules should be used or the import should be removed",
    "range": "2:1:2:33",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

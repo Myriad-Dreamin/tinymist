@@ -6,10 +6,15 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/array_dict_usage.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
    "message": "unused variable: `unused`\nHint: consider removing this variable or prefixing with underscore: `_unused`",
    "range": "3:5:3:11",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

@@ -6,10 +6,15 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_un
 {
  "main.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "import",
+    "type": "dead-code"
+   },
    "message": "unused module import\nHint: imported modules should be used or the import should be removed",
    "range": "2:1:2:18",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

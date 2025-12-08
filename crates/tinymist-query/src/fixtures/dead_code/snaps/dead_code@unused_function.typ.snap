@@ -6,10 +6,15 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/unused_function.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
    "message": "unused function: `unused_func`\nHint: consider removing this function or prefixing with underscore: `_unused_func`",
    "range": "1:5:1:16",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

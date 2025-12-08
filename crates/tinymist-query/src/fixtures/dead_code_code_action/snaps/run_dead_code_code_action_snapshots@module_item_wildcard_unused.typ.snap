@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 183
 description: Dead code code actions in /dummy-root/main.typ
 expression: "JsonRepr::new_pure(ordered_entries)"
 input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_unused.typ
@@ -8,6 +7,72 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_un
 [
  {
   "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_omp",
+        "range": "0:5:0:8"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `omp`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "0:5:0:8"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   }
+  ],
+  "message": "unused function: `foo`\nHint: consider removing this function or prefixing with underscore: `_foo`",
+  "range": "0:5:0:8"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_ort",
+        "range": "2:4:2:7"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `ort`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "2:4:2:7"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
    {
     "edit": {
      "changes": {
@@ -22,6 +87,48 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_un
     },
     "kind": "quickfix",
     "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused function: `bar`\nHint: consider removing this function or prefixing with underscore: `_bar`",
+  "range": "1:5:1:8"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:1:2:18"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+  "range": "2:1:2:18"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:1:2:18"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
    }
   ],
   "message": "unused module import\nHint: imported modules should be used or the import should be removed",

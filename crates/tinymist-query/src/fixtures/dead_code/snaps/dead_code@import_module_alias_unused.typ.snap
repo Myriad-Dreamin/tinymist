@@ -6,10 +6,15 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_unu
 {
  "main.typ": [
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "import",
+    "type": "dead-code"
+   },
    "message": "unused import: `util`\nHint: consider removing this unused import",
    "range": "2:19:2:23",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

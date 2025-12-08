@@ -13,6 +13,114 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_unu
       "main.typ": [
        {
         "insertTextFormat": 1,
+        "newText": "_omp",
+        "range": "0:5:0:8"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `omp`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "0:5:0:8"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   }
+  ],
+  "message": "unused function: `foo`\nHint: consider removing this function or prefixing with underscore: `_foo`",
+  "range": "0:5:0:8"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_ort",
+        "range": "2:4:2:7"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `ort`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "2:4:2:7"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:0:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused function: `bar`\nHint: consider removing this function or prefixing with underscore: `_bar`",
+  "range": "1:5:1:8"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:15:2:23"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused import: `util`\nHint: consider removing this unused import",
+  "range": "2:19:2:23"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
         "newText": "",
         "range": "2:15:2:23"
        }

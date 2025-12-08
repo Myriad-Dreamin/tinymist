@@ -6,16 +6,22 @@ input_file: crates/tinymist-query/src/fixtures/lint/binary_type_compare_str.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.type-comparison",
    "message": "comparing strings with types is deprecated\nHint: compare with the literal type instead\nHint: this comparison will always return `false` since typst v0.14",
    "range": "0:11:0:28",
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
   },
   {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
    "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
    "range": "0:5:0:6",
    "severity": 4,
-   "source": "typst",
+   "source": "tinymist-lint",
    "tags": [
     1
    ]

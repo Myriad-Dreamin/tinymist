@@ -25,5 +25,26 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/imported_used.typ
   ],
   "message": "unused import: `foo`\nHint: consider removing this unused import",
   "range": "2:31:2:34"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:29:2:34"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused import: `foo`\nHint: consider removing this unused import",
+  "range": "2:31:2:34"
  }
 ]
