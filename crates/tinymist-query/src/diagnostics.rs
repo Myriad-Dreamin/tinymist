@@ -119,7 +119,13 @@ impl<'w> DiagWorker<'w> {
         let source = self.ctx.source_by_id(id)?;
         let lsp_range = self.diagnostic_range(&source, span);
 
-        let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
+        let is_unused = typst_diagnostic.message.starts_with("unused ");
+
+        let lsp_severity = if is_unused {
+            DiagnosticSeverity::HINT
+        } else {
+            diagnostic_severity(typst_diagnostic.severity)
+        };
         let lsp_message = diagnostic_message(&typst_diagnostic);
 
         let diagnostic = Diagnostic {
@@ -127,6 +133,7 @@ impl<'w> DiagWorker<'w> {
             severity: Some(lsp_severity),
             message: lsp_message,
             source: Some(self.source.to_owned()),
+            tags: is_unused.then(|| vec![DiagnosticTag::UNNECESSARY]),
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
                     .trace
