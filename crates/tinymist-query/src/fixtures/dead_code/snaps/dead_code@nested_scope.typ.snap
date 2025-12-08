@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/nested_scope.typ
   {
    "message": "unused variable: `inner_unused`\nHint: consider removing this variable or prefixing with underscore: `_inner_unused`",
    "range": "4:6:4:18",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }
