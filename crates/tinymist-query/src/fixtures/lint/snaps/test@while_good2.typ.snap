@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/lint/while_good2.typ
   {
    "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
    "range": "0:5:0:6",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/lint/return_partial2.typ
   {
    "message": "unused function: `as-padding-dict`\nHint: consider removing this function or prefixing with underscore: `_as-padding-dict`",
    "range": "0:5:0:20",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

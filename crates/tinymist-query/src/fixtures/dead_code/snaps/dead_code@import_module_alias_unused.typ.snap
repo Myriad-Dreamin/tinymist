@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_unu
   {
    "message": "unused import: `util`\nHint: consider removing this unused import",
    "range": "2:19:2:23",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }
