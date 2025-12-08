@@ -236,12 +236,15 @@ pub struct BlockVerbatimNode {
 
 impl BlockVerbatimNode {
     fn write_custom(&self, writer: &mut BlockWriterProxy) -> WriteResult<()> {
+        writer.write_str("\n\n")?;
         writer.write_str(&self.content)?;
-        Ok(())
+        writer.write_str("\n\n")
     }
 
     fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
-        writer.write_trusted_html(&self.content)
+        writer.write_trusted_html("\n\n")?;
+        writer.write_trusted_html(&self.content)?;
+        writer.write_trusted_html("\n\n")
     }
 }
 

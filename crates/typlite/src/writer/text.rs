@@ -163,6 +163,7 @@ impl TextWriter {
             }
             node if node.is_custom_type::<BlockVerbatimNode>() => {
                 if let Some(block_node) = node.as_custom_type::<BlockVerbatimNode>() {
+                    output.push_str("\n\n");
                     output.push_str(&block_node.content);
                     output.push_str("\n\n");
                 }
