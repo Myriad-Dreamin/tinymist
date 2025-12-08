@@ -328,8 +328,8 @@ impl DerefMut for LocalContext {
 impl LocalContext {
     /// Set list of packages for LSP-based completion.
     #[cfg(test)]
-    pub fn test_package_list(&mut self, f: impl Fn() -> Vec<PackageIndexEntry>) {
-        self.world().registry.test_package_list(&f);
+    pub fn test_package_list(&mut self, f: impl FnOnce() -> Vec<PackageIndexEntry> + Clone) {
+        self.world().registry.test_package_list(f.clone());
         self.analysis.caches.local_packages.get_or_init(f);
     }
 
