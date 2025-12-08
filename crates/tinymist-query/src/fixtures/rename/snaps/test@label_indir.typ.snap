@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/label_indir.typ
 {
  "changeAnnotations": {
   "Typst Rename Labels": {
-   "description": "The language server searched the labels ambiguously",
+   "description": "The language server fuzzy searched the labels",
    "label": "Typst Rename Labels",
    "needsConfirmation": true
   }

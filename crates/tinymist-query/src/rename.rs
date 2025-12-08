@@ -124,7 +124,7 @@ impl SemanticRequest for RenameRequest {
                     let change_annotations = Some(create_change_annotation(
                         change_id,
                         true,
-                        Some("The language server searched the labels ambiguously".to_string()),
+                        Some("The language server fuzzy searched the labels".to_string()),
                     ));
 
                     Some(WorkspaceEdit {
