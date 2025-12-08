@@ -84,6 +84,7 @@ impl<'w> DiagWorker<'w> {
     }
 
     /// Extends the worker with lint diagnostics.
+    #[cfg(test)]
     pub fn push_lints<'a>(&mut self, diagnostics: impl IntoIterator<Item = &'a LintDiagnostic>) {
         let source = self.source;
         self.source = "tinymist-lint";
