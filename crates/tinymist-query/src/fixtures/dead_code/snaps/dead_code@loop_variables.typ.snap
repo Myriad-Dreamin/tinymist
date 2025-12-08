@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/loop_variables.typ
   {
    "message": "unused variable: `unused_item`\nHint: consider removing this variable or prefixing with underscore: `_unused_item`",
    "range": "1:5:1:16",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

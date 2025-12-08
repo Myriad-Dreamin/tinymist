@@ -14,14 +14,20 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_for2.typ
   {
    "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
    "range": "0:5:0:6",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   },
   {
    "message": "unused variable: `i`\nHint: consider removing this variable or prefixing with underscore: `_i`",
    "range": "0:15:0:16",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

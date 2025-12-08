@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/conditional_usage.typ
   {
    "message": "unused variable: `unused`\nHint: consider removing this variable or prefixing with underscore: `_unused`",
    "range": "4:5:4:11",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

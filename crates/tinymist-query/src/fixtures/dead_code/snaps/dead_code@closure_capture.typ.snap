@@ -8,8 +8,11 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/closure_capture.typ
   {
    "message": "unused variable: `unused_not_captured`\nHint: consider removing this variable or prefixing with underscore: `_unused_not_captured`",
    "range": "2:5:2:24",
-   "severity": 2,
-   "source": "typst"
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }
