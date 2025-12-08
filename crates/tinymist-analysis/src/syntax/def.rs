@@ -571,7 +571,15 @@ impl Decl {
     pub fn ref_(ident: ast::Ref) -> Self {
         Self::ContentRef(SpannedDecl {
             name: ident.target().into(),
-            at: ident.span(),
+            at: {
+                let marker_span = ident
+                    .to_untyped()
+                    .children()
+                    .find(|child| child.kind() == SyntaxKind::RefMarker)
+                    .map(|child| child.span());
+
+                marker_span.unwrap_or(ident.span())
+            },
         })
     }
 

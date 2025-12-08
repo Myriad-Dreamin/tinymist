@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/rename.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
-input_file: crates/tinymist-query/src/fixtures/rename/label_indir2.typ
+input_file: crates/tinymist-query/src/fixtures/rename/label_content.typ
 ---
 {
  "changeAnnotations": {
@@ -17,7 +17,7 @@ input_file: crates/tinymist-query/src/fixtures/rename/label_indir2.typ
     {
      "annotationId": "Typst Rename Labels",
      "newText": "new_name",
-     "range": "8:22:8:31"
+     "range": "4:22:4:31"
     }
    ],
    "textDocument": {

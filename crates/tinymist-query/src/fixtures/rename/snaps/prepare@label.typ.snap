@@ -5,5 +5,5 @@ input_file: crates/tinymist-query/src/fixtures/rename/label.typ
 ---
 {
  "placeholder": "title_label",
- "range": "6:21:6:33"
+ "range": "6:22:6:33"
 }

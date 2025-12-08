@@ -41,7 +41,20 @@ impl SemanticRequest for PrepareRenameRequest {
             return None;
         }
 
-        let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
+        //  todo: process RefMarker consistently?
+        let mut node = syntax.node().clone();
+        if matches!(node.kind(), SyntaxKind::Ref) {
+            let marker = node
+                .children()
+                .find(|child| child.kind() == SyntaxKind::RefMarker)?;
+            node = marker;
+        }
+        let mut range = node.range();
+        if matches!(node.kind(), SyntaxKind::RefMarker) {
+            range.start += 1;
+        }
+
+        let origin_selection_range = ctx.to_lsp_range(range, &source);
         let def = ctx.def_of_syntax(&source, syntax.clone())?;
 
         let name = prepare_renaming(&syntax, &def)?;
