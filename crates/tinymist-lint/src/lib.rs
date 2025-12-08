@@ -1,7 +1,12 @@
 //! A linter for Typst.
 
-use std::sync::Arc;
+mod dead_code;
 
+pub use dead_code::DeadCodeConfig;
+
+use std::{collections::HashMap, sync::Arc};
+
+use serde::{Deserialize, Serialize};
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{Decl, ExprInfo},
@@ -18,7 +23,166 @@ use typst::{
 };
 
 /// A type alias for a vector of diagnostics.
-type DiagnosticVec = EcoVec<SourceDiagnostic>;
+type DiagnosticVec = EcoVec<LintDiagnostic>;
+
+/// Known lint rules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LintRule {
+    /// Unused bindings or imports.
+    DeadCode,
+    /// `break`/`continue` outside of loops.
+    BranchOutsideLoop,
+    /// `show`/`set` statements that never run.
+    IneffectiveShowSet,
+    /// Comparing types with strings.
+    TypeComparison,
+    /// Using variable fonts which Typst cannot handle yet.
+    VariableFont,
+    /// `return` outside of a function scope.
+    ReturnOutsideFunction,
+    /// Unknown math identifiers.
+    UnknownMathIdent,
+    /// Expressions implicitly discarded by a `return`.
+    ImplicitReturnDiscard,
+}
+
+impl LintRule {
+    /// Returns the short identifier used in user configuration.
+    pub const fn short_name(self) -> &'static str {
+        match self {
+            LintRule::DeadCode => "dead-code",
+            LintRule::BranchOutsideLoop => "branch-outside-loop",
+            LintRule::IneffectiveShowSet => "ineffective-show-set",
+            LintRule::TypeComparison => "type-comparison",
+            LintRule::VariableFont => "variable-font",
+            LintRule::ReturnOutsideFunction => "return-outside-function",
+            LintRule::UnknownMathIdent => "unknown-math-ident",
+            LintRule::ImplicitReturnDiscard => "implicit-return-discard",
+        }
+    }
+
+    /// Returns the diagnostic code reported over LSP.
+    pub const fn code(self) -> &'static str {
+        match self {
+            LintRule::DeadCode => "tinymist-lint.dead-code",
+            LintRule::BranchOutsideLoop => "tinymist-lint.branch-outside-loop",
+            LintRule::IneffectiveShowSet => "tinymist-lint.ineffective-show-set",
+            LintRule::TypeComparison => "tinymist-lint.type-comparison",
+            LintRule::VariableFont => "tinymist-lint.variable-font",
+            LintRule::ReturnOutsideFunction => "tinymist-lint.return-outside-function",
+            LintRule::UnknownMathIdent => "tinymist-lint.unknown-math-ident",
+            LintRule::ImplicitReturnDiscard => "tinymist-lint.implicit-return-discard",
+        }
+    }
+
+    /// Returns the default severity for the rule.
+    pub const fn default_level(self) -> LintLevel {
+        match self {
+            LintRule::DeadCode => LintLevel::Hint,
+            _ => LintLevel::Warning,
+        }
+    }
+}
+
+/// Severity levels configurable per lint rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LintLevel {
+    /// Report as error.
+    Error,
+    /// Report as warning.
+    Warning,
+    /// Report as information.
+    Info,
+    /// Report as hint.
+    Hint,
+    /// Disable the lint altogether.
+    Off,
+}
+
+impl Default for LintLevel {
+    fn default() -> Self {
+        Self::Warning
+    }
+}
+
+/// User-provided lint customizations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+#[derive(Default)]
+pub struct LintSettings(HashMap<LintRule, LintLevel>);
+
+impl LintSettings {
+    /// Get the effective level for a lint rule.
+    pub fn level(&self, rule: LintRule) -> LintLevel {
+        self.0
+            .get(&rule)
+            .copied()
+            .unwrap_or_else(|| rule.default_level())
+    }
+}
+
+/// A lint diagnostic coupled with its rule metadata.
+#[derive(Debug, Clone)]
+pub struct LintDiagnostic {
+    /// The lint rule that emitted this diagnostic.
+    pub rule: LintRule,
+    /// The raw Typst diagnostic.
+    pub diagnostic: SourceDiagnostic,
+    /// Optional metadata to help consumers tailor behavior.
+    pub metadata: Option<LintMetadata>,
+}
+
+impl LintDiagnostic {
+    /// Creates a new lint diagnostic.
+    pub fn new(rule: LintRule, diagnostic: SourceDiagnostic) -> Self {
+        Self {
+            rule,
+            diagnostic,
+            metadata: None,
+        }
+    }
+
+    /// Creates a new diagnostic with metadata.
+    pub fn with_metadata(
+        rule: LintRule,
+        diagnostic: SourceDiagnostic,
+        metadata: LintMetadata,
+    ) -> Self {
+        Self {
+            rule,
+            diagnostic,
+            metadata: Some(metadata),
+        }
+    }
+
+    /// Exposes the metadata if present.
+    pub fn metadata(&self) -> Option<LintMetadata> {
+        self.metadata
+    }
+}
+
+/// Extra metadata for lint diagnostics.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum LintMetadata {
+    /// Metadata associated with dead code diagnostics.
+    DeadCode {
+        /// Specifies what kind of dead code we detected.
+        kind: DeadCodeKind,
+    },
+}
+
+/// The specialization for dead code diagnostics.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeadCodeKind {
+    /// The unused item refers to an import/module binding.
+    Import,
+    /// The unused item refers to a local binding/definition.
+    Binding,
+}
 
 /// The lint information about a file.
 #[derive(Debug, Clone)]
@@ -37,8 +201,14 @@ pub fn lint_file(
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
+    has_references: impl Fn(&Interned<Decl>) -> bool,
 ) -> LintInfo {
-    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+    let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+
+    let dead_code_diags =
+        dead_code::check_dead_code(world, ei, has_references, &DeadCodeConfig::default());
+    diagnostics.extend(dead_code_diags);
+
     LintInfo {
         revision: ei.revision,
         fid: ei.fid,
@@ -117,6 +287,10 @@ impl<'w> Linter<'w> {
         self.diag
     }
 
+    fn push_diag(&mut self, rule: LintRule, diag: SourceDiagnostic) {
+        self.diag.push(LintDiagnostic::new(rule, diag));
+    }
+
     fn with_loop_info<F>(&mut self, span: Span, f: F) -> Option<()>
     where
         F: FnOnce(&mut Self) -> Option<()>,
@@ -178,7 +352,7 @@ impl<'w> Linter<'w> {
             diag.trace
                 .push(Spanned::new(Tracepoint::Call(None), func_info.span));
         }
-        self.diag.push(diag);
+        self.push_diag(LintRule::BranchOutsideLoop, diag);
 
         Some(())
     }
@@ -202,7 +376,7 @@ impl<'w> Linter<'w> {
                     first = false;
                     warning.hint(loc.hint(set));
                 }
-                self.diag.push(warning);
+                self.push_diag(LintRule::IneffectiveShowSet, warning);
             }
 
             return None;
@@ -248,7 +422,7 @@ impl<'w> Linter<'w> {
                     "compare with the literal type instead".into(),
                     "this comparison will always return `false` since typst v0.14".into(),
                 ]);
-                self.diag.push(diag);
+                self.push_diag(LintRule::TypeComparison, diag);
             }
         }
     }
@@ -298,7 +472,7 @@ impl<'w> Linter<'w> {
         let diag =
             SourceDiagnostic::warning(expr.span(), "variable font is not supported by typst yet");
         let diag = diag.with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185");
-        self.diag.push(diag);
+        self.push_diag(LintRule::VariableFont, diag);
 
         Some(())
     }
@@ -411,10 +585,13 @@ impl DataFlowVisitor for Linter<'_> {
             info.has_return = true;
             info.has_return_value = expr.body().is_some();
         } else {
-            self.diag.push(SourceDiagnostic::warning(
-                expr.span(),
-                "`return` statement in a non-function context",
-            ));
+            self.push_diag(
+                LintRule::ReturnOutsideFunction,
+                SourceDiagnostic::warning(
+                    expr.span(),
+                    "`return` statement in a non-function context",
+                ),
+            );
         }
         Some(())
     }
@@ -448,7 +625,7 @@ impl DataFlowVisitor for Linter<'_> {
             // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
             let in_global = self.world.library.global.scope().get(var).is_some();
             hint_unknown_variable_math(var, in_global, &mut warning);
-            self.diag.push(warning);
+            self.push_diag(LintRule::UnknownMathIdent, warning);
         }
 
         Some(())
@@ -663,7 +840,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 )),
                 _ => diag,
             };
-            self.linter.diag.push(diag);
+            self.linter.push_diag(LintRule::ImplicitReturnDiscard, diag);
         } else if ri.return_none && matches!(expr, ast::Expr::ShowRule(..) | ast::Expr::SetRule(..))
         {
             ri.warned = true;
@@ -674,7 +851,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                     expr.to_untyped().kind().name()
                 ),
             );
-            self.linter.diag.push(diag);
+            self.linter.push_diag(LintRule::ImplicitReturnDiscard, diag);
         }
 
         Some(())

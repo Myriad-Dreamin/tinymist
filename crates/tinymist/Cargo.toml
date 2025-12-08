@@ -52,6 +52,7 @@ sync-ls = { workspace = true, features = ["lsp", "server"] }
 tinymist-assets = { workspace = true }
 tinymist-debug = { workspace = true, optional = true }
 tinymist-l10n.workspace = true
+tinymist-lint.workspace = true
 tinymist-query.workspace = true
 tinymist-std.workspace = true
 tinymist-preview = { workspace = true, optional = true }

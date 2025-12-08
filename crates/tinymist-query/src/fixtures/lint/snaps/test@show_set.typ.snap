@@ -6,10 +6,11 @@ input_file: crates/tinymist-query/src/fixtures/lint/show_set.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.ineffective-show-set",
    "message": "This set statement doesn't take effect.\nHint: consider changing parent to `show : set text(red)`",
    "range": "1:2:1:15",
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
   }
  ]
 }
