@@ -4,6 +4,7 @@ expression: "JsonRepr::new_pure(result)"
 input_file: crates/tinymist-query/src/fixtures/references/cross_file_ref_label.typ
 ---
 [
+ "base1.typ@0:11:0:13",
  "base1.typ@1:11:1:13",
  "base2.typ@1:11:1:13",
  "base2.typ@3:11:3:13",

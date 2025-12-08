@@ -17,6 +17,11 @@ input_file: crates/tinymist-query/src/fixtures/rename/label.typ
     {
      "annotationId": "Typst Rename Labels",
      "newText": "new_name",
+     "range": "4:11:4:22"
+    },
+    {
+     "annotationId": "Typst Rename Labels",
+     "newText": "new_name",
      "range": "6:22:6:33"
     }
    ],

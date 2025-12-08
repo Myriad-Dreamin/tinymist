@@ -399,10 +399,6 @@ impl ExprWorker<'_> {
         }
     }
 
-    fn check_label(&mut self, label: ast::Label) -> Expr {
-        Expr::Decl(Decl::label(label.get(), label.span()).into())
-    }
-
     fn check_element<T: NativeElement>(&mut self, content: EcoVec<Expr>) -> Expr {
         let elem = Element::of::<T>();
         Expr::Element(ElementExpr { elem, content }.into())
@@ -1103,6 +1099,21 @@ impl ExprWorker<'_> {
 
         self.lexical.mode = old_mode;
         Expr::Block(items.into())
+    }
+
+    fn check_label(&mut self, label: ast::Label) -> Expr {
+        let decl: Interned<Decl> = Decl::label(label.get(), label.span()).into();
+
+        self.resolve_as(
+            RefExpr {
+                decl: decl.clone(),
+                step: None,
+                root: None,
+                term: None,
+            }
+            .into(),
+        );
+        Expr::Decl(decl)
     }
 
     fn check_ref(&mut self, ref_node: ast::Ref) -> Expr {
