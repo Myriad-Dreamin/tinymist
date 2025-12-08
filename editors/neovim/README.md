@@ -119,6 +119,12 @@ end, {})
 
 Make sure to change `exportPdf` to “onType” or “onSave”.
 
+### Working under Power-Saving Mode or with Resource-consumed Projects
+
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
+
+For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
+
 ### Working with Multiple-Files Projects
 
 Tinymist cannot know the main file of a multiple-files project if you don’t tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:

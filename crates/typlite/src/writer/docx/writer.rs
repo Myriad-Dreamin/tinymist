@@ -4,13 +4,14 @@ use base64::Engine;
 use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
-use log::{debug, warn};
+use log::debug;
 use std::fs;
 use std::io::Cursor;
 
 use crate::Result;
 use crate::common::{
-    CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode, VerbatimNode,
+    BlockVerbatimNode, CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode,
+    VerbatimNode,
 };
 
 use super::image_processor::DocxImageProcessor;
@@ -253,10 +254,7 @@ impl DocxWriter {
             }
             node if node.is_custom_type::<VerbatimNode>() => {
                 let node = node.as_custom_type::<VerbatimNode>().unwrap();
-                warn!(
-                    "ignoring `m1verbatim` content in DOCX export: {:?}",
-                    node.content
-                );
+                run = run.style("CodeInline").add_text(&node.content);
             }
             // Other inline element types
             _ => {
@@ -501,6 +499,15 @@ impl DocxWriter {
 
                 if !run.children.is_empty() {
                     para = para.add_run(run);
+                    docx = docx.add_paragraph(para);
+                }
+            }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                let block_node = node.as_custom_type::<BlockVerbatimNode>().unwrap();
+                for line in block_node.content.split('\n') {
+                    let para = Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(Run::new().add_text(line));
                     docx = docx.add_paragraph(para);
                 }
             }
