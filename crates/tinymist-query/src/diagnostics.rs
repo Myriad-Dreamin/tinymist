@@ -119,14 +119,9 @@ impl<'w> DiagWorker<'w> {
         let source = self.ctx.source_by_id(id)?;
         let lsp_range = self.diagnostic_range(&source, span);
 
-        let is_unused = typst_diagnostic.message.starts_with("unused ");
-
-        let lsp_severity = if is_unused {
-            DiagnosticSeverity::HINT
-        } else {
-            diagnostic_severity(typst_diagnostic.severity)
-        };
+        let lsp_severity = diagnostic_severity(&typst_diagnostic);
         let lsp_message = diagnostic_message(&typst_diagnostic);
+        let is_unused = typst_diagnostic.message.starts_with("unused ");
 
         let diagnostic = Diagnostic {
             range: lsp_range,
@@ -189,8 +184,12 @@ impl<'w> DiagWorker<'w> {
     }
 }
 
-fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
-    match typst_severity {
+fn diagnostic_severity(typst_diagnostic: &TypstDiagnostic) -> DiagnosticSeverity {
+    if typst_diagnostic.message.starts_with("unused ") {
+        return DiagnosticSeverity::HINT;
+    }
+
+    match typst_diagnostic.severity {
         TypstSeverity::Error => DiagnosticSeverity::ERROR,
         TypstSeverity::Warning => DiagnosticSeverity::WARNING,
     }
