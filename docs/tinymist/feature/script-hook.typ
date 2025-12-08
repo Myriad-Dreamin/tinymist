@@ -1,6 +1,6 @@
 #import "mod.typ": *
 
-#show: book-page.with(title: [Hook Script])
+#show: book-page.with(title: [Hook Scripts])
 
 The hook script feature is available since `tinymist` v0.14.2.
 
@@ -67,7 +67,7 @@ Specifically, three script hooks will be supported:
 - Hook on Watch: customize the watch behavior when a file change is detected in the workspaces.
 - Hook on Generating Code Actions and Lenses: adding additional code actions by typst scripting.
 
-= Customizing Paste Behavior
+= Customizing Paste Behavior (for VS Code)
 
 You could configure `tinymist.onPaste` to customize the paste behavior. It will be executed when pasting resources into the editing typst document. Two kinds of script code are supported:
 - If the script code starts with `{` and ends with `}`, it will be evaluated as a typst code expression.
@@ -109,7 +109,7 @@ If the result is a string, it will be treated as the `dir` field, i.e. `{ dir: <
 
 More fields will be supported in the future. If you have any suggestions, please feel free to open an issue.
 
-= Customizing Watch Behavior (Experimental)
+= Customizing Export Behavior (for all Editors, Experimental)
 
 *Note: this is not implemented yet in current version.*
 
@@ -151,7 +151,7 @@ async function pdfWithGhostScript() {
 
 Hint: you could create your own vscode extension to define such custom commands.
 
-= Providing Package-Specific Code Actions (Experimental)
+= Providing Package-Specific Code Actions (for all Editors, Experimental)
 
 *Note: this is not implemented yet in current version.*
 

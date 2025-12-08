@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import { extensionState } from "../../state";
 import type { EditorToolContext } from "../../tools";
+import { type ExportArgs, type ExportFormat, exportOps, provideFormats } from "../tasks.export";
 import { FONTS_EXPORT_CONFIG_VERSION, USER_PACKAGE_VERSION } from "../tool";
+import { base64Decode } from "../../util";
 
 export interface WebviewMessage {
   type: string;
@@ -27,6 +29,7 @@ export async function handleMessage(
       return false;
     }
   }
+  console.warn(`No handler for message type: ${message.type}`);
   return false;
 }
 
@@ -71,6 +74,19 @@ interface InitTemplateMessage {
 
 interface StopServerProfilingMessage {
   type: "stopServerProfiling";
+}
+
+interface ExportDocumentMessage {
+  type: "exportDocument";
+  format: ExportFormat;
+  extraArgs: ExportArgs;
+}
+
+interface GeneratePreviewMessage {
+  type: "generatePreview";
+  format: ExportFormat;
+  extraArgs: ExportArgs;
+  version: number;
 }
 
 export const messageHandlers: Record<string, MessageHandler> = {
@@ -220,5 +236,130 @@ export const messageHandlers: Record<string, MessageHandler> = {
     const traceData = await traceDataTask;
 
     postMessage({ type: "traceData", data: traceData });
+  },
+
+  exportDocument: async ({ format, extraArgs }: ExportDocumentMessage) => {
+    try {
+      const ops = exportOps(extraArgs);
+      const formatProvider = provideFormats(extraArgs);
+
+      // Get the active document
+      const uri = ops.resolveInputPath();
+      if (!uri) {
+        await vscode.window.showErrorMessage("No active document found");
+        return;
+      }
+
+      const provider = formatProvider[format];
+      if (!provider) {
+        await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
+        return;
+      }
+
+      // Execute export with configuration (file export by default)
+      const result = await provider.export(uri, provider.opts());
+
+      // Handle the response based on the new OnExportResponse format
+      if (!result) {
+        await vscode.window.showErrorMessage(`Export failed`);
+        return;
+      } else if ("path" in result) {
+        // Success case - Single
+        if (result.path) {
+          await vscode.window.showInformationMessage(`Exported successfully to: ${result.path}`);
+        } else {
+          await vscode.window.showInformationMessage("Export completed");
+        }
+      } else {
+        // Multiple files
+        const paths = result.items.map((item) => item.path).filter(Boolean);
+        if (paths.length > 0) {
+          await vscode.window.showInformationMessage(
+            `Exported successfully to:\n${paths.join("\n")}`,
+          );
+        } else {
+          await vscode.window.showInformationMessage("Export completed");
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await vscode.window.showErrorMessage(`Export failed: ${message}`);
+    }
+  },
+
+  generatePreview: async (
+    { format, extraArgs, version }: GeneratePreviewMessage,
+    { postMessage },
+  ) => {
+    const sendError = (message: string) => {
+      postMessage({
+        type: "previewError",
+        format,
+        error: message,
+      });
+    };
+
+    try {
+      const ops = exportOps(extraArgs);
+      const formatProvider = provideFormats(extraArgs);
+
+      // Get the active document
+      const uri = ops.resolveInputPath();
+      if (!uri) {
+        // Just ignore if no active document
+        return;
+      }
+
+      // Use PNG for both PDF and PNG preview
+      const actualFormat = format === "pdf" ? "png" : format;
+
+      const provider = formatProvider[actualFormat];
+      if (!provider) {
+        sendError(`Unsupported export format: ${format}`);
+        await vscode.window.showErrorMessage(`Unsupported export format: ${format}`);
+        return;
+      }
+
+      // Execute export with configuration (file export by default)
+      const response = await provider.export(uri, provider.opts(), { write: false });
+      console.log("Preview generation response:", response);
+      if (!response) {
+        const failureMessage = "Failed to generate preview data";
+        sendError(failureMessage);
+        await vscode.window.showErrorMessage(failureMessage);
+        return;
+      }
+
+      // For visual formats, generate PNG/SVG previews
+      if (format === "pdf" || format === "png" || format === "svg") {
+        // Extract base64 data from the response
+        const renderedPages = "data" in response ? [{ page: 1, ...response }] : response.items;
+
+        // Determine MIME type
+        const mimeType = actualFormat === "svg" ? "image/svg+xml" : "image/png";
+
+        // Multiple pages
+        postMessage({
+          type: "previewGenerated",
+          version,
+          format,
+          pages: renderedPages.map((page) => ({
+            pageNumber: page.page,
+            imageData: `data:${mimeType};base64,${page.data}`,
+          })),
+        });
+      } else {
+        const text = "data" in response ? response.data : response.items[0].data;
+        postMessage({
+          type: "previewGenerated",
+          version,
+          format,
+          text: text && base64Decode(text),
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      sendError(`Preview generation failed: ${message}`);
+    }
   },
 };

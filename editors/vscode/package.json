@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.14.0",
+  "version": "0.14.6-rc1",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -339,6 +339,24 @@
           "enumDescriptions": [
             "%extension.tinymist.config.tinymist.projectResolution.string.enum.singleFile%",
             "%extension.tinymist.config.tinymist.projectResolution.string.enum.lockDatabase%"
+          ]
+        },
+        "tinymist.syntaxOnly": {
+          "title": "%extension.tinymist.config.tinymist.syntaxOnly.title%",
+          "type": "string",
+          "default": "auto",
+          "markdownDescription": "%extension.tinymist.config.tinymist.syntaxOnly.desc%",
+          "enum": [
+            "auto",
+            "onPowerSaving",
+            "enable",
+            "disable"
+          ],
+          "enumDescriptions": [
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.auto%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.onPowerSaving%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.enable%",
+            "%extension.tinymist.config.tinymist.syntaxOnly.string.enum.disable%"
           ]
         },
         "tinymist.outputPath": {

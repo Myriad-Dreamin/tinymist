@@ -79,7 +79,7 @@ pub fn start_session<F: CompilerFeat>(
         adaptor.before_compile();
         step_global(BreakpointKind::BeforeCompile, &world);
 
-        let result = typst::compile::<PagedDocument>(&world);
+        let result = typst_shim::compile_opt::<PagedDocument>(&world);
 
         adaptor.after_compile(result);
         step_global(BreakpointKind::AfterCompile, &world);

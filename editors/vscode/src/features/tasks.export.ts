@@ -38,6 +38,10 @@ export interface ExportArgs {
   "svg.merged.gap"?: string;
 
   "pdf.creationTimestamp"?: string | null;
+  "pdf.pdfVersion"?: string;
+  "pdf.pdfValidator"?: string;
+  "pdf.pdfStandard"?: string[];
+  "pdf.pdfTags"?: boolean;
 
   "png.ppi"?: number;
 
@@ -140,9 +144,21 @@ export const exportOps = (exportArgs: ExportArgs) => ({
 export const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => ({
   pdf: {
     opts(): ExportPdfOpts {
+      const rawCreationTimestamp = exportArgs["pdf.creationTimestamp"];
+      const creationTimestamp = rawCreationTimestamp?.includes("T")
+        ? Math.floor(new Date(rawCreationTimestamp).getTime() / 1000).toString() // datetime-local to unix timestamp
+        : rawCreationTimestamp; // already unix timestamp or null/undefined
+
+      const pdfStandard = exportArgs["pdf.pdfStandard"] ?? [
+        ...(exportArgs["pdf.pdfVersion"] ? [exportArgs["pdf.pdfVersion"]] : []),
+        ...(exportArgs["pdf.pdfValidator"] ? [exportArgs["pdf.pdfValidator"]] : []),
+      ]; // combine version and validator into array
+
       return {
         pages: ops.resolvePagesOpts("pdf"),
-        creationTimestamp: exportArgs["pdf.creationTimestamp"],
+        creationTimestamp,
+        pdfStandard,
+        noPdfTags: !exportArgs["pdf.pdfTags"], // invert to noPdfTags
       };
     },
     export: tinymist.exportPdf,

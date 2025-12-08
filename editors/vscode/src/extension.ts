@@ -202,8 +202,8 @@ async function languageActivate(context: IContext) {
 
   const initTemplateCommand =
     (inPlace: boolean) =>
-      (...args: string[]) =>
-        initTemplate(context.context, inPlace, ...args);
+    (...args: string[]) =>
+      initTemplate(context.context, inPlace, ...args);
 
   // prettier-ignore
   context.subscriptions.push(
@@ -555,6 +555,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
     case "preview": {
       void vscode.commands.executeCommand(`typst-preview.preview`);
       return;
+    }
+    case "export": {
+      void vscode.commands.executeCommand(`tinymist.openExportTool`);
+      break;
     }
     case "export-html": {
       await commandShow("Html");

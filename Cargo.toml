@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.14.0"
+version = "0.14.6-rc1"
 edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
@@ -34,6 +34,7 @@ tokio = { version = "1.48.0", features = ["macros"] }
 tokio-util = { version = "0.7.16", features = ["compat"] }
 
 # System
+battery = "0.7.8"
 temp-env = "0.3.6"
 open = { version = "5.3.2" }
 parking_lot = "0.12.1"
@@ -190,7 +191,7 @@ insta-cmd = "0.6.0"
 
 
 # Our Own Crates
-tinymist-assets = { version = "=0.14.0" }
+tinymist-assets = { version = "=0.14.6-rc1" }
 
 tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.14.0" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.14.0" }
@@ -204,16 +205,16 @@ typst-shim = { path = "./crates/typst-shim", version = "0.14.0" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.14.0" }
-tinymist = { path = "./crates/tinymist/", version = "0.14.0", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.0" }
-tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.0" }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.0" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.0" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.0" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.0" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.14.0" }
-typlite = { path = "./crates/typlite", version = "0.14.0", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.14.6-rc1" }
+tinymist = { path = "./crates/tinymist/", version = "0.14.6-rc1", default-features = false }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.6-rc1" }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.6-rc1" }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.6-rc1" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.6-rc1" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.6-rc1" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.6-rc1" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.14.6-rc1" }
+typlite = { path = "./crates/typlite", version = "0.14.6-rc1", default-features = false }
 
 [profile.dev.package.insta]
 opt-level = 3
