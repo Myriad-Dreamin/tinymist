@@ -2,7 +2,9 @@
 
 use std::path::PathBuf;
 
-use ecow::{EcoVec, eco_format, eco_vec};
+use ecow::eco_format;
+#[cfg(feature = "local-registry")]
+use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::PackageSpec;
