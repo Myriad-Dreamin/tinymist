@@ -95,7 +95,8 @@ impl SemanticRequest for CodeActionRequest {
 mod tests {
     use std::path::PathBuf;
 
-    use tinymist_lint::KnownIssues;
+    use lsp_types::NumberOrString;
+    use tinymist_lint::{KnownIssues, LintRule};
     use typst::{diag::Warned, layout::PagedDocument};
 
     use super::*;
@@ -141,7 +142,11 @@ mod tests {
         let mut entries = Vec::new();
 
         for diag in gather_diagnostics(ctx, &source) {
-            if !diag.message.starts_with("unused ") {
+            let is_dead_code = matches!(
+                diag.code.as_ref(),
+                Some(NumberOrString::String(code)) if code == LintRule::DeadCode.code()
+            );
+            if !is_dead_code {
                 continue;
             }
 
@@ -215,10 +220,12 @@ mod tests {
         let compiler_diags = compiler_warnings.iter().chain(compiler_errors.iter());
 
         let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
-        let lint_warnings = ctx.lint(source, &known_issues);
+        let lint_diags = ctx.lint(source, &known_issues);
 
-        DiagWorker::new(ctx)
-            .convert_all(compiler_diags.chain(lint_warnings.iter()))
+        let mut worker = DiagWorker::new(ctx).check(&known_issues);
+        worker.push_lints(lint_diags.iter());
+        worker
+            .convert_all(compiler_diags)
             .into_values()
             .flatten()
             .collect()

@@ -12,7 +12,7 @@ use tinymist_analysis::{
 use tinymist_project::LspWorld;
 use typst::{ecow::EcoVec, syntax::FileId};
 
-use crate::DiagnosticVec;
+use crate::{DiagnosticVec, LintDiagnostic, LintMetadata, LintRule};
 use collector::{DefInfo, DefScope, collect_definitions};
 use diagnostic::generate_diagnostic;
 
@@ -101,8 +101,12 @@ pub fn check_dead_code(
         };
 
         if is_unused {
-            if let Some(diag) = generate_diagnostic(&def_info, world, ei) {
-                diagnostics.push(diag);
+            if let Some((diag, kind)) = generate_diagnostic(&def_info, world, ei) {
+                diagnostics.push(LintDiagnostic::with_metadata(
+                    LintRule::DeadCode,
+                    diag,
+                    LintMetadata::DeadCode { kind },
+                ));
             }
         }
     }

@@ -7,6 +7,8 @@ use tinymist_analysis::syntax::{Decl, DefKind, ExprInfo};
 use tinymist_project::LspWorld;
 use typst::diag::{SourceDiagnostic, eco_format};
 
+use crate::DeadCodeKind;
+
 use super::collector::{DefInfo, DefScope};
 
 /// Generates a diagnostic for an unused definition.
@@ -17,7 +19,7 @@ pub fn generate_diagnostic(
     def_info: &DefInfo,
     _world: &LspWorld,
     ei: &ExprInfo,
-) -> Option<SourceDiagnostic> {
+) -> Option<(SourceDiagnostic, DeadCodeKind)> {
     // Skip if the span is detached (synthetic or generated code)
     if def_info.span.is_detached() {
         return None;
@@ -93,5 +95,11 @@ pub fn generate_diagnostic(
         diag = diag.with_hint("imported modules should be used or the import should be removed");
     }
 
-    Some(diag)
+    let kind = if is_module_import || is_import_item {
+        DeadCodeKind::Import
+    } else {
+        DeadCodeKind::Binding
+    };
+
+    Some((diag, kind))
 }

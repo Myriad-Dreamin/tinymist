@@ -1,12 +1,14 @@
 //! Provides code actions for the document.
 
 use ecow::{EcoString, eco_format};
-use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
+use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions, DiagnosticTag, NumberOrString};
 use regex::Regex;
+use serde_json;
 use tinymist_analysis::syntax::{
     ExprInfo, ModuleItemLayout, PreviousItem, SyntaxClass, adjust_expr, node_ancestors,
     previous_items,
 };
+use tinymist_lint::{DeadCodeKind, LintMetadata, LintRule};
 use tinymist_std::path::{diff, unix_slash};
 use typst::syntax::Side;
 
@@ -83,21 +85,20 @@ impl<'a> CodeActionWorker<'a> {
                 continue;
             };
 
-            match match_autofix_kind(source, diag.message.as_str()) {
+            match match_autofix_kind(source, diag) {
                 Some(AutofixKind::UnknownVariable) => {
                     self.autofix_unknown_variable(root, &diag_range);
                 }
                 Some(AutofixKind::FileNotFound) => {
                     self.autofix_file_not_found(root, &diag_range);
                 }
+                Some(AutofixKind::RemoveUnusedImport) => {
+                    self.autofix_remove_unused_import(root, &diag_range);
+                }
                 Some(AutofixKind::MarkUnusedSymbol) => {
-                    if diag.message.starts_with("unused import:") {
-                        self.autofix_remove_unused_import(root, &diag_range);
-                    } else {
-                        self.autofix_unused_symbol(&diag_range);
-                        self.autofix_replace_with_placeholder(root, &diag_range);
-                        self.autofix_remove_declaration(root, &diag_range);
-                    }
+                    self.autofix_unused_symbol(&diag_range);
+                    self.autofix_replace_with_placeholder(root, &diag_range);
+                    self.autofix_remove_declaration(root, &diag_range);
                 }
                 _ => {}
             }
@@ -971,27 +972,56 @@ enum AutofixKind {
     UnknownVariable,
     FileNotFound,
     MarkUnusedSymbol,
+    RemoveUnusedImport,
 }
 
-fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
-    if msg.starts_with("unused ") {
-        return Some(AutofixKind::MarkUnusedSymbol);
-    }
+fn match_autofix_kind(source: &str, diag: &lsp_types::Diagnostic) -> Option<AutofixKind> {
+    if source == "tinymist-lint" {
+        if let Some(NumberOrString::String(code)) = diag.code.as_ref() {
+            if code == LintRule::DeadCode.code() {
+                let metadata = lint_metadata_from_diag(diag);
+                if metadata.is_some_and(|meta| {
+                    matches!(
+                        meta,
+                        LintMetadata::DeadCode {
+                            kind: DeadCodeKind::Import
+                        }
+                    )
+                }) {
+                    return Some(AutofixKind::RemoveUnusedImport);
+                }
 
-    if source == "typst" {
-        static PATTERNS: &[(&str, AutofixKind)] = &[
-            ("unknown variable", AutofixKind::UnknownVariable),
-            ("file not found", AutofixKind::FileNotFound),
-        ];
-
-        for (pattern, kind) in PATTERNS {
-            if msg.starts_with(pattern) {
-                return Some(*kind);
+                return Some(AutofixKind::MarkUnusedSymbol);
             }
         }
     }
 
+    if source == "typst" {
+        if let Some(NumberOrString::String(code)) = diag.code.as_ref() {
+            return match code.as_str() {
+                "typst.unknown-variable" => Some(AutofixKind::UnknownVariable),
+                "typst.file-not-found" => Some(AutofixKind::FileNotFound),
+                "typst.unused" => Some(AutofixKind::MarkUnusedSymbol),
+                _ => None,
+            };
+        }
+    }
+
+    if diag
+        .tags
+        .as_ref()
+        .is_some_and(|tags| tags.contains(&DiagnosticTag::UNNECESSARY))
+    {
+        return Some(AutofixKind::MarkUnusedSymbol);
+    }
+
     None
+}
+
+fn lint_metadata_from_diag(diag: &lsp_types::Diagnostic) -> Option<LintMetadata> {
+    diag.data
+        .as_ref()
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
 }
 
 fn is_ascii_ident(ch: u8) -> bool {

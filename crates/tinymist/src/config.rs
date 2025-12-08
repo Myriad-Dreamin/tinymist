@@ -30,6 +30,7 @@ use crate::project::{
     EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
 use crate::world::font::FontResolverImpl;
+use tinymist_lint::LintSettings;
 
 #[cfg(feature = "export")]
 use task::ExportUserConfig;
@@ -980,6 +981,9 @@ pub struct LintFeat {
     pub enabled: Option<bool>,
     /// When to trigger the lint checks.
     pub when: Option<TaskWhen>,
+    /// Per-rule severity overrides.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub rules: LintSettings,
 }
 
 impl LintFeat {
@@ -990,6 +994,11 @@ impl LintFeat {
         }
 
         self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
+    }
+
+    /// Get effective per-rule overrides.
+    pub fn settings(&self) -> &LintSettings {
+        &self.rules
     }
 }
 /// The lint features.

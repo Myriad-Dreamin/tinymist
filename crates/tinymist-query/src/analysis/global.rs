@@ -14,7 +14,7 @@ use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::{KnownIssues, LintInfo};
+use tinymist_lint::{KnownIssues, LintDiagnostic, LintInfo, LintSettings};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -22,7 +22,7 @@ use tinymist_world::debug_loc::DataSource;
 use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
-use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
+use typst::diag::{At, FileError, FileResult, SourceResult, StrResult};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
 use typst::layout::Position;
@@ -83,6 +83,8 @@ pub struct Analysis {
     pub color_theme: ColorTheme,
     /// When to trigger the lint.
     pub lint: TaskWhen,
+    /// Lint severity overrides.
+    pub lint_settings: LintSettings,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
@@ -485,7 +487,7 @@ impl LocalContext {
         &mut self,
         source: &Source,
         known_issues: &KnownIssues,
-    ) -> EcoVec<SourceDiagnostic> {
+    ) -> EcoVec<LintDiagnostic> {
         self.shared.lint(source, known_issues).diagnostics
     }
 
