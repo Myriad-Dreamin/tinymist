@@ -850,7 +850,7 @@ impl SharedContext {
                     }
                 } else if ei
                     .get_refs(decl.clone())
-                    .any(|(_, r)| r.as_ref().decl != *decl)
+                    .any(|(span, _)| *span != decl.span())
                 {
                     return true;
                 }
@@ -903,7 +903,7 @@ impl SharedContext {
             for decl in &all_decls {
                 if file_ei
                     .get_refs(decl.clone())
-                    .any(|(_, r)| r.as_ref().decl != *decl)
+                    .any(|(span, _)| *span != decl.span())
                 {
                     referenced_decls.insert(decl.clone());
                 }
