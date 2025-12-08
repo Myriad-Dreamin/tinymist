@@ -75,15 +75,15 @@ impl SemanticRequest for CodeLensRequest {
                 range: doc_start,
                 command: Some(Command {
                     title: if is_html {
-                        tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF")
-                    } else {
                         tinymist_l10n::t!("tinymist-query.code-action.exportHtml", "Export HTML")
+                    } else {
+                        tinymist_l10n::t!("tinymist-query.code-action.exportPdf", "Export PDF")
                     }
                     .to_string(),
                     command: if is_html {
-                        "tinymist.exportPdf"
-                    } else {
                         "tinymist.exportHtml"
+                    } else {
+                        "tinymist.exportPdf"
                     }
                     .to_string(),
                     arguments: Some(vec![uri]),
