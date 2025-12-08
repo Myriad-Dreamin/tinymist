@@ -81,6 +81,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
         },
         lint: config.lint.when().clone(),
         periscope: None,
+        local_packages: Arc::default(),
         tokens_caches: Arc::default(),
         workers: Default::default(),
         caches: Default::default(),

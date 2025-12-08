@@ -186,6 +186,7 @@ impl ServerState {
                     let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
                     Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
                 }),
+                local_packages: Arc::default(),
                 tokens_caches: Arc::default(),
                 workers: Default::default(),
                 caches: Default::default(),

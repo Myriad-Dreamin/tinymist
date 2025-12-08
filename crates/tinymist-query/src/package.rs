@@ -3,6 +3,8 @@
 use std::path::PathBuf;
 
 use ecow::eco_format;
+#[cfg(feature = "local-registry")]
+use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::PackageSpec;
@@ -80,7 +82,7 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 pub fn list_package(
     world: &tinymist_project::LspWorld,
     ns: Option<EcoString>,
-) -> Vec<PackageIndexEntry> {
+) -> EcoVec<PackageIndexEntry> {
     trait IsDirFollowLinks {
         fn is_dir_follow_links(&self) -> bool;
     }
@@ -100,7 +102,7 @@ pub fn list_package(
     // search packages locally. We only search in the data
     // directory and not the cache directory, because the latter is not
     // intended for storage of local packages.
-    let mut packages = vec![];
+    let mut packages = eco_vec![];
 
     log::info!(
         "searching for packages in namespace {ns:?} in paths {:?}",

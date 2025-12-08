@@ -86,6 +86,8 @@ pub struct Analysis {
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
     pub workers: Arc<AnalysisGlobalWorkers>,
+    /// The local package cache.
+    pub local_packages: Arc<Mutex<OnceLock<EcoVec<PackageIndexEntry>>>>,
     /// The semantic token cache.
     pub tokens_caches: Arc<Mutex<SemanticTokenCache>>,
     /// The global caches for analysis.
@@ -170,6 +172,7 @@ impl Analysis {
         self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
+        *self.local_packages.lock() = OnceLock::default();
         self.tokens_caches.lock().clear();
         self.analysis_rev_cache.lock().clear();
     }
@@ -683,17 +686,12 @@ impl SharedContext {
     }
 
     /// Gets the local packages and their descriptions.
-    pub fn local_packages(&self) -> &[PackageIndexEntry] {
-        self.analysis.caches.local_packages.get_or_init(|| {
-            #[cfg(feature = "local-registry")]
-            {
-                crate::package::list_package(self.world(), None)
-            }
-            #[cfg(not(feature = "local-registry"))]
-            {
-                Default::default()
-            }
-        })
+    pub fn local_packages(&self) -> EcoVec<PackageIndexEntry> {
+        #[cfg(feature = "local-registry")]
+        let it = || crate::package::list_package(self.world(), None);
+        #[cfg(not(feature = "local-registry"))]
+        let it = || Default::default();
+        self.analysis.local_packages.lock().get_or_init(it).clone()
     }
 
     pub(crate) fn const_eval(rr: ast::Expr<'_>) -> Option<Value> {
@@ -1292,7 +1290,6 @@ pub struct AnalysisGlobalCaches {
     signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     docstrings: CacheMap<DeferredCompute<Option<Arc<DocString>>>>,
     terms: CacheMap<(Value, Ty)>,
-    local_packages: DeferredCompute<Vec<PackageIndexEntry>>,
 }
 
 /// A local (lsp request spanned) cache for all level of analysis results of a
