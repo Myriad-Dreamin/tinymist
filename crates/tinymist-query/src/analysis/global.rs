@@ -677,6 +677,9 @@ impl SharedContext {
             }
         }
 
+        // todo: if previous and current are both valid language items. we prefer to
+        // select the previous one. e.g. @a:1|@b:1, we will select the `@a:1`?
+
         classify_syntax(node, cursor)
     }
 
