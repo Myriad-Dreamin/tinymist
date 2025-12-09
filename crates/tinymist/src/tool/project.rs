@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use parking_lot::Mutex;
 use tinymist_query::analysis::Analysis;
 use tokio::sync::mpsc;
 
@@ -76,20 +75,26 @@ where
         log::warn!("Project: system watcher is not enabled, file changes will not be watched");
     }
 
-    // Create the actor
-    let compile_handle = Arc::new(CompileHandlerImpl {
-        #[cfg(feature = "preview")]
-        preview: opts.preview,
-        is_standalone: true,
-        #[cfg(feature = "export")]
-        export: crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export()),
-        editor_tx,
-        client: Arc::new(intr_tx.clone()),
+    let analysis = opts.analysis.clone();
 
-        analysis: opts.analysis,
-        status_revision: Mutex::default(),
-        notified_revision: Mutex::default(),
-    });
+    #[cfg(feature = "preview")]
+    let preview = opts.preview;
+
+    #[cfg(feature = "export")]
+    let export_task =
+        crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export());
+
+    // Create the actor
+    let compile_handle = CompileHandlerImpl::new(
+        analysis,
+        editor_tx.clone(),
+        Arc::new(intr_tx.clone()),
+        true,
+        #[cfg(feature = "preview")]
+        preview,
+        #[cfg(feature = "export")]
+        export_task,
+    );
 
     let mut compiler = ProjectCompiler::new(
         verse,
