@@ -22,7 +22,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_for3.typ
   },
   {
    "message": "unused variable: `i`\nHint: consider removing this variable or prefixing with underscore: `_i`",
-   "range": "0:15:0:16",
+   "range": "0:1:2:1",
    "severity": 4,
    "source": "typst",
    "tags": [

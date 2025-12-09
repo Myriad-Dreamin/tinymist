@@ -11,21 +11,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
     "s1.typ": [
      {
       "insertTextFormat": 1,
-      "newText": "",
-      "range": "0:1:0:19"
-     }
-    ]
-   }
-  },
-  "kind": "quickfix",
-  "title": "Remove unused declaration"
- },
- {
-  "edit": {
-   "changes": {
-    "s1.typ": [
-     {
-      "insertTextFormat": 1,
       "newText": "\"/base.typ\"",
       "range": "0:9:0:19"
      }
