@@ -161,38 +161,49 @@ impl ServerState {
 
         // Create the compile handler for client consuming results.
         let periscope_args = config.periscope_args.clone();
+        let analysis = Arc::new(Analysis {
+            position_encoding: const_config.position_encoding,
+            allow_overlapping_token: const_config.tokens_overlapping_token_support,
+            allow_multiline_token: const_config.tokens_multiline_token_support,
+            remove_html: !config.support_html_in_markdown,
+            support_client_codelens: true,
+            extended_code_action: config.extended_code_action,
+            completion_feat: config.completion.clone(),
+            color_theme: match config.color_theme.as_deref() {
+                Some("dark") => tinymist_query::ColorTheme::Dark,
+                _ => tinymist_query::ColorTheme::Light,
+            },
+            lint: config.lint.when().clone(),
+            periscope: periscope_args.map(|args| {
+                let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
+                Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
+            }),
+            local_packages: Arc::default(),
+            tokens_caches: Arc::default(),
+            workers: Default::default(),
+            caches: Default::default(),
+            analysis_rev_cache: Arc::default(),
+            stats: Arc::default(),
+        });
+
+        let lint_hook = LintHook::new(analysis.clone(), editor_tx.clone());
+
+        #[cfg(feature = "preview")]
+        let preview_hook = PreviewHook::new(preview);
+
+        #[cfg(feature = "export")]
+        let export_hook = ExportHook::new(export.clone());
+
         let handle = Arc::new(CompileHandlerImpl {
+            analysis,
+            lint_hook,
             #[cfg(feature = "preview")]
-            preview,
+            preview_hook,
             is_standalone: false,
             #[cfg(feature = "export")]
-            export: export.clone(),
+            export_hook,
             editor_tx: editor_tx.clone(),
             client: Arc::new(client.clone().to_untyped()),
-            analysis: Arc::new(Analysis {
-                position_encoding: const_config.position_encoding,
-                allow_overlapping_token: const_config.tokens_overlapping_token_support,
-                allow_multiline_token: const_config.tokens_multiline_token_support,
-                remove_html: !config.support_html_in_markdown,
-                support_client_codelens: true,
-                extended_code_action: config.extended_code_action,
-                completion_feat: config.completion.clone(),
-                color_theme: match config.color_theme.as_deref() {
-                    Some("dark") => tinymist_query::ColorTheme::Dark,
-                    _ => tinymist_query::ColorTheme::Light,
-                },
-                lint: config.lint.when().clone(),
-                periscope: periscope_args.map(|args| {
-                    let r = TypstPeriscopeProvider(PeriscopeRenderer::new(args));
-                    Arc::new(r) as Arc<dyn PeriscopeProvider + Send + Sync>
-                }),
-                local_packages: Arc::default(),
-                tokens_caches: Arc::default(),
-                workers: Default::default(),
-                caches: Default::default(),
-                analysis_rev_cache: Arc::default(),
-                stats: Arc::default(),
-            }),
 
             status_revision: Mutex::default(),
             notified_revision: Mutex::default(),
@@ -245,11 +256,11 @@ impl ServerState {
         ProjectState {
             compiler,
             #[cfg(feature = "preview")]
-            preview: handle.preview.clone(),
+            preview: handle.preview_state(),
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
             #[cfg(feature = "export")]
-            export: handle.export.clone(),
+            export: handle.export_task(),
         }
     }
 }
@@ -448,19 +459,155 @@ impl ProjectPreviewState {
     }
 }
 
+fn push_editor_diagnostics(
+    editor_tx: &EditorSender,
+    dv: ProjVersion,
+    kind: DiagKind,
+    diagnostics: Option<DiagnosticsMap>,
+) {
+    editor_tx
+        .send(EditorRequest::Diag(dv, kind, diagnostics))
+        .log_error("failed to send diagnostics");
+}
+
+struct LintHook {
+    analysis: Arc<Analysis>,
+    editor_tx: EditorSender,
+}
+
+impl LintHook {
+    fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
+        Self {
+            analysis,
+            editor_tx,
+        }
+    }
+
+    fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact) {
+        let should_lint = art
+            .snap
+            .signal
+            .should_run_task_dyn(&self.analysis.lint, art.doc.as_ref())
+            .unwrap_or_default();
+        log::debug!(
+            "Project: should_lint: {should_lint:?}, signal: {:?}",
+            art.snap.signal
+        );
+
+        if !should_lint {
+            let enc = self.analysis.position_encoding;
+            let diagnostics =
+                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
+
+            log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+
+            push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Compiler, Some(diagnostics));
+            return;
+        }
+
+        let snap = art.clone();
+        let editor_tx = self.editor_tx.clone();
+        let analysis = self.analysis.clone();
+        let dv_clone = dv;
+        spawn_cpu(move || {
+            let mut ctx = analysis.enter(snap.graph.clone());
+
+            // todo: check all errors in this file
+            let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
+                return;
+            };
+
+            log::trace!(
+                "notify lint diagnostics({:?}): {:#?}",
+                dv_clone.id,
+                diagnostics.lint
+            );
+            log::trace!(
+                "notify compiler diagnostics({:?}): {:#?}",
+                dv_clone.id,
+                diagnostics.compiler
+            );
+
+            let lint_version = dv_clone.clone();
+            editor_tx
+                .send(EditorRequest::Diag(
+                    lint_version,
+                    DiagKind::Lint,
+                    Some(diagnostics.lint),
+                ))
+                .log_error("failed to send lint diagnostics");
+            editor_tx
+                .send(EditorRequest::Diag(
+                    dv_clone,
+                    DiagKind::Compiler,
+                    Some(diagnostics.compiler),
+                ))
+                .log_error("failed to send compiler diagnostics");
+        });
+    }
+}
+
+#[cfg(feature = "preview")]
+#[derive(Clone)]
+struct PreviewHook {
+    state: ProjectPreviewState,
+}
+
+#[cfg(feature = "preview")]
+impl PreviewHook {
+    fn new(state: ProjectPreviewState) -> Self {
+        Self { state }
+    }
+
+    fn notify(&self, art: &LspCompiledArtifact) {
+        if let Some(inner) = self.state.get(art.id()) {
+            let art = art.clone();
+            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { art }));
+        } else {
+            log::debug!("Project: no preview for {:?}", art.id());
+        }
+    }
+
+    fn state(&self) -> ProjectPreviewState {
+        self.state.clone()
+    }
+}
+
+#[cfg(feature = "export")]
+#[derive(Clone)]
+struct ExportHook {
+    task: crate::task::ExportTask,
+}
+
+#[cfg(feature = "export")]
+impl ExportHook {
+    fn new(task: crate::task::ExportTask) -> Self {
+        Self { task }
+    }
+
+    fn notify(&self, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>) {
+        self.task.signal(art, client);
+    }
+
+    fn task(&self) -> crate::task::ExportTask {
+        self.task.clone()
+    }
+}
+
 /// The implementation of the compile handler.
 pub struct CompileHandlerImpl {
     /// The analysis data.
     pub(crate) analysis: Arc<Analysis>,
+    lint_hook: LintHook,
 
     #[cfg(feature = "preview")]
-    pub(crate) preview: ProjectPreviewState,
+    preview_hook: PreviewHook,
     /// Whether the compile server is running in standalone CLI (not as a
     /// language server).
     pub is_standalone: bool,
     /// The export task.
     #[cfg(feature = "export")]
-    pub(crate) export: crate::task::ExportTask,
+    export_hook: ExportHook,
     /// The editor sender, used to send editor requests to the editor.
     pub(crate) editor_tx: EditorSender,
     /// The client used to send events back to the server itself or the clients.
@@ -519,21 +666,20 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
+    #[cfg(feature = "preview")]
+    fn preview_state(&self) -> ProjectPreviewState {
+        self.preview_hook.state()
+    }
+
+    #[cfg(feature = "export")]
+    fn export_task(&self) -> crate::task::ExportTask {
+        self.export_hook.task()
+    }
+
     /// Clears both compiler and lint diagnostics for the given project version.
     fn clear_diagnostics(&self, dv: ProjVersion) {
-        self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
-        self.push_diagnostics(dv, DiagKind::Lint, None);
-    }
-    /// Pushes diagnostics to the editor.
-    fn push_diagnostics(
-        &self,
-        dv: ProjVersion,
-        kind: DiagKind,
-        diagnostics: Option<DiagnosticsMap>,
-    ) {
-        self.editor_tx
-            .send(EditorRequest::Diag(dv, kind, diagnostics))
-            .log_error("failed to send diagnostics");
+        push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Compiler, None);
+        push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Lint, None);
     }
 
     /// Notifies the diagnostics.
@@ -549,65 +695,7 @@ impl CompileHandlerImpl {
             return;
         }
 
-        let should_lint = art
-            .snap
-            .signal
-            .should_run_task_dyn(&self.analysis.lint, art.doc.as_ref())
-            .unwrap_or_default();
-        log::debug!(
-            "Project: should_lint: {should_lint:?}, signal: {:?}",
-            art.snap.signal
-        );
-
-        if !should_lint {
-            let enc = self.analysis.position_encoding;
-            let diagnostics =
-                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
-
-            log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
-
-            self.push_diagnostics(dv, DiagKind::Compiler, Some(diagnostics));
-        } else {
-            let snap = art.clone();
-            let editor_tx = self.editor_tx.clone();
-            let analysis = self.analysis.clone();
-            let dv_clone = dv;
-            spawn_cpu(move || {
-                let mut ctx = analysis.enter(snap.graph.clone());
-
-                // todo: check all errors in this file
-                let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
-                    return;
-                };
-
-                log::trace!(
-                    "notify lint diagnostics({:?}): {:#?}",
-                    dv_clone.id,
-                    diagnostics.lint
-                );
-                log::trace!(
-                    "notify compiler diagnostics({:?}): {:#?}",
-                    dv_clone.id,
-                    diagnostics.compiler
-                );
-
-                let lint_version = dv_clone.clone();
-                editor_tx
-                    .send(EditorRequest::Diag(
-                        lint_version,
-                        DiagKind::Lint,
-                        Some(diagnostics.lint),
-                    ))
-                    .log_error("failed to send lint diagnostics");
-                editor_tx
-                    .send(EditorRequest::Diag(
-                        dv_clone,
-                        DiagKind::Compiler,
-                        Some(diagnostics.compiler),
-                    ))
-                    .log_error("failed to send compiler diagnostics");
-            });
-        }
+        self.lint_hook.notify(dv, art);
     }
 }
 
@@ -801,15 +889,10 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
 
         #[cfg(feature = "export")]
-        self.export.signal(art, &self.client);
+        self.export_hook.notify(art, &self.client);
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview.get(art.id()) {
-            let art = art.clone();
-            inner.notify_compile(Arc::new(crate::tool::preview::PreviewCompileView { art }));
-        } else {
-            log::debug!("Project: no preview for {:?}", art.id());
-        }
+        self.preview_hook.notify(art);
 
         self.notify_diagnostics(art);
     }
