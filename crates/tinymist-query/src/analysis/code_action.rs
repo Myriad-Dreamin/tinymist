@@ -94,9 +94,15 @@ impl<'a> CodeActionWorker<'a> {
                     if diag.message.starts_with("unused import:") {
                         self.autofix_remove_unused_import(root, &diag_range);
                     } else {
-                        self.autofix_unused_symbol(&diag_range);
-                        self.autofix_replace_with_placeholder(root, &diag_range);
-                        self.autofix_remove_declaration(root, &diag_range);
+                        let Some(binding_range) =
+                            self.binding_range_for_diag(root, &diag_range, diag)
+                        else {
+                            continue;
+                        };
+
+                        self.autofix_unused_symbol(&binding_range);
+                        self.autofix_replace_with_placeholder(root, &binding_range);
+                        self.autofix_remove_declaration(root, &binding_range);
                     }
                 }
                 _ => {}
@@ -505,6 +511,41 @@ impl<'a> CodeActionWorker<'a> {
             .values()
             .find(|layout| layout.binding_range == *binding_range)
             .cloned()
+    }
+
+    fn binding_range_for_diag(
+        &mut self,
+        root: &LinkedNode<'_>,
+        diag_range: &Range<usize>,
+        diag: &lsp_types::Diagnostic,
+    ) -> Option<Range<usize>> {
+        if diag_range.is_empty() {
+            return None;
+        }
+
+        if let Some(text) = self.source.text().get(diag_range.clone()) {
+            if is_plain_identifier(text) {
+                return Some(diag_range.clone());
+            }
+        }
+
+        let name = extract_backticked_name(&diag.message)?;
+        let cursor = (diag_range.start + 1).min(self.source.text().len());
+        let node = root.leaf_at_compat(cursor)?;
+        let decl_node = self.find_declaration_ancestor(&node)?;
+
+        if decl_node.kind() == SyntaxKind::LetBinding {
+            let let_binding = decl_node.cast::<ast::LetBinding>()?;
+            for binding in let_binding.kind().bindings() {
+                let binding_node = decl_node.find(binding.span())?;
+                let range = binding_node.range();
+                if self.source.text().get(range.clone())? == name {
+                    return Some(range);
+                }
+            }
+        }
+
+        None
     }
 
     fn expand_import_item_range(&self, mut range: Range<usize>) -> Range<usize> {
@@ -992,6 +1033,13 @@ fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
     }
 
     None
+}
+
+fn extract_backticked_name(message: &str) -> Option<&str> {
+    let start = message.find('`')?;
+    let rest = &message[start + 1..];
+    let end = rest.find('`')?;
+    Some(&rest[..end])
 }
 
 fn is_ascii_ident(ch: u8) -> bool {

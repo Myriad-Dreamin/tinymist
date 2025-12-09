@@ -54,6 +54,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/conditional_usage.typ
    }
   ],
   "message": "unused variable: `unused`\nHint: consider removing this variable or prefixing with underscore: `_unused`",
-  "range": "4:5:4:11"
+  "range": "4:1:4:16"
  }
 ]

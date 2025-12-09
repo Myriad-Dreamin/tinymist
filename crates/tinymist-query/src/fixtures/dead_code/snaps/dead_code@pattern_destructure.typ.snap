@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/pattern_destructure.typ
  "s0.typ": [
   {
    "message": "unused variable: `unused_b`\nHint: consider removing this variable or prefixing with underscore: `_unused_b`",
-   "range": "1:14:1:22",
+   "range": "1:1:1:43",
    "severity": 4,
    "source": "typst",
    "tags": [
