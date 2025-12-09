@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
  "s0.typ": [
   {
    "message": "unused variable: `unused_x`\nHint: consider removing this variable or prefixing with underscore: `_unused_x`",
-   "range": "6:18:6:26",
+   "range": "6:1:6:52",
    "severity": 4,
    "source": "typst",
    "tags": [
@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
   },
   {
    "message": "unused variable: `c2`\nHint: consider removing this variable or prefixing with underscore: `_c2`",
-   "range": "6:37:6:39",
+   "range": "6:1:6:52",
    "severity": 4,
    "source": "typst",
    "tags": [

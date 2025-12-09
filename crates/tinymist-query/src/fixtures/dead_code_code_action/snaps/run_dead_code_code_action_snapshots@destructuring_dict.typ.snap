@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 180
 description: Dead code code actions in /dummy-root/s0.typ
 expression: "JsonRepr::new_pure(ordered_entries)"
 input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
@@ -40,7 +39,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
    }
   ],
   "message": "unused variable: `unused_x`\nHint: consider removing this variable or prefixing with underscore: `_unused_x`",
-  "range": "6:18:6:26"
+  "range": "6:1:6:52"
  },
  {
   "actions": [
@@ -76,6 +75,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
    }
   ],
   "message": "unused variable: `c2`\nHint: consider removing this variable or prefixing with underscore: `_c2`",
-  "range": "6:37:6:39"
+  "range": "6:1:6:52"
  }
 ]

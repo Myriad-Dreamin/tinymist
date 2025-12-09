@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-assertion_line: 180
 description: Dead code code actions in /dummy-root/s0.typ
 expression: "JsonRepr::new_pure(ordered_entries)"
 input_file: crates/tinymist-query/src/fixtures/dead_code/nested_scope.typ
@@ -55,6 +54,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/nested_scope.typ
    }
   ],
   "message": "unused variable: `inner_unused`\nHint: consider removing this variable or prefixing with underscore: `_inner_unused`",
-  "range": "4:6:4:18"
+  "range": "4:2:4:22"
  }
 ]

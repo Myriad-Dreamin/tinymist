@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/shadowing.typ
  "s0.typ": [
   {
    "message": "unused variable: `x`\nHint: consider removing this variable or prefixing with underscore: `_x`",
-   "range": "1:5:1:6",
+   "range": "1:1:1:10",
    "severity": 4,
    "source": "typst",
    "tags": [

@@ -6,6 +6,8 @@
 use tinymist_analysis::syntax::{Decl, DefKind, ExprInfo};
 use tinymist_project::LspWorld;
 use typst::diag::{SourceDiagnostic, eco_format};
+use typst::syntax::ast::AstNode;
+use typst::syntax::{LinkedNode, Span, ast};
 
 use super::collector::{DefInfo, DefScope};
 
@@ -49,12 +51,14 @@ pub fn generate_diagnostic(
     }
 
     // Create the base diagnostic
+    let highlight_span = binding_span(def_info, ei).unwrap_or(def_info.span);
+
     let mut diag = if is_module_import {
-        SourceDiagnostic::warning(def_info.span, eco_format!("unused module import"))
+        SourceDiagnostic::warning(highlight_span, eco_format!("unused module import"))
     } else if is_import_item {
-        SourceDiagnostic::warning(def_info.span, eco_format!("unused import: `{name}`"))
+        SourceDiagnostic::warning(highlight_span, eco_format!("unused import: `{name}`"))
     } else {
-        SourceDiagnostic::warning(def_info.span, eco_format!("unused {kind_str}: `{name}`"))
+        SourceDiagnostic::warning(highlight_span, eco_format!("unused {kind_str}: `{name}`"))
     };
 
     // Add helpful hints based on the scope and kind
@@ -94,4 +98,24 @@ pub fn generate_diagnostic(
     }
 
     Some(diag)
+}
+
+fn binding_span(def_info: &DefInfo, ei: &ExprInfo) -> Option<Span> {
+    if !matches!(def_info.kind, DefKind::Variable | DefKind::Constant) {
+        return None;
+    }
+    if !matches!(def_info.scope, DefScope::File | DefScope::Local) {
+        return None;
+    }
+
+    let node = LinkedNode::new(ei.source.root()).find(def_info.span)?;
+    let mut current = Some(node);
+    while let Some(node) = current {
+        if let Some(binding) = node.cast::<ast::LetBinding>() {
+            return Some(binding.span());
+        }
+        current = node.parent().cloned();
+    }
+
+    None
 }
