@@ -519,6 +519,11 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
+    /// Clears both compiler and lint diagnostics for the given project version.
+    fn clear_diagnostics(&self, dv: ProjVersion) {
+        self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
+        self.push_diagnostics(dv, DiagKind::Lint, None);
+    }
     /// Pushes diagnostics to the editor.
     fn push_diagnostics(
         &self,
@@ -540,8 +545,7 @@ impl CompileHandlerImpl {
         // todo: better way to remove diagnostics
         let valid = !art.world().entry_state().is_inactive();
         if !valid {
-            self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
-            self.push_diagnostics(dv, DiagKind::Lint, None);
+            self.clear_diagnostics(dv);
             return;
         }
 
@@ -717,8 +721,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 id: rep.id.clone(),
                 revision,
             };
-            self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
-            self.push_diagnostics(dv, DiagKind::Lint, None);
+            self.clear_diagnostics(dv);
         }
 
         #[cfg(feature = "preview")]
@@ -747,8 +750,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         // todo: race condition with notify_compile?
         // remove diagnostics
-        self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
-        self.push_diagnostics(dv, DiagKind::Lint, None);
+        self.clear_diagnostics(dv);
     }
 
     fn notify_compile(&self, art: &LspCompiledArtifact) {
