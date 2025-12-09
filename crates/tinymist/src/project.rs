@@ -38,7 +38,7 @@ use tokio::sync::mpsc;
 use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
 
 use super::ServerState;
-use crate::actor::editor::{EditorRequest, ProjVersion};
+use crate::actor::editor::{DiagKind, EditorRequest, ProjVersion};
 use crate::stats::{CompilerQueryStats, QueryStatGuard};
 #[cfg(feature = "export")]
 use crate::task::ExportUserConfig;
@@ -520,9 +520,14 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 
 impl CompileHandlerImpl {
     /// Pushes diagnostics to the editor.
-    fn push_diagnostics(&self, dv: ProjVersion, diagnostics: Option<DiagnosticsMap>) {
+    fn push_diagnostics(
+        &self,
+        dv: ProjVersion,
+        kind: DiagKind,
+        diagnostics: Option<DiagnosticsMap>,
+    ) {
         self.editor_tx
-            .send(EditorRequest::Diag(dv, diagnostics))
+            .send(EditorRequest::Diag(dv, kind, diagnostics))
             .log_error("failed to send diagnostics");
     }
 
@@ -535,7 +540,8 @@ impl CompileHandlerImpl {
         // todo: better way to remove diagnostics
         let valid = !art.world().entry_state().is_inactive();
         if !valid {
-            self.push_diagnostics(dv, None);
+            self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
+            self.push_diagnostics(dv, DiagKind::Lint, None);
             return;
         }
 
@@ -556,13 +562,12 @@ impl CompileHandlerImpl {
 
             log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
 
-            self.editor_tx
-                .send(EditorRequest::Diag(dv, Some(diagnostics)))
-                .log_error("failed to send diagnostics");
+            self.push_diagnostics(dv, DiagKind::Compiler, Some(diagnostics));
         } else {
             let snap = art.clone();
             let editor_tx = self.editor_tx.clone();
             let analysis = self.analysis.clone();
+            let dv_clone = dv;
             spawn_cpu(move || {
                 let mut ctx = analysis.enter(snap.graph.clone());
 
@@ -571,11 +576,32 @@ impl CompileHandlerImpl {
                     return;
                 };
 
-                log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
+                log::trace!(
+                    "notify lint diagnostics({:?}): {:#?}",
+                    dv_clone.id,
+                    diagnostics.lint
+                );
+                log::trace!(
+                    "notify compiler diagnostics({:?}): {:#?}",
+                    dv_clone.id,
+                    diagnostics.compiler
+                );
 
+                let lint_version = dv_clone.clone();
                 editor_tx
-                    .send(EditorRequest::Diag(dv, Some(diagnostics)))
-                    .log_error("failed to send diagnostics");
+                    .send(EditorRequest::Diag(
+                        lint_version,
+                        DiagKind::Lint,
+                        Some(diagnostics.lint),
+                    ))
+                    .log_error("failed to send lint diagnostics");
+                editor_tx
+                    .send(EditorRequest::Diag(
+                        dv_clone,
+                        DiagKind::Compiler,
+                        Some(diagnostics.compiler),
+                    ))
+                    .log_error("failed to send compiler diagnostics");
             });
         }
     }
@@ -691,7 +717,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 id: rep.id.clone(),
                 revision,
             };
-            self.push_diagnostics(dv, None);
+            self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
+            self.push_diagnostics(dv, DiagKind::Lint, None);
         }
 
         #[cfg(feature = "preview")]
@@ -720,7 +747,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         // todo: race condition with notify_compile?
         // remove diagnostics
-        self.push_diagnostics(dv, None);
+        self.push_diagnostics(dv.clone(), DiagKind::Compiler, None);
+        self.push_diagnostics(dv, DiagKind::Lint, None);
     }
 
     fn notify_compile(&self, art: &LspCompiledArtifact) {
