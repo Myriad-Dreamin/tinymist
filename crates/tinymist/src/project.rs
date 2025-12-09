@@ -185,29 +185,16 @@ impl ServerState {
             analysis_rev_cache: Arc::default(),
             stats: Arc::default(),
         });
-
-        let lint_hook = LintHook::new(analysis.clone(), editor_tx.clone());
-
-        #[cfg(feature = "preview")]
-        let preview_hook = PreviewHook::new(preview);
-
-        #[cfg(feature = "export")]
-        let export_hook = ExportHook::new(export.clone());
-
-        let handle = Arc::new(CompileHandlerImpl {
-            analysis,
-            lint_hook,
+        let handle = CompileHandlerImpl::new(
+            analysis.clone(),
+            editor_tx.clone(),
+            Arc::new(client.clone().to_untyped()),
+            false,
             #[cfg(feature = "preview")]
-            preview_hook,
-            is_standalone: false,
+            preview,
             #[cfg(feature = "export")]
-            export_hook,
-            editor_tx: editor_tx.clone(),
-            client: Arc::new(client.clone().to_untyped()),
-
-            status_revision: Mutex::default(),
-            notified_revision: Mutex::default(),
-        });
+            export.clone(),
+        );
 
         let export_target = config.export_target;
         let default_path = config.entry_resolver.resolve_default();
@@ -484,6 +471,23 @@ impl LintHook {
     }
 
     fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact) {
+        let enc = self.analysis.position_encoding;
+        let diagnostics =
+            tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
+
+        log::trace!(
+            "notify compiler diagnostics({:?}): {:#?}",
+            dv.id,
+            diagnostics
+        );
+
+        push_editor_diagnostics(
+            &self.editor_tx,
+            dv.clone(),
+            DiagKind::Compiler,
+            Some(diagnostics),
+        );
+
         let should_lint = art
             .snap
             .signal
@@ -495,13 +499,6 @@ impl LintHook {
         );
 
         if !should_lint {
-            let enc = self.analysis.position_encoding;
-            let diagnostics =
-                tinymist_query::convert_diagnostics(art.graph.clone(), art.diagnostics(), enc);
-
-            log::trace!("notify diagnostics({dv:?}): {diagnostics:#?}");
-
-            push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Compiler, Some(diagnostics));
             return;
         }
 
@@ -522,11 +519,6 @@ impl LintHook {
                 dv_clone.id,
                 diagnostics.lint
             );
-            log::trace!(
-                "notify compiler diagnostics({:?}): {:#?}",
-                dv_clone.id,
-                diagnostics.compiler
-            );
 
             let lint_version = dv_clone.clone();
             editor_tx
@@ -536,13 +528,6 @@ impl LintHook {
                     Some(diagnostics.lint),
                 ))
                 .log_error("failed to send lint diagnostics");
-            editor_tx
-                .send(EditorRequest::Diag(
-                    dv_clone,
-                    DiagKind::Compiler,
-                    Some(diagnostics.compiler),
-                ))
-                .log_error("failed to send compiler diagnostics");
         });
     }
 }
@@ -666,6 +651,35 @@ impl ProjectClient for mpsc::UnboundedSender<LspInterrupt> {
 }
 
 impl CompileHandlerImpl {
+    pub(crate) fn new(
+        analysis: Arc<Analysis>,
+        editor_tx: EditorSender,
+        client: Arc<dyn ProjectClient>,
+        is_standalone: bool,
+        #[cfg(feature = "preview")] preview: ProjectPreviewState,
+        #[cfg(feature = "export")] export: crate::task::ExportTask,
+    ) -> Arc<Self> {
+        let lint_hook = LintHook::new(analysis.clone(), editor_tx.clone());
+        #[cfg(feature = "preview")]
+        let preview_hook = PreviewHook::new(preview);
+        #[cfg(feature = "export")]
+        let export_hook = ExportHook::new(export);
+
+        Arc::new(Self {
+            analysis,
+            lint_hook,
+            #[cfg(feature = "preview")]
+            preview_hook,
+            is_standalone,
+            #[cfg(feature = "export")]
+            export_hook,
+            editor_tx,
+            client,
+            status_revision: Mutex::default(),
+            notified_revision: Mutex::default(),
+        })
+    }
+
     #[cfg(feature = "preview")]
     fn preview_state(&self) -> ProjectPreviewState {
         self.preview_hook.state()
@@ -813,7 +827,7 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
         }
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview.get(&rep.id) {
+        if let Some(inner) = self.preview_state().get(&rep.id) {
             use tinymist_preview::CompileStatus;
             use tinymist_project::CompileStatusEnum::*;
 
