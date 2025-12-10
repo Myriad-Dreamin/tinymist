@@ -457,12 +457,12 @@ fn push_editor_diagnostics(
         .log_error("failed to send diagnostics");
 }
 
-struct LintHook {
+struct DiagHook {
     analysis: Arc<Analysis>,
     editor_tx: EditorSender,
 }
 
-impl LintHook {
+impl DiagHook {
     fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
         Self {
             analysis,
@@ -487,7 +487,23 @@ impl LintHook {
             DiagKind::Compiler,
             Some(diagnostics),
         );
+    }
+}
 
+struct LintHook {
+    analysis: Arc<Analysis>,
+    editor_tx: EditorSender,
+}
+
+impl LintHook {
+    fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
+        Self {
+            analysis,
+            editor_tx,
+        }
+    }
+
+    fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact) {
         let should_lint = art
             .snap
             .signal
@@ -505,7 +521,6 @@ impl LintHook {
         let snap = art.clone();
         let editor_tx = self.editor_tx.clone();
         let analysis = self.analysis.clone();
-        let dv_clone = dv;
         spawn_cpu(move || {
             let mut ctx = analysis.enter(snap.graph.clone());
 
@@ -516,14 +531,13 @@ impl LintHook {
 
             log::trace!(
                 "notify lint diagnostics({:?}): {:#?}",
-                dv_clone.id,
+                dv.id,
                 diagnostics.lint
             );
 
-            let lint_version = dv_clone.clone();
             editor_tx
                 .send(EditorRequest::Diag(
-                    lint_version,
+                    dv,
                     DiagKind::Lint,
                     Some(diagnostics.lint),
                 ))
@@ -583,6 +597,7 @@ impl ExportHook {
 pub struct CompileHandlerImpl {
     /// The analysis data.
     pub(crate) analysis: Arc<Analysis>,
+    diag_hook: DiagHook,
     lint_hook: LintHook,
 
     #[cfg(feature = "preview")]
@@ -659,6 +674,7 @@ impl CompileHandlerImpl {
         #[cfg(feature = "preview")] preview: ProjectPreviewState,
         #[cfg(feature = "export")] export: crate::task::ExportTask,
     ) -> Arc<Self> {
+        let diag_hook = DiagHook::new(analysis.clone(), editor_tx.clone());
         let lint_hook = LintHook::new(analysis.clone(), editor_tx.clone());
         #[cfg(feature = "preview")]
         let preview_hook = PreviewHook::new(preview);
@@ -667,6 +683,7 @@ impl CompileHandlerImpl {
 
         Arc::new(Self {
             analysis,
+            diag_hook,
             lint_hook,
             #[cfg(feature = "preview")]
             preview_hook,
@@ -709,6 +726,7 @@ impl CompileHandlerImpl {
             return;
         }
 
+        self.diag_hook.notify(dv.clone(), art);
         self.lint_hook.notify(dv, art);
     }
 }
