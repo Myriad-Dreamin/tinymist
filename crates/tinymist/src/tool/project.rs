@@ -84,9 +84,10 @@ where
     let export_task =
         crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export());
 
-    let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = Vec::new();
-    hooks.push(Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())));
-    hooks.push(Box::new(LintHook::new(analysis.clone(), editor_tx.clone())));
+    let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = vec![
+        Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())),
+        Box::new(LintHook::new(analysis.clone(), editor_tx.clone())),
+    ];
     #[cfg(feature = "preview")]
     hooks.push(Box::new(PreviewHook::new(preview)));
     #[cfg(feature = "export")]
