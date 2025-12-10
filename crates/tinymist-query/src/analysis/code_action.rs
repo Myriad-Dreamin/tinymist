@@ -93,6 +93,8 @@ impl<'a> CodeActionWorker<'a> {
                 Some(AutofixKind::MarkUnusedSymbol) => {
                     if diag.message.starts_with("unused import:") {
                         self.autofix_remove_unused_import(root, &diag_range);
+                    } else if diag.message.starts_with("unused module:") {
+                        self.autofix_remove_declaration(root, &diag_range);
                     } else {
                         let Some(binding_range) =
                             self.binding_range_for_diag(root, &diag_range, diag)
