@@ -84,16 +84,21 @@ where
     let export_task =
         crate::task::ExportTask::new(handle, Some(editor_tx.clone()), opts.config.export());
 
+    let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = Vec::new();
+    hooks.push(Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())));
+    hooks.push(Box::new(LintHook::new(analysis.clone(), editor_tx.clone())));
+    #[cfg(feature = "preview")]
+    hooks.push(Box::new(PreviewHook::new(preview)));
+    #[cfg(feature = "export")]
+    hooks.push(Box::new(ExportHook::new(export_task)));
+
     // Create the actor
     let compile_handle = CompileHandlerImpl::new(
         analysis,
         editor_tx.clone(),
         Arc::new(intr_tx.clone()),
         true,
-        #[cfg(feature = "preview")]
-        preview,
-        #[cfg(feature = "export")]
-        export_task,
+        hooks,
     );
 
     let mut compiler = ProjectCompiler::new(
