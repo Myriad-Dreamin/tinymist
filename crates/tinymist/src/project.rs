@@ -189,9 +189,10 @@ impl ServerState {
             stats: Arc::default(),
         });
 
-        let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = Vec::new();
-        hooks.push(Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())));
-        hooks.push(Box::new(LintHook::new(analysis.clone(), editor_tx.clone())));
+        let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = vec![
+            Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())),
+            Box::new(LintHook::new(analysis.clone(), editor_tx.clone())),
+        ];
         #[cfg(feature = "preview")]
         hooks.push(Box::new(PreviewHook::new(preview)));
         #[cfg(feature = "export")]
@@ -466,12 +467,14 @@ fn push_editor_diagnostics(
         .log_error("failed to send diagnostics");
 }
 
+/// A hook that handles diagnostics.
 pub struct DiagHook {
     analysis: Arc<Analysis>,
     editor_tx: EditorSender,
 }
 
 impl DiagHook {
+    /// Creates a new diagnostics hook.
     pub fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
         Self {
             analysis,
@@ -499,8 +502,11 @@ impl DiagHook {
     }
 }
 
+/// A hook that handles compilation events.
 pub trait CompileHook {
+    /// Notifies the hook of a compilation result.
     fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>);
+    /// Notifies the hook of a compilation status.
     fn status(&self, _revision: usize, _rep: &CompileReport) {}
 }
 
@@ -515,12 +521,14 @@ impl CompileHook for DiagHook {
     }
 }
 
+/// A hook that handles linting.
 pub struct LintHook {
     analysis: Arc<Analysis>,
     editor_tx: EditorSender,
 }
 
 impl LintHook {
+    /// Creates a new lint hook.
     pub fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
         Self {
             analysis,
@@ -584,12 +592,14 @@ impl CompileHook for LintHook {
 
 #[cfg(feature = "preview")]
 #[derive(Clone)]
+/// A hook that handles preview.
 pub struct PreviewHook {
     state: ProjectPreviewState,
 }
 
 #[cfg(feature = "preview")]
 impl PreviewHook {
+    /// Creates a new preview hook.
     pub fn new(state: ProjectPreviewState) -> Self {
         Self { state }
     }
@@ -616,6 +626,7 @@ impl PreviewHook {
         }
     }
 
+    #[allow(dead_code)]
     fn state(&self) -> ProjectPreviewState {
         self.state.clone()
     }
@@ -639,16 +650,19 @@ impl CompileHook for PreviewHook {
 
 #[cfg(feature = "export")]
 #[derive(Clone)]
+/// A hook that handles export.
 pub struct ExportHook {
     task: crate::task::ExportTask,
 }
 
 #[cfg(feature = "export")]
 impl ExportHook {
+    /// Creates a new export hook.
     pub fn new(task: crate::task::ExportTask) -> Self {
         Self { task }
     }
 
+    #[allow(dead_code)]
     fn task(&self) -> crate::task::ExportTask {
         self.task.clone()
     }
