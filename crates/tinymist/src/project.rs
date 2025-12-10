@@ -189,6 +189,7 @@ impl ServerState {
             stats: Arc::default(),
         });
 
+        #[allow(unused_mut)]
         let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = vec![
             Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())),
             Box::new(LintHook::new(analysis.clone(), editor_tx.clone())),
