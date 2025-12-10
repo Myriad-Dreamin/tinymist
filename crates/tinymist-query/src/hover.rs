@@ -1,6 +1,9 @@
 use core::fmt::{self, Write};
+use std::cmp::Reverse;
+use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
+use tinymist_world::package::PackageSpec;
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -100,6 +103,7 @@ impl HoverWorker<'_> {
         let source = self.source.clone();
         let leaf = LinkedNode::new(source.root()).leaf_at_compat(self.cursor)?;
 
+        self.package_import(&leaf);
         self.definition(&leaf)
             .or_else(|| self.star(&leaf))
             .or_else(|| self.link(&leaf))
@@ -212,6 +216,192 @@ impl HoverWorker<'_> {
         let content = format!("This star imports {}", separated_list(&names, "and"));
         self.def.push(content);
         Some(())
+    }
+
+    fn package_import(&mut self, node: &LinkedNode) -> Option<()> {
+        // Check if we're in a string literal that's part of an import
+        if !matches!(node.kind(), SyntaxKind::Str) {
+            return None;
+        }
+
+        // Navigate up to find the ModuleImport node
+        let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
+
+        // Check if this is a package import
+        if let ast::Expr::Str(str_node) = import_node.source()
+            && let import_str = str_node.get()
+            && import_str.starts_with("@")
+            && let Ok(package_spec) = PackageSpec::from_str(&import_str)
+        {
+            self.def
+                .push(self.get_package_hover_info(&package_spec, node));
+            return Some(());
+        }
+
+        None
+    }
+
+    /// Get package information for hover content
+    fn get_package_hover_info(
+        &self,
+        package_spec: &PackageSpec,
+        import_str_node: &LinkedNode,
+    ) -> String {
+        #[cfg(feature = "local-registry")]
+        use tinymist_world::package::registry::PackageSpecExt;
+
+        let versionless_spec = package_spec.versionless();
+
+        // Get all matching packages
+        let w = self.ctx.world().clone();
+        let mut packages = w
+            .packages()
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .collect_vec();
+        // local_packages to references and add them to the packages
+        #[cfg(feature = "local-registry")]
+        let local_packages = self.ctx.local_packages();
+        #[cfg(feature = "local-registry")]
+        if !package_spec.is_preview() {
+            packages.extend(
+                local_packages
+                    .iter()
+                    .filter(|it| it.matches_versionless(&versionless_spec)),
+            );
+        }
+
+        // Sort by version descending
+        packages.sort_by_key(|entry| Reverse(entry.package.version));
+
+        let current_entry = packages
+            .iter()
+            .find(|entry| entry.package.version == package_spec.version);
+
+        let mut info = String::new();
+        {
+            // Add links
+            let mut links_line = Vec::new();
+
+            if package_spec.is_preview() {
+                let package_name = &package_spec.name;
+
+                // Universe page
+                let universe_url = format!("https://typst.app/universe/package/{package_name}");
+                links_line.push(format!("🌌 [Universe]({universe_url})"));
+            }
+
+            if let Some(current_entry) = current_entry {
+                // Repository URL
+                if let Some(ref repo) = current_entry.package.repository {
+                    links_line.push(format!("🔗 [Repository]({repo})"));
+                }
+
+                // Homepage URL
+                if let Some(ref homepage) = current_entry.package.homepage {
+                    links_line.push(format!("🏠 [Homepage]({homepage})"));
+                }
+            }
+
+            if !links_line.is_empty() {
+                info.push_str(&links_line.iter().join(" | "));
+                info.push_str("\n\n");
+            }
+        }
+
+        // Package header
+        if package_spec.namespace == "local" {
+            info.push_str("ℹ️ This is a local package\n\n");
+        }
+
+        info.push_str(&format!("**Package:** `{package_spec}`\n"));
+        // Check version information and show status
+        if current_entry.is_none() {
+            info.push_str(&format!(
+                "‼️ **Version {} not found**\n\n",
+                package_spec.version
+            ));
+        } else if let Some(latest) = packages.first() {
+            let latest_version = &latest.package.version;
+            if *latest_version != package_spec.version {
+                info.push_str(&format!(
+                    "⚠️ **Newer version available: {latest_version}**\n"
+                ));
+            } else {
+                info.push_str("✅ **Up to date** (latest version)\n");
+            }
+        }
+        info.push('\n');
+
+        let date_format = tinymist_std::time::yyyy_mm_dd();
+
+        // Add manifest information if available
+        if let Some(current_entry) = current_entry {
+            let pkg_info = &current_entry.package;
+
+            if !pkg_info.authors.is_empty() {
+                info.push_str(&format!("**Authors:** {}\n\n", pkg_info.authors.join(", ")));
+            }
+
+            if let Some(description) = pkg_info.description.as_ref() {
+                info.push_str(&format!("**Description:** {description}\n\n"));
+            }
+
+            if let Some(license) = &pkg_info.license {
+                info.push_str(&format!("**License:** {license}\n\n"));
+            }
+
+            if let Some(updated_at) = &current_entry.updated_at {
+                info.push_str(&format!(
+                    "**Updated:** {}\n\n",
+                    updated_at
+                        .format(&date_format)
+                        .unwrap_or_else(|_| "unknown".to_string())
+                ));
+            }
+        }
+
+        // Show version history for preview packages
+        if !packages.is_empty() {
+            info.push_str("**Available Versions** (click to replace):\n");
+            for entry in &packages {
+                let version = &entry.package.version;
+                let release_date = entry
+                    .updated_at
+                    .and_then(|time| time.format(&date_format).ok())
+                    .unwrap_or_default();
+                if *version == package_spec.version {
+                    // Current version
+                    info.push_str(&format!("- **{version}** / {release_date}\n"));
+                    continue;
+                }
+                // Other versions
+                let lsp_range = self.ctx.to_lsp_range(import_str_node.range(), &self.source);
+                let args = serde_json::json!({
+                    "range": lsp_range,
+                    "replace": format!(
+                        "\"@{}/{}:{}\"",
+                        package_spec.namespace, package_spec.name, version
+                    )
+                });
+                let json_str = match serde_json::to_string(&args) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::error!("Failed to serialize arguments for replaceText command: {e}");
+                        continue;
+                    }
+                };
+                let encoded = percent_encoding::utf8_percent_encode(
+                    &json_str,
+                    percent_encoding::NON_ALPHANUMERIC,
+                );
+                let version_url = format!("command:tinymist.replaceText?{encoded}");
+                info.push_str(&format!("- [{version}]({version_url}) / {release_date}\n"));
+            }
+            info.push('\n');
+        }
+
+        info
     }
 
     fn link(&mut self, mut node: &LinkedNode) -> Option<()> {
