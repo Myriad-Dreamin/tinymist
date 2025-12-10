@@ -13,6 +13,21 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_unused.ty
       "main.typ": [
        {
         "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:0:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   },
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
         "newText": "\"/u.typ\"",
         "range": "2:8:2:15"
        }
