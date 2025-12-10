@@ -4,4 +4,4 @@ pub mod pack;
 pub use pack::*;
 
 pub mod registry;
-pub use registry::{PackageError, PackageRegistry, PackageSpec};
+pub use registry::{PackageError, PackageRegistry, PackageSpec, PackageSpecExt};

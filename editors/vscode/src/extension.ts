@@ -232,8 +232,9 @@ async function languageActivate(context: IContext) {
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
+
+    commands.registerTextEditorCommand("tinymist.replaceText", commandReplaceText),
   );
-  // context.subscriptions.push
   const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
@@ -638,4 +639,18 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
+}
+
+async function commandReplaceText(
+  editor: TextEditor,
+  edit: vscode.TextEditorEdit,
+  args?: { range: vscode.Range; replace: string },
+): Promise<void> {
+  if (editor && args) {
+    const range = new vscode.Range(
+      new vscode.Position(args.range.start.line, args.range.start.character),
+      new vscode.Position(args.range.end.line, args.range.end.character),
+    );
+    edit.replace(range, args.replace);
+  }
 }
