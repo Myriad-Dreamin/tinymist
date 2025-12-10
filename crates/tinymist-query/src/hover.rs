@@ -251,11 +251,14 @@ impl HoverWorker<'_> {
 
         // Get all matching packages
         let w = self.ctx.world().clone();
-        let mut packages = w
-            .packages()
-            .iter()
-            .filter(|it| it.matches_versionless(&versionless_spec))
-            .collect_vec();
+        let mut packages = vec![];
+        if package_spec.is_preview() {
+            packages.extend(
+                w.packages()
+                    .iter()
+                    .filter(|it| it.matches_versionless(&versionless_spec)),
+            );
+        }
         // local_packages to references and add them to the packages
         #[cfg(feature = "local-registry")]
         let local_packages = self.ctx.local_packages();
@@ -360,7 +363,10 @@ impl HoverWorker<'_> {
 
         // Show version history for preview packages
         if !packages.is_empty() {
-            info.push_str("**Available Versions** (click to replace):\n");
+            info.push_str(&format!(
+                "**Available Versions ({})** (click to replace):\n",
+                packages.len()
+            ));
             for entry in &packages {
                 let version = &entry.package.version;
                 let release_date = entry

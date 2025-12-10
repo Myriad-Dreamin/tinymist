@@ -12,6 +12,6 @@ Range: 0:29:0:53
 
 **Description:** example package (mock).
 
-**Available Versions** (click to replace):
+**Available Versions (2)** (click to replace):
 - **0.1.1** / 
 - [0.1.0](command:tinymist.replaceText?%7B%22range%22%3A%7B%22end%22%3A%7B%22character%22%3A53%2C%22line%22%3A0%7D%2C%22start%22%3A%7B%22character%22%3A29%2C%22line%22%3A0%7D%7D%2C%22replace%22%3A%22%5C%22%40preview%2Fexample%3A0%2E1%2E0%5C%22%22%7D) /
