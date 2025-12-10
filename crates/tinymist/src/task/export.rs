@@ -16,7 +16,7 @@ use tinymist_std::path::PathClean;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{
     output_template, DocumentQuery, ExportMarkdownTask, ExportPngTask, ExportSvgTask, ExportTarget,
-    ImageOutput, PdfExport, PngExport, SvgExport, TextExport,
+    ExportTask as ProjectExportTask, ImageOutput, PdfExport, PngExport, SvgExport, TextExport,
 };
 use tokio::sync::mpsc;
 use typlite::{Format, Typlite};
@@ -27,16 +27,16 @@ use parking_lot::Mutex;
 use rayon::Scope;
 
 use super::SyncTaskFactory;
+use crate::actor::editor::EditorRequest;
 use crate::lsp::query::QueryFuture;
 use crate::project::{
     update_lock, ApplyProjectTask, CompiledArtifact, DevEvent, DevExportEvent, EntryReader,
-    ExportHtmlTask, ExportPdfTask, ExportTask as ProjectExportTask, ExportTeXTask, ExportTextTask,
-    LspCompiledArtifact, LspComputeGraph, ProjectClient, ProjectTask, TaskWhen,
-    PROJECT_ROUTE_USER_ACTION_PRIORITY,
+    ExportHtmlTask, ExportPdfTask, ExportTeXTask, ExportTextTask, LspCompiledArtifact,
+    LspComputeGraph, ProjectClient, ProjectTask, TaskWhen, PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
+use crate::tool::word_count;
 use crate::world::TaskInputs;
 use crate::ServerState;
-use crate::{actor::editor::EditorRequest, tool::word_count};
 
 impl ServerState {
     /// Exports the current document.
@@ -159,15 +159,11 @@ impl ExportTask {
         self.factory.mutate(|data| *data = config);
     }
 
-    pub(crate) fn signal(
-        &self,
-        snap: &LspCompiledArtifact,
-        client: &std::sync::Arc<dyn ProjectClient + 'static>,
-    ) {
+    pub(crate) fn signal(&self, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>) {
         let config = self.factory.task();
 
-        self.signal_export(snap, &config, client);
-        self.signal_count_word(snap, &config);
+        self.signal_export(art, &config, client);
+        self.signal_count_word(art, &config);
     }
 
     fn signal_export(

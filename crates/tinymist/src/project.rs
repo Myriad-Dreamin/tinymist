@@ -159,6 +159,9 @@ impl ServerState {
             config.export(),
         );
 
+        #[cfg(feature = "preview")]
+        let preview_state = preview.clone();
+
         // Create the compile handler for client consuming results.
         let periscope_args = config.periscope_args.clone();
         let analysis = Arc::new(Analysis {
@@ -185,15 +188,21 @@ impl ServerState {
             analysis_rev_cache: Arc::default(),
             stats: Arc::default(),
         });
+
+        let mut hooks: Vec<Box<dyn CompileHook + Send + Sync>> = Vec::new();
+        hooks.push(Box::new(DiagHook::new(analysis.clone(), editor_tx.clone())));
+        hooks.push(Box::new(LintHook::new(analysis.clone(), editor_tx.clone())));
+        #[cfg(feature = "preview")]
+        hooks.push(Box::new(PreviewHook::new(preview)));
+        #[cfg(feature = "export")]
+        hooks.push(Box::new(ExportHook::new(export.clone())));
+
         let handle = CompileHandlerImpl::new(
             analysis.clone(),
             editor_tx.clone(),
             Arc::new(client.clone().to_untyped()),
             false,
-            #[cfg(feature = "preview")]
-            preview,
-            #[cfg(feature = "export")]
-            export.clone(),
+            hooks,
         );
 
         let export_target = config.export_target;
@@ -243,11 +252,11 @@ impl ServerState {
         ProjectState {
             compiler,
             #[cfg(feature = "preview")]
-            preview: handle.preview_state(),
+            preview: preview_state,
             analysis: handle.analysis.clone(),
             stats: CompilerQueryStats::default(),
             #[cfg(feature = "export")]
-            export: handle.export_task(),
+            export,
         }
     }
 }
@@ -457,13 +466,13 @@ fn push_editor_diagnostics(
         .log_error("failed to send diagnostics");
 }
 
-struct DiagHook {
+pub struct DiagHook {
     analysis: Arc<Analysis>,
     editor_tx: EditorSender,
 }
 
 impl DiagHook {
-    fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
+    pub fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
         Self {
             analysis,
             editor_tx,
@@ -490,13 +499,29 @@ impl DiagHook {
     }
 }
 
-struct LintHook {
+pub trait CompileHook {
+    fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>);
+    fn status(&self, _revision: usize, _rep: &CompileReport) {}
+}
+
+impl CompileHook for DiagHook {
+    fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact, _client: &Arc<dyn ProjectClient>) {
+        if art.world().entry_state().is_inactive() {
+            push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Compiler, None);
+            return;
+        }
+
+        self.notify(dv, art);
+    }
+}
+
+pub struct LintHook {
     analysis: Arc<Analysis>,
     editor_tx: EditorSender,
 }
 
 impl LintHook {
-    fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
+    pub fn new(analysis: Arc<Analysis>, editor_tx: EditorSender) -> Self {
         Self {
             analysis,
             editor_tx,
@@ -546,15 +571,26 @@ impl LintHook {
     }
 }
 
+impl CompileHook for LintHook {
+    fn notify(&self, dv: ProjVersion, art: &LspCompiledArtifact, _client: &Arc<dyn ProjectClient>) {
+        if art.world().entry_state().is_inactive() {
+            push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Lint, None);
+            return;
+        }
+
+        self.notify(dv, art);
+    }
+}
+
 #[cfg(feature = "preview")]
 #[derive(Clone)]
-struct PreviewHook {
+pub struct PreviewHook {
     state: ProjectPreviewState,
 }
 
 #[cfg(feature = "preview")]
 impl PreviewHook {
-    fn new(state: ProjectPreviewState) -> Self {
+    pub fn new(state: ProjectPreviewState) -> Self {
         Self { state }
     }
 
@@ -567,25 +603,50 @@ impl PreviewHook {
         }
     }
 
+    fn status(&self, _revision: usize, rep: &CompileReport) {
+        if let Some(inner) = self.state.get(&rep.id) {
+            use tinymist_preview::CompileStatus;
+            use tinymist_project::CompileStatusEnum::*;
+
+            inner.status(match &rep.status {
+                Compiling => CompileStatus::Compiling,
+                Suspend | CompileSuccess { .. } => CompileStatus::CompileSuccess,
+                ExportError { .. } | CompileError { .. } => CompileStatus::CompileError,
+            });
+        }
+    }
+
     fn state(&self) -> ProjectPreviewState {
         self.state.clone()
     }
 }
 
+#[cfg(feature = "preview")]
+impl CompileHook for PreviewHook {
+    fn notify(
+        &self,
+        _dv: ProjVersion,
+        art: &LspCompiledArtifact,
+        _client: &Arc<dyn ProjectClient>,
+    ) {
+        self.notify(art);
+    }
+
+    fn status(&self, revision: usize, rep: &CompileReport) {
+        self.status(revision, rep);
+    }
+}
+
 #[cfg(feature = "export")]
 #[derive(Clone)]
-struct ExportHook {
+pub struct ExportHook {
     task: crate::task::ExportTask,
 }
 
 #[cfg(feature = "export")]
 impl ExportHook {
-    fn new(task: crate::task::ExportTask) -> Self {
+    pub fn new(task: crate::task::ExportTask) -> Self {
         Self { task }
-    }
-
-    fn notify(&self, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>) {
-        self.task.signal(art, client);
     }
 
     fn task(&self) -> crate::task::ExportTask {
@@ -593,21 +654,22 @@ impl ExportHook {
     }
 }
 
+#[cfg(feature = "export")]
+impl CompileHook for ExportHook {
+    fn notify(&self, _dv: ProjVersion, art: &LspCompiledArtifact, client: &Arc<dyn ProjectClient>) {
+        self.task.signal(art, client);
+    }
+}
+
 /// The implementation of the compile handler.
 pub struct CompileHandlerImpl {
     /// The analysis data.
     pub(crate) analysis: Arc<Analysis>,
-    diag_hook: DiagHook,
-    lint_hook: LintHook,
+    hooks: Vec<Box<dyn CompileHook + Send + Sync>>,
 
-    #[cfg(feature = "preview")]
-    preview_hook: PreviewHook,
     /// Whether the compile server is running in standalone CLI (not as a
     /// language server).
     pub is_standalone: bool,
-    /// The export task.
-    #[cfg(feature = "export")]
-    export_hook: ExportHook,
     /// The editor sender, used to send editor requests to the editor.
     pub(crate) editor_tx: EditorSender,
     /// The client used to send events back to the server itself or the clients.
@@ -671,46 +733,17 @@ impl CompileHandlerImpl {
         editor_tx: EditorSender,
         client: Arc<dyn ProjectClient>,
         is_standalone: bool,
-        #[cfg(feature = "preview")] preview: ProjectPreviewState,
-        #[cfg(feature = "export")] export: crate::task::ExportTask,
+        hooks: Vec<Box<dyn CompileHook + Send + Sync>>,
     ) -> Arc<Self> {
-        let diag_hook = DiagHook::new(analysis.clone(), editor_tx.clone());
-        let lint_hook = LintHook::new(analysis.clone(), editor_tx.clone());
-        #[cfg(feature = "preview")]
-        let preview_hook = PreviewHook::new(preview);
-        #[cfg(feature = "export")]
-        let export_hook = ExportHook::new(export);
-
         Arc::new(Self {
             analysis,
-            diag_hook,
-            lint_hook,
-            #[cfg(feature = "preview")]
-            preview_hook,
             is_standalone,
-            #[cfg(feature = "export")]
-            export_hook,
             editor_tx,
             client,
             status_revision: Mutex::default(),
             notified_revision: Mutex::default(),
+            hooks,
         })
-    }
-
-    #[cfg(feature = "preview")]
-    fn preview_state(&self) -> ProjectPreviewState {
-        self.preview_hook.state()
-    }
-
-    #[cfg(feature = "export")]
-    fn export_task(&self) -> crate::task::ExportTask {
-        self.export_hook.task()
-    }
-
-    /// Clears both compiler and lint diagnostics for the given project version.
-    fn clear_diagnostics(&self, dv: ProjVersion) {
-        push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Compiler, None);
-        push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Lint, None);
     }
 
     /// Notifies the diagnostics.
@@ -719,15 +752,10 @@ impl CompileHandlerImpl {
             id: art.id().clone(),
             revision: art.world().revision().get(),
         };
-        // todo: better way to remove diagnostics
-        let valid = !art.world().entry_state().is_inactive();
-        if !valid {
-            self.clear_diagnostics(dv);
-            return;
-        }
 
-        self.diag_hook.notify(dv.clone(), art);
-        self.lint_hook.notify(dv, art);
+        for hook in &self.hooks {
+            hook.notify(dv.clone(), art, &self.client);
+        }
     }
 }
 
@@ -841,19 +869,13 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                 id: rep.id.clone(),
                 revision,
             };
-            self.clear_diagnostics(dv);
+            push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Compiler, None);
+            push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Lint, None);
         }
 
         #[cfg(feature = "preview")]
-        if let Some(inner) = self.preview_state().get(&rep.id) {
-            use tinymist_preview::CompileStatus;
-            use tinymist_project::CompileStatusEnum::*;
-
-            inner.status(match &rep.status {
-                Compiling => CompileStatus::Compiling,
-                Suspend | CompileSuccess { .. } => CompileStatus::CompileSuccess,
-                ExportError { .. } | CompileError { .. } => CompileStatus::CompileError,
-            });
+        for hook in &self.hooks {
+            hook.status(revision, &rep);
         }
 
         self.editor_tx.send(EditorRequest::Status(rep)).unwrap();
@@ -870,7 +892,8 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         // todo: race condition with notify_compile?
         // remove diagnostics
-        self.clear_diagnostics(dv);
+        push_editor_diagnostics(&self.editor_tx, dv.clone(), DiagKind::Compiler, None);
+        push_editor_diagnostics(&self.editor_tx, dv, DiagKind::Lint, None);
     }
 
     fn notify_compile(&self, art: &LspCompiledArtifact) {
@@ -919,12 +942,6 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
             )
             .log_error("failed to print diagnostics");
         }
-
-        #[cfg(feature = "export")]
-        self.export_hook.notify(art, &self.client);
-
-        #[cfg(feature = "preview")]
-        self.preview_hook.notify(art);
 
         self.notify_diagnostics(art);
     }
