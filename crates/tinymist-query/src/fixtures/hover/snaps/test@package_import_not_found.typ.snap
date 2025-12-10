@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/hover.rs
 expression: content
-input_file: crates/tinymist-query/src/fixtures/hover/package_import.typ
+input_file: crates/tinymist-query/src/fixtures/hover/package_import_not_found.typ
 ---
 Range: 0:29:0:52
 

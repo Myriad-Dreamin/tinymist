@@ -105,6 +105,7 @@ pub fn run_with_ctx_<T>(
         vec![
             dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.0").unwrap()),
             dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.1").unwrap()),
+            dummy_package_from_spec(&PackageSpec::from_str("@local/local-example:0.0.1").unwrap()),
         ]
     });
     ctx.test_completion_files(|| paths.clone());

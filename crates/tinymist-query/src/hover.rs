@@ -3,7 +3,7 @@ use std::cmp::Reverse;
 use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
-use tinymist_world::package::PackageSpec;
+use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -247,9 +247,6 @@ impl HoverWorker<'_> {
         package_spec: &PackageSpec,
         import_str_node: &LinkedNode,
     ) -> String {
-        #[cfg(feature = "local-registry")]
-        use tinymist_world::package::registry::PackageSpecExt;
-
         let versionless_spec = package_spec.versionless();
 
         // Get all matching packages
@@ -310,7 +307,7 @@ impl HoverWorker<'_> {
         }
 
         // Package header
-        if package_spec.namespace == "local" {
+        if !package_spec.is_preview() {
             info.push_str("ℹ️ This is a local package\n\n");
         }
 
