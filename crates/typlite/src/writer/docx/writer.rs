@@ -194,7 +194,12 @@ impl DocxWriter {
             }
             Node::HtmlElement(element) => {
                 // Handle special HTML elements
-                if element.tag == "img" && element.self_closing {
+                if element.tag == "mark" {
+                    run = run.highlight("yellow");
+                    for child in &element.children {
+                        run = self.process_inline_to_run(run, child)?;
+                    }
+                } else if element.tag == "img" && element.self_closing {
                     let is_typst_block = element
                         .attributes
                         .iter()
@@ -452,6 +457,9 @@ impl DocxWriter {
             Node::Image { url, title: _, alt } => {
                 docx = self.process_image(docx, url, alt)?;
             }
+            Node::HtmlElement(element) => {
+                docx = self.process_html_element_block(docx, element)?;
+            }
             node if node.is_custom_type::<FigureNode>() => {
                 let figure_node = node.as_custom_type::<FigureNode>().unwrap();
                 docx = self.process_figure(docx, figure_node)?;
@@ -544,6 +552,45 @@ impl DocxWriter {
                 docx = docx.add_paragraph(hr_para);
             }
             // Inline elements should not be processed here individually
+            _ => {}
+        }
+
+        Ok(docx)
+    }
+
+    fn process_html_element_block(
+        &mut self,
+        mut docx: Docx,
+        element: &cmark_writer::ast::HtmlElement,
+    ) -> Result<Docx> {
+        match element.tag.as_str() {
+            "figure" => {
+                let Some((first, rest)) = element.children.split_first() else {
+                    return Ok(docx);
+                };
+                let synthetic = FigureNode {
+                    body: Box::new(first.clone()),
+                    caption: rest.to_vec(),
+                };
+                docx = self.process_figure(docx, &synthetic)?;
+            }
+            "p" => {
+                let is_center = element
+                    .attributes
+                    .iter()
+                    .any(|a| a.name == "align" && a.value == "center");
+                if is_center {
+                    let start_idx = docx.document.children.len();
+                    for child in &element.children {
+                        docx = self.process_node(docx, child)?;
+                    }
+                    for child in docx.document.children.iter_mut().skip(start_idx) {
+                        if let DocumentChild::Paragraph(para) = child {
+                            para.property = para.property.clone().align(AlignmentType::Center);
+                        }
+                    }
+                }
+            }
             _ => {}
         }
 
@@ -778,7 +825,7 @@ impl FormatWriter for DocxWriter {
 
 impl IrFormatWriter for DocxWriter {
     fn write_ir_vec(&mut self, document: &ir::Document) -> Result<Vec<u8>> {
-        let ast = document.to_cmark();
+        let ast = document.to_cmark_with(ir::CmarkExportTarget::Docx);
         self.write_vec(&ast)
     }
 
