@@ -14,6 +14,8 @@ use crate::Result;
 use crate::common::{
     CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode, VerbatimNode,
 };
+use crate::ir;
+use crate::writer::IrFormatWriter;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
@@ -770,6 +772,17 @@ impl FormatWriter for DocxWriter {
     }
 
     fn write_eco(&mut self, _document: &Node, _output: &mut EcoString) -> Result<()> {
+        Err("DOCX format does not support EcoString output".into())
+    }
+}
+
+impl IrFormatWriter for DocxWriter {
+    fn write_ir_vec(&mut self, document: &ir::Document) -> Result<Vec<u8>> {
+        let ast = document.to_cmark();
+        self.write_vec(&ast)
+    }
+
+    fn write_ir_eco(&mut self, _document: &ir::Document, _output: &mut EcoString) -> Result<()> {
         Err("DOCX format does not support EcoString output".into())
     }
 }

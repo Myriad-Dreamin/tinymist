@@ -8,6 +8,7 @@ use tinymist_std::path::unix_slash;
 use crate::Result;
 use crate::common::{FormatWriter, ListState};
 use crate::ir::{self, Block, Inline, IrNode, ListItem, TableAlignment};
+use crate::writer::IrFormatWriter;
 
 /// LaTeX writer implementation
 pub struct LaTeXWriter {
@@ -249,7 +250,15 @@ impl LaTeXWriter {
             }
             Block::Center(inner) => {
                 output.push_str("\\begin{center}\n");
-                self.write_block(inner, output)?;
+                match &**inner {
+                    Block::Paragraph(inlines) => {
+                        self.write_inline_nodes(inlines, output)?;
+                        if !output.as_str().ends_with('\n') {
+                            output.push('\n');
+                        }
+                    }
+                    other => self.write_block(other, output)?,
+                }
                 output.push_str("\\end{center}\n\n");
             }
             Block::Alert { class, content } => {
@@ -542,6 +551,18 @@ impl FormatWriter for LaTeXWriter {
     fn write_vec(&mut self, document: &cmark_writer::ast::Node) -> Result<Vec<u8>> {
         let mut output = EcoString::new();
         self.write_eco(document, &mut output)?;
+        Ok(output.as_str().as_bytes().to_vec())
+    }
+}
+
+impl IrFormatWriter for LaTeXWriter {
+    fn write_ir_eco(&mut self, document: &ir::Document, output: &mut EcoString) -> Result<()> {
+        self.write_document(document, output)
+    }
+
+    fn write_ir_vec(&mut self, document: &ir::Document) -> Result<Vec<u8>> {
+        let mut output = EcoString::new();
+        self.write_ir_eco(document, &mut output)?;
         Ok(output.as_str().as_bytes().to_vec())
     }
 }

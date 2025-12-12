@@ -177,11 +177,11 @@ impl MarkdownDocument {
     /// Convert content to markdown string
     pub fn to_md_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Md);
+        let mut writer = WriterFactory::create_ir(Format::Md);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -190,11 +190,11 @@ impl MarkdownDocument {
     /// Convert content to plain text string
     pub fn to_text_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Text);
+        let mut writer = WriterFactory::create_ir(Format::Text);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -203,11 +203,11 @@ impl MarkdownDocument {
     /// Convert the content to a LaTeX string.
     pub fn to_tex_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::LaTeX);
+        let mut writer = WriterFactory::create_ir(Format::LaTeX);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -216,10 +216,10 @@ impl MarkdownDocument {
     /// Convert the content to a DOCX document
     #[cfg(feature = "docx")]
     pub fn to_docx(&self) -> tinymist_std::Result<Vec<u8>> {
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Docx);
-        writer.write_vec(&ast).context_ut("failed to write")
+        let mut writer = WriterFactory::create_ir(Format::Docx);
+        writer.write_ir_vec(&doc).context_ut("failed to write")
     }
 }
 

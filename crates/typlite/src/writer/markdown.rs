@@ -7,6 +7,8 @@ use ecow::EcoString;
 
 use crate::Result;
 use crate::common::FormatWriter;
+use crate::ir;
+use crate::writer::IrFormatWriter;
 
 /// Markdown writer implementation
 #[derive(Default)]
@@ -34,6 +36,17 @@ impl FormatWriter for MarkdownWriter {
     }
 
     fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
+        Err("Markdown writer does not support writing to Vec<u8>".into())
+    }
+}
+
+impl IrFormatWriter for MarkdownWriter {
+    fn write_ir_eco(&mut self, document: &ir::Document, output: &mut EcoString) -> Result<()> {
+        let ast = document.to_cmark();
+        self.write_eco(&ast, output)
+    }
+
+    fn write_ir_vec(&mut self, _document: &ir::Document) -> Result<Vec<u8>> {
         Err("Markdown writer does not support writing to Vec<u8>".into())
     }
 }
