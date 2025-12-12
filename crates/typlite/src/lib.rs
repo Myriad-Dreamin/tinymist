@@ -7,13 +7,14 @@ pub mod attributes;
 pub mod common;
 mod diagnostics;
 mod error;
+pub mod ir;
 pub mod parser;
 pub mod tags;
 pub mod writer;
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub use error::*;
 
@@ -51,7 +52,8 @@ pub struct MarkdownDocument {
     pub base: HtmlDocument,
     world: Arc<LspWorld>,
     feat: TypliteFeat,
-    ast: Option<Node>,
+    ast: Arc<OnceLock<Node>>,
+    ir: Arc<OnceLock<crate::ir::Document>>,
     warnings: WarningCollector,
 }
 
@@ -62,7 +64,8 @@ impl MarkdownDocument {
             base,
             world,
             feat,
-            ast: None,
+            ast: Arc::new(OnceLock::new()),
+            ir: Arc::new(OnceLock::new()),
             warnings: WarningCollector::default(),
         }
     }
@@ -74,11 +77,14 @@ impl MarkdownDocument {
         feat: TypliteFeat,
         ast: Node,
     ) -> Self {
+        let ast_lock = Arc::new(OnceLock::new());
+        let _ = ast_lock.set(ast);
         Self {
             base,
             world,
             feat,
-            ast: Some(ast),
+            ast: ast_lock,
+            ir: Arc::new(OnceLock::new()),
             warnings: WarningCollector::default(),
         }
     }
@@ -138,11 +144,27 @@ impl MarkdownDocument {
 
     /// Parse HTML document to AST
     pub fn parse(&self) -> tinymist_std::Result<Node> {
-        if let Some(ast) = &self.ast {
+        if let Some(ast) = self.ast.get() {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        parser.parse(&self.base.root).context_ut("failed to parse")
+        let ast = parser
+            .parse(&self.base.root)
+            .context_ut("failed to parse")?;
+        let _ = self.ast.set(ast.clone());
+        Ok(ast)
+    }
+
+    /// Parse HTML document to semantic IR.
+    pub fn parse_ir(&self) -> tinymist_std::Result<crate::ir::Document> {
+        if let Some(doc) = self.ir.get() {
+            return Ok(doc.clone());
+        }
+
+        let ast = self.parse()?;
+        let doc = crate::ir::Document::from_cmark(&ast);
+        let _ = self.ir.set(doc.clone());
+        Ok(doc)
     }
 
     /// Convert content to markdown string

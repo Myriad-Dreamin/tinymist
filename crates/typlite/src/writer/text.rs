@@ -1,10 +1,10 @@
 //! Text writer implementation - produces plain text output
 
-use cmark_writer::ast::Node;
 use ecow::EcoString;
 
 use crate::Result;
-use crate::common::{ExternalFrameNode, FigureNode, FormatWriter};
+use crate::common::FormatWriter;
+use crate::ir::{self, Block, Inline, IrNode, ListItem};
 
 /// Text writer implementation
 #[derive(Default)]
@@ -15,163 +15,168 @@ impl TextWriter {
         Self {}
     }
 
-    fn write_node(node: &Node, output: &mut EcoString) -> Result<()> {
+    fn write_document(&mut self, document: &ir::Document, output: &mut EcoString) -> Result<()> {
+        for block in &document.blocks {
+            self.write_block(block, output)?;
+            output.push_str("\n");
+        }
+        Ok(())
+    }
+
+    fn write_ir_node(&mut self, node: &IrNode, output: &mut EcoString) -> Result<()> {
         match node {
-            Node::Document(blocks) => {
+            IrNode::Block(block) => self.write_block(block, output),
+            IrNode::Inline(inline) => self.write_inline(inline, output),
+        }
+    }
+
+    fn write_inline_nodes(&mut self, nodes: &[Inline], output: &mut EcoString) -> Result<()> {
+        for inline in nodes {
+            self.write_inline(inline, output)?;
+        }
+        Ok(())
+    }
+
+    fn write_block(&mut self, node: &Block, output: &mut EcoString) -> Result<()> {
+        match node {
+            Block::Document(blocks) => {
                 for block in blocks {
-                    Self::write_node(block, output)?;
+                    self.write_block(block, output)?;
                     output.push_str("\n");
                 }
             }
-            Node::Paragraph(inlines) => {
-                for inline in inlines {
-                    Self::write_node(inline, output)?;
-                }
+            Block::Paragraph(inlines) => {
+                self.write_inline_nodes(inlines, output)?;
                 output.push_str("\n");
             }
-            Node::Heading {
-                level: _,
-                content,
-                heading_type: _,
-            } => {
-                for inline in content {
-                    Self::write_node(inline, output)?;
-                }
+            Block::Heading { content, .. } => {
+                self.write_inline_nodes(content, output)?;
                 output.push_str("\n");
             }
-            Node::BlockQuote(content) => {
+            Block::BlockQuote(content) => {
                 for block in content {
-                    Self::write_node(block, output)?;
+                    self.write_block(block, output)?;
                 }
             }
-            Node::CodeBlock {
-                language: _,
-                content,
-                block_type: _,
-            } => {
+            Block::CodeBlock { content, .. } => {
                 output.push_str(content);
                 output.push_str("\n\n");
             }
-            Node::OrderedList { start: _, items } => {
-                for item in items.iter() {
-                    match item {
-                        cmark_writer::ast::ListItem::Ordered { content, .. }
-                        | cmark_writer::ast::ListItem::Unordered { content } => {
-                            for block in content {
-                                Self::write_node(block, output)?;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Node::UnorderedList(items) => {
+            Block::OrderedList { items, .. } | Block::UnorderedList(items) => {
                 for item in items {
                     match item {
-                        cmark_writer::ast::ListItem::Ordered { content, .. }
-                        | cmark_writer::ast::ListItem::Unordered { content } => {
+                        ListItem::Ordered { content, .. } | ListItem::Unordered { content } => {
                             for block in content {
-                                Self::write_node(block, output)?;
+                                self.write_block(block, output)?;
                             }
                         }
-                        _ => {}
                     }
                 }
             }
-            Node::Table { rows, .. } => {
-                for row in rows {
+            Block::Table(table) => {
+                for row in &table.rows {
                     for cell in &row.cells {
-                        Self::write_node(&cell.content, output)?;
+                        for node in &cell.content {
+                            self.write_ir_node(node, output)?;
+                        }
                         output.push(' ');
                     }
                     output.push('\n');
                 }
                 output.push('\n');
             }
-            Node::Text(text) => {
-                output.push_str(text);
-            }
-            Node::Emphasis(content) | Node::Strong(content) | Node::Strikethrough(content) => {
-                for inline in content {
-                    Self::write_node(inline, output)?;
-                }
-            }
-            Node::Link {
-                url: _,
-                title: _,
-                content,
-            } => {
-                for inline in content {
-                    Self::write_node(inline, output)?;
-                }
-            }
-            Node::Image {
-                url: _,
-                title: _,
-                alt,
-            } => {
-                if !alt.is_empty() {
-                    for inline in alt {
-                        Self::write_node(inline, output)?;
-                    }
-                }
-            }
-            Node::InlineCode(code) => {
-                output.push_str(code);
-            }
-            Node::HardBreak => {
+            Block::ThematicBreak => {
                 output.push_str("\n");
             }
-            Node::SoftBreak => {
-                output.push(' ');
-            }
-            Node::ThematicBreak => {
-                output.push_str("\n");
-            }
-            Node::HtmlElement(element) => {
+            Block::HtmlElement(element) => {
                 for child in &element.children {
-                    Self::write_node(child, output)?;
+                    self.write_ir_node(child, output)?;
                 }
             }
-            node if node.is_custom_type::<FigureNode>() => {
-                if let Some(figure_node) = node.as_custom_type::<FigureNode>() {
-                    Self::write_node(&figure_node.body, output)?;
-                    if !figure_node.caption.is_empty() {
-                        output.push_str("\n");
-                        for inline in &figure_node.caption {
-                            Self::write_node(inline, output)?;
-                        }
-                    }
+            Block::Figure { body, caption } => {
+                self.write_block(body, output)?;
+                if !caption.is_empty() {
+                    output.push_str("\n");
+                    self.write_inline_nodes(caption, output)?;
                 }
             }
-            node if node.is_custom_type::<ExternalFrameNode>() => {
-                if let Some(external_frame) = node.as_custom_type::<ExternalFrameNode>()
-                    && !external_frame.alt_text.is_empty()
-                {
-                    output.push_str(&external_frame.alt_text);
+            Block::ExternalFrame(frame) => {
+                if !frame.alt_text.is_empty() {
+                    output.push_str(&frame.alt_text);
                 }
             }
-            node if node.is_custom_type::<crate::common::HighlightNode>() => {
-                if let Some(highlight) = node.as_custom_type::<crate::common::HighlightNode>() {
-                    for child in &highlight.content {
-                        Self::write_node(child, output)?;
-                    }
+            Block::Center(inner) => {
+                self.write_block(inner, output)?;
+            }
+            Block::Alert { content, .. } => {
+                for block in content {
+                    self.write_block(block, output)?;
                 }
             }
-            _ => {}
+            Block::HtmlBlock(_) => {}
         }
+
+        Ok(())
+    }
+
+    fn write_inline(&mut self, node: &Inline, output: &mut EcoString) -> Result<()> {
+        match node {
+            Inline::Text(text) => output.push_str(text),
+            Inline::Emphasis(content)
+            | Inline::Strong(content)
+            | Inline::Strikethrough(content)
+            | Inline::Group(content)
+            | Inline::Highlight(content) => {
+                self.write_inline_nodes(content, output)?;
+            }
+            Inline::Link { content, .. } => {
+                self.write_inline_nodes(content, output)?;
+            }
+            Inline::ReferenceLink { label, content } => {
+                if content.is_empty() {
+                    output.push_str(label);
+                } else {
+                    self.write_inline_nodes(content, output)?;
+                }
+            }
+            Inline::Image { alt, .. } => {
+                if !alt.is_empty() {
+                    self.write_inline_nodes(alt, output)?;
+                }
+            }
+            Inline::InlineCode(code) => output.push_str(code),
+            Inline::HardBreak => output.push_str("\n"),
+            Inline::SoftBreak => output.push(' '),
+            Inline::Autolink { url, .. } => output.push_str(url),
+            Inline::HtmlElement(element) => {
+                for child in &element.children {
+                    self.write_ir_node(child, output)?;
+                }
+            }
+            Inline::Verbatim(text) => output.push_str(text),
+            Inline::EmbeddedBlock(block) => {
+                self.write_block(block, output)?;
+            }
+            Inline::UnsupportedCustom => {}
+        }
+
         Ok(())
     }
 }
 
 impl FormatWriter for TextWriter {
-    fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        Self::write_node(document, output)
+    fn write_eco(
+        &mut self,
+        document: &cmark_writer::ast::Node,
+        output: &mut EcoString,
+    ) -> Result<()> {
+        let ir_doc = ir::Document::from_cmark(document);
+        self.write_document(&ir_doc, output)
     }
 
-    fn write_vec(&mut self, document: &Node) -> Result<Vec<u8>> {
+    fn write_vec(&mut self, document: &cmark_writer::ast::Node) -> Result<Vec<u8>> {
         let mut output = EcoString::new();
-        Self::write_node(document, &mut output)?;
+        self.write_eco(document, &mut output)?;
         Ok(output.as_str().as_bytes().to_vec())
     }
 }
