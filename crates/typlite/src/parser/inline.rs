@@ -1,50 +1,48 @@
-//! Inline element processing module, handles text and inline style elements
+//! Inline element processing module, handles text and inline style elements.
 
-use cmark_writer::ast::Node;
 use typst_html::{HtmlElement, HtmlNode};
 
 use crate::Result;
 use crate::attributes::{FigureAttr, ImageAttr, LinkAttr, TypliteAttrsParser, md_attr};
-use crate::common::{CenterNode, FigureNode, HighlightNode};
+use crate::ir::{Block, Inline};
 use crate::tags::md_tag;
 
-use super::core::HtmlToAstParser;
+use super::core::HtmlToIrParser;
 
-impl HtmlToAstParser {
-    /// Convert strong emphasis element
+impl HtmlToIrParser {
+    /// Convert strong emphasis element.
     pub fn convert_strong(&mut self, element: &HtmlElement) -> Result<()> {
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
-        self.inline_buffer.push(Node::Strong(content));
+        self.inline_buffer.push(Inline::Strong(content));
         Ok(())
     }
 
-    /// Convert emphasis element
+    /// Convert emphasis element.
     pub fn convert_emphasis(&mut self, element: &HtmlElement) -> Result<()> {
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
-        self.inline_buffer.push(Node::Emphasis(content));
+        self.inline_buffer.push(Inline::Emphasis(content));
         Ok(())
     }
 
-    /// Convert highlight element
+    /// Convert highlight element.
     pub fn convert_highlight(&mut self, element: &HtmlElement) -> Result<()> {
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
-        self.inline_buffer
-            .push(Node::Custom(Box::new(HighlightNode { content })));
+        self.inline_buffer.push(Inline::Highlight(content));
         Ok(())
     }
 
-    /// Convert strikethrough element
+    /// Convert strikethrough element.
     pub fn convert_strikethrough(&mut self, element: &HtmlElement) -> Result<()> {
         let mut content = Vec::new();
         self.convert_children_into(&mut content, element)?;
-        self.inline_buffer.push(Node::Strikethrough(content));
+        self.inline_buffer.push(Inline::Strikethrough(content));
         Ok(())
     }
 
-    /// Convert link element
+    /// Convert link element.
     pub fn convert_link(&mut self, element: &HtmlElement) -> Result<()> {
         let attrs = LinkAttr::parse(&element.attrs)?;
         let mut url = attrs.dest;
@@ -70,7 +68,7 @@ impl HtmlToAstParser {
                         content.extend(extra);
                     }
                 }
-                HtmlNode::Text(text, _) => content.push(Node::Text(text.clone())),
+                HtmlNode::Text(text, _) => content.push(Inline::Text(text.clone())),
                 HtmlNode::Frame(frame) => {
                     content.push(self.convert_frame(&frame.inner));
                 }
@@ -82,7 +80,7 @@ impl HtmlToAstParser {
             self.convert_children_into(&mut content, element)?;
         }
 
-        self.inline_buffer.push(Node::Link {
+        self.inline_buffer.push(Inline::Link {
             url,
             title: None,
             content,
@@ -90,25 +88,24 @@ impl HtmlToAstParser {
         Ok(())
     }
 
-    /// Convert image element
+    /// Convert image element.
     pub fn convert_image(&mut self, element: &HtmlElement) -> Result<()> {
         let attrs = ImageAttr::parse(&element.attrs)?;
-        self.inline_buffer.push(Node::Image {
+        self.inline_buffer.push(Inline::Image {
             url: attrs.source,
             title: None,
-            alt: vec![Node::Text(attrs.alt)],
+            alt: vec![Inline::Text(attrs.alt)],
         });
         Ok(())
     }
 
-    /// Convert figure element
+    /// Convert figure element.
     pub fn convert_figure(&mut self, element: &HtmlElement) -> Result<()> {
         self.flush_inline_buffer();
 
-        // Parse figure attributes to extract caption
         let _attrs = FigureAttr::parse(&element.attrs)?;
         let mut caption_nodes = Vec::new();
-        let mut inline_segments: Vec<Vec<Node>> = Vec::new();
+        let mut inline_segments: Vec<Vec<Inline>> = Vec::new();
         let mut block_content = Vec::new();
 
         for child in &element.children {
@@ -132,32 +129,31 @@ impl HtmlToAstParser {
             }
             block_content.append(&mut blocks);
         }
+
         let mut content_nodes = Vec::new();
         if !inline_segments.is_empty() {
             for segment in inline_segments {
-                content_nodes.push(Node::Paragraph(segment));
+                content_nodes.push(Block::Paragraph(segment));
             }
         }
         content_nodes.append(&mut block_content);
 
         let body = if content_nodes.is_empty() {
-            Box::new(Node::Paragraph(Vec::new()))
+            Box::new(Block::Paragraph(Vec::new()))
         } else if content_nodes.len() == 1 {
             Box::new(content_nodes.into_iter().next().unwrap())
         } else {
-            Box::new(Node::Document(content_nodes))
+            Box::new(Block::Document(content_nodes))
         };
 
-        // Create figure node with centering
-        let figure_node = Box::new(FigureNode {
+        let figure_block = Block::Figure {
             body,
             caption: caption_nodes,
-        });
-        let centered_node = CenterNode::new(vec![Node::Custom(figure_node)]);
+        };
 
-        // Add the centered figure to blocks
-        self.blocks.push(Node::Custom(Box::new(centered_node)));
+        self.blocks.push(Block::Center(Box::new(figure_block)));
 
         Ok(())
     }
 }
+

@@ -85,6 +85,7 @@ pub enum Inline {
     HtmlElement(HtmlElement),
     Highlight(Vec<Inline>),
     Verbatim(EcoString),
+    Comment(EcoString),
     EmbeddedBlock(Box<Block>),
     UnsupportedCustom,
 }
@@ -202,6 +203,230 @@ impl Document {
                 blocks: convert_block(other).into_iter().collect(),
             },
         }
+    }
+
+    /// Convert semantic IR into a CommonMark AST document.
+    pub fn to_cmark(&self) -> cmark_writer::ast::Node {
+        cmark_writer::ast::Node::Document(
+            self.blocks.iter().map(block_to_cmark).collect(),
+        )
+    }
+}
+
+fn block_to_cmark(block: &Block) -> cmark_writer::ast::Node {
+    use cmark_writer::ast::{CodeBlockType as CmarkCodeBlockType, Node};
+
+    match block {
+        Block::Document(blocks) => Node::Document(blocks.iter().map(block_to_cmark).collect()),
+        Block::Paragraph(inlines) => Node::Paragraph(inlines.iter().flat_map(inline_to_cmark_vec).collect()),
+        Block::Heading { level, content } => {
+            Node::heading(*level, content.iter().flat_map(inline_to_cmark_vec).collect())
+        }
+        Block::ThematicBreak => Node::ThematicBreak,
+        Block::BlockQuote(content) => Node::BlockQuote(content.iter().map(block_to_cmark).collect()),
+        Block::OrderedList { start, items } => Node::OrderedList {
+            start: *start,
+            items: items.iter().filter_map(list_item_to_cmark).collect(),
+        },
+        Block::UnorderedList(items) => Node::UnorderedList(
+            items.iter().filter_map(list_item_to_cmark).collect(),
+        ),
+        Block::Table(table) => Node::Table {
+            columns: table.columns,
+            rows: table
+                .rows
+                .iter()
+                .map(|row| cmark_writer::ast::TableRow {
+                    kind: match row.kind {
+                        TableRowKind::Head => cmark_writer::ast::TableRowKind::Head,
+                        TableRowKind::Body => cmark_writer::ast::TableRowKind::Body,
+                        TableRowKind::Foot => cmark_writer::ast::TableRowKind::Foot,
+                    },
+                    cells: row
+                        .cells
+                        .iter()
+                        .map(|cell| {
+                            let nodes: Vec<Node> = cell
+                                .content
+                                .iter()
+                                .flat_map(any_to_cmark_nodes)
+                                .collect();
+                            let merged = match nodes.len() {
+                                0 => Node::Text(EcoString::new()),
+                                1 => nodes.into_iter().next().unwrap(),
+                                _ => Node::Custom(Box::new(InlineNode { content: nodes })),
+                            };
+                            cmark_writer::ast::TableCell {
+                                kind: match cell.kind {
+                                    TableCellKind::Header => {
+                                        cmark_writer::ast::TableCellKind::Header
+                                    }
+                                    TableCellKind::Data => cmark_writer::ast::TableCellKind::Data,
+                                },
+                                colspan: cell.colspan,
+                                rowspan: cell.rowspan,
+                                content: merged,
+                                align: cell.align.as_ref().map(|align| match align {
+                                    TableAlignment::Left => {
+                                        cmark_writer::ast::TableAlignment::Left
+                                    }
+                                    TableAlignment::Center => {
+                                        cmark_writer::ast::TableAlignment::Center
+                                    }
+                                    TableAlignment::Right => {
+                                        cmark_writer::ast::TableAlignment::Right
+                                    }
+                                    TableAlignment::None => {
+                                        cmark_writer::ast::TableAlignment::None
+                                    }
+                                }),
+                            }
+                        })
+                        .collect(),
+                })
+                .collect(),
+            alignments: table
+                .alignments
+                .iter()
+                .map(|align| match align {
+                    TableAlignment::Left => cmark_writer::ast::TableAlignment::Left,
+                    TableAlignment::Center => cmark_writer::ast::TableAlignment::Center,
+                    TableAlignment::Right => cmark_writer::ast::TableAlignment::Right,
+                    TableAlignment::None => cmark_writer::ast::TableAlignment::None,
+                })
+                .collect(),
+        },
+        Block::CodeBlock {
+            language,
+            content,
+            block_type,
+        } => Node::CodeBlock {
+            language: language.clone(),
+            content: content.clone(),
+            block_type: match block_type {
+                CodeBlockType::Indented => CmarkCodeBlockType::Indented,
+                CodeBlockType::Fenced => CmarkCodeBlockType::Fenced,
+            },
+        },
+        Block::HtmlBlock(html) => Node::HtmlBlock(html.clone()),
+        Block::HtmlElement(element) => Node::HtmlElement(html_element_to_cmark(element)),
+        Block::Figure { body, caption } => Node::Custom(Box::new(FigureNode {
+            body: Box::new(block_to_cmark(body)),
+            caption: caption.iter().flat_map(inline_to_cmark_vec).collect(),
+        })),
+        Block::ExternalFrame(frame) => Node::Custom(Box::new(ExternalFrameNode {
+            file_path: frame.file_path.clone(),
+            alt_text: frame.alt_text.clone(),
+            svg: frame.svg.clone(),
+        })),
+        Block::Center(inner) => match &**inner {
+            Block::Paragraph(inlines) => {
+                let children = inlines.iter().flat_map(inline_to_cmark_vec).collect();
+                Node::Custom(Box::new(CenterNode::new(children)))
+            }
+            other => {
+                let child = block_to_cmark(other);
+                Node::Custom(Box::new(CenterNode::new(vec![child])))
+            }
+        },
+        Block::Alert { class, content } => Node::Custom(Box::new(AlertNode {
+            content: content.iter().map(block_to_cmark).collect(),
+            class: class.clone(),
+        })),
+    }
+}
+
+fn list_item_to_cmark(item: &ListItem) -> Option<cmark_writer::ast::ListItem> {
+    use cmark_writer::ast::ListItem as CmarkListItem;
+    match item {
+        ListItem::Ordered { number, content } => Some(CmarkListItem::Ordered {
+            number: *number,
+            content: content.iter().map(block_to_cmark).collect(),
+        }),
+        ListItem::Unordered { content } => Some(CmarkListItem::Unordered {
+            content: content.iter().map(block_to_cmark).collect(),
+        }),
+    }
+}
+
+fn inline_to_cmark_vec(inline: &Inline) -> Vec<cmark_writer::ast::Node> {
+    use cmark_writer::ast::Node;
+    match inline {
+        Inline::Group(content) => content.iter().flat_map(inline_to_cmark_vec).collect(),
+        Inline::Emphasis(content) => vec![Node::Emphasis(
+            content.iter().flat_map(inline_to_cmark_vec).collect(),
+        )],
+        Inline::Strong(content) => vec![Node::Strong(
+            content.iter().flat_map(inline_to_cmark_vec).collect(),
+        )],
+        Inline::Strikethrough(content) => vec![Node::Strikethrough(
+            content.iter().flat_map(inline_to_cmark_vec).collect(),
+        )],
+        Inline::Highlight(content) => vec![Node::Custom(Box::new(HighlightNode {
+            content: content.iter().flat_map(inline_to_cmark_vec).collect(),
+        }))],
+        Inline::Text(text) => vec![Node::Text(text.clone())],
+        Inline::InlineCode(code) => vec![Node::InlineCode(code.clone())],
+        Inline::Link {
+            url,
+            title,
+            content,
+        } => vec![Node::Link {
+            url: url.clone(),
+            title: title.clone(),
+            content: content.iter().flat_map(inline_to_cmark_vec).collect(),
+        }],
+        Inline::ReferenceLink { label, content } => vec![Node::ReferenceLink {
+            label: label.clone(),
+            content: content.iter().flat_map(inline_to_cmark_vec).collect(),
+        }],
+        Inline::Image { url, title, alt } => vec![Node::Image {
+            url: url.clone(),
+            title: title.clone(),
+            alt: alt.iter().flat_map(inline_to_cmark_vec).collect(),
+        }],
+        Inline::Autolink { url, is_email } => vec![Node::Autolink {
+            url: url.clone(),
+            is_email: *is_email,
+        }],
+        Inline::HardBreak => vec![Node::HardBreak],
+        Inline::SoftBreak => vec![Node::SoftBreak],
+        Inline::HtmlElement(element) => vec![Node::HtmlElement(html_element_to_cmark(element))],
+        Inline::Verbatim(text) => vec![Node::Custom(Box::new(VerbatimNode {
+            content: text.clone(),
+        }))],
+        Inline::Comment(text) => vec![Node::Custom(Box::new(crate::common::CommentNode {
+            content: text.clone(),
+        }))],
+        Inline::EmbeddedBlock(block) => vec![block_to_cmark(block)],
+        Inline::UnsupportedCustom => Vec::new(),
+    }
+}
+
+fn any_to_cmark_nodes(node: &IrNode) -> Vec<cmark_writer::ast::Node> {
+    match node {
+        IrNode::Block(block) => vec![block_to_cmark(block)],
+        IrNode::Inline(inline) => inline_to_cmark_vec(inline),
+    }
+}
+
+fn html_element_to_cmark(element: &HtmlElement) -> cmark_writer::ast::HtmlElement {
+    cmark_writer::ast::HtmlElement {
+        tag: element.tag.clone(),
+        attributes: element
+            .attributes
+            .iter()
+            .map(|attr| cmark_writer::ast::HtmlAttribute {
+                name: attr.name.clone(),
+                value: attr.value.clone(),
+            })
+            .collect(),
+        children: element
+            .children
+            .iter()
+            .flat_map(any_to_cmark_nodes)
+            .collect(),
+        self_closing: element.self_closing,
     }
 }
 

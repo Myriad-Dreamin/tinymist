@@ -232,6 +232,27 @@ impl VerbatimNode {
     }
 }
 
+/// Inline HTML comment node, used for element annotations.
+#[derive(Debug, PartialEq, Clone)]
+#[custom_node(block = false, html_impl = true)]
+pub struct CommentNode {
+    pub content: EcoString,
+}
+
+impl CommentNode {
+    fn write_custom(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
+        writer.write_str("<!-- ")?;
+        writer.write_str(&self.content)?;
+        writer.write_str(" -->")?;
+        Ok(())
+    }
+
+    fn write_html_custom(&self, writer: &mut HtmlWriter) -> HtmlWriteResult<()> {
+        writer.write_trusted_html(&format!("<!-- {} -->", self.content))?;
+        Ok(())
+    }
+}
+
 /// Alert node for alert messages
 #[derive(Debug, PartialEq, Clone)]
 #[custom_node(block = true, html_impl = false)]

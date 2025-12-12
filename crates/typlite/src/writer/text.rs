@@ -157,6 +157,7 @@ impl TextWriter {
             Inline::EmbeddedBlock(block) => {
                 self.write_block(block, output)?;
             }
+            Inline::Comment(_) => {}
             Inline::UnsupportedCustom => {}
         }
 

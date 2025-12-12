@@ -33,7 +33,7 @@ use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;
 use crate::diagnostics::WarningCollector;
-use crate::parser::HtmlToAstParser;
+use crate::parser::HtmlToIrParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
@@ -147,10 +147,16 @@ impl MarkdownDocument {
         if let Some(ast) = self.ast.get() {
             return Ok(ast.clone());
         }
-        let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        let ast = parser
-            .parse(&self.base.root)
-            .context_ut("failed to parse")?;
+        if let Some(doc) = self.ir.get() {
+            let ast = doc.to_cmark();
+            let _ = self.ast.set(ast.clone());
+            return Ok(ast);
+        }
+
+        let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
+        let doc = parser.parse_ir(&self.base.root).context_ut("failed to parse")?;
+        let ast = doc.to_cmark();
+        let _ = self.ir.set(doc);
         let _ = self.ast.set(ast.clone());
         Ok(ast)
     }
@@ -161,8 +167,9 @@ impl MarkdownDocument {
             return Ok(doc.clone());
         }
 
-        let ast = self.parse()?;
-        let doc = crate::ir::Document::from_cmark(&ast);
+        let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
+        let doc = parser.parse_ir(&self.base.root).context_ut("failed to parse")?;
+        let _ = self.ast.set(doc.to_cmark());
         let _ = self.ir.set(doc.clone());
         Ok(doc)
     }

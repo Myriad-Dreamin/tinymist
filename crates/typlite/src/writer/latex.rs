@@ -380,6 +380,7 @@ impl LaTeXWriter {
             Inline::EmbeddedBlock(block) => {
                 self.write_block(block, output)?;
             }
+            Inline::Comment(_) => {}
             Inline::UnsupportedCustom => {}
         }
 

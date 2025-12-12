@@ -1,15 +1,16 @@
-//! HTML table parsing module, processes the conversion of table elements
+//! HTML table parsing module, processes the conversion of table elements.
 
-use cmark_writer::ast::{Node, TableAlignment, TableCell, TableCellKind, TableRow, TableRowKind};
 use ecow::EcoString;
 use typst_html::{HtmlElement, HtmlNode};
 
 use crate::Result;
 use crate::attributes::{TableAttr, TableCellAttr, TypliteAttrsParser};
-use crate::common::InlineNode;
+use crate::ir::{
+    Block, Inline, IrNode, Table, TableAlignment, TableCell, TableCellKind, TableRow, TableRowKind,
+};
 use crate::tags::md_tag;
 
-use super::core::HtmlToAstParser;
+use super::core::HtmlToIrParser;
 
 /// Responsible for finding HTML table elements in the DOM structure.
 pub struct TableStructureFinder;
@@ -21,10 +22,10 @@ impl TableStructureFinder {
             Some(element)
         } else if element.tag == md_tag::grid {
             element.children.iter().find_map(|child| {
-                if let HtmlNode::Element(table_elem) = child {
-                    if table_elem.tag == md_tag::table {
-                        return Some(table_elem);
-                    }
+                if let HtmlNode::Element(table_elem) = child
+                    && table_elem.tag == md_tag::table
+                {
+                    return Some(table_elem);
                 }
                 None
             })
@@ -34,15 +35,15 @@ impl TableStructureFinder {
     }
 }
 
-/// Table parser
+/// Table parser.
 pub struct TableParser;
 
 impl TableParser {
-    /// Convert structured table nodes to the CommonMark AST.
+    /// Convert structured table nodes to semantic IR.
     pub fn convert_table(
-        parser: &mut HtmlToAstParser,
+        parser: &mut HtmlToIrParser,
         element: &HtmlElement,
-    ) -> Result<Option<Node>> {
+    ) -> Result<Option<Block>> {
         let Some(table) = TableStructureFinder::find_structured_table(element) else {
             return Ok(None);
         };
@@ -51,9 +52,9 @@ impl TableParser {
     }
 
     fn convert_structured_table(
-        parser: &mut HtmlToAstParser,
+        parser: &mut HtmlToIrParser,
         element: &HtmlElement,
-    ) -> Result<Option<Node>> {
+    ) -> Result<Option<Block>> {
         let attrs = TableAttr::parse(&element.attrs)?;
         let columns = attrs.columns.unwrap_or(1).max(1);
         let alignments = Self::parse_table_alignments(attrs.align.as_ref(), columns);
@@ -150,15 +151,15 @@ impl TableParser {
         rows.extend(body_rows);
         rows.extend(footer_rows);
 
-        Ok(Some(Node::Table {
+        Ok(Some(Block::Table(Table {
             columns,
             rows,
             alignments,
-        }))
+        })))
     }
 
     fn convert_structured_row(
-        parser: &mut HtmlToAstParser,
+        parser: &mut HtmlToIrParser,
         element: &HtmlElement,
         row_kind: TableRowKind,
         cell_kind: TableCellKind,
@@ -184,28 +185,36 @@ impl TableParser {
     }
 
     fn convert_structured_cell(
-        parser: &mut HtmlToAstParser,
+        parser: &mut HtmlToIrParser,
         cell: &HtmlElement,
         kind: TableCellKind,
-    ) -> Result<cmark_writer::ast::TableCell> {
+    ) -> Result<TableCell> {
         let attrs = TableCellAttr::parse(&cell.attrs)?;
-        let (mut inline_nodes, block_nodes) = parser.capture_children(cell)?;
-        if !block_nodes.is_empty() {
-            inline_nodes.extend(block_nodes);
-        }
-        let mut table_cell = TableCell::new(kind, Self::merge_cell_content(inline_nodes));
-        table_cell.colspan = attrs.colspan.unwrap_or(1).max(1);
-        table_cell.rowspan = attrs.rowspan.unwrap_or(1).max(1);
-        table_cell.align = Self::parse_cell_alignment(attrs.align.as_ref());
-        Ok(table_cell)
-    }
+        let (inline_nodes, block_nodes) = parser.capture_children(cell)?;
 
-    fn merge_cell_content(content: Vec<Node>) -> Node {
-        match content.len() {
-            0 => Node::Text(EcoString::new()),
-            1 => content.into_iter().next().unwrap(),
-            _ => Node::Custom(Box::new(InlineNode { content })),
+        let mut content: Vec<IrNode> = Vec::new();
+        for inline in inline_nodes {
+            content.push(IrNode::Inline(inline));
         }
+        for block in block_nodes {
+            content.push(IrNode::Block(block));
+        }
+
+        let mut table_cell = TableCell {
+            kind,
+            colspan: attrs.colspan.unwrap_or(1).max(1),
+            rowspan: attrs.rowspan.unwrap_or(1).max(1),
+            content,
+            align: Self::parse_cell_alignment(attrs.align.as_ref()),
+        };
+
+        if table_cell.content.is_empty() {
+            table_cell
+                .content
+                .push(IrNode::Inline(Inline::Text(EcoString::new())));
+        }
+
+        Ok(table_cell)
     }
 
     fn flush_pending_row(
@@ -234,7 +243,7 @@ impl TableParser {
                 kind: default_kind.clone(),
                 colspan: 1,
                 rowspan: 1,
-                content: Node::Text(EcoString::new()),
+                content: vec![IrNode::Inline(Inline::Text(EcoString::new()))],
                 align: None,
             });
             width += 1;
