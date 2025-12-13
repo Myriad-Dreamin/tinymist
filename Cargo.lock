@@ -606,28 +606,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cmark-writer"
-version = "0.9.0"
-dependencies = [
- "cmark-writer-macros",
- "ecow",
- "env_logger",
- "html-escape",
- "log",
-]
-
-[[package]]
-name = "cmark-writer-macros"
-version = "0.9.0"
-dependencies = [
- "cmark-writer",
- "ecow",
- "proc-macro2",
- "quote",
- "syn 2.0.104",
-]
-
-[[package]]
 name = "cobs"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
