@@ -1,7 +1,5 @@
 //! DOCX document writer implementation
 
-use base64::Engine;
-use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
 use log::{debug, warn};
@@ -9,16 +7,14 @@ use std::fs;
 use std::io::Cursor;
 
 use crate::Result;
-use crate::common::{
-    CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode, VerbatimNode,
-};
+use crate::ir;
+use crate::writer::IrFormatWriter;
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
 use super::styles::DocxStyles;
 
-/// DOCX writer that generates DOCX directly from AST (without intermediate
-/// representation)
+/// DOCX writer that generates DOCX directly from typlite IR.
 pub struct DocxWriter {
     styles: DocxStyles,
     numbering: DocxNumbering,
@@ -44,165 +40,85 @@ impl DocxWriter {
         }
     }
 
-    /// Process image node
-    fn process_image(&self, docx: Docx, url: &str, alt_nodes: &[Node]) -> Result<Docx> {
-        // Build alt text
-        let alt_text = if !alt_nodes.is_empty() {
-            let mut text = String::new();
-            for node in alt_nodes {
-                if let Node::Text(content) = node {
-                    text.push_str(content);
+    fn process_ir_inline_to_run(&mut self, mut run: Run, node: &ir::Inline) -> Result<Run> {
+        match node {
+            ir::Inline::Text(text) => {
+                run = run.add_text(text);
+            }
+            ir::Inline::Strong(content) => {
+                run = run.style("Strong");
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
                 }
             }
-            Some(text)
-        } else {
-            None
-        };
-
-        // Try reading image file
-        if let Ok(img_data) = fs::read(url) {
-            Ok(self
-                .image_processor
-                .process_image_data(docx, &img_data, alt_text.as_deref(), None))
-        } else {
-            let placeholder = format!("[Image not found: {url}]");
-            let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
-            Ok(docx.add_paragraph(para))
-        }
-    }
-
-    /// Process figure node (image with caption)
-    fn process_figure(&mut self, mut docx: Docx, figure_node: &FigureNode) -> Result<Docx> {
-        // First handle the figure body (typically an image)
-        match &*figure_node.body {
-            Node::Paragraph(content) => {
-                for node in content {
-                    if let Node::Image {
-                        url,
-                        title: _,
-                        alt: _,
-                    } = node
-                    {
-                        // Process the image
-                        if let Ok(img_data) = fs::read(url.as_str()) {
-                            let alt_text = figure_node.caption.clone();
-                            // Add the image with caption
-                            docx = self.image_processor.process_image_data(
-                                docx,
-                                &img_data,
-                                Some(&alt_text),
-                                None,
-                            );
-
-                            // Add caption as a separate paragraph with Caption style
-                            if !figure_node.caption.is_empty() {
-                                let caption_text = format!("Figure: {}", figure_node.caption);
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(caption_text));
-                                docx = docx.add_paragraph(caption_para);
-                            }
-                        } else {
-                            // Image not found, show placeholder
-                            let placeholder = format!("[Image not found: {url}]");
-                            let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
-                            docx = docx.add_paragraph(para);
-
-                            // Still add caption
-                            if !figure_node.caption.is_empty() {
-                                let caption_para = Paragraph::new()
-                                    .style("Caption")
-                                    .add_run(Run::new().add_text(&figure_node.caption));
-                                docx = docx.add_paragraph(caption_para);
-                            }
-                        }
-                    } else {
-                        // Handle non-image content
-                        let mut para = Paragraph::new();
-                        let run = Run::new();
-                        let run = self.process_inline_to_run(run, node)?;
-                        if !run.children.is_empty() {
-                            para = para.add_run(run);
-                            docx = docx.add_paragraph(para);
-                        }
-
-                        // Add caption as a separate paragraph
-                        if !figure_node.caption.is_empty() {
-                            let caption_para = Paragraph::new()
-                                .style("Caption")
-                                .add_run(Run::new().add_text(&figure_node.caption));
-                            docx = docx.add_paragraph(caption_para);
-                        }
+            ir::Inline::Emphasis(content) => {
+                run = run.style("Emphasis");
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
+                }
+            }
+            ir::Inline::Strikethrough(content) => {
+                run = run.strike();
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
+                }
+            }
+            ir::Inline::Group(content) => {
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
+                }
+            }
+            ir::Inline::Highlight(content) => {
+                run = run.highlight("yellow");
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
+                }
+            }
+            ir::Inline::Link { content, .. } => {
+                run = run.style("Hyperlink");
+                for child in content {
+                    run = self.process_ir_inline_to_run(run, child)?;
+                }
+                // `Hyperlink` nodes need to be attached at paragraph level. The paragraph
+                // writer handles `Inline::Link` explicitly.
+            }
+            ir::Inline::ReferenceLink { label, content } => {
+                if content.is_empty() {
+                    run = run.add_text(label);
+                } else {
+                    for child in content {
+                        run = self.process_ir_inline_to_run(run, child)?;
                     }
                 }
             }
-            // Handle other content types within figure
-            _ => {
-                // Process the content using standard node processing
-                docx = self.process_node(docx, &figure_node.body)?;
-
-                // Add caption as a separate paragraph
-                if !figure_node.caption.is_empty() {
-                    let caption_para = Paragraph::new()
-                        .style("Caption")
-                        .add_run(Run::new().add_text(&figure_node.caption));
-                    docx = docx.add_paragraph(caption_para);
-                }
-            }
-        }
-
-        Ok(docx)
-    }
-
-    /// Process inline element and add to Run
-    fn process_inline_to_run(&self, mut run: Run, node: &Node) -> Result<Run> {
-        match node {
-            Node::Text(text) => {
-                run = run.add_text(text);
-            }
-            Node::Strong(content) => {
-                run = run.style("Strong");
-                for child in content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            Node::Emphasis(content) => {
-                run = run.style("Emphasis");
-                for child in content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            Node::Strikethrough(content) => {
-                run = run.strike();
-                for child in content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            Node::Link {
-                url: _,
-                title: _,
-                content,
-            } => {
-                // Hyperlinks need to be processed at paragraph level, only handle content here
-                run = run.style("Hyperlink");
-                for child in content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            Node::Image {
-                url,
-                title: _,
-                alt: _,
-            } => {
+            ir::Inline::Image { url, .. } => {
                 if let Ok(img_data) = fs::read(url.as_str()) {
                     run = self.image_processor.process_inline_image(run, &img_data)?;
                 } else {
                     run = run.add_text(format!("[Image not found: {url}]"));
                 }
             }
-            Node::HtmlElement(element) => {
-                // Handle special HTML elements
-                if element.tag == "img" && element.self_closing {
+            ir::Inline::Autolink { url, .. } => {
+                run = run.add_text(url);
+            }
+            ir::Inline::InlineCode(code) => {
+                run = run.style("CodeInline").add_text(code);
+            }
+            ir::Inline::HardBreak => {
+                run = run.add_break(BreakType::TextWrapping);
+            }
+            ir::Inline::SoftBreak => {
+                run = run.add_text(" ");
+            }
+            ir::Inline::HtmlElement(element) => {
+                if element.tag == "mark" {
+                    run = run.highlight("yellow");
+                    for child in &element.children {
+                        if let ir::IrNode::Inline(inline) = child {
+                            run = self.process_ir_inline_to_run(run, inline)?;
+                        }
+                    }
+                } else if element.tag == "img" && element.self_closing {
                     let is_typst_block = element
                         .attributes
                         .iter()
@@ -223,159 +139,109 @@ impl DocxWriter {
                         )?;
                     }
                 } else {
-                    // Standard element content processing
                     for child in &element.children {
-                        run = self.process_inline_to_run(run, child)?;
+                        match child {
+                            ir::IrNode::Inline(inline) => {
+                                run = self.process_ir_inline_to_run(run, inline)?;
+                            }
+                            ir::IrNode::Block(block) => {
+                                debug!(
+                                    "unhandled block node inside inline HTML element: {block:?}"
+                                );
+                            }
+                        }
                     }
                 }
             }
-            Node::InlineCode(code) => {
-                run = run.style("CodeInline").add_text(code);
+            ir::Inline::EmbeddedBlock(block) => {
+                debug!("ignoring embedded block inside paragraph for DOCX export: {block:?}");
             }
-            Node::HardBreak => {
-                run = run.add_break(BreakType::TextWrapping);
+            ir::Inline::Verbatim(text) => {
+                warn!("ignoring `m1verbatim` content in DOCX export: {text:?}");
             }
-            Node::SoftBreak => {
-                run = run.add_text(" ");
-            }
-            node if node.is_custom_type::<HighlightNode>() => {
-                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
-                run = run.highlight("yellow");
-                for child in &highlight_node.content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            node if node.is_custom_type::<InlineNode>() => {
-                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
-                for child in &inline_node.content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-            }
-            node if node.is_custom_type::<VerbatimNode>() => {
-                let node = node.as_custom_type::<VerbatimNode>().unwrap();
-                warn!(
-                    "ignoring `m1verbatim` content in DOCX export: {:?}",
-                    node.content
-                );
-            }
-            // Other inline element types
-            _ => {
-                debug!("unhandled inline node in DOCX export: {node:?}");
-            }
+            ir::Inline::Comment(_) => {}
+            ir::Inline::UnsupportedCustom => {}
         }
 
         Ok(run)
     }
 
-    /// Process paragraph and add to document
-    fn process_paragraph(
-        &self,
+    fn build_caption_paragraph_ir(
+        &mut self,
+        prefix: Option<&str>,
+        nodes: &[ir::Inline],
+    ) -> Result<Option<Paragraph>> {
+        if nodes.is_empty() {
+            return Ok(None);
+        }
+
+        let mut para = Paragraph::new().style("Caption");
+
+        if let Some(prefix_text) = prefix {
+            para = para.add_run(Run::new().add_text(prefix_text));
+        }
+
+        for node in nodes {
+            let run = self.process_ir_inline_to_run(Run::new(), node)?;
+            if !run.children.is_empty() {
+                para = para.add_run(run);
+            }
+        }
+
+        Ok(Some(para))
+    }
+
+    fn process_paragraph_ir(
+        &mut self,
         mut docx: Docx,
-        content: &[Node],
+        content: &[ir::Inline],
         style: Option<&str>,
     ) -> Result<Docx> {
         let mut para = Paragraph::new();
-
-        // Apply style
         if let Some(style_name) = style {
             para = para.style(style_name);
         }
 
-        // Extract all link nodes
-        let mut links = Vec::new();
-        for (i, node) in content.iter().enumerate() {
-            if let Node::Link {
-                url,
-                title: _,
-                content: _,
-            } = node
-            {
-                links.push((i, url.clone()));
-            }
-        }
-
-        // If no links, process paragraph normally
-        if links.is_empty() {
-            // Process paragraph content
-            for node in content {
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, node)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
+        for node in content {
+            match node {
+                ir::Inline::Link { url, content, .. } => {
+                    let mut hyperlink_run = Run::new().style("Hyperlink");
+                    for child in content {
+                        hyperlink_run = self.process_ir_inline_to_run(hyperlink_run, child)?;
+                    }
+                    if !hyperlink_run.children.is_empty() {
+                        let hyperlink = Hyperlink::new(url.as_str(), HyperlinkType::External)
+                            .add_run(hyperlink_run);
+                        para = para.add_hyperlink(hyperlink);
+                    }
                 }
-            }
-        } else {
-            // If links exist, we need to process in segments
-            let mut last_idx = 0;
-            for (idx, url) in links {
-                // Process content before the link
-                for item in content.iter().take(idx).skip(last_idx) {
-                    let run = Run::new();
-                    let run = self.process_inline_to_run(run, item)?;
+                other => {
+                    let run = self.process_ir_inline_to_run(Run::new(), other)?;
                     if !run.children.is_empty() {
                         para = para.add_run(run);
                     }
                 }
-
-                // Process link
-                if let Node::Link {
-                    url: _,
-                    title: _,
-                    content: link_content,
-                } = &content[idx]
-                {
-                    let mut hyperlink_run = Run::new().style("Hyperlink");
-                    for child in link_content {
-                        hyperlink_run = self.process_inline_to_run(hyperlink_run, child)?;
-                    }
-
-                    // Create and add hyperlink
-                    if !hyperlink_run.children.is_empty() {
-                        let hyperlink =
-                            Hyperlink::new(&url, HyperlinkType::External).add_run(hyperlink_run);
-                        para = para.add_hyperlink(hyperlink);
-                    }
-                }
-
-                last_idx = idx + 1;
-            }
-
-            // Process content after the last link
-            for item in content.iter().skip(last_idx) {
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, item)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
-                }
             }
         }
 
-        // Only add when paragraph has content
         if !para.children.is_empty() {
             docx = docx.add_paragraph(para);
         }
-
         Ok(docx)
     }
 
-    /// Process node and add to document
-    fn process_node(&mut self, mut docx: Docx, node: &Node) -> Result<Docx> {
+    fn process_ir_block(&mut self, mut docx: Docx, node: &ir::Block) -> Result<Docx> {
         match node {
-            Node::Document(blocks) => {
+            ir::Block::Document(blocks) => {
                 for block in blocks {
-                    docx = self.process_node(docx, block)?;
+                    docx = self.process_ir_block(docx, block)?;
                 }
             }
-            Node::Paragraph(content) => {
-                docx = self.process_paragraph(docx, content, None)?;
+            ir::Block::Paragraph(content) => {
+                docx = self.process_paragraph_ir(docx, content, None)?;
             }
-            Node::Heading {
-                level,
-                content,
-                heading_type: _,
-            } => {
-                // Determine heading style name
-                let style_name = match level {
+            ir::Block::Heading { level, content } => {
+                let style_name = match *level {
                     1 => "Heading1",
                     2 => "Heading2",
                     3 => "Heading3",
@@ -383,24 +249,23 @@ impl DocxWriter {
                     5 => "Heading5",
                     _ => "Heading6",
                 };
-
-                docx = self.process_paragraph(docx, content, Some(style_name))?;
+                docx = self.process_paragraph_ir(docx, content, Some(style_name))?;
             }
-            Node::BlockQuote(content) => {
+            ir::Block::BlockQuote(content) => {
                 for block in content {
-                    if let Node::Paragraph(inline) = block {
-                        docx = self.process_paragraph(docx, inline, Some("Blockquote"))?;
-                    } else {
-                        docx = self.process_node(docx, block)?;
+                    match block {
+                        ir::Block::Paragraph(inline) => {
+                            docx = self.process_paragraph_ir(docx, inline, Some("Blockquote"))?;
+                        }
+                        other => {
+                            docx = self.process_ir_block(docx, other)?;
+                        }
                     }
                 }
             }
-            Node::CodeBlock {
-                language,
-                content,
-                block_type: _,
+            ir::Block::CodeBlock {
+                language, content, ..
             } => {
-                // Add language information
                 if let Some(lang) = language
                     && !lang.is_empty()
                 {
@@ -410,182 +275,132 @@ impl DocxWriter {
                     docx = docx.add_paragraph(lang_para);
                 }
 
-                // Process code line by line, preserving line breaks
-                let lines: Vec<&str> = content.split('\n').collect();
-                for line in lines {
+                for line in content.split('\n') {
                     let code_para = Paragraph::new()
                         .style("CodeBlock")
                         .add_run(Run::new().add_text(line));
                     docx = docx.add_paragraph(code_para);
                 }
             }
-            Node::OrderedList { start: _, items } => {
-                docx = self.process_ordered_list(docx, items)?;
+            ir::Block::OrderedList { items, .. } => {
+                docx = self.process_ir_ordered_list(docx, items)?;
             }
-            Node::UnorderedList(items) => {
-                docx = self.process_unordered_list(docx, items)?;
+            ir::Block::UnorderedList(items) => {
+                docx = self.process_ir_unordered_list(docx, items)?;
             }
-            Node::Table {
-                headers,
-                rows,
-                alignments: _,
-            } => {
-                docx = self.process_table(docx, headers, rows)?;
+            ir::Block::Table(table) => {
+                docx = self.process_ir_table(docx, table)?;
             }
-            Node::Image { url, title: _, alt } => {
-                docx = self.process_image(docx, url, alt)?;
+            ir::Block::Figure { body, caption } => {
+                docx = self.process_ir_figure(docx, body, caption)?;
             }
-            node if node.is_custom_type::<FigureNode>() => {
-                let figure_node = node.as_custom_type::<FigureNode>().unwrap();
-                docx = self.process_figure(docx, figure_node)?;
+            ir::Block::ExternalFrame(frame) => {
+                if let Ok(png_data) = self
+                    .image_processor
+                    .convert_svg_to_png(frame.svg.as_bytes())
+                {
+                    docx = self.image_processor.process_image_data(
+                        docx,
+                        &png_data,
+                        Some(frame.alt_text.as_str()),
+                        None,
+                    );
+                } else if let Ok(img_data) = fs::read(&frame.file_path) {
+                    docx = self.image_processor.process_image_data(
+                        docx,
+                        &img_data,
+                        Some(frame.alt_text.as_str()),
+                        None,
+                    );
+                }
             }
-            node if node.is_custom_type::<CenterNode>() => {
-                let center_node = node.as_custom_type::<CenterNode>().unwrap();
-                // Handle regular node but with center alignment
-                match &center_node.node {
-                    Node::Paragraph(content) => {
-                        docx = self.process_paragraph(docx, content, None)?;
-                        // Get the last paragraph and center it
-                        if let Some(DocumentChild::Paragraph(para)) =
-                            docx.document.children.last_mut()
-                        {
-                            para.property = para.property.clone().align(AlignmentType::Center);
-                        }
-                    }
-                    Node::HtmlElement(element) => {
+            ir::Block::Center(inner) => {
+                match &**inner {
+                    // Match the current (cmark-based) DOCX behavior: a centered paragraph
+                    // (e.g. block equation) ends up as block-level HTML with inline children,
+                    // which the DOCX writer currently drops.
+                    ir::Block::Paragraph(_) => {}
+                    other => {
                         let start_idx = docx.document.children.len();
-                        for child in &element.children {
-                            docx = self.process_node(docx, child)?;
-                        }
+                        docx = self.process_ir_block(docx, other)?;
                         for child in docx.document.children.iter_mut().skip(start_idx) {
                             if let DocumentChild::Paragraph(para) = child {
                                 para.property = para.property.clone().align(AlignmentType::Center);
                             }
                         }
                     }
-                    other => {
-                        docx = self.process_node(docx, other)?;
-                        // Get the last element and center it if it's a paragraph
-                        if let Some(DocumentChild::Paragraph(para)) =
-                            docx.document.children.last_mut()
-                        {
-                            para.property = para.property.clone().align(AlignmentType::Center);
-                        }
-                    }
                 }
             }
-            node if node.is_custom_type::<crate::common::ExternalFrameNode>() => {
-                let external_frame = node
-                    .as_custom_type::<crate::common::ExternalFrameNode>()
-                    .unwrap();
-                let data = base64::engine::general_purpose::STANDARD
-                    .decode(&external_frame.svg)
-                    .map_err(|e| format!("Failed to decode SVG data: {e}"))?;
-
-                docx = self.image_processor.process_image_data(
-                    docx,
-                    &data,
-                    Some(&external_frame.alt_text),
-                    None,
-                );
-            }
-            node if node.is_custom_type::<HighlightNode>() => {
-                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
-                // Handle HighlightNode at block level (convert to paragraph)
-                let mut para = Paragraph::new();
-                let mut run = Run::new().highlight("yellow");
-
-                for child in &highlight_node.content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
-                    docx = docx.add_paragraph(para);
+            ir::Block::Alert { content, .. } => {
+                for block in content {
+                    docx = self.process_ir_block(docx, block)?;
                 }
             }
-            node if node.is_custom_type::<InlineNode>() => {
-                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
-                // Handle InlineNode at block level (convert to paragraph)
-                let mut para = Paragraph::new();
-                let mut run = Run::new();
-
-                for child in &inline_node.content {
-                    run = self.process_inline_to_run(run, child)?;
-                }
-
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
-                    docx = docx.add_paragraph(para);
-                }
-            }
-            Node::ThematicBreak => {
-                // Add horizontal line as specially formatted paragraph
+            ir::Block::ThematicBreak => {
                 let hr_para = Paragraph::new()
                     .style("HorizontalLine")
                     .add_run(Run::new().add_text(""));
                 docx = docx.add_paragraph(hr_para);
             }
-            // Inline elements should not be processed here individually
-            _ => {}
+            ir::Block::HtmlElement(element) => {
+                // Keep behavior conservative: treat as container and only render nested blocks.
+                for child in &element.children {
+                    if let ir::IrNode::Block(block) = child {
+                        docx = self.process_ir_block(docx, block)?;
+                    }
+                }
+            }
+            ir::Block::HtmlBlock(_) => {}
         }
 
         Ok(docx)
     }
 
-    /// Process ordered list
-    fn process_ordered_list(&mut self, mut docx: Docx, items: &[ListItem]) -> Result<Docx> {
-        // Enter deeper list level
+    fn process_ir_ordered_list(&mut self, mut docx: Docx, items: &[ir::ListItem]) -> Result<Docx> {
         self.list_level += 1;
         let current_level = self.list_level - 1;
 
-        // Create new ordered list numbering definition
         let (doc, num_id) = self.numbering.create_ordered_numbering(docx);
         docx = doc;
 
-        // Process list items
         for item in items {
-            if let ListItem::Ordered { content, .. } = item {
-                docx = self.process_list_item_content(docx, content, num_id, current_level)?;
+            if let ir::ListItem::Ordered { content, .. } = item {
+                docx = self.process_ir_list_item_content(docx, content, num_id, current_level)?;
             }
         }
 
-        // Exit list level
         self.list_level -= 1;
         Ok(docx)
     }
 
-    /// Process unordered list
-    fn process_unordered_list(&mut self, mut docx: Docx, items: &[ListItem]) -> Result<Docx> {
-        // Enter deeper list level
+    fn process_ir_unordered_list(
+        &mut self,
+        mut docx: Docx,
+        items: &[ir::ListItem],
+    ) -> Result<Docx> {
         self.list_level += 1;
         let current_level = self.list_level - 1;
 
-        // Create new unordered list numbering definition
         let (doc, num_id) = self.numbering.create_unordered_numbering(docx);
         docx = doc;
 
-        // Process list items
         for item in items {
-            if let ListItem::Unordered { content } = item {
-                docx = self.process_list_item_content(docx, content, num_id, current_level)?;
+            if let ir::ListItem::Unordered { content } = item {
+                docx = self.process_ir_list_item_content(docx, content, num_id, current_level)?;
             }
         }
 
-        // Exit list level
         self.list_level -= 1;
         Ok(docx)
     }
 
-    /// Helper function to process list item content
-    fn process_list_item_content(
+    fn process_ir_list_item_content(
         &mut self,
         mut docx: Docx,
-        content: &[Node],
+        content: &[ir::Block],
         num_id: usize,
         level: usize,
     ) -> Result<Docx> {
-        // If content is empty, add empty paragraph
         if content.is_empty() {
             let empty_para = Paragraph::new()
                 .numbering(NumberingId::new(num_id), IndentLevel::new(level))
@@ -593,17 +408,14 @@ impl DocxWriter {
             return Ok(docx.add_paragraph(empty_para));
         }
 
-        // Process content
         for block in content {
             match block {
-                Node::Paragraph(inline) => {
+                ir::Block::Paragraph(inline) => {
                     let mut para = Paragraph::new()
                         .numbering(NumberingId::new(num_id), IndentLevel::new(level));
 
-                    // Process paragraph content
                     for node in inline {
-                        let run = Run::new();
-                        let run = self.process_inline_to_run(run, node)?;
+                        let run = self.process_ir_inline_to_run(Run::new(), node)?;
                         if !run.children.is_empty() {
                             para = para.add_run(run);
                         }
@@ -611,12 +423,11 @@ impl DocxWriter {
 
                     docx = docx.add_paragraph(para);
                 }
-                // Recursively process nested lists
-                Node::OrderedList { start: _, items: _ } | Node::UnorderedList(_) => {
-                    docx = self.process_node(docx, block)?;
+                ir::Block::OrderedList { .. } | ir::Block::UnorderedList(_) => {
+                    docx = self.process_ir_block(docx, block)?;
                 }
                 _ => {
-                    docx = self.process_node(docx, block)?;
+                    docx = self.process_ir_block(docx, block)?;
                 }
             }
         }
@@ -624,83 +435,169 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    /// Process table
-    fn process_table(&self, mut docx: Docx, headers: &[Node], rows: &[Vec<Node>]) -> Result<Docx> {
-        let mut table = Table::new(vec![]).style("Table");
-
-        // Process table headers
-        if !headers.is_empty() {
-            let mut cells = Vec::new();
-
-            for header_node in headers {
-                let mut table_cell = TableCell::new();
-                let mut para = Paragraph::new();
-
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, header_node)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
-                }
-
-                if !para.children.is_empty() {
-                    table_cell = table_cell.add_paragraph(para);
-                }
-
-                cells.push(table_cell);
-            }
-
-            if !cells.is_empty() {
-                let header_row = TableRow::new(cells);
-                table = table.add_row(header_row);
-            }
+    fn process_ir_table(&mut self, mut docx: Docx, table: &ir::Table) -> Result<Docx> {
+        if table.rows.is_empty() || table.columns == 0 {
+            return Ok(docx);
         }
 
-        // Process table rows
-        for row in rows {
+        let mut out_table = Table::new(vec![]).style("Table");
+        let mut vmerge = vec![0usize; table.columns];
+
+        for row in &table.rows {
             let mut cells = Vec::new();
+            let mut col_index = 0;
+            let mut cell_iter = row.cells.iter();
 
-            for cell_node in row {
-                let mut table_cell = TableCell::new();
-                let mut para = Paragraph::new();
-
-                let run = Run::new();
-                let run = self.process_inline_to_run(run, cell_node)?;
-                if !run.children.is_empty() {
-                    para = para.add_run(run);
+            while col_index < table.columns {
+                if vmerge[col_index] > 0 {
+                    cells.push(TableCell::new().vertical_merge(VMergeType::Continue));
+                    vmerge[col_index] -= 1;
+                    col_index += 1;
+                    continue;
                 }
 
-                if !para.children.is_empty() {
-                    table_cell = table_cell.add_paragraph(para);
+                if let Some(cell) = cell_iter.next() {
+                    let mut effective_align = cell.align.clone();
+                    if effective_align.is_none() {
+                        if let Some(column_align) = table.alignments.get(col_index).cloned() {
+                            if !matches!(column_align, ir::TableAlignment::None) {
+                                effective_align = Some(column_align);
+                            }
+                        }
+                    }
+
+                    let mut table_cell = self.build_table_cell_ir(cell, effective_align)?;
+                    if cell.colspan > 1 {
+                        table_cell = table_cell.grid_span(cell.colspan);
+                    }
+                    if cell.rowspan > 1 {
+                        table_cell = table_cell.vertical_merge(VMergeType::Restart);
+                        for offset in 0..cell.colspan {
+                            if col_index + offset < table.columns {
+                                vmerge[col_index + offset] =
+                                    vmerge[col_index + offset].max(cell.rowspan - 1);
+                            }
+                        }
+                    }
+                    cells.push(table_cell);
+                    col_index += cell.colspan;
+                } else {
+                    cells.push(TableCell::new());
+                    col_index += 1;
                 }
-
-                cells.push(table_cell);
             }
 
-            if !cells.is_empty() {
-                let data_row = TableRow::new(cells);
-                table = table.add_row(data_row);
-            }
+            out_table = out_table.add_row(TableRow::new(cells));
         }
 
-        // Add table to document
-        docx = docx.add_table(table);
-
+        docx = docx.add_table(out_table);
         Ok(docx)
     }
 
-    /// Generate DOCX document
-    pub fn generate_docx(&mut self, doc: &Node) -> Result<Vec<u8>> {
-        // Create DOCX document and initialize styles
+    fn build_table_cell_ir(
+        &mut self,
+        cell: &ir::TableCell,
+        align: Option<ir::TableAlignment>,
+    ) -> Result<TableCell> {
+        let mut table_cell = TableCell::new();
+        let mut para = Paragraph::new();
+
+        let mut run = Run::new();
+        for node in &cell.content {
+            match node {
+                ir::IrNode::Inline(inline) => {
+                    run = self.process_ir_inline_to_run(run, inline)?;
+                }
+                ir::IrNode::Block(block) => {
+                    debug!("ignoring block node inside table cell for DOCX export: {block:?}");
+                }
+            }
+        }
+        if !run.children.is_empty() {
+            para = para.add_run(run);
+        }
+
+        if let Some(alignment) = align.and_then(|a| match a {
+            ir::TableAlignment::Left => Some(AlignmentType::Left),
+            ir::TableAlignment::Center => Some(AlignmentType::Center),
+            ir::TableAlignment::Right => Some(AlignmentType::Right),
+            ir::TableAlignment::None => None,
+        }) {
+            para.property = para.property.clone().align(alignment);
+        }
+
+        if !para.children.is_empty() {
+            table_cell = table_cell.add_paragraph(para);
+        }
+
+        Ok(table_cell)
+    }
+
+    fn process_ir_figure(
+        &mut self,
+        mut docx: Docx,
+        body: &ir::Block,
+        caption: &[ir::Inline],
+    ) -> Result<Docx> {
+        match body {
+            ir::Block::Paragraph(inlines) => {
+                for inline in inlines {
+                    match inline {
+                        ir::Inline::Image { url, .. } => {
+                            if let Ok(img_data) = fs::read(url.as_str()) {
+                                docx = self
+                                    .image_processor
+                                    .process_image_data(docx, &img_data, None, None);
+
+                                if let Some(caption_para) =
+                                    self.build_caption_paragraph_ir(Some("Figure: "), caption)?
+                                {
+                                    docx = docx.add_paragraph(caption_para);
+                                }
+                            } else {
+                                let placeholder = format!("[Image not found: {url}]");
+                                let para =
+                                    Paragraph::new().add_run(Run::new().add_text(placeholder));
+                                docx = docx.add_paragraph(para);
+
+                                if let Some(caption_para) =
+                                    self.build_caption_paragraph_ir(None, caption)?
+                                {
+                                    docx = docx.add_paragraph(caption_para);
+                                }
+                            }
+                        }
+                        other => {
+                            let mut para = Paragraph::new();
+                            let run = self.process_ir_inline_to_run(Run::new(), other)?;
+                            if !run.children.is_empty() {
+                                para = para.add_run(run);
+                                docx = docx.add_paragraph(para);
+                            }
+                        }
+                    }
+                }
+            }
+            other => {
+                docx = self.process_ir_block(docx, other)?;
+                if let Some(caption_para) = self.build_caption_paragraph_ir(None, caption)? {
+                    docx = docx.add_paragraph(caption_para);
+                }
+            }
+        }
+        Ok(docx)
+    }
+
+    pub fn generate_docx_ir(&mut self, doc: &ir::Document) -> Result<Vec<u8>> {
         let mut docx = Docx::new();
         docx = self.styles.initialize_styles(docx);
 
-        // Process document content
-        docx = self.process_node(docx, doc)?;
+        for block in &doc.blocks {
+            docx = self.process_ir_block(docx, block)?;
+        }
 
-        // Initialize numbering definitions
         docx = self.numbering.initialize_numbering(docx);
 
-        // Build and pack document
         let docx_built = docx.build();
         let mut buffer = Vec::new();
         docx_built
@@ -711,14 +608,14 @@ impl DocxWriter {
     }
 }
 
-impl FormatWriter for DocxWriter {
-    fn write_vec(&mut self, document: &Node) -> Result<Vec<u8>> {
+impl IrFormatWriter for DocxWriter {
+    fn write_ir_vec(&mut self, document: &ir::Document) -> Result<Vec<u8>> {
         self.list_level = 0;
         self.list_numbering_count = 0;
-        self.generate_docx(document)
+        self.generate_docx_ir(document)
     }
 
-    fn write_eco(&mut self, _document: &Node, _output: &mut EcoString) -> Result<()> {
+    fn write_ir_eco(&mut self, _document: &ir::Document, _output: &mut EcoString) -> Result<()> {
         Err("DOCX format does not support EcoString output".into())
     }
 }

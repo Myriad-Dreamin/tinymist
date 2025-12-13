@@ -1,11 +1,10 @@
-//! Media processing module, handles images, SVG and Frame media elements
+//! Media processing module, handles images, SVG and Frame media elements.
 
 use core::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, LazyLock};
 
 use base64::Engine;
-use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
 use ecow::{EcoString, eco_format};
 use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowApi};
@@ -20,15 +19,15 @@ use typst_html::{HtmlElement, HtmlNode};
 use crate::{
     ColorTheme,
     attributes::{IdocAttr, TypliteAttrsParser, md_attr},
-    common::ExternalFrameNode,
+    ir::{Block, ExternalFrame, HtmlAttribute, HtmlElement as IrHtmlElement, Inline, IrNode},
 };
 
-use super::core::HtmlToAstParser;
+use super::core::HtmlToIrParser;
 
 enum AssetUrl {
-    /// Embedded Base64 SVG data
+    /// Embedded Base64 SVG data.
     Embedded(String),
-    /// External file path
+    /// External file path.
     External(PathBuf),
 }
 
@@ -36,44 +35,41 @@ impl fmt::Display for AssetUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AssetUrl::Embedded(data) => write!(f, "data:image/svg+xml;base64,{data}"),
-            // todo: correct relative path?
             AssetUrl::External(path) => write!(f, "{}", path.display()),
         }
     }
 }
 
-impl HtmlToAstParser {
-    /// Convert Typst source to CommonMark node
-    pub fn convert_source(&mut self, element: &HtmlElement) -> Node {
+impl HtmlToIrParser {
+    /// Convert Typst source to an IR inline node.
+    pub fn convert_source(&mut self, element: &HtmlElement) -> Inline {
         if element.children.len() != 1 {
-            // Construct error node
-            return Node::HtmlElement(CmarkHtmlElement {
+            return Inline::HtmlElement(IrHtmlElement {
                 tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
                     name: EcoString::inline("class"),
                     value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(eco_format!(
+                children: vec![IrNode::Inline(Inline::Text(eco_format!(
                     "source contains not only one child: {}, whose attrs: {:?}",
                     element.children.len(),
                     element.attrs
-                ))],
+                )))],
                 self_closing: false,
             });
         }
 
         let Some(HtmlNode::Frame(frame)) = element.children.first() else {
-            // todo: utils to remove duplicated error construction
-            return Node::HtmlElement(CmarkHtmlElement {
+            return Inline::HtmlElement(IrHtmlElement {
                 tag: EcoString::inline("div"),
                 attributes: vec![HtmlAttribute {
                     name: EcoString::inline("class"),
                     value: EcoString::inline("error"),
                 }],
-                children: vec![Node::Text(eco_format!(
+                children: vec![IrNode::Inline(Inline::Text(eco_format!(
                     "source contains not a frame, but: {:?}",
                     element.children
-                ))],
+                )))],
                 self_closing: false,
             });
         };
@@ -82,14 +78,15 @@ impl HtmlToAstParser {
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {
-                // Construct error node
-                return Node::HtmlElement(CmarkHtmlElement {
+                return Inline::HtmlElement(IrHtmlElement {
                     tag: EcoString::inline("div"),
                     attributes: vec![HtmlAttribute {
                         name: EcoString::inline("class"),
                         value: EcoString::inline("error"),
                     }],
-                    children: vec![Node::Text(eco_format!("Error creating source URL: {e}"))],
+                    children: vec![IrNode::Inline(Inline::Text(eco_format!(
+                        "Error creating source URL: {e}"
+                    )))],
                     self_closing: false,
                 });
             }
@@ -103,7 +100,7 @@ impl HtmlToAstParser {
             }
         });
 
-        Node::HtmlElement(CmarkHtmlElement {
+        Inline::HtmlElement(IrHtmlElement {
             tag: EcoString::inline("source"),
             attributes: vec![
                 HtmlAttribute {
@@ -120,40 +117,42 @@ impl HtmlToAstParser {
         })
     }
 
-    /// Convert Typst frame to CommonMark node
-    pub fn convert_frame(&mut self, frame: &Frame) -> Node {
+    /// Convert Typst frame to an IR inline node.
+    pub fn convert_frame(&mut self, frame: &Frame) -> Inline {
         if self.feat.remove_html {
-            // todo: make error silent is not good.
-            return Node::Text(EcoString::new());
+            return Inline::Text(EcoString::new());
         }
 
         let svg = typst_svg::svg_frame(frame);
         self.convert_svg(svg)
     }
 
-    fn convert_svg(&mut self, svg: String) -> Node {
+    fn convert_svg(&mut self, svg: String) -> Inline {
         let frame_url = self.create_asset_url(&svg);
 
         match frame_url {
             Ok(url @ AssetUrl::Embedded(..)) => Self::create_embedded_frame(&url),
-            Ok(AssetUrl::External(file_path)) => Node::Custom(Box::new(ExternalFrameNode {
-                file_path,
-                alt_text: EcoString::inline("typst-frame"),
-                svg,
-            })),
+            Ok(AssetUrl::External(file_path)) => {
+                Inline::EmbeddedBlock(Box::new(Block::ExternalFrame(ExternalFrame {
+                    file_path,
+                    alt_text: EcoString::inline("typst-frame"),
+                    svg,
+                })))
+            }
             Err(e) => {
                 if self.feat.soft_error {
                     let b64_data = Self::base64_url(&svg);
                     Self::create_embedded_frame(&b64_data)
                 } else {
-                    // Construct error node
-                    Node::HtmlElement(CmarkHtmlElement {
+                    Inline::HtmlElement(IrHtmlElement {
                         tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
                             name: EcoString::inline("class"),
                             value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(eco_format!("Error creating frame URL: {e}"))],
+                        children: vec![IrNode::Inline(Inline::Text(eco_format!(
+                            "Error creating frame URL: {e}"
+                        )))],
                         self_closing: false,
                     })
                 }
@@ -161,9 +160,8 @@ impl HtmlToAstParser {
         }
     }
 
-    /// Create embedded frame node
-    fn create_embedded_frame(url: &AssetUrl) -> Node {
-        Node::HtmlElement(CmarkHtmlElement {
+    fn create_embedded_frame(url: &AssetUrl) -> Inline {
+        Inline::HtmlElement(IrHtmlElement {
             tag: EcoString::inline("img"),
             attributes: vec![
                 HtmlAttribute {
@@ -180,7 +178,6 @@ impl HtmlToAstParser {
         })
     }
 
-    /// Convert asset to asset url
     fn create_asset_url(&mut self, svg: &str) -> crate::Result<AssetUrl> {
         if let Some(assets_path) = &self.feat.assets_path {
             let file_id = self.asset_counter;
@@ -192,16 +189,15 @@ impl HtmlToAstParser {
             return Ok(AssetUrl::External(file_path));
         }
 
-        // Fall back to embedded mode if no external asset path is specified
         Ok(Self::base64_url(svg))
     }
 
-    /// Create embedded frame node
     fn base64_url(data: &str) -> AssetUrl {
         AssetUrl::Embedded(base64::engine::general_purpose::STANDARD.encode(data.as_bytes()))
     }
-    /// Convert Typst inline document to CommonMark node
-    pub fn convert_idoc(&mut self, element: &HtmlElement) -> Node {
+
+    /// Convert Typst inline document to an IR inline node.
+    pub fn convert_idoc(&mut self, element: &HtmlElement) -> Inline {
         static DARK_THEME_INPUT: LazyLock<Arc<LazyHash<Dict>>> = LazyLock::new(|| {
             Arc::new(LazyHash::new(Dict::from_iter(std::iter::once((
                 "x-color-theme".into(),
@@ -211,25 +207,24 @@ impl HtmlToAstParser {
 
         if self.feat.remove_html {
             log::debug!("remove_html feature active, dropping inline document element");
-            // todo: make error silent is not good.
-            return Node::Text(EcoString::new());
+            return Inline::Text(EcoString::new());
         }
+
         let attrs = match IdocAttr::parse(&element.attrs) {
             Ok(attrs) => attrs,
             Err(e) => {
                 if self.feat.soft_error {
-                    return Node::Text(eco_format!("Error parsing idoc attributes: {e}"));
+                    return Inline::Text(eco_format!("Error parsing idoc attributes: {e}"));
                 } else {
-                    // Construct error node
-                    return Node::HtmlElement(CmarkHtmlElement {
+                    return Inline::HtmlElement(IrHtmlElement {
                         tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
                             name: EcoString::inline("class"),
                             value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(eco_format!(
+                        children: vec![IrNode::Inline(Inline::Text(eco_format!(
                             "Error parsing idoc attributes: {e}"
-                        ))],
+                        )))],
                         self_closing: false,
                     });
                 }
@@ -250,7 +245,6 @@ impl HtmlToAstParser {
                 None | Some(ColorTheme::Light) => None,
             },
         });
-        // todo: cost some performance.
         world.take_db();
 
         let main = world.main();
@@ -271,14 +265,11 @@ impl HtmlToAstParser {
                     "code" => eco_format!("{}{PRELUDE}#{{{src}}}", import_prefix),
                     "math" => eco_format!("{}{PRELUDE}${src}$", import_prefix),
                     "markup" => eco_format!("{}{PRELUDE}#[{}]", import_prefix, src),
-                    // todo check mode
-                    //  "markup" |
                     _ => eco_format!("{}{PRELUDE}#[{}]", import_prefix, src),
                 }),
             )
             .unwrap();
 
-        // this is not affected by syntax-only mode (typst_shim::compile_opt)
         let compiled = typst::compile(&world);
         self.warnings.extend(compiled.warnings.iter().cloned());
         let doc = match compiled.output {
@@ -294,16 +285,17 @@ impl HtmlToAstParser {
                 .unwrap_or_else(|e| e);
 
                 if self.feat.soft_error {
-                    return Node::Text(eco_format!("Error compiling idoc: {e}"));
+                    return Inline::Text(eco_format!("Error compiling idoc: {e}"));
                 } else {
-                    // Construct error node
-                    return Node::HtmlElement(CmarkHtmlElement {
+                    return Inline::HtmlElement(IrHtmlElement {
                         tag: EcoString::inline("div"),
                         attributes: vec![HtmlAttribute {
                             name: EcoString::inline("class"),
                             value: EcoString::inline("error"),
                         }],
-                        children: vec![Node::Text(eco_format!("Error compiling idoc: {e}"))],
+                        children: vec![IrNode::Inline(Inline::Text(eco_format!(
+                            "Error compiling idoc: {e}"
+                        )))],
                         self_closing: false,
                     });
                 }

@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/issue-1844.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1parbreak></m1parbreak><m1parbreak></m1parbreak><m1heading level="1"><span style="display: inline-block">Reproducer document</span></m1heading><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">Example</span></m1heading><m1parbreak></m1parbreak><m1parbreak></m1parbreak><p>Just the source (ok)</p><m1parbreak></m1parbreak><m1verbatim src="````
+  <body><m1document><m1parbreak></m1parbreak><m1parbreak></m1parbreak><m1heading level="1">Reproducer document</m1heading><m1parbreak></m1parbreak><m1heading level="2">Example</m1heading><m1parbreak></m1parbreak><m1parbreak></m1parbreak><p>Just the source (ok)</p><m1parbreak></m1parbreak><m1verbatim src="````
 
 == Under the Greenwood Tree
 by Shakespeare.

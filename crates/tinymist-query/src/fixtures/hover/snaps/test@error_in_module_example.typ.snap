@@ -29,7 +29,7 @@ Error compiling idoc: error: unknown variable: my-f
 14 │ #my-f
    │  ^^^^
    │
-   = hint: if you meant to use subtraction, try adding spaces around the minus sign: \`my - f\`
+   = hint: if you meant to use subtraction, try adding spaces around the minus sign: `my - f`
 
 help: error occurred while importing this module
   ┌─ /dummy-root/\_\_main\_\_.typ:1:8

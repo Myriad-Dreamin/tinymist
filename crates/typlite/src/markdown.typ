@@ -1,131 +1,249 @@
-#let bool-str(x) = {
-  if x {
-    "true"
-  } else {
-    "false"
-  }
-}
+#let elem(kind, ..args) = html.elem(
+  "m1" + kind,
+  attrs: args
+    .named()
+    .pairs()
+    .map(((k, v)) => (
+      k,
+      {
+        if type(v) == bool {
+          if (v) { "true" } else { "" }
+        } else if v == none {
+          ""
+        } else if v == auto {
+          "auto"
+        } else if type(v) == bytes {
+          // from digestify.typ
+          let bytes-to-hex(bytes, upper: false) = {
+            let res = array(bytes)
+              .map(x => {
+                let s = str(x, base: 16)
+                return "0" * (2 - s.len()) + s
+              })
+              .join()
 
-// typst doesn't allow things like `typParbreak`.
-#let md-parbreak = html.elem("m1parbreak", "")
-#let md-linebreak = html.elem("m1linebreak", "")
-#let md-strong(body, delta: 0) = html.elem("span", html.elem("m1strong", body))
-#let md-emph(body) = html.elem("span", html.elem("m1emph", body))
-#let md-raw(lang: none, block: false, text: "", body) = {
-  let body = html.elem(
-    "m1raw",
-    attrs: (
-      lang: if lang == none {
-        ""
-      } else {
-        lang
-      },
-      block: bool-str(block),
-      text: text,
-    ),
-    body,
-  )
-
-  if block {
-    return body
-  } else {
-    html.elem("span", body)
-  }
-}
-#let md-link(dest: none, body) = html.elem(
-  "span",
-  html.elem(
-    "m1link",
-    attrs: (dest: dest),
-    body,
-  ),
-)
-#let md-label(dest: none, body) = html.elem(
-  "m1label",
-  attrs: (dest: dest),
-  body,
-)
-#let md-ref(body) = {
-  show link: it => it.body
-  html.elem(
-    "span",
-    html.elem(
-      "m1ref",
-      body,
-    ),
-  )
-}
-#let md-heading(level: int, body) = html.elem(
-  "m1heading",
-  attrs: (level: str(level)),
-  box(body),
-)
-#let md-outline = html.elem.with("m1outline")
-#let md-outline-entry(level: int, body) = html.elem(
-  "m1outentry",
-  attrs: (level: str(level)),
-  body,
-)
-#let md-quote(/* attribution: none, */ body) = html.elem(
-  "m1quote",
-  // attrs: (attribution: attribution),
-  body,
-)
-#let md-table(it) = html.elem(
-  "m1table",
-  it,
-)
-#let md-grid(it) = html.elem(
-  "m1grid",
-  table(columns: it.columns, ..it
-      .children
-      .map(child => {
-        {
-          let func = child.func()
-          if func == grid.cell {
-            table.cell(
-              child.body,
-            )
-          } else if func == grid.header {
-            table.header(..child.children.map(it => table.cell(
-              it.body,
-            )))
-          } else if func == grid.footer {
-            table.footer(..child.children.map(it => table.cell(
-              it.body,
-            )))
+            if upper {
+              return std.upper(res)
+            } else {
+              return res
+            }
           }
-        }
+          bytes-to-hex(v)
+        } else if type(v) == alignment {
+          repr(v)
+        } else { str(v) }
+      },
+    ))
+    .to-dict(),
+  { args.pos().join() },
+)
+
+#let rewrap(tag) = {
+  return x => html.span(elem(tag, x.body))
+}
+
+#let attributed(tag, attrs) = {
+  return x => elem(tag, ..attrs.map(attr => (attr, x.fields().at(attr))).to-dict())
+}
+
+#let attributed-rewrap(tag, attrs) = {
+  return x => elem(tag, x.body, ..attrs.map(attr => (attr, x.fields().at(attr))).to-dict())
+}
+
+#let const-func(res) = {
+  return (..x) => res
+}
+
+#let child-number(it) = {
+  let value = it.fields().at("number", default: none)
+  if value == auto {
+    none
+  } else {
+    value
+  }
+}
+
+#let process-math-eq(item) = {
+  if type(item) == str {
+    return item
+  }
+  if type(item) == array {
+    if (
+      item.any(x => {
+        type(x) == content and x.func() == str
       })
-      .flatten()),
-)
-#let md-image(src: "", alt: none) = html.elem(
-  "m1image",
-  attrs: (
-    src: src,
-    alt: if alt == none {
-      ""
+    ) {
+      item.flatten()
     } else {
-      alt
+      item.map(x => process-math-eq(x)).flatten()
+    }
+  } else {
+    process-math-eq(item.fields().values().flatten().filter(x => type(x) == content or type(x) == str))
+  }
+}
+
+#let rules = (
+  ..(
+    strong,
+    emph,
+    footnote,
+    underline,
+    strike,
+    overline,
+    sub,
+    super,
+    highlight,
+    smallcaps,
+  ).map(x => (
+    x,
+    rewrap(repr(x)),
+  )),
+  ..(
+    linebreak,
+    pagebreak,
+    parbreak,
+  ).map(x => (x, const-func(elem(repr(x))))),
+  ..(
+    (heading, ("level" /*"numbering"*/,)),
+    (quote, ("block",)),
+  ).map(x => (
+    x.first(),
+    attributed-rewrap(repr(x.first()), x.last()),
+  )),
+  ..(
+    (ref, ("target", "supplement")),
+    (cite, ("key", "supplement")),
+    (image, ("source", "alt", "width", "height")),
+  ).map(x => (
+    x.first(),
+    attributed(repr(x.first()), x.last()),
+  )),
+  (
+    raw.where(block: true),
+    it => elem("raw", text: it.text, block: it.block, lang: it.lang),
+  ),
+  (
+    raw.where(block: false),
+    it => html.span(elem("raw", text: it.text, block: it.block, lang: it.lang)),
+  ),
+  (list, it => elem("list", tight: it.tight, ..it.children.map(child => elem("item", child.body)))),
+  (
+    enum,
+    it => elem(
+      "enum",
+      reversed: it.reversed,
+      start: it.start,
+      tight: it.tight,
+      ..it.children.map(child => elem("item", value: child-number(child), child.body)),
+    ),
+  ),
+  (
+    terms,
+    it => elem("terms", tight: it.tight, ..it.children.map(
+      it => elem("item", elem("term", it.term), elem("description", it.description)),
+    )),
+  ),
+  (
+    link,
+    it => {
+      let kind = if type(it.dest) == str { "url" } else { repr(type(it.dest)) }
+      elem(
+        "link",
+        elem("dest", kind: kind, dest: if type(it.dest) == location { "location" } else { str(it.dest) }),
+        elem("body", it.body),
+      )
     },
   ),
-  "",
-)
-#let md-figure(body, caption: none) = html.elem(
-    "m1figure",
-  attrs: (
-    caption: if caption == none {
-      ""
+  (
+    grid,
+    it => elem(
+      "grid",
+      // there may be a better way to represent grid
+      table(columns: it.columns, align: it.align, ..it
+          .children
+          .map(child => {
+            {
+              let func = child.func()
+              if func == grid.cell {
+                table.cell(
+                  child.body,
+                )
+              } else if func == grid.header {
+                table.header(..child.children.map(it => table.cell(
+                  it.body,
+                )))
+              } else if func == grid.footer {
+                table.footer(..child.children.map(it => table.cell(
+                  it.body,
+                )))
+              }
+            }
+          })
+          .flatten()),
+    ),
+  ),
+  (
+    table,
+    it => elem(
+      "table",
+      columns: if type(it.columns) == array { it.columns.len() } else { it.columns },
+      align: if it.align == auto { (it.align,) } else if type(it.align) == array { it.align }.map(repr).join(","),
+      ..it.children,
+    ),
+  ),
+  (
+    table.header,
+    it => elem(
+      "header",
+      ..it.children,
+    ),
+  ),
+  (
+    table.footer,
+    it => elem(
+      "footer",
+      ..it.children,
+    ),
+  ),
+  (
+    table.cell,
+    it => elem(
+      "cell",
+      colspan: it.colspan,
+      rowspan: it.rowspan,
+      align: it.align,
+      it.body,
+    ),
+  ),
+  (
+    figure,
+    it => elem("figure", elem("body", it.body), elem("caption", it.caption), kind: repr(
+      it.kind,
+    )),
+  ),
+  (
+    bibliography,
+    it => elem(
+      "bibliography",
+      // TODO: this place should not use join directly
+      elem("sources", it.sources.join()),
+      full: it.full,
+      title: it.title,
+      style: it.style,
+    ),
+  ),
+  (
+    math.equation,
+    it => if sys.inputs.at("x-remove-html", default: none) == "true" {
+      process-math-eq(it.body).flatten().join()
+    } else if it.block {
+      elem("equation", block: it.block, html.frame(block(inset: 0.5em, it)))
     } else {
-      if caption.body.func() == text {
-        caption.body.text
-      } else {
-        ""
-      }
+      html.span(elem("equation", block: it.block, html.frame(block(inset: 0.5em, it))))
     },
   ),
-  body,
-  )
+  it => elem("document", it),
+)
 
 #let if-not-paged(it, act) = {
   if target() == "html" {
@@ -166,70 +284,19 @@
   }
 }
 
-#let process-math-eq(item) = {
-  if type(item) == str {
-    return item
-  }
-  if type(item) == array {
-    if (
-      item.any(x => {
-        type(x) == content and x.func() == str
-      })
-    ) {
-      item.flatten()
+#let md-doc = rules.fold(
+  it => it,
+  (acc, sr) => it => context {
+    if type(sr) == array {
+      let (selector, rule) = sr
+      if target() != "html" {
+        return it
+      }
+      show selector: rule
+      acc(it)
     } else {
-      item.map(x => process-math-eq(x)).flatten()
+      show: sr
+      acc(it)
     }
-  } else {
-    process-math-eq(item.fields().values().flatten().filter(x => type(x) == content or type(x) == str))
-  }
-}
-
-#let md-doc(body) = context {
-  // distinguish parbreak from <p> tag
-  show parbreak: it => if-not-paged(it, md-parbreak)
-  show strong: it => if-not-paged(it, md-strong(it.body, delta: it.delta))
-  show emph: it => if-not-paged(it, md-emph(it.body))
-  // todo: icc?
-  show image: it => if-not-paged(it, md-image(src: it.source, alt: it.alt))
-
-  show raw: it => if-not-paged(it, md-raw(lang: it.lang, block: it.block, text: it.text, it))
-  show link: it => if-not-paged(it, md-link(dest: it.dest, it.body))
-  show ref: it => if-not-paged(it, md-ref(it))
-
-  show heading: it => if-not-paged(it, md-heading(level: it.level, it.body))
-  show outline: it => if-not-paged(it, md-outline(it))
-  show outline.entry: it => if-not-paged(it, md-outline-entry(level: it.level, it.element))
-  show quote: it => if-not-paged(it, md-quote(it.body))
-  show table: it => if-not-paged(it, md-table(it))
-  show grid: it => if-not-paged(it, md-grid(it))
-
-  show math.equation.where(block: false): it => if-not-paged(
-    it,
-    html.elem(
-      "m1eqinline",
-      if sys.inputs.at("x-remove-html", default: none) != "true" { html.frame(box(inset: 0.5em, it)) } else {
-        process-math-eq(it.body).flatten().join()
-      },
-    ),
-  )
-  show math.equation.where(block: true): it => if-not-paged(
-    it,
-    if sys.inputs.at("x-remove-html", default: none) != "true" {
-      html.elem(
-        "m1eqblock",
-        html.frame(block(inset: 0.5em, it)),
-      )
-    } else {
-      html.elem(
-        "m1eqinline",
-        process-math-eq(it.body).flatten().join(),
-      )
-    },
-  )
-
-  show linebreak: it => if-not-paged(it, md-linebreak)
-  show figure: it => if-not-paged(it, md-figure(it.body, caption: it.caption))
-
-  html.elem("m1document", body)
-}
+  },
+)
