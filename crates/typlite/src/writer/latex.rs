@@ -6,7 +6,7 @@ use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
 use crate::Result;
-use crate::common::{FormatWriter, ListState};
+use crate::common::ListState;
 use crate::ir::{self, Block, Inline, IrNode, ListItem, TableAlignment};
 use crate::writer::IrFormatWriter;
 
@@ -535,23 +535,6 @@ impl LaTeXWriter {
         output.push_str("\\end{table}\n\n");
 
         Ok(())
-    }
-}
-
-impl FormatWriter for LaTeXWriter {
-    fn write_eco(
-        &mut self,
-        document: &cmark_writer::ast::Node,
-        output: &mut EcoString,
-    ) -> Result<()> {
-        let ir_doc = ir::Document::from_cmark(document);
-        self.write_document(&ir_doc, output)
-    }
-
-    fn write_vec(&mut self, document: &cmark_writer::ast::Node) -> Result<Vec<u8>> {
-        let mut output = EcoString::new();
-        self.write_eco(document, &mut output)?;
-        Ok(output.as_str().as_bytes().to_vec())
     }
 }
 

@@ -3,7 +3,6 @@
 use ecow::EcoString;
 
 use crate::Result;
-use crate::common::FormatWriter;
 use crate::ir::{self, Block, Inline, IrNode, ListItem};
 use crate::writer::IrFormatWriter;
 
@@ -163,23 +162,6 @@ impl TextWriter {
         }
 
         Ok(())
-    }
-}
-
-impl FormatWriter for TextWriter {
-    fn write_eco(
-        &mut self,
-        document: &cmark_writer::ast::Node,
-        output: &mut EcoString,
-    ) -> Result<()> {
-        let ir_doc = ir::Document::from_cmark(document);
-        self.write_document(&ir_doc, output)
-    }
-
-    fn write_vec(&mut self, document: &cmark_writer::ast::Node) -> Result<Vec<u8>> {
-        let mut output = EcoString::new();
-        self.write_eco(document, &mut output)?;
-        Ok(output.as_str().as_bytes().to_vec())
     }
 }
 

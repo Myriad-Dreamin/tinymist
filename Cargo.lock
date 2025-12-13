@@ -5265,11 +5265,11 @@ version = "0.14.2"
 dependencies = [
  "base64",
  "clap",
- "cmark-writer",
  "comemo",
  "docx-rs",
  "ecow",
  "env_logger",
+ "html-escape",
  "image",
  "insta",
  "log",

@@ -1,7 +1,4 @@
 //! HTML parser core, containing main structures and general parsing logic.
-//!
-//! Stage 2: this parser builds typlite semantic IR, and the legacy
-//! `HtmlToAstParser` is a thin wrapper around it.
 
 use std::sync::Arc;
 
@@ -520,22 +517,4 @@ impl HtmlToIrParser {
     }
 }
 
-/// Legacy HTML-to-AST parser wrapper.
-#[allow(dead_code)]
-pub struct HtmlToAstParser(HtmlToIrParser);
-
-#[allow(dead_code)]
-impl HtmlToAstParser {
-    pub(crate) fn new(
-        feat: TypliteFeat,
-        world: &Arc<LspWorld>,
-        warnings: WarningCollector,
-    ) -> Self {
-        Self(HtmlToIrParser::new(feat, world, warnings))
-    }
-
-    pub fn parse(self, root: &HtmlElement) -> Result<cmark_writer::ast::Node> {
-        let ir_doc = self.0.parse_ir(root)?;
-        Ok(ir_doc.to_cmark())
-    }
-}
+// The previous `HtmlToAstParser` compatibility wrapper has been removed.

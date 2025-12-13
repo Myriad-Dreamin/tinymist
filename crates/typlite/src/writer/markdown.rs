@@ -1,11 +1,10 @@
 //! Markdown writer implementation
 
-use cmark_writer::ast::Node;
 use ecow::EcoString;
 
 use crate::Result;
-use crate::common::FormatWriter;
-use crate::ir::{self, Block, Inline, IrNode, ListItem, Table, TableCellKind, TableRowKind};
+use crate::html::{self, HtmlRenderOptions};
+use crate::ir::{self, Block, Inline, IrNode, ListItem, Table, TableRowKind};
 use crate::writer::IrFormatWriter;
 
 /// Markdown writer implementation
@@ -15,18 +14,6 @@ pub struct MarkdownWriter {}
 impl MarkdownWriter {
     pub fn new() -> Self {
         Self {}
-    }
-}
-
-impl FormatWriter for MarkdownWriter {
-    fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let ir_doc = ir::Document::from_cmark(document);
-        let mut emitter = IrMarkdownEmitter::new();
-        emitter.write_document(&ir_doc, output)
-    }
-
-    fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
-        Err("Markdown writer does not support writing to Vec<u8>".into())
     }
 }
 
@@ -444,21 +431,19 @@ impl IrMarkdownEmitter {
 
     fn render_center_as_html(&mut self, inner: &Block) -> Result<String> {
         let children = match inner {
-            Block::Paragraph(inlines) => {
-                inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect()
-            }
-            other => vec![ir_block_to_cmark_node(other)],
+            Block::Paragraph(inlines) => inlines.iter().cloned().map(IrNode::Inline).collect(),
+            other => vec![IrNode::Block(other.clone())],
         };
-        let element = cmark_writer::ast::HtmlElement {
+        let element = ir::HtmlElement {
             tag: EcoString::inline("p"),
-            attributes: vec![cmark_writer::ast::HtmlAttribute {
+            attributes: vec![ir::HtmlAttribute {
                 name: EcoString::inline("align"),
                 value: EcoString::inline("center"),
             }],
             children,
             self_closing: false,
         };
-        render_html_node(&cmark_writer::ast::Node::HtmlElement(element))
+        render_ir_html_element_as_html(&element)
     }
 
     fn render_figure_as_html(&mut self, figure: &Block) -> Result<String> {
@@ -466,12 +451,12 @@ impl IrMarkdownEmitter {
             return Ok(String::new());
         };
 
-        let mut children = vec![ir_block_to_cmark_node(body)];
-        children.extend(caption.iter().flat_map(ir_inline_to_cmark_nodes));
+        let mut children = vec![IrNode::Block((**body).clone())];
+        children.extend(caption.iter().cloned().map(IrNode::Inline));
 
-        let element = cmark_writer::ast::HtmlElement {
+        let element = ir::HtmlElement {
             tag: EcoString::inline("figure"),
-            attributes: vec![cmark_writer::ast::HtmlAttribute {
+            attributes: vec![ir::HtmlAttribute {
                 name: EcoString::inline("class"),
                 value: EcoString::inline("figure"),
             }],
@@ -479,7 +464,7 @@ impl IrMarkdownEmitter {
             self_closing: false,
         };
 
-        render_html_node(&cmark_writer::ast::Node::HtmlElement(element))
+        render_ir_html_element_as_html(&element)
     }
 }
 
@@ -623,7 +608,7 @@ fn indent_code_fence_block(language: Option<&str>, content: &str, indent: usize)
     if !content.ends_with('\n') {
         content.push('\n');
     }
-    out.push_str(&indent_multiline(&content.trim_end_matches('\n'), indent));
+    out.push_str(&indent_multiline(content.trim_end_matches('\n'), indent));
     out.push('\n');
     out.push_str(&" ".repeat(indent));
     out.push_str(&fence);
@@ -676,277 +661,27 @@ fn should_render_table_as_html(table: &Table) -> bool {
 }
 
 fn render_ir_table_as_html(table: &Table) -> Result<String> {
-    let node = ir_table_to_cmark_node(table);
-    render_html_node(&node)
-}
-
-fn ir_table_to_cmark_node(table: &Table) -> cmark_writer::ast::Node {
-    use cmark_writer::ast;
-    ast::Node::Table {
-        columns: table.columns,
-        rows: table
-            .rows
-            .iter()
-            .map(|row| ast::TableRow {
-                kind: match row.kind {
-                    TableRowKind::Head => ast::TableRowKind::Head,
-                    TableRowKind::Body => ast::TableRowKind::Body,
-                    TableRowKind::Foot => ast::TableRowKind::Foot,
-                },
-                cells: row
-                    .cells
-                    .iter()
-                    .map(|cell| ast::TableCell {
-                        kind: match cell.kind {
-                            TableCellKind::Header => ast::TableCellKind::Header,
-                            TableCellKind::Data => ast::TableCellKind::Data,
-                        },
-                        colspan: cell.colspan,
-                        rowspan: cell.rowspan,
-                        content: if cell.content.is_empty() {
-                            ast::Node::Text(EcoString::new())
-                        } else if cell.content.len() == 1 {
-                            match &cell.content[0] {
-                                IrNode::Inline(inline) => {
-                                    let mut nodes = ir_inline_to_cmark_nodes(inline);
-                                    nodes.pop().unwrap_or(ast::Node::Text(EcoString::new()))
-                                }
-                                IrNode::Block(block) => ir_block_to_cmark_node(block),
-                            }
-                        } else {
-                            ast::Node::Document(
-                                cell.content
-                                    .iter()
-                                    .flat_map(ir_node_to_cmark_nodes)
-                                    .collect(),
-                            )
-                        },
-                        align: None,
-                    })
-                    .collect(),
-            })
-            .collect(),
-        alignments: vec![ast::TableAlignment::None; table.columns],
-    }
-}
-
-fn render_html_node(node: &cmark_writer::ast::Node) -> Result<String> {
-    let mut writer = cmark_writer::HtmlWriter::with_options(cmark_writer::HtmlWriterOptions {
-        strict: false,
-        ..Default::default()
-    });
-    writer
-        .write_node(node)
-        .map_err(|e| format!("failed to write html: {e}"))?;
-    let html = writer
-        .into_string()
-        .map_err(|e| format!("failed to finalize html: {e}"))?;
-    Ok(html.as_str().to_owned())
+    html::render_table_as_html(
+        table,
+        &HtmlRenderOptions {
+            strict: false,
+            ..Default::default()
+        },
+    )
 }
 
 fn render_ir_html_element_as_html(element: &ir::HtmlElement) -> Result<String> {
-    let node = cmark_writer::ast::Node::HtmlElement(ir_html_element_to_cmark(element));
-    render_html_node(&node)
+    html::render_html_element(
+        element,
+        &HtmlRenderOptions {
+            strict: false,
+            ..Default::default()
+        },
+    )
 }
 
 fn render_ir_html_element_inline(element: &ir::HtmlElement) -> Result<String> {
     // Inline HTML should not include trailing newlines.
     let html = render_ir_html_element_as_html(element)?;
     Ok(html.trim_end_matches('\n').to_string())
-}
-
-fn ir_html_element_to_cmark(element: &ir::HtmlElement) -> cmark_writer::ast::HtmlElement {
-    cmark_writer::ast::HtmlElement {
-        tag: element.tag.clone(),
-        attributes: element
-            .attributes
-            .iter()
-            .map(|attr| cmark_writer::ast::HtmlAttribute {
-                name: attr.name.clone(),
-                value: attr.value.clone(),
-            })
-            .collect(),
-        children: element
-            .children
-            .iter()
-            .flat_map(ir_node_to_cmark_nodes)
-            .collect(),
-        self_closing: element.self_closing,
-    }
-}
-
-fn ir_node_to_cmark_nodes(node: &IrNode) -> Vec<cmark_writer::ast::Node> {
-    match node {
-        IrNode::Inline(inline) => ir_inline_to_cmark_nodes(inline),
-        IrNode::Block(block) => vec![ir_block_to_cmark_node(block)],
-    }
-}
-
-fn ir_inline_to_cmark_nodes(inline: &Inline) -> Vec<cmark_writer::ast::Node> {
-    use cmark_writer::ast::Node as CNode;
-    match inline {
-        Inline::Group(content) => content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        Inline::Emphasis(content) => vec![CNode::Emphasis(
-            content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        )],
-        Inline::Strong(content) => vec![CNode::Strong(
-            content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        )],
-        Inline::Strikethrough(content) => vec![CNode::Strikethrough(
-            content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        )],
-        Inline::Text(text) => vec![CNode::Text(text.clone())],
-        Inline::InlineCode(code) => vec![CNode::InlineCode(code.clone())],
-        Inline::Link {
-            url,
-            title,
-            content,
-        } => vec![CNode::Link {
-            url: url.clone(),
-            title: title.clone(),
-            content: content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        }],
-        Inline::ReferenceLink { label, content } => vec![CNode::ReferenceLink {
-            label: label.clone(),
-            content: content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        }],
-        Inline::Image { url, title, alt } => vec![CNode::Image {
-            url: url.clone(),
-            title: title.clone(),
-            alt: alt.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        }],
-        Inline::Autolink { url, is_email } => vec![CNode::Autolink {
-            url: url.clone(),
-            is_email: *is_email,
-        }],
-        Inline::HardBreak => vec![CNode::HardBreak],
-        Inline::SoftBreak => vec![CNode::SoftBreak],
-        Inline::HtmlElement(element) => vec![CNode::HtmlElement(ir_html_element_to_cmark(element))],
-        Inline::Verbatim(text) => vec![CNode::Custom(Box::new(crate::common::VerbatimNode {
-            content: text.clone(),
-        }))],
-        Inline::Comment(text) => vec![CNode::Custom(Box::new(crate::common::CommentNode {
-            content: text.clone(),
-        }))],
-        Inline::EmbeddedBlock(block) => vec![ir_block_to_cmark_node(block)],
-        Inline::Highlight(content) => vec![CNode::HtmlElement(cmark_writer::ast::HtmlElement {
-            tag: EcoString::inline("mark"),
-            attributes: vec![],
-            children: content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-            self_closing: false,
-        })],
-        Inline::UnsupportedCustom => Vec::new(),
-    }
-}
-
-fn ir_block_to_cmark_node(block: &Block) -> cmark_writer::ast::Node {
-    use cmark_writer::ast::{CodeBlockType as CmarkCodeBlockType, Node as CNode};
-    match block {
-        Block::Document(blocks) => {
-            CNode::Document(blocks.iter().map(ir_block_to_cmark_node).collect())
-        }
-        Block::Paragraph(inlines) => {
-            CNode::Paragraph(inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect())
-        }
-        Block::Heading { level, content } => CNode::heading(
-            *level,
-            content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
-        ),
-        Block::ThematicBreak => CNode::ThematicBreak,
-        Block::BlockQuote(content) => {
-            CNode::BlockQuote(content.iter().map(ir_block_to_cmark_node).collect())
-        }
-        Block::OrderedList { start, items } => CNode::OrderedList {
-            start: *start,
-            items: items
-                .iter()
-                .filter_map(|item| match item {
-                    ListItem::Ordered { number, content } => {
-                        Some(cmark_writer::ast::ListItem::Ordered {
-                            number: *number,
-                            content: content.iter().map(ir_block_to_cmark_node).collect(),
-                        })
-                    }
-                    _ => None,
-                })
-                .collect(),
-        },
-        Block::UnorderedList(items) => CNode::UnorderedList(
-            items
-                .iter()
-                .filter_map(|item| match item {
-                    ListItem::Unordered { content } => {
-                        Some(cmark_writer::ast::ListItem::Unordered {
-                            content: content.iter().map(ir_block_to_cmark_node).collect(),
-                        })
-                    }
-                    _ => None,
-                })
-                .collect(),
-        ),
-        Block::Table(table) => ir_table_to_cmark_node(table),
-        Block::CodeBlock {
-            language,
-            content,
-            block_type,
-        } => CNode::CodeBlock {
-            language: language.clone(),
-            content: content.clone(),
-            block_type: match block_type {
-                ir::CodeBlockType::Indented => CmarkCodeBlockType::Indented,
-                ir::CodeBlockType::Fenced => CmarkCodeBlockType::Fenced,
-            },
-        },
-        Block::HtmlBlock(html) => CNode::HtmlBlock(html.clone()),
-        Block::HtmlElement(element) => CNode::HtmlElement(ir_html_element_to_cmark(element)),
-        Block::Figure { body, caption } => {
-            let mut children = vec![ir_block_to_cmark_node(body)];
-            children.extend(caption.iter().flat_map(ir_inline_to_cmark_nodes));
-            CNode::HtmlElement(cmark_writer::ast::HtmlElement {
-                tag: EcoString::inline("figure"),
-                attributes: vec![cmark_writer::ast::HtmlAttribute {
-                    name: EcoString::inline("class"),
-                    value: EcoString::inline("figure"),
-                }],
-                children,
-                self_closing: false,
-            })
-        }
-        Block::ExternalFrame(frame) => CNode::HtmlElement(cmark_writer::ast::HtmlElement {
-            tag: EcoString::inline("img"),
-            attributes: vec![
-                cmark_writer::ast::HtmlAttribute {
-                    name: EcoString::inline("src"),
-                    value: frame.file_path.display().to_string().into(),
-                },
-                cmark_writer::ast::HtmlAttribute {
-                    name: EcoString::inline("alt"),
-                    value: frame.alt_text.clone(),
-                },
-            ],
-            children: vec![],
-            self_closing: true,
-        }),
-        Block::Center(inner) => {
-            let children = match &**inner {
-                Block::Paragraph(inlines) => {
-                    inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect()
-                }
-                other => vec![ir_block_to_cmark_node(other)],
-            };
-            CNode::HtmlElement(cmark_writer::ast::HtmlElement {
-                tag: EcoString::inline("p"),
-                attributes: vec![cmark_writer::ast::HtmlAttribute {
-                    name: EcoString::inline("align"),
-                    value: EcoString::inline("center"),
-                }],
-                children,
-                self_closing: false,
-            })
-        }
-        Block::Alert { class, content } => CNode::Custom(Box::new(crate::common::AlertNode {
-            class: class.clone(),
-            content: content.iter().map(ir_block_to_cmark_node).collect(),
-        })),
-    }
 }

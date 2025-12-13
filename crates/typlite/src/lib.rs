@@ -5,6 +5,7 @@
 
 pub mod attributes;
 pub mod common;
+mod html;
 mod diagnostics;
 mod error;
 pub mod ir;
@@ -18,7 +19,6 @@ use std::sync::{Arc, OnceLock};
 
 pub use error::*;
 
-use cmark_writer::ast::Node;
 use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
@@ -43,7 +43,6 @@ use crate::tinymist_std::typst::foundations::Value::Str;
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
-pub use cmark_writer::ast;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
@@ -52,7 +51,6 @@ pub struct MarkdownDocument {
     pub base: HtmlDocument,
     world: Arc<LspWorld>,
     feat: TypliteFeat,
-    ast: Arc<OnceLock<Node>>,
     ir: Arc<OnceLock<crate::ir::Document>>,
     warnings: WarningCollector,
 }
@@ -64,26 +62,6 @@ impl MarkdownDocument {
             base,
             world,
             feat,
-            ast: Arc::new(OnceLock::new()),
-            ir: Arc::new(OnceLock::new()),
-            warnings: WarningCollector::default(),
-        }
-    }
-
-    /// Create a MarkdownDocument instance with pre-parsed AST
-    pub fn with_ast(
-        base: HtmlDocument,
-        world: Arc<LspWorld>,
-        feat: TypliteFeat,
-        ast: Node,
-    ) -> Self {
-        let ast_lock = Arc::new(OnceLock::new());
-        let _ = ast_lock.set(ast);
-        Self {
-            base,
-            world,
-            feat,
-            ast: ast_lock,
             ir: Arc::new(OnceLock::new()),
             warnings: WarningCollector::default(),
         }
@@ -142,25 +120,6 @@ impl MarkdownDocument {
         Some(diagnostic)
     }
 
-    /// Parse HTML document to AST
-    pub fn parse(&self) -> tinymist_std::Result<Node> {
-        if let Some(ast) = self.ast.get() {
-            return Ok(ast.clone());
-        }
-        if let Some(doc) = self.ir.get() {
-            let ast = doc.to_cmark();
-            let _ = self.ast.set(ast.clone());
-            return Ok(ast);
-        }
-
-        let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        let doc = parser.parse_ir(&self.base.root).context_ut("failed to parse")?;
-        let ast = doc.to_cmark();
-        let _ = self.ir.set(doc);
-        let _ = self.ast.set(ast.clone());
-        Ok(ast)
-    }
-
     /// Parse HTML document to semantic IR.
     pub fn parse_ir(&self) -> tinymist_std::Result<crate::ir::Document> {
         if let Some(doc) = self.ir.get() {
@@ -169,7 +128,6 @@ impl MarkdownDocument {
 
         let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
         let doc = parser.parse_ir(&self.base.root).context_ut("failed to parse")?;
-        let _ = self.ast.set(doc.to_cmark());
         let _ = self.ir.set(doc.clone());
         Ok(doc)
     }
