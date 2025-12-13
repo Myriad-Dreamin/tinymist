@@ -1,8 +1,6 @@
 //! Markdown writer implementation
 
-use cmark_writer::WriterOptions;
 use cmark_writer::ast::Node;
-use cmark_writer::writer::CommonMarkWriter;
 use ecow::EcoString;
 
 use crate::Result;
@@ -22,17 +20,9 @@ impl MarkdownWriter {
 
 impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let mut writer = CommonMarkWriter::with_options(WriterOptions {
-            strict: false,
-            escape_special_chars: true,
-            trim_paragraph_trailing_hard_breaks: true,
-            ..Default::default()
-        });
-        writer
-            .write(document)
-            .map_err(|e| format!("failed to write document: {e}"))?;
-        output.push_str(&writer.into_string());
-        Ok(())
+        let ir_doc = ir::Document::from_cmark(document);
+        let mut emitter = IrMarkdownEmitter::new();
+        emitter.write_document(&ir_doc, output)
     }
 
     fn write_vec(&mut self, _document: &Node) -> Result<Vec<u8>> {
@@ -145,7 +135,11 @@ impl IrMarkdownEmitter {
                 content,
                 block_type: _,
             } => {
-                out.push_str(&indent_code_fence_block(language.as_deref(), content, indent));
+                out.push_str(&indent_code_fence_block(
+                    language.as_deref(),
+                    content,
+                    indent,
+                ));
             }
             Block::HtmlBlock(html) => {
                 out.push_str(&indent_multiline(html.as_str(), indent));
@@ -210,7 +204,9 @@ impl IrMarkdownEmitter {
         let mut out = String::new();
         for inline in inlines {
             match inline {
-                Inline::Text(text) => out.push_str(&escape_markdown_text(text, self.escape_special_chars)),
+                Inline::Text(text) => {
+                    out.push_str(&escape_markdown_text(text, self.escape_special_chars))
+                }
                 Inline::Emphasis(content) => {
                     out.push('_');
                     out.push_str(&self.render_inlines(content)?);
@@ -230,7 +226,11 @@ impl IrMarkdownEmitter {
                 Inline::InlineCode(code) => {
                     out.push_str(&render_inline_code(code));
                 }
-                Inline::Link { url, title: _, content } => {
+                Inline::Link {
+                    url,
+                    title: _,
+                    content,
+                } => {
                     out.push('[');
                     out.push_str(&self.render_inlines(content)?);
                     out.push_str("](");
@@ -397,7 +397,9 @@ impl IrMarkdownEmitter {
     fn render_table(&mut self, table: &Table, indent: usize) -> Result<String> {
         if should_render_table_as_html(table) {
             let html = render_ir_table_as_html(table)?;
-            return Ok(indent_multiline(&html, indent).trim_end_matches('\n').to_string());
+            return Ok(indent_multiline(&html, indent)
+                .trim_end_matches('\n')
+                .to_string());
         }
 
         let mut out = String::new();
@@ -442,7 +444,9 @@ impl IrMarkdownEmitter {
 
     fn render_center_as_html(&mut self, inner: &Block) -> Result<String> {
         let children = match inner {
-            Block::Paragraph(inlines) => inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
+            Block::Paragraph(inlines) => {
+                inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect()
+            }
             other => vec![ir_block_to_cmark_node(other)],
         };
         let element = cmark_writer::ast::HtmlElement {
@@ -482,8 +486,7 @@ impl IrMarkdownEmitter {
 fn is_block_html_tag(tag: &str) -> bool {
     matches!(
         tag,
-        "p"
-            | "div"
+        "p" | "div"
             | "blockquote"
             | "h1"
             | "h2"
@@ -555,7 +558,9 @@ fn append_to_last_line(out: &mut String, suffix: &str) {
     out.push_str(suffix);
 }
 
-fn analyze_list_item_paragraph_inlines(inlines: &[Inline]) -> (Vec<Inline>, Vec<Block>, Vec<Inline>) {
+fn analyze_list_item_paragraph_inlines(
+    inlines: &[Inline],
+) -> (Vec<Inline>, Vec<Block>, Vec<Inline>) {
     let mut leading = Vec::new();
     let mut embedded = Vec::new();
     let mut trailing = Vec::new();
@@ -563,17 +568,15 @@ fn analyze_list_item_paragraph_inlines(inlines: &[Inline]) -> (Vec<Inline>, Vec<
     let mut seen_nested_blocks = false;
     for inline in inlines {
         match inline {
-            Inline::EmbeddedBlock(block) => {
-                match &**block {
-                    Block::Paragraph(content) if !seen_nested_blocks => {
-                        leading.extend(content.iter().cloned());
-                    }
-                    other => {
-                        seen_nested_blocks = true;
-                        embedded.push(other.clone());
-                    }
+            Inline::EmbeddedBlock(block) => match &**block {
+                Block::Paragraph(content) if !seen_nested_blocks => {
+                    leading.extend(content.iter().cloned());
                 }
-            }
+                other => {
+                    seen_nested_blocks = true;
+                    embedded.push(other.clone());
+                }
+            },
             Inline::Comment(_) if seen_nested_blocks => trailing.push(inline.clone()),
             other if seen_nested_blocks => trailing.push(other.clone()),
             other => leading.push(other.clone()),
@@ -640,7 +643,10 @@ fn render_gfm_row(cells: &[ir::TableCell], emitter: &mut IrMarkdownEmitter) -> R
     Ok(row)
 }
 
-fn render_table_cell_inline(cell: &ir::TableCell, emitter: &mut IrMarkdownEmitter) -> Result<String> {
+fn render_table_cell_inline(
+    cell: &ir::TableCell,
+    emitter: &mut IrMarkdownEmitter,
+) -> Result<String> {
     let mut out = String::new();
     for node in &cell.content {
         match node {
@@ -836,35 +842,54 @@ fn ir_inline_to_cmark_nodes(inline: &Inline) -> Vec<cmark_writer::ast::Node> {
 fn ir_block_to_cmark_node(block: &Block) -> cmark_writer::ast::Node {
     use cmark_writer::ast::{CodeBlockType as CmarkCodeBlockType, Node as CNode};
     match block {
-        Block::Document(blocks) => CNode::Document(blocks.iter().map(ir_block_to_cmark_node).collect()),
+        Block::Document(blocks) => {
+            CNode::Document(blocks.iter().map(ir_block_to_cmark_node).collect())
+        }
         Block::Paragraph(inlines) => {
             CNode::Paragraph(inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect())
         }
-        Block::Heading { level, content } => {
-            CNode::heading(*level, content.iter().flat_map(ir_inline_to_cmark_nodes).collect())
-        }
+        Block::Heading { level, content } => CNode::heading(
+            *level,
+            content.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
+        ),
         Block::ThematicBreak => CNode::ThematicBreak,
-        Block::BlockQuote(content) => CNode::BlockQuote(content.iter().map(ir_block_to_cmark_node).collect()),
+        Block::BlockQuote(content) => {
+            CNode::BlockQuote(content.iter().map(ir_block_to_cmark_node).collect())
+        }
         Block::OrderedList { start, items } => CNode::OrderedList {
             start: *start,
-            items: items.iter().filter_map(|item| match item {
-                ListItem::Ordered { number, content } => Some(cmark_writer::ast::ListItem::Ordered {
-                    number: *number,
-                    content: content.iter().map(ir_block_to_cmark_node).collect(),
-                }),
-                _ => None,
-            }).collect(),
+            items: items
+                .iter()
+                .filter_map(|item| match item {
+                    ListItem::Ordered { number, content } => {
+                        Some(cmark_writer::ast::ListItem::Ordered {
+                            number: *number,
+                            content: content.iter().map(ir_block_to_cmark_node).collect(),
+                        })
+                    }
+                    _ => None,
+                })
+                .collect(),
         },
         Block::UnorderedList(items) => CNode::UnorderedList(
-            items.iter().filter_map(|item| match item {
-                ListItem::Unordered { content } => Some(cmark_writer::ast::ListItem::Unordered {
-                    content: content.iter().map(ir_block_to_cmark_node).collect(),
-                }),
-                _ => None,
-            }).collect(),
+            items
+                .iter()
+                .filter_map(|item| match item {
+                    ListItem::Unordered { content } => {
+                        Some(cmark_writer::ast::ListItem::Unordered {
+                            content: content.iter().map(ir_block_to_cmark_node).collect(),
+                        })
+                    }
+                    _ => None,
+                })
+                .collect(),
         ),
         Block::Table(table) => ir_table_to_cmark_node(table),
-        Block::CodeBlock { language, content, block_type } => CNode::CodeBlock {
+        Block::CodeBlock {
+            language,
+            content,
+            block_type,
+        } => CNode::CodeBlock {
             language: language.clone(),
             content: content.clone(),
             block_type: match block_type {
@@ -904,7 +929,9 @@ fn ir_block_to_cmark_node(block: &Block) -> cmark_writer::ast::Node {
         }),
         Block::Center(inner) => {
             let children = match &**inner {
-                Block::Paragraph(inlines) => inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect(),
+                Block::Paragraph(inlines) => {
+                    inlines.iter().flat_map(ir_inline_to_cmark_nodes).collect()
+                }
                 other => vec![ir_block_to_cmark_node(other)],
             };
             CNode::HtmlElement(cmark_writer::ast::HtmlElement {
