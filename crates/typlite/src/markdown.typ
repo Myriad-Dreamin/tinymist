@@ -104,7 +104,7 @@
     parbreak,
   ).map(x => (x, const-func(elem(repr(x))))),
   ..(
-    (heading, ("level", "numbering")),
+    (heading, ("level" /*"numbering"*/,)),
     (quote, ("block",)),
   ).map(x => (
     x.first(),

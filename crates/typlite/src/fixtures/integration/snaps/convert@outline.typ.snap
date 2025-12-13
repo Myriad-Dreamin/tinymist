@@ -1,6 +1,5 @@
 ---
 source: crates/typlite/src/tests.rs
-assertion_line: 19
 expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/outline.typ
 ---
@@ -10,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/outline.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><nav role="doc-toc"><m1heading level="1" numbering>Contents</m1heading><ol style="list-style-type: none"><li><div><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 1</m1body></m1link></div><ol style="list-style-type: none"><li><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 2</m1body></m1link></li></ol></li></ol></nav><m1parbreak></m1parbreak><m1heading id="loc-1" level="2" numbering>Heading 1</m1heading><m1parbreak></m1parbreak><m1heading id="loc-2" level="3" numbering>Heading 2</m1heading><m1parbreak></m1parbreak><m1link><m1dest kind="url" dest="https://example.com"></m1dest><m1body>This is a link to example.com</m1body></m1link><m1parbreak></m1parbreak><p>Inline<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="code" block lang></m1raw></span> has<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="back-ticks around" block lang></m1raw></span> it.</p><m1parbreak></m1parbreak><m1raw text="using System.IO.Compression;
+  <body><m1document><nav role="doc-toc"><m1heading level="1">Contents</m1heading><ol style="list-style-type: none"><li><div><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 1</m1body></m1link></div><ol style="list-style-type: none"><li><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 2</m1body></m1link></li></ol></li></ol></nav><m1parbreak></m1parbreak><m1heading id="loc-1" level="2">Heading 1</m1heading><m1parbreak></m1parbreak><m1heading id="loc-2" level="3">Heading 2</m1heading><m1parbreak></m1parbreak><m1link><m1dest kind="url" dest="https://example.com"></m1dest><m1body>This is a link to example.com</m1body></m1link><m1parbreak></m1parbreak><p>Inline<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="code" block lang></m1raw></span> has<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="back-ticks around" block lang></m1raw></span> it.</p><m1parbreak></m1parbreak><m1raw text="using System.IO.Compression;
 
 #pragma warning disable 414, 3021
 
