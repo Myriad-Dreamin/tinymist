@@ -186,4 +186,3 @@ pub struct ExternalFrame {
     pub alt_text: EcoString,
     pub svg: String,
 }
-

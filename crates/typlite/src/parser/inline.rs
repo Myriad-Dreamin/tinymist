@@ -156,4 +156,3 @@ impl HtmlToIrParser {
         Ok(())
     }
 }
-

@@ -132,13 +132,13 @@ impl HtmlToIrParser {
 
         match frame_url {
             Ok(url @ AssetUrl::Embedded(..)) => Self::create_embedded_frame(&url),
-            Ok(AssetUrl::External(file_path)) => Inline::EmbeddedBlock(Box::new(
-                Block::ExternalFrame(ExternalFrame {
+            Ok(AssetUrl::External(file_path)) => {
+                Inline::EmbeddedBlock(Box::new(Block::ExternalFrame(ExternalFrame {
                     file_path,
                     alt_text: EcoString::inline("typst-frame"),
                     svg,
-                }),
-            )),
+                })))
+            }
             Err(e) => {
                 if self.feat.soft_error {
                     let b64_data = Self::base64_url(&svg);
@@ -306,4 +306,3 @@ impl HtmlToIrParser {
         self.convert_svg(svg)
     }
 }
-

@@ -5,7 +5,6 @@
 
 pub mod attributes;
 pub mod common;
-mod html;
 mod diagnostics;
 mod error;
 pub mod ir;
@@ -127,7 +126,9 @@ impl MarkdownDocument {
         }
 
         let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        let doc = parser.parse_ir(&self.base.root).context_ut("failed to parse")?;
+        let doc = parser
+            .parse_ir(&self.base.root)
+            .context_ut("failed to parse")?;
         let _ = self.ir.set(doc.clone());
         Ok(doc)
     }

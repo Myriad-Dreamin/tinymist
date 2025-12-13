@@ -196,9 +196,8 @@ impl HtmlToIrParser {
                     self.flush_inline_buffer();
                     self.convert_children(element)?;
                     let content = std::mem::take(&mut self.inline_buffer);
-                    self.blocks.push(Block::Center(Box::new(Block::Paragraph(
-                        content,
-                    ))));
+                    self.blocks
+                        .push(Block::Center(Box::new(Block::Paragraph(content))));
                 } else {
                     self.convert_children(element)?;
                 }
@@ -288,10 +287,7 @@ impl HtmlToIrParser {
         }
     }
 
-    pub fn flush_inline_buffer_as_block(
-        &mut self,
-        make_block: impl FnOnce(Vec<Inline>) -> Block,
-    ) {
+    pub fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Inline>) -> Block) {
         if !self.inline_buffer.is_empty() {
             self.blocks
                 .push(make_block(std::mem::take(&mut self.inline_buffer)));
@@ -411,9 +407,8 @@ impl HtmlToIrParser {
             self.flush_inline_buffer();
             self.convert_children(element)?;
             let content = std::mem::take(&mut self.inline_buffer);
-            self.blocks.push(Block::Center(Box::new(Block::Paragraph(
-                content,
-            ))));
+            self.blocks
+                .push(Block::Center(Box::new(Block::Paragraph(content))));
         } else {
             self.convert_children(element)?;
         }

@@ -2,6 +2,7 @@
 
 #[cfg(feature = "docx")]
 pub mod docx;
+pub(crate) mod html;
 pub mod latex;
 pub mod markdown;
 pub mod text;
@@ -12,10 +13,10 @@ pub use latex::LaTeXWriter;
 pub use markdown::MarkdownWriter;
 pub use text::TextWriter;
 
+use crate::Result;
 use crate::common::Format;
 use crate::ir;
 use ecow::EcoString;
-use crate::Result;
 
 /// Writer interface for semantic IR documents.
 pub trait IrFormatWriter {

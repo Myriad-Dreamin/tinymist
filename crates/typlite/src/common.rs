@@ -16,4 +16,3 @@ pub enum Format {
     #[cfg(feature = "docx")]
     Docx,
 }
-

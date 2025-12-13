@@ -132,9 +132,11 @@ impl DocxWriter {
                         .unwrap_or("");
 
                     if src.starts_with("data:image/") {
-                        run = self
-                            .image_processor
-                            .process_data_url_image(run, src, is_typst_block)?;
+                        run = self.image_processor.process_data_url_image(
+                            run,
+                            src,
+                            is_typst_block,
+                        )?;
                     }
                 } else {
                     for child in &element.children {
@@ -143,7 +145,9 @@ impl DocxWriter {
                                 run = self.process_ir_inline_to_run(run, inline)?;
                             }
                             ir::IrNode::Block(block) => {
-                                debug!("unhandled block node inside inline HTML element: {block:?}");
+                                debug!(
+                                    "unhandled block node inside inline HTML element: {block:?}"
+                                );
                             }
                         }
                     }
@@ -259,7 +263,9 @@ impl DocxWriter {
                     }
                 }
             }
-            ir::Block::CodeBlock { language, content, .. } => {
+            ir::Block::CodeBlock {
+                language, content, ..
+            } => {
                 if let Some(lang) = language
                     && !lang.is_empty()
                 {
@@ -289,7 +295,9 @@ impl DocxWriter {
                 docx = self.process_ir_figure(docx, body, caption)?;
             }
             ir::Block::ExternalFrame(frame) => {
-                if let Ok(png_data) = self.image_processor.convert_svg_to_png(frame.svg.as_bytes())
+                if let Ok(png_data) = self
+                    .image_processor
+                    .convert_svg_to_png(frame.svg.as_bytes())
                 {
                     docx = self.image_processor.process_image_data(
                         docx,
@@ -348,11 +356,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn process_ir_ordered_list(
-        &mut self,
-        mut docx: Docx,
-        items: &[ir::ListItem],
-    ) -> Result<Docx> {
+    fn process_ir_ordered_list(&mut self, mut docx: Docx, items: &[ir::ListItem]) -> Result<Docx> {
         self.list_level += 1;
         let current_level = self.list_level - 1;
 
@@ -545,8 +549,8 @@ impl DocxWriter {
                                     .image_processor
                                     .process_image_data(docx, &img_data, None, None);
 
-                                if let Some(caption_para) = self
-                                    .build_caption_paragraph_ir(Some("Figure: "), caption)?
+                                if let Some(caption_para) =
+                                    self.build_caption_paragraph_ir(Some("Figure: "), caption)?
                                 {
                                     docx = docx.add_paragraph(caption_para);
                                 }
@@ -602,7 +606,6 @@ impl DocxWriter {
 
         Ok(buffer)
     }
-
 }
 
 impl IrFormatWriter for DocxWriter {

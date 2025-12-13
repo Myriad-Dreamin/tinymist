@@ -1,7 +1,7 @@
 use ecow::EcoString;
 
-use crate::ir::{self, Block, Inline, IrNode, ListItem, Table, TableCellKind, TableRowKind};
 use crate::Result;
+use crate::ir::{self, Block, Inline, IrNode, ListItem, Table, TableCellKind, TableRowKind};
 
 #[derive(Debug, Clone)]
 pub(crate) struct HtmlRenderOptions {
@@ -118,7 +118,8 @@ impl IrHtmlRenderer {
 
     fn text(&mut self, text: &str) -> Result<()> {
         self.ensure_tag_closed()?;
-        self.buffer.push_str(html_escape::encode_text(text).as_ref());
+        self.buffer
+            .push_str(html_escape::encode_text(text).as_ref());
         Ok(())
     }
 
@@ -137,9 +138,9 @@ impl IrHtmlRenderer {
 
     fn is_safe_attribute_name(name: &str) -> bool {
         !name.is_empty()
-            && name.chars().all(|c| {
-                c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-' || c == '.'
-            })
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':' || c == '-' || c == '.')
     }
 
     fn write_node(&mut self, node: &IrNode) -> Result<()> {
@@ -185,7 +186,9 @@ impl IrHtmlRenderer {
                 self.write_trusted_html("\n")?;
                 Ok(())
             }
-            Block::CodeBlock { language, content, .. } => {
+            Block::CodeBlock {
+                language, content, ..
+            } => {
                 self.start_tag("pre")?;
                 self.finish_tag()?;
                 self.start_tag("code")?;
@@ -284,7 +287,9 @@ impl IrHtmlRenderer {
             }
             Block::Center(inner) => {
                 let children = match &**inner {
-                    Block::Paragraph(inlines) => inlines.iter().cloned().map(IrNode::Inline).collect(),
+                    Block::Paragraph(inlines) => {
+                        inlines.iter().cloned().map(IrNode::Inline).collect()
+                    }
                     other => vec![IrNode::Block(other.clone())],
                 };
                 let element = ir::HtmlElement {
@@ -301,11 +306,9 @@ impl IrHtmlRenderer {
             Block::Alert { class, content } => {
                 // Preserve existing behavior of emitting alerts as blockquotes in HTML rendering.
                 let mut inner = Vec::new();
-                inner.push(Block::Paragraph(vec![Inline::Text(format!(
-                    "[!{}]",
-                    class.to_ascii_uppercase()
-                )
-                .into())]));
+                inner.push(Block::Paragraph(vec![Inline::Text(
+                    format!("[!{}]", class.to_ascii_uppercase()).into(),
+                )]));
                 inner.push(Block::Paragraph(vec![Inline::Text("".into())]));
                 inner.extend(content.clone());
                 self.write_block(&Block::BlockQuote(inner))
@@ -383,7 +386,9 @@ impl IrHtmlRenderer {
         Ok(())
     }
 
-    fn partition_rows(rows: &[ir::TableRow]) -> (&[ir::TableRow], &[ir::TableRow], &[ir::TableRow]) {
+    fn partition_rows(
+        rows: &[ir::TableRow],
+    ) -> (&[ir::TableRow], &[ir::TableRow], &[ir::TableRow]) {
         let mut head_end = 0;
         while head_end < rows.len() && matches!(rows[head_end].kind, TableRowKind::Head) {
             head_end += 1;
@@ -549,7 +554,11 @@ impl IrHtmlRenderer {
                 self.end_tag("code")?;
                 Ok(())
             }
-            Inline::Link { url, title, content } => {
+            Inline::Link {
+                url,
+                title,
+                content,
+            } => {
                 self.start_tag("a")?;
                 self.attribute("href", url)?;
                 if let Some(title) = title {
@@ -678,10 +687,9 @@ fn render_inlines_to_plain_text(inlines: &[Inline], out: &mut EcoString) {
             Inline::HtmlElement(element) => {
                 for child in &element.children {
                     match child {
-                        IrNode::Inline(inline) => render_inlines_to_plain_text(
-                            std::slice::from_ref(inline),
-                            out,
-                        ),
+                        IrNode::Inline(inline) => {
+                            render_inlines_to_plain_text(std::slice::from_ref(inline), out)
+                        }
                         IrNode::Block(_) => {}
                     }
                 }
