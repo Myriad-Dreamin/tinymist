@@ -77,11 +77,22 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
     Ok(())
 }
 
+/// A filter for packages.
+#[cfg(feature = "local-registry")]
+pub enum PackageFilter {
+    /// Filter for packages that match the given namespace.
+    For(EcoString),
+    /// Filter for packages that do not match the given namespace.
+    ExceptFor(EcoString),
+    /// Filter that matches all packages.
+    All,
+}
+
 #[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
 pub fn list_package(
     world: &tinymist_project::LspWorld,
-    ns: Option<EcoString>,
+    filter: PackageFilter,
 ) -> EcoVec<PackageIndexEntry> {
     trait IsDirFollowLinks {
         fn is_dir_follow_links(&self) -> bool;
@@ -104,10 +115,8 @@ pub fn list_package(
     // intended for storage of local packages.
     let mut packages = eco_vec![];
 
-    log::info!(
-        "searching for packages in namespace {ns:?} in paths {:?}",
-        registry.paths()
-    );
+    let paths = registry.paths();
+    log::info!("searching for packages in paths {paths:?}");
 
     let mut search_in_dir = |local_path: PathBuf, ns: EcoString| {
         if !local_path.exists() || !local_path.is_dir_follow_links() {
@@ -179,22 +188,34 @@ pub fn list_package(
         }
     };
 
-    for dir in registry.paths() {
-        if let Some(ns) = &ns {
-            let local_path = dir.join(ns.as_str());
-            search_in_dir(local_path, ns.clone());
-        } else {
-            let Some(namespaces) = once_log(std::fs::read_dir(dir), "read package directory")
-            else {
+    for dir in paths {
+        let matching_ns = match &filter {
+            PackageFilter::For(ns) => {
+                let local_path = dir.join(ns.as_str());
+                search_in_dir(local_path, ns.clone());
+
+                continue;
+            }
+            PackageFilter::ExceptFor(ns) => Some(ns),
+            PackageFilter::All => None,
+        };
+
+        let Some(namespaces) = once_log(std::fs::read_dir(dir), "read package directory") else {
+            continue;
+        };
+        for dir in namespaces {
+            let Some(dir) = once_log(dir, "read ns directory") else {
                 continue;
             };
-            for dir in namespaces {
-                let Some(dir) = once_log(dir, "read ns directory") else {
+            let ns = dir.file_name();
+            let ns = ns.to_string_lossy();
+            if let Some(matching_ns) = &matching_ns {
+                if matching_ns.as_str() != ns.as_ref() {
                     continue;
-                };
-                let local_path = dir.path();
-                search_in_dir(local_path, dir.file_name().to_string_lossy().into());
+                }
             }
+            let local_path = dir.path();
+            search_in_dir(local_path, ns.into());
         }
     }
 
