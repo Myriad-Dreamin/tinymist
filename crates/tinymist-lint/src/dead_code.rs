@@ -165,13 +165,16 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         }
     }
 
-    let mut changed = true;
-    while changed {
-        changed = false;
-        for (alias, target) in alias_links.iter() {
-            if used.contains(alias) && !used.contains(target) {
-                used.insert(target.clone());
-                changed = true;
+    let mut worklist: Vec<_> = used
+        .iter()
+        .filter(|decl| alias_links.contains_key(decl))
+        .cloned()
+        .collect();
+
+    while let Some(alias) = worklist.pop() {
+        if let Some(target) = alias_links.get(&alias) {
+            if used.insert(target.clone()) {
+                worklist.push(target.clone());
             }
         }
     }
@@ -251,37 +254,35 @@ fn is_wildcard_module_import_decl(ei: &ExprInfo, decl: &Interned<Decl>) -> bool 
 
 fn collect_used_decls(reference: &RefExpr, used: &mut HashSet<Interned<Decl>>) {
     let mut visited_refs = HashSet::new();
+    let mut worklist = Vec::new();
+
     if let Some(step) = reference.step.as_ref() {
-        collect_decl_from_expr(step, used, &mut visited_refs);
+        worklist.push(step);
     }
     if let Some(root) = reference.root.as_ref() {
-        collect_decl_from_expr(root, used, &mut visited_refs);
+        worklist.push(root);
     }
-}
 
-fn collect_decl_from_expr(
-    expr: &Expr,
-    used: &mut HashSet<Interned<Decl>>,
-    visited_refs: &mut HashSet<Interned<RefExpr>>,
-) {
-    match expr {
-        Expr::Decl(decl) => {
-            used.insert(decl.clone());
-        }
-        Expr::Ref(reference) => {
-            if visited_refs.insert(reference.clone()) {
-                if let Some(step) = reference.step.as_ref() {
-                    collect_decl_from_expr(step, used, visited_refs);
-                }
-                if let Some(root) = reference.root.as_ref() {
-                    collect_decl_from_expr(root, used, visited_refs);
+    while let Some(expr) = worklist.pop() {
+        match expr {
+            Expr::Decl(decl) => {
+                used.insert(decl.clone());
+            }
+            Expr::Ref(reference) => {
+                if visited_refs.insert(reference.clone()) {
+                    if let Some(step) = reference.step.as_ref() {
+                        worklist.push(step);
+                    }
+                    if let Some(root) = reference.root.as_ref() {
+                        worklist.push(root);
+                    }
                 }
             }
+            Expr::Select(select) => {
+                worklist.push(&select.lhs);
+            }
+            _ => {}
         }
-        Expr::Select(select) => {
-            collect_decl_from_expr(&select.lhs, used, visited_refs);
-        }
-        _ => {}
     }
 }
 
