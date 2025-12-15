@@ -14,7 +14,7 @@ use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::{KnownIssues, LintInfo};
+use tinymist_lint::{DeadCodeConfig, KnownIssues, LintInfo};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -83,6 +83,8 @@ pub struct Analysis {
     pub color_theme: ColorTheme,
     /// When to trigger the lint.
     pub lint: TaskWhen,
+    /// Configuration for dead code detection.
+    pub dead_code: DeadCodeConfig,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
@@ -837,33 +839,43 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
-            guard.miss();
+        self.slot.lint.compute(
+            hash128(&(&ei, &ti, issues, &self.analysis.dead_code)),
+            |_| {
+                guard.miss();
 
-            let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
+                let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
 
-            let has_references = |decl: &Interned<Decl>| -> bool {
-                if matches!(decl.as_ref(), Decl::PathStem(_)) {
-                    if ei.resolves.values().any(|r| {
-                        matches!(
-                            r.step.as_ref(),
-                            Some(Expr::Decl(step_decl)) if step_decl == decl
-                        )
-                    }) {
+                let has_references = |decl: &Interned<Decl>| -> bool {
+                    if matches!(decl.as_ref(), Decl::PathStem(_)) {
+                        if ei.resolves.values().any(|r| {
+                            matches!(
+                                r.step.as_ref(),
+                                Some(Expr::Decl(step_decl)) if step_decl == decl
+                            )
+                        }) {
+                            return true;
+                        }
+                    } else if ei
+                        .get_refs(decl.clone())
+                        .any(|(_, r)| r.as_ref().decl != *decl)
+                    {
                         return true;
                     }
-                } else if ei
-                    .get_refs(decl.clone())
-                    .any(|(_, r)| r.as_ref().decl != *decl)
-                {
-                    return true;
-                }
 
-                cross_file_refs.contains(decl)
-            };
+                    cross_file_refs.contains(decl)
+                };
 
-            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone(), has_references)
-        })
+                tinymist_lint::lint_file_with_dead_code_config(
+                    self.world(),
+                    &ei,
+                    ti,
+                    issues.clone(),
+                    has_references,
+                    &self.analysis.dead_code,
+                )
+            },
+        )
     }
 
     /// Computes which declarations from the current file are referenced by other files.

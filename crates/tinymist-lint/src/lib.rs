@@ -43,10 +43,28 @@ pub fn lint_file(
     known_issues: KnownIssues,
     has_references: impl Fn(&Interned<Decl>) -> bool,
 ) -> LintInfo {
+    lint_file_with_dead_code_config(
+        world,
+        ei,
+        ti,
+        known_issues,
+        has_references,
+        &DeadCodeConfig::default(),
+    )
+}
+
+/// Performs linting check on file with a custom dead-code configuration.
+pub fn lint_file_with_dead_code_config(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
+    has_references: impl Fn(&Interned<Decl>) -> bool,
+    dead_code_config: &DeadCodeConfig,
+) -> LintInfo {
     let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
 
-    let dead_code_diags =
-        dead_code::check_dead_code(world, ei, has_references, &DeadCodeConfig::default());
+    let dead_code_diags = dead_code::check_dead_code(world, ei, has_references, dead_code_config);
     diagnostics.extend(dead_code_diags);
 
     LintInfo {

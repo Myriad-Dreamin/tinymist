@@ -980,6 +980,13 @@ pub struct LintFeat {
     pub enabled: Option<bool>,
     /// When to trigger the lint checks.
     pub when: Option<TaskWhen>,
+    /// Dead code detection options.
+    #[serde(
+        default,
+        rename = "deadCode",
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub dead_code: DeadCodeFeat,
 }
 
 impl LintFeat {
@@ -991,6 +998,33 @@ impl LintFeat {
 
         self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
     }
+
+    /// Gets the dead-code lint configuration derived from `lint.deadCode`.
+    pub fn dead_code_config(&self) -> tinymist_lint::DeadCodeConfig {
+        let mut config = tinymist_lint::DeadCodeConfig::default();
+        if let Some(check_exported) = self.dead_code.check_exported {
+            config.check_exported = check_exported;
+        }
+        if let Some(check_params) = self.dead_code.check_params {
+            config.check_params = check_params;
+        }
+        if let Some(exceptions) = &self.dead_code.exceptions {
+            config.exceptions = exceptions.clone();
+        }
+        config
+    }
+}
+
+/// Dead code detection options under `lint.deadCode`.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeadCodeFeat {
+    /// Whether to check module-level (exported) symbols.
+    pub check_exported: Option<bool>,
+    /// Whether to check unused function parameters.
+    pub check_params: Option<bool>,
+    /// Patterns for exceptions (e.g., "test_*", "_*").
+    pub exceptions: Option<Vec<String>>,
 }
 /// The lint features.
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -1277,6 +1311,10 @@ mod tests {
         test_good_config("lint");
         test_good_config("lint.enabled");
         test_good_config("lint.when");
+        test_good_config("lint.deadCode");
+        test_good_config("lint.deadCode.checkExported");
+        test_good_config("lint.deadCode.checkParams");
+        test_good_config("lint.deadCode.exceptions");
 
         test_good_config("preview");
         test_good_config("preview.browsing");

@@ -27,7 +27,7 @@ struct ImportUsageInfo {
 }
 
 /// Configuration for dead code detection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct DeadCodeConfig {
     /// Whether to check exported but unused symbols.
     pub check_exported: bool,

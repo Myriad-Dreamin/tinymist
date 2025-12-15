@@ -4450,6 +4450,7 @@ dependencies = [
  "tinymist-assets 0.14.6-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
+ "tinymist-lint",
  "tinymist-preview",
  "tinymist-project",
  "tinymist-query",
