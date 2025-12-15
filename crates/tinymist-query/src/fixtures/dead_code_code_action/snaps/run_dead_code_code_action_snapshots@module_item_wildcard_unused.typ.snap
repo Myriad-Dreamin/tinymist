@@ -4,4 +4,26 @@ description: Dead code code actions in /dummy-root/main.typ
 expression: "JsonRepr::new_pure(ordered_entries)"
 input_file: crates/tinymist-query/src/fixtures/dead_code/module_item_wildcard_unused.typ
 ---
-[]
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:0:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+  "range": "2:1:2:18"
+ }
+]

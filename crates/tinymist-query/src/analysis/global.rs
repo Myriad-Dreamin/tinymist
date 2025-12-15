@@ -883,10 +883,6 @@ impl SharedContext {
             }
         }
 
-        for (_, ref_expr) in current_ei.resolves.iter() {
-            all_decls.push(ref_expr.decl.clone());
-        }
-
         for &file_id in &files {
             if file_id == current_file {
                 continue;
