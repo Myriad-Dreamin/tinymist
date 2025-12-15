@@ -101,7 +101,7 @@ pub fn diff(path: &Path, base: &Path) -> Option<PathBuf> {
 mod test {
     use std::path::{Path, PathBuf};
 
-    use super::{PathClean, clean as inner_path_clean, unix_slash};
+    use super::{PathClean, clean as inner_path_clean, unix_slash, looks_like_uri};
 
     pub fn clean<P: AsRef<Path>>(path: P) -> String {
         unix_slash(&inner_path_clean(path))
@@ -276,5 +276,35 @@ mod test {
         for test in tests {
             assert_eq!(clean(test.0), test.1);
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_looks_like_uri_valid_schemes() {
+        assert!(looks_like_uri("http:/path"));
+        assert!(looks_like_uri("file:/C:/Windows"));
+        assert!(looks_like_uri("custom-scheme:/abc"));
+        assert!(looks_like_uri("oct:/workspace/file typst"));
+        assert!(looks_like_uri("a+1.2-3:/zzz"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_looks_like_uri_rejects_drive_letters_and_edge_cases() {
+        // Single-letter "scheme" like windows drive should be rejected
+        assert!(!looks_like_uri("C:/Windows"));
+        assert!(!looks_like_uri("D:"));
+
+        // No colon -> not a URI
+        assert!(!looks_like_uri("/usr/bin"));
+        assert!(!looks_like_uri("relative/path"));
+
+        // Invalid first character
+        assert!(!looks_like_uri("1abc:/path"));
+        assert!(!looks_like_uri("+abc:/path"));
+
+        // Invalid characters in scheme
+        assert!(!looks_like_uri("ab*c:/path"));
+        assert!(!looks_like_uri("ab c:/path"));
     }
 }

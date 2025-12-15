@@ -348,7 +348,30 @@ impl fmt::Display for Resolving {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_interner_untitled() {}
+
+    #[test]
+    fn test_workspace_id_preserves_uri_roots() {
+        let uri_root = ImmutPath::from(PathBuf::from("oct:/workspace/project"));
+        let id = WorkspaceResolver::workspace_id(&uri_root);
+        let interner = INTERNER.read();
+        let stored = interner.from_id.get(id.0 as usize).expect("id present");
+        assert_eq!(stored.as_ref().to_string_lossy(), "oct:/workspace/project");
+    }
+
+    #[test]
+    fn test_workspace_id_cleans_regular_paths() {
+        let p = ImmutPath::from(PathBuf::from("/tmp/../tmp/project"));
+        let id = WorkspaceResolver::workspace_id(&p);
+        let interner = INTERNER.read();
+        let stored = interner.from_id.get(id.0 as usize).expect("id present");
+        // Normalize separators to make the assertion platform-independent.
+        let norm = stored.as_ref().to_string_lossy().replace('\\', "/");
+        assert!(norm.contains("/tmp/project") || norm.ends_with("/project"));
+        assert!(!norm.contains(".."));
+    }
 }

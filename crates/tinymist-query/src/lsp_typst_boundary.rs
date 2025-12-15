@@ -126,6 +126,8 @@ pub fn url_to_path(uri: &Url) -> PathBuf {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
+    // Prefer `Url::from_file_path` for correctness; fall back to manual construction
+    // to handle edge cases like UNC paths, leading double slashes, or drive letters.
     Url::from_file_path(path).or_else(|never| {
         let _: () = never;
 
@@ -170,6 +172,7 @@ fn url_to_file_path(uri: &Url) -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_untitled() {
@@ -192,5 +195,57 @@ mod test {
 
         let uri2 = path_to_url(&path).unwrap();
         assert_eq!(EMPTY_URL.clone(), uri2);
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_path_to_url_file_scheme_roundtrip() {
+        // This test uses a Unix-style path; skip on Windows where
+        // `Url::to_file_path` semantics differ for such inputs.
+        #[cfg(unix)]
+        {
+            let p = PathBuf::from("/tmp/example file.typ");
+            let url = path_to_url(&p).expect("file path to url");
+            assert_eq!(url.scheme(), "file");
+            // spaces should be percent-encoded
+            assert!(url.as_str().contains("%20"));
+
+            // url_to_file_path should give us back a cleaned absolute path
+            let back = url_to_file_path(&url);
+            assert!(back.is_absolute());
+            assert!(back.ends_with("example file.typ"));
+        }
+    }
+
+    #[cfg(all(not(target_arch = "wasm32"), windows))]
+    #[test]
+    fn test_path_to_url_file_scheme_roundtrip_windows() {
+        let p = PathBuf::from("C:\\Temp\\example file.typ");
+        let url = path_to_url(&p).expect("file path to url");
+        assert_eq!(url.scheme(), "file");
+        // spaces should be percent-encoded
+        assert!(url.as_str().contains("%20"));
+
+        let back = url_to_file_path(&url);
+        assert!(back.is_absolute());
+        assert!(back.ends_with("example file.typ"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_path_to_url_untitled_special_case() {
+        let p = PathBuf::from("/untitled/nEoViM-BuG");
+        let url = path_to_url(&p).expect("untitled url");
+        // Special case maps to EMPTY_URL which is a placeholder file:// URI
+        assert_eq!(url.scheme(), "file");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_url_to_path_virtual_scheme() {
+        let url = Url::parse("oct:/workspace/My File.typ").unwrap();
+        let p = url_to_path(&url);
+        // scheme should be embedded back into the path text, with decoded spaces
+        assert_eq!(p.to_string_lossy(), "oct:/workspace/My File.typ");
     }
 }

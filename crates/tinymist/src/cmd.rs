@@ -37,6 +37,12 @@ struct ExportSyntaxRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
+    /// Parse a string as either a URI or a filesystem path.
+    ///
+    /// - If `s` parses as a `Url`, convert it using `url_to_path()` which
+    ///   preserves the scheme (e.g. `oct:`) embedded in the textual path for
+    ///   delegated filesystem providers.
+    /// - Otherwise, treat `s` as a raw path string.
     fn parse_uri_or_path(s: &str) -> ImmutPath {
         if let Ok(uri) = Url::parse(s) {
             // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
@@ -582,5 +588,32 @@ impl ServerState {
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let snap = self.query_snapshot().map_err(internal_error)?;
         Ok(async move { snap.run_within_package(&info, f).map_err(internal_error) })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_uri_or_path_parses_uri() {
+        let p = ServerState::parse_uri_or_path("oct:/workspace/file typst");
+        assert_eq!(p.as_ref().to_string_lossy(), "oct:/workspace/file typst");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_parse_uri_or_path_falls_back_to_path_unix() {
+        let p = ServerState::parse_uri_or_path("/home/user/file.typ");
+        assert!(p.is_absolute());
+        assert_eq!(p.as_ref().to_string_lossy(), "/home/user/file.typ");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_parse_uri_or_path_falls_back_to_path_windows() {
+        // On Windows, "/home/user/file.typ" is not considered absolute.
+        let p = ServerState::parse_uri_or_path("/home/user/file.typ");
+        assert_eq!(p.as_ref().to_string_lossy(), "/home/user/file.typ");
     }
 }
