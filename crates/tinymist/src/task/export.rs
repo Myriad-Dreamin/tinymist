@@ -298,7 +298,7 @@ impl ExportTask {
         };
 
         #[cfg(target_arch = "wasm32")]
-        let mut write_to = write_to.to_path_buf();
+        let write_to = write_to.to_path_buf();
 
         let write_to = if write_to.is_relative() {
             let cwd = std::env::current_dir().context("failed to get current directory")?;

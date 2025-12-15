@@ -37,6 +37,15 @@ struct ExportSyntaxRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
+    fn parse_uri_or_path(s: &str) -> ImmutPath {
+        if let Ok(uri) = Url::parse(s) {
+            // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
+            ImmutPath::from(url_to_path(&uri))
+        } else {
+            ImmutPath::from(PathBuf::from(s))
+        }
+    }
+
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
@@ -104,14 +113,7 @@ impl ServerState {
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let raw: Option<String> = get_arg!(args[0] as Option<String>);
-        let entry = raw.map(|s| {
-            // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
-            if let Ok(uri) = Url::parse(&s) {
-                ImmutPath::from(url_to_path(&uri))
-            } else {
-                ImmutPath::from(PathBuf::from(&s))
-            }
-        });
+        let entry = raw.as_deref().map(Self::parse_uri_or_path);
 
         let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
@@ -123,14 +125,7 @@ impl ServerState {
     /// Focus main file to some path.
     pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let raw: Option<String> = get_arg!(args[0] as Option<String>);
-        let entry = raw.map(|s| {
-            // same as `pin_document`
-            if let Ok(uri) = Url::parse(&s) {
-                ImmutPath::from(url_to_path(&uri))
-            } else {
-                ImmutPath::from(PathBuf::from(&s))
-            }
-        });
+        let entry = raw.as_deref().map(Self::parse_uri_or_path);
 
         if !self.ever_manual_focusing {
             self.ever_manual_focusing = true;

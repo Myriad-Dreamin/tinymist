@@ -233,22 +233,16 @@ impl ServerState {
     pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
         let raw: String = get_arg!(args[0] as String);
 
-        let path: PathBuf = if self.config.delegate_fs_requests { // treat the first argument as a URI string when filesystem delegation is enabled
-            if let Ok(uri) = Url::parse(&raw) {
-                url_to_path(&uri)
-            } else {
-                PathBuf::from(&raw)
+        let path: PathBuf = match Url::parse(&raw) {
+            Ok(uri) => {
+                let p = url_to_path(&uri);
+                if self.config.delegate_fs_requests || p.is_absolute() {
+                    p
+                } else {
+                    PathBuf::from(&raw)
+                }
             }
-        } else if let Ok(uri) = Url::parse(&raw) {
-            // still accept absolute paths encoded as URIs
-            let p = url_to_path(&uri);
-            if p.is_absolute() {
-                p
-            } else {
-                PathBuf::from(&raw)
-            }
-        } else {
-            PathBuf::from(&raw)
+            Err(_) => PathBuf::from(&raw),
         };
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
         let write = action_opts.write.unwrap_or(true);

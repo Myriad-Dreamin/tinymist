@@ -4,6 +4,7 @@ use anyhow::Context;
 use percent_encoding::percent_decode_str;
 use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::PathResolution;
+use tinymist_std::path::looks_like_uri;
 
 use crate::prelude::*;
 
@@ -142,30 +143,6 @@ fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
     })
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn looks_like_uri(s: &str) -> bool {
-    if let Some(pos) = s.find(':') {
-        let (scheme, _) = s.split_at(pos);
-        // require a non-empty, multi-character scheme
-        // avoids treating windows drive letters like `C:` as URI schemes
-        if scheme.is_empty() || scheme.len() == 1 {
-            return false;
-        }
-
-        let mut bytes = scheme.bytes();
-        match bytes.next() {
-            Some(b) if (b as char).is_ascii_alphabetic() => {}
-            _ => return false,
-        }
-
-        bytes.all(|b| {
-            let c = b as char;
-            c.is_ascii_alphanumeric() || c == '+' || c == '.' || c == '-'
-        })
-    } else {
-        false
-    }
-}
 
 #[cfg(target_arch = "wasm32")]
 fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
