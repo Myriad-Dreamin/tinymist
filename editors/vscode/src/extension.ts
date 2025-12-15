@@ -513,7 +513,7 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
 }
 
 function commandActivateDoc(doc: vscode.TextDocument | undefined) {
-  commandActivateDocPath(doc, doc?.uri.fsPath);
+  commandActivateDocPath(doc, doc?.uri.toString());
 }
 
 let focusMainTimeout: NodeJS.Timeout | undefined = undefined;

@@ -276,7 +276,7 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
   let shadowDispose: vscode.Disposable | undefined = undefined;
   let shadowDisposeClose: vscode.Disposable | undefined = undefined;
   const { context, editor: activeEditor, bindDocument, webviewPanel } = task;
-  const filePath = bindDocument.uri.fsPath;
+  const filePath = bindDocument.uri.toString();
 
   const refreshStyle =
     vscode.workspace.getConfiguration().get<string>("typst-preview.refresh") || "onSave";

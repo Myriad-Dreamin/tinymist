@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 
 use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
-use tinymist_std::path::PathClean;
+use tinymist_std::path::{PathClean, unix_slash};
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::VirtualPath;
 use typst::syntax::package::{PackageSpec, PackageVersion};
@@ -155,6 +155,36 @@ impl WorkspaceId {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))] // same as in `crates/tinymist-query/src/lsp_typst_boundary.rs`
+fn looks_like_uri(s: &str) -> bool {
+    if let Some(pos) = s.find(':') {
+        let (scheme, _) = s.split_at(pos);
+        // require a non-empty, multi-character scheme
+        // avoids treating windows drive letters like `C:` as URI schemes
+        if scheme.is_empty() || scheme.len() == 1 {
+            return false;
+        }
+
+        let mut bytes = scheme.bytes();
+        match bytes.next() {
+            Some(b) if (b as char).is_ascii_alphabetic() => {}
+            _ => return false,
+        }
+
+        bytes.all(|b| {
+            let c = b as char;
+            c.is_ascii_alphanumeric() || c == '+' || c == '.' || c == '-'
+        })
+    } else {
+        false
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn looks_like_uri(_s: &str) -> bool {
+    false
+}
+
 /// The global package-path interner.
 static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
     RwLock::new(Interner {
@@ -203,17 +233,24 @@ impl WorkspaceResolver {
 
     /// Gets or creates a workspace ID for the given root path.
     pub fn workspace_id(root: &ImmutPath) -> WorkspaceId {
+        let root: ImmutPath = {
+            let as_str = unix_slash(&*root);
+            if looks_like_uri(&as_str) { // avoid running URI roots through `PathClean` because they might be misinterpreted as drive letters
+                root.clone()
+            } else {
+                ImmutPath::from(root.clean())
+            }
+        };
+
         // Try to find an existing entry that we can reuse.
         //
         // We could check with just a read lock, but if the pair is not yet
         // present, we would then need to recheck after acquiring a write lock,
         // which is probably not worth it.
         let mut interner = INTERNER.write();
-        if let Some(&id) = interner.to_id.get(root) {
+        if let Some(&id) = interner.to_id.get(&root) {
             return id;
         }
-
-        let root = ImmutPath::from(root.clean());
 
         // Create a new entry forever by leaking the pair. We can't leak more
         // than 2^16 pair (and typically will leak a lot less), so its not a

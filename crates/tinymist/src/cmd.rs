@@ -5,15 +5,16 @@ mod export;
 use std::ops::Range;
 use std::path::PathBuf;
 
-use lsp_types::TextDocumentIdentifier;
+use lsp_types::{TextDocumentIdentifier, Url};
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 #[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{LocalContextGuard, LspRange};
+use tinymist_query::{url_to_path, LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
+use tinymist_std::ImmutPath;
 use typst::syntax::{LinkedNode, Source};
 
 use super::*;
@@ -102,7 +103,15 @@ impl ServerState {
 
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+        let raw: Option<String> = get_arg!(args[0] as Option<String>);
+        let entry = raw.map(|s| {
+            // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
+            if let Ok(uri) = Url::parse(&s) {
+                ImmutPath::from(url_to_path(&uri))
+            } else {
+                ImmutPath::from(PathBuf::from(&s))
+            }
+        });
 
         let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
@@ -113,7 +122,15 @@ impl ServerState {
 
     /// Focus main file to some path.
     pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+        let raw: Option<String> = get_arg!(args[0] as Option<String>);
+        let entry = raw.map(|s| {
+            // same as `pin_document`
+            if let Ok(uri) = Url::parse(&s) {
+                ImmutPath::from(url_to_path(&uri))
+            } else {
+                ImmutPath::from(PathBuf::from(&s))
+            }
+        });
 
         if !self.ever_manual_focusing {
             self.ever_manual_focusing = true;

@@ -358,7 +358,12 @@ impl Config {
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
-        assign_config!(delegate_fs_requests := "delegateFsRequests"?: bool);
+
+        if let Some(v) = try_deserialize!(bool, "delegateFsRequests") {
+            self.delegate_fs_requests = v; // only update this flag when the key is actually present in the update map.
+            // `delegate_fs_requests` is configured on startup, but vscode doesn't include this field in new workspace configuration updates. if we treat a missing key as "reset to default" here new config changes would turn it off again
+        }
+
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(development := "development"?: bool);

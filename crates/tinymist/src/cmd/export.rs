@@ -11,6 +11,9 @@ use tinymist_project::{
 use tinymist_std::error::prelude::*;
 use tinymist_task::{ExportMarkdownTask, PageMerge};
 
+use lsp_types::Url;
+use tinymist_query::url_to_path;
+
 use super::*;
 use crate::lsp::query::run_query;
 
@@ -228,7 +231,25 @@ impl ServerState {
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
     pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let path = get_arg!(args[0] as PathBuf);
+        let raw: String = get_arg!(args[0] as String);
+
+        let path: PathBuf = if self.config.delegate_fs_requests { // treat the first argument as a URI string when filesystem delegation is enabled
+            if let Ok(uri) = Url::parse(&raw) {
+                url_to_path(&uri)
+            } else {
+                PathBuf::from(&raw)
+            }
+        } else if let Ok(uri) = Url::parse(&raw) {
+            // still accept absolute paths encoded as URIs
+            let p = url_to_path(&uri);
+            if p.is_absolute() {
+                p
+            } else {
+                PathBuf::from(&raw)
+            }
+        } else {
+            PathBuf::from(&raw)
+        };
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
         let write = action_opts.write.unwrap_or(true);
         let open = action_opts.open;

@@ -42,8 +42,10 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.supportHtmlInMarkdown = true;
   config.supportExtendedCodeAction = true;
   config.customizedShowDocument = true;
-  config.delegateFsRequests = false; // todo: detect live sharing.
-  // Sets shared features
+  const isVirtualWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.every(f => f.uri.scheme !== "file"); // https://code.visualstudio.com/api/extension-guides/virtual-workspaces#detect-virtual-workspaces-programmatically
+  const isLiveShare = vscode.env.remoteName === "vsls";
+  config.delegateFsRequests = isVirtualWorkspace || isLiveShare;
+    // Sets shared features
   extensionState.features.preview = !isWeb && config.previewFeature === "enable";
   extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";
   extensionState.features.devKit = isDevMode || config.devKit === "enable";

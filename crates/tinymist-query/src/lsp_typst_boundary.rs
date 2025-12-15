@@ -1,6 +1,8 @@
 //! Conversions between Typst and LSP types and representations
 
-use tinymist_std::path::PathClean;
+use anyhow::Context;
+use percent_encoding::percent_decode_str;
+use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::PathResolution;
 
 use crate::prelude::*;
@@ -27,13 +29,55 @@ pub fn is_untitled_path(p: &Path) -> bool {
 
 /// Convert a path to a URL.
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
-    if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
-        // rust-url will panic on converting an empty path.
-        if untitled == Path::new("nEoViM-BuG") {
-            return Ok(EMPTY_URL.clone());
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path_str = unix_slash(path);
+        if looks_like_uri(&path_str) {
+            // let `url::Url` handle percent-encoding of the path component
+            // ensures that characters like spaces are encoded as `%20`
+            if let Some(pos) = path_str.find(':') {
+                let (scheme, rest) = path_str.split_at(pos);
+                let raw_path = &rest[1..]; // skip ':'
+
+                let mut url = Url::parse(&format!("{scheme}:"))
+                    .with_context(|| {
+                        format!("could not convert path to URI: path: {path:?}")
+                    })?;
+                url.set_path(raw_path);
+                return Ok(url);
+            }
+
+            // this should never happen given `looks_like_uri`, but the old behaviour is here anyway
+            return Url::parse(&path_str)
+                .with_context(|| format!("could not convert path to URI: path: {path:?}"));
+        }
+    }
+
+    // on windows, paths with `/untitled` prefix get normalized to backslashes
+    let path_str = path.to_string_lossy();
+    let backslash_prefix = UNTITLED_ROOT.replace('/', "\\");
+
+    let is_untitled = path_str.starts_with(UNTITLED_ROOT) || path_str.starts_with(&backslash_prefix);
+
+    if is_untitled {
+        if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
+            // rust-url will panic on converting an empty path.
+            if untitled == Path::new("nEoViM-BuG") {
+                return Ok(EMPTY_URL.clone());
+            }
+            
+            return untitled_url(untitled);
         }
 
-        return untitled_url(untitled);
+        // fallback: manually extract and normalize for windows backslashes
+        let trimmed = if path_str.starts_with(UNTITLED_ROOT) {
+            path_str.strip_prefix(UNTITLED_ROOT).unwrap_or(&path_str)
+        } else {
+            path_str.strip_prefix(&backslash_prefix).unwrap_or(&path_str)
+        };
+
+        let normalized = trimmed.trim_start_matches('/').trim_start_matches('\\').replace('\\', "/");
+        return untitled_url(Path::new(&normalized));
     }
 
     url_from_file_path(path)
@@ -72,7 +116,11 @@ pub fn url_to_path(uri: &Url) -> PathBuf {
         return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
     }
 
-    url_to_file_path(uri)
+    // for non-file, non-untitled schemes (virtual filesystem providers), encode the scheme back into the path while decoding any percent-encoding from the URL
+    // it means that filesystem paths can use the same textual representation as Typst virtual paths, which may contain characters like spaces
+    let decoded_path = percent_decode_str(uri.path()).decode_utf8_lossy();
+    let raw = format!("{}:{}", uri.scheme(), decoded_path);
+    PathBuf::from(raw)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -80,8 +128,43 @@ fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
     Url::from_file_path(path).or_else(|never| {
         let _: () = never;
 
-        anyhow::bail!("could not convert path to URI: path: {path:?}",)
+        let p = path.to_string_lossy().replace('\\', "/");
+        let url_str = if p.starts_with("//") {
+            format!("file:{}", p)
+        } else if p.starts_with('/') {
+            format!("file://{}", p)
+        } else {
+            format!("file:///{}", p)
+        };
+
+        Url::parse(&url_str)
+            .with_context(|| format!("could not convert path to URI: path: {path:?}"))
     })
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn looks_like_uri(s: &str) -> bool {
+    if let Some(pos) = s.find(':') {
+        let (scheme, _) = s.split_at(pos);
+        // require a non-empty, multi-character scheme
+        // avoids treating windows drive letters like `C:` as URI schemes
+        if scheme.is_empty() || scheme.len() == 1 {
+            return false;
+        }
+
+        let mut bytes = scheme.bytes();
+        match bytes.next() {
+            Some(b) if (b as char).is_ascii_alphabetic() => {}
+            _ => return false,
+        }
+
+        bytes.all(|b| {
+            let c = b as char;
+            c.is_ascii_alphanumeric() || c == '+' || c == '.' || c == '-'
+        })
+    } else {
+        false
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
