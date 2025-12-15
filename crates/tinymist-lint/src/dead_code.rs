@@ -10,7 +10,10 @@ use tinymist_analysis::{
     syntax::{Decl, Expr, ExprInfo, RefExpr},
 };
 use tinymist_project::LspWorld;
-use typst::{ecow::EcoVec, syntax::FileId};
+use typst::{
+    ecow::EcoVec,
+    syntax::{FileId, LinkedNode, ast},
+};
 
 use crate::DiagnosticVec;
 use collector::{DefInfo, DefScope, collect_definitions};
@@ -20,8 +23,7 @@ struct ImportUsageInfo {
     used: HashSet<Interned<Decl>>,
     shadowed: HashSet<Interned<Decl>>,
     module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
-    module_targets: HashMap<Interned<Decl>, FileId>,
-    used_module_files: HashSet<FileId>,
+    module_used_decls: HashSet<Interned<Decl>>,
 }
 
 /// Configuration for dead code detection.
@@ -63,8 +65,7 @@ pub fn check_dead_code(
         used,
         shadowed,
         module_children,
-        module_targets,
-        used_module_files,
+        module_used_decls,
     } = compute_import_usage(&definitions, ei);
 
     let mut seen_module_aliases = HashSet::new();
@@ -85,17 +86,12 @@ pub fn check_dead_code(
         let is_unused = match def_info.decl.as_ref() {
             Decl::Import(_) | Decl::ImportAlias(_) => !used.contains(&def_info.decl),
             Decl::ModuleImport(_) | Decl::ModuleAlias(_) => {
+                let decl_used = used.contains(&def_info.decl);
                 let children_used = module_children
                     .get(&def_info.decl)
                     .is_some_and(|children| children.iter().any(|child| used.contains(child)));
-                let module_used = if module_children.contains_key(&def_info.decl) {
-                    false
-                } else {
-                    module_targets
-                        .get(&def_info.decl)
-                        .is_some_and(|fid| used_module_files.contains(fid))
-                };
-                !(children_used || module_used || has_references(&def_info.decl))
+                let module_used = module_used_decls.contains(&def_info.decl);
+                !(children_used || module_used || decl_used || has_references(&def_info.decl))
             }
             _ => !has_references(&def_info.decl),
         };
@@ -176,13 +172,63 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         }
     }
 
+    let mut module_used_decls = HashSet::new();
+    let mut module_used_candidates: HashMap<FileId, Vec<Interned<Decl>>> = HashMap::new();
+    for (decl, fid) in &module_targets {
+        if module_children.contains_key(decl) {
+            continue;
+        }
+
+        let is_candidate = match decl.as_ref() {
+            Decl::ModuleImport(_) => true,
+            Decl::ModuleAlias(_) => is_wildcard_module_import_decl(ei, decl),
+            _ => false,
+        };
+        if !is_candidate {
+            continue;
+        }
+
+        module_used_candidates
+            .entry(*fid)
+            .or_default()
+            .push(decl.clone());
+    }
+
+    for (fid, decls) in module_used_candidates {
+        if !used_module_files.contains(&fid) {
+            continue;
+        }
+
+        let Some(chosen) = decls.into_iter().min_by_key(|decl| decl.span().into_raw()) else {
+            continue;
+        };
+        module_used_decls.insert(chosen);
+    }
+
     ImportUsageInfo {
         used,
         shadowed,
         module_children,
-        module_targets,
-        used_module_files,
+        module_used_decls,
     }
+}
+
+fn is_wildcard_module_import_decl(ei: &ExprInfo, decl: &Interned<Decl>) -> bool {
+    let span = decl.span();
+    if span.is_detached() {
+        return false;
+    }
+
+    let node = LinkedNode::new(ei.source.root()).find(span);
+    let mut current = node;
+    while let Some(node) = current {
+        if let Some(module_import) = node.cast::<ast::ModuleImport>() {
+            return matches!(module_import.imports(), Some(ast::Imports::Wildcard));
+        }
+        current = node.parent().cloned();
+    }
+
+    false
 }
 
 fn collect_used_decls(reference: &RefExpr, used: &mut HashSet<Interned<Decl>>) {
