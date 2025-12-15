@@ -71,10 +71,10 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
         }
 
         // fallback: manually extract and normalize for windows backslashes
-        let trimmed = if let Some(t) = path_str.strip_prefix(UNTITLED_ROOT) {
-            t
+        let trimmed = if path_str.starts_with(UNTITLED_ROOT) {
+            path_str.strip_prefix(UNTITLED_ROOT).unwrap_or(&path_str)
         } else {
-            path_str.strip_prefix(&backslash_prefix).expect("is_untitled check should guarantee a prefix match")
+            path_str.strip_prefix(&backslash_prefix).unwrap_or(&path_str)
         };
 
         let normalized = trimmed.trim_start_matches('/').trim_start_matches('\\').replace('\\', "/");
