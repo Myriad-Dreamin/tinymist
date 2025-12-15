@@ -6,8 +6,9 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `unused1`\nHint: consider removing this variable or prefixing with underscore: `_unused1`",
-   "range": "1:1:1:16",
+   "range": "1:5:1:12",
    "severity": 4,
    "source": "typst",
    "tags": [
@@ -15,8 +16,9 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
    ]
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `unused2`\nHint: consider removing this variable or prefixing with underscore: `_unused2`",
-   "range": "2:1:2:16",
+   "range": "2:5:2:12",
    "severity": 4,
    "source": "typst",
    "tags": [
@@ -24,8 +26,9 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
    ]
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `unused3`\nHint: consider removing this variable or prefixing with underscore: `_unused3`",
-   "range": "4:1:4:16",
+   "range": "4:5:4:12",
    "severity": 4,
    "source": "typst",
    "tags": [
@@ -33,6 +36,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
    ]
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused function: `unused_func1`\nHint: consider removing this function or prefixing with underscore: `_unused_func1`",
    "range": "6:5:6:17",
    "severity": 4,
@@ -42,6 +46,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/multiple_unused.typ
    ]
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused function: `unused_func2`\nHint: consider removing this function or prefixing with underscore: `_unused_func2`",
    "range": "8:5:8:17",
    "severity": 4,

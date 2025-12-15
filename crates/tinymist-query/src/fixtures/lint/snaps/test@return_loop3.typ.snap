@@ -6,6 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/return_loop3.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused function: `mul-mat`\nHint: consider removing this function or prefixing with underscore: `_mul-mat`",
    "range": "0:5:0:12",
    "severity": 4,
@@ -15,8 +16,9 @@ input_file: crates/tinymist-query/src/fixtures/lint/return_loop3.typ
    ]
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `matrix`\nHint: consider removing this variable or prefixing with underscore: `_matrix`",
-   "range": "0:1:9:1",
+   "range": "3:6:3:12",
    "severity": 4,
    "source": "typst",
    "tags": [

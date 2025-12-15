@@ -18,6 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_if2.typ
    "source": "typst"
   },
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
    "range": "0:5:0:6",
    "severity": 4,

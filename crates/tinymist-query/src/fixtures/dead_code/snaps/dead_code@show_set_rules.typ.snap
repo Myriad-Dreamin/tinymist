@@ -6,8 +6,9 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/show_set_rules.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `unused_style`\nHint: consider removing this variable or prefixing with underscore: `_unused_style`",
-   "range": "1:1:1:23",
+   "range": "1:5:1:17",
    "severity": 4,
    "source": "typst",
    "tags": [

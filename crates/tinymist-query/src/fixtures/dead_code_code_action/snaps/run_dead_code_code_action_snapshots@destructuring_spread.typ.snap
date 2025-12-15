@@ -24,6 +24,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_spread.ty
    }
   ],
   "message": "unused variable: `unused_rest`\nHint: consider removing this variable or prefixing with underscore: `_unused_rest`",
-  "range": "4:1:4:30"
+  "range": "4:11:4:22"
  }
 ]

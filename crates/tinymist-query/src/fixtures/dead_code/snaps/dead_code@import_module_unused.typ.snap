@@ -6,6 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_unused.ty
 {
  "main.typ": [
   {
+   "code": "tinymist.unused.module",
    "message": "unused module: `u`\nHint: imported modules should be used or the import should be removed",
    "range": "2:8:2:15",
    "severity": 4,

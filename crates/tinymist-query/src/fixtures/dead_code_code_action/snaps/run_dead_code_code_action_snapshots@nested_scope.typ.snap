@@ -54,6 +54,6 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/nested_scope.typ
    }
   ],
   "message": "unused variable: `inner_unused`\nHint: consider removing this variable or prefixing with underscore: `_inner_unused`",
-  "range": "4:2:4:22"
+  "range": "4:6:4:18"
  }
 ]

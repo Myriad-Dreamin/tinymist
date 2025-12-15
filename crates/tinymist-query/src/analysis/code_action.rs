@@ -15,6 +15,13 @@ use crate::analysis::LinkTarget;
 use crate::prelude::*;
 use crate::syntax::{InterpretMode, interpret_mode_at};
 
+const UNUSED_CODE_IMPORTED_ITEM: &str = "tinymist.unused.import";
+const UNUSED_CODE_MODULE_IMPORT: &str = "tinymist.unused.module_import";
+const UNUSED_CODE_MODULE: &str = "tinymist.unused.module";
+const UNUSED_CODE_SYMBOL: &str = "tinymist.unused.symbol";
+const UNUSED_CODE_EXPORTED_DOCUMENTED_FUNCTION: &str =
+    "tinymist.unused.exported_documented_function";
+
 /// Analyzes the document and provides code actions.
 pub struct CodeActionWorker<'a> {
     /// The local analysis context to work with.
@@ -75,11 +82,32 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         for diag in &context.diagnostics {
-            let Some(source) = diag.source.as_deref() else {
+            let Some(diag_range) = self.ctx.to_typst_range(diag.range, &self.source) else {
                 continue;
             };
 
-            let Some(diag_range) = self.ctx.to_typst_range(diag.range, &self.source) else {
+            if let Some(unused_code) = unused_code(diag) {
+                if unused_code == UNUSED_CODE_IMPORTED_ITEM {
+                    self.autofix_remove_unused_import(root, &diag_range);
+                } else if unused_code == UNUSED_CODE_MODULE_IMPORT
+                    || unused_code == UNUSED_CODE_MODULE
+                {
+                    self.autofix_remove_declaration(root, &diag_range);
+                } else {
+                    let Some(binding_range) = self.binding_range_for_diag(root, &diag_range, diag)
+                    else {
+                        continue;
+                    };
+
+                    self.autofix_unused_symbol(&binding_range);
+                    self.autofix_replace_with_placeholder(root, &binding_range);
+                    self.autofix_remove_declaration(root, &binding_range);
+                }
+
+                continue;
+            }
+
+            let Some(source) = diag.source.as_deref() else {
                 continue;
             };
 
@@ -89,23 +117,6 @@ impl<'a> CodeActionWorker<'a> {
                 }
                 Some(AutofixKind::FileNotFound) => {
                     self.autofix_file_not_found(root, &diag_range);
-                }
-                Some(AutofixKind::MarkUnusedSymbol) => {
-                    if diag.message.starts_with("unused import:") {
-                        self.autofix_remove_unused_import(root, &diag_range);
-                    } else if diag.message.starts_with("unused module") {
-                        self.autofix_remove_declaration(root, &diag_range);
-                    } else {
-                        let Some(binding_range) =
-                            self.binding_range_for_diag(root, &diag_range, diag)
-                        else {
-                            continue;
-                        };
-
-                        self.autofix_unused_symbol(&binding_range);
-                        self.autofix_replace_with_placeholder(root, &binding_range);
-                        self.autofix_remove_declaration(root, &binding_range);
-                    }
                 }
                 _ => {}
             }
@@ -521,33 +532,12 @@ impl<'a> CodeActionWorker<'a> {
         diag_range: &Range<usize>,
         diag: &lsp_types::Diagnostic,
     ) -> Option<Range<usize>> {
+        let _ = (root, diag);
         if diag_range.is_empty() {
             return None;
         }
 
-        if let Some(text) = self.source.text().get(diag_range.clone()) {
-            if is_plain_identifier(text) {
-                return Some(diag_range.clone());
-            }
-        }
-
-        let name = extract_backticked_name(&diag.message)?;
-        let cursor = (diag_range.start + 1).min(self.source.text().len());
-        let node = root.leaf_at_compat(cursor)?;
-        let decl_node = self.find_declaration_ancestor(&node)?;
-
-        if decl_node.kind() == SyntaxKind::LetBinding {
-            let let_binding = decl_node.cast::<ast::LetBinding>()?;
-            for binding in let_binding.kind().bindings() {
-                let binding_node = decl_node.find(binding.span())?;
-                let range = binding_node.range();
-                if self.source.text().get(range.clone())? == name {
-                    return Some(range);
-                }
-            }
-        }
-
-        None
+        Some(diag_range.clone())
     }
 
     fn expand_import_item_range(&self, mut range: Range<usize>) -> Range<usize> {
@@ -1013,14 +1003,9 @@ impl<'a> CodeActionWorker<'a> {
 enum AutofixKind {
     UnknownVariable,
     FileNotFound,
-    MarkUnusedSymbol,
 }
 
 fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
-    if msg.starts_with("unused ") {
-        return Some(AutofixKind::MarkUnusedSymbol);
-    }
-
     if source == "typst" {
         static PATTERNS: &[(&str, AutofixKind)] = &[
             ("unknown variable", AutofixKind::UnknownVariable),
@@ -1037,15 +1022,8 @@ fn match_autofix_kind(source: &str, msg: &str) -> Option<AutofixKind> {
     None
 }
 
-fn extract_backticked_name(message: &str) -> Option<&str> {
-    let start = message.find('`')?;
-    let rest = &message[start + 1..];
-    let end = rest.find('`')?;
-    Some(&rest[..end])
-}
-
 fn is_ascii_ident(ch: u8) -> bool {
-    matches!(ch, b'_' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9')
+    matches!(ch, b'_' | b'-' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9')
 }
 
 fn is_plain_identifier(name: &str) -> bool {
@@ -1059,4 +1037,18 @@ fn is_plain_identifier(name: &str) -> bool {
     }
 
     chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+fn unused_code(diag: &lsp_types::Diagnostic) -> Option<&str> {
+    match diag.code.as_ref()? {
+        lsp_types::NumberOrString::String(s) => match s.as_str() {
+            UNUSED_CODE_IMPORTED_ITEM
+            | UNUSED_CODE_MODULE_IMPORT
+            | UNUSED_CODE_MODULE
+            | UNUSED_CODE_SYMBOL
+            | UNUSED_CODE_EXPORTED_DOCUMENTED_FUNCTION => Some(s.as_str()),
+            _ => None,
+        },
+        _ => None,
+    }
 }

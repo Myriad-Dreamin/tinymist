@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use tinymist_lint::KnownIssues;
+use tinymist_lint::{DOCUMENTED_EXPORTED_FUNCTION_HINT, KnownIssues};
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
 
@@ -13,6 +13,13 @@ pub type DiagnosticsMap = HashMap<Url, EcoVec<Diagnostic>>;
 
 type TypstDiagnostic = typst::diag::SourceDiagnostic;
 type TypstSeverity = typst::diag::Severity;
+
+const UNUSED_CODE_IMPORTED_ITEM: &str = "tinymist.unused.import";
+const UNUSED_CODE_MODULE_IMPORT: &str = "tinymist.unused.module_import";
+const UNUSED_CODE_MODULE: &str = "tinymist.unused.module";
+const UNUSED_CODE_SYMBOL: &str = "tinymist.unused.symbol";
+const UNUSED_CODE_EXPORTED_DOCUMENTED_FUNCTION: &str =
+    "tinymist.unused.exported_documented_function";
 
 /// Converts a list of Typst diagnostics to LSP diagnostics,
 /// with potential refinements on the error messages.
@@ -122,13 +129,20 @@ impl<'w> DiagWorker<'w> {
         let lsp_severity = diagnostic_severity(&typst_diagnostic);
         let lsp_message = diagnostic_message(&typst_diagnostic);
         let is_unused = typst_diagnostic.message.starts_with("unused ");
+        let unused_code = is_unused
+            .then(|| self.unused_code(&typst_diagnostic))
+            .flatten();
+        let is_documented_exported_function =
+            unused_code.is_some_and(|code| code == UNUSED_CODE_EXPORTED_DOCUMENTED_FUNCTION);
 
         let diagnostic = Diagnostic {
             range: lsp_range,
             severity: Some(lsp_severity),
             message: lsp_message,
             source: Some(self.source.to_owned()),
-            tags: is_unused.then(|| vec![DiagnosticTag::UNNECESSARY]),
+            code: unused_code.map(|code| lsp_types::NumberOrString::String(code.to_string())),
+            tags: (is_unused && !is_documented_exported_function)
+                .then(|| vec![DiagnosticTag::UNNECESSARY]),
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
                     .trace
@@ -181,6 +195,31 @@ impl<'w> DiagWorker<'w> {
             Some(node) => self.ctx.to_lsp_range(node.range(), source),
             None => LspRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
         }
+    }
+
+    fn unused_code(&self, diag: &TypstDiagnostic) -> Option<&'static str> {
+        let msg = diag.message.as_str();
+        if msg.starts_with("unused import:") {
+            return Some(UNUSED_CODE_IMPORTED_ITEM);
+        }
+        if msg.starts_with("unused module import") {
+            return Some(UNUSED_CODE_MODULE_IMPORT);
+        }
+        if msg.starts_with("unused module:") {
+            return Some(UNUSED_CODE_MODULE);
+        }
+        if msg.starts_with("unused function:")
+            && diag
+                .hints
+                .iter()
+                .any(|hint| hint.as_str() == DOCUMENTED_EXPORTED_FUNCTION_HINT)
+        {
+            return Some(UNUSED_CODE_EXPORTED_DOCUMENTED_FUNCTION);
+        }
+        if msg.starts_with("unused ") {
+            return Some(UNUSED_CODE_SYMBOL);
+        }
+        None
     }
 }
 

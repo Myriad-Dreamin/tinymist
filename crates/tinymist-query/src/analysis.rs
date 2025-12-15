@@ -629,7 +629,11 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
-    use tinymist_lint::KnownIssues;
+    use tinymist_analysis::{
+        adt::interner::Interned,
+        syntax::{Decl, Expr},
+    };
+    use tinymist_lint::{DeadCodeConfig, KnownIssues};
 
     use crate::tests::*;
 
@@ -654,6 +658,56 @@ mod lint_tests {
             let source = ctx.source_by_path(&path).unwrap();
 
             let result = ctx.lint(&source, &KnownIssues::default());
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_uri_(&k), v))
+                .collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+
+    #[test]
+    fn test_dead_code_exported() {
+        snapshot_testing("dead_code_exported", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+            let ei = ctx.expr_stage(&source);
+            let ti = ctx.type_check(&source);
+
+            let has_references = |decl: &Interned<Decl>| -> bool {
+                if matches!(decl.as_ref(), Decl::PathStem(_)) {
+                    if ei.resolves.values().any(|r| {
+                        matches!(
+                            r.step.as_ref(),
+                            Some(Expr::Decl(step_decl)) if step_decl == decl
+                        )
+                    }) {
+                        return true;
+                    }
+                } else if ei
+                    .get_refs(decl.clone())
+                    .any(|(_, r)| r.as_ref().decl != *decl)
+                {
+                    return true;
+                }
+
+                false
+            };
+
+            let dead_code_config = DeadCodeConfig {
+                check_exported: true,
+                ..DeadCodeConfig::default()
+            };
+            let result = tinymist_lint::lint_file_with_dead_code_config(
+                ctx.world(),
+                &ei,
+                ti,
+                KnownIssues::default(),
+                has_references,
+                &dead_code_config,
+            )
+            .diagnostics;
+
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()

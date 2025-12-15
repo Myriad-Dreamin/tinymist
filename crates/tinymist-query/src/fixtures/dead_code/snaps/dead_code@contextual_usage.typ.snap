@@ -6,8 +6,9 @@ input_file: crates/tinymist-query/src/fixtures/dead_code/contextual_usage.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist.unused.symbol",
    "message": "unused variable: `unused_ctx`\nHint: consider removing this variable or prefixing with underscore: `_unused_ctx`",
-   "range": "2:1:2:20",
+   "range": "2:5:2:15",
    "severity": 4,
    "source": "typst",
    "tags": [
