@@ -823,8 +823,8 @@ dependencies = [
  "ecow",
  "half",
  "insta",
- "tinymist-project 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-project",
+ "tinymist-std",
  "typst",
  "typst-syntax 0.14.2",
 ]
@@ -3311,9 +3311,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo"
-version = "0.7.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "162ca3cdf58cd3ed6aa2cdbd9042df22d93848594eb729503da34bab55401637"
+version = "0.7.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c078ddf869d9438b36e1cacb65100e4514780dc1#c078ddf869d9438b36e1cacb65100e4514780dc1"
 dependencies = [
  "base64",
  "bitvec",
@@ -3331,16 +3330,15 @@ dependencies = [
  "serde_with",
  "siphasher",
  "tiny-skia-path",
- "tinymist-std 0.14.0",
- "tinymist-world 0.14.0",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
 ]
 
 [[package]]
 name = "reflexo-typst"
-version = "0.7.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cd5adb0376231ebe8f759bcec940a82eaa5790d63e4bf21bd34c3d017a72833"
+version = "0.7.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c078ddf869d9438b36e1cacb65100e4514780dc1#c078ddf869d9438b36e1cacb65100e4514780dc1"
 dependencies = [
  "codespan-reporting",
  "comemo",
@@ -3360,9 +3358,9 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-project 0.14.0",
- "tinymist-task 0.14.0",
- "tinymist-world 0.14.0",
+ "tinymist-project",
+ "tinymist-task",
+ "tinymist-world",
  "tokio",
  "typst",
  "typst-eval",
@@ -3371,9 +3369,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo-typst2vec"
-version = "0.7.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f54fa9f06eb87731714bb853406889e776dcf4bea2b986a97a2520c140d49449"
+version = "0.7.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c078ddf869d9438b36e1cacb65100e4514780dc1#c078ddf869d9438b36e1cacb65100e4514780dc1"
 dependencies = [
  "bitvec",
  "comemo",
@@ -3400,9 +3397,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo-vec2svg"
-version = "0.7.0-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68eaf03d725daab95fef696642984735491cb4e2631047a0d480fd791896a49e"
+version = "0.7.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=c078ddf869d9438b36e1cacb65100e4514780dc1#c078ddf869d9438b36e1cacb65100e4514780dc1"
 dependencies = [
  "base64",
  "comemo",
@@ -4164,7 +4160,7 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-std",
  "tokio",
  "tokio-util",
  "wasm-bindgen",
@@ -4290,7 +4286,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sync-ls",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-std",
 ]
 
 [[package]]
@@ -4453,13 +4449,13 @@ dependencies = [
  "temp-env",
  "tinymist-assets 0.14.6-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
- "tinymist-l10n 0.14.6-rc2",
+ "tinymist-l10n",
  "tinymist-preview",
- "tinymist-project 0.14.6-rc2",
+ "tinymist-project",
  "tinymist-query",
  "tinymist-render",
- "tinymist-std 0.14.6-rc2",
- "tinymist-task 0.14.6-rc2",
+ "tinymist-std",
+ "tinymist-task",
  "tokio",
  "tokio-util",
  "toml",
@@ -4470,7 +4466,7 @@ dependencies = [
  "typst-html",
  "typst-pdf",
  "typst-render",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "typst-svg",
  "typst-timing 0.14.2",
  "typstfmt",
@@ -4502,14 +4498,14 @@ dependencies = [
  "serde",
  "serde_yaml",
  "strum",
- "tinymist-derive 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-derive",
+ "tinymist-std",
+ "tinymist-world",
  "toml",
  "triomphe",
  "typst",
  "typst-macros",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "typst-timing 0.14.2",
  "unscanny",
 ]
@@ -4579,13 +4575,13 @@ dependencies = [
  "tinymist",
  "tinymist-assets 0.14.6-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
- "tinymist-l10n 0.14.6-rc2",
+ "tinymist-l10n",
  "tinymist-preview",
- "tinymist-project 0.14.6-rc2",
+ "tinymist-project",
  "tinymist-query",
  "tinymist-render",
- "tinymist-std 0.14.6-rc2",
- "tinymist-task 0.14.6-rc2",
+ "tinymist-std",
+ "tinymist-task",
  "tokio",
  "tokio-util",
  "toml",
@@ -4596,7 +4592,7 @@ dependencies = [
  "typst-html",
  "typst-pdf",
  "typst-render",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "typst-svg",
  "typst-timing 0.14.2",
  "typstfmt",
@@ -4619,11 +4615,11 @@ dependencies = [
  "serde_json",
  "tinymist-analysis",
  "tinymist-debug",
- "tinymist-std 0.14.6-rc2",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
  "typst-library",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
 ]
 
 [[package]]
@@ -4638,21 +4634,11 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-analysis",
- "tinymist-std 0.14.6-rc2",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-std",
+ "tinymist-world",
  "typst",
  "typst-library",
- "typst-shim 0.14.6-rc2",
-]
-
-[[package]]
-name = "tinymist-derive"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "057c411697250caa33073c5da43be8ecd7c3ac32c6808c5931263ae7e94ec8c2"
-dependencies = [
- "quote",
- "syn 2.0.104",
+ "typst-shim",
 ]
 
 [[package]]
@@ -4661,21 +4647,6 @@ version = "0.14.6-rc2"
 dependencies = [
  "quote",
  "syn 2.0.104",
-]
-
-[[package]]
-name = "tinymist-l10n"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31f90a326c57f6dfbd6473d3ceec2259783cc35da1626659b7d9d1abc9752f31"
-dependencies = [
- "anyhow",
- "clap",
- "ecow",
- "rayon",
- "rustc-hash 2.1.1",
- "serde_json",
- "walkdir",
 ]
 
 [[package]]
@@ -4700,37 +4671,10 @@ dependencies = [
  "insta",
  "rayon",
  "tinymist-analysis",
- "tinymist-project 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-project",
+ "tinymist-std",
  "typst",
  "typst-library",
-]
-
-[[package]]
-name = "tinymist-package"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457399bf43d18f46dc5d9efefd4ae36998ac918e61825af5d6c13d473005d804"
-dependencies = [
- "base64",
- "comemo",
- "dirs",
- "ecow",
- "flate2",
- "js-sys",
- "log",
- "parking_lot",
- "rayon",
- "reqwest",
- "serde",
- "serde_json",
- "tar",
- "tinymist-std 0.14.0",
- "toml",
- "typst",
- "walkdir",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4752,7 +4696,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-std",
  "toml",
  "typst",
  "walkdir",
@@ -4777,42 +4721,12 @@ dependencies = [
  "serde",
  "serde_json",
  "tinymist-assets 0.14.6-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-std",
  "tokio",
  "typst",
  "typst-assets",
  "typst-macros",
  "typst-timing 0.14.2",
-]
-
-[[package]]
-name = "tinymist-project"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55362eaf0be1555e80f02a778c2fe01d00a7611ab24115c7fc60cec220274c2a"
-dependencies = [
- "anyhow",
- "clap",
- "comemo",
- "dirs",
- "ecow",
- "log",
- "notify",
- "parking_lot",
- "rayon",
- "rpds",
- "semver",
- "serde",
- "serde_json",
- "tinymist-derive 0.14.0",
- "tinymist-l10n 0.14.0",
- "tinymist-std 0.14.0",
- "tinymist-task 0.14.0",
- "tinymist-world 0.14.0",
- "tokio",
- "toml",
- "typst",
- "typst-assets",
 ]
 
 [[package]]
@@ -4833,11 +4747,11 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "tinymist-derive 0.14.6-rc2",
- "tinymist-l10n 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
- "tinymist-task 0.14.6-rc2",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-derive",
+ "tinymist-l10n",
+ "tinymist-std",
+ "tinymist-task",
+ "tinymist-world",
  "tokio",
  "toml",
  "typst",
@@ -4878,13 +4792,13 @@ dependencies = [
  "siphasher",
  "strum",
  "tinymist-analysis",
- "tinymist-derive 0.14.6-rc2",
- "tinymist-l10n 0.14.6-rc2",
+ "tinymist-derive",
+ "tinymist-l10n",
  "tinymist-lint",
- "tinymist-project 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-project",
+ "tinymist-std",
  "tinymist-tests",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-world",
  "toml",
  "ttf-parser",
  "typlite",
@@ -4892,7 +4806,7 @@ dependencies = [
  "typst-assets",
  "typst-library",
  "typst-macros",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "typst-timing 0.14.2",
  "unscanny",
  "walkdir",
@@ -4909,46 +4823,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "tinymist-query",
- "tinymist-std 0.14.6-rc2",
-]
-
-[[package]]
-name = "tinymist-std"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ac648385b83f167b3d110cfd49428b9b9dc7b64e2423cd17eb25e4c7b056ebb"
-dependencies = [
- "anyhow",
- "base64",
- "bitvec",
- "comemo",
- "core-foundation 0.10.1",
- "dashmap",
- "ecow",
- "fxhash",
- "js-sys",
- "libc",
- "log",
- "lsp-types",
- "parking_lot",
- "path-clean",
- "pathdiff",
- "rkyv",
- "rustc-hash 2.1.1",
- "same-file",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_with",
- "siphasher",
- "tempfile",
- "time",
- "typst",
- "typst-html",
- "typst-shim 0.14.0",
- "wasm-bindgen",
- "web-time",
- "windows-sys 0.61.2",
+ "tinymist-std",
 ]
 
 [[package]]
@@ -4984,45 +4859,10 @@ dependencies = [
  "time",
  "typst",
  "typst-html",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "wasm-bindgen",
  "web-time",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "tinymist-task"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "853e65d2e03b5cf50a8186321d2d9c103cf84fbe0dbb56de4bb695f7f09ca993"
-dependencies = [
- "anyhow",
- "clap",
- "comemo",
- "dirs",
- "ecow",
- "log",
- "notify",
- "parking_lot",
- "rayon",
- "rpds",
- "semver",
- "serde",
- "serde_json",
- "serde_yaml",
- "tinymist-derive 0.14.0",
- "tinymist-std 0.14.0",
- "tinymist-world 0.14.0",
- "tokio",
- "toml",
- "typst",
- "typst-assets",
- "typst-eval",
- "typst-html",
- "typst-pdf",
- "typst-render",
- "typst-shim 0.14.0",
- "typst-svg",
 ]
 
 [[package]]
@@ -5043,9 +4883,9 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "tinymist-derive 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
- "tinymist-world 0.14.6-rc2",
+ "tinymist-derive",
+ "tinymist-std",
+ "tinymist-world",
  "tokio",
  "toml",
  "typst",
@@ -5054,7 +4894,7 @@ dependencies = [
  "typst-html",
  "typst-pdf",
  "typst-render",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "typst-svg",
 ]
 
@@ -5066,29 +4906,9 @@ dependencies = [
  "insta",
  "rayon",
  "tinymist-analysis",
- "tinymist-project 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-project",
+ "tinymist-std",
  "typst",
-]
-
-[[package]]
-name = "tinymist-vfs"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84c247128aff35a5a8440c6d305bd165b735f52a47cff25bfc1a251bf52480b2"
-dependencies = [
- "comemo",
- "ecow",
- "indexmap 2.12.0",
- "js-sys",
- "log",
- "nohash-hasher",
- "parking_lot",
- "rpds",
- "tinymist-std 0.14.0",
- "typst",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -5103,48 +4923,8 @@ dependencies = [
  "nohash-hasher",
  "parking_lot",
  "rpds",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-std",
  "typst",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "tinymist-world"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8b62bbbd56a1cf3ddfa97f094f523c3e7b37ffc72e76fddf0978a477b27e105"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "codespan-reporting",
- "comemo",
- "dirs",
- "ecow",
- "flate2",
- "fontdb",
- "hex",
- "js-sys",
- "log",
- "lsp-types",
- "parking_lot",
- "rayon",
- "reqwest",
- "rpds",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "serde_with",
- "sha2",
- "strum",
- "tar",
- "tinymist-package 0.14.0",
- "tinymist-std 0.14.0",
- "tinymist-vfs 0.14.0",
- "ttf-parser",
- "typst",
- "typst-assets",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -5177,13 +4957,13 @@ dependencies = [
  "sha2",
  "strum",
  "tar",
- "tinymist-package 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
- "tinymist-vfs 0.14.6-rc2",
+ "tinymist-package",
+ "tinymist-std",
+ "tinymist-vfs",
  "ttf-parser",
  "typst",
  "typst-assets",
- "typst-shim 0.14.6-rc2",
+ "typst-shim",
  "wasm-bindgen",
  "web-sys",
 ]
@@ -5492,9 +5272,9 @@ dependencies = [
  "log",
  "regex",
  "resvg",
- "tinymist-derive 0.14.6-rc2",
- "tinymist-project 0.14.6-rc2",
- "tinymist-std 0.14.6-rc2",
+ "tinymist-derive",
+ "tinymist-project",
+ "tinymist-std",
  "tinymist-tests",
  "typst",
  "typst-html",
@@ -5750,19 +5530,6 @@ dependencies = [
  "typst-library",
  "typst-macros",
  "typst-timing 0.14.2",
-]
-
-[[package]]
-name = "typst-shim"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c789bc82265613edafff63039b4180d53aa843360e3375ab32c320224320e96a"
-dependencies = [
- "cfg-if",
- "comemo",
- "typst",
- "typst-eval",
- "typst-syntax 0.14.2",
 ]
 
 [[package]]
