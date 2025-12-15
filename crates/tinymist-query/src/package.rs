@@ -209,10 +209,10 @@ pub fn list_package(
             };
             let ns = dir.file_name();
             let ns = ns.to_string_lossy();
-            if let Some(matching_ns) = &matching_ns {
-                if matching_ns.as_str() != ns.as_ref() {
-                    continue;
-                }
+            if let Some(matching_ns) = &matching_ns
+                && matching_ns.as_str() == ns.as_ref()
+            {
+                continue;
             }
             let local_path = dir.path();
             search_in_dir(local_path, ns.into());
