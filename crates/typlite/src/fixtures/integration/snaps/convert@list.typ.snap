@@ -1,6 +1,6 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/list.typ
 ---
 <!DOCTYPE html>
@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/list.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><ul><li>Some <span><m1strong>item</m1strong></span></li><li>Another <span><m1emph>item</m1emph></span></li></ul></m1document></body>
+  <body><m1document><m1list tight="true"><m1item>Some <span><m1strong>item</m1strong></span></m1item><m1item>Another <span><m1emph>item</m1emph></span></m1item></m1list></m1document></body>
 </html>
 
 =====

@@ -1,38 +1,39 @@
-//! HTML parser core, containing main structures and general parsing logic
+//! HTML parser core, containing main structures and general parsing logic.
 
 use std::sync::Arc;
 
 use typst::diag::SourceDiagnostic;
 use typst_syntax::Span;
 
-use cmark_writer::WriteResult;
-use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
-use cmark_writer::writer::InlineWriterProxy;
 use ecow::EcoString;
 use tinymist_project::LspWorld;
-use typst_html::{HtmlElement, HtmlNode, tag};
+use typst_html::{HtmlElement, HtmlNode, HtmlTag, tag};
 
 use crate::Result;
 use crate::TypliteFeat;
-use crate::attributes::{AlertsAttr, HeadingAttr, RawAttr, TypliteAttrsParser, md_attr};
-use crate::common::{AlertNode, CenterNode, VerbatimNode};
+use crate::attributes::{
+    AlertsAttr, EnumAttr, EquationAttr, HeadingAttr, ListAttr, RawAttr, TermsAttr,
+    TypliteAttrsParser, md_attr,
+};
 use crate::diagnostics::WarningCollector;
+use crate::ir::{self, Block, CodeBlockType, Inline, IrNode};
 use crate::tags::md_tag;
 
 use super::{list::ListParser, table::TableParser};
 
-/// HTML to AST parser implementation
-pub struct HtmlToAstParser {
+/// HTML to IR parser implementation.
+pub struct HtmlToIrParser {
     pub asset_counter: usize,
     pub feat: TypliteFeat,
     pub world: Arc<LspWorld>,
     pub list_level: usize,
-    pub blocks: Vec<Node>,
-    pub inline_buffer: Vec<Node>,
+    pub blocks: Vec<Block>,
+    pub inline_buffer: Vec<Inline>,
+    pub element_stack: Vec<HtmlTag>,
     pub(crate) warnings: WarningCollector,
 }
 
-impl HtmlToAstParser {
+impl HtmlToIrParser {
     pub(crate) fn new(
         feat: TypliteFeat,
         world: &Arc<LspWorld>,
@@ -45,6 +46,7 @@ impl HtmlToAstParser {
             list_level: 0,
             blocks: Vec::new(),
             inline_buffer: Vec::new(),
+            element_stack: Vec::new(),
             warnings,
         }
     }
@@ -65,28 +67,31 @@ impl HtmlToAstParser {
 
             tag::strong | md_tag::strong => self.convert_strong(element),
             tag::em | md_tag::emph => self.convert_emphasis(element),
-            tag::mark => self.convert_highlight(element),
-            tag::s => self.convert_strikethrough(element),
+            tag::mark | md_tag::highlight => self.convert_highlight(element),
+            tag::s | md_tag::strike => self.convert_strikethrough(element),
 
             tag::br => {
-                self.inline_buffer.push(Node::HardBreak);
+                self.inline_buffer.push(Inline::HardBreak);
+                Ok(())
+            }
+
+            md_tag::pagebreak => {
+                self.flush_inline_buffer();
+                self.blocks.push(Block::ThematicBreak);
                 Ok(())
             }
 
             tag::ol => {
                 self.flush_inline_buffer();
-                let items = ListParser::convert_list(self, element);
-                self.blocks.push(Node::OrderedList {
-                    start: 1,
-                    items: items?,
-                });
+                let items = ListParser::convert_list(self, element)?;
+                self.blocks.push(Block::OrderedList { start: 1, items });
                 Ok(())
             }
 
             tag::ul => {
                 self.flush_inline_buffer();
-                let items = ListParser::convert_list(self, element);
-                self.blocks.push(Node::UnorderedList(items?));
+                let items = ListParser::convert_list(self, element)?;
+                self.blocks.push(Block::UnorderedList(items));
                 Ok(())
             }
 
@@ -95,12 +100,36 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
+            md_tag::list => {
+                self.flush_inline_buffer();
+                let attrs = ListAttr::parse(&element.attrs)?;
+                let node = ListParser::convert_m1_list(self, element, &attrs)?;
+                self.blocks.push(node);
+                Ok(())
+            }
+
+            md_tag::r#enum => {
+                self.flush_inline_buffer();
+                let attrs = EnumAttr::parse(&element.attrs)?;
+                let node = ListParser::convert_m1_enum(self, element, &attrs)?;
+                self.blocks.push(node);
+                Ok(())
+            }
+
+            md_tag::terms => {
+                self.flush_inline_buffer();
+                let attrs = TermsAttr::parse(&element.attrs)?;
+                self.convert_terms(element, &attrs)?;
+                Ok(())
+            }
+
             md_tag::heading => {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
                 self.convert_children(element)?;
-                self.flush_inline_buffer_as_block(|content| {
-                    Node::heading(attrs.level as u8 + 1, content)
+                self.flush_inline_buffer_as_block(|content| Block::Heading {
+                    level: attrs.level as u8 + 1,
+                    content,
                 });
                 Ok(())
             }
@@ -109,10 +138,13 @@ impl HtmlToAstParser {
                 let attrs = RawAttr::parse(&element.attrs)?;
                 if attrs.block {
                     self.flush_inline_buffer();
-                    self.blocks
-                        .push(Node::code_block(Some(attrs.lang), attrs.text));
+                    self.blocks.push(Block::CodeBlock {
+                        language: Some(attrs.lang),
+                        content: attrs.text,
+                        block_type: CodeBlockType::Fenced,
+                    });
                 } else {
-                    self.inline_buffer.push(Node::InlineCode(attrs.text));
+                    self.inline_buffer.push(Inline::InlineCode(attrs.text));
                 }
                 Ok(())
             }
@@ -121,12 +153,12 @@ impl HtmlToAstParser {
                 let prev_blocks = std::mem::take(&mut self.blocks);
                 self.flush_inline_buffer();
                 self.convert_children(element)?;
-                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
+                let content = Block::Paragraph(std::mem::take(&mut self.inline_buffer));
                 let mut quote = std::mem::take(&mut self.blocks);
                 quote.push(content);
                 self.blocks.clear();
                 self.blocks.extend(prev_blocks);
-                self.blocks.push(Node::BlockQuote(quote));
+                self.blocks.push(Block::BlockQuote(quote));
                 Ok(())
             }
 
@@ -135,7 +167,7 @@ impl HtmlToAstParser {
             md_tag::image => self.convert_image(element),
 
             md_tag::linebreak => {
-                self.inline_buffer.push(Node::HardBreak);
+                self.inline_buffer.push(Inline::HardBreak);
                 Ok(())
             }
 
@@ -165,12 +197,14 @@ impl HtmlToAstParser {
                     self.convert_children(element)?;
                     let content = std::mem::take(&mut self.inline_buffer);
                     self.blocks
-                        .push(Node::Custom(Box::new(CenterNode::new(content))));
+                        .push(Block::Center(Box::new(Block::Paragraph(content))));
                 } else {
                     self.convert_children(element)?;
                 }
                 Ok(())
             }
+
+            md_tag::equation => self.convert_equation(element),
 
             md_tag::alerts => {
                 self.flush_inline_buffer();
@@ -178,28 +212,27 @@ impl HtmlToAstParser {
                 let prev_blocks = std::mem::take(&mut self.blocks);
                 self.flush_inline_buffer();
                 self.convert_children(element)?;
-                let content = Node::Paragraph(std::mem::take(&mut self.inline_buffer));
+                let content = Block::Paragraph(std::mem::take(&mut self.inline_buffer));
                 let mut quote = std::mem::take(&mut self.blocks);
                 quote.push(content);
                 self.blocks.clear();
                 self.blocks.extend(prev_blocks);
-                self.blocks.push(Node::Custom(Box::new(AlertNode {
+                self.blocks.push(Block::Alert {
                     content: quote,
                     class: attrs.class,
-                })));
+                });
                 Ok(())
             }
 
             md_tag::verbatim => {
-                self.inline_buffer.push(Node::Custom(Box::new(VerbatimNode {
-                    content: element
-                        .attrs
-                        .0
-                        .iter()
-                        .find(|(name, _)| *name == md_attr::src)
-                        .map(|(_, value)| value.clone())
-                        .unwrap_or_default(),
-                })));
+                let content = element
+                    .attrs
+                    .0
+                    .iter()
+                    .find(|(name, _)| *name == md_attr::src)
+                    .map(|(_, value)| value.clone())
+                    .unwrap_or_default();
+                self.inline_buffer.push(Inline::Verbatim(content));
                 Ok(())
             }
 
@@ -207,12 +240,6 @@ impl HtmlToAstParser {
                 let tag_name = element.tag.resolve().to_string();
 
                 if !tag_name.starts_with("m1") {
-                    // self.warn_at(
-                    //     Some(element.span),
-                    //     eco_format!(
-                    //         "unsupported HTML element `<{tag_name}>`; exported as raw HTML"
-                    //     ),
-                    // );
                     let html_element = self.create_html_element(element)?;
                     self.inline_buffer.push(html_element);
                 } else {
@@ -223,13 +250,13 @@ impl HtmlToAstParser {
         }
     }
 
-    /// Create a CommonMark HTML element from the given HTML element    
-    pub(crate) fn create_html_element(&mut self, element: &HtmlElement) -> Result<Node> {
+    /// Create a semantic HTML element from the given HTML element.
+    pub(crate) fn create_html_element(&mut self, element: &HtmlElement) -> Result<Inline> {
         let attributes = element
             .attrs
             .0
             .iter()
-            .map(|(name, value)| HtmlAttribute {
+            .map(|(name, value)| ir::HtmlAttribute {
                 name: name.resolve().to_string().into(),
                 value: value.clone(),
             })
@@ -237,13 +264,15 @@ impl HtmlToAstParser {
 
         let (inline_nodes, block_nodes) = self.capture_children(element)?;
 
-        let mut children = Vec::new();
-        if !inline_nodes.is_empty() {
-            children.extend(inline_nodes);
+        let mut children: Vec<IrNode> = Vec::new();
+        for inline in inline_nodes {
+            children.push(IrNode::Inline(inline));
         }
-        children.extend(block_nodes);
+        for block in block_nodes {
+            children.push(IrNode::Block(block));
+        }
 
-        Ok(Node::HtmlElement(CmarkHtmlElement {
+        Ok(Inline::HtmlElement(ir::HtmlElement {
             tag: element.tag.resolve().to_string().into(),
             attributes,
             children,
@@ -254,22 +283,22 @@ impl HtmlToAstParser {
     pub fn flush_inline_buffer(&mut self) {
         if !self.inline_buffer.is_empty() {
             self.blocks
-                .push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
+                .push(Block::Paragraph(std::mem::take(&mut self.inline_buffer)));
         }
     }
 
-    pub fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Node>) -> Node) {
+    pub fn flush_inline_buffer_as_block(&mut self, make_block: impl FnOnce(Vec<Inline>) -> Block) {
         if !self.inline_buffer.is_empty() {
             self.blocks
                 .push(make_block(std::mem::take(&mut self.inline_buffer)));
         }
     }
 
-    pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
+    fn convert_children_impl(&mut self, element: &HtmlElement) -> Result<()> {
         for child in &element.children {
             match child {
                 HtmlNode::Text(text, _) => {
-                    self.inline_buffer.push(Node::Text(text.clone()));
+                    self.inline_buffer.push(Inline::Text(text.clone()));
                 }
                 HtmlNode::Element(element) => {
                     self.convert_element(element)?;
@@ -284,9 +313,16 @@ impl HtmlToAstParser {
         Ok(())
     }
 
+    pub fn convert_children(&mut self, element: &HtmlElement) -> Result<()> {
+        self.element_stack.push(element.tag);
+        let result = self.convert_children_impl(element);
+        self.element_stack.pop();
+        result
+    }
+
     pub fn convert_children_into(
         &mut self,
-        target: &mut Vec<Node>,
+        target: &mut Vec<Inline>,
         element: &HtmlElement,
     ) -> Result<()> {
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
@@ -297,7 +333,7 @@ impl HtmlToAstParser {
     }
 
     /// Convert element children while capturing both inline and block outputs.
-    pub fn capture_children(&mut self, element: &HtmlElement) -> Result<(Vec<Node>, Vec<Node>)> {
+    pub fn capture_children(&mut self, element: &HtmlElement) -> Result<(Vec<Inline>, Vec<Block>)> {
         let prev_buffer = std::mem::take(&mut self.inline_buffer);
         let prev_blocks = std::mem::take(&mut self.blocks);
 
@@ -312,6 +348,7 @@ impl HtmlToAstParser {
         Ok((inline, blocks))
     }
 
+    #[allow(dead_code)]
     pub(crate) fn warn_at(&mut self, span: Option<Span>, message: EcoString) {
         let span = span.unwrap_or_else(Span::detached);
         let span = self
@@ -328,45 +365,56 @@ impl HtmlToAstParser {
     fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<Span> {
         info.remap_span(self.world.as_ref(), span)
     }
-}
 
-#[derive(Debug, Clone)]
-pub(crate) struct Comment(pub EcoString);
+    pub fn convert_terms(&mut self, element: &HtmlElement, _attrs: &TermsAttr) -> Result<()> {
+        for child in &element.children {
+            if let HtmlNode::Element(item) = child
+                && item.tag == md_tag::item
+            {
+                let mut term_nodes = Vec::new();
+                let mut desc_nodes = Vec::new();
 
-impl CustomNode for Comment {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
+                for part in &item.children {
+                    if let HtmlNode::Element(part_elem) = part {
+                        if part_elem.tag == md_tag::term_entry {
+                            self.convert_children_into(&mut term_nodes, part_elem)?;
+                        } else if part_elem.tag.resolve().as_str() == "m1description" {
+                            self.convert_children_into(&mut desc_nodes, part_elem)?;
+                        }
+                    }
+                }
 
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
-    }
+                if term_nodes.is_empty() && desc_nodes.is_empty() {
+                    continue;
+                }
 
-    fn write_inline(&self, writer: &mut InlineWriterProxy) -> WriteResult<()> {
-        writer.write_str("<!-- ")?;
-        writer.write_str(&self.0)?;
-        writer.write_str(" -->")?;
+                let mut paragraph = Vec::new();
+                if !term_nodes.is_empty() {
+                    paragraph.push(Inline::Strong(term_nodes));
+                    paragraph.push(Inline::Text(EcoString::from(": ")));
+                }
+                paragraph.extend(desc_nodes);
+                self.blocks.push(Block::Paragraph(paragraph));
+            }
+        }
+
         Ok(())
     }
 
-    fn clone_box(&self) -> Box<dyn CustomNode> {
-        Box::new(self.clone())
-    }
-
-    fn eq_box(&self, other: &dyn CustomNode) -> bool {
-        if let Some(other) = other.as_any().downcast_ref::<Comment>() {
-            self.0 == other.0
+    pub fn convert_equation(&mut self, element: &HtmlElement) -> Result<()> {
+        let attrs = EquationAttr::parse(&element.attrs)?;
+        if attrs.block {
+            self.flush_inline_buffer();
+            self.convert_children(element)?;
+            let content = std::mem::take(&mut self.inline_buffer);
+            self.blocks
+                .push(Block::Center(Box::new(Block::Paragraph(content))));
         } else {
-            false
+            self.convert_children(element)?;
         }
+        Ok(())
     }
 
-    fn is_block(&self) -> bool {
-        false
-    }
-}
-
-impl HtmlToAstParser {
     pub fn is_block_element(element: &HtmlElement) -> bool {
         matches!(
             element.tag,
@@ -401,14 +449,28 @@ impl HtmlToAstParser {
         )
     }
 
-    pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Node>> {
+    /// Process an element that appears in a list item, returning inline nodes.
+    pub fn process_list_item_element(&mut self, element: &HtmlElement) -> Result<Vec<Inline>> {
         if element.tag == tag::ul || element.tag == tag::ol {
             let items = super::list::ListParser::convert_list(self, element)?;
-            if element.tag == tag::ul {
-                return Ok(vec![Node::UnorderedList(items)]);
+            let block = if element.tag == tag::ul {
+                Block::UnorderedList(items)
             } else {
-                return Ok(vec![Node::OrderedList { start: 1, items }]);
-            }
+                Block::OrderedList { start: 1, items }
+            };
+            return Ok(vec![Inline::EmbeddedBlock(Box::new(block))]);
+        }
+
+        if element.tag == md_tag::list {
+            let attrs = ListAttr::parse(&element.attrs)?;
+            let node = super::list::ListParser::convert_m1_list(self, element, &attrs)?;
+            return Ok(vec![Inline::EmbeddedBlock(Box::new(node))]);
+        }
+
+        if element.tag == md_tag::r#enum {
+            let attrs = EnumAttr::parse(&element.attrs)?;
+            let node = super::list::ListParser::convert_m1_enum(self, element, &attrs)?;
+            return Ok(vec![Inline::EmbeddedBlock(Box::new(node))]);
         }
 
         let prev_blocks = std::mem::take(&mut self.blocks);
@@ -418,10 +480,13 @@ impl HtmlToAstParser {
         let mut result = Vec::new();
 
         if !self.blocks.is_empty() {
-            result.extend(std::mem::take(&mut self.blocks));
+            for block in std::mem::take(&mut self.blocks) {
+                result.push(Inline::EmbeddedBlock(Box::new(block)));
+            }
         } else if !self.inline_buffer.is_empty() {
             if Self::is_block_element(element) {
-                result.push(Node::Paragraph(std::mem::take(&mut self.inline_buffer)));
+                let paragraph = Block::Paragraph(std::mem::take(&mut self.inline_buffer));
+                result.push(Inline::EmbeddedBlock(Box::new(paragraph)));
             } else {
                 result = std::mem::take(&mut self.inline_buffer);
             }
@@ -433,13 +498,18 @@ impl HtmlToAstParser {
         Ok(result)
     }
 
-    pub fn parse(mut self, root: &HtmlElement) -> Result<Node> {
+    /// Parse HTML root element into semantic IR.
+    pub fn parse_ir(mut self, root: &HtmlElement) -> Result<ir::Document> {
         self.blocks.clear();
         self.inline_buffer.clear();
 
         self.convert_element(root)?;
         self.flush_inline_buffer();
 
-        Ok(Node::Document(self.blocks))
+        Ok(ir::Document {
+            blocks: self.blocks,
+        })
     }
 }
+
+// The previous `HtmlToAstParser` compatibility wrapper has been removed.

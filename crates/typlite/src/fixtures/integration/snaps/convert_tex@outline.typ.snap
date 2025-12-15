@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/outline.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1outline><nav role="doc-toc"><m1heading level="1"><span style="display: inline-block">Contents</span></m1heading><ol style="list-style-type: none"><li><div><m1outentry level="2"><m1heading level="2"><span style="display: inline-block">Heading 1</span></m1heading></m1outentry></div><ol style="list-style-type: none"><li><m1outentry level="3"><m1heading level="3"><span style="display: inline-block">Heading 2</span></m1heading></m1outentry></li></ol></li></ol></nav></m1outline><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">Heading 1</span></m1heading><m1parbreak></m1parbreak><m1heading level="3"><span style="display: inline-block">Heading 2</span></m1heading><m1parbreak></m1parbreak><p><span><m1link dest="https://example.com">This is a link to example.com</m1link></span></p><m1parbreak></m1parbreak><p>Inline <span><m1raw lang block="false" text="code"><code>code</code></m1raw></span> has <span><m1raw lang block="false" text="back-ticks around"><code>back-ticks around</code></m1raw></span> it.</p><m1parbreak></m1parbreak><m1raw lang="cs" block="true" text="using System.IO.Compression;
+  <body><m1document><nav role="doc-toc"><m1heading level="1">Contents</m1heading><ol style="list-style-type: none"><li><div><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 1</m1body></m1link></div><ol style="list-style-type: none"><li><m1link><m1dest kind="location" dest="location"></m1dest><m1body>Heading 2</m1body></m1link></li></ol></li></ol></nav><m1parbreak></m1parbreak><m1heading id="loc-1" level="2">Heading 1</m1heading><m1parbreak></m1parbreak><m1heading id="loc-2" level="3">Heading 2</m1heading><m1parbreak></m1parbreak><m1link><m1dest kind="url" dest="https://example.com"></m1dest><m1body>This is a link to example.com</m1body></m1link><m1parbreak></m1parbreak><p>Inline<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="code" block lang></m1raw></span> has<span style="white-space: pre-wrap">&#x20;</span><span><m1raw text="back-ticks around" block lang></m1raw></span> it.</p><m1parbreak></m1parbreak><m1raw text="using System.IO.Compression;
 
 #pragma warning disable 414, 3021
 
@@ -24,19 +24,17 @@ namespace MyApplication
             return new List<int>(new int[] { 1, 2, 3 })
         }
     }
-}"><pre><code data-lang="cs"><p><span style="color: #d73948">using</span> System.IO.Compression;</p><m1linebreak></m1linebreak><m1linebreak></m1linebreak><p><span style="color: #d73948">#</span><span style="color: #d73948">pragma</span> <span style="color: #d73948">warning</span> <span style="color: #d73948">disable</span> 414, 3021</p><m1linebreak></m1linebreak><m1linebreak></m1linebreak><p><span style="color: #d73948">namespace</span> <span style="color: #4b69c6">MyApplication</span></p><m1linebreak></m1linebreak><p>{</p><m1linebreak></m1linebreak><p>    <span style="color: #301414">[</span><span style="color: #301414">Obsolete</span><span style="color: #301414">(</span><span style="color: #198810">"</span><span style="color: #198810">...</span><span style="color: #198810">"</span><span style="color: #301414">)</span><span style="color: #301414">]</span></p><m1linebreak></m1linebreak><p>    <span style="color: #d73948">class</span> <span style="color: #4b69c6">Program</span> : <span style="color: #8b41b1">IInterface</span></p><m1linebreak></m1linebreak><p>    {</p><m1linebreak></m1linebreak><p>        <span style="color: #d73948">public</span> <span style="color: #d73948">static</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>> <span style="color: #4b69c6">JustDoIt</span>(<span style="color: #d73948">int</span> count)</p><m1linebreak></m1linebreak><p>        {</p><m1linebreak></m1linebreak><p>            Console.<span style="color: #4b69c6">WriteLine</span>(<span style="color: #198810">$"</span><span style="color: #198810">Hello </span>{Name}<span style="color: #198810">!</span><span style="color: #198810">"</span>);</p><m1linebreak></m1linebreak><p>            <span style="color: #d73948">return</span> <span style="color: #d73948">new</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>>(<span style="color: #d73948">new</span> <span style="color: #d73948">int</span>[] { <span style="color: #b60157">1</span>, <span style="color: #b60157">2</span>, <span style="color: #b60157">3</span> })</p><m1linebreak></m1linebreak><p>        }</p><m1linebreak></m1linebreak><p>    }</p><m1linebreak></m1linebreak><p>}</p></code></pre></m1raw><m1parbreak></m1parbreak><p>Math inline:</p><m1eqinline>redacted-frame</m1eqinline><p>and block:</p><m1eqblock>redacted-frame</m1eqblock><m1parbreak></m1parbreak><ul><li>First item</li><li><p>Second item</p><ol><li>First sub-item</li><li><p>Second sub-item</p><ul><li>First sub-sub-item</li></ul></li></ol></li></ul><m1parbreak></m1parbreak><dl><dt>First term</dt><dd>First definition</dd></dl><m1parbreak></m1parbreak><m1table><table><tr><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td></tr></table></m1table></m1document></body>
+}" block="true" lang="cs"></m1raw><m1parbreak></m1parbreak><p>Math inline: <span><m1equation block>redacted-frame</m1equation></span> and block:</p><m1equation block="true">redacted-frame</m1equation><m1parbreak></m1parbreak><m1list tight="true"><m1item>First item</m1item><m1item><p>Second item</p><m1enum reversed start="auto" tight="true"><m1item value>First sub-item</m1item><m1item value><p>Second sub-item</p><m1list tight="true"><m1item>First sub-sub-item</m1item></m1list></m1item></m1enum></m1item></m1list><m1parbreak></m1parbreak><m1terms tight="true"><m1item><m1term>First term</m1term><m1description>First definition</m1description></m1item></m1terms><m1parbreak></m1parbreak><m1table columns="20" align="auto"><m1cell colspan="1" rowspan="1" align="auto">0</m1cell><m1cell colspan="1" rowspan="1" align="auto">1</m1cell><m1cell colspan="1" rowspan="1" align="auto">2</m1cell><m1cell colspan="1" rowspan="1" align="auto">3</m1cell><m1cell colspan="1" rowspan="1" align="auto">4</m1cell><m1cell colspan="1" rowspan="1" align="auto">5</m1cell><m1cell colspan="1" rowspan="1" align="auto">6</m1cell><m1cell colspan="1" rowspan="1" align="auto">7</m1cell><m1cell colspan="1" rowspan="1" align="auto">8</m1cell><m1cell colspan="1" rowspan="1" align="auto">9</m1cell><m1cell colspan="1" rowspan="1" align="auto">10</m1cell><m1cell colspan="1" rowspan="1" align="auto">11</m1cell><m1cell colspan="1" rowspan="1" align="auto">12</m1cell><m1cell colspan="1" rowspan="1" align="auto">13</m1cell><m1cell colspan="1" rowspan="1" align="auto">14</m1cell><m1cell colspan="1" rowspan="1" align="auto">15</m1cell><m1cell colspan="1" rowspan="1" align="auto">16</m1cell><m1cell colspan="1" rowspan="1" align="auto">17</m1cell><m1cell colspan="1" rowspan="1" align="auto">18</m1cell><m1cell colspan="1" rowspan="1" align="auto">19</m1cell></m1table></m1document></body>
 </html>
 
 =====
 \section{Contents}
 
 \begin{enumerate}
-\item \subsection{Heading 1}
+\item \href{location}{Heading 1}
 
 \begin{enumerate}
-\item \subsubsection{Heading 2}
-
-
+\item \href{location}{Heading 2}
 \end{enumerate}
 
 
@@ -71,7 +69,7 @@ namespace MyApplication
 }
 \end{lstlisting}
 
-Math inline:and block:
+Math inline:  and block:
 
 \begin{center}
 \end{center}
@@ -94,14 +92,11 @@ Math inline:and block:
 
 \end{itemize}
 
-First termFirst definition
+\textbf{First term}: First definition
 
 \begin{table}[htbp]
 \centering
 \begin{tabular}{cccccccccccccccccccc}
-\hline
 0 & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 & 17 & 18 & 19 \\
-\hline
-\hline
 \end{tabular}
 \end{table}

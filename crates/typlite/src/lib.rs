@@ -7,17 +7,17 @@ pub mod attributes;
 pub mod common;
 mod diagnostics;
 mod error;
+pub mod ir;
 pub mod parser;
 pub mod tags;
 pub mod writer;
 
 use std::path::PathBuf;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 pub use error::*;
 
-use cmark_writer::ast::Node;
 use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
@@ -32,7 +32,7 @@ use typst_syntax::VirtualPath;
 
 pub use crate::common::Format;
 use crate::diagnostics::WarningCollector;
-use crate::parser::HtmlToAstParser;
+use crate::parser::HtmlToIrParser;
 use crate::writer::WriterFactory;
 use typst_syntax::FileId;
 
@@ -42,7 +42,6 @@ use crate::tinymist_std::typst::foundations::Value::Str;
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
 
-pub use cmark_writer::ast;
 pub use tinymist_project::CompileOnceArgs;
 pub use tinymist_std;
 
@@ -51,7 +50,7 @@ pub struct MarkdownDocument {
     pub base: HtmlDocument,
     world: Arc<LspWorld>,
     feat: TypliteFeat,
-    ast: Option<Node>,
+    ir: Arc<OnceLock<crate::ir::Document>>,
     warnings: WarningCollector,
 }
 
@@ -62,23 +61,7 @@ impl MarkdownDocument {
             base,
             world,
             feat,
-            ast: None,
-            warnings: WarningCollector::default(),
-        }
-    }
-
-    /// Create a MarkdownDocument instance with pre-parsed AST
-    pub fn with_ast(
-        base: HtmlDocument,
-        world: Arc<LspWorld>,
-        feat: TypliteFeat,
-        ast: Node,
-    ) -> Self {
-        Self {
-            base,
-            world,
-            feat,
-            ast: Some(ast),
+            ir: Arc::new(OnceLock::new()),
             warnings: WarningCollector::default(),
         }
     }
@@ -136,23 +119,28 @@ impl MarkdownDocument {
         Some(diagnostic)
     }
 
-    /// Parse HTML document to AST
-    pub fn parse(&self) -> tinymist_std::Result<Node> {
-        if let Some(ast) = &self.ast {
-            return Ok(ast.clone());
+    /// Parse HTML document to semantic IR.
+    pub fn parse_ir(&self) -> tinymist_std::Result<crate::ir::Document> {
+        if let Some(doc) = self.ir.get() {
+            return Ok(doc.clone());
         }
-        let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        parser.parse(&self.base.root).context_ut("failed to parse")
+
+        let parser = HtmlToIrParser::new(self.feat.clone(), &self.world, self.warning_collector());
+        let doc = parser
+            .parse_ir(&self.base.root)
+            .context_ut("failed to parse")?;
+        let _ = self.ir.set(doc.clone());
+        Ok(doc)
     }
 
     /// Convert content to markdown string
     pub fn to_md_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Md);
+        let mut writer = WriterFactory::create_ir(Format::Md);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -161,11 +149,11 @@ impl MarkdownDocument {
     /// Convert content to plain text string
     pub fn to_text_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Text);
+        let mut writer = WriterFactory::create_ir(Format::Text);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -174,11 +162,11 @@ impl MarkdownDocument {
     /// Convert the content to a LaTeX string.
     pub fn to_tex_string(&self) -> tinymist_std::Result<ecow::EcoString> {
         let mut output = ecow::EcoString::new();
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::LaTeX);
+        let mut writer = WriterFactory::create_ir(Format::LaTeX);
         writer
-            .write_eco(&ast, &mut output)
+            .write_ir_eco(&doc, &mut output)
             .context_ut("failed to write")?;
 
         Ok(output)
@@ -187,10 +175,10 @@ impl MarkdownDocument {
     /// Convert the content to a DOCX document
     #[cfg(feature = "docx")]
     pub fn to_docx(&self) -> tinymist_std::Result<Vec<u8>> {
-        let ast = self.parse()?;
+        let doc = self.parse_ir()?;
 
-        let mut writer = WriterFactory::create(Format::Docx);
-        writer.write_vec(&ast).context_ut("failed to write")
+        let mut writer = WriterFactory::create_ir(Format::Docx);
+        writer.write_ir_vec(&doc).context_ut("failed to write")
     }
 }
 

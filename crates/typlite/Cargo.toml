@@ -23,9 +23,9 @@ doc = false
 [dependencies]
 base64.workspace = true
 clap = { workspace = true, optional = true }
-cmark-writer.workspace = true
 comemo.workspace = true
 ecow.workspace = true
+html-escape = "0.2.13"
 regex.workspace = true
 tinymist-std.workspace = true
 tinymist-derive.workspace = true

@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/highlight.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><mark>highlight</mark></m1document></body>
+  <body><m1document><span><m1highlight>highlight</m1highlight></span></m1document></body>
 </html>
 
 =====
