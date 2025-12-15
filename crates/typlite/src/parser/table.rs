@@ -351,9 +351,10 @@ impl TableSpanResolver {
         // table.cell has only one child (the body element)
         cell.children.first().and_then(|node| {
             if let HtmlNode::Element(elem) = node
-                && HtmlToAstParser::is_block_element(elem) {
-                    return Some(elem);
-                }
+                && HtmlToAstParser::is_block_element(elem)
+            {
+                return Some(elem);
+            }
             None
         })
     }
@@ -400,9 +401,10 @@ impl TableValidator {
         for row_node in &section.children {
             if let HtmlNode::Element(row_elem) = row_node
                 && row_elem.tag == tag::tr
-                && let Some(span) = Self::check_row_for_complex_cells(row_elem) {
-                    return Some(span);
-                }
+                && let Some(span) = Self::check_row_for_complex_cells(row_elem)
+            {
+                return Some(span);
+            }
         }
         None
     }
