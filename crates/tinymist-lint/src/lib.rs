@@ -4,6 +4,11 @@ mod dead_code;
 
 pub use dead_code::DeadCodeConfig;
 
+/// Hint added to diagnostics for documented exported functions, to mark them as
+/// likely public API.
+pub const DOCUMENTED_EXPORTED_FUNCTION_HINT: &str =
+    "this function is exported and documented; it may be part of the public API";
+
 use std::sync::Arc;
 
 use tinymist_analysis::{

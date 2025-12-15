@@ -6,10 +6,10 @@
 use tinymist_analysis::syntax::{Decl, DefKind, ExprInfo};
 use tinymist_project::LspWorld;
 use typst::diag::{SourceDiagnostic, eco_format};
-use typst::syntax::ast::AstNode;
-use typst::syntax::{LinkedNode, Span, ast};
 
 use super::collector::{DefInfo, DefScope};
+
+use crate::DOCUMENTED_EXPORTED_FUNCTION_HINT;
 
 /// Generates a diagnostic for an unused definition.
 ///
@@ -51,14 +51,12 @@ pub fn generate_diagnostic(
     }
 
     // Create the base diagnostic
-    let highlight_span = binding_span(def_info, ei).unwrap_or(def_info.span);
-
     let mut diag = if is_module_import {
-        SourceDiagnostic::warning(highlight_span, eco_format!("unused module import"))
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused module import"))
     } else if is_import_item {
-        SourceDiagnostic::warning(highlight_span, eco_format!("unused import: `{name}`"))
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused import: `{name}`"))
     } else {
-        SourceDiagnostic::warning(highlight_span, eco_format!("unused {kind_str}: `{name}`"))
+        SourceDiagnostic::warning(def_info.span, eco_format!("unused {kind_str}: `{name}`"))
     };
 
     // Add helpful hints based on the scope and kind
@@ -84,12 +82,13 @@ pub fn generate_diagnostic(
 
     // Add kind-specific hints
     if let DefKind::Function = def_info.kind {
-        // Check if there's a docstring - documented functions might be intentional API
         if matches!(def_info.scope, DefScope::Exported)
             && ei.docstrings.contains_key(&def_info.decl)
         {
-            // Reduce severity for documented functions (they might be public API)
-            return None;
+            diag = diag.with_hint(DOCUMENTED_EXPORTED_FUNCTION_HINT);
+            diag = diag.with_hint(
+                "if this is intended public API, you can ignore this diagnostic; otherwise consider removing it",
+            );
         }
     }
 
@@ -98,24 +97,4 @@ pub fn generate_diagnostic(
     }
 
     Some(diag)
-}
-
-fn binding_span(def_info: &DefInfo, ei: &ExprInfo) -> Option<Span> {
-    if !matches!(def_info.kind, DefKind::Variable | DefKind::Constant) {
-        return None;
-    }
-    if !matches!(def_info.scope, DefScope::File | DefScope::Local) {
-        return None;
-    }
-
-    let node = LinkedNode::new(ei.source.root()).find(def_info.span)?;
-    let mut current = Some(node);
-    while let Some(node) = current {
-        if let Some(binding) = node.cast::<ast::LetBinding>() {
-            return Some(binding.span());
-        }
-        current = node.parent().cloned();
-    }
-
-    None
 }

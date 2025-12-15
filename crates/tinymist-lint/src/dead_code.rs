@@ -68,18 +68,29 @@ pub fn check_dead_code(
         module_used_decls,
     } = compute_import_usage(&definitions, ei);
 
-    let mut seen_module_aliases = HashSet::new();
+    let mut seen_decls = HashSet::new();
 
     for def_info in definitions {
-        if matches!(def_info.decl.as_ref(), Decl::ModuleAlias(_))
-            && !seen_module_aliases.insert(def_info.decl.clone())
+        let def_info = if config.check_exported
+            && matches!(def_info.scope, DefScope::File)
+            && is_exported_symbol_candidate(def_info.decl.as_ref())
+            && ei.is_exported(&def_info.decl)
         {
-            continue;
-        }
+            DefInfo {
+                scope: DefScope::Exported,
+                ..def_info
+            }
+        } else {
+            def_info
+        };
+
         if shadowed.contains(&def_info.decl) {
             continue;
         }
         if should_skip_definition(&def_info, config) {
+            continue;
+        }
+        if !seen_decls.insert(def_info.decl.clone()) {
             continue;
         }
 
@@ -211,6 +222,13 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         module_children,
         module_used_decls,
     }
+}
+
+fn is_exported_symbol_candidate(decl: &Decl) -> bool {
+    matches!(
+        decl,
+        Decl::Func(_) | Decl::Var(_) | Decl::Module(_) | Decl::Closure(_)
+    )
 }
 
 fn is_wildcard_module_import_decl(ei: &ExprInfo, decl: &Interned<Decl>) -> bool {
