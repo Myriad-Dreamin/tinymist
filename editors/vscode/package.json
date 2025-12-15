@@ -454,6 +454,29 @@
             "%extension.tinymist.config.tinymist.lint.when.string.enum.onType%"
           ]
         },
+        "tinymist.lint.deadCode.checkExported": {
+          "title": "%extension.tinymist.config.tinymist.lint.deadCode.checkExported.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.checkExported.desc%",
+          "type": "boolean",
+          "default": false
+        },
+        "tinymist.lint.deadCode.checkParams": {
+          "title": "%extension.tinymist.config.tinymist.lint.deadCode.checkParams.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.checkParams.desc%",
+          "type": "boolean",
+          "default": true
+        },
+        "tinymist.lint.deadCode.exceptions": {
+          "title": "%extension.tinymist.config.tinymist.lint.deadCode.exceptions.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.exceptions.desc%",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "_*"
+          ]
+        },
         "tinymist.typingContinueCommentsOnNewline": {
           "title": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.desc%",
