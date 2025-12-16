@@ -16,6 +16,18 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_if2.typ
    "range": "4:2:4:16",
    "severity": 2,
    "source": "typst"
+  },
+  {
+   "message": "unreachable code",
+   "range": "4:2:4:16",
+   "severity": 2,
+   "source": "typst"
+  },
+  {
+   "message": "unreachable code",
+   "range": "5:2:5:11",
+   "severity": 2,
+   "source": "typst"
   }
  ]
 }

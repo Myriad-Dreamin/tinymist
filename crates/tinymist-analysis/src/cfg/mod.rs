@@ -352,10 +352,10 @@ impl BodyBuilder {
     }
 
     fn finish(mut self) -> ControlFlowGraph {
-        if let Some(bb) = self.current.take() {
-            if matches!(self.blocks[bb.0].terminator, Terminator::Unset) {
-                self.blocks[bb.0].terminator = Terminator::Goto(self.exit);
-            }
+        if let Some(bb) = self.current.take()
+            && matches!(self.blocks[bb.0].terminator, Terminator::Unset)
+        {
+            self.blocks[bb.0].terminator = Terminator::Goto(self.exit);
         }
 
         ControlFlowGraph {
@@ -452,10 +452,10 @@ impl BodyBuilder {
                 // then
                 self.current = Some(then_bb);
                 self.eval_expr(cond.if_body(), col);
-                if let Some(end) = self.current.take() {
-                    if matches!(self.blocks[end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(end, Terminator::Goto(join_bb));
-                    }
+                if let Some(end) = self.current.take()
+                    && matches!(self.blocks[end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(end, Terminator::Goto(join_bb));
                 }
 
                 // else
@@ -463,10 +463,10 @@ impl BodyBuilder {
                 if let Some(else_body) = cond.else_body() {
                     self.eval_expr(else_body, col);
                 }
-                if let Some(end) = self.current.take() {
-                    if matches!(self.blocks[end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(end, Terminator::Goto(join_bb));
-                    }
+                if let Some(end) = self.current.take()
+                    && matches!(self.blocks[end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(end, Terminator::Goto(join_bb));
                 }
 
                 self.current = Some(join_bb);
@@ -510,10 +510,10 @@ impl BodyBuilder {
                 self.eval_expr(w.body(), col);
                 self.ctx.loops.truncate(old_loops_len);
 
-                if let Some(body_end) = self.current.take() {
-                    if matches!(self.blocks[body_end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(body_end, Terminator::Goto(header));
-                    }
+                if let Some(body_end) = self.current.take()
+                    && matches!(self.blocks[body_end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(body_end, Terminator::Goto(header));
                 }
 
                 self.current = Some(exit);
@@ -558,10 +558,10 @@ impl BodyBuilder {
                 self.eval_expr(f.body(), col);
                 self.ctx.loops.truncate(old_loops_len);
 
-                if let Some(body_end) = self.current.take() {
-                    if matches!(self.blocks[body_end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(body_end, Terminator::Goto(header));
-                    }
+                if let Some(body_end) = self.current.take()
+                    && matches!(self.blocks[body_end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(body_end, Terminator::Goto(header));
                 }
 
                 self.current = Some(exit);
@@ -574,6 +574,9 @@ impl BodyBuilder {
                 } else {
                     (self.ctx.error_exit, false)
                 };
+                if !allowed {
+                    return;
+                }
                 let bb = self.ensure_current();
                 self.set_terminator(
                     bb,
@@ -593,6 +596,9 @@ impl BodyBuilder {
                 } else {
                     (self.ctx.error_exit, false)
                 };
+                if !allowed {
+                    return;
+                }
                 let bb = self.ensure_current();
                 self.set_terminator(
                     bb,
@@ -610,6 +616,9 @@ impl BodyBuilder {
                     self.eval_expr(body, col);
                 }
                 self.append_stmt(expr.span(), SyntaxKind::FuncReturn);
+                if !self.ctx.ret.allowed {
+                    return;
+                }
                 let bb = self.ensure_current();
                 self.set_terminator(
                     bb,
@@ -643,10 +652,10 @@ impl BodyBuilder {
 
                 self.ctx.ret = saved;
 
-                if let Some(end) = self.current.take() {
-                    if matches!(self.blocks[end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(end, Terminator::Goto(after));
-                    }
+                if let Some(end) = self.current.take()
+                    && matches!(self.blocks[end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(end, Terminator::Goto(after));
                 }
                 self.current = Some(after);
             }
@@ -682,10 +691,10 @@ impl BodyBuilder {
 
                 self.current = Some(rhs_bb);
                 self.eval_expr(bin.rhs(), col);
-                if let Some(end) = self.current.take() {
-                    if matches!(self.blocks[end.0].terminator, Terminator::Unset) {
-                        self.set_terminator(end, Terminator::Goto(join_bb));
-                    }
+                if let Some(end) = self.current.take()
+                    && matches!(self.blocks[end.0].terminator, Terminator::Unset)
+                {
+                    self.set_terminator(end, Terminator::Goto(join_bb));
                 }
 
                 self.current = Some(join_bb);
@@ -699,8 +708,13 @@ impl BodyBuilder {
             }
 
             _ => {
-                self.eval_untyped_children(expr.to_untyped(), col);
-                self.append_stmt(expr.span(), expr.to_untyped().kind());
+                // Record the statement before descending: some expression kinds
+                // (e.g. content blocks / code injections) contain `return`/`break`
+                // as children, and visiting children first would incorrectly make
+                // the container expression appear "after" the terminator.
+                let untyped = expr.to_untyped();
+                self.append_stmt(expr.span(), untyped.kind());
+                self.eval_untyped_children(untyped, col);
             }
         }
     }

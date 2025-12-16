@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use rustc_hash::FxHashSet;
 use tinymist_analysis::{
     adt::interner::Interned,
     cfg,
@@ -126,7 +127,7 @@ impl<'w> Linter<'w> {
 
         for body in &cfgs.bodies {
             let reachable = body.reachable_blocks();
-            let mut seen = std::collections::HashSet::<u64>::new();
+            let mut seen = FxHashSet::<u64>::default();
             let mut spans = Vec::<Span>::new();
 
             for bb_idx in 0..body.blocks.len() {
@@ -153,12 +154,12 @@ impl<'w> Linter<'w> {
                 }
             }
 
-            spans.sort_by_key(|s| {
-                source
-                    .range(*s)
-                    .map(|r| (r.start as u64) << 1)
-                    .unwrap_or(u64::MAX - 1)
-                    .saturating_add(s.into_raw().get())
+            spans.sort_by(|a, b| {
+                let start_a = source.range(*a).map(|r| r.start).unwrap_or(usize::MAX);
+                let start_b = source.range(*b).map(|r| r.start).unwrap_or(usize::MAX);
+                start_a
+                    .cmp(&start_b)
+                    .then_with(|| a.into_raw().get().cmp(&b.into_raw().get()))
             });
             for span in spans {
                 self.diag

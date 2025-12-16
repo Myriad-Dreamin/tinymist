@@ -10,6 +10,18 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_join_partial.typ
    "range": "2:5:2:6",
    "severity": 2,
    "source": "typst"
+  },
+  {
+   "message": "unreachable code",
+   "range": "4:4:4:7",
+   "severity": 2,
+   "source": "typst"
+  },
+  {
+   "message": "unreachable code",
+   "range": "5:4:5:10",
+   "severity": 2,
+   "source": "typst"
   }
  ]
 }

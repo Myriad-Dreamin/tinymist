@@ -4670,6 +4670,7 @@ dependencies = [
  "comemo",
  "insta",
  "rayon",
+ "rustc-hash 2.1.1",
  "tinymist-analysis",
  "tinymist-project",
  "tinymist-std",

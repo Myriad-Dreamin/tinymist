@@ -10,6 +10,12 @@ input_file: crates/tinymist-query/src/fixtures/lint/if_show.typ
    "range": "1:2:1:17",
    "severity": 2,
    "source": "typst"
+  },
+  {
+   "message": "unreachable code",
+   "range": "1:2:1:17",
+   "severity": 2,
+   "source": "typst"
   }
  ]
 }
