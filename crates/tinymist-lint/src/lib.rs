@@ -180,13 +180,13 @@ impl<'w> Linter<'w> {
         let mut markup_like: Option<Span> = None;
 
         loop {
-            if let Some(expr) = node.cast::<ast::Expr>() {
-                if let Some(parent) = node.parent() {
-                    match parent.kind() {
-                        SyntaxKind::Code => return Some(expr.span()),
-                        SyntaxKind::Markup | SyntaxKind::Math => markup_like = Some(expr.span()),
-                        _ => {}
-                    }
+            if let Some(expr) = node.cast::<ast::Expr>()
+                && let Some(parent) = node.parent()
+            {
+                match parent.kind() {
+                    SyntaxKind::Code => return Some(expr.span()),
+                    SyntaxKind::Markup | SyntaxKind::Math => markup_like = Some(expr.span()),
+                    _ => {}
                 }
             }
 
