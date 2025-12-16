@@ -122,8 +122,10 @@ impl ExprInfoRepr {
         self.resolves
             .iter()
             .filter(move |(_, r)| match (decl.as_ref(), r.decl.as_ref()) {
-                (Decl::Label(..), Decl::Label(..)) => r.decl == decl,
-                (Decl::Label(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
+                (Decl::Label(..), Decl::Label(..))
+                | (Decl::Label(..), Decl::ContentRef(..))
+                | (Decl::ContentRef(..), Decl::Label(..))
+                | (Decl::ContentRef(..), Decl::ContentRef(..)) => r.decl.name() == decl.name(),
                 (Decl::Label(..), _) => false,
                 _ => r.decl == decl || r.root == of,
             })
@@ -571,7 +573,15 @@ impl Decl {
     pub fn ref_(ident: ast::Ref) -> Self {
         Self::ContentRef(SpannedDecl {
             name: ident.target().into(),
-            at: ident.span(),
+            at: {
+                let marker_span = ident
+                    .to_untyped()
+                    .children()
+                    .find(|child| child.kind() == SyntaxKind::RefMarker)
+                    .map(|child| child.span());
+
+                marker_span.unwrap_or(ident.span())
+            },
         })
     }
 
