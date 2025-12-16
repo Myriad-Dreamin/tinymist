@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use tinymist_analysis::{
     adt::interner::Interned,
+    cfg,
     syntax::{Decl, ExprInfo},
     ty::{Ty, TyCtx, TypeInfo},
 };
@@ -114,7 +115,26 @@ impl<'w> Linter<'w> {
             self.expr(expr);
         }
 
+        self.unreachable_cfg(node);
+
         self.diag
+    }
+
+    fn unreachable_cfg(&mut self, root: &SyntaxNode) {
+        let cfgs = cfg::build_cfgs(root);
+        for body in &cfgs.bodies {
+            for bb in cfg::orphan_blocks(body) {
+                let block = body.block(bb);
+                let Some(first) = block.stmts.first() else {
+                    continue;
+                };
+                if first.span == Span::detached() {
+                    continue;
+                }
+                let msg = "unreachable code";
+                self.diag.push(SourceDiagnostic::warning(first.span, msg));
+            }
+        }
     }
 
     fn with_loop_info<F>(&mut self, span: Span, f: F) -> Option<()>

@@ -1,6 +1,7 @@
 //! Tinymist Analysis
 
 pub mod adt;
+pub mod cfg;
 pub mod docs;
 pub mod location;
 mod sig;
