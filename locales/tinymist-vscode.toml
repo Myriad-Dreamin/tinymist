@@ -1184,8 +1184,8 @@ en = "Status Bar Format"
 zh = "状态栏格式"
 
 [extension.tinymist.config.tinymist.statusBarFormat.desc]
-en = "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty."
-zh = "设置服务器状态的格式字符串。例如，`{compileStatusIcon}{wordCount} [{fileName}]` 将格式化状态为 `$(check) 123 words [main]`。有效的占位符包括：\n\n- `{compileStatusIcon}`：指示编译状态的图标\n- `{wordCount}`：文档中的字数\n- `{fileName}`：正在编译的文件的名称\n\n注意：如果格式字符串为空，则状态栏将被隐藏。"
+en = "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{charCount}`: Number of characters in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty."
+zh = "设置服务器状态的格式字符串。例如，`{compileStatusIcon}{wordCount} [{fileName}]` 将格式化状态为 `$(check) 123 words [main]`。有效的占位符包括：\n\n- `{compileStatusIcon}`：指示编译状态的图标\n- `{wordCount}`：文档中的字数\n- `{charCount}`：文档中的字符数\n- `{fileName}`：正在编译的文件的名称\n\n注意：如果格式字符串为空，则状态栏将被隐藏。"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.title]
 en = "Typst Extra Arguments"

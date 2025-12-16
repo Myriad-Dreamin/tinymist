@@ -689,10 +689,16 @@ impl SharedContext {
         self.world().font_resolver.describe_font(&font)
     }
 
-    /// Gets the local packages and their descriptions.
-    pub fn local_packages(&self) -> EcoVec<PackageIndexEntry> {
+    /// Gets the packages other than that in the preview namespace and their
+    /// descriptions.
+    pub fn non_preview_packages(&self) -> EcoVec<PackageIndexEntry> {
         #[cfg(feature = "local-registry")]
-        let it = || crate::package::list_package(self.world(), None);
+        let it = || {
+            crate::package::list_package(
+                self.world(),
+                crate::package::PackageFilter::ExceptFor(EcoString::inline("preview")),
+            )
+        };
         #[cfg(not(feature = "local-registry"))]
         let it = || Default::default();
         self.analysis.local_packages.lock().get_or_init(it).clone()

@@ -259,9 +259,9 @@ impl HoverWorker<'_> {
                     .filter(|it| it.matches_versionless(&versionless_spec)),
             );
         }
-        // local_packages to references and add them to the packages
+        // Add non-preview packages
         #[cfg(feature = "local-registry")]
-        let local_packages = self.ctx.local_packages();
+        let local_packages = self.ctx.non_preview_packages();
         #[cfg(feature = "local-registry")]
         if !package_spec.is_preview() {
             packages.extend(

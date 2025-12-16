@@ -30,12 +30,14 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
+        // Finds packages that are in `@preview`
         let mut packages = w.packages().iter().collect_vec();
-        // local_packages to references and add them to the packages
+
+        // Finds packages that are not in `@preview`
         #[cfg(feature = "local-registry")]
-        let local_packages_refs = self.worker.ctx.local_packages();
+        let other_packages_refs = self.worker.ctx.non_preview_packages();
         #[cfg(feature = "local-registry")]
-        packages.extend(local_packages_refs.iter());
+        packages.extend(other_packages_refs.iter());
 
         packages.sort_by_key(|entry| {
             (
