@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/unreachable_tests.rs
+expression: "JsonRepr::new_pure(diags)"
+input_file: crates/tinymist-query/src/fixtures/unreachable/if_false_then_unreachable.typ
+---
+[
+ {
+  "message": "unreachable code",
+  "range": "1:13:1:14"
+ }
+]

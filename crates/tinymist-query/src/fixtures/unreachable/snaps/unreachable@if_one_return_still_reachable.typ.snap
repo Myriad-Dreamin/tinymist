@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/unreachable_tests.rs
+expression: "JsonRepr::new_pure(diags)"
+input_file: crates/tinymist-query/src/fixtures/unreachable/if_one_return_still_reachable.typ
+---
+[]

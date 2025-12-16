@@ -33,6 +33,8 @@ pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
 
+mod unreachable;
+
 #[derive(Default, Clone, Copy)]
 pub struct Opts {
     pub need_compile: bool,
