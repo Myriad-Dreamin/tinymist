@@ -10,51 +10,73 @@ use typst::syntax::{Span, SyntaxKind, SyntaxNode, ast};
 #[cfg(test)]
 mod tests;
 
+/// Identifier of a CFG "body" within a [`CfgCollection`].
+///
+/// A "body" corresponds to an executable region: the file root or a nested
+/// closure body.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BodyId(pub usize);
 
+/// Identifier of a basic block within a [`ControlFlowGraph`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BlockId(pub usize);
 
+/// Kind of a CFG body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BodyKind {
+    /// The file/root markup body.
     Root,
+    /// A nested closure body.
     Closure,
 }
 
+/// A collection of CFG bodies built from a syntax tree.
 #[derive(Debug, Clone)]
 pub struct CfgCollection {
+    /// All built bodies.
     pub bodies: Vec<ControlFlowGraph>,
 }
 
 impl CfgCollection {
+    /// Returns the CFG for `id`.
     pub fn body(&self, id: BodyId) -> &ControlFlowGraph {
         &self.bodies[id.0]
     }
 }
 
+/// A control-flow graph for a single body (root or closure).
 #[derive(Debug, Clone)]
 pub struct ControlFlowGraph {
+    /// Body id within the owning [`CfgCollection`].
     pub id: BodyId,
+    /// Body kind (root or closure).
     pub kind: BodyKind,
+    /// Span of the source region that produced this body.
     pub origin: Span,
 
+    /// Entry basic block.
     pub entry: BlockId,
+    /// Normal exit block.
     pub exit: BlockId,
+    /// Error exit block for illegal control flow.
     pub error_exit: BlockId,
 
+    /// All basic blocks in this body.
     pub blocks: Vec<BasicBlock>,
 }
 
 impl ControlFlowGraph {
+    /// Returns a block by id.
     pub fn block(&self, id: BlockId) -> &BasicBlock {
         &self.blocks[id.0]
     }
 
+    /// Returns up to two successor blocks of `id`.
     pub fn successors(&self, id: BlockId) -> [Option<BlockId>; 2] {
         self.block(id).terminator.successors()
     }
 
+    /// Computes predecessor lists for all blocks.
     pub fn predecessors(&self) -> Vec<Vec<BlockId>> {
         let mut preds: Vec<Vec<BlockId>> = vec![Vec::new(); self.blocks.len()];
         for from in 0..self.blocks.len() {
@@ -66,6 +88,7 @@ impl ControlFlowGraph {
         preds
     }
 
+    /// Computes the set of blocks reachable from [`ControlFlowGraph::entry`].
     pub fn reachable_blocks(&self) -> FxHashSet<BlockId> {
         let mut seen: FxHashSet<BlockId> = FxHashSet::default();
         let mut stack = vec![self.entry];
@@ -102,62 +125,99 @@ impl ControlFlowGraph {
     }
 }
 
+/// A basic block: a sequence of statements ending in a [`Terminator`].
 #[derive(Debug, Clone)]
 pub struct BasicBlock {
+    /// Statement-like items recorded for diagnostics.
     pub stmts: Vec<Stmt>,
+    /// Terminator that defines outgoing edges.
     pub terminator: Terminator,
 }
 
+/// A statement-like item recorded in a block.
 #[derive(Debug, Clone)]
 pub struct Stmt {
+    /// Span of the originating syntax node.
     pub span: Span,
+    /// Syntax kind of the originating node.
     pub kind: SyntaxKind,
 }
 
+/// Kind of CFG exit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ExitKind {
+    /// Normal completion.
     Normal,
+    /// Error completion.
     Error,
 }
 
+/// Kind of conditional edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BranchKind {
+    /// `if` / `else`.
     If,
+    /// `while` condition.
     While,
+    /// `for` iteration step.
     ForIter,
+    /// Short-circuit `and`.
     And,
+    /// Short-circuit `or`.
     Or,
 }
 
+/// Terminator of a basic block.
 #[derive(Debug, Clone)]
 pub enum Terminator {
+    /// Temporary placeholder during construction.
     Unset,
+    /// Exit the current body.
     Exit(ExitKind),
+    /// Unconditional jump.
     Goto(BlockId),
+    /// Conditional branch (including short-circuit edges).
     Branch {
+        /// Branch type.
         kind: BranchKind,
+        /// Span of the condition/operator.
         span: Span,
+        /// Successor for the "then"/true edge.
         then_bb: BlockId,
+        /// Successor for the "else"/false edge.
         else_bb: BlockId,
     },
+    /// `return` from a closure/context boundary.
     Return {
+        /// Span of the `return`.
         span: Span,
+        /// Target block (normal exit if allowed, error exit otherwise).
         target: BlockId,
+        /// Whether this `return` is syntactically allowed here.
         allowed: bool,
     },
+    /// `break` from a loop.
     Break {
+        /// Span of the `break`.
         span: Span,
+        /// Target block (loop exit if allowed, error exit otherwise).
         target: BlockId,
+        /// Whether this `break` is syntactically allowed here.
         allowed: bool,
     },
+    /// `continue` within a loop.
     Continue {
+        /// Span of the `continue`.
         span: Span,
+        /// Target block (loop header if allowed, error exit otherwise).
         target: BlockId,
+        /// Whether this `continue` is syntactically allowed here.
         allowed: bool,
     },
 }
 
 impl Terminator {
+    /// Returns up to two successor blocks of this terminator.
     pub fn successors(&self) -> [Option<BlockId>; 2] {
         match *self {
             Terminator::Unset | Terminator::Exit(..) => [None, None],
@@ -343,22 +403,29 @@ impl BodyBuilder {
             if let Some(expr) = child.cast::<ast::Expr<'a>>() {
                 self.eval_expr(expr, col);
             } else {
-                self.eval_untyped_children(&child, col);
-            }
-            if self.current.is_none() {
-                // Keep walking to record unreachable blocks/statements, but
-                // avoid accidentally connecting control-flow.
-                self.ensure_current();
+                self.eval_untyped_children(child, col);
             }
         }
     }
 
     fn eval_expr<'a>(&mut self, expr: ast::Expr<'a>, col: &mut CollectionBuilder) {
         match expr {
-            ast::Expr::Conditional(cond) => {
-                let cond_span = cond.condition().span();
+            ast::Expr::CodeBlock(code_block) => {
+                for e in code_block.body().exprs() {
+                    self.eval_expr(e, col);
+                }
+            }
 
-                self.eval_expr(cond.condition(), col);
+            ast::Expr::Parenthesized(paren) => {
+                self.eval_expr(paren.expr(), col);
+            }
+
+            ast::Expr::Conditional(cond) => {
+                let cond_expr = cond.condition();
+                let cond_span = cond_expr.span();
+                let cond_const = const_bool(cond_expr);
+
+                self.eval_expr(cond_expr, col);
                 let Some(head) = self.current else {
                     return;
                 };
@@ -367,15 +434,19 @@ impl BodyBuilder {
                 let else_bb = self.new_block();
                 let join_bb = self.new_block();
 
-                self.set_terminator(
-                    head,
-                    Terminator::Branch {
-                        kind: BranchKind::If,
-                        span: cond_span,
-                        then_bb,
-                        else_bb,
-                    },
-                );
+                match cond_const {
+                    Some(true) => self.set_terminator(head, Terminator::Goto(then_bb)),
+                    Some(false) => self.set_terminator(head, Terminator::Goto(else_bb)),
+                    None => self.set_terminator(
+                        head,
+                        Terminator::Branch {
+                            kind: BranchKind::If,
+                            span: cond_span,
+                            then_bb,
+                            else_bb,
+                        },
+                    ),
+                }
                 self.current = None;
 
                 // then
@@ -399,7 +470,6 @@ impl BodyBuilder {
                 }
 
                 self.current = Some(join_bb);
-                self.append_stmt(expr.span(), SyntaxKind::Conditional);
             }
 
             ast::Expr::WhileLoop(w) => {
@@ -447,7 +517,6 @@ impl BodyBuilder {
                 }
 
                 self.current = Some(exit);
-                self.append_stmt(expr.span(), SyntaxKind::WhileLoop);
             }
 
             ast::Expr::ForLoop(f) => {
@@ -580,7 +649,6 @@ impl BodyBuilder {
                     }
                 }
                 self.current = Some(after);
-                self.append_stmt(expr.span(), SyntaxKind::Contextual);
             }
 
             ast::Expr::Binary(bin) if matches!(bin.op(), ast::BinOp::And | ast::BinOp::Or) => {
@@ -621,7 +689,6 @@ impl BodyBuilder {
                 }
 
                 self.current = Some(join_bb);
-                self.append_stmt(span, SyntaxKind::Binary);
             }
 
             ast::Expr::Closure(closure) => {
@@ -636,6 +703,23 @@ impl BodyBuilder {
                 self.append_stmt(expr.span(), expr.to_untyped().kind());
             }
         }
+    }
+}
+
+fn const_bool(expr: ast::Expr<'_>) -> Option<bool> {
+    match expr {
+        ast::Expr::Bool(b) => Some(b.get()),
+        ast::Expr::Parenthesized(p) => const_bool(p.expr()),
+        ast::Expr::Unary(u) => match u.op() {
+            ast::UnOp::Not => const_bool(u.expr()).map(|v| !v),
+            _ => None,
+        },
+        ast::Expr::Binary(b) => match b.op() {
+            ast::BinOp::And => Some(const_bool(b.lhs())? && const_bool(b.rhs())?),
+            ast::BinOp::Or => Some(const_bool(b.lhs())? || const_bool(b.rhs())?),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -676,6 +760,7 @@ pub fn stmt_index(cfg: &ControlFlowGraph) -> FxHashMap<Span, BlockId> {
     map
 }
 
+/// Dominator tree information for a CFG.
 #[derive(Debug, Clone)]
 pub struct Dominators {
     /// Immediate dominator for each block (or `None` if unreachable).
@@ -685,6 +770,7 @@ pub struct Dominators {
 }
 
 impl Dominators {
+    /// Returns whether block `a` dominates block `b`.
     pub fn dominates(&self, a: BlockId, mut b: BlockId) -> bool {
         if a == b {
             return true;
@@ -702,6 +788,7 @@ impl Dominators {
     }
 }
 
+/// Computes dominators for `cfg` (restricted to reachable blocks).
 pub fn dominators(cfg: &ControlFlowGraph) -> Dominators {
     let preds = cfg.predecessors();
     let reachable = cfg.reachable_blocks();
@@ -785,6 +872,7 @@ pub fn dominators(cfg: &ControlFlowGraph) -> Dominators {
     Dominators { idom, rpo }
 }
 
+/// Returns all back edges `(from, to)` where `to` dominates `from`.
 pub fn back_edges(cfg: &ControlFlowGraph, dom: &Dominators) -> Vec<(BlockId, BlockId)> {
     let mut edges = Vec::new();
     for from in 0..cfg.blocks.len() {
@@ -798,6 +886,7 @@ pub fn back_edges(cfg: &ControlFlowGraph, dom: &Dominators) -> Vec<(BlockId, Blo
     edges
 }
 
+/// Computes the natural loop induced by a back edge `back -> header`.
 pub fn natural_loop(cfg: &ControlFlowGraph, header: BlockId, back: BlockId) -> FxHashSet<BlockId> {
     let preds = cfg.predecessors();
     let mut set: FxHashSet<BlockId> = FxHashSet::default();
