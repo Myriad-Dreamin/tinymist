@@ -8,8 +8,8 @@ use tinymist_std::path::unix_slash;
 
 use crate::Result;
 use crate::common::{
-    CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, InlineNode, ListState,
-    VerbatimNode,
+    BlockVerbatimNode, CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode,
+    InlineNode, ListState, VerbatimNode,
 };
 
 /// LaTeX writer implementation
@@ -288,6 +288,11 @@ impl LaTeXWriter {
                 for child in &inline_node.content {
                     self.write_node(child, output)?;
                 }
+            }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                let block_node = node.as_custom_type::<BlockVerbatimNode>().unwrap();
+                output.push_str(&block_node.content);
+                output.push_str("\n\n");
             }
             node if node.is_custom_type::<VerbatimNode>() => {
                 let inline_node = node.as_custom_type::<VerbatimNode>().unwrap();
