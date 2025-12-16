@@ -13,7 +13,7 @@ use typst::{
     diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
     syntax::{
-        FileId, Span, Spanned, SyntaxNode,
+        FileId, LinkedNode, Span, Spanned, SyntaxKind, SyntaxNode,
         ast::{self, AstNode},
     },
 };
@@ -122,19 +122,80 @@ impl<'w> Linter<'w> {
 
     fn unreachable_cfg(&mut self, root: &SyntaxNode) {
         let cfgs = cfg::build_cfgs(root);
+        let source = &self.ei.source;
+
         for body in &cfgs.bodies {
-            for bb in cfg::orphan_blocks(body) {
-                let block = body.block(bb);
-                let Some(first) = block.stmts.first() else {
-                    continue;
-                };
-                if first.span == Span::detached() {
+            let reachable = body.reachable_blocks();
+            let mut seen = std::collections::HashSet::<u64>::new();
+            let mut spans = Vec::<Span>::new();
+
+            for bb_idx in 0..body.blocks.len() {
+                let bb = cfg::BlockId(bb_idx);
+                if bb == body.entry || bb == body.exit || bb == body.error_exit {
                     continue;
                 }
-                let msg = "unreachable code";
-                self.diag.push(SourceDiagnostic::warning(first.span, msg));
+                if reachable.contains(&bb) {
+                    continue;
+                }
+                let block = body.block(bb);
+                for stmt in &block.stmts {
+                    let mut span = stmt.span;
+                    if span == Span::detached() {
+                        continue;
+                    }
+                    if let Some(stmt_span) = Self::enclosing_stmt_span(source, span) {
+                        span = stmt_span;
+                    }
+                    let raw = span.into_raw().get();
+                    if seen.insert(raw) {
+                        spans.push(span);
+                    }
+                }
+            }
+
+            spans.sort_by_key(|s| {
+                source
+                    .range(*s)
+                    .map(|r| (r.start as u64) << 1)
+                    .unwrap_or(u64::MAX - 1)
+                    .saturating_add(s.into_raw().get())
+            });
+            for span in spans {
+                self.diag
+                    .push(SourceDiagnostic::warning(span, "unreachable code"));
             }
         }
+    }
+
+    /// Maps a deep expression span (e.g. a field name inside `[a: b]`) to the
+    /// surrounding "statement expression" span (e.g. the whole `[a: b]`), so
+    /// diagnostics highlight the intended unit.
+    ///
+    /// Preference order:
+    /// 1) `Code` direct-child expr (code statements)
+    /// 2) `Markup`/`Math` direct-child expr (markup/math statements)
+    fn enclosing_stmt_span(source: &typst::syntax::Source, span: Span) -> Option<Span> {
+        let mut node: LinkedNode = source.find(span)?;
+        let mut markup_like: Option<Span> = None;
+
+        loop {
+            if let Some(expr) = node.cast::<ast::Expr>() {
+                if let Some(parent) = node.parent() {
+                    match parent.kind() {
+                        SyntaxKind::Code => return Some(expr.span()),
+                        SyntaxKind::Markup | SyntaxKind::Math => markup_like = Some(expr.span()),
+                        _ => {}
+                    }
+                }
+            }
+
+            let Some(parent) = node.parent() else {
+                break;
+            };
+            node = parent.clone();
+        }
+
+        markup_like
     }
 
     fn with_loop_info<F>(&mut self, span: Span, f: F) -> Option<()>
