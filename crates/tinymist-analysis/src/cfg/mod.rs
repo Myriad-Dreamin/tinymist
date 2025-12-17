@@ -35,12 +35,31 @@ pub enum BodyKind {
 pub struct CfgCollection {
     /// All built bodies.
     pub bodies: Vec<ControlFlowGraph>,
+    /// Mapping from closure expression spans to their body ids.
+    pub closure_bodies: FxHashMap<Span, BodyId>,
+    /// Mapping from declaration spans (e.g. `let f = (..) => ..`) to their body ids.
+    pub decl_bodies: FxHashMap<Span, BodyId>,
 }
 
 impl CfgCollection {
     /// Returns the CFG for `id`.
     pub fn body(&self, id: BodyId) -> &ControlFlowGraph {
         &self.bodies[id.0]
+    }
+
+    /// Returns the root body id, if any.
+    pub fn root(&self) -> Option<BodyId> {
+        (!self.bodies.is_empty()).then_some(BodyId(0))
+    }
+
+    /// Returns the body id for a closure expression span.
+    pub fn closure_body(&self, closure_span: Span) -> Option<BodyId> {
+        self.closure_bodies.get(&closure_span).copied()
+    }
+
+    /// Returns the body id for a declaration span.
+    pub fn decl_body(&self, decl_span: Span) -> Option<BodyId> {
+        self.decl_bodies.get(&decl_span).copied()
     }
 }
 
@@ -253,11 +272,17 @@ struct BuildCtx {
 
 struct CollectionBuilder {
     bodies: Vec<ControlFlowGraph>,
+    closure_bodies: FxHashMap<Span, BodyId>,
+    decl_bodies: FxHashMap<Span, BodyId>,
 }
 
 impl CollectionBuilder {
     fn new() -> Self {
-        Self { bodies: Vec::new() }
+        Self {
+            bodies: Vec::new(),
+            closure_bodies: FxHashMap::default(),
+            decl_bodies: FxHashMap::default(),
+        }
     }
 
     fn push_body(&mut self, mut cfg: ControlFlowGraph) -> BodyId {
@@ -272,7 +297,9 @@ impl CollectionBuilder {
     }
 
     fn build_closure<'a>(&mut self, closure: ast::Closure<'a>) -> BodyId {
-        self.build_body_from_expr(BodyKind::Closure, closure.span(), closure.body(), true)
+        let id = self.build_body_from_expr(BodyKind::Closure, closure.span(), closure.body(), true);
+        self.closure_bodies.insert(closure.span(), id);
+        id
     }
 
     fn build_body_from_exprs<'a>(
@@ -631,6 +658,37 @@ impl BodyBuilder {
                 self.current = None;
             }
 
+            ast::Expr::LetBinding(let_) => {
+                // Record the let binding as a statement in the current body.
+                self.append_stmt(expr.span(), SyntaxKind::LetBinding);
+
+                // If this is a closure-valued binding, build a separate CFG for
+                // the closure and remember the declaration -> body mapping so
+                // interprocedural analyses can resolve calls.
+                if let Some(ast::Expr::Closure(closure)) = let_.init() {
+                    let body_id = col.build_closure(closure);
+
+                    match let_.kind() {
+                        ast::LetBindingKind::Closure(ident) => {
+                            col.decl_bodies.insert(ident.span(), body_id);
+                        }
+                        ast::LetBindingKind::Normal(pattern) => {
+                            // Best-effort: only handle `let f = (..) => ..`.
+                            if let ast::Pattern::Normal(ast::Expr::Ident(ident)) = pattern {
+                                col.decl_bodies.insert(ident.span(), body_id);
+                            }
+                        }
+                    }
+
+                    // Do not descend into the closure: its body isn't executed
+                    // at binding time and is represented by the separate CFG.
+                    return;
+                }
+
+                // Otherwise, descend into children for best-effort control flow.
+                self.eval_untyped_children(expr.to_untyped(), col);
+            }
+
             ast::Expr::Contextual(ctx_expr) => {
                 // Contextual expressions act like a "return boundary": `return`
                 // exits the contextual expression, not the surrounding body.
@@ -740,14 +798,120 @@ fn const_bool(expr: ast::Expr<'_>) -> Option<bool> {
 /// Builds CFGs for the file root (and nested closures).
 pub fn build_cfgs(root: &SyntaxNode) -> CfgCollection {
     let Some(markup) = root.cast::<ast::Markup>() else {
-        return CfgCollection { bodies: Vec::new() };
+        return CfgCollection {
+            bodies: Vec::new(),
+            closure_bodies: FxHashMap::default(),
+            decl_bodies: FxHashMap::default(),
+        };
     };
 
     let mut builder = CollectionBuilder::new();
     let _root_id = builder.build_root(markup);
     CfgCollection {
         bodies: builder.bodies,
+        closure_bodies: builder.closure_bodies,
+        decl_bodies: builder.decl_bodies,
     }
+}
+
+/// A mapping from a reference-use span (e.g. callee ident span in a call) to the
+/// span of its resolved declaration.
+pub type ResolveMap = FxHashMap<Span, Span>;
+
+/// A call edge between two CFG bodies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CallEdge {
+    /// Span of the `f(..)` call expression.
+    pub call_span: Span,
+    /// Caller body.
+    pub caller_body: BodyId,
+    /// Basic block in which the call expression appears.
+    pub caller_block: BlockId,
+    /// Callee body.
+    pub callee_body: BodyId,
+}
+
+/// Interprocedural control-flow information built on top of [`CfgCollection`].
+#[derive(Debug, Clone)]
+pub struct InterproceduralCfg {
+    /// The underlying per-body CFGs.
+    pub cfgs: CfgCollection,
+    /// Call edges discovered in the syntax tree.
+    pub calls: Vec<CallEdge>,
+}
+
+/// Builds per-body CFGs plus best-effort call edges between bodies.
+///
+/// `resolves` can optionally map callee identifier spans at call sites to their
+/// resolved declaration spans, enabling call edges for `let`-bound closures.
+pub fn build_interprocedural_cfg(root: &SyntaxNode, resolves: Option<&ResolveMap>) -> InterproceduralCfg {
+    let cfgs = build_cfgs(root);
+    if cfgs.bodies.is_empty() {
+        return InterproceduralCfg { cfgs, calls: Vec::new() };
+    }
+
+    let mut stmt_locs: FxHashMap<Span, (BodyId, BlockId)> = FxHashMap::default();
+    for body in &cfgs.bodies {
+        for (bb_idx, bb) in body.blocks.iter().enumerate() {
+            let bb_id = BlockId(bb_idx);
+            for stmt in &bb.stmts {
+                stmt_locs.entry(stmt.span).or_insert((body.id, bb_id));
+            }
+        }
+    }
+
+    fn unwrap_parens<'a>(mut e: ast::Expr<'a>) -> ast::Expr<'a> {
+        loop {
+            match e {
+                ast::Expr::Parenthesized(p) => e = p.expr(),
+                _ => return e,
+            }
+        }
+    }
+
+    fn collect_calls<'a>(
+        node: &'a SyntaxNode,
+        cfgs: &CfgCollection,
+        stmt_locs: &FxHashMap<Span, (BodyId, BlockId)>,
+        resolves: Option<&ResolveMap>,
+        out: &mut Vec<CallEdge>,
+    ) {
+        for child in node.children() {
+            if let Some(expr) = child.cast::<ast::Expr<'a>>() {
+                if let ast::Expr::FuncCall(call) = expr {
+                    let call_span = call.span();
+                    let callee_expr = unwrap_parens(call.callee());
+                    let callee_body = match callee_expr {
+                        ast::Expr::Closure(c) => cfgs.closure_body(c.span()),
+                        ast::Expr::Ident(ident) => resolves
+                            .and_then(|m| m.get(&ident.span()).copied())
+                            .and_then(|decl_span| cfgs.decl_body(decl_span)),
+                        _ => None,
+                    };
+
+                    if let (Some(callee_body), Some((caller_body, caller_block))) =
+                        (callee_body, stmt_locs.get(&call_span).copied())
+                    {
+                        out.push(CallEdge {
+                            call_span,
+                            caller_body,
+                            caller_block,
+                            callee_body,
+                        });
+                    }
+                }
+
+                collect_calls(expr.to_untyped(), cfgs, stmt_locs, resolves, out);
+            } else {
+                collect_calls(child, cfgs, stmt_locs, resolves, out);
+            }
+        }
+    }
+
+    let mut calls = Vec::new();
+    collect_calls(root, &cfgs, &stmt_locs, resolves, &mut calls);
+
+    InterproceduralCfg { cfgs, calls }
 }
 
 /// Returns blocks that are structurally unreachable because the builder had no
