@@ -6,10 +6,11 @@ input_file: crates/tinymist-query/src/fixtures/lint/return_loop.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.return-outside-function",
    "message": "`return` statement in a non-function context",
    "range": "1:2:1:8",
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
   }
  ]
 }
