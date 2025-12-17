@@ -1,6 +1,6 @@
 //! Definition collector for dead code analysis.
 
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{ArgExpr, Decl, DefKind, Expr, ExprInfo, Pattern, PatternSig},
@@ -40,7 +40,7 @@ pub fn collect_definitions(ei: &ExprInfo) -> Vec<DefInfo> {
         ei,
         definitions: &mut definitions,
         fid: ei.fid,
-        ignored: HashSet::new(),
+        ignored: FxHashSet::default(),
     };
 
     collector.collect_exports();
@@ -58,7 +58,7 @@ struct DefinitionCollector<'a> {
     ei: &'a ExprInfo,
     definitions: &'a mut Vec<DefInfo>,
     fid: FileId,
-    ignored: HashSet<Interned<Decl>>,
+    ignored: FxHashSet<Interned<Decl>>,
 }
 
 impl<'a> DefinitionCollector<'a> {

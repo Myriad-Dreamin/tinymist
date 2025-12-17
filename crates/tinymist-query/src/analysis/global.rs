@@ -846,32 +846,12 @@ impl SharedContext {
 
                 let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
 
-                let has_references = |decl: &Interned<Decl>| -> bool {
-                    if matches!(decl.as_ref(), Decl::PathStem(_)) {
-                        if ei.resolves.values().any(|r| {
-                            matches!(
-                                r.step.as_ref(),
-                                Some(Expr::Decl(step_decl)) if step_decl == decl
-                            )
-                        }) {
-                            return true;
-                        }
-                    } else if ei
-                        .get_refs(decl.clone())
-                        .any(|(_, r)| r.as_ref().decl != *decl)
-                    {
-                        return true;
-                    }
-
-                    cross_file_refs.contains(decl)
-                };
-
                 tinymist_lint::lint_file_with_dead_code_config(
                     self.world(),
                     &ei,
                     ti,
                     issues.clone(),
-                    has_references,
+                    &cross_file_refs,
                     &self.analysis.dead_code,
                 )
             },
@@ -884,18 +864,24 @@ impl SharedContext {
         current_file: TypstFileId,
         current_ei: &ExprInfo,
     ) -> FxHashSet<Interned<Decl>> {
-        let mut referenced_decls = FxHashSet::default();
-        let files: Vec<_> = self.world().depended_files().into_iter().collect();
+        let mut referenced = FxHashSet::default();
 
-        let mut all_decls = Vec::new();
+        let exported: FxHashSet<Interned<Decl>> = current_ei
+            .exports
+            .iter()
+            .filter_map(|(_, expr)| match expr {
+                Expr::Decl(decl) => Some(decl.clone()),
+                _ => None,
+            })
+            .collect();
 
-        for (_, expr) in current_ei.exports.iter() {
-            if let Expr::Decl(decl) = expr {
-                all_decls.push(decl.clone());
-            }
+        if exported.is_empty() {
+            return referenced;
         }
 
-        for &file_id in &files {
+        // Collect references by scanning other files once, instead of checking
+        // every exported symbol against every file.
+        for file_id in self.world().depended_files() {
             if file_id == current_file {
                 continue;
             }
@@ -912,17 +898,20 @@ impl SharedContext {
 
             let file_ei = self.expr_stage(&src);
 
-            for decl in &all_decls {
-                if file_ei
-                    .get_refs(decl.clone())
-                    .any(|(_, r)| r.as_ref().decl != *decl)
+            for r in file_ei.resolves.values() {
+                // Match the same shape as the previous `get_refs(..).any(|..| r.decl != decl)`
+                // check: only count references that trace back to a root
+                // definition in the current file.
+                if let Some(Expr::Decl(root_decl)) = r.root.as_ref()
+                    && exported.contains(root_decl)
+                    && r.decl != *root_decl
                 {
-                    referenced_decls.insert(decl.clone());
+                    referenced.insert(root_decl.clone());
                 }
             }
         }
 
-        referenced_decls
+        referenced
     }
 
     pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {

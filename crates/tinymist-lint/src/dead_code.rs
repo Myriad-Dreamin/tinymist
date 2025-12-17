@@ -3,7 +3,7 @@
 mod collector;
 mod diagnostic;
 
-use std::collections::{HashMap, HashSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use tinymist_analysis::{
     adt::interner::Interned,
@@ -20,10 +20,10 @@ use collector::{DefInfo, DefScope, collect_definitions};
 use diagnostic::generate_diagnostic;
 
 struct ImportUsageInfo {
-    used: HashSet<Interned<Decl>>,
-    shadowed: HashSet<Interned<Decl>>,
-    module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>>,
-    module_used_decls: HashSet<Interned<Decl>>,
+    used: FxHashSet<Interned<Decl>>,
+    shadowed: FxHashSet<Interned<Decl>>,
+    module_children: FxHashMap<Interned<Decl>, FxHashSet<Interned<Decl>>>,
+    module_used_decls: FxHashSet<Interned<Decl>>,
 }
 
 /// Configuration for dead code detection.
@@ -50,7 +50,7 @@ impl Default for DeadCodeConfig {
 pub fn check_dead_code(
     world: &LspWorld,
     ei: &ExprInfo,
-    has_references: impl Fn(&Interned<Decl>) -> bool,
+    cross_file_refs: &FxHashSet<Interned<Decl>>,
     config: &DeadCodeConfig,
 ) -> DiagnosticVec {
     let mut diagnostics = EcoVec::new();
@@ -68,7 +68,29 @@ pub fn check_dead_code(
         module_used_decls,
     } = compute_import_usage(&definitions, ei);
 
-    let mut seen_decls = HashSet::new();
+    let mut seen_decls: FxHashSet<Interned<Decl>> = FxHashSet::default();
+
+    let has_references = |decl: &Interned<Decl>| -> bool {
+        if matches!(decl.as_ref(), Decl::PathStem(_)) {
+            // Path stems are "used" when they appear as an intermediate step in
+            // resolution (e.g. when building module import graphs).
+            return ei.resolves.values().any(|r| {
+                matches!(
+                    r.step.as_ref(),
+                    Some(Expr::Decl(step_decl)) if step_decl == decl
+                )
+            });
+        }
+
+        if ei
+            .get_refs(decl.clone())
+            .any(|(_, r)| r.as_ref().decl != *decl)
+        {
+            return true;
+        }
+
+        cross_file_refs.contains(decl)
+    };
 
     for def_info in definitions {
         let def_info = if config.check_exported
@@ -118,10 +140,11 @@ pub fn check_dead_code(
 }
 
 fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageInfo {
-    let mut alias_links: HashMap<Interned<Decl>, Interned<Decl>> = HashMap::new();
-    let mut shadowed = HashSet::new();
-    let mut module_children: HashMap<Interned<Decl>, HashSet<Interned<Decl>>> = HashMap::new();
-    let mut module_targets: HashMap<Interned<Decl>, FileId> = HashMap::new();
+    let mut alias_links: FxHashMap<Interned<Decl>, Interned<Decl>> = FxHashMap::default();
+    let mut shadowed: FxHashSet<Interned<Decl>> = FxHashSet::default();
+    let mut module_children: FxHashMap<Interned<Decl>, FxHashSet<Interned<Decl>>> =
+        FxHashMap::default();
+    let mut module_targets: FxHashMap<Interned<Decl>, FileId> = FxHashMap::default();
 
     for (child, layout) in ei.module_items.iter() {
         module_children
@@ -157,7 +180,7 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         }
     }
 
-    let mut used: HashSet<Interned<Decl>> = HashSet::new();
+    let mut used: FxHashSet<Interned<Decl>> = FxHashSet::default();
 
     for r in ei.resolves.values() {
         if matches!(r.decl.as_ref(), Decl::IdentRef(_)) {
@@ -179,15 +202,15 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         }
     }
 
-    let mut used_module_files = HashSet::new();
+    let mut used_module_files: FxHashSet<FileId> = FxHashSet::default();
     for decl in &used {
         if let Some(fid) = decl.file_id() {
             used_module_files.insert(fid);
         }
     }
 
-    let mut module_used_decls = HashSet::new();
-    let mut module_used_candidates: HashMap<FileId, Vec<Interned<Decl>>> = HashMap::new();
+    let mut module_used_decls: FxHashSet<Interned<Decl>> = FxHashSet::default();
+    let mut module_used_candidates: FxHashMap<FileId, Vec<Interned<Decl>>> = FxHashMap::default();
     for (decl, fid) in &module_targets {
         if module_children.contains_key(decl) {
             continue;
@@ -252,8 +275,8 @@ fn is_wildcard_module_import_decl(ei: &ExprInfo, decl: &Interned<Decl>) -> bool 
     false
 }
 
-fn collect_used_decls(reference: &RefExpr, used: &mut HashSet<Interned<Decl>>) {
-    let mut visited_refs = HashSet::new();
+fn collect_used_decls(reference: &RefExpr, used: &mut FxHashSet<Interned<Decl>>) {
+    let mut visited_refs: FxHashSet<Interned<RefExpr>> = FxHashSet::default();
     let mut worklist = Vec::new();
 
     if let Some(step) = reference.step.as_ref() {
@@ -334,7 +357,6 @@ fn matches_pattern(name: &str, pattern: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashSet;
 
     #[test]
     fn test_pattern_matching() {
@@ -359,7 +381,7 @@ mod tests {
             term: None,
         };
 
-        let mut used = HashSet::new();
+        let mut used: FxHashSet<Interned<Decl>> = FxHashSet::default();
         collect_used_decls(&reference, &mut used);
 
         assert!(used.contains(&module_decl));

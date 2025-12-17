@@ -629,10 +629,6 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
-    use tinymist_analysis::{
-        adt::interner::Interned,
-        syntax::{Decl, Expr},
-    };
     use tinymist_lint::{DeadCodeConfig, KnownIssues};
 
     use crate::tests::*;
@@ -673,26 +669,7 @@ mod lint_tests {
             let source = ctx.source_by_path(&path).unwrap();
             let ei = ctx.expr_stage(&source);
             let ti = ctx.type_check(&source);
-
-            let has_references = |decl: &Interned<Decl>| -> bool {
-                if matches!(decl.as_ref(), Decl::PathStem(_)) {
-                    if ei.resolves.values().any(|r| {
-                        matches!(
-                            r.step.as_ref(),
-                            Some(Expr::Decl(step_decl)) if step_decl == decl
-                        )
-                    }) {
-                        return true;
-                    }
-                } else if ei
-                    .get_refs(decl.clone())
-                    .any(|(_, r)| r.as_ref().decl != *decl)
-                {
-                    return true;
-                }
-
-                false
-            };
+            let cross_file_refs = rustc_hash::FxHashSet::default();
 
             let dead_code_config = DeadCodeConfig {
                 check_exported: true,
@@ -703,7 +680,7 @@ mod lint_tests {
                 &ei,
                 ti,
                 KnownIssues::default(),
-                has_references,
+                &cross_file_refs,
                 &dead_code_config,
             )
             .diagnostics;

@@ -11,6 +11,7 @@ pub const DOCUMENTED_EXPORTED_FUNCTION_HINT: &str =
 
 use std::sync::Arc;
 
+use rustc_hash::FxHashSet;
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{Decl, ExprInfo},
@@ -46,15 +47,16 @@ pub fn lint_file(
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
-    has_references: impl Fn(&Interned<Decl>) -> bool,
 ) -> LintInfo {
+    let cross_file_refs: FxHashSet<Interned<Decl>> = FxHashSet::default();
+    let dead_code_config = DeadCodeConfig::default();
     lint_file_with_dead_code_config(
         world,
         ei,
         ti,
         known_issues,
-        has_references,
-        &DeadCodeConfig::default(),
+        &cross_file_refs,
+        &dead_code_config,
     )
 }
 
@@ -64,12 +66,12 @@ pub fn lint_file_with_dead_code_config(
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
-    has_references: impl Fn(&Interned<Decl>) -> bool,
+    cross_file_refs: &FxHashSet<Interned<Decl>>,
     dead_code_config: &DeadCodeConfig,
 ) -> LintInfo {
     let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
 
-    let dead_code_diags = dead_code::check_dead_code(world, ei, has_references, dead_code_config);
+    let dead_code_diags = dead_code::check_dead_code(world, ei, cross_file_refs, dead_code_config);
     diagnostics.extend(dead_code_diags);
 
     LintInfo {
