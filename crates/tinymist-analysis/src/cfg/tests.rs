@@ -1,7 +1,10 @@
 use super::*;
 
+use std::path::Path;
+
 use typst::syntax::Source;
-use typst::syntax::{Span, ast};
+use typst::syntax::ast::AstNode;
+use typst::syntax::{FileId, Span, VirtualPath, ast};
 
 fn walk_exprs<'a>(node: &'a typst::syntax::SyntaxNode, f: &mut impl FnMut(ast::Expr<'a>)) {
     for child in node.children() {
@@ -135,7 +138,9 @@ fn ipcfg_direct_closure_call_edge() {
         .expect("closure CFG");
 
     assert!(
-        ip.calls.iter().any(|e| e.caller_body == root.id && e.callee_body == closure.id),
+        ip.calls
+            .iter()
+            .any(|e| e.caller_body == root.id && e.callee_body == closure.id),
         "expected a call edge from root to closure, got {:#?}",
         ip.calls
     );
@@ -159,10 +164,10 @@ fn ipcfg_let_bound_closure_call_edge_with_resolve_map() {
             }
         }
         ast::Expr::FuncCall(call) => {
-            if let ast::Expr::Ident(ident) = call.callee() {
-                if ident.get() == "f" {
-                    use_span = Some(ident.span());
-                }
+            if let ast::Expr::Ident(ident) = call.callee()
+                && ident.get() == "f"
+            {
+                use_span = Some(ident.span());
             }
         }
         _ => {}
@@ -207,10 +212,10 @@ fn ipcfg_let_var_bound_closure_call_edge_with_resolve_map() {
             }
         }
         ast::Expr::FuncCall(call) => {
-            if let ast::Expr::Ident(ident) = call.callee() {
-                if ident.get() == "f" {
-                    use_span = Some(ident.span());
-                }
+            if let ast::Expr::Ident(ident) = call.callee()
+                && ident.get() == "f"
+            {
+                use_span = Some(ident.span());
             }
         }
         _ => {}
@@ -230,6 +235,123 @@ fn ipcfg_let_var_bound_closure_call_edge_with_resolve_map() {
     assert!(
         ip.calls.iter().any(|e| e.callee_body == callee),
         "expected a call edge into the var-bound closure body, got {:#?}",
+        ip.calls
+    );
+}
+
+fn source_at(path: &str, text: &str) -> Source {
+    let id = FileId::new(None, VirtualPath::new(Path::new(path)));
+    Source::new(id, text.to_owned())
+}
+
+#[test]
+fn ipcfg_cross_file_imported_ident_call_edge_with_resolve_map() {
+    let callee_src = source_at(
+        "/b.typ",
+        r#"#{
+  let f(x) = { x }
+}"#,
+    );
+    let caller_src = source_at(
+        "/a.typ",
+        r#"#{
+  import "/b.typ": f
+  f(1)
+}"#,
+    );
+
+    let mut def_span: Option<Span> = None;
+    walk_exprs(callee_src.root(), &mut |expr| {
+        if let ast::Expr::LetBinding(let_) = expr
+            && let ast::LetBindingKind::Closure(ident) = let_.kind()
+            && ident.get() == "f"
+        {
+            def_span = Some(ident.span());
+        }
+    });
+
+    let mut use_span: Option<Span> = None;
+    walk_exprs(caller_src.root(), &mut |expr| {
+        if let ast::Expr::FuncCall(call) = expr
+            && let ast::Expr::Ident(ident) = call.callee()
+            && ident.get() == "f"
+        {
+            use_span = Some(ident.span());
+        }
+    });
+
+    let def_span = def_span.expect("def span");
+    let use_span = use_span.expect("use span");
+
+    let mut resolves = ResolveMap::default();
+    resolves.insert(use_span, def_span);
+
+    let ip =
+        build_interprocedural_cfg_many([caller_src.root(), callee_src.root()], Some(&resolves));
+
+    let callee = ip
+        .cfgs
+        .decl_body(def_span)
+        .expect("callee body for declaration");
+    assert!(
+        ip.calls.iter().any(|e| e.callee_body == callee),
+        "expected a call edge into the imported closure body, got {:#?}",
+        ip.calls
+    );
+}
+
+#[test]
+fn ipcfg_cross_file_imported_field_access_call_edge_with_resolve_map() {
+    let callee_src = source_at(
+        "/b.typ",
+        r#"#{
+  let f(x) = { x }
+}"#,
+    );
+    let caller_src = source_at(
+        "/a.typ",
+        r#"#{
+  import "/b.typ" as m
+  m.f(1)
+}"#,
+    );
+
+    let mut def_span: Option<Span> = None;
+    walk_exprs(callee_src.root(), &mut |expr| {
+        if let ast::Expr::LetBinding(let_) = expr
+            && let ast::LetBindingKind::Closure(ident) = let_.kind()
+            && ident.get() == "f"
+        {
+            def_span = Some(ident.span());
+        }
+    });
+
+    let mut use_span: Option<Span> = None;
+    walk_exprs(caller_src.root(), &mut |expr| {
+        if let ast::Expr::FuncCall(call) = expr
+            && let ast::Expr::FieldAccess(access) = call.callee()
+            && access.field().get() == "f"
+        {
+            use_span = Some(access.field().span());
+        }
+    });
+
+    let def_span = def_span.expect("def span");
+    let use_span = use_span.expect("use span");
+
+    let mut resolves = ResolveMap::default();
+    resolves.insert(use_span, def_span);
+
+    let ip =
+        build_interprocedural_cfg_many([caller_src.root(), callee_src.root()], Some(&resolves));
+
+    let callee = ip
+        .cfgs
+        .decl_body(def_span)
+        .expect("callee body for declaration");
+    assert!(
+        ip.calls.iter().any(|e| e.callee_body == callee),
+        "expected a call edge into the field-accessed imported closure body, got {:#?}",
         ip.calls
     );
 }
