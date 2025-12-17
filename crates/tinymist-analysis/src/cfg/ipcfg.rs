@@ -1,6 +1,8 @@
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use typst::syntax::ast::AstNode;
 use typst::syntax::{Span, SyntaxNode, ast};
+
+use crate::syntax::{Expr, ExprInfo, RefExpr as AnalysisRefExpr};
 
 use super::builder::build_cfgs_many;
 use super::ir::*;
@@ -29,6 +31,65 @@ pub struct InterproceduralCfg {
     pub cfgs: CfgCollection,
     /// Call edges discovered in the syntax tree.
     pub calls: Vec<CallEdge>,
+}
+
+/// Builds a [`ResolveMap`] from an [`ExprInfo`] resolve table.
+///
+/// The resulting map can be passed to [`build_interprocedural_cfg`] to enable
+/// call edges for `let`-bound closures and imported symbols without requiring a
+/// separate resolver pass.
+///
+/// This is best-effort: only references that can be traced back to a concrete
+/// definition span (e.g. `Decl::Func` / `Decl::Var`) are included.
+pub fn resolve_map_from_expr_info(ei: &ExprInfo) -> ResolveMap {
+    fn resolved_def_span(reference: &AnalysisRefExpr) -> Option<Span> {
+        let mut visited: FxHashSet<crate::ty::Interned<AnalysisRefExpr>> = FxHashSet::default();
+        let mut stack: Vec<Expr> = Vec::new();
+
+        if let Some(step) = reference.step.clone() {
+            stack.push(step);
+        }
+        if let Some(root) = reference.root.clone() {
+            stack.push(root);
+        }
+
+        while let Some(expr) = stack.pop() {
+            match expr {
+                Expr::Decl(decl) => {
+                    if decl.is_def() {
+                        return Some(decl.span());
+                    }
+                }
+                Expr::Ref(r) => {
+                    if visited.insert(r.clone()) {
+                        if let Some(step) = r.step.clone() {
+                            stack.push(step);
+                        }
+                        if let Some(root) = r.root.clone() {
+                            stack.push(root);
+                        }
+                    }
+                }
+                Expr::Select(select) => {
+                    stack.push(select.lhs.clone());
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
+    let mut out = ResolveMap::default();
+    for (&use_span, reference) in ei.resolves.iter() {
+        if use_span.is_detached() {
+            continue;
+        }
+        if let Some(def_span) = resolved_def_span(reference.as_ref()) {
+            out.insert(use_span, def_span);
+        }
+    }
+    out
 }
 
 /// Builds per-body CFGs plus best-effort call edges between bodies.

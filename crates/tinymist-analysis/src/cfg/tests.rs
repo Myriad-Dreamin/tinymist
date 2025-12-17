@@ -1,10 +1,16 @@
 use super::*;
 
 use std::path::Path;
+use std::sync::Arc;
 
+use rustc_hash::FxHashMap;
 use typst::syntax::Source;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{FileId, Span, VirtualPath, ast};
+use typst::utils::LazyHash;
+
+use crate::docs::DocString;
+use crate::syntax::{Decl, Expr, ExprInfo, ExprInfoRepr, LexicalScope, RefExpr};
 
 fn walk_exprs<'a>(node: &'a typst::syntax::SyntaxNode, f: &mut impl FnMut(ast::Expr<'a>)) {
     for child in node.children() {
@@ -235,6 +241,79 @@ fn ipcfg_let_var_bound_closure_call_edge_with_resolve_map() {
     assert!(
         ip.calls.iter().any(|e| e.callee_body == callee),
         "expected a call edge into the var-bound closure body, got {:#?}",
+        ip.calls
+    );
+}
+
+#[test]
+fn ipcfg_resolve_map_from_expr_info_enables_let_bound_call_edge() {
+    let source = Source::detached(
+        r#"#{
+  let f(x) = { x }
+  f(1)
+}"#,
+    );
+
+    let mut def_ident: Option<ast::Ident<'_>> = None;
+    let mut use_ident: Option<ast::Ident<'_>> = None;
+    walk_exprs(source.root(), &mut |expr| match expr {
+        ast::Expr::LetBinding(let_) => {
+            if let ast::LetBindingKind::Closure(ident) = let_.kind()
+                && ident.get() == "f"
+            {
+                def_ident = Some(ident);
+            }
+        }
+        ast::Expr::FuncCall(call) => {
+            if let ast::Expr::Ident(ident) = call.callee()
+                && ident.get() == "f"
+            {
+                use_ident = Some(ident);
+            }
+        }
+        _ => {}
+    });
+
+    let def_ident = def_ident.expect("def ident");
+    let use_ident = use_ident.expect("use ident");
+
+    // Create a minimal ExprInfo with only the resolve we need:
+    // use-site ident span -> reference chain that roots at the definition decl.
+    let def_decl: crate::syntax::DeclExpr = Decl::func(def_ident).into();
+    let use_decl: crate::syntax::DeclExpr = Decl::ident_ref(use_ident).into();
+    let reference = RefExpr {
+        decl: use_decl,
+        step: Some(Expr::Decl(def_decl.clone())),
+        root: Some(Expr::Decl(def_decl.clone())),
+        term: None,
+    };
+
+    let mut resolves: FxHashMap<Span, crate::ty::Interned<RefExpr>> = FxHashMap::default();
+    resolves.insert(use_ident.span(), crate::ty::Interned::new(reference));
+
+    let ei = ExprInfo::new(ExprInfoRepr {
+        fid: source.id(),
+        revision: 0,
+        source: source.clone(),
+        root: Expr::Star,
+        module_docstring: Arc::new(DocString::default()),
+        exports: Arc::new(LazyHash::new(LexicalScope::default())),
+        imports: FxHashMap::default(),
+        exprs: FxHashMap::default(),
+        resolves,
+        docstrings: FxHashMap::default(),
+        module_items: FxHashMap::default(),
+    });
+
+    let resolves = resolve_map_from_expr_info(&ei);
+    let ip = build_interprocedural_cfg(source.root(), Some(&resolves));
+    let callee = ip
+        .cfgs
+        .decl_body(def_ident.span())
+        .expect("callee body for declaration");
+    assert!(
+        ip.calls.iter().any(|e| e.callee_body == callee),
+        "expected a call edge into the let-bound closure body, got {:#?}",
         ip.calls
     );
 }
