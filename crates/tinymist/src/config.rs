@@ -984,7 +984,6 @@ pub struct LintFeat {
     #[serde(
         default,
         rename = "unused",
-        alias = "deadCode",
         deserialize_with = "deserialize_null_default"
     )]
     pub unused: UnusedFeat,
