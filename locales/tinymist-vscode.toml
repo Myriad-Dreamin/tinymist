@@ -1621,7 +1621,7 @@ zh = "是否检查未使用的函数参数。"
 
 [extension.tinymist.config.tinymist.lint.unused.exceptions.title]
 en = "Unused exceptions"
-zh = "死代码例外规则"
+zh = "未使用声明的例外规则"
 
 [extension.tinymist.config.tinymist.lint.unused.exceptions.desc]
 en = "Glob-like patterns for exceptions (e.g., \"test_*\", \"_*\")."
