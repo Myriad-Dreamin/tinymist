@@ -629,7 +629,7 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
-    use tinymist_lint::{DeadCodeConfig, KnownIssues};
+    use tinymist_lint::{KnownIssues, UnusedConfig};
 
     use crate::tests::*;
 
@@ -671,11 +671,11 @@ mod lint_tests {
             let ti = ctx.type_check(&source);
             let cross_file_refs = rustc_hash::FxHashSet::default();
 
-            let dead_code_config = DeadCodeConfig {
+            let dead_code_config = UnusedConfig {
                 check_exported: true,
-                ..DeadCodeConfig::default()
+                ..UnusedConfig::default()
             };
-            let result = tinymist_lint::lint_file_with_dead_code_config(
+            let result = tinymist_lint::lint_file_with_unused_config(
                 ctx.world(),
                 &ei,
                 ti,

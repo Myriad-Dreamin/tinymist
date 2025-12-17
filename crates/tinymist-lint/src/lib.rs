@@ -1,8 +1,8 @@
 //! A linter for Typst.
 
-mod dead_code;
+mod unused;
 
-pub use dead_code::DeadCodeConfig;
+pub use unused::UnusedConfig;
 
 /// Hint added to diagnostics for documented exported functions, to mark them as
 /// likely public API.
@@ -49,30 +49,30 @@ pub fn lint_file(
     known_issues: KnownIssues,
 ) -> LintInfo {
     let cross_file_refs: FxHashSet<Interned<Decl>> = FxHashSet::default();
-    let dead_code_config = DeadCodeConfig::default();
-    lint_file_with_dead_code_config(
+    let unused_config = UnusedConfig::default();
+    lint_file_with_unused_config(
         world,
         ei,
         ti,
         known_issues,
         &cross_file_refs,
-        &dead_code_config,
+        &unused_config,
     )
 }
 
-/// Performs linting check on file with a custom dead-code configuration.
-pub fn lint_file_with_dead_code_config(
+/// Performs linting check on file with a custom unused configuration.
+pub fn lint_file_with_unused_config(
     world: &LspWorld,
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
     cross_file_refs: &FxHashSet<Interned<Decl>>,
-    dead_code_config: &DeadCodeConfig,
+    unused_config: &UnusedConfig,
 ) -> LintInfo {
     let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
 
-    let dead_code_diags = dead_code::check_dead_code(world, ei, cross_file_refs, dead_code_config);
-    diagnostics.extend(dead_code_diags);
+    let unused_diags = unused::check_unused(world, ei, cross_file_refs, unused_config);
+    diagnostics.extend(unused_diags);
 
     LintInfo {
         revision: ei.revision,

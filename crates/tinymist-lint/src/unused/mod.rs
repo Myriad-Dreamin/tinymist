@@ -1,4 +1,4 @@
-//! Dead code detection for Typst.
+//! Unused declaration detection for Typst.
 
 mod collector;
 mod diagnostic;
@@ -26,9 +26,9 @@ struct ImportUsageInfo {
     module_used_decls: FxHashSet<Interned<Decl>>,
 }
 
-/// Configuration for dead code detection.
+/// Configuration for unused declaration detection.
 #[derive(Debug, Clone, Hash)]
-pub struct DeadCodeConfig {
+pub struct UnusedConfig {
     /// Whether to check exported but unused symbols.
     pub check_exported: bool,
     /// Whether to check unused function parameters.
@@ -37,7 +37,7 @@ pub struct DeadCodeConfig {
     pub exceptions: Vec<String>,
 }
 
-impl Default for DeadCodeConfig {
+impl Default for UnusedConfig {
     fn default() -> Self {
         Self {
             check_exported: false,
@@ -47,11 +47,11 @@ impl Default for DeadCodeConfig {
     }
 }
 
-pub fn check_dead_code(
+pub fn check_unused(
     world: &LspWorld,
     ei: &ExprInfo,
     cross_file_refs: &FxHashSet<Interned<Decl>>,
-    config: &DeadCodeConfig,
+    config: &UnusedConfig,
 ) -> DiagnosticVec {
     let mut diagnostics = EcoVec::new();
 
@@ -129,10 +129,8 @@ pub fn check_dead_code(
             _ => !has_references(&def_info.decl),
         };
 
-        if is_unused {
-            if let Some(diag) = generate_diagnostic(&def_info, world, ei) {
-                diagnostics.push(diag);
-            }
+        if is_unused && let Some(diag) = generate_diagnostic(&def_info, world, ei) {
+            diagnostics.push(diag);
         }
     }
 
@@ -157,26 +155,24 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         if matches!(
             def.decl.as_ref(),
             Decl::ModuleImport(_) | Decl::ModuleAlias(_)
-        ) {
-            if let Some(r) = ei.resolves.get(&def.span) {
-                let fid = r
-                    .root
-                    .as_ref()
-                    .and_then(|expr| expr.file_id())
-                    .or_else(|| r.step.as_ref().and_then(|expr| expr.file_id()));
-                if let Some(fid) = fid {
-                    module_targets.insert(def.decl.clone(), fid);
-                }
+        ) && let Some(r) = ei.resolves.get(&def.span)
+        {
+            let fid = r
+                .root
+                .as_ref()
+                .and_then(|expr| expr.file_id())
+                .or_else(|| r.step.as_ref().and_then(|expr| expr.file_id()));
+            if let Some(fid) = fid {
+                module_targets.insert(def.decl.clone(), fid);
             }
         }
 
-        if matches!(def.decl.as_ref(), Decl::ImportAlias(_)) {
-            if let Some(alias_ref) = ei.resolves.get(&def.span) {
-                if let Some(Expr::Decl(step_decl)) = alias_ref.step.as_ref() {
-                    alias_links.insert(def.decl.clone(), step_decl.clone());
-                    shadowed.insert(step_decl.clone());
-                }
-            }
+        if matches!(def.decl.as_ref(), Decl::ImportAlias(_))
+            && let Some(alias_ref) = ei.resolves.get(&def.span)
+            && let Some(Expr::Decl(step_decl)) = alias_ref.step.as_ref()
+        {
+            alias_links.insert(def.decl.clone(), step_decl.clone());
+            shadowed.insert(step_decl.clone());
         }
     }
 
@@ -195,10 +191,10 @@ fn compute_import_usage(definitions: &[DefInfo], ei: &ExprInfo) -> ImportUsageIn
         .collect();
 
     while let Some(alias) = worklist.pop() {
-        if let Some(target) = alias_links.get(&alias) {
-            if used.insert(target.clone()) {
-                worklist.push(target.clone());
-            }
+        if let Some(target) = alias_links.get(&alias)
+            && used.insert(target.clone())
+        {
+            worklist.push(target.clone());
         }
     }
 
@@ -309,7 +305,7 @@ fn collect_used_decls(reference: &RefExpr, used: &mut FxHashSet<Interned<Decl>>)
     }
 }
 
-fn should_skip_definition(def_info: &DefInfo, config: &DeadCodeConfig) -> bool {
+fn should_skip_definition(def_info: &DefInfo, config: &UnusedConfig) -> bool {
     if matches!(def_info.scope, DefScope::Exported) && !config.check_exported {
         return true;
     }

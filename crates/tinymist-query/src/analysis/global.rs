@@ -14,7 +14,7 @@ use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::{DeadCodeConfig, KnownIssues, LintInfo};
+use tinymist_lint::{KnownIssues, LintInfo, UnusedConfig};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -83,8 +83,8 @@ pub struct Analysis {
     pub color_theme: ColorTheme,
     /// When to trigger the lint.
     pub lint: TaskWhen,
-    /// Configuration for dead code detection.
-    pub dead_code: DeadCodeConfig,
+    /// Configuration for unused declaration detection.
+    pub unused: UnusedConfig,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
@@ -839,23 +839,22 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(
-            hash128(&(&ei, &ti, issues, &self.analysis.dead_code)),
-            |_| {
+        self.slot
+            .lint
+            .compute(hash128(&(&ei, &ti, issues, &self.analysis.unused)), |_| {
                 guard.miss();
 
                 let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
 
-                tinymist_lint::lint_file_with_dead_code_config(
+                tinymist_lint::lint_file_with_unused_config(
                     self.world(),
                     &ei,
                     ti,
                     issues.clone(),
                     &cross_file_refs,
-                    &self.analysis.dead_code,
+                    &self.analysis.unused,
                 )
-            },
-        )
+            })
     }
 
     /// Computes which declarations from the current file are referenced by other files.

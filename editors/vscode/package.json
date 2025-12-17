@@ -454,21 +454,21 @@
             "%extension.tinymist.config.tinymist.lint.when.string.enum.onType%"
           ]
         },
-        "tinymist.lint.deadCode.checkExported": {
-          "title": "%extension.tinymist.config.tinymist.lint.deadCode.checkExported.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.checkExported.desc%",
+        "tinymist.lint.unused.checkExported": {
+          "title": "%extension.tinymist.config.tinymist.lint.unused.checkExported.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.unused.checkExported.desc%",
           "type": "boolean",
           "default": false
         },
-        "tinymist.lint.deadCode.checkParams": {
-          "title": "%extension.tinymist.config.tinymist.lint.deadCode.checkParams.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.checkParams.desc%",
+        "tinymist.lint.unused.checkParams": {
+          "title": "%extension.tinymist.config.tinymist.lint.unused.checkParams.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.unused.checkParams.desc%",
           "type": "boolean",
           "default": true
         },
-        "tinymist.lint.deadCode.exceptions": {
-          "title": "%extension.tinymist.config.tinymist.lint.deadCode.exceptions.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.lint.deadCode.exceptions.desc%",
+        "tinymist.lint.unused.exceptions": {
+          "title": "%extension.tinymist.config.tinymist.lint.unused.exceptions.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.lint.unused.exceptions.desc%",
           "type": "array",
           "items": {
             "type": "string"

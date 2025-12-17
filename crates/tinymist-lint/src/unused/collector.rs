@@ -1,4 +1,4 @@
-//! Definition collector for dead code analysis.
+//! Definition collector for unused declaration analysis.
 
 use rustc_hash::FxHashSet;
 use tinymist_analysis::{
@@ -64,10 +64,10 @@ struct DefinitionCollector<'a> {
 impl<'a> DefinitionCollector<'a> {
     fn collect_exports(&mut self) {
         for (_name, expr) in self.ei.exports.iter() {
-            if let Some(decl) = Self::extract_decl(expr) {
-                if decl.is_def() {
-                    self.add_definition(decl, DefScope::Exported);
-                }
+            if let Some(decl) = Self::extract_decl(expr)
+                && decl.is_def()
+            {
+                self.add_definition(decl, DefScope::Exported);
             }
         }
     }

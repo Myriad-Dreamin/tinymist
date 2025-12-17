@@ -1,4 +1,4 @@
-//! Diagnostic generator for dead code warnings.
+//! Diagnostic generator for unused declaration warnings.
 //!
 //! This module creates user-friendly diagnostic messages for unused
 //! definitions, with appropriate hints and severity levels.
@@ -81,15 +81,14 @@ pub fn generate_diagnostic(
     }
 
     // Add kind-specific hints
-    if let DefKind::Function = def_info.kind {
-        if matches!(def_info.scope, DefScope::Exported)
-            && ei.docstrings.contains_key(&def_info.decl)
-        {
-            diag = diag.with_hint(DOCUMENTED_EXPORTED_FUNCTION_HINT);
-            diag = diag.with_hint(
+    if let DefKind::Function = def_info.kind
+        && matches!(def_info.scope, DefScope::Exported)
+        && ei.docstrings.contains_key(&def_info.decl)
+    {
+        diag = diag.with_hint(DOCUMENTED_EXPORTED_FUNCTION_HINT);
+        diag = diag.with_hint(
                 "if this is intended public API, you can ignore this diagnostic; otherwise consider removing it",
             );
-        }
     }
 
     if is_module_like {
