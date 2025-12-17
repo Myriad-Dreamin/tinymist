@@ -1620,7 +1620,7 @@ en = "Whether to check unused function parameters."
 zh = "是否检查未使用的函数参数。"
 
 [extension.tinymist.config.tinymist.lint.unused.exceptions.title]
-en = "Dead code exceptions"
+en = "Unused exceptions"
 zh = "死代码例外规则"
 
 [extension.tinymist.config.tinymist.lint.unused.exceptions.desc]
