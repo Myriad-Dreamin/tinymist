@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/unused_function.typ
+---
+{
+ "s0.typ": [
+  {
+   "code": "tinymist.unused.symbol",
+   "message": "unused function: `unused_func`\nHint: consider removing this function or prefixing with underscore: `_unused_func`",
+   "range": "1:5:1:16",
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}

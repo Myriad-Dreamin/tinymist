@@ -19,6 +19,7 @@ tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-std.workspace = true
 comemo.workspace = true
 rayon.workspace = true
+rustc-hash.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

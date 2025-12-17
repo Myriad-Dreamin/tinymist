@@ -1,0 +1,71 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/main.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/imported_unused.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:0:3:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+  "range": "2:1:2:33"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:17:2:30"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused import: `Bbar`\nHint: consider removing this unused import",
+  "range": "2:24:2:28"
+ },
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "2:28:2:33"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused import"
+   }
+  ],
+  "message": "unused import: `foo`\nHint: consider removing this unused import",
+  "range": "2:30:2:33"
+ }
+]

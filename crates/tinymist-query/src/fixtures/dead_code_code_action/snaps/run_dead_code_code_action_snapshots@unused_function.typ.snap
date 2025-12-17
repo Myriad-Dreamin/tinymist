@@ -1,0 +1,44 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/s0.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/unused_function.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_unused_func",
+        "range": "1:5:1:16"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `unused_func`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "1:0:4:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused function: `unused_func`\nHint: consider removing this function or prefixing with underscore: `_unused_func`",
+  "range": "1:5:1:16"
+ }
+]
