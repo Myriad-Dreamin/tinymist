@@ -201,7 +201,7 @@ export class LanguageState {
     };
 
     const trustedCommands = {
-      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
+      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText"],
     };
     const hoverStorage =
       extensionState.features.renderDocs && LanguageState.HoverTmpStorage

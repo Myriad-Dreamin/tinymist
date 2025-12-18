@@ -9,7 +9,7 @@ use serde::Deserialize;
 use tinymist_std::time::UtcDateTime;
 pub use typst::diag::PackageError;
 pub use typst::syntax::package::PackageSpec;
-use typst::syntax::package::{PackageInfo, TemplateInfo};
+use typst::syntax::package::{PackageInfo, TemplateInfo, VersionlessPackageSpec};
 
 mod dummy;
 pub use dummy::*;
@@ -29,6 +29,27 @@ pub use http::*;
 
 /// The default Typst registry.
 pub const DEFAULT_REGISTRY: &str = "https://packages.typst.org";
+
+/// The namespace for Typst registry.
+pub const PREVIEW_NS: &str = "preview";
+
+/// An extension trait for package specifications.
+pub trait PackageSpecExt {
+    /// Returns true if the package spec is in the preview namespace.
+    fn is_preview(&self) -> bool;
+}
+
+impl PackageSpecExt for PackageSpec {
+    fn is_preview(&self) -> bool {
+        self.namespace == PREVIEW_NS
+    }
+}
+
+impl PackageSpecExt for VersionlessPackageSpec {
+    fn is_preview(&self) -> bool {
+        self.namespace == PREVIEW_NS
+    }
+}
 
 /// A trait for package registries.
 pub trait PackageRegistry {
@@ -84,6 +105,11 @@ impl PackageIndexEntry {
             name: self.package.name.clone(),
             version: self.package.version,
         }
+    }
+
+    /// Check if this entry matches a versionless package specification.
+    pub fn matches_versionless(&self, spec: &VersionlessPackageSpec) -> bool {
+        self.namespace == spec.namespace && self.package.name == spec.name
     }
 }
 
