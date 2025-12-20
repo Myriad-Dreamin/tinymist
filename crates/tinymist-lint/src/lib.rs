@@ -22,6 +22,13 @@ mod cfg;
 /// A type alias for a vector of diagnostics.
 type DiagnosticVec = EcoVec<SourceDiagnostic>;
 
+#[derive(Default)]
+/// Cache container for lint analyses that are expensive to recompute (e.g. CFG +
+/// dataflow for particular bodies).
+pub struct LintCaches {
+    discard_by_return: cfg::DiscardByReturnCache,
+}
+
 /// The lint information about a file.
 #[derive(Debug, Clone)]
 pub struct LintInfo {
@@ -39,8 +46,10 @@ pub fn lint_file(
     ei: &ExprInfo,
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
+    caches: &mut LintCaches,
 ) -> LintInfo {
-    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+    let diagnostics =
+        Linter::new(world, ei.clone(), ti, known_issues, caches).lint(ei.source.root());
     LintInfo {
         revision: ei.revision,
         fid: ei.fid,
@@ -77,7 +86,7 @@ impl KnownIssues {
     }
 }
 
-struct Linter<'w> {
+struct Linter<'w, 'c> {
     world: &'w LspWorld,
     ei: ExprInfo,
     ti: Arc<TypeInfo>,
@@ -85,14 +94,16 @@ struct Linter<'w> {
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
+    caches: &'c mut LintCaches,
 }
 
-impl<'w> Linter<'w> {
+impl<'w, 'c> Linter<'w, 'c> {
     fn new(
         world: &'w LspWorld,
         ei: ExprInfo,
         ti: Arc<TypeInfo>,
         known_issues: KnownIssues,
+        caches: &'c mut LintCaches,
     ) -> Self {
         Self {
             world,
@@ -102,6 +113,7 @@ impl<'w> Linter<'w> {
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
+            caches,
         }
     }
 
@@ -428,7 +440,11 @@ impl<'w> Linter<'w> {
 
             let body = expr.body();
             this.expr(body);
-            cfg::lint_discarded_by_function_return(&mut this.diag, body);
+            cfg::lint_discarded_by_function_return_cached(
+                &mut this.caches.discard_by_return,
+                &mut this.diag,
+                body,
+            );
 
             Some(())
         })
@@ -441,7 +457,11 @@ impl<'w> Linter<'w> {
 
             let body = expr.body();
             this.expr(body);
-            cfg::lint_discarded_by_function_return(&mut this.diag, body);
+            cfg::lint_discarded_by_function_return_cached(
+                &mut this.caches.discard_by_return,
+                &mut this.diag,
+                body,
+            );
 
             Some(())
         })

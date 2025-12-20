@@ -836,9 +836,25 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
+
+        let source_hash = hash128(source);
+        let lint_caches = self.slot.lint_caches.compute(source.id(), |prev| {
+            if let Some(prev) = prev {
+                if prev.lock().source_hash == source_hash {
+                    return prev;
+                }
+            }
+
+            Arc::new(Mutex::new(LintCachesSlot {
+                source_hash,
+                caches: tinymist_lint::LintCaches::default(),
+            }))
+        });
+
         self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
             guard.miss();
-            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone())
+            let mut caches = lint_caches.lock();
+            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone(), &mut caches.caches)
         })
     }
 
@@ -1325,6 +1341,11 @@ pub struct ModuleAnalysisLocalCache {
     type_check: OnceLock<Arc<TypeInfo>>,
 }
 
+struct LintCachesSlot {
+    source_hash: u128,
+    caches: tinymist_lint::LintCaches,
+}
+
 /// A revision-managed (per input change) cache for all level of analysis
 /// results of a module.
 #[derive(Default)]
@@ -1391,6 +1412,7 @@ impl AnalysisRevCache {
                     expr_stage: slot.data.expr_stage.crawl(revision.get()),
                     type_check: slot.data.type_check.crawl(revision.get()),
                     lint: slot.data.lint.crawl(revision.get()),
+                    lint_caches: slot.data.lint_caches.crawl(revision.get()),
                 })
                 .unwrap_or_else(|| self.default_slot.clone())
         })
@@ -1424,6 +1446,7 @@ struct AnalysisRevSlot {
     expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
     lint: IncrCacheMap<u128, LintInfo>,
+    lint_caches: IncrCacheMap<TypstFileId, Arc<Mutex<LintCachesSlot>>>,
 }
 
 impl Drop for AnalysisRevSlot {

@@ -6,6 +6,18 @@ use typst::syntax::{Span, ast};
 
 use crate::DiagnosticVec;
 
+#[derive(Debug)]
+struct DiscardByReturnAnalysis {
+    cfg: Cfg,
+    reachable: Vec<bool>,
+    states: Vec<MustReturnState>,
+}
+
+#[derive(Default)]
+pub(crate) struct DiscardByReturnCache {
+    by_span: std::collections::HashMap<u64, std::sync::Arc<DiscardByReturnAnalysis>>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MustReturnKind {
     No,
@@ -466,14 +478,26 @@ fn warn_meta(expr: ast::Expr<'_>) -> Option<WarnMeta> {
     })
 }
 
-pub(crate) fn lint_discarded_by_function_return(diag: &mut DiagnosticVec, body: ast::Expr<'_>) {
+fn analyze_discarded_by_function_return(body: ast::Expr<'_>) -> Option<DiscardByReturnAnalysis> {
     let cfg = Builder::new(body.span()).build_body(body);
     if !cfg.has_return {
-        return;
+        return None;
     }
 
     let reachable = cfg.reachable_from_entry();
     let states = cfg.compute_states();
+
+    Some(DiscardByReturnAnalysis {
+        cfg,
+        reachable,
+        states,
+    })
+}
+
+fn emit_discarded_by_function_return(diag: &mut DiagnosticVec, analysis: &DiscardByReturnAnalysis) {
+    let cfg = &analysis.cfg;
+    let reachable = &analysis.reachable;
+    let states = &analysis.states;
 
     for (id, node) in cfg.nodes.iter().enumerate() {
         if !reachable[id] {
@@ -519,4 +543,23 @@ pub(crate) fn lint_discarded_by_function_return(diag: &mut DiagnosticVec, body: 
 
         diag.push(diag_);
     }
+}
+
+pub(crate) fn lint_discarded_by_function_return_cached(
+    cache: &mut DiscardByReturnCache,
+    diag: &mut DiagnosticVec,
+    body: ast::Expr<'_>,
+) {
+    let key = body.span().into_raw().get();
+    if let Some(analysis) = cache.by_span.get(&key) {
+        emit_discarded_by_function_return(diag, analysis);
+        return;
+    }
+
+    let Some(analysis) = analyze_discarded_by_function_return(body) else {
+        return;
+    };
+    let analysis = std::sync::Arc::new(analysis);
+    emit_discarded_by_function_return(diag, &analysis);
+    cache.by_span.insert(key, analysis);
 }
