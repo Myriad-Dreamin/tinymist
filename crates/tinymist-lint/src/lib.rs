@@ -17,6 +17,8 @@ use typst::{
     },
 };
 
+mod cfg;
+
 /// A type alias for a vector of diagnostics.
 type DiagnosticVec = EcoVec<SourceDiagnostic>;
 
@@ -117,16 +119,86 @@ impl<'w> Linter<'w> {
         self.diag
     }
 
+    fn expr(&mut self, expr: ast::Expr) -> Option<()> {
+        match expr {
+            ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
+            ast::Expr::CodeBlock(expr) => self.exprs(expr.body().exprs()),
+            ast::Expr::ContentBlock(expr) => self.exprs(expr.body().exprs()),
+            ast::Expr::Math(expr) => self.exprs(expr.exprs()),
+
+            ast::Expr::Text(..)
+            | ast::Expr::Space(..)
+            | ast::Expr::Linebreak(..)
+            | ast::Expr::Parbreak(..)
+            | ast::Expr::Escape(..)
+            | ast::Expr::Shorthand(..)
+            | ast::Expr::SmartQuote(..)
+            | ast::Expr::Raw(..)
+            | ast::Expr::Link(..)
+            | ast::Expr::Label(..)
+            | ast::Expr::Ref(..)
+            | ast::Expr::None(..)
+            | ast::Expr::Auto(..)
+            | ast::Expr::Bool(..)
+            | ast::Expr::Int(..)
+            | ast::Expr::Float(..)
+            | ast::Expr::Numeric(..)
+            | ast::Expr::Str(..)
+            | ast::Expr::MathText(..)
+            | ast::Expr::MathShorthand(..)
+            | ast::Expr::MathAlignPoint(..)
+            | ast::Expr::MathPrimes(..)
+            | ast::Expr::MathRoot(..) => Some(()),
+
+            ast::Expr::Strong(content) => self.exprs(content.body().exprs()),
+            ast::Expr::Emph(content) => self.exprs(content.body().exprs()),
+            ast::Expr::Heading(content) => self.exprs(content.body().exprs()),
+            ast::Expr::ListItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::EnumItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::TermItem(content) => {
+                self.exprs(content.term().exprs().chain(content.description().exprs()))
+            }
+            ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
+            ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
+
+            ast::Expr::Ident(..) => Some(()),
+            ast::Expr::MathIdent(expr) => self.math_ident(expr),
+            ast::Expr::Equation(expr) => self.exprs(expr.body().exprs()),
+            ast::Expr::Array(expr) => self.exprs(expr.to_untyped().exprs()),
+            ast::Expr::Dict(expr) => self.exprs(expr.to_untyped().exprs()),
+            ast::Expr::Unary(expr) => self.expr(expr.expr()),
+            ast::Expr::Binary(expr) => self.binary(expr),
+            ast::Expr::FieldAccess(expr) => self.expr(expr.target()),
+            ast::Expr::FuncCall(expr) => self.func_call(expr),
+            ast::Expr::Closure(expr) => self.closure(expr),
+            ast::Expr::LetBinding(expr) => self.expr(expr.init()?),
+            ast::Expr::DestructAssignment(expr) => self.expr(expr.value()),
+            ast::Expr::SetRule(expr) => self.set(expr),
+            ast::Expr::ShowRule(expr) => self.show(expr),
+            ast::Expr::Contextual(expr) => self.contextual(expr),
+            ast::Expr::Conditional(expr) => self.conditional(expr),
+            ast::Expr::WhileLoop(expr) => self.while_loop(expr),
+            ast::Expr::ForLoop(expr) => self.for_loop(expr),
+            ast::Expr::ModuleImport(..) | ast::Expr::ModuleInclude(..) => Some(()),
+            ast::Expr::LoopBreak(expr) => self.loop_break(expr),
+            ast::Expr::LoopContinue(expr) => self.loop_continue(expr),
+            ast::Expr::FuncReturn(expr) => self.func_return(expr),
+        }
+    }
+
+    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
+        for expr in exprs {
+            self.expr(expr);
+        }
+        Some(())
+    }
+
     fn with_loop_info<F>(&mut self, span: Span, f: F) -> Option<()>
     where
         F: FnOnce(&mut Self) -> Option<()>,
     {
         let old = self.loop_info.take();
-        self.loop_info = Some(LoopInfo {
-            span,
-            has_break: false,
-            has_continue: false,
-        });
+        self.loop_info = Some(LoopInfo { span });
         f(self);
         self.loop_info = old;
         Some(())
@@ -140,24 +212,12 @@ impl<'w> Linter<'w> {
         self.func_info = Some(FuncInfo {
             span,
             is_contextual: false,
-            has_return: false,
-            has_return_value: false,
             parent_loop: self.loop_info.clone(),
         });
         f(self);
         self.loop_info = self.func_info.take().expect("func info").parent_loop;
         self.func_info = old;
         Some(())
-    }
-
-    fn late_func_return(&mut self, f: impl FnOnce(LateFuncLinter) -> Option<()>) -> Option<()> {
-        let func_info = self.func_info.as_ref().expect("func info").clone();
-        f(LateFuncLinter {
-            linter: self,
-            func_info,
-            return_block_info: None,
-            expr_context: ExprContext::Block,
-        })
     }
 
     fn bad_branch_stmt(&mut self, expr: &SyntaxNode, name: &str) -> Option<()> {
@@ -302,15 +362,6 @@ impl<'w> Linter<'w> {
 
         Some(())
     }
-}
-
-impl DataFlowVisitor for Linter<'_> {
-    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        for expr in exprs {
-            self.expr(expr);
-        }
-        Some(())
-    }
 
     fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
         if let Some(target) = expr.condition() {
@@ -374,8 +425,12 @@ impl DataFlowVisitor for Linter<'_> {
                 .as_mut()
                 .expect("contextual function info")
                 .is_contextual = true;
-            this.expr(expr.body());
-            this.late_func_return(|mut this| this.late_contextual(expr))
+
+            let body = expr.body();
+            this.expr(body);
+            cfg::lint_discarded_by_function_return(&mut this.diag, body);
+
+            Some(())
         })
     }
 
@@ -383,39 +438,41 @@ impl DataFlowVisitor for Linter<'_> {
         self.with_func_info(expr.span(), |this| {
             this.loop_info = None;
             this.exprs(expr.params().to_untyped().exprs());
-            this.expr(expr.body());
-            this.late_func_return(|mut this| this.late_closure(expr))
+
+            let body = expr.body();
+            this.expr(body);
+            cfg::lint_discarded_by_function_return(&mut this.diag, body);
+
+            Some(())
         })
     }
 
     fn loop_break(&mut self, expr: ast::LoopBreak<'_>) -> Option<()> {
-        if let Some(info) = &mut self.loop_info {
-            info.has_break = true;
-        } else {
+        if self.loop_info.is_none() {
             self.bad_branch_stmt(expr.to_untyped(), "break");
         }
         Some(())
     }
 
     fn loop_continue(&mut self, expr: ast::LoopContinue<'_>) -> Option<()> {
-        if let Some(info) = &mut self.loop_info {
-            info.has_continue = true;
-        } else {
+        if self.loop_info.is_none() {
             self.bad_branch_stmt(expr.to_untyped(), "continue");
         }
         Some(())
     }
 
     fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
-        if let Some(info) = &mut self.func_info {
-            info.has_return = true;
-            info.has_return_value = expr.body().is_some();
-        } else {
+        if self.func_info.is_none() {
             self.diag.push(SourceDiagnostic::warning(
                 expr.span(),
                 "`return` statement in a non-function context",
             ));
         }
+
+        if let Some(body) = expr.body() {
+            self.expr(body);
+        }
+
         Some(())
     }
 
@@ -425,8 +482,6 @@ impl DataFlowVisitor for Linter<'_> {
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
-        // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
-        // "VF"
         if expr.callee().to_untyped().text() == "text" {
             self.check_variable_font(expr.args().items());
         }
@@ -443,468 +498,12 @@ impl DataFlowVisitor for Linter<'_> {
             let mut warning =
                 SourceDiagnostic::warning(ident.span(), eco_format!("unknown variable: {var}"));
 
-            // Tries to produce the same hints as the corresponding Typst compiler error.
-            // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:
-            // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
             let in_global = self.world.library.global.scope().get(var).is_some();
             hint_unknown_variable_math(var, in_global, &mut warning);
             self.diag.push(warning);
         }
 
         Some(())
-    }
-}
-
-struct LateFuncLinter<'a, 'b> {
-    linter: &'a mut Linter<'b>,
-    func_info: FuncInfo,
-    return_block_info: Option<ReturnBlockInfo>,
-    expr_context: ExprContext,
-}
-
-impl LateFuncLinter<'_, '_> {
-    fn late_closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
-        if !self.func_info.has_return {
-            return Some(());
-        }
-        self.expr(expr.body())
-    }
-
-    fn late_contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
-        if !self.func_info.has_return {
-            return Some(());
-        }
-        self.expr(expr.body())
-    }
-
-    fn expr_ctx<F>(&mut self, ctx: ExprContext, f: F) -> Option<()>
-    where
-        F: FnOnce(&mut Self) -> Option<()>,
-    {
-        let ctx = match ctx {
-            ExprContext::Block if self.expr_context != ExprContext::Block => ExprContext::BlockExpr,
-            a => a,
-        };
-        let old = std::mem::replace(&mut self.expr_context, ctx);
-        f(self);
-        self.expr_context = old;
-        Some(())
-    }
-
-    fn join(&mut self, parent: Option<ReturnBlockInfo>) {
-        if let Some(parent) = parent {
-            match &mut self.return_block_info {
-                Some(info) => {
-                    if info.return_value == parent.return_value {
-                        return;
-                    }
-
-                    // Merge the two return block info
-                    *info = parent.merge(std::mem::take(info));
-                }
-                info @ None => {
-                    *info = Some(parent);
-                }
-            }
-        }
-    }
-}
-
-impl DataFlowVisitor for LateFuncLinter<'_, '_> {
-    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        for expr in exprs.rev() {
-            self.expr(expr);
-        }
-        Some(())
-    }
-
-    fn block<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        self.expr_ctx(ExprContext::Block, |this| this.exprs(exprs))
-    }
-
-    fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
-        self.return_block_info = Some(ReturnBlockInfo {
-            return_value: false,
-            return_none: false,
-            warned: false,
-        });
-        Some(())
-    }
-
-    fn loop_continue(&mut self, _expr: ast::LoopContinue<'_>) -> Option<()> {
-        self.return_block_info = Some(ReturnBlockInfo {
-            return_value: false,
-            return_none: false,
-            warned: false,
-        });
-        Some(())
-    }
-
-    fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
-        if expr.body().is_some() {
-            self.return_block_info = Some(ReturnBlockInfo {
-                return_value: true,
-                return_none: false,
-                warned: false,
-            });
-        } else {
-            self.return_block_info = Some(ReturnBlockInfo {
-                return_value: false,
-                return_none: true,
-                warned: false,
-            });
-        }
-        Some(())
-    }
-
-    fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
-        let ident = expr.name().map(ast::Expr::Ident).into_iter();
-        let params = expr.params().to_untyped().exprs();
-        // the body is ignored in the return stmt analysis
-        let _body = expr.body().once();
-        self.exprs(ident.chain(params))
-    }
-
-    fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
-        // the body is ignored in the return stmt analysis
-        let _body = expr.body();
-        Some(())
-    }
-
-    fn field_access(&mut self, _expr: ast::FieldAccess<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn unary(&mut self, expr: ast::Unary<'_>) -> Option<()> {
-        self.expr_ctx(ExprContext::Expr, |this| this.expr(expr.expr()))
-    }
-
-    fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
-        self.expr_ctx(ExprContext::Expr, |this| {
-            this.exprs([expr.lhs(), expr.rhs()].into_iter())
-        })
-    }
-
-    fn equation(&mut self, expr: ast::Equation<'_>) -> Option<()> {
-        self.value(ast::Expr::Equation(expr));
-        Some(())
-    }
-
-    fn array(&mut self, expr: ast::Array<'_>) -> Option<()> {
-        self.value(ast::Expr::Array(expr));
-        Some(())
-    }
-
-    fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
-        self.value(ast::Expr::Dict(expr));
-        Some(())
-    }
-
-    fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
-        self.value(ast::Expr::ModuleInclude(expr));
-        Some(())
-    }
-
-    fn func_call(&mut self, _expr: ast::FuncCall<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn let_binding(&mut self, _expr: ast::LetBinding<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn destruct_assign(&mut self, _expr: ast::DestructAssignment<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
-        let if_body = expr.if_body();
-        let else_body = expr.else_body();
-
-        let parent = self.return_block_info.clone();
-        self.exprs(if_body.once());
-        let if_branch = std::mem::replace(&mut self.return_block_info, parent.clone());
-        self.exprs(else_body.into_iter());
-        // else_branch
-        self.join(if_branch);
-
-        Some(())
-    }
-
-    fn value(&mut self, expr: ast::Expr) -> Option<()> {
-        match self.expr_context {
-            ExprContext::Block => {}
-            ExprContext::BlockExpr => return None,
-            ExprContext::Expr => return None,
-        }
-
-        let ri = self.return_block_info.as_mut()?;
-        if ri.warned {
-            return None;
-        }
-        if matches!(expr, ast::Expr::None(..)) || expr.to_untyped().kind().is_trivia() {
-            return None;
-        }
-
-        if ri.return_value {
-            ri.warned = true;
-            let diag = SourceDiagnostic::warning(
-                expr.span(),
-                eco_format!(
-                    "This {} is implicitly discarded by function return",
-                    expr.to_untyped().kind().name()
-                ),
-            );
-            let diag = match expr {
-                ast::Expr::ShowRule(..) | ast::Expr::SetRule(..) => diag,
-                expr if expr.hash() => diag.with_hint(eco_format!(
-                    "consider ignoring the value explicitly using underscore: `let _ = {}`",
-                    expr.to_untyped().clone().into_text()
-                )),
-                _ => diag,
-            };
-            self.linter.diag.push(diag);
-        } else if ri.return_none && matches!(expr, ast::Expr::ShowRule(..) | ast::Expr::SetRule(..))
-        {
-            ri.warned = true;
-            let diag = SourceDiagnostic::warning(
-                expr.span(),
-                eco_format!(
-                    "This {} is implicitly discarded by function return",
-                    expr.to_untyped().kind().name()
-                ),
-            );
-            self.linter.diag.push(diag);
-        }
-
-        Some(())
-    }
-
-    fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
-        self.value(ast::Expr::ShowRule(expr));
-        Some(())
-    }
-
-    fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
-        self.value(ast::Expr::SetRule(expr));
-        Some(())
-    }
-
-    fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
-        self.expr(expr.body())
-    }
-
-    fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
-        self.expr(expr.body())
-    }
-}
-
-#[derive(Clone, Default)]
-struct ReturnBlockInfo {
-    return_value: bool,
-    return_none: bool,
-    warned: bool,
-}
-
-impl ReturnBlockInfo {
-    fn merge(self, other: Self) -> Self {
-        Self {
-            return_value: self.return_value && other.return_value,
-            return_none: self.return_none && other.return_none,
-            warned: self.warned && other.warned,
-        }
-    }
-}
-
-trait DataFlowVisitor {
-    fn expr(&mut self, expr: ast::Expr) -> Option<()> {
-        match expr {
-            ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
-            ast::Expr::CodeBlock(expr) => self.block(expr.body().exprs()),
-            ast::Expr::ContentBlock(expr) => self.block(expr.body().exprs()),
-            ast::Expr::Math(expr) => self.exprs(expr.exprs()),
-
-            ast::Expr::Text(..) => self.value(expr),
-            ast::Expr::Space(..) => self.value(expr),
-            ast::Expr::Linebreak(..) => self.value(expr),
-            ast::Expr::Parbreak(..) => self.value(expr),
-            ast::Expr::Escape(..) => self.value(expr),
-            ast::Expr::Shorthand(..) => self.value(expr),
-            ast::Expr::SmartQuote(..) => self.value(expr),
-            ast::Expr::Raw(..) => self.value(expr),
-            ast::Expr::Link(..) => self.value(expr),
-
-            ast::Expr::Label(..) => self.value(expr),
-            ast::Expr::Ref(..) => self.value(expr),
-            ast::Expr::None(..) => self.value(expr),
-            ast::Expr::Auto(..) => self.value(expr),
-            ast::Expr::Bool(..) => self.value(expr),
-            ast::Expr::Int(..) => self.value(expr),
-            ast::Expr::Float(..) => self.value(expr),
-            ast::Expr::Numeric(..) => self.value(expr),
-            ast::Expr::Str(..) => self.value(expr),
-            ast::Expr::MathText(..) => self.value(expr),
-            ast::Expr::MathShorthand(..) => self.value(expr),
-            ast::Expr::MathAlignPoint(..) => self.value(expr),
-            ast::Expr::MathPrimes(..) => self.value(expr),
-            ast::Expr::MathRoot(..) => self.value(expr),
-
-            ast::Expr::Strong(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Emph(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Heading(content) => self.exprs(content.body().exprs()),
-            ast::Expr::ListItem(content) => self.exprs(content.body().exprs()),
-            ast::Expr::EnumItem(content) => self.exprs(content.body().exprs()),
-            ast::Expr::TermItem(content) => {
-                self.exprs(content.term().exprs().chain(content.description().exprs()))
-            }
-            ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
-            ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
-
-            ast::Expr::Ident(expr) => self.ident(expr),
-            ast::Expr::MathIdent(expr) => self.math_ident(expr),
-            ast::Expr::Equation(expr) => self.equation(expr),
-            ast::Expr::Array(expr) => self.array(expr),
-            ast::Expr::Dict(expr) => self.dict(expr),
-            ast::Expr::Unary(expr) => self.unary(expr),
-            ast::Expr::Binary(expr) => self.binary(expr),
-            ast::Expr::FieldAccess(expr) => self.field_access(expr),
-            ast::Expr::FuncCall(expr) => self.func_call(expr),
-            ast::Expr::Closure(expr) => self.closure(expr),
-            ast::Expr::LetBinding(expr) => self.let_binding(expr),
-            ast::Expr::DestructAssignment(expr) => self.destruct_assign(expr),
-            ast::Expr::SetRule(expr) => self.set(expr),
-            ast::Expr::ShowRule(expr) => self.show(expr),
-            ast::Expr::Contextual(expr) => self.contextual(expr),
-            ast::Expr::Conditional(expr) => self.conditional(expr),
-            ast::Expr::WhileLoop(expr) => self.while_loop(expr),
-            ast::Expr::ForLoop(expr) => self.for_loop(expr),
-            ast::Expr::ModuleImport(expr) => self.import(expr),
-            ast::Expr::ModuleInclude(expr) => self.include(expr),
-            ast::Expr::LoopBreak(expr) => self.loop_break(expr),
-            ast::Expr::LoopContinue(expr) => self.loop_continue(expr),
-            ast::Expr::FuncReturn(expr) => self.func_return(expr),
-        }
-    }
-
-    fn exprs<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        for expr in exprs {
-            self.expr(expr);
-        }
-        Some(())
-    }
-
-    fn block<'a>(&mut self, exprs: impl DoubleEndedIterator<Item = ast::Expr<'a>>) -> Option<()> {
-        self.exprs(exprs)
-    }
-
-    fn value(&mut self, _expr: ast::Expr) -> Option<()> {
-        Some(())
-    }
-
-    fn ident(&mut self, _expr: ast::Ident<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn math_ident(&mut self, _expr: ast::MathIdent<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn import(&mut self, _expr: ast::ModuleImport<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn include(&mut self, _expr: ast::ModuleInclude<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn equation(&mut self, expr: ast::Equation<'_>) -> Option<()> {
-        self.exprs(expr.body().exprs())
-    }
-
-    fn array(&mut self, expr: ast::Array<'_>) -> Option<()> {
-        self.exprs(expr.to_untyped().exprs())
-    }
-
-    fn dict(&mut self, expr: ast::Dict<'_>) -> Option<()> {
-        self.exprs(expr.to_untyped().exprs())
-    }
-
-    fn unary(&mut self, expr: ast::Unary<'_>) -> Option<()> {
-        self.expr(expr.expr())
-    }
-
-    fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
-        self.exprs([expr.lhs(), expr.rhs()].into_iter())
-    }
-
-    fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
-        self.expr(expr.target())
-    }
-
-    fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
-        self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()))
-    }
-
-    fn closure(&mut self, expr: ast::Closure<'_>) -> Option<()> {
-        let ident = expr.name().map(ast::Expr::Ident).into_iter();
-        let params = expr.params().to_untyped().exprs();
-        let body = expr.body().once();
-        self.exprs(ident.chain(params).chain(body))
-    }
-
-    fn let_binding(&mut self, expr: ast::LetBinding<'_>) -> Option<()> {
-        self.expr(expr.init()?)
-    }
-
-    fn destruct_assign(&mut self, expr: ast::DestructAssignment<'_>) -> Option<()> {
-        self.expr(expr.value())
-    }
-
-    fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
-        let cond = expr.condition().into_iter();
-        let args = expr.args().to_untyped().exprs();
-        self.exprs(cond.chain(args).chain(expr.target().once()))
-    }
-
-    fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
-        let selector = expr.selector().into_iter();
-        let transform = expr.transform();
-        self.exprs(selector.chain(transform.once()))
-    }
-
-    fn contextual(&mut self, expr: ast::Contextual<'_>) -> Option<()> {
-        self.expr(expr.body())
-    }
-
-    fn conditional(&mut self, expr: ast::Conditional<'_>) -> Option<()> {
-        let cond = expr.condition().once();
-        let if_body = expr.if_body().once();
-        let else_body = expr.else_body().into_iter();
-        self.exprs(cond.chain(if_body).chain(else_body))
-    }
-
-    fn while_loop(&mut self, expr: ast::WhileLoop<'_>) -> Option<()> {
-        let cond = expr.condition().once();
-        let body = expr.body().once();
-        self.exprs(cond.chain(body))
-    }
-
-    fn for_loop(&mut self, expr: ast::ForLoop<'_>) -> Option<()> {
-        let iterable = expr.iterable().once();
-        let body = expr.body().once();
-        self.exprs(iterable.chain(body))
-    }
-
-    fn loop_break(&mut self, _expr: ast::LoopBreak<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn loop_continue(&mut self, _expr: ast::LoopContinue<'_>) -> Option<()> {
-        Some(())
-    }
-
-    fn func_return(&mut self, expr: ast::FuncReturn<'_>) -> Option<()> {
-        self.expr(expr.body()?)
     }
 }
 
@@ -937,16 +536,12 @@ impl<'a> ExprsOnce<'a> for ast::Expr<'a> {
 #[derive(Clone)]
 struct LoopInfo {
     span: Span,
-    has_break: bool,
-    has_continue: bool,
 }
 
 #[derive(Clone)]
 struct FuncInfo {
     span: Span,
     is_contextual: bool,
-    has_return: bool,
-    has_return_value: bool,
     parent_loop: Option<LoopInfo>,
 }
 
@@ -1070,13 +665,6 @@ impl BuggyBlockLoc<'_> {
             }
         }
     }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ExprContext {
-    BlockExpr,
-    Block,
-    Expr,
 }
 
 fn is_show_set(it: ast::Expr) -> bool {
