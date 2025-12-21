@@ -19,11 +19,20 @@ impl From<usize> for NodeId {
     }
 }
 
+#[derive(Debug, Clone)]
+/// A directed edge in a [`Cfg`].
+pub struct Edge<E> {
+    /// Successor node id.
+    pub to: NodeId,
+    /// Edge payload.
+    pub data: E,
+}
+
 /// A simple directed control-flow graph with explicit entry/exit nodes.
 #[derive(Debug, Clone)]
-pub struct Cfg<N> {
+pub struct Cfg<N, E = ()> {
     nodes: Vec<N>,
-    succ: Vec<Vec<NodeId>>,
+    succ: Vec<Vec<Edge<E>>>,
     pred: Vec<Vec<NodeId>>,
     /// Entry node for reachability queries and boundary conditions.
     pub entry: NodeId,
@@ -31,7 +40,23 @@ pub struct Cfg<N> {
     pub exit: NodeId,
 }
 
-impl<N> Cfg<N> {
+impl<N> Cfg<N, ()> {
+    /// Adds a directed edge `from -> to`.
+    pub fn add_edge(&mut self, from: NodeId, to: NodeId) {
+        debug_assert!(
+            !self.succ[from.index()].iter().any(|e| e.to == to),
+            "duplicate edge: {from:?} -> {to:?}"
+        );
+        debug_assert!(
+            !self.pred[to.index()].contains(&from),
+            "duplicate edge (pred): {from:?} -> {to:?}"
+        );
+        self.succ[from.index()].push(Edge { to, data: () });
+        self.pred[to.index()].push(from);
+    }
+}
+
+impl<N, E> Cfg<N, E> {
     /// Creates a new CFG with the given entry/exit node payloads.
     pub fn new(entry: N, exit: N) -> Self {
         Self {
@@ -71,7 +96,7 @@ impl<N> Cfg<N> {
 
     #[inline]
     /// Returns the successors of the given node.
-    pub fn successors(&self, id: NodeId) -> &[NodeId] {
+    pub fn successors(&self, id: NodeId) -> &[Edge<E>] {
         &self.succ[id.index()]
     }
 
@@ -90,17 +115,12 @@ impl<N> Cfg<N> {
         id
     }
 
-    /// Adds a directed edge `from -> to`.
-    pub fn add_edge(&mut self, from: NodeId, to: NodeId) {
-        debug_assert!(
-            !self.succ[from.index()].contains(&to),
-            "duplicate edge: {from:?} -> {to:?}"
-        );
-        debug_assert!(
-            !self.pred[to.index()].contains(&from),
-            "duplicate edge (pred): {from:?} -> {to:?}"
-        );
-        self.succ[from.index()].push(to);
+    /// Adds a directed edge `from -> to` with an edge payload.
+    ///
+    /// Note: This does not enforce uniqueness of `(from, to)` pairs because
+    /// labeled CFGs may legitimately have multiple edges to the same successor.
+    pub fn add_edge_with(&mut self, from: NodeId, to: NodeId, data: E) {
+        self.succ[from.index()].push(Edge { to, data });
         self.pred[to.index()].push(from);
     }
 
@@ -112,10 +132,10 @@ impl<N> Cfg<N> {
         q.push_back(start);
 
         while let Some(n) = q.pop_front() {
-            for &m in &self.succ[n.index()] {
-                if !reachable[m.index()] {
-                    reachable[m.index()] = true;
-                    q.push_back(m);
+            for e in &self.succ[n.index()] {
+                if !reachable[e.to.index()] {
+                    reachable[e.to.index()] = true;
+                    q.push_back(e.to);
                 }
             }
         }

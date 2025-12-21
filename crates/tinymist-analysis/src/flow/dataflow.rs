@@ -83,7 +83,7 @@ pub trait BackwardDataflowProblem<N> {
 }
 
 /// Solves a forward dataflow problem on the given CFG.
-pub fn solve_forward<N, P>(cfg: &Cfg<N>, problem: &P) -> DataflowSolution<P::State>
+pub fn solve_forward<N, E, P>(cfg: &Cfg<N, E>, problem: &P) -> DataflowSolution<P::State>
 where
     P: ForwardDataflowProblem<N>,
 {
@@ -133,7 +133,8 @@ where
         }
         out_states[n.index()] = new_out;
 
-        for &s in cfg.successors(n) {
+        for e in cfg.successors(n) {
+            let s = e.to;
             if !in_worklist[s.index()] {
                 q.push_back(s);
                 in_worklist[s.index()] = true;
@@ -148,7 +149,7 @@ where
 }
 
 /// Solves a backward dataflow problem on the given CFG.
-pub fn solve_backward<N, P>(cfg: &Cfg<N>, problem: &P) -> DataflowSolution<P::State>
+pub fn solve_backward<N, E, P>(cfg: &Cfg<N, E>, problem: &P) -> DataflowSolution<P::State>
 where
     P: BackwardDataflowProblem<N>,
 {
@@ -177,12 +178,12 @@ where
         in_worklist[n.index()] = false;
         let node_data = cfg.node(n);
 
-        let mut it = cfg.successors(n).iter().copied();
+        let mut it = cfg.successors(n).iter();
         let joined = match it.next() {
             Some(first) => {
-                let mut acc = in_states[first.index()].clone();
+                let mut acc = in_states[first.to.index()].clone();
                 for s in it {
-                    acc = problem.join(&acc, &in_states[s.index()]);
+                    acc = problem.join(&acc, &in_states[s.to.index()]);
                 }
                 acc
             }

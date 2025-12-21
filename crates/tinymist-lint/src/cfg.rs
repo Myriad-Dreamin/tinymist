@@ -189,9 +189,10 @@ impl BackwardDataflowProblem<Node<()>> for WarnCoverageProblem<'_> {
             return true;
         }
 
-        let warnable = self.warn_meta_by_node[node_id.index()]
-            .as_ref()
-            .is_some_and(|m| m.warnable_for(kind));
+        let warnable = matches!(node.kind, NodeKind::Stmt)
+            && self.warn_meta_by_node[node_id.index()]
+                .as_ref()
+                .is_some_and(|m| m.warnable_for(kind));
         *succ_covered || warnable
     }
 }
@@ -221,6 +222,9 @@ fn analyze_discarded_by_function_return(body: ast::Expr<'_>) -> Option<DiscardBy
             continue;
         }
         if matches!(node.kind, NodeKind::Return { .. }) {
+            continue;
+        }
+        if !matches!(node.kind, NodeKind::Stmt) {
             continue;
         }
 
