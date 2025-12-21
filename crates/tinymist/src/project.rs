@@ -30,7 +30,7 @@ use sync_ls::{LspClient, TypedLspClient};
 use tinymist_project::vfs::{FileChangeSet, MemoryEvent};
 use tinymist_query::analysis::{Analysis, LspQuerySnapshot, PeriscopeProvider};
 use tinymist_query::{
-    CheckRequest, CompilerQueryRequest, DiagnosticsMap, LocalContext, SemanticRequest, GLOBAL_STATS,
+    CompilerQueryRequest, DiagnosticsMap, LintRequest, LocalContext, SemanticRequest, GLOBAL_STATS,
 };
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
@@ -559,22 +559,14 @@ impl LintHook {
             let mut ctx = analysis.enter(snap.graph.clone());
 
             // todo: check all errors in this file
-            let Some(diagnostics) = CheckRequest { snap }.request(&mut ctx) else {
+            let Some(lint) = LintRequest { snap }.request(&mut ctx) else {
                 return;
             };
 
-            log::trace!(
-                "notify lint diagnostics({:?}): {:#?}",
-                dv.id,
-                diagnostics.lint
-            );
+            log::trace!("notify lint diagnostics({:?}): {:#?}", dv.id, lint);
 
             editor_tx
-                .send(EditorRequest::Diag(
-                    dv,
-                    DiagKind::Lint,
-                    Some(diagnostics.lint),
-                ))
+                .send(EditorRequest::Diag(dv, DiagKind::Lint, Some(lint)))
                 .log_error("failed to send lint diagnostics");
         });
     }
