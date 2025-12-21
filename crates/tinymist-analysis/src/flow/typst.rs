@@ -320,7 +320,10 @@ impl<D: Default> Builder<D> {
             }
         } else {
             self.connect_open(
-                &false_exits.into_iter().map(OpenEdge::cond_false).collect::<Vec<_>>(),
+                &false_exits
+                    .into_iter()
+                    .map(OpenEdge::cond_false)
+                    .collect::<Vec<_>>(),
                 after,
             );
         }
@@ -362,7 +365,10 @@ impl<D: Default> Builder<D> {
             side,
         );
         self.connect_open(
-            &false_exits.into_iter().map(OpenEdge::cond_false).collect::<Vec<_>>(),
+            &false_exits
+                .into_iter()
+                .map(OpenEdge::cond_false)
+                .collect::<Vec<_>>(),
             after,
         );
 
