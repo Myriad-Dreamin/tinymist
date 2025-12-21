@@ -2,6 +2,7 @@
 
 pub mod adt;
 pub mod docs;
+pub mod flow;
 pub mod location;
 mod sig;
 pub mod stats;

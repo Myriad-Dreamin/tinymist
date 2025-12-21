@@ -1,16 +1,20 @@
-use std::collections::VecDeque;
-
 use typst::diag::{EcoString, SourceDiagnostic, eco_format};
+use typst::syntax::ast;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{Span, ast};
+
+use tinymist_analysis::flow::cfg::NodeId;
+use tinymist_analysis::flow::dataflow::{BackwardDataflowProblem, solve_backward};
+use tinymist_analysis::flow::typst::{Node, NodeKind, StmtCfg, build_stmt_cfg_with_side_table};
 
 use crate::DiagnosticVec;
 
 #[derive(Debug)]
 struct DiscardByReturnAnalysis {
-    cfg: Cfg,
+    cfg: StmtCfg<()>,
+    warn_meta_by_node: Vec<Option<WarnMeta>>,
     reachable: Vec<bool>,
-    states: Vec<MustReturnState>,
+    kind_at: Vec<MustReturnKind>,
+    warn_here: Vec<bool>,
 }
 
 #[derive(Default)]
@@ -20,6 +24,7 @@ pub(crate) struct DiscardByReturnCache {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MustReturnKind {
+    Unreachable,
     No,
     Value,
     None,
@@ -28,52 +33,12 @@ enum MustReturnKind {
 impl MustReturnKind {
     fn join(self, other: Self) -> Self {
         match (self, other) {
+            (MustReturnKind::Unreachable, x) | (x, MustReturnKind::Unreachable) => x,
             (MustReturnKind::Value, MustReturnKind::Value) => MustReturnKind::Value,
             (MustReturnKind::None, MustReturnKind::None) => MustReturnKind::None,
             _ => MustReturnKind::No,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct MustReturnState {
-    kind: MustReturnKind,
-    /// Whether a warning has already been emitted on all paths to the return.
-    ///
-    /// This matches the old `ReturnBlockInfo.warned` behavior (AND-merge across
-    /// branches) to keep diagnostics from becoming too noisy.
-    warned: bool,
-}
-
-impl MustReturnState {
-    const NO: Self = Self {
-        kind: MustReturnKind::No,
-        warned: true,
-    };
-
-    fn join(self, other: Self) -> Self {
-        let kind = self.kind.join(other.kind);
-        if kind == MustReturnKind::No {
-            return Self::NO;
-        }
-        Self {
-            kind,
-            warned: self.warned && other.warned,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NodeKind {
-    Entry,
-    Exit,
-    Branch,
-    LoopHead,
-    Join,
-    Break,
-    Continue,
-    Return { has_value: bool },
-    Stmt,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +52,7 @@ struct WarnMeta {
 impl WarnMeta {
     fn warnable_for(&self, kind: MustReturnKind) -> bool {
         match kind {
+            MustReturnKind::Unreachable => false,
             MustReturnKind::No => false,
             MustReturnKind::Value => true,
             MustReturnKind::None => self.is_show_or_set,
@@ -94,325 +60,31 @@ impl WarnMeta {
     }
 }
 
-#[derive(Debug, Clone)]
-struct Node {
-    kind: NodeKind,
-    span: Span,
-    warn: Option<WarnMeta>,
-}
+struct MustReturnKindProblem;
 
-#[derive(Debug, Default)]
-struct Cfg {
-    nodes: Vec<Node>,
-    succ: Vec<Vec<usize>>,
-    entry: usize,
-    exit: usize,
-    has_return: bool,
-}
+impl BackwardDataflowProblem<Node<()>> for MustReturnKindProblem {
+    type State = MustReturnKind;
 
-impl Cfg {
-    fn add_node(&mut self, node: Node) -> usize {
-        let id = self.nodes.len();
-        self.nodes.push(node);
-        self.succ.push(Vec::new());
-        id
+    fn bottom(&self) -> Self::State {
+        MustReturnKind::Unreachable
     }
 
-    fn add_edge(&mut self, from: usize, to: usize) {
-        self.succ[from].push(to);
+    fn join(&self, left: &Self::State, right: &Self::State) -> Self::State {
+        (*left).join(*right)
     }
 
-    fn reachable_from_entry(&self) -> Vec<bool> {
-        let mut reachable = vec![false; self.nodes.len()];
-        let mut q = VecDeque::new();
-        reachable[self.entry] = true;
-        q.push_back(self.entry);
-
-        while let Some(n) = q.pop_front() {
-            for &m in &self.succ[n] {
-                if !reachable[m] {
-                    reachable[m] = true;
-                    q.push_back(m);
+    fn transfer(&self, _node_id: NodeId, node: &Node<()>, out_state: &Self::State) -> Self::State {
+        match node.kind {
+            NodeKind::Exit => MustReturnKind::No,
+            NodeKind::Return { has_value } => {
+                if has_value {
+                    MustReturnKind::Value
+                } else {
+                    MustReturnKind::None
                 }
             }
+            _ => *out_state,
         }
-
-        reachable
-    }
-
-    fn compute_states(&self) -> Vec<MustReturnState> {
-        let mut states = vec![MustReturnState::NO; self.nodes.len()];
-
-        for (id, node) in self.nodes.iter().enumerate() {
-            match node.kind {
-                NodeKind::Exit => states[id] = MustReturnState::NO,
-                NodeKind::Return { has_value } => {
-                    states[id] = MustReturnState {
-                        kind: if has_value {
-                            MustReturnKind::Value
-                        } else {
-                            MustReturnKind::None
-                        },
-                        warned: false,
-                    };
-                }
-                _ => {}
-            }
-        }
-
-        // Small lattice (3 kinds + warned boolean), so a simple fixed-point loop
-        // is sufficient.
-        for _ in 0..(self.nodes.len().saturating_mul(8).max(32)) {
-            let mut changed = false;
-
-            for id in (0..self.nodes.len()).rev() {
-                let node = &self.nodes[id];
-                let new_state = match node.kind {
-                    NodeKind::Exit => MustReturnState::NO,
-                    NodeKind::Return { .. } => states[id],
-                    _ => {
-                        let succ_state = self.succ[id]
-                            .iter()
-                            .copied()
-                            .map(|sid| states[sid])
-                            .reduce(MustReturnState::join)
-                            .unwrap_or(MustReturnState::NO);
-
-                        if succ_state.kind == MustReturnKind::No {
-                            MustReturnState::NO
-                        } else {
-                            let warnable = node.warn.as_ref().is_some_and(|m| {
-                                m.warnable_for(succ_state.kind) && !succ_state.warned
-                            });
-
-                            MustReturnState {
-                                kind: succ_state.kind,
-                                warned: succ_state.warned || warnable,
-                            }
-                        }
-                    }
-                };
-
-                if new_state != states[id] {
-                    states[id] = new_state;
-                    changed = true;
-                }
-            }
-
-            if !changed {
-                break;
-            }
-        }
-
-        states
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct LoopCtx {
-    head: usize,
-    after: usize,
-}
-
-struct Builder {
-    cfg: Cfg,
-    loops: Vec<LoopCtx>,
-}
-
-impl Builder {
-    fn new(span: Span) -> Self {
-        let mut cfg = Cfg::default();
-
-        let exit = cfg.add_node(Node {
-            kind: NodeKind::Exit,
-            span,
-            warn: None,
-        });
-        let entry = cfg.add_node(Node {
-            kind: NodeKind::Entry,
-            span,
-            warn: None,
-        });
-
-        cfg.exit = exit;
-        cfg.entry = entry;
-
-        Self {
-            cfg,
-            loops: Vec::new(),
-        }
-    }
-
-    fn build_body(mut self, body: ast::Expr<'_>) -> Cfg {
-        let exits = self.build_stmt(body, vec![self.cfg.entry]);
-        for e in exits {
-            self.cfg.add_edge(e, self.cfg.exit);
-        }
-        self.cfg
-    }
-
-    fn connect_open(&mut self, open: &[usize], to: usize) {
-        for &p in open {
-            self.cfg.add_edge(p, to);
-        }
-    }
-
-    fn build_seq<'a>(
-        &mut self,
-        exprs: impl IntoIterator<Item = ast::Expr<'a>>,
-        mut open: Vec<usize>,
-    ) -> Vec<usize> {
-        for expr in exprs {
-            open = self.build_stmt(expr, open);
-        }
-        open
-    }
-
-    fn build_stmt<'a>(&mut self, expr: ast::Expr<'a>, open: Vec<usize>) -> Vec<usize> {
-        match expr {
-            ast::Expr::Parenthesized(p) => self.build_stmt(p.expr(), open),
-            ast::Expr::CodeBlock(b) => self.build_seq(b.body().exprs(), open),
-            ast::Expr::ContentBlock(b) => self.build_seq(b.body().exprs(), open),
-
-            ast::Expr::Conditional(c) => self.build_conditional(c, open),
-            ast::Expr::WhileLoop(l) => self.build_loop(l.span(), l.body(), open),
-            ast::Expr::ForLoop(l) => self.build_loop(l.span(), l.body(), open),
-
-            // Treat nested functions as atomic: their `return` does not affect
-            // the enclosing function.
-            ast::Expr::Closure(..) | ast::Expr::Contextual(..) => self.build_simple(expr, open),
-
-            ast::Expr::LoopBreak(b) => self.build_break(b, open),
-            ast::Expr::LoopContinue(c) => self.build_continue(c, open),
-            ast::Expr::FuncReturn(r) => self.build_return(r, open),
-
-            _ => self.build_simple(expr, open),
-        }
-    }
-
-    fn build_simple<'a>(&mut self, expr: ast::Expr<'a>, open: Vec<usize>) -> Vec<usize> {
-        let span = expr.span();
-        let warn = warn_meta(expr);
-        let id = self.cfg.add_node(Node {
-            kind: NodeKind::Stmt,
-            span,
-            warn,
-        });
-        self.connect_open(&open, id);
-        vec![id]
-    }
-
-    fn build_conditional<'a>(
-        &mut self,
-        expr: ast::Conditional<'a>,
-        open: Vec<usize>,
-    ) -> Vec<usize> {
-        let branch = self.cfg.add_node(Node {
-            kind: NodeKind::Branch,
-            span: expr.span(),
-            warn: None,
-        });
-        let after = self.cfg.add_node(Node {
-            kind: NodeKind::Join,
-            span: expr.span(),
-            warn: None,
-        });
-
-        self.connect_open(&open, branch);
-
-        // If branch.
-        let if_exits = self.build_stmt(expr.if_body(), vec![branch]);
-        for e in if_exits {
-            self.cfg.add_edge(e, after);
-        }
-
-        // Else branch.
-        if let Some(else_body) = expr.else_body() {
-            let else_exits = self.build_stmt(else_body, vec![branch]);
-            for e in else_exits {
-                self.cfg.add_edge(e, after);
-            }
-        } else {
-            self.cfg.add_edge(branch, after);
-        }
-
-        vec![after]
-    }
-
-    fn build_loop<'a>(&mut self, span: Span, body: ast::Expr<'a>, open: Vec<usize>) -> Vec<usize> {
-        let head = self.cfg.add_node(Node {
-            kind: NodeKind::LoopHead,
-            span,
-            warn: None,
-        });
-        let after = self.cfg.add_node(Node {
-            kind: NodeKind::Join,
-            span,
-            warn: None,
-        });
-        self.connect_open(&open, head);
-
-        self.cfg.add_edge(head, after);
-
-        self.loops.push(LoopCtx { head, after });
-        let body_exits = self.build_stmt(body, vec![head]);
-        self.loops.pop();
-
-        for e in body_exits {
-            self.cfg.add_edge(e, head);
-        }
-
-        vec![after]
-    }
-
-    fn build_break(&mut self, expr: ast::LoopBreak<'_>, open: Vec<usize>) -> Vec<usize> {
-        let id = self.cfg.add_node(Node {
-            kind: NodeKind::Break,
-            span: expr.span(),
-            warn: None,
-        });
-        self.connect_open(&open, id);
-
-        if let Some(loop_ctx) = self.loops.last().copied() {
-            self.cfg.add_edge(id, loop_ctx.after);
-            Vec::new()
-        } else {
-            // Invalid `break`: terminate the path conservatively so we don't
-            // emit follow-up diagnostics that depend on well-formed control
-            // flow.
-            self.cfg.add_edge(id, self.cfg.exit);
-            Vec::new()
-        }
-    }
-
-    fn build_continue(&mut self, expr: ast::LoopContinue<'_>, open: Vec<usize>) -> Vec<usize> {
-        let id = self.cfg.add_node(Node {
-            kind: NodeKind::Continue,
-            span: expr.span(),
-            warn: None,
-        });
-        self.connect_open(&open, id);
-
-        if let Some(loop_ctx) = self.loops.last().copied() {
-            self.cfg.add_edge(id, loop_ctx.head);
-            Vec::new()
-        } else {
-            self.cfg.add_edge(id, self.cfg.exit);
-            Vec::new()
-        }
-    }
-
-    fn build_return(&mut self, expr: ast::FuncReturn<'_>, open: Vec<usize>) -> Vec<usize> {
-        let has_value = expr.body().is_some();
-        let id = self.cfg.add_node(Node {
-            kind: NodeKind::Return { has_value },
-            span: expr.span(),
-            warn: None,
-        });
-        self.cfg.has_return = true;
-        self.connect_open(&open, id);
-        self.cfg.add_edge(id, self.cfg.exit);
-        Vec::new()
     }
 }
 
@@ -477,47 +149,120 @@ fn warn_meta(expr: ast::Expr<'_>) -> Option<WarnMeta> {
     })
 }
 
+struct WarnCoverageProblem<'a> {
+    reachable: &'a [bool],
+    kind_at: &'a [MustReturnKind],
+    warn_meta_by_node: &'a [Option<WarnMeta>],
+}
+
+impl BackwardDataflowProblem<Node<()>> for WarnCoverageProblem<'_> {
+    /// Whether this node is already "covered" by a warning on all paths to the
+    /// relevant `return`.
+    ///
+    /// This is a diagnostic policy state (not a program semantic fact) and is
+    /// kept separate from the semantic analysis lattice (`MustReturnKind`).
+    type State = bool;
+
+    fn bottom(&self) -> Self::State {
+        true
+    }
+
+    fn join(&self, left: &Self::State, right: &Self::State) -> Self::State {
+        *left && *right
+    }
+
+    fn transfer(
+        &self,
+        node_id: NodeId,
+        node: &Node<()>,
+        succ_covered: &Self::State,
+    ) -> Self::State {
+        if !self.reachable[node_id.index()] {
+            return true;
+        }
+        if matches!(node.kind, NodeKind::Return { .. }) {
+            return false;
+        }
+
+        let kind = self.kind_at[node_id.index()];
+        if matches!(kind, MustReturnKind::Unreachable | MustReturnKind::No) {
+            return true;
+        }
+
+        let warnable = self.warn_meta_by_node[node_id.index()]
+            .as_ref()
+            .is_some_and(|m| m.warnable_for(kind));
+        *succ_covered || warnable
+    }
+}
+
 fn analyze_discarded_by_function_return(body: ast::Expr<'_>) -> Option<DiscardByReturnAnalysis> {
-    let cfg = Builder::new(body.span()).build_body(body);
+    let (cfg, warn_meta_by_node) =
+        build_stmt_cfg_with_side_table(body, |expr| ((), warn_meta(expr)));
     if !cfg.has_return {
         return None;
     }
 
-    let reachable = cfg.reachable_from_entry();
-    let states = cfg.compute_states();
+    let reachable = cfg.cfg.reachable_from_entry();
+    let solution = solve_backward(&cfg.cfg, &MustReturnKindProblem);
+    let kind_at = solution.in_states;
+    let coverage = solve_backward(
+        &cfg.cfg,
+        &WarnCoverageProblem {
+            reachable: &reachable,
+            kind_at: &kind_at,
+            warn_meta_by_node: &warn_meta_by_node,
+        },
+    );
+
+    let mut warn_here = vec![false; cfg.cfg.len()];
+    for (idx, node) in cfg.cfg.nodes().iter().enumerate() {
+        if !reachable[idx] {
+            continue;
+        }
+        if matches!(node.kind, NodeKind::Return { .. }) {
+            continue;
+        }
+
+        let kind = kind_at[idx];
+        if matches!(kind, MustReturnKind::Unreachable | MustReturnKind::No) {
+            continue;
+        }
+
+        let Some(meta) = warn_meta_by_node[idx].as_ref() else {
+            continue;
+        };
+        if !meta.warnable_for(kind) {
+            continue;
+        }
+
+        let succ_covered = coverage.out_states[idx];
+        warn_here[idx] = !succ_covered;
+    }
 
     Some(DiscardByReturnAnalysis {
         cfg,
+        warn_meta_by_node,
         reachable,
-        states,
+        kind_at,
+        warn_here,
     })
 }
 
 fn emit_discarded_by_function_return(diag: &mut DiagnosticVec, analysis: &DiscardByReturnAnalysis) {
-    let cfg = &analysis.cfg;
-    let reachable = &analysis.reachable;
-    let states = &analysis.states;
+    let cfg = &analysis.cfg.cfg;
 
-    for (id, node) in cfg.nodes.iter().enumerate() {
-        if !reachable[id] {
+    for (id, node) in cfg.nodes().iter().enumerate() {
+        if !analysis.reachable[id] || !analysis.warn_here[id] {
             continue;
         }
 
-        let Some(meta) = node.warn.as_ref() else {
+        let Some(meta) = analysis.warn_meta_by_node[id].as_ref() else {
             continue;
         };
 
-        let succ_state = cfg.succ[id]
-            .iter()
-            .copied()
-            .map(|sid| states[sid])
-            .reduce(MustReturnState::join)
-            .unwrap_or(MustReturnState::NO);
-
-        if succ_state.kind == MustReturnKind::No || succ_state.warned {
-            continue;
-        }
-        if !meta.warnable_for(succ_state.kind) {
+        let kind = analysis.kind_at[id];
+        if !meta.warnable_for(kind) {
             continue;
         }
 
@@ -529,7 +274,7 @@ fn emit_discarded_by_function_return(diag: &mut DiagnosticVec, analysis: &Discar
             ),
         );
 
-        if succ_state.kind == MustReturnKind::Value
+        if kind == MustReturnKind::Value
             && !meta.is_show_or_set
             && meta.is_hashable
             && let Some(text) = meta.expr_text.as_ref()
