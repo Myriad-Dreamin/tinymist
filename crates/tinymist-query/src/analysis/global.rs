@@ -839,10 +839,10 @@ impl SharedContext {
 
         let source_hash = hash128(source);
         let lint_caches = self.slot.lint_caches.compute(source.id(), |prev| {
-            if let Some(prev) = prev {
-                if prev.lock().source_hash == source_hash {
-                    return prev;
-                }
+            if let Some(prev) = prev
+                && prev.lock().source_hash == source_hash
+            {
+                return prev;
             }
 
             Arc::new(Mutex::new(LintCachesSlot {
