@@ -275,8 +275,8 @@ impl Builder {
             ast::Expr::ContentBlock(b) => self.build_seq(b.body().exprs(), open),
 
             ast::Expr::Conditional(c) => self.build_conditional(c, open),
-            ast::Expr::WhileLoop(l) => self.build_loop(l.body(), open),
-            ast::Expr::ForLoop(l) => self.build_loop(l.body(), open),
+            ast::Expr::WhileLoop(l) => self.build_loop(l.span(), l.body(), open),
+            ast::Expr::ForLoop(l) => self.build_loop(l.span(), l.body(), open),
 
             // Treat nested functions as atomic: their `return` does not affect
             // the enclosing function.
@@ -339,8 +339,7 @@ impl Builder {
         vec![after]
     }
 
-    fn build_loop<'a>(&mut self, body: ast::Expr<'a>, open: Vec<usize>) -> Vec<usize> {
-        let span = body.span();
+    fn build_loop<'a>(&mut self, span: Span, body: ast::Expr<'a>, open: Vec<usize>) -> Vec<usize> {
         let head = self.cfg.add_node(Node {
             kind: NodeKind::LoopHead,
             span,
