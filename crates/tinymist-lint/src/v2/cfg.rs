@@ -6,7 +6,7 @@ use tinymist_analysis::flow::cfg::NodeId;
 use tinymist_analysis::flow::dataflow::{BackwardDataflowProblem, solve_backward};
 use tinymist_analysis::flow::typst::{Node, NodeKind, StmtCfg, build_stmt_cfg_with_side_table};
 
-use crate::DiagnosticVec;
+use super::DiagnosticVec;
 
 #[derive(Debug)]
 struct DiscardByReturnAnalysis {

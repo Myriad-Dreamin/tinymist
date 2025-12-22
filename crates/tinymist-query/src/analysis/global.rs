@@ -837,25 +837,36 @@ impl SharedContext {
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
 
-        let source_hash = hash128(source);
-        let lint_caches = self.slot.lint_caches.compute(source.id(), |prev| {
-            if let Some(prev) = prev
-                && prev.lock().source_hash == source_hash
-            {
-                return prev;
-            }
+        #[cfg(feature = "lint-v2")]
+        {
+            let source_hash = hash128(source);
+            let lint_caches = self.slot.lint_caches.compute(source.id(), |prev| {
+                if let Some(prev) = prev
+                    && prev.lock().source_hash == source_hash
+                {
+                    return prev;
+                }
 
-            Arc::new(Mutex::new(LintCachesSlot {
-                source_hash,
-                caches: tinymist_lint::LintCaches::default(),
-            }))
-        });
+                Arc::new(Mutex::new(LintCachesSlot {
+                    source_hash,
+                    caches: tinymist_lint::LintCaches::default(),
+                }))
+            });
 
-        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
-            guard.miss();
-            let mut caches = lint_caches.lock();
-            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone(), &mut caches.caches)
-        })
+            self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
+                guard.miss();
+                let mut caches = lint_caches.lock();
+                tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone(), &mut caches.caches)
+            })
+        }
+
+        #[cfg(not(feature = "lint-v2"))]
+        {
+            self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
+                guard.miss();
+                tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone())
+            })
+        }
     }
 
     pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {
@@ -1341,6 +1352,7 @@ pub struct ModuleAnalysisLocalCache {
     type_check: OnceLock<Arc<TypeInfo>>,
 }
 
+#[cfg(feature = "lint-v2")]
 struct LintCachesSlot {
     source_hash: u128,
     caches: tinymist_lint::LintCaches,
@@ -1412,6 +1424,7 @@ impl AnalysisRevCache {
                     expr_stage: slot.data.expr_stage.crawl(revision.get()),
                     type_check: slot.data.type_check.crawl(revision.get()),
                     lint: slot.data.lint.crawl(revision.get()),
+                    #[cfg(feature = "lint-v2")]
                     lint_caches: slot.data.lint_caches.crawl(revision.get()),
                 })
                 .unwrap_or_else(|| self.default_slot.clone())
@@ -1446,6 +1459,7 @@ struct AnalysisRevSlot {
     expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
     lint: IncrCacheMap<u128, LintInfo>,
+    #[cfg(feature = "lint-v2")]
     lint_caches: IncrCacheMap<TypstFileId, Arc<Mutex<LintCachesSlot>>>,
 }
 

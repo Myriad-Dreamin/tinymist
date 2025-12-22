@@ -11,6 +11,7 @@ pub struct CheckRequest {
 }
 
 /// A request to compute only lint diagnostics for the document.
+#[cfg(feature = "lint-v2")]
 #[derive(Clone)]
 pub struct LintRequest {
     /// The compilation result of the document.
@@ -30,20 +31,22 @@ impl SemanticRequest for CheckRequest {
     type Response = DiagnosticsResult;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        let compiler_diags = self.snap.diagnostics();
-        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
+        let compiler_diags: Vec<_> = self.snap.diagnostics().cloned().collect();
+        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.iter());
         let lint = DiagWorker::new(ctx).check(&known_issues).results;
-        let compiler = DiagWorker::new(ctx).convert_all(compiler_diags);
+        let compiler = DiagWorker::new(ctx).convert_all(compiler_diags.iter());
 
         Some(DiagnosticsResult { compiler, lint })
     }
 }
 
+#[cfg(feature = "lint-v2")]
 impl SemanticRequest for LintRequest {
     type Response = DiagnosticsMap;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        let known_issues = KnownIssues::from_compiler_diagnostics(self.snap.diagnostics());
+        let compiler_diags: Vec<_> = self.snap.diagnostics().cloned().collect();
+        let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.iter());
         Some(DiagWorker::new(ctx).check(&known_issues).results)
     }
 }

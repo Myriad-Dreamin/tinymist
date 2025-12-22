@@ -2,6 +2,7 @@
 
 pub mod adt;
 pub mod docs;
+#[cfg(feature = "flow")]
 pub mod flow;
 pub mod location;
 mod sig;
