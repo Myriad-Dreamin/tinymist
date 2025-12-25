@@ -15,7 +15,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Editor
 
-* Added character count to VS Code status bar by @Sejder in https://github.com/Myriad-Dreamin/tinymist/pull/2308
+* Added character count format specifier to VS Code status bar by @Sejder in https://github.com/Myriad-Dreamin/tinymist/pull/2308
 * Added new PDF options and image page number template to exporter by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2281
 
 ### Code Analysis
