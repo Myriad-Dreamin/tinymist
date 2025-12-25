@@ -1648,15 +1648,11 @@ Text
     }
 
     #[test]
-    fn ref_syntxax() {
+    fn ref_syntax() {
         assert_snapshot!(map_syntax("@ab:"), @r###"
         @ab:
         rrrr
         "###);
-    }
-
-    #[test]
-    fn ref_syntax() {
         assert_snapshot!(map_syntax("@"), @r"
         @
         r
