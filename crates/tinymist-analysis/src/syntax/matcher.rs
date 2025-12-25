@@ -654,7 +654,7 @@ pub enum SyntaxClass<'a> {
     },
     /// A `@` text, which can be viewed as references with "empty content"
     At {
-        /// The node of the reference.
+        /// The node containing the `@` text.
         node: LinkedNode<'a>,
     },
     /// A callee expression.
