@@ -70,11 +70,20 @@ For a full list of available settings see #github-link("/editors/neovim/Configur
 
 = Formatting
 
-Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
+Either #link("https://typstyle-rs.github.io/typstyle/")[`typstyle`] or #link("https://github.com/astrale-sharp/typstfmt")[`typstfmt`] can be used. 
+Both are now included in `tinymist`, so you do not need to install them separately if you only intend to use them through `tinymist`.
+You can select the one you prefer using the `formatterMode` setting. 
+The following snippet shows all formatting settings that you can put in the `settings` table of the snippets from the previous section:
 
 ```lua
-formatterMode = "typstyle"
+formatterMode = "typstyle", -- or "typstfmt"
+formatterProseWrap = true, -- wrap lines in content mode
+formatterPrintWidth = 80,  -- limit line length to 80 if possible
+formatterIndentSize = 4,   -- indentation width
 ```
+
+Note that, since #link("https://github.com/neovim/neovim/pull/19677")[this Neovim PR], neovim uses LSP servers (hence `tinymist` in our case) by default when formatting code. 
+This applies to calls to `vim.lsp.buf.format()` (which formats the whole current buffer) and also to the `gq` command.
 
 = Live Preview
 <live-preview>
