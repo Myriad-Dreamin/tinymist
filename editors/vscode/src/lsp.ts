@@ -325,7 +325,16 @@ export class LanguageState {
     if (extensionState.features.preview) {
       this.registerPreviewNotifications(client);
     }
+
+    // Track server readiness state
+    client.onDidChangeState((event) => {
+      extensionState.mut.serverReady = event.newState === lc.State.Running;
+    });
+
     await client.start();
+
+    // Reset server health warning flag when client successfully starts
+    extensionState.mut.serverHealthWarningShown = false;
 
     return;
   }
