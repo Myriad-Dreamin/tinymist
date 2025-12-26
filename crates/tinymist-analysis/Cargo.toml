@@ -42,5 +42,9 @@ unscanny.workspace = true
 insta.workspace = true
 regex.workspace = true
 
+[features]
+# CFG + dataflow infrastructure used by experimental lint passes.
+flow = []
+
 [lints]
 workspace = true
