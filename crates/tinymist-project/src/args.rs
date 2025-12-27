@@ -3,8 +3,8 @@ use std::{path::Path, sync::OnceLock};
 use clap::{ArgAction, ValueHint, builder::ValueParser};
 use tinymist_std::{bail, error::prelude::Result};
 
-use tinymist_world::args::{parse_input_pair, PdfExportArgs, PngExportArgs};
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
+use tinymist_world::args::{PdfExportArgs, PngExportArgs, parse_input_pair};
 
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
 use crate::model::*;
@@ -18,7 +18,6 @@ pub enum DocCommands {
     /// Configure document priority in workspace.
     Configure(DocConfigureArgs),
 }
-
 
 /// Declare a document (project's input).
 #[derive(Debug, Clone, clap::Parser)]
@@ -90,7 +89,6 @@ impl DocNewArgs {
         }
     }
 }
-
 
 /// Specify the id of a document.
 ///
