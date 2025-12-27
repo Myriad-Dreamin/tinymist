@@ -378,7 +378,13 @@ impl Config {
             }
         };
         self.syntax_only = match try_(|| update.get("syntaxOnly")?.as_str()) {
+            #[cfg(feature = "battery")]
             Some("onPowerSaving") => tinymist_std::battery::is_power_saving(),
+            #[cfg(not(feature = "battery"))]
+            Some("onPowerSaving") => {
+                log::warn!("battery feature is not enabled for checking power saving mode, syntax-only mode is disabled");
+                false
+            }
             Some("enable") => true,
             Some("disable" | "auto") | None => false,
             Some(value) => {

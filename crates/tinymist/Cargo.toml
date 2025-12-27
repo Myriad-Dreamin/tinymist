@@ -138,6 +138,7 @@ system = [
     "tokio/rt-multi-thread",
     "tokio/io-std",
 ]
+battery = ["tinymist-std/battery"]
 
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
