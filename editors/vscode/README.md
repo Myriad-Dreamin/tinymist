@@ -186,6 +186,16 @@ You can export your documents to various other formats by lsp as well. Currently
 
 See [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/feature/export.html) for more information.
 
+### Working under Power-Saving Mode or with Resource-consumed Projects
+
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting, by:
+
+1. Open settings.
+2. Search for “Tinymist Syntax Only Mode”.
+3. Toggle the “Syntax Only Mode” setting to always enable, disable syntax only mode, or enable on power-saving mode.
+
+For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
+
 ### Working with Multiple-File Projects
 
 You can pin a main file by command.
