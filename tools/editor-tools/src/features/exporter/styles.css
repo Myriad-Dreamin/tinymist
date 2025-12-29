@@ -8,6 +8,17 @@
   transition: padding 0.2s ease;
 }
 
+/* Warning Messages */
+.warning-message {
+  padding: 0.75rem;
+  background: var(--vscode-inputValidation-warningBackground, rgba(255, 191, 0, 0.1));
+  border: 1px solid var(--vscode-inputValidation-warningBorder, #ffcc00);
+  border-radius: 4px;
+  color: var(--vscode-inputValidation-warningForeground, #cccccc);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
 /* Format Selector */
 .format-selector {
   display: grid;
@@ -224,4 +235,34 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Compiler Inputs */
+.inputs-entry {
+  padding: 0.5rem;
+  background: var(--vscode-input-background, #3c3c3c);
+  border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.inputs-entry:hover {
+  background: var(--vscode-list-hoverBackground, #2a2d2e);
+  border-color: var(--vscode-focusBorder, #007acc);
+}
+
+.inputs-entry.dragging {
+  opacity: 0.5;
+}
+
+.drag-handle {
+  padding: 0 0.5rem;
+  cursor: move;
+  user-select: none;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.drag-handle:hover {
+  color: var(--vscode-focusBorder, #007acc);
 }
