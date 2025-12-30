@@ -3,7 +3,7 @@ import van, { type State } from "vanjs-core";
 const { div, h3, button, input, span, p } = van.tags;
 
 interface CompilerInputsProps {
-  inputs: State<Record<string, string>>;
+  inputs: State<[string, string][]>;
 }
 
 type InputEntryState = { key: State<string>; value: State<string> };
@@ -12,11 +12,9 @@ export const CompilerInputs = ({ inputs }: CompilerInputsProps) => {
   const inputEntries = van.state<InputEntryState[]>([]);
 
   van.derive(() => {
-    inputs.val = Object.fromEntries(
-      inputEntries.val
-        .filter((entry) => entry.key.val)
-        .map((entry) => [entry.key.val, entry.value.val]),
-    );
+    inputs.val = inputEntries.val
+      .filter((entry) => entry.key.val)
+      .map((entry) => [entry.key.val, entry.value.val]);
     if (import.meta.env.DEV) {
       console.log("Compiler inputs updated:", inputs.val);
     }

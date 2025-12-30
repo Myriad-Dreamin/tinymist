@@ -57,3 +57,7 @@ export interface ExportActionOpts {
   write?: boolean;
   open?: boolean;
 }
+
+export interface ExportCommonOpts {
+  inputs: [string, string][];
+}

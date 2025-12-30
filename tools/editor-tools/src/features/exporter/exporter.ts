@@ -11,7 +11,7 @@ export function useExporter() {
   const format = van.state(EXPORT_FORMATS[0]);
   // option value may be scalar or an array (multi-select)
   const optionStates: Record<string, State<Scalar | Scalar[] | undefined>> = {};
-  const compilerInputs = van.state<Record<string, string>>({});
+  const compilerInputs = van.state<[string, string][]>([]);
 
   let previewVersion = 0;
   const previewGenerating = van.state(false);
@@ -31,7 +31,7 @@ export function useExporter() {
     return {
       inputPath: inputPath.val.length > 0 ? inputPath.val : lastFocusedTypstDoc.val,
       outputPath: outputPath.rawVal.length > 0 ? outputPath.rawVal : undefined,
-      inputs: compilerInputs,
+      inputs: compilerInputs.val,
       ...extraOpts,
     };
   };

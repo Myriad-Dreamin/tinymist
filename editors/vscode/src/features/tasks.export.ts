@@ -19,6 +19,7 @@ export interface ExportArgs {
   format: ExportFormat | ExportFormat[];
   inputPath: string;
   outputPath: string;
+  inputs: [string, string][];
 
   pages?: string | string[]; // Array of page ranges like ["1-3", "5", "7-9"], or comma separated ranges
   "pdf.pages"?: string | string[];
@@ -138,6 +139,9 @@ export const exportOps = (exportArgs: ExportArgs) => ({
     }
 
     return inputPath;
+  },
+  resolveCommonOpts() {
+    return { inputs: exportArgs.inputs };
   },
 });
 
