@@ -23,5 +23,9 @@ rayon.workspace = true
 [dev-dependencies]
 insta.workspace = true
 
+[features]
+# Enables the v2 lint design (CFG-based discard-by-return analysis + caches).
+lint-v2 = ["tinymist-analysis/flow"]
+
 [lints]
 workspace = true

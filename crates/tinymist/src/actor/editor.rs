@@ -25,11 +25,32 @@ pub struct EditorActorConfig {
 pub enum EditorRequest {
     Config(EditorActorConfig),
     /// Publishes diagnostics to the editor.
-    Diag(ProjVersion, Option<DiagnosticsMap>),
+    Diag(ProjVersion, DiagKind, Option<DiagnosticsMap>),
     /// Updates compile status to the editor.
     Status(CompileReport),
     /// Updastes words count status to the editor.
     WordCount(ProjectInsId, WordsCount),
+}
+
+/// The kind of diagnostics published to the editor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DiagKind {
+    /// Diagnostics reported by the Typst compiler.
+    Compiler,
+    /// Diagnostics reported by Tinymist's lint engine.
+    Lint,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DiagKey {
+    pub project: ProjectInsId,
+    pub kind: DiagKind,
+}
+
+impl DiagKey {
+    fn new(project: ProjectInsId, kind: DiagKind) -> Self {
+        Self { project, kind }
+    }
 }
 
 /// The actor maintaining output to the editor, including diagnostics and
@@ -44,11 +65,11 @@ pub struct EditorActor {
 
     /// Accumulated diagnostics per file.
     /// The outer `HashMap` is indexed by the file's URL.
-    /// The inner `HashMap` is indexed by the project ID, allowing multiple
-    /// projects publishing diagnostics to the same file independently.
-    diagnostics: HashMap<Url, HashMap<ProjectInsId, EcoVec<Diagnostic>>>,
-    /// The map from project ID to the affected files.
-    affect_map: HashMap<ProjectInsId, Vec<Url>>,
+    /// The inner `HashMap` is indexed by the `(project, kind)` pair, allowing
+    /// multiple sources publishing diagnostics to the same file independently.
+    diagnostics: HashMap<Url, HashMap<DiagKey, EcoVec<Diagnostic>>>,
+    /// The map from `(project, kind)` to the affected files.
+    affect_map: HashMap<DiagKey, Vec<Url>>,
 
     /// The local state.
     status: StatusAll,
@@ -100,13 +121,13 @@ impl EditorActor {
                 log::info!("received config request: {config:?}");
                 self.config = config;
             }
-            EditorRequest::Diag(version, diagnostics) => {
+            EditorRequest::Diag(version, kind, diagnostics) => {
                 log::debug!(
                     "received diagnostics from {version:?}: diag({:?})",
                     diagnostics.as_ref().map(|files| files.len())
                 );
 
-                self.publish(version.id, diagnostics);
+                self.publish(version, kind, diagnostics);
             }
             EditorRequest::Status(compile_status) => {
                 log::trace!("received status request: {compile_status:?}");
@@ -137,12 +158,18 @@ impl EditorActor {
     }
 
     /// Publishes diagnostics of a project to the editor.
-    pub fn publish(&mut self, id: ProjectInsId, next_diag: Option<DiagnosticsMap>) {
+    pub fn publish(
+        &mut self,
+        version: ProjVersion,
+        kind: DiagKind,
+        next_diag: Option<DiagnosticsMap>,
+    ) {
+        let key = DiagKey::new(version.id.clone(), kind);
         let affected = match next_diag.as_ref() {
             Some(next_diag) => self
                 .affect_map
-                .insert(id.clone(), next_diag.keys().cloned().collect()),
-            None => self.affect_map.remove(&id),
+                .insert(key.clone(), next_diag.keys().cloned().collect()),
+            None => self.affect_map.remove(&key),
         };
 
         // Gets sources which had some diagnostic published last time, but not this
@@ -155,24 +182,24 @@ impl EditorActor {
         // Gets sources that affected by this group in last round but not this time
         for uri in affected.into_iter().flatten() {
             if !next_diag.as_ref().is_some_and(|e| e.contains_key(&uri)) {
-                self.publish_file(&id, uri, None)
+                self.publish_file(&key, uri, None)
             }
         }
 
         // Gets touched updates
         for (uri, next) in next_diag.into_iter().flatten() {
-            self.publish_file(&id, uri, Some(next))
+            self.publish_file(&key, uri, Some(next))
         }
     }
 
     /// Publishes diagnostics of a file to the editor.
-    fn publish_file(&mut self, id: &ProjectInsId, uri: Url, next: Option<EcoVec<Diagnostic>>) {
+    fn publish_file(&mut self, key: &DiagKey, uri: Url, next: Option<EcoVec<Diagnostic>>) {
         let mut diagnostics = EcoVec::new();
 
         // Gets the diagnostics from other groups
         let path_diags = self.diagnostics.entry(uri.clone()).or_default();
-        for (existing_id, diags) in path_diags.iter() {
-            if existing_id != id {
+        for (existing_key, diags) in path_diags.iter() {
+            if existing_key != key {
                 diagnostics.push(diags.clone());
             }
         }
@@ -184,8 +211,8 @@ impl EditorActor {
 
         // Updates the diagnostics for this group
         match next {
-            Some(next) => path_diags.insert(id.clone(), next),
-            None => path_diags.remove(id),
+            Some(next) => path_diags.insert(key.clone(), next),
+            None => path_diags.remove(key),
         };
 
         // Publishes the diagnostics
