@@ -629,7 +629,7 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
-    use tinymist_lint::KnownIssues;
+    use tinymist_lint::{KnownIssues, UnusedConfig};
 
     use crate::tests::*;
 
@@ -639,6 +639,52 @@ mod lint_tests {
             let source = ctx.source_by_path(&path).unwrap();
 
             let result = ctx.lint(&source, &KnownIssues::default());
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_uri_(&k), v))
+                .collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+
+    #[test]
+    fn test_dead_code() {
+        snapshot_testing("dead_code", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.lint(&source, &KnownIssues::default());
+            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+            let result = result
+                .into_iter()
+                .map(|(k, v)| (file_uri_(&k), v))
+                .collect::<BTreeMap<_, _>>();
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
+
+    #[test]
+    fn test_dead_code_exported() {
+        snapshot_testing("dead_code_exported", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+            let ei = ctx.expr_stage(&source);
+            let ti = ctx.type_check(&source);
+            let cross_file_refs = rustc_hash::FxHashSet::default();
+
+            let dead_code_config = UnusedConfig {
+                check_exported: true,
+                ..UnusedConfig::default()
+            };
+            let result = tinymist_lint::lint_file_with_unused_config(
+                ctx.world(),
+                &ei,
+                ti,
+                KnownIssues::default(),
+                &cross_file_refs,
+                &dead_code_config,
+            )
+            .diagnostics;
+
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()

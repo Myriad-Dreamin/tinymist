@@ -3,4 +3,17 @@ source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lint/show_good.typ
 ---
-{}
+{
+ "s0.typ": [
+  {
+   "code": "tinymist.unused.symbol",
+   "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
+   "range": "0:5:0:6",
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}

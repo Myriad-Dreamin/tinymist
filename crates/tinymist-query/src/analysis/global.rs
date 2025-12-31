@@ -7,13 +7,14 @@ use std::{collections::HashSet, ops::Deref};
 use comemo::{Track, Tracked};
 use lsp_types::Url;
 use parking_lot::Mutex;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
+use tinymist_analysis::adt::interner::Interned;
 use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::AllocStats;
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
-use tinymist_lint::{KnownIssues, LintInfo};
+use tinymist_lint::{KnownIssues, LintInfo, UnusedConfig};
 use tinymist_project::{LspComputeGraph, LspWorld, TaskWhen};
 use tinymist_std::hash::{FxDashMap, hash128};
 use tinymist_std::typst::TypstDocument;
@@ -40,7 +41,7 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
+    Decl, DefKind, Expr, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
     classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
     scan_workspace_files,
 };
@@ -82,6 +83,8 @@ pub struct Analysis {
     pub color_theme: ColorTheme,
     /// When to trigger the lint.
     pub lint: TaskWhen,
+    /// Configuration for unused declaration detection.
+    pub unused: UnusedConfig,
     /// The periscope provider.
     pub periscope: Option<Arc<dyn PeriscopeProvider + Send + Sync>>,
     /// The global worker resources for analysis.
@@ -836,10 +839,78 @@ impl SharedContext {
         let ei = self.expr_stage(source);
         let ti = self.type_check(source);
         let guard = self.query_stat(source.id(), "lint");
-        self.slot.lint.compute(hash128(&(&ei, &ti, issues)), |_| {
-            guard.miss();
-            tinymist_lint::lint_file(self.world(), &ei, ti, issues.clone())
-        })
+        self.slot
+            .lint
+            .compute(hash128(&(&ei, &ti, issues, &self.analysis.unused)), |_| {
+                guard.miss();
+
+                let cross_file_refs = self.compute_cross_file_references(source.id(), &ei);
+
+                tinymist_lint::lint_file_with_unused_config(
+                    self.world(),
+                    &ei,
+                    ti,
+                    issues.clone(),
+                    &cross_file_refs,
+                    &self.analysis.unused,
+                )
+            })
+    }
+
+    /// Computes which declarations from the current file are referenced by other files.
+    fn compute_cross_file_references(
+        self: &Arc<Self>,
+        current_file: TypstFileId,
+        current_ei: &ExprInfo,
+    ) -> FxHashSet<Interned<Decl>> {
+        let mut referenced = FxHashSet::default();
+
+        let exported: FxHashSet<Interned<Decl>> = current_ei
+            .exports
+            .iter()
+            .filter_map(|(_, expr)| match expr {
+                Expr::Decl(decl) => Some(decl.clone()),
+                _ => None,
+            })
+            .collect();
+
+        if exported.is_empty() {
+            return referenced;
+        }
+
+        // Collect references by scanning other files once, instead of checking
+        // every exported symbol against every file.
+        for file_id in self.world().depended_files() {
+            if file_id == current_file {
+                continue;
+            }
+
+            let src = match self.source_by_id(file_id) {
+                Ok(src) => src,
+                Err(e) => {
+                    log::debug!(
+                        "failed to load source file {file_id:?} for cross-file reference check: {e:?}"
+                    );
+                    continue;
+                }
+            };
+
+            let file_ei = self.expr_stage(&src);
+
+            for r in file_ei.resolves.values() {
+                // Match the same shape as the previous `get_refs(..).any(|..| r.decl != decl)`
+                // check: only count references that trace back to a root
+                // definition in the current file.
+                if let Some(Expr::Decl(root_decl)) = r.root.as_ref()
+                    && exported.contains(root_decl)
+                    && r.decl != *root_decl
+                {
+                    referenced.insert(root_decl.clone());
+                }
+            }
+        }
+
+        referenced
     }
 
     pub(crate) fn type_of_func(self: &Arc<Self>, func: Func) -> Signature {

@@ -10,6 +10,16 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_equation.typ
    "range": "1:2:1:11",
    "severity": 2,
    "source": "typst"
+  },
+  {
+   "code": "tinymist.unused.symbol",
+   "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
+   "range": "0:5:0:6",
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
   }
  ]
 }

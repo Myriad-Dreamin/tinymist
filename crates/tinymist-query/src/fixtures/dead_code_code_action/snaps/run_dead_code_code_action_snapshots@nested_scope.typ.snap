@@ -1,0 +1,59 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/s0.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/nested_scope.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_inner_unused",
+        "range": "4:6:4:18"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Prefix `_` to `inner_unused`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "_",
+        "range": "4:6:4:18"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Replace with `_`"
+   },
+   {
+    "edit": {
+     "changes": {
+      "s0.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "4:2:5:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused variable: `inner_unused`\nHint: consider removing this variable or prefixing with underscore: `_inner_unused`",
+  "range": "4:6:4:18"
+ }
+]

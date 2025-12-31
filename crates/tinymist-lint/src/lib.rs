@@ -1,7 +1,17 @@
 //! A linter for Typst.
 
+mod unused;
+
+pub use unused::UnusedConfig;
+
+/// Hint added to diagnostics for documented exported functions, to mark them as
+/// likely public API.
+pub const DOCUMENTED_EXPORTED_FUNCTION_HINT: &str =
+    "this function is exported and documented; it may be part of the public API";
+
 use std::sync::Arc;
 
+use rustc_hash::FxHashSet;
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{Decl, ExprInfo},
@@ -38,7 +48,32 @@ pub fn lint_file(
     ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
 ) -> LintInfo {
-    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+    let cross_file_refs: FxHashSet<Interned<Decl>> = FxHashSet::default();
+    let unused_config = UnusedConfig::default();
+    lint_file_with_unused_config(
+        world,
+        ei,
+        ti,
+        known_issues,
+        &cross_file_refs,
+        &unused_config,
+    )
+}
+
+/// Performs linting check on file with a custom unused configuration.
+pub fn lint_file_with_unused_config(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
+    cross_file_refs: &FxHashSet<Interned<Decl>>,
+    unused_config: &UnusedConfig,
+) -> LintInfo {
+    let mut diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+
+    let unused_diags = unused::check_unused(world, ei, cross_file_refs, unused_config);
+    diagnostics.extend(unused_diags);
+
     LintInfo {
         revision: ei.revision,
         fid: ei.fid,
