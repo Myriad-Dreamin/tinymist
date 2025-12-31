@@ -30,6 +30,7 @@ pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
 pub use crate::syntax::find_module_level_docs;
+use crate::testing::test_suites;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
 
@@ -557,5 +558,163 @@ impl RegexCowExt for Regex {
             Cow::Owned(result) => Cow::Owned(result),
             Cow::Borrowed(_) => text,
         }
+    }
+}
+
+#[cfg(test)]
+mod testing_tests {
+    use super::*;
+
+    #[test]
+    fn test_basic() {
+        snapshot_testing_with("testing", Opts { need_compile: true }, &|ctx, _| {
+            let suites = test_suites(ctx).unwrap();
+            assert_snapshot!(json!({
+                "tests": suites.tests.iter().map(|t| json!({
+                    "name": t.name,
+                    "kind": format!("{:?}", t.kind),
+                })).collect::<Vec<_>>(),
+                "examples": suites.examples.iter().map(|e| {
+                    e.id().vpath().as_rooted_path().to_string_lossy().to_string()
+                }).collect::<Vec<_>>(),
+            }));
+        });
+    }
+
+    #[test]
+    fn test_coverage() {
+        snapshot_testing_with(
+            "testing_coverage",
+            Opts { need_compile: true },
+            &|ctx, _| {
+                let suites = test_suites(ctx).unwrap();
+                let world = ctx.world();
+                let (cov, _) = tinymist_debug::with_cov(world, |world| {
+                    let suites = suites.recheck(world);
+                    for test in &suites.tests {
+                        let test_world = tinymist_world::world::with_main(world, test.location);
+                        let _ = typst_shim::eval::TypstEngine::new(&test_world)
+                            .call(&test.function, typst::foundations::Context::default());
+                    }
+                    Ok(())
+                });
+
+                let cov = cov.unwrap();
+                let json = cov.to_json(world);
+
+                let mut coverage_report = String::new();
+
+                let mut normalized_json = serde_json::Map::new();
+                if let Some(obj) = json.as_object() {
+                    for (file, details) in obj {
+                        let normalized_file = unix_slash(&std::path::PathBuf::from(file.as_str()));
+                        normalized_json.insert(normalized_file, details.clone());
+                    }
+                }
+                coverage_report.push_str(&serde_json::to_string(&normalized_json).unwrap());
+
+                if let Some(obj) = json.as_object() {
+                    for (file, details) in obj {
+                        if let Some(arr) = details.as_array() {
+                            let source = world
+                                .source_by_path(&std::path::PathBuf::from(file.as_str()))
+                                .ok();
+                            if let Some(src) = source {
+                                let normalized_file =
+                                    unix_slash(&std::path::PathBuf::from(file.as_str()));
+                                coverage_report.push_str(&format!("\n--- {normalized_file}\n"));
+
+                                let text = src.text();
+                                let lines: Vec<&str> = text.lines().collect();
+                                let mut line_ranges: Vec<Vec<(usize, usize, bool)>> =
+                                    vec![vec![]; lines.len()];
+
+                                for d in arr {
+                                    if let Some(loc) = d["location"].as_object() {
+                                        if let (Some(start), Some(end)) =
+                                            (loc.get("start"), loc.get("end"))
+                                        {
+                                            let start_line = start["line"]
+                                                .as_u64()
+                                                .expect("`start.line` should be a u64")
+                                                as usize;
+                                            let start_char = start["character"]
+                                                .as_u64()
+                                                .expect("`start.character` should be a u64")
+                                                as usize;
+                                            let end_line = end["line"]
+                                                .as_u64()
+                                                .expect("`end.line` should be a u64")
+                                                as usize;
+                                            let end_char = end["character"]
+                                                .as_u64()
+                                                .expect("`end.character` should be a u64")
+                                                as usize;
+                                            let executed = d["executed"]
+                                                .as_bool()
+                                                .expect("`executed` should be a bool");
+
+                                            if start_line == end_line && start_line < lines.len() {
+                                                line_ranges[start_line]
+                                                    .push((start_char, end_char, executed));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                for (idx, line) in lines.iter().enumerate() {
+                                    if line_ranges[idx].is_empty() {
+                                        coverage_report.push_str(&format!("  {line}\n"));
+                                    } else {
+                                        let mut ranges = line_ranges[idx].clone();
+                                        ranges.sort_by_key(|r| r.0);
+
+                                        let mut marked_line = String::new();
+                                        let mut pos = 0;
+                                        let has_uncovered = ranges.iter().any(|r| !r.2);
+                                        let prefix = if has_uncovered { "-" } else { "+" };
+
+                                        // Helper function to convert UTF-16 offset to byte offset
+                                        let utf16_to_byte = |utf16_offset: usize| -> usize {
+                                            let mut utf16_count = 0;
+                                            for (byte_idx, ch) in line.char_indices() {
+                                                if utf16_count >= utf16_offset {
+                                                    return byte_idx;
+                                                }
+                                                utf16_count += ch.len_utf16();
+                                            }
+                                            line.len()
+                                        };
+
+                                        for (start_utf16, end_utf16, executed) in ranges {
+                                            let start = utf16_to_byte(start_utf16);
+                                            let end = utf16_to_byte(end_utf16);
+
+                                            if pos < start {
+                                                marked_line.push_str(&line[pos..start]);
+                                            }
+                                            let segment = &line[start..end.min(line.len())];
+                                            if executed {
+                                                marked_line.push_str(&format!("[{segment}]"));
+                                            } else {
+                                                marked_line.push_str(&format!("<{segment}>"));
+                                            }
+                                            pos = end.min(line.len());
+                                        }
+                                        if pos < line.len() {
+                                            marked_line.push_str(&line[pos..]);
+                                        }
+
+                                        coverage_report
+                                            .push_str(&format!("{prefix} {marked_line}\n"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                assert_snapshot!(coverage_report);
+            },
+        );
     }
 }
