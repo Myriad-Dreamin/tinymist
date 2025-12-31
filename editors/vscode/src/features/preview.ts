@@ -401,7 +401,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   }
 
   const taskId = Math.random().toString(36).substring(7);
-  const filePath = bindDocument.uri.fsPath;
+  const filePath = bindDocument.uri.toString();
 
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);

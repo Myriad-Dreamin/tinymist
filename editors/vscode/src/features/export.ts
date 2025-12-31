@@ -223,7 +223,7 @@ export async function commandExport(
   opts?: ExportOpts,
   actionOpts?: ExportActionOpts,
 ): Promise<ExportResponse | null> {
-  const uri = vscode.window.activeTextEditor?.document.uri.fsPath;
+  const uri = vscode.window.activeTextEditor?.document.uri.toString();
   if (!uri) {
     return null;
   }
