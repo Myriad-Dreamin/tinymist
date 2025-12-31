@@ -9,9 +9,13 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.14.6 - [2025-12-26]
+## v0.14.6 - [2025-12-29]
 
 * Bumped typst to v0.14.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2312
+
+### Server
+
+* Added `--input` flag to CLI commands by @xiyihan0 in https://github.com/Myriad-Dreamin/tinymist/pull/2328
 
 ### Editor
 
