@@ -29,7 +29,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Editor
 
-* Introspecting and showing complation statistics happening in the language server in https://github.com/Myriad-Dreamin/tinymist/pull/1958 and https://github.com/Myriad-Dreamin/tinymist/pull/2231
+* Introspecting and showing compilation statistics happening in the language server in https://github.com/Myriad-Dreamin/tinymist/pull/1958 and https://github.com/Myriad-Dreamin/tinymist/pull/2231
 * Added export tool with page/text preview features by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2182
 * Customizing paste behaviors in vscode in https://github.com/Myriad-Dreamin/tinymist/pull/2238 and https://github.com/Myriad-Dreamin/tinymist/pull/2239
 
