@@ -770,7 +770,7 @@ Nightly Release at [feat: split tinymist-task (#1277)](https://github.com/Myriad
 ## v0.12.20 - [2025-02-21]
 
 We massively changed the internal world implementation. This unblocks many new features:
-- It computes dependencies of compilation accurately. It was not correct because compilations and analyzers runs on a same world at the same time.
+- It computes dependencies of compilation accurately. It was not correct because compilations and analyzers run on the same world at the same time.
 - It only compiles documents when file changes really affect the compilation, because we now tracks dependencies correctly.
 - It now adds new project model with a `tinymist.lock` to help manage documents and their dependencies on large multiple-files projects. This is still experimental and disabled by default.
 - The `tinymist.lock` along with the browsing preview is expected to greatly help people work on large and complex projects using any of their favorite editors.
