@@ -879,7 +879,7 @@ For `tinymist.lock` feature, please check the [tinymist.projectResolution = "loc
 * CI used newest deploy-pages, upload-pages-artifact, and configure-pages actions in https://github.com/Myriad-Dreamin/tinymist/pull/1249 and https://github.com/Myriad-Dreamin/tinymist/pull/1251
 * Documenting Myriad-Dreamin's workspace setting in https://github.com/Myriad-Dreamin/tinymist/pull/1264
 * CI Added release crates action in https://github.com/Myriad-Dreamin/tinymist/pull/1298
- * Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates in https://github.com/Myriad-Dreamin/tinymist/pull/1310
+* Published {tinymist-{derive,analysis,std,vfs,world,project},typlite,crityp} crates in https://github.com/Myriad-Dreamin/tinymist/pull/1310
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.12.18...v0.12.20
 
