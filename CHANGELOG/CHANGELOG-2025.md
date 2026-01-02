@@ -773,7 +773,7 @@ We massively changed the internal world implementation. This unblocks many new f
 - It computes dependencies of compilation accurately. It was not correct because compilations and analyzers runs on a same world at the same time.
 - It only compiles documents when file changes really affect the compilation, because we now tracks dependencies correctly.
 - It now adds new project model with a `tinymist.lock` to help manage documents and their dependencies on large multiple-files projects. This is still experimental and disabled by default.
-- The `tinymist.lock` along with the browsing preview is expected to greatly help people work on large and complex projects using any of their faviorite editors.
+- The `tinymist.lock` along with the browsing preview is expected to greatly help people work on large and complex projects using any of their favorite editors.
 
 For `tinymist.lock` feature, please check the [tinymist.projectResolution = "lockDatabase"](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/Configuration.md#tinymistprojectresolution). This is still experimental for multiple-files projects.
 
