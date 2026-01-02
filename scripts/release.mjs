@@ -102,7 +102,10 @@ const currentBranch = (await spawn("current-branch", "git rev-parse --abbrev-ref
 
 async function findWorkflowRunId(workflowId, branch) {
   const runs = JSON.parse(
-    await spawn("workflow-run-list", `gh run list -w ${workflowId} ${REPO_PARAM} --json headBranch,databaseId`),
+    await spawn(
+      "workflow-run-list",
+      `gh run list -w ${workflowId} ${REPO_PARAM} --json headBranch,databaseId`,
+    ),
   );
 
   console.log(runs, branch);

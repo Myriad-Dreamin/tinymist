@@ -14,7 +14,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Preview
 
-* (Fixed) fix irresponsive preview caused by incorrect scroll handling by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2269
+* (Fix) fix irresponsive preview caused by incorrect scroll handling by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2269
   * This was introduced in https://github.com/Myriad-Dreamin/tinymist/pull/2145
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.2...v0.14.4
@@ -227,7 +227,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Server
 
-"Server Features" Were named "Compiler Features"
+"Compiler Features" are named as "Server Features" now.
 
 * (Fix) Made configuration items null-safe in https://github.com/Myriad-Dreamin/tinymist/pull/1988
 * (Fix) Corrected export signal handling in https://github.com/Myriad-Dreamin/tinymist/pull/1990 and https://github.com/Myriad-Dreamin/tinymist/pull/1991
