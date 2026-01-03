@@ -37,42 +37,66 @@ impl SemanticRequest for PrepareRenameRequest {
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
-        if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
-            // todo: rename field access
-            log::info!("prepare_rename: field access is not a definition site");
+        if bad_syntax(&syntax) {
             return None;
         }
 
-        let origin_selection_range = ctx.to_lsp_range(syntax.node().range(), &source);
+        //  todo: process RefMarker consistently?
+        let mut node = syntax.node().clone();
+        if matches!(node.kind(), SyntaxKind::Ref) {
+            let marker = node
+                .children()
+                .find(|child| child.kind() == SyntaxKind::RefMarker)?;
+            node = marker;
+        }
+        let mut range = node.range();
+        if matches!(node.kind(), SyntaxKind::RefMarker) {
+            range.start += 1;
+        }
+
+        let origin_selection_range = ctx.to_lsp_range(range, &source);
         let def = ctx.def_of_syntax(&source, syntax.clone())?;
 
-        let (name, range) = prepare_renaming(&syntax, &def)?;
+        let name = prepare_renaming(&syntax, &def)?;
 
         Some(PrepareRenameResponse::RangeWithPlaceholder {
-            range: range.unwrap_or(origin_selection_range),
+            range: origin_selection_range,
             placeholder: name,
         })
     }
 }
 
-pub(crate) fn prepare_renaming(
-    deref_target: &SyntaxClass,
-    def: &Definition,
-) -> Option<(String, Option<LspRange>)> {
-    let name = def.name().clone();
+fn bad_syntax(syntax: &SyntaxClass) -> bool {
+    if matches!(syntax.node().kind(), SyntaxKind::FieldAccess) {
+        // todo: rename field access
+        log::info!("prepare_rename: field access is not a definition site");
+        return true;
+    }
+
+    if syntax.contains_error() {
+        return true;
+    }
+
+    false
+}
+
+pub(crate) fn prepare_renaming(syntax: &SyntaxClass, def: &Definition) -> Option<String> {
+    if bad_syntax(syntax) {
+        return None;
+    }
+
     let def_fid = def.file_id()?;
 
     if WorkspaceResolver::is_package_file(def_fid) {
         crate::log_debug_ct!(
-            "prepare_rename: {name} is in a package {pkg:?}",
+            "prepare_rename: is in a package {pkg:?}, def: {def:?}",
             pkg = def_fid.package(),
         );
         return None;
     }
 
-    let var_rename = || Some((name.to_string(), None));
+    let decl_name = || def.name().clone().to_string();
 
-    crate::log_debug_ct!("prepare_rename: {name}");
     use Decl::*;
     match def.decl.as_ref() {
         // Cannot rename headings or blocks
@@ -81,17 +105,17 @@ pub(crate) fn prepare_renaming(
         // LexicalKind::Mod(Star) => None,
         // Cannot rename expression import
         // LexicalKind::Mod(Module(ModSrc::Expr(..))) => None,
-        Var(..) => var_rename(),
-        Func(..) | Closure(..) => validate_fn_renaming(def).map(|_| (name.to_string(), None)),
+        Var(..) | Label(..) | ContentRef(..) => Some(decl_name()),
+        Func(..) | Closure(..) => validate_fn_renaming(def).map(|_| decl_name()),
         Module(..) | ModuleAlias(..) | PathStem(..) | ImportPath(..) | IncludePath(..)
         | ModuleImport(..) => {
-            let node = deref_target.node().get().clone();
+            let node = syntax.node().get().clone();
             let path = node.cast::<ast::Str>()?;
             let name = path.get().to_string();
-            Some((name, None))
+            Some(name)
         }
-        // todo: label renaming, bibkey renaming
-        BibEntry(..) | Label(..) | ContentRef(..) => None,
+        // todo: bibkey renaming
+        BibEntry(..) => None,
         ImportAlias(..) | Constant(..) | IdentRef(..) | Import(..) | StrName(..) | Spread(..) => {
             None
         }
