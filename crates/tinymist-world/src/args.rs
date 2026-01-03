@@ -216,7 +216,7 @@ impl CompileOnceArgs {
 ///
 /// This function will return an error if the argument contains no equals sign
 /// or contains the key (before the equals sign) is empty.
-fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
+pub fn parse_input_pair(raw: &str) -> Result<(String, String), String> {
     let (key, val) = raw
         .split_once('=')
         .ok_or("input must be a key and a value separated by an equal sign")?;
@@ -425,6 +425,8 @@ display_possible_values!(PdfStandard);
 pub enum Feature {
     /// The HTML feature.
     Html,
+    /// The A11yExtras feature.
+    A11yExtras,
 }
 
 display_possible_values!(Feature);
@@ -433,6 +435,7 @@ impl From<Feature> for typst::Feature {
     fn from(f: Feature) -> typst::Feature {
         match f {
             Feature::Html => typst::Feature::Html,
+            Feature::A11yExtras => typst::Feature::A11yExtras,
         }
     }
 }

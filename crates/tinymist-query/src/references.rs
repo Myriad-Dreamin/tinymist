@@ -54,6 +54,7 @@ pub(crate) fn find_references(
         | SyntaxClass::Ref {
             suffix_colon: true, ..
         }
+        | SyntaxClass::At { node: _ }
         | SyntaxClass::Normal(..) => {
             return None;
         }

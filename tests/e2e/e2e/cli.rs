@@ -94,9 +94,9 @@ fn test_help_lsp() {
 }
 
 #[test]
-fn test_help_compile() {
+fn test_help_compile_alias() {
     apply_common_filters!();
-    insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--help"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg("--help"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -126,6 +126,147 @@ fn test_help_compile() {
               resolved relative to the current working directory (PWD)
               
               [env: TYPST_ROOT=REDACTED]
+
+          --input <key=value>
+              Add a string key-value pair visible through `sys.inputs`
+
+          --font-path <DIR>
+              Add additional directories that are recursively searched for fonts.
+              
+              If multiple paths are specified, they are separated by the system's path separator (`:` on
+              Unix-like systems and `;` on Windows).
+              
+              [env: TYPST_FONT_PATHS=REDACTED]
+
+          --ignore-system-fonts
+              Ensure system fonts won't be searched, unless explicitly included via `--font-path`
+
+          --package-path <DIR>
+              Specify a custom path to local packages, defaults to system-dependent location
+              
+              [env: TYPST_PACKAGE_PATH=REDACTED]
+
+          --package-cache-path <DIR>
+              Specify a custom path to package cache, defaults to system-dependent location
+              
+              [env: TYPST_PACKAGE_CACHE_PATH=REDACTED]
+
+          --when <WHEN>
+              Configure when to run the task
+
+              Possible values:
+              - never:              Never watch to run task
+              - onSave:             Run task on saving the document, i.e. on `textDocument/didSave`
+                events
+              - onType:             Run task on typing, i.e. on `textDocument/didChange` events
+              - onDocumentHasTitle: *DEPRECATED* Run task when a document has a title and on saved,
+                which is useful to filter out template files
+              - script:             Checks by running a typst script
+
+      -f, --format <FORMAT>
+              Specify the format of the output file, inferred from the extension by default
+
+              Possible values:
+              - pdf:  Export to PDF
+              - png:  Export to PNG
+              - svg:  Export to SVG
+              - html: Export to HTML
+
+          --pages <PAGES>
+              Specify which pages to export. When unspecified, all pages are exported.
+              
+              Pages to export are separated by commas, and can be either simple page numbers (e.g. '2,5'
+              to export only pages 2 and 5) or page ranges (e.g. '2,3-6,8-' to export page 2, pages 3 to
+              6 (inclusive), page 8 and any pages after it).
+              
+              Page numbers are one-indexed and correspond to physical page numbers in the document
+              (therefore not being affected by the document's page counter).
+
+          --pdf-standard <STANDARD>
+              Specify the PDF standards that Typst will enforce conformance with.
+              
+              If multiple standards are specified, they are separated by commas.
+
+              Possible values:
+              - 1.4:  PDF 1.4
+              - 1.5:  PDF 1.5
+              - 1.6:  PDF 1.6
+              - 1.7:  PDF 1.7
+              - 2.0:  PDF 2.0
+              - a-1b: PDF/A-1b
+              - a-1a: PDF/A-1a
+              - a-2b: PDF/A-2b
+              - a-2u: PDF/A-2u
+              - a-2a: PDF/A-2a
+              - a-3b: PDF/A-3b
+              - a-3u: PDF/A-3u
+              - a-3a: PDF/A-3a
+              - a-4:  PDF/A-4
+              - a-4f: PDF/A-4f
+              - a-4e: PDF/A-4e
+              - ua-1: PDF/UA-1
+
+          --no-pdf-tags
+              By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is
+              written to provide a baseline of accessibility. In some circumstances (for example when
+              trying to reduce the size of a document) it can be desirable to disable tagged PDF
+
+          --ppi <PPI>
+              Specify the PPI (pixels per inch) to use for PNG export
+              
+              [default: 144]
+
+          --save-lock
+              Save the compilation arguments to the lock file. If `--lockfile` is not set, the lock file
+              will be saved in the cwd
+
+          --lockfile <LOCKFILE>
+              Specify the path to the lock file. If the path is set, the lockfile will be saved
+              (--save-lock)
+
+      -h, --help
+              Print help (see a summary with '-h')
+
+    ----- stderr -----
+    ");
+}
+
+#[test]
+fn test_help_compile() {
+    apply_common_filters!();
+    insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--help"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    Run compile command like `typst-cli compile`
+
+    Usage: tinymist compile [OPTIONS] <INPUT> [OUTPUT]
+
+    Arguments:
+      <INPUT>
+              Specify the path to input Typst file
+
+      [OUTPUT]
+              Provide the path to output file (PDF, PNG, SVG, or HTML). Use `-` to write output to
+              stdout.
+              
+              For output formats emitting one file per page (PNG & SVG), a page number template must be
+              present if the source document renders to multiple pages. Use `{p}` for page numbers,
+              `{0p}` for zero padded page numbers and `{t}` for page count. For example,
+              `page-{0p}-of-{t}.png` creates `page-01-of-10.png`, `page-02-of-10.png`, and so on.
+
+    Options:
+          --name <NAME>
+              Give a task name to the document
+
+          --root <DIR>
+              Configure the project root (for absolute paths). If the path is relative, it will be
+              resolved relative to the current working directory (PWD)
+              
+              [env: TYPST_ROOT=REDACTED]
+
+          --input <key=value>
+              Add a string key-value pair visible through `sys.inputs`
 
           --font-path <DIR>
               Add additional directories that are recursively searched for fonts.
@@ -247,12 +388,12 @@ fn test_help_preview() {
     Options:
           --preview-mode <MODE>
               Configure the preview mode
-              
-              [default: document]
 
               Possible values:
               - document: Would like to preview a regular document
               - slide:    Would like to preview slides
+              
+              [default: document]
 
           --partial-rendering <ENABLE_PARTIAL_RENDERING>
               Only render visible part of the document.
@@ -346,11 +487,12 @@ fn test_help_preview() {
 
           --features <FEATURES>
               Enable in-development features that may be changed or removed at any time
-              
-              [env: TYPST_FEATURES=REDACTED]
 
               Possible values:
-              - html: The HTML feature
+              - html:        The HTML feature
+              - a11y-extras: The A11yExtras feature
+              
+              [env: TYPST_FEATURES=REDACTED]
 
           --input <key=value>
               Add a string key-value pair visible through `sys.inputs`.
@@ -442,6 +584,40 @@ fn test_compile() {
             let output = rel_out.join(format!("test{i}.pdf"));
             assert!(output.exists(), "output file should exist: {output:?}");
         }
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+#[test]
+fn test_compile_alias() {
+    const INPUT_REL: &str = "tests/workspaces/individuals/tiny.typ";
+
+    std::env::set_var("RUST_BACKTRACE", "full");
+    let cwd = GIT_ROOT.clone();
+    let root = cwd.join("target/e2e/tinymist-cli");
+
+    std::env::set_current_dir(&cwd).expect("should change current directory");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let abs_out = tmp.clean();
+        let rel_out = abs_out.strip_prefix(&cwd).expect("path should be stripped");
+
+        assert!(cwd.is_absolute(), "cwd should be absolute {cwd:?}");
+        assert!(abs_out.is_absolute(), "abs_out should be absolute {abs_out:?}");
+        assert!(rel_out.is_relative(), "rel_out should be relative {rel_out:?}");
+
+        // Test the 'c' alias with relative INPUT and OUTPUT
+        insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg(INPUT_REL).arg(rel_out.join("test_alias.pdf")), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        ");
+
+        let output = rel_out.join("test_alias.pdf");
+        assert!(output.exists(), "output file should exist: {output:?}");
 
         Ok(())
     })

@@ -318,3 +318,34 @@ impl TypeSimplifier<'_, '_> {
         sig.into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// See https://github.com/typst/typst/issues/6285
+    #[test]
+    fn test_simplify_sort() {
+        fn ch(it: &str) -> Ty {
+            Ty::Value(InsTy::new(Value::Str(it.into())))
+        }
+
+        fn val(it: Value) -> Ty {
+            Ty::Value(InsTy::new(it))
+        }
+
+        fn test_sort_ty(mut tys: Vec<Ty>) {
+            tys.sort();
+        }
+
+        let abcdef = vec![ch("a"), ch("b"), ch("c"), ch("d"), ch("e"), ch("f")];
+
+        let mut res = vec![];
+        res.extend(abcdef.clone());
+        res.extend(abcdef.clone());
+        res.extend(abcdef.clone());
+        res.extend(vec![ch("c"), val(Value::None), ch("a")]);
+
+        test_sort_ty(res);
+    }
+}

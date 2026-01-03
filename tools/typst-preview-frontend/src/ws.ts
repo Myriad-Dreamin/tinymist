@@ -1,5 +1,9 @@
 import { PreviewMode } from "typst-dom/typst-doc.mjs";
-import { TypstPreviewDocument as TypstDocument, TypstDomHookedElement, TypstDomWindowElement } from "typst-dom/index.preview.mjs";
+import {
+  TypstPreviewDocument as TypstDocument,
+  TypstDomHookedElement,
+  TypstDomWindowElement,
+} from "typst-dom/index.preview.mjs";
 import {
   rendererBuildInfo,
   createTypstRenderer,
@@ -33,7 +37,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     if (hookedElem) {
       hookedElem.innerHTML = "";
     }
-    return () => { };
+    return () => {};
   }
   const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
 
@@ -70,7 +74,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
     if (!isContentPreview) {
       subsribes.push(
-        fromEvent(window, "scroll")
+        fromEvent(resizeTarget, "scroll")
           .pipe(debounceTime(500))
           .subscribe(() => svgDoc.addViewportChange()),
       );
@@ -88,7 +92,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
       }),
     );
-
 
     const focusInput = () => {
       const inpPageSelector = document.getElementById("typst-page-selector") as
@@ -180,12 +183,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     window.addEventListener("keydown", (e) => {
       let handled = true;
 
-      // https://stackoverflow.com/questions/3464876/javascript-get-window-x-y-position-for-scroll
-      let top = () => {
-        let doc = document.documentElement;
-        return (window.pageYOffset || doc.scrollTop) - (doc.clientTop || 0)
-      };
-      const scrollDelta = 50
+      const scrollDelta = 50;
 
       switch (e.key) {
         case "ArrowLeft":
@@ -206,16 +204,16 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           }
           break;
         case "j":
-          window.scroll({ top: top() + scrollDelta, behavior: "instant" });
+          resizeTarget.scrollBy({ top: + scrollDelta, behavior: "instant" });
           break;
         case "k":
-          window.scroll({ top: top() - scrollDelta, behavior: "instant" });
+          resizeTarget.scrollBy({ top: - scrollDelta, behavior: "instant" });
           break;
         case "h":
-          window.scroll({ top: top() - scrollDelta * 10, behavior: "smooth" });
+          resizeTarget.scrollBy({ top: - scrollDelta * 10, behavior: "smooth" });
           break;
         case "l":
-          window.scroll({ top: top() + scrollDelta * 10, behavior: "smooth" });
+          resizeTarget.scrollBy({ top: + scrollDelta * 10, behavior: "smooth" });
           break;
         case "?":
           blurInput();

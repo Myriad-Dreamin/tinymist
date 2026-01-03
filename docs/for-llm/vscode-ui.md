@@ -469,6 +469,7 @@ Set format string of the server status. For example, `{compileStatusIcon}{wordCo
 
 - `{compileStatusIcon}`: Icon indicating the compile status
 - `{wordCount}`: Number of words in the document
+- `{charCount}`: Number of characters in the document
 - `{fileName}`: Name of the file being compiled
 
 Note: The status bar will be hidden if the format string is empty.

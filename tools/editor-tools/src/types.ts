@@ -1,3 +1,8 @@
+export interface Versioned<T> {
+  version: string;
+  data: T;
+}
+
 export interface FsFontSource {
   kind: "fs";
   path: string;

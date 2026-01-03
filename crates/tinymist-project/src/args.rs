@@ -1,11 +1,10 @@
 use std::{path::Path, sync::OnceLock};
 
-use clap::ValueHint;
+use clap::{ArgAction, ValueHint, builder::ValueParser};
 use tinymist_std::{bail, error::prelude::Result};
 
-use tinymist_world::args::PdfExportArgs;
-use tinymist_world::args::PngExportArgs;
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
+use tinymist_world::args::{PdfExportArgs, PngExportArgs, parse_input_pair};
 
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
 use crate::model::*;
@@ -31,6 +30,14 @@ pub struct DocNewArgs {
     /// (PWD).
     #[clap(long = "root", env = "TYPST_ROOT", value_name = "DIR")]
     pub root: Option<String>,
+    /// Add a string key-value pair visible through `sys.inputs`.
+    #[clap(
+        long = "input",
+        value_name = "key=value",
+        action = ArgAction::Append,
+        value_parser = ValueParser::new(parse_input_pair),
+    )]
+    pub inputs: Vec<(String, String)>,
     /// Specify the font related arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
@@ -74,8 +81,7 @@ impl DocNewArgs {
             lock_dir: Some(ctx.1.to_path_buf()),
             root,
             main,
-            // todo: inputs
-            inputs: vec![],
+            inputs: self.inputs.clone(),
             font_paths,
             system_fonts: !self.font.ignore_system_fonts,
             package_path,

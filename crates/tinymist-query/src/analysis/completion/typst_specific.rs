@@ -1,6 +1,7 @@
 //! Completion by typst specific semantics, like `font`, `package`, `label`, or
 //! `typst::foundations::Value`.
 
+use tinymist_std::time::yyyy_mm_dd;
 use typst::foundations::Symbol;
 
 use super::*;
@@ -29,32 +30,45 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
-        let mut packages: Vec<_> = w
-            .packages()
-            .iter()
-            .map(|(spec, desc)| (spec, desc.clone()))
-            .collect();
-        // local_packages to references and add them to the packages
-        #[cfg(feature = "local-registry")]
-        let local_packages_refs = self.worker.ctx.local_packages();
-        #[cfg(feature = "local-registry")]
-        packages.extend(
-            local_packages_refs
-                .iter()
-                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
-        );
+        // Finds packages that are in `@preview`
+        let mut packages = w.packages().iter().collect_vec();
 
-        packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
+        // Finds packages that are not in `@preview`
+        #[cfg(feature = "local-registry")]
+        let other_packages_refs = self.worker.ctx.non_preview_packages();
+        #[cfg(feature = "local-registry")]
+        packages.extend(other_packages_refs.iter());
+
+        packages.sort_by_key(|entry| {
+            (
+                &entry.namespace,
+                &entry.package.name,
+                Reverse(entry.package.version),
+            )
+        });
         if !all_versions {
-            packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
+            packages.dedup_by_key(|entry| (&entry.namespace, &entry.package.name));
         }
-        for (package, description) in packages {
-            self.value_completion(
-                None,
-                &Value::Str(format_str!("{package}")),
-                false,
-                description.as_deref(),
-            );
+        let completion_info = packages
+            .iter()
+            .map(|entry| {
+                let mut docs = String::new();
+                if let Some(desc) = &entry.package.description {
+                    docs.push_str(desc);
+                    docs.push_str("\n\n");
+                }
+                docs.push_str(&format!("Authors: {}\n", entry.package.authors.join(", ")));
+                docs.push_str(&format!("Version: {}\n", entry.package.version));
+                if let Some(updated_at) = &entry.updated_at
+                    && let Ok(formatted) = updated_at.format(&yyyy_mm_dd())
+                {
+                    docs.push_str(&format!("Updated: {formatted}\n"));
+                }
+                (format_str!("{}", entry.spec()), docs)
+            })
+            .collect_vec(); // avoid self borrow
+        for (value, docs) in completion_info {
+            self.value_completion(None, &Value::Str(value), false, Some(&docs));
         }
     }
 

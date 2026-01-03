@@ -1,11 +1,15 @@
 //! Package Registry.
 
 use std::num::NonZeroUsize;
+use std::path::PathBuf;
 use std::{path::Path, sync::Arc};
 
 use ecow::EcoString;
+use serde::Deserialize;
+use tinymist_std::time::UtcDateTime;
 pub use typst::diag::PackageError;
 pub use typst::syntax::package::PackageSpec;
+use typst::syntax::package::{PackageInfo, TemplateInfo};
 
 mod dummy;
 pub use dummy::*;
@@ -47,9 +51,48 @@ pub trait PackageRegistry {
     /// by enabling autocompletion for packages. Details about packages from the
     /// `@preview` namespace are available from
     /// `https://packages.typst.org/preview/index.json`.
-    fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    fn packages(&self) -> &[PackageIndexEntry] {
         &[]
     }
+}
+
+/// An entry in the package index.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PackageIndexEntry {
+    /// The namespace the package lives in.
+    #[serde(default)]
+    pub namespace: EcoString,
+    /// Details about the package itself.
+    #[serde(flatten)]
+    pub package: PackageInfo,
+    /// Details about the template, if the package is one.
+    #[serde(default)]
+    pub template: Option<TemplateInfo>,
+    /// The timestamp when the package was last updated.
+    #[serde(rename = "updatedAt", deserialize_with = "deserialize_timestamp")]
+    pub updated_at: Option<UtcDateTime>,
+    /// The local path of the package, if available.
+    #[serde(default)]
+    pub path: Option<PathBuf>,
+}
+
+impl PackageIndexEntry {
+    /// Get the package specification for this entry.
+    pub fn spec(&self) -> PackageSpec {
+        PackageSpec {
+            namespace: self.namespace.clone(),
+            name: self.package.name.clone(),
+            version: self.package.version,
+        }
+    }
+}
+
+fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<Option<UtcDateTime>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let timestamp = i64::deserialize(deserializer)?;
+    Ok(UtcDateTime::from_unix_timestamp(timestamp).ok())
 }
 
 /// A trait for package registries that can be notified.

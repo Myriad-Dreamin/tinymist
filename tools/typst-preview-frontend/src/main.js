@@ -57,7 +57,7 @@ function retrieveWsArgs() {
 /// `buildWs` returns a object, which keeps track of websocket
 ///  connections.
 function buildWs() {
-  let previousDispose = Promise.resolve(() => { });
+  let previousDispose = Promise.resolve(() => {});
   /// `nextWs` will always hold a global unique websocket connection
   /// to the preview backend.
   function nextWs(nextWsArgs) {
