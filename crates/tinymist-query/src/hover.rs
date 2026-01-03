@@ -288,18 +288,18 @@ impl HoverWorker<'_> {
 
                 // Universe page
                 let universe_url = format!("https://typst.app/universe/package/{package_name}");
-                links_line.push(format!("🌌 [Universe]({universe_url})"));
+                links_line.push(format!("[Universe]({universe_url})"));
             }
 
             if let Some(current_entry) = current_entry {
                 // Repository URL
                 if let Some(ref repo) = current_entry.package.repository {
-                    links_line.push(format!("🔗 [Repository]({repo})"));
+                    links_line.push(format!("[Repository]({repo})"));
                 }
 
                 // Homepage URL
                 if let Some(ref homepage) = current_entry.package.homepage {
-                    links_line.push(format!("🏠 [Homepage]({homepage})"));
+                    links_line.push(format!("[Homepage]({homepage})"));
                 }
             }
 
@@ -311,24 +311,22 @@ impl HoverWorker<'_> {
 
         // Package header
         if !package_spec.is_preview() {
-            info.push_str("ℹ️ This is a local package\n\n");
+            info.push_str("Info: This is a local package\n\n");
         }
 
         info.push_str(&format!("**Package:** `{package_spec}`\n"));
         // Check version information and show status
         if current_entry.is_none() {
             info.push_str(&format!(
-                "‼️ **Version {} not found**\n\n",
+                "**Version {} not found**\n\n",
                 package_spec.version
             ));
         } else if let Some(latest) = packages.first() {
             let latest_version = &latest.package.version;
             if *latest_version != package_spec.version {
-                info.push_str(&format!(
-                    "⚠️ **Newer version available: {latest_version}**\n"
-                ));
+                info.push_str(&format!("**Newer version available: {latest_version}**\n"));
             } else {
-                info.push_str("✅ **Up to date** (latest version)\n");
+                info.push_str("**Up to date** (latest version)\n");
             }
         }
         info.push('\n');
