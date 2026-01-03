@@ -5,10 +5,10 @@ input_file: crates/tinymist-query/src/fixtures/hover/package_import_no_upgrade.t
 ---
 Range: 0:29:0:53
 
-🌌 [Universe](https://typst.app/universe/package/example)
+[Universe](https://typst.app/universe/package/example)
 
 **Package:** `@preview/example:0.1.1`
-✅ **Up to date** (latest version)
+**Up to date** (latest version)
 
 **Description:** example package (mock).
 

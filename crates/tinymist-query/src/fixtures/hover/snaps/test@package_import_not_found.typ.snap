@@ -5,7 +5,7 @@ input_file: crates/tinymist-query/src/fixtures/hover/package_import_not_found.ty
 ---
 Range: 0:29:0:52
 
-🌌 [Universe](https://typst.app/universe/package/shiroa)
+[Universe](https://typst.app/universe/package/shiroa)
 
 **Package:** `@preview/shiroa:0.2.3`
-‼️ **Version 0.2.3 not found**
+**Version 0.2.3 not found**
