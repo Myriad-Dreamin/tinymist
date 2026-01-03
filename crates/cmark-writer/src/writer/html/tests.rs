@@ -11,7 +11,7 @@ fn write_trusted_html_keeps_fragment_verbatim() {
     writer.end_tag("div").unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(output, "<div><span>&ok</div>");
+    insta::assert_snapshot!(output, @"<div><span>&ok</div>");
 }
 
 #[test]
@@ -23,7 +23,7 @@ fn write_untrusted_html_escapes_fragment() {
     writer.end_tag("div").unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(output, "<div>&lt;span&gt;&amp;oops</div>");
+    insta::assert_snapshot!(output, @"<div>&lt;span&gt;&amp;oops</div>");
 }
 
 #[test]
@@ -36,9 +36,9 @@ fn attribute_escaping_handles_quotes_and_special_chars() {
     writer.finish_self_closing_tag().unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(
+    insta::assert_snapshot!(
         output,
-        "<div data-title=\"He said &quot;&lt;Hello&gt;&quot; &amp; more\" />"
+        @"<div data-title=\"He said &quot;&lt;Hello&gt;&quot; &amp; more\" />"
     );
 }
 
@@ -58,7 +58,7 @@ fn guarded_writer_renders_safe_html_element() {
     writer.write_html_element(&element).unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(output, "<div class=\"note\">\n\nHello\n\n</div>");
+    insta::assert_snapshot!(output, @r#"<div class="note">Hello</div>"#);
 }
 
 #[test]
@@ -80,9 +80,9 @@ fn guarded_writer_textualizes_invalid_tag_in_non_strict_mode() {
     writer.write_html_element(&element).unwrap();
 
     let output = writer.into_string().unwrap();
-    assert_eq!(
+    insta::assert_snapshot!(
         output,
-        "&lt;div! class=\"unsafe\"&gt;\n\noops\n\n&lt;/div!&gt;"
+        @r#"&lt;div! class="unsafe"&gt;oops&lt;/div!&gt;"#
     );
 }
 
@@ -121,9 +121,9 @@ fn guarded_writer_textualizes_invalid_attribute_in_non_strict_mode() {
 
     writer.write_html_element(&element).unwrap();
     let output = writer.into_string().unwrap();
-    assert_eq!(
+    insta::assert_snapshot!(
         output,
-        "&lt;div onload!=\"evil\"&gt;\n\nbody\n\n&lt;/div&gt;"
+        @r#"&lt;div onload!="evil"&gt;body&lt;/div&gt;"#
     );
 }
 

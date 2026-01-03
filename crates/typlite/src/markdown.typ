@@ -112,7 +112,7 @@
   "",
 )
 #let md-figure(body, caption: none) = html.elem(
-    "m1figure",
+  "m1figure",
   attrs: (
     caption: if caption == none {
       ""
@@ -125,7 +125,7 @@
     },
   ),
   body,
-  )
+)
 
 #let if-not-paged(it, act) = {
   if target() == "html" {

@@ -616,6 +616,7 @@ dependencies = [
  "ecow",
  "env_logger",
  "html-escape",
+ "insta",
  "log",
 ]
 

@@ -13,13 +13,5 @@ input_file: crates/typlite/src/fixtures/integration/figure_image.typ
 </html>
 
 =====
-<p align="center">
-
-<figure class="figure">
-
-<p><img src="./fig.svg" alt="" /></p>
-
-
-</figure>
-
-</p>
+<p align="center"><figure class="figure"><p><img src="./fig.svg" alt="" /></p>
+</figure></p>
