@@ -321,6 +321,7 @@ impl<'a> PostTypeChecker<'a> {
             | SyntaxContext::VarAccess(VarClass::DotAccess(node))
             | SyntaxContext::Label { node, .. }
             | SyntaxContext::Ref { node, .. }
+            | SyntaxContext::At { node, .. }
             | SyntaxContext::Normal(node) => {
                 let label_or_ref_ty = match cursor {
                     SyntaxContext::Label { is_error: true, .. } => {

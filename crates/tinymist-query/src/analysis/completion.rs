@@ -260,6 +260,14 @@ impl<'a> CompletionCursor<'a> {
                 return Some(SelectedNode::Ref(self.leaf.clone()));
             }
 
+            // @identifier
+            //  ^ from
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::At { .. }))
+                && self.leaf.offset() + 1 == self.from;
+            if is_from_ref {
+                return Some(SelectedNode::At(self.leaf.clone()));
+            }
+
             None
         })
     }
@@ -287,6 +295,7 @@ impl<'a> CompletionCursor<'a> {
                     | SyntaxContext::Paren { .. }
                     | SyntaxContext::Label { .. }
                     | SyntaxContext::Ref { .. }
+                    | SyntaxContext::At { .. }
                     | SyntaxContext::Normal(..),
                 )
                 | None => {}
@@ -342,8 +351,13 @@ impl<'a> CompletionCursor<'a> {
 
                 self.lsp_range_of(rng)
             }
-            Some(SelectedNode::Ref(from_ref)) => {
-                let mut rng = from_ref.range();
+            Some(node @ (SelectedNode::At(from_ref) | SelectedNode::Ref(from_ref))) => {
+                let mut rng = if matches!(node, SelectedNode::At(..)) {
+                    let offset = from_ref.offset();
+                    offset..offset + 1
+                } else {
+                    from_ref.range()
+                };
                 if from_ref.text().starts_with('@') && !snippet.starts_with('@') {
                     rng.start += 1;
                 }
@@ -382,6 +396,8 @@ enum SelectedNode<'a> {
     Label(LinkedNode<'a>),
     /// Selects a reference, e.g. `@foobar|` or `@foo|bar`.
     Ref(LinkedNode<'a>),
+    /// Selects a `@` text, e.g. `@|`.
+    At(LinkedNode<'a>),
 }
 
 /// Autocomplete a cursor position in a source file.
@@ -522,6 +538,7 @@ impl<'a> CompletionWorker<'a> {
         let _ = pair.complete_cursor();
 
         // Filters
+        // todo: reference filter
         if let Some(SelectedNode::Ident(from_ident)) = cursor.selected_node() {
             let ident_prefix = cursor.text[from_ident.offset()..cursor.cursor].to_string();
 
@@ -641,10 +658,13 @@ impl CompletionPair<'_, '_, '_> {
                 return Some(());
             }
             // todo: complete reference by type
-            Some(SyntaxContext::Ref {
-                node,
-                suffix_colon: _,
-            }) => {
+            Some(
+                SyntaxContext::Ref {
+                    node,
+                    suffix_colon: _,
+                }
+                | SyntaxContext::At { node },
+            ) => {
                 self.cursor.from = node.offset() + 1;
                 self.ref_completions();
                 return Some(());

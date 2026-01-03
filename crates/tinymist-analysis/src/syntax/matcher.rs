@@ -652,6 +652,11 @@ pub enum SyntaxClass<'a> {
         /// `@a:b:|`.
         suffix_colon: bool,
     },
+    /// A `@` text, which can be viewed as references with "empty content"
+    At {
+        /// The node containing the `@` text.
+        node: LinkedNode<'a>,
+    },
     /// A callee expression.
     Callee(LinkedNode<'a>),
     /// An import path expression.
@@ -685,6 +690,7 @@ impl<'a> SyntaxClass<'a> {
             SyntaxClass::VarAccess(cls) => cls.node(),
             SyntaxClass::Label { node, .. }
             | SyntaxClass::Ref { node, .. }
+            | SyntaxClass::At { node, .. }
             | SyntaxClass::Callee(node)
             | SyntaxClass::ImportPath(node)
             | SyntaxClass::IncludePath(node)
@@ -847,10 +853,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         && node.offset() + 1 == cursor
         && node.text().starts_with('@')
     {
-        return Some(SyntaxClass::Ref {
-            node,
-            suffix_colon: false,
-        });
+        return Some(SyntaxClass::At { node });
     }
 
     // todo: check if we can remove Text here
@@ -1150,6 +1153,11 @@ pub enum SyntaxContext<'a> {
         /// `@a:b:|`.
         suffix_colon: bool,
     },
+    /// A cursor on a `@` text.
+    At {
+        /// The node of the `@` text.
+        node: LinkedNode<'a>,
+    },
     /// A cursor on a normal [`SyntaxClass`].
     Normal(LinkedNode<'a>),
 }
@@ -1168,6 +1176,7 @@ impl<'a> SyntaxContext<'a> {
             SyntaxContext::Paren { container, .. } => container.clone(),
             SyntaxContext::Label { node, .. }
             | SyntaxContext::Ref { node, .. }
+            | SyntaxContext::At { node, .. }
             | SyntaxContext::ImportPath(node)
             | SyntaxContext::IncludePath(node)
             | SyntaxContext::Normal(node) => node.clone(),
@@ -1260,6 +1269,9 @@ pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<S
         }
         SyntaxClass::Ref { node, suffix_colon } => {
             return Some(SyntaxContext::Ref { node, suffix_colon });
+        }
+        SyntaxClass::At { node } => {
+            return Some(SyntaxContext::At { node });
         }
         SyntaxClass::ImportPath(node) => {
             return Some(SyntaxContext::ImportPath(node));
@@ -1530,6 +1542,7 @@ mod tests {
                 Some(SyntaxClass::Normal(..)) => 'n',
                 Some(SyntaxClass::Label { .. }) => 'l',
                 Some(SyntaxClass::Ref { .. }) => 'r',
+                Some(SyntaxClass::At { .. }) => 'r',
                 Some(SyntaxClass::Callee(..)) => 'c',
                 Some(SyntaxClass::ImportPath(..)) => 'i',
                 Some(SyntaxClass::IncludePath(..)) => 'I',
@@ -1551,6 +1564,7 @@ mod tests {
                 Some(SyntaxContext::IncludePath(..)) => 'I',
                 Some(SyntaxContext::Label { .. }) => 'l',
                 Some(SyntaxContext::Ref { .. }) => 'r',
+                Some(SyntaxContext::At { .. }) => 'r',
                 Some(SyntaxContext::Normal(..)) => 'n',
                 None => ' ',
             }
@@ -1634,21 +1648,21 @@ Text
     }
 
     #[test]
-    fn ref_syntxax() {
+    fn ref_syntax() {
         assert_snapshot!(map_syntax("@ab:"), @r###"
         @ab:
         rrrr
         "###);
-    }
-
-    #[test]
-    fn ref_syntax() {
         assert_snapshot!(map_syntax("@"), @r"
         @
         r
         ");
         assert_snapshot!(map_syntax("@;"), @r"
         @;
+        r
+        ");
+        assert_snapshot!(map_syntax("@ t"), @r"
+        @ t
         r
         ");
         assert_snapshot!(map_syntax("@ab"), @r###"

@@ -124,6 +124,7 @@ pub fn definition(
             node: _,
             suffix_colon: true,
         }
+        | SyntaxClass::At { node: _ }
         | SyntaxClass::Normal(..) => None,
     }
 }

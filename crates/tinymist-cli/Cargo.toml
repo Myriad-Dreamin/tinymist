@@ -93,6 +93,7 @@ dapts.workspace = true
 [features]
 default = [
     "cli",
+    "battery",
     "pdf",
     "l10n",
     "lock",
@@ -133,6 +134,7 @@ export = ["tinymist/export"]
 lock = ["tinymist/lock"]
 preview = ["tinymist/preview", "hyper-tungstenite"]
 trace = ["tinymist/trace"]
+battery = ["tinymist/battery"]
 
 dap = ["tinymist/dap"]
 
