@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { applySnippetTextEdits } from "./snippets";
 import { activeTypstEditor } from "./util";
 import { extensionState } from "./state";
+import { l10nMsg } from "./l10n";
 import { tinymist } from "./lsp";
 
 /**
@@ -40,17 +41,58 @@ async function handleKeypress() {
   const editor = activeTypstEditor();
 
   const client = tinymist.client;
-  if (!editor || !client) return false;
+  if (!editor || !client) {
+    // Server health check: warn user if server is unavailable
+    if (
+      extensionState.features.onEnter &&
+      !client &&
+      !extensionState.mut.serverHealthWarningShown
+    ) {
+      extensionState.mut.serverHealthWarningShown = true;
+      void vscode.window
+        .showWarningMessage(
+          l10nMsg(
+            "Tinymist server is not available. Some features like auto-formatting on Enter may not work. Try restarting the server.",
+          ),
+          l10nMsg("Restart Server"),
+        )
+        .then((selection) => {
+          if (selection === l10nMsg("Restart Server")) {
+            vscode.commands.executeCommand("tinymist.restartServer");
+          }
+        });
+    }
+    return false;
+  }
 
-  const lcEdits = await client
-    .sendRequest(onEnter, {
-      textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
-      range: client.code2ProtocolConverter.asRange(editor.selection),
-    })
-    .catch((_error: any) => {
-      // client.handleFailedRequest(OnEnterRequest.type, error, null);
-      return null;
-    });
+  // When the server is not ready, skip the onEnter handling.
+  const serverReady = extensionState.mut.serverReady;
+  if (!serverReady) {
+    console.log("onEnter: waiting for server to be ready...");
+    return false;
+  }
+
+  // Prepare a cancellation token so we can cancel the request if it times out.
+  const cts = new vscode.CancellationTokenSource();
+  const timeout = setTimeout(() => cts.cancel(), 1000);
+
+  let lcEdits: lc.TextEdit[] | null = null;
+  try {
+    lcEdits = await client.sendRequest(
+      onEnter,
+      {
+        textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
+        range: client.code2ProtocolConverter.asRange(editor.selection),
+      },
+      cts.token,
+    );
+  } catch {
+    // ignore
+  } finally {
+    clearTimeout(timeout);
+    cts.dispose();
+  }
+
   if (!lcEdits) return false;
 
   const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);

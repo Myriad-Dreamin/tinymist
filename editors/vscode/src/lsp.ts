@@ -123,6 +123,12 @@ export class LanguageState {
       await this.client.stop();
       this.client = undefined;
     }
+    // Reset server readiness flag so other code doesn't assume a running server
+    try {
+      extensionState.mut.serverReady = false;
+    } catch (_) {
+      // ignore if state not available
+    }
   }
 
   getClient() {
@@ -325,7 +331,16 @@ export class LanguageState {
     if (extensionState.features.preview) {
       this.registerPreviewNotifications(client);
     }
+
+    // Track server readiness state
+    client.onDidChangeState((event) => {
+      extensionState.mut.serverReady = event.newState === lc.State.Running;
+    });
+
     await client.start();
+
+    // Reset server health warning flag when client successfully starts
+    extensionState.mut.serverHealthWarningShown = false;
 
     return;
   }
