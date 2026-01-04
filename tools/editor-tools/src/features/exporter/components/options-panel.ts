@@ -1,7 +1,7 @@
 import van, { type State } from "vanjs-core";
 import type { ExportFormat, OptionSchema, Scalar } from "../types";
 
-const { div, h3, label, input, select, option, span, p } = van.tags;
+const { div, h3, button, label, input, select, option, span, p } = van.tags;
 
 interface OptionsPanelProps {
   format: ExportFormat;
@@ -31,10 +31,29 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
     );
   }
 
+  const resetToDefaults = () => {
+    for (const option of options) {
+      if (optionStates[option.key]) {
+        optionStates[option.key].val = option.default;
+      }
+    }
+  };
+
   return div(
     { class: "card" },
 
-    h3({ class: "mb-sm" }, ` Options`),
+    div(
+      { class: "flex flex-row items-center justify-between mb-sm" },
+      h3(` Options`),
+      button(
+        {
+          class: "btn btn-secondary",
+          title: "Reset all options to their default values",
+          onclick: resetToDefaults,
+        },
+        "Reset to Defaults",
+      ),
+    ),
 
     div(
       { class: "options-grid" },

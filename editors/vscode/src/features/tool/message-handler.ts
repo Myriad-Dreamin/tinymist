@@ -257,7 +257,12 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
 
       // Execute export with configuration (file export by default)
-      const result = await provider.export(uri, provider.opts());
+      const result = await provider.export(
+        uri,
+        provider.opts(),
+        undefined,
+        ops.resolveCommonOpts(),
+      );
 
       // Handle the response based on the new OnExportResponse format
       if (!result) {
@@ -321,7 +326,12 @@ export const messageHandlers: Record<string, MessageHandler> = {
       }
 
       // Execute export with configuration (file export by default)
-      const response = await provider.export(uri, provider.opts(), { write: false });
+      const response = await provider.export(
+        uri,
+        provider.opts(),
+        { write: false },
+        ops.resolveCommonOpts(),
+      );
       console.log("Preview generation response:", response);
       if (!response) {
         const failureMessage = "Failed to generate preview data";

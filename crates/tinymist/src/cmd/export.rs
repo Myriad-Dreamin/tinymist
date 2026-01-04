@@ -82,6 +82,12 @@ struct ExportQueryOpts {
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
+struct ExportCommonOpts {
+    inputs: Option<Vec<(String, String)>>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 struct ExportActionOpts {
     /// Whether to write to file.
     write: Option<bool>,
@@ -230,9 +236,11 @@ impl ServerState {
     pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
         let path = get_arg!(args[0] as PathBuf);
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
+        let common_opts = get_arg_or_default!(args[3] as ExportCommonOpts);
         let write = action_opts.write.unwrap_or(true);
         let open = action_opts.open;
+        let inputs = common_opts.inputs;
 
-        run_query!(self.OnExport(path, task, write, open))
+        run_query!(self.OnExport(path, task, inputs, write, open))
     }
 }

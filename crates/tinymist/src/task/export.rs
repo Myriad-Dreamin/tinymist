@@ -6,7 +6,7 @@ use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
 
 use reflexo::ImmutPath;
-use reflexo_typst::{Bytes, CompilationTask, ExportComputation};
+use reflexo_typst::{Bytes, CompilationTask, ExportComputation, LazyHash};
 use sync_ls::{internal_error, just_future};
 use tinymist_project::LspWorld;
 use tinymist_query::{OnExportRequest, OnExportResponse, PagedExportResponse, GLOBAL_STATS};
@@ -25,6 +25,7 @@ use typst::ecow::EcoString;
 use futures::Future;
 use parking_lot::Mutex;
 use rayon::Scope;
+use typst::foundations::IntoValue;
 
 use super::SyncTaskFactory;
 use crate::lsp::query::QueryFuture;
@@ -44,6 +45,7 @@ impl ServerState {
         let OnExportRequest {
             path,
             task,
+            inputs,
             open,
             write,
         } = req;
@@ -69,9 +71,23 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
+            let inputs = inputs.map(|inputs| {
+                // merge with existing inputs
+                Arc::new(LazyHash::new(
+                    snap.world()
+                        .inputs()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .chain(inputs.into_iter().map(|(k, v)| (k.into(), v.into_value())))
+                        .collect(),
+                ))
+            });
             let snap = snap.task(TaskInputs {
                 entry: Some(entry),
-                ..TaskInputs::default()
+                ..TaskInputs {
+                    inputs,
+                    ..Default::default()
+                }
             });
 
             let id = snap.world().main_id();
