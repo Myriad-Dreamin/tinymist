@@ -357,12 +357,25 @@ Set format string of the server status. For example, `{compileStatusIcon}{wordCo
 
 - `{compileStatusIcon}`: Icon indicating the compile status
 - `{wordCount}`: Number of words in the document
+- `{charCount}`: Number of characters in the document
 - `{fileName}`: Name of the file being compiled
 
 Note: The status bar will be hidden if the format string is empty.
 
 - **Type**: `string`
 - **Default**: `"{compileStatusIcon} {wordCount} [{fileName}]"`
+
+## `tinymist.syntaxOnly`
+
+Configure whether to enable syntax-only mode for the language server. In syntax-only mode, the language server will only provide syntax checking and basic code completion, but will not perform full document compilation or code analysis. This can be useful for improving performance on low-end devices or when working with large documents.
+
+- **Type**: `string`
+- **Valid Values**:
+  - `"auto"` : Always disable syntax-only mode. The strategy may be changed in the future, for example, automatically enable syntax-only mode when the system is in power-saving mode.
+  - `"onPowerSaving"` : Enable syntax-only mode when the system is in power-saving mode.
+  - `"enable"` : Always enable syntax-only mode.
+  - `"disable"` : Always disable syntax-only mode.
+- **Default**: `"auto"`
 
 ## `tinymist.systemFonts`
 

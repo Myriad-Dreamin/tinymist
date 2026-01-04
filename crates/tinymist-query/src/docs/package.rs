@@ -431,7 +431,7 @@ struct ConvertResult {
 
 #[cfg(test)]
 mod tests {
-    use tinymist_world::package::{PackageRegistry, PackageSpec};
+    use tinymist_world::package::{PackageRegistry, PackageSpec, registry::PREVIEW_NS};
 
     use super::{PackageInfo, package_docs, package_docs_md, package_docs_typ};
     use crate::tests::*;
@@ -471,7 +471,7 @@ mod tests {
     #[test]
     fn tidy() {
         test(PackageSpec {
-            namespace: "preview".into(),
+            namespace: PREVIEW_NS.into(),
             name: "tidy".into(),
             version: "0.3.0".parse().unwrap(),
         });
@@ -480,7 +480,7 @@ mod tests {
     #[test]
     fn touying() {
         test(PackageSpec {
-            namespace: "preview".into(),
+            namespace: PREVIEW_NS.into(),
             name: "touying".into(),
             version: "0.6.0".parse().unwrap(),
         });
@@ -489,7 +489,7 @@ mod tests {
     #[test]
     fn fletcher() {
         test(PackageSpec {
-            namespace: "preview".into(),
+            namespace: PREVIEW_NS.into(),
             name: "fletcher".into(),
             version: "0.5.8".parse().unwrap(),
         });
@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn cetz() {
         test(PackageSpec {
-            namespace: "preview".into(),
+            namespace: PREVIEW_NS.into(),
             name: "cetz".into(),
             version: "0.2.2".parse().unwrap(),
         });

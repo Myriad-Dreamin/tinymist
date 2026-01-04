@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.14.6-rc2"
+version = "0.14.6"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -79,7 +79,8 @@ rkyv-validation = ["rkyv/validation"]
 
 __web = ["wasm-bindgen", "js-sys", "web-time"]
 web = ["__web"]
-system = ["tempfile", "same-file", "battery"]
+system = ["tempfile", "same-file"]
+battery = ["dep:battery"]
 bi-hash = []
 
 [lints]

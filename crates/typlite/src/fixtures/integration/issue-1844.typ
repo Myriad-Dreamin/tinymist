@@ -12,7 +12,7 @@
 })
 
 #show raw.where(block: true): show-if(x-target == "md", it => {
-  html.elem("m1verbatim", attrs: (src: "````\n" + it.text + "\n````"))
+  html.elem("m1verbatim", attrs: (block: "true", src: "````\n" + it.text + "\n````"))
 })
 
 = Reproducer document

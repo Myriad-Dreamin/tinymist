@@ -15,7 +15,7 @@ RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovi
 USER root
 RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
 
-FROM myriaddreamin/tinymist:0.14.6-rc1 as tinymist
+FROM myriaddreamin/tinymist:0.14.6 as tinymist
 
 FROM debian:12
 

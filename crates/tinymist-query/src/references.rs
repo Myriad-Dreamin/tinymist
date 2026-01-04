@@ -54,6 +54,7 @@ pub(crate) fn find_references(
         | SyntaxClass::Ref {
             suffix_colon: true, ..
         }
+        | SyntaxClass::At { node: _ }
         | SyntaxClass::Normal(..) => {
             return None;
         }
@@ -140,13 +141,35 @@ impl ReferencesWorker<'_> {
         url: &Url,
         idents: impl Iterator<Item = (&'b Span, &'b Interned<RefExpr>)>,
     ) {
-        self.push_ranges(src, url, idents.map(|(span, _)| span));
+        self.push_ranges(
+            src,
+            url,
+            idents.map(|(span, expr)| {
+                let adjust = match expr.decl.as_ref() {
+                    Decl::Label(..) => Some((1, -1)),
+                    Decl::ContentRef(..) => Some((1, 0)),
+                    _ => None,
+                };
+
+                (*span, adjust)
+            }),
+        );
     }
 
-    fn push_ranges<'b>(&mut self, src: &Source, url: &Url, spans: impl Iterator<Item = &'b Span>) {
-        self.references.extend(spans.filter_map(|span| {
+    fn push_ranges(
+        &mut self,
+        src: &Source,
+        url: &Url,
+        spans: impl Iterator<Item = (Span, Option<(isize, isize)>)>,
+    ) {
+        self.references.extend(spans.filter_map(|(span, adjust)| {
             // todo: this is not necessary a name span
-            let range = self.ctx.ctx.to_lsp_range(src.range(*span)?, src);
+            let mut range = src.range(span)?;
+            if let Some((start, end)) = adjust {
+                range.start = (range.start as isize + start) as usize;
+                range.end = (range.end as isize + end) as usize;
+            }
+            let range = self.ctx.ctx.to_lsp_range(range, src);
             Some(LspLocation {
                 uri: url.clone(),
                 range,
