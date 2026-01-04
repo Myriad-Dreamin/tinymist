@@ -1,4 +1,5 @@
 # CHANGELOGs
 
-- [CHANGELOG-2025.md](/editors/vscode/CHANGELOG.md)
+- [CHANGELOG-2026.md](/editors/vscode/CHANGELOG.md)
+- [CHANGELOG-2025.md](./CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](./CHANGELOG-2024.md)
