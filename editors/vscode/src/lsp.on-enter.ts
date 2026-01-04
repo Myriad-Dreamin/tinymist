@@ -58,36 +58,41 @@ async function handleKeypress() {
         )
         .then((selection) => {
           if (selection === l10nMsg("Restart Server")) {
-            void vscode.commands.executeCommand("tinymist.restartServer");
+            vscode.commands.executeCommand("tinymist.restartServer");
           }
         });
     }
     return false;
   }
 
-  // Add timeout to prevent stalling when server is starting but not ready
-  // However, if server is ready, we'll skip the timeout and respond immediately
+  // When the server is not ready, skip the onEnter handling.
   const serverReady = extensionState.mut.serverReady;
   if (!serverReady) {
     console.log("onEnter: waiting for server to be ready...");
     return false;
   }
 
-  const lcEditsRequest = client
-    .sendRequest(onEnter, {
-      textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
-      range: client.code2ProtocolConverter.asRange(editor.selection),
-    })
-    .catch((_error: any) => {
-      // client.handleFailedRequest(OnEnterRequest.type, error, null);
-      return null;
-    });
-  const lcEdits = await (serverReady
-    ? lcEditsRequest
-    : Promise.race([
-        lcEditsRequest,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 1000)),
-      ]));
+  // Prepare a cancellation token so we can cancel the request if it times out.
+  const cts = new vscode.CancellationTokenSource();
+  const timeout = setTimeout(() => cts.cancel(), 1000);
+
+  let lcEdits: lc.TextEdit[] | null = null;
+  try {
+    lcEdits = await client.sendRequest(
+      onEnter,
+      {
+        textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
+        range: client.code2ProtocolConverter.asRange(editor.selection),
+      },
+      cts.token,
+    );
+  } catch {
+    // ignore
+  } finally {
+    clearTimeout(timeout);
+    cts.dispose();
+  }
+
   if (!lcEdits) return false;
 
   const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);

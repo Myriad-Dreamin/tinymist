@@ -123,6 +123,12 @@ export class LanguageState {
       await this.client.stop();
       this.client = undefined;
     }
+    // Reset server readiness flag so other code doesn't assume a running server
+    try {
+      extensionState.mut.serverReady = false;
+    } catch (_) {
+      // ignore if state not available
+    }
   }
 
   getClient() {
