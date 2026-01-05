@@ -708,11 +708,11 @@ impl<'a> SyntaxClass<'a> {
         }
     }
 
-    /// Checks if the syntax class contains an error node.
-    pub fn contains_error(&self) -> bool {
+    /// Whether the syntax class or its children contain an error.
+    pub fn erroneous(&self) -> bool {
         use SyntaxClass::*;
         match self {
-            Label { is_error, node } => *is_error || node.erroneous(),
+            Label { .. } => false,
             VarAccess(cls) => cls.node().erroneous(),
             Normal(_, node)
             | Callee(node)
