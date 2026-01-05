@@ -73,7 +73,7 @@ fn bad_syntax(syntax: &SyntaxClass) -> bool {
         return true;
     }
 
-    if syntax.contains_error() {
+    if syntax.erroneous() {
         return true;
     }
 
