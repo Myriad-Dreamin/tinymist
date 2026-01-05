@@ -715,7 +715,7 @@ impl<'a> SyntaxClass<'a> {
             Label { is_error, .. } => *is_error,
             Normal(kind, _) => *kind == SyntaxKind::Error,
             Callee(..) | VarAccess(..) => self.node().kind() == SyntaxKind::Error,
-            Ref { .. } | ImportPath(..) | IncludePath(..) => false,
+            At { .. } | Ref { .. } | ImportPath(..) | IncludePath(..) => false,
         }
     }
 }
