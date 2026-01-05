@@ -712,10 +712,14 @@ impl<'a> SyntaxClass<'a> {
     pub fn contains_error(&self) -> bool {
         use SyntaxClass::*;
         match self {
-            Label { is_error, .. } => *is_error,
-            Normal(kind, _) => *kind == SyntaxKind::Error,
-            Callee(..) | VarAccess(..) => self.node().kind() == SyntaxKind::Error,
-            At { .. } | Ref { .. } | ImportPath(..) | IncludePath(..) => false,
+            Label { is_error, node } => *is_error || node.erroneous(),
+            VarAccess(cls) => cls.node().erroneous(),
+            Normal(_, node)
+            | Callee(node)
+            | At { node }
+            | Ref { node, .. }
+            | ImportPath(node)
+            | IncludePath(node) => node.erroneous(),
         }
     }
 }
