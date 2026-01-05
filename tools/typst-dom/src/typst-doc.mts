@@ -407,7 +407,9 @@ export class TypstDocumentContext<O = any> {
 
     this.isRendering = true;
     const doUpdate = async () => {
+      const lastWidth = this.cachedDOMState.width;
       this.cachedDOMState = this.retrieveDOMState();
+      const currentWidth = this.cachedDOMState.width;
 
       if (this.patchQueue.length === 0) {
         this.isRendering = false;
@@ -431,6 +433,13 @@ export class TypstDocumentContext<O = any> {
           await this.r.rerender();
           this.r.rescale();
         }
+
+        if (lastWidth !== currentWidth) {
+          const svg = this.hookedElem.firstElementChild as SVGElement;
+          const scale = currentWidth / lastWidth;
+          this.hookedElem.parentElement!.scrollBy(-svg.getBoundingClientRect().left * (scale - 1), -svg.getBoundingClientRect().top * (scale - 1));
+        }
+
         let t2 = performance.now();
 
         /// perf event
