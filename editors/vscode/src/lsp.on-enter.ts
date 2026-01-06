@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 import { applySnippetTextEdits } from "./snippets";
 import { activeTypstEditor } from "./util";
 import { extensionState } from "./state";
-import { l10nMsg } from "./l10n";
 import { tinymist } from "./lsp";
 
 /**
@@ -39,29 +38,12 @@ async function handleKeypress() {
   if (!extensionState.features.onEnter) return false;
 
   const editor = activeTypstEditor();
+  if (!editor) {
+    return false;
+  }
 
   const client = tinymist.client;
-  if (!editor || !client) {
-    // Server health check: warn user if server is unavailable
-    if (
-      extensionState.features.onEnter &&
-      !client &&
-      !extensionState.mut.serverHealthWarningShown
-    ) {
-      extensionState.mut.serverHealthWarningShown = true;
-      void vscode.window
-        .showWarningMessage(
-          l10nMsg(
-            "Tinymist server is not available. Some features like auto-formatting on Enter may not work. Try restarting the server.",
-          ),
-          l10nMsg("Restart Server"),
-        )
-        .then((selection) => {
-          if (selection === l10nMsg("Restart Server")) {
-            vscode.commands.executeCommand("tinymist.restartServer");
-          }
-        });
-    }
+  if (!tinymist.checkServerHealth() || !client) {
     return false;
   }
 
@@ -86,8 +68,8 @@ async function handleKeypress() {
       },
       cts.token,
     );
-  } catch {
-    // ignore
+  } catch (err) {
+    console.debug("onEnter request failed or was cancelled", err);
   } finally {
     clearTimeout(timeout);
     cts.dispose();
