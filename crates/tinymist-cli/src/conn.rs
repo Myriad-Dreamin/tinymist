@@ -112,6 +112,8 @@ impl TinymistHook {
                 tab.stalled = true;
             } else {
                 // This is free, because vecqueue is a ring buffer.
+                // And we intentionally push back instead of pushing front to
+                // avoid stucking detection on specific stalling messages.
                 may_stall.push_back((id, since));
                 break;
             }
@@ -119,7 +121,6 @@ impl TinymistHook {
     }
 
     fn stop_stall(&self, msg_id: MsgId) {
-        let mut _may_stall = self.may_stall.lock();
         let result = self.stall_data.lock().remove(&msg_id);
         if let Some(tab) = result
             && tab.stalled
