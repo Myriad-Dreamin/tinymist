@@ -10,6 +10,22 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.8 - [2026-01-08]
+
+### Rename
+
+* Renaming labels (#1858) by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2133 and https://github.com/Myriad-Dreamin/tinymist/pull/2339
+
+### Code Analysis
+
+* Added hover tooltip for package import by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2095
+
+### Typlite
+
+* (Fix) Corrected space handling among html element tags by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2243
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.6...v0.14.8
+
 ## v0.14.6 - [2026-01-02]
 
 * Bumped typst to v0.14.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2312
