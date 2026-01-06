@@ -11,6 +11,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::atomic::AtomicI32;
 #[cfg(feature = "web")]
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Weak};
@@ -541,9 +542,15 @@ pub trait LsHook: fmt::Debug + Send + Sync {
     /// Stops a request.
     fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant);
     /// Starts a notification.
-    fn start_notification(&self, method: &str);
+    fn start_notification(&self, track_id: i32, method: &str);
     /// Stops a notification.
-    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>);
+    fn stop_notification(
+        &self,
+        track_id: i32,
+        method: &str,
+        received_at: Instant,
+        result: LspResult<()>,
+    );
 }
 
 impl LsHook for () {
@@ -556,16 +563,24 @@ impl LsHook for () {
         log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
     }
 
-    fn start_notification(&self, method: &str) {
-        log::info!("notifying {method}");
+    fn start_notification(&self, track_id: i32, method: &str) {
+        log::info!("notifying ({track_id}) - {method}");
     }
 
-    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>) {
+    fn stop_notification(
+        &self,
+        track_id: i32,
+        method: &str,
+        received_at: Instant,
+        result: LspResult<()>,
+    ) {
         let request_duration = received_at.elapsed();
         if let Err(err) = result {
-            log::error!("notify {method} failed in {request_duration:0.2?}: {err:?}");
+            log::error!(
+                "notify ({track_id}) - {method} failed in {request_duration:0.2?}: {err:?}"
+            );
         } else {
-            log::info!("notify {method} succeeded in {request_duration:0.2?}");
+            log::info!("notify ({track_id}) - {method} succeeded in {request_duration:0.2?}");
         }
     }
 }
@@ -667,6 +682,7 @@ where
     pub fn build(self) -> LsDriver<M, Args> {
         LsDriver {
             state: State::Uninitialized(Some(Box::new(self.args))),
+            next_not_id: AtomicI32::new(1),
             events: self.events,
             client: self.client,
             commands: self.command_handlers,
@@ -726,6 +742,8 @@ pub struct LsDriver<M, Args: Initializer> {
     state: State<Args, Args::S>,
     /// The language server client.
     pub client: LspClient,
+    /// The next notification ID.
+    pub next_not_id: AtomicI32,
 
     // Handle maps
     /// Events for dispatching.

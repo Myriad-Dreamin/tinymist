@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use dapts::IRequest;
 
 use super::*;
@@ -240,7 +242,8 @@ where
 
     /// Handles an incoming event.
     fn on_event(&mut self, received_at: Instant, not: dap::Event) -> anyhow::Result<()> {
-        self.client.hook.start_notification(&not.event);
+        let track_id = self.next_not_id.fetch_add(1, Ordering::Relaxed);
+        self.client.hook.start_notification(track_id, &not.event);
         let handle = |s,
                       dap::Event {
                           seq: _,
@@ -255,7 +258,7 @@ where
             let result = handler(s, body);
             self.client
                 .hook
-                .stop_notification(&event, received_at, result);
+                .stop_notification(track_id, &event, received_at, result);
 
             Ok(())
         };

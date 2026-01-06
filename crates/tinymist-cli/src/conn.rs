@@ -22,9 +22,9 @@ pub fn client_root<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>(
 #[derive(Default)]
 struct TinymistHook {
     /// Data for stalling tracking.
-    may_stall: Mutex<VecDeque<(RequestId, tinymist_std::time::Time)>>,
+    may_stall: Mutex<VecDeque<(MsgId, tinymist_std::time::Time)>>,
     /// Whether finished for stalling tracking.
-    stall_data: Mutex<FxHashMap<RequestId, StallTab>>,
+    stall_data: Mutex<FxHashMap<MsgId, StallTab>>,
     /// Data for performance tracking.
     perf: Mutex<FxHashMap<RequestId, typst_timing::TimingScope>>,
 }
@@ -37,7 +37,7 @@ impl fmt::Debug for TinymistHook {
 
 impl LsHook for TinymistHook {
     fn start_request(&self, req_id: &RequestId, method: &str) {
-        self.start_stall(req_id.clone(), method);
+        self.start_stall(MsgId::Request(req_id.clone()), method);
 
         if let Some(scope) = typst_timing::TimingScope::new(static_str(method)) {
             let mut map = self.perf.lock();
@@ -51,29 +51,30 @@ impl LsHook for TinymistHook {
         _method: &str,
         _received_at: tinymist_std::time::Instant,
     ) {
-        self.stop_stall(req_id.clone());
+        self.stop_stall(MsgId::Request(req_id.clone()));
 
         if let Some(scope) = self.perf.lock().remove(req_id) {
             let _ = scope;
         }
     }
 
-    fn start_notification(&self, method: &str) {
-        ().start_notification(method);
+    fn start_notification(&self, track_id: i32, method: &str) {
+        self.start_stall(MsgId::Notification(track_id), method);
     }
 
     fn stop_notification(
         &self,
-        method: &str,
-        received_at: tinymist_std::time::Instant,
-        result: LspResult<()>,
+        track_id: i32,
+        _method: &str,
+        _received_at: tinymist_std::time::Instant,
+        _result: LspResult<()>,
     ) {
-        ().stop_notification(method, received_at, result);
+        self.stop_stall(MsgId::Notification(track_id));
     }
 }
 
 impl TinymistHook {
-    fn start_stall(&self, msg_id: RequestId, method: &str) {
+    fn start_stall(&self, msg_id: MsgId, method: &str) {
         let mut may_stall = self.may_stall.lock();
         let time = tinymist_std::time::now();
         may_stall.push_back((msg_id.clone(), time));
@@ -117,7 +118,7 @@ impl TinymistHook {
         }
     }
 
-    fn stop_stall(&self, msg_id: RequestId) {
+    fn stop_stall(&self, msg_id: MsgId) {
         let mut _may_stall = self.may_stall.lock();
         let result = self.stall_data.lock().remove(&msg_id);
         if let Some(tab) = result
@@ -129,6 +130,15 @@ impl TinymistHook {
             );
         }
     }
+}
+
+/// The ID of a message.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum MsgId {
+    /// The ID of a request.
+    Request(RequestId),
+    /// The ID of a notification.
+    Notification(i32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
