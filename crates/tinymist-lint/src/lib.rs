@@ -2,7 +2,7 @@
 
 mod rules;
 
-use std::sync::Arc;
+use std::{cell::OnceCell, sync::Arc};
 
 use tinymist_analysis::{
     adt::interner::Interned,
@@ -87,9 +87,9 @@ impl KnownIssues {
 
     pub(crate) fn get_unknown_font(&self, span: Span) -> Option<&EcoString> {
         self.unknown_fonts
-            .iter()
-            .find(|(s, _)| *s == span)
-            .map(|(_, name)| name)
+            .binary_search_by_key(&span.into_raw(), |(s, _)| s.into_raw())
+            .ok()
+            .map(|i| &self.unknown_fonts[i].1)
     }
 }
 
@@ -101,6 +101,8 @@ struct Linter<'w> {
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
+
+    available_fonts: OnceCell<Vec<&'w str>>,
 }
 
 impl<'w> Linter<'w> {
@@ -118,6 +120,8 @@ impl<'w> Linter<'w> {
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
+
+            available_fonts: OnceCell::new(),
         }
     }
 

@@ -15,19 +15,22 @@ impl<'w> Linter<'w> {
             if let ast::Arg::Named(arg) = arg
                 && arg.name().as_str() == "font"
             {
-                self.check_variable_font_object(arg.expr().to_untyped());
-                self.check_unknown_font(arg.expr().to_untyped());
+                self.check_bad_font_expr(arg.expr().to_untyped());
                 if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
                     for item in array.items() {
-                        self.check_variable_font_object(item.to_untyped());
-                        self.check_unknown_font(item.to_untyped());
+                        self.check_bad_font_expr(item.to_untyped());
                     }
                 }
             }
         }
     }
 
-    pub(crate) fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
+    fn check_bad_font_expr(&mut self, expr: &SyntaxNode) {
+        self.check_variable_font_object(expr);
+        self.check_unknown_font(expr);
+    }
+
+    fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
         if let Some(font_dict) = expr.cast::<ast::Dict>() {
             for item in font_dict.items() {
                 if let ast::DictItem::Named(arg) = item
@@ -56,15 +59,17 @@ impl<'w> Linter<'w> {
         Some(())
     }
 
-    pub(crate) fn check_unknown_font(&mut self, expr: &SyntaxNode) -> Option<()> {
+    fn check_unknown_font(&mut self, expr: &SyntaxNode) -> Option<()> {
         // Check if this span has a known unknown font warning from compiler
         let unknown_font = self.known_issues.get_unknown_font(expr.span())?;
         // Get available fonts from the font book
-        let book = self.world.font_resolver.font_book();
-        let available_fonts: Vec<_> = book.families().map(|(name, _)| name).collect();
+        let available_fonts = self.available_fonts.get_or_init(|| {
+            let book = self.world.font_resolver.font_book();
+            book.families().map(|(name, _)| name).collect()
+        });
 
         // Find the best matching fonts using string similarity
-        let suggestions = find_similar_fonts(unknown_font.as_str(), &available_fonts, 3);
+        let suggestions = find_similar_fonts(unknown_font.as_str(), available_fonts, 3);
 
         if !suggestions.is_empty() {
             let mut diag = SourceDiagnostic::warning(
@@ -107,6 +112,8 @@ fn find_similar_fonts<'a>(
 ) -> Vec<&'a str> {
     use strsim::jaro_winkler;
 
+    const SIMILARITY_THRESHOLD: f64 = 0.6; // Only suggest if similarity is > 60%
+
     let target_lower = target.to_lowercase();
     let mut scored_fonts: Vec<_> = available
         .iter()
@@ -115,7 +122,7 @@ fn find_similar_fonts<'a>(
             let similarity = jaro_winkler(&target_lower, &font_lower);
             (font, similarity)
         })
-        .filter(|(_, similarity)| *similarity > 0.6) // Only suggest if similarity is > 60%
+        .filter(|(_, similarity)| *similarity > SIMILARITY_THRESHOLD)
         .collect();
 
     // Sort by similarity (descending)
