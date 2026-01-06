@@ -121,7 +121,7 @@ where
         use EventOrMessage::*;
 
         while let Ok(msg) = inbox.recv() {
-            let loop_start = Instant::now();
+            let loop_start = tinymist_std::time::now();
             match msg {
                 Evt(event) => {
                     let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
@@ -241,7 +241,7 @@ where
     }
 
     /// Handles an incoming event.
-    fn on_event(&mut self, received_at: Instant, not: dap::Event) -> anyhow::Result<()> {
+    fn on_event(&mut self, received_at: Time, not: dap::Event) -> anyhow::Result<()> {
         let track_id = self.next_not_id.fetch_add(1, Ordering::Relaxed);
         self.client.hook.start_notification(track_id, &not.event);
         let handle = |s,

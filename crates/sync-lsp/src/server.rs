@@ -20,7 +20,7 @@ use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, from_value};
-use tinymist_std::time::Instant;
+use tinymist_std::time::Time;
 
 use crate::msg::*;
 use crate::req_queue;
@@ -240,7 +240,7 @@ impl LspClientRoot {
 }
 
 type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, LspOrDapResponse) + Send + Sync>;
-type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
+type ReqQueue = req_queue::ReqQueue<(String, Time), ReqHandler>;
 
 /// Different transport mechanisms for communication.
 #[derive(Debug, Clone)]
@@ -476,7 +476,7 @@ impl LspClient {
     }
 
     /// Registers an client2server request in the request queue.
-    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Instant) {
+    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Time) {
         let mut req_queue = self.req_queue.lock();
         self.hook.start_request(id, method);
         req_queue
@@ -509,6 +509,30 @@ impl LspClient {
 
         self.hook.stop_request(&id, &method, received_at);
 
+        let delay = tinymist_std::time::now().duration_since(received_at);
+        match delay {
+            Ok(delay) => {
+                if delay.as_secs() > 10 {
+                    let worst_outgoing =
+                        req_queue.incoming.pending().max_by_key(|(_, data)| data.1);
+                    let worst_case = if let Some((id, (method, since))) = worst_outgoing {
+                        let duration = tinymist_std::time::now().duration_since(*since);
+                        format!(", worst case: req({method:?}, {id:?}) - {duration:?}")
+                    } else {
+                        String::new()
+                    };
+                    log::warn!(
+                        "request {id:?} is completed after {delay:?}, pending incoming requests: {:?}, pending outgoing requests: {:?}{worst_case}",
+                        req_queue.incoming,
+                        req_queue.outgoing
+                    );
+                }
+            }
+            Err(err) => {
+                log::error!("failed to get delay for request {id:?}: {err:?}");
+            }
+        }
+
         self.sender.send_message(response);
     }
 }
@@ -540,7 +564,7 @@ pub trait LsHook: fmt::Debug + Send + Sync {
     /// Starts a request.
     fn start_request(&self, req_id: &RequestId, method: &str);
     /// Stops a request.
-    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant);
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Time);
     /// Starts a notification.
     fn start_notification(&self, track_id: i32, method: &str);
     /// Stops a notification.
@@ -548,7 +572,7 @@ pub trait LsHook: fmt::Debug + Send + Sync {
         &self,
         track_id: i32,
         method: &str,
-        received_at: Instant,
+        received_at: Time,
         result: LspResult<()>,
     );
 }
@@ -558,7 +582,7 @@ impl LsHook for () {
         log::info!("handling {method} - ({req_id})");
     }
 
-    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Time) {
         let duration = received_at.elapsed();
         log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
     }
@@ -571,7 +595,7 @@ impl LsHook for () {
         &self,
         track_id: i32,
         method: &str,
-        received_at: Instant,
+        received_at: Time,
         result: LspResult<()>,
     ) {
         let request_duration = received_at.elapsed();

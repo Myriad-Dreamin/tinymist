@@ -74,7 +74,7 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
         resp.unwrap();
 
         // todo: persist
-        let request_received = reflexo::time::Instant::now();
+        let request_received = reflexo::time::Time::now();
 
         let req_id: RequestId = 0.into();
         client.register_request("tinymistExt/documentProfiling", &req_id, request_received);

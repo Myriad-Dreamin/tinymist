@@ -202,7 +202,7 @@ where
 
         while let Ok(msg) = inbox.recv() {
             const EXIT_METHOD: &str = notification::Exit::METHOD;
-            let loop_start = Instant::now();
+            let loop_start = tinymist_std::time::now();
             match msg {
                 Evt(event) => {
                     let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {

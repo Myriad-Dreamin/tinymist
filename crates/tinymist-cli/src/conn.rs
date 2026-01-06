@@ -49,7 +49,7 @@ impl LsHook for TinymistHook {
         &self,
         req_id: &RequestId,
         _method: &str,
-        _received_at: tinymist_std::time::Instant,
+        _received_at: tinymist_std::time::Time,
     ) {
         self.stop_stall(MsgId::Request(req_id.clone()));
 
@@ -66,7 +66,7 @@ impl LsHook for TinymistHook {
         &self,
         track_id: i32,
         _method: &str,
-        _received_at: tinymist_std::time::Instant,
+        _received_at: tinymist_std::time::Time,
         _result: LspResult<()>,
     ) {
         self.stop_stall(MsgId::Notification(track_id));
@@ -75,6 +75,7 @@ impl LsHook for TinymistHook {
 
 impl TinymistHook {
     fn start_stall(&self, msg_id: MsgId, method: &str) {
+        self.detect_stall();
         let mut may_stall = self.may_stall.lock();
         let time = tinymist_std::time::now();
         may_stall.push_back((msg_id.clone(), time));
@@ -85,7 +86,25 @@ impl TinymistHook {
                 stalled: false,
             },
         );
+    }
 
+    fn stop_stall(&self, msg_id: MsgId) {
+        self.detect_stall();
+        let result = self.stall_data.lock().remove(&msg_id);
+        if let Some(tab) = result
+            && tab.stalled
+        {
+            log::info!(
+                "stalling request {msg_id:?} finished, method: {:?}",
+                tab.method
+            );
+        }
+    }
+
+    fn detect_stall(&self) {
+        let time = tinymist_std::time::now();
+
+        let mut may_stall = self.may_stall.lock();
         while !may_stall.is_empty() {
             // consume one anyway.
             let Some((id, since)) = may_stall.pop_front() else {
@@ -117,18 +136,6 @@ impl TinymistHook {
                 may_stall.push_back((id, since));
                 break;
             }
-        }
-    }
-
-    fn stop_stall(&self, msg_id: MsgId) {
-        let result = self.stall_data.lock().remove(&msg_id);
-        if let Some(tab) = result
-            && tab.stalled
-        {
-            log::info!(
-                "stalling request {msg_id:?} finished, method: {:?}",
-                tab.method
-            );
         }
     }
 }
