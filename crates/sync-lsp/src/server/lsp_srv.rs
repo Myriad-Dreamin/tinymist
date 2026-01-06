@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
 
 use super::*;
@@ -231,7 +229,9 @@ where
                 }
                 Msg(LspMessage::Notification(not)) => {
                     let is_exit = not.method == EXIT_METHOD;
-                    let track_id = self.next_not_id.fetch_add(1, Ordering::Relaxed);
+                    let track_id = self
+                        .next_not_id
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     self.client.hook.start_notification(track_id, &not.method);
                     let result = self.on_notification(&not.method, not.params);
                     self.client
