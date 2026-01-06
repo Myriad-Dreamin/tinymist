@@ -75,6 +75,7 @@ http-body-util = "0.1.3"
 # Algorithms
 base64 = "0.22"
 regex = "1.12.2"
+strsim = "0.11"
 
 # Cryptography and data processing
 fastrand = "2.3.0"
