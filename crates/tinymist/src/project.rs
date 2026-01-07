@@ -231,7 +231,9 @@ impl ServerState {
 
         // Creates the actor
         let compile_handle = handle.clone();
-        let ignore_first_sync = !config.delegate_fs_requests;  // when using delegated filesystem access, we should treat the first fs sync from the client as a real change that should trigger a compilation, since the server has no local view of the files
+        let ignore_first_sync = !config.delegate_fs_requests; // when using delegated filesystem access, we should treat the first fs sync
+                                                              // from the client as a real change that should trigger a compilation, since the
+                                                              // server has no local view of the files
         let compiler = ProjectCompiler::new(
             verse,
             dep_tx,
@@ -630,8 +632,12 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
                         break 'vfs_is_clean false;
                     };
 
-                    // if the last compilation failed due to a delegated missing-file error (t-file-missing), we have to try again
-                    // new updates after will carry the real file contents from the client in delegated FS mode, and we need to recompile to clear the missing-file state
+                    // if the last compilation failed due to a delegated missing-file error
+                    // (t-file-missing), we have to try again new updates after
+                    // will carry the real file contents from the client in delegated FS mode, and
+                    // we need to recompile to clear the missing-file state
+                    // TODO: this check looks hacking, we may see if we can check `t-file-missing`
+                    // it in other way.
                     if compilation
                         .diagnostics()
                         .any(|d| d.message.contains("(t-file-missing)"))
