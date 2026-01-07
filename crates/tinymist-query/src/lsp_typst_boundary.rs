@@ -145,7 +145,6 @@ fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
     })
 }
 
-
 #[cfg(target_arch = "wasm32")]
 fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
     // In WASM, create a simple file:// URL
