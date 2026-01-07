@@ -89,7 +89,10 @@ pub struct Config {
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,
-    /// Whether to support client code lenses.
+    /// Whether the client has a handler for client-side code lenses.
+    /// When true, the server uses the `tinymist.runCodeLens` command and lets
+    /// the client handle code lens execution. When false, the server provides
+    /// direct export commands instead of client-side code lenses.
     pub support_client_codelens: bool,
     /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
     /// side.
