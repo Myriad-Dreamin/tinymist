@@ -155,7 +155,6 @@ impl WorkspaceId {
     }
 }
 
-
 /// The global package-path interner.
 static INTERNER: LazyLock<RwLock<Interner>> = LazyLock::new(|| {
     RwLock::new(Interner {
