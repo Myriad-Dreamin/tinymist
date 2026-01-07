@@ -309,7 +309,6 @@ impl ServerState {
             }
         }
 
-
         let task_id = cli_args.task_id.clone();
         if task_id == "primary" {
             return Err(invalid_params("task id 'primary' is reserved"));
