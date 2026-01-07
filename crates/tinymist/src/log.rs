@@ -26,7 +26,7 @@ pub fn init_log(
 
     let base_no_info = is_transient_cmd || is_test_no_verbose;
     let base_level = if base_no_info { Warn } else { Info };
-    let preview_level = if is_test_no_verbose { Warn } else { Debug };
+    let preview_level = if is_test_no_verbose { Warn } else { Info };
     let diag_level = if is_test_no_verbose { Warn } else { Info };
 
     let mut builder = env_logger::builder();
