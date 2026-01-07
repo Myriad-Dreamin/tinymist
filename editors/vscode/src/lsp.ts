@@ -494,18 +494,18 @@ export class LanguageState {
     let watchClock = 0;
 
     const tryRead = async (uri: vscode.Uri) => {
-      // virtual workspaces) don't provide a filesystem provider that supports workspace.fs.readFile
-      // use the open TextDocument when available and only fall back to workspace.fs for real files.
-      const doc = vscode.workspace.textDocuments.find(
-        (d) => d.uri.toString() === uri.toString(),
-      );
-
-      if (doc) {
-        const text = doc.getText();
-        const data = Buffer.from(text, "utf8");
-        return { type: "ok", content: bytesBase64Encode(data) } as const;
+      {
+        // Virtual workspaces don't provide a filesystem provider that supports workspace.fs.readFile
+        // Uses the open TextDocument Whenever available.
+        const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+        if (doc) {
+          const text = doc.getText();
+          const data = Buffer.from(text, "utf8");
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        }
       }
 
+      // Otherwise falls back to workspace.fs for real files
       return vscode.workspace.fs.readFile(uri).then(
         (data): FileResult => {
           return { type: "ok", content: bytesBase64Encode(data) } as const;
@@ -643,16 +643,14 @@ export class LanguageState {
         const inserts: FileChange[] = [{ uri: uriStr, content }];
         const removes: string[] = [];
 
-        client
-          .sendRequest(fsChange, { inserts, removes, isSync })
-          .then(
-            () => {
-              console.log("sent fsChange (doc)", uriStr, currentClock, { isSync });
-            },
-            (err) => {
-              console.error("fsChange request failed (doc)", uriStr, err);
-            },
-          );
+        client.sendRequest(fsChange, { inserts, removes, isSync }).then(
+          () => {
+            console.log("sent fsChange (doc)", uriStr, currentClock, { isSync });
+          },
+          (err) => {
+            console.error("fsChange request failed (doc)", uriStr, err);
+          },
+        );
       };
 
       this._watchDisposables.push(
