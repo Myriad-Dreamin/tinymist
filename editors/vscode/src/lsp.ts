@@ -496,7 +496,7 @@ export class LanguageState {
     const tryRead = async (uri: vscode.Uri) => {
       {
         // Virtual workspaces don't provide a filesystem provider that supports workspace.fs.readFile
-        // Uses the open TextDocument Whenever available.
+        // Uses the open TextDocument whenever available.
         const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
         if (doc) {
           const text = doc.getText();
