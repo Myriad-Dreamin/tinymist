@@ -104,6 +104,7 @@ cargo_metadata = "0.18.0"
 [features]
 dap = ["sync-ls/dap", "tinymist-debug"]
 default = ["web", "no-content-hint"]
+lint-v2 = ["tinymist-query/lint-v2"]
 preview = [
     "open",
     "http-body-util",

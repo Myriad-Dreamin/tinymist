@@ -630,21 +630,48 @@ mod lint_tests {
     use std::collections::BTreeMap;
 
     use tinymist_lint::KnownIssues;
+    use tinymist_tests::Settings;
 
     use crate::tests::*;
 
     #[test]
     fn test() {
-        snapshot_testing("lint", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
+        let mut settings = Settings::new();
+        settings.set_prepend_module_to_snapshot(false);
+        settings.set_snapshot_path("fixtures/lint/snaps");
+        settings.bind(|| {
+            tinymist_tests::glob!("fixtures/lint/*.typ", |fixture_path| {
+                let contents = std::fs::read_to_string(fixture_path).unwrap();
+                #[cfg(windows)]
+                let contents = contents.replace("\r\n", "\n");
 
-            let result = ctx.lint(&source, &KnownIssues::default());
-            let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
-            let result = result
-                .into_iter()
-                .map(|(k, v)| (file_uri_(&k), v))
-                .collect::<BTreeMap<_, _>>();
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+                let is_discard_common_break = fixture_path
+                    .file_name()
+                    .is_some_and(|n| n == "discard_common_break.typ");
+
+                run_with_sources(&contents, |verse, entry_path| {
+                    run_with_ctx(verse, entry_path, &|ctx, path| {
+                        let source = ctx.source_by_path(&path).unwrap();
+
+                        let result = ctx.lint(&source, &KnownIssues::default());
+                        let result =
+                            crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
+                        let result = result
+                            .into_iter()
+                            .map(|(k, v)| (file_uri_(&k), v))
+                            .collect::<BTreeMap<_, _>>();
+
+                        if cfg!(feature = "lint-v2") && is_discard_common_break {
+                            assert_snapshot!(
+                                "test.lint_v2",
+                                JsonRepr::new_redacted(result, &REDACT_LOC)
+                            );
+                        } else {
+                            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+                        }
+                    })
+                });
+            });
         });
     }
 }
