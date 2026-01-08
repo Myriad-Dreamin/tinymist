@@ -583,17 +583,15 @@ export class LanguageState {
       const filesToRead: vscode.Uri[] = [];
       const filesDeleted: string[] = [];
 
-      for (const uri of params.inserts) {
-        const uriObj = typeof uri === "string" ? vscode.Uri.parse(uri) : uri;
-        const uriStr = uriObj.toString();
+      for (const uriStr of params.inserts) {
+        const uriObj = vscode.Uri.parse(uriStr);
         if (!watches.has(uriStr)) {
           filesToRead.push(uriObj);
           watches.add(uriStr);
         }
       }
 
-      for (const uri of params.removes) {
-        const uriStr = (typeof uri === "string" ? vscode.Uri.parse(uri) : uri).toString();
+      for (const uriStr of params.removes) {
         if (watches.has(uriStr)) {
           filesDeleted.push(uriStr);
           watches.delete(uriStr);
@@ -959,8 +957,8 @@ function isCodeActionWithoutEditsAndCommands(value: any): boolean {
 interface FsWatchRequest {
   // delivered by vscode-languageclient
   // can be strings or vscode.Uri objects depending on the transport.
-  inserts: (string | vscode.Uri)[];
-  removes: (string | vscode.Uri)[];
+  inserts: string[];
+  removes: string[];
 }
 
 interface FileResult {
