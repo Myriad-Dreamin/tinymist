@@ -121,7 +121,9 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let id = entry.main().unwrap();
+            let id = entry
+                .main()
+                .ok_or_else(|| internal_error("failed to get entry main file for md export"))?;
             let _guard = GLOBAL_STATS.stat(Some(id), "export");
 
             let mut world = snap.world().task(TaskInputs {

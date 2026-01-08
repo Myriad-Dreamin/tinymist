@@ -125,7 +125,6 @@ export async function tinymistActivate(
       }
     },
   });
-  console.log(enableNavigateMdToPdfIcon);
 
   configureEditorAndLanguage(context, trait);
 
