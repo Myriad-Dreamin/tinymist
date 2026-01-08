@@ -650,19 +650,6 @@ export class LanguageState {
           },
         );
       };
-
-      this._watchDisposables.push(
-        vscode.workspace.onDidChangeTextDocument((e) => {
-          void sendForDocument(e.document, false);
-        }),
-      );
-
-      this._watchDisposables.push(
-        vscode.workspace.onDidSaveTextDocument((doc) => {
-          // resync on explicit saves
-          void sendForDocument(doc, false);
-        }),
-      );
     }
   }
 
