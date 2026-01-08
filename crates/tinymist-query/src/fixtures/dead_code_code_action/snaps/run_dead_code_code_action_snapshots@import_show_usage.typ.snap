@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/main.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/import_show_usage.typ
+---
+[]

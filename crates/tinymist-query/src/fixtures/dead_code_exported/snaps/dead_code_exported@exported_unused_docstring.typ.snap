@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code_exported/exported_unused_docstring.typ
+---
+{
+ "main.typ": [
+  {
+   "code": "tinymist.unused.exported_documented_function",
+   "message": "unused function: `api`\nHint: this function is exported but never used\nHint: this function is exported and documented; it may be part of the public API\nHint: if this is intended public API, you can ignore this diagnostic; otherwise consider removing it",
+   "range": "3:5:3:8",
+   "severity": 4,
+   "source": "typst"
+  }
+ ]
+}

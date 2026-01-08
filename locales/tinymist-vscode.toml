@@ -1602,3 +1602,27 @@ zh = "保存文件时执行代码检查"
 [extension.tinymist.config.tinymist.lint.when.string.enum.onType]
 en = "Perform lint checks on type"
 zh = "标记文件时执行代码检查"
+
+[extension.tinymist.config.tinymist.lint.unused.checkExported.title]
+en = "Check exported symbols"
+zh = "检查导出符号"
+
+[extension.tinymist.config.tinymist.lint.unused.checkExported.desc]
+en = "Whether to check module-level (exported) symbols for being unused."
+zh = "是否检查模块级（导出）符号是否未使用。"
+
+[extension.tinymist.config.tinymist.lint.unused.checkParams.title]
+en = "Check unused parameters"
+zh = "检查未使用参数"
+
+[extension.tinymist.config.tinymist.lint.unused.checkParams.desc]
+en = "Whether to check unused function parameters."
+zh = "是否检查未使用的函数参数。"
+
+[extension.tinymist.config.tinymist.lint.unused.exceptions.title]
+en = "Unused exceptions"
+zh = "未使用声明的例外规则"
+
+[extension.tinymist.config.tinymist.lint.unused.exceptions.desc]
+en = "Glob-like patterns for exceptions (e.g., \"test_*\", \"_*\")."
+zh = "用于例外的类似 glob 的模式（例如 \"test_*\"、\"_*\"）。"

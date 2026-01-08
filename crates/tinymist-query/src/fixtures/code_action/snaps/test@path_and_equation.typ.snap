@@ -1,10 +1,26 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
+assertion_line: 120
 description: "Code Action on rt \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
 ---
 [
+ {
+  "edit": {
+   "changes": {
+    "s1.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "",
+      "range": "0:2:0:19"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Remove unused declaration"
+ },
  {
   "edit": {
    "changes": {

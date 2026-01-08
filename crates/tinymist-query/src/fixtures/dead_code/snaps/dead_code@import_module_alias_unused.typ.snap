@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_unused.typ
+---
+{
+ "main.typ": [
+  {
+   "code": "tinymist.unused.import",
+   "message": "unused import: `util`\nHint: consider removing this unused import",
+   "range": "2:19:2:23",
+   "severity": 4,
+   "source": "typst",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: Dead code code actions in /dummy-root/main.typ
+expression: "JsonRepr::new_pure(ordered_entries)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/duplicate_module_wildcard_unused.typ
+---
+[
+ {
+  "actions": [
+   {
+    "edit": {
+     "changes": {
+      "main.typ": [
+       {
+        "insertTextFormat": 1,
+        "newText": "",
+        "range": "3:0:4:0"
+       }
+      ]
+     }
+    },
+    "kind": "quickfix",
+    "title": "Remove unused declaration"
+   }
+  ],
+  "message": "unused module import\nHint: imported modules should be used or the import should be removed",
+  "range": "3:1:3:18"
+ }
+]

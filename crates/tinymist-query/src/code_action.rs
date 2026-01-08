@@ -84,7 +84,7 @@ impl SemanticRequest for CodeActionRequest {
 
         let root = LinkedNode::new(source.root());
         let mut worker = CodeActionWorker::new(ctx, source.clone());
-        worker.autofix(&root, &range, &self.context);
+        worker.autofix(&root, &self.context);
         worker.scoped(&root, &range);
 
         (!worker.actions.is_empty()).then_some(worker.actions)
@@ -93,6 +93,8 @@ impl SemanticRequest for CodeActionRequest {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use tinymist_lint::KnownIssues;
     use typst::{diag::Warned, layout::PagedDocument};
 
@@ -101,24 +103,84 @@ mod tests {
 
     #[test]
     fn test() {
-        snapshot_testing("code_action", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
+        snapshot_testing("code_action", &run_code_action_snapshot);
+    }
 
-            let request_range = find_test_range(&source);
-            let code_action_ctx = compute_code_action_context(ctx, &source, &request_range);
+    #[test]
+    fn test_dead_code_fixtures() {
+        snapshot_testing_with_snapshots(
+            "dead_code",
+            "dead_code_code_action",
+            Opts::default(),
+            &run_dead_code_code_action_snapshots,
+        );
+    }
+
+    fn run_code_action_snapshot(ctx: &mut LocalContext, path: PathBuf) {
+        let source = ctx.source_by_path(&path).unwrap();
+
+        let request_range = find_test_range(&source);
+        let code_action_ctx = compute_code_action_context(ctx, &source, &request_range);
+        let request = CodeActionRequest {
+            path: path.clone(),
+            range: request_range,
+            context: code_action_ctx,
+        };
+
+        let result = request.request(ctx);
+
+        with_settings!({
+            description => format!("Code Action on {}", make_range_annotation(&source)),
+        }, {
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        })
+    }
+
+    fn run_dead_code_code_action_snapshots(ctx: &mut LocalContext, path: PathBuf) {
+        let source = ctx.source_by_path(&path).unwrap();
+        let mut entries = Vec::new();
+
+        for diag in gather_diagnostics(ctx, &source) {
+            if !diag.message.starts_with("unused ") {
+                continue;
+            }
+
             let request = CodeActionRequest {
                 path: path.clone(),
-                range: request_range,
-                context: code_action_ctx,
+                range: diag.range,
+                context: CodeActionContext {
+                    diagnostics: vec![diag.clone()],
+                    only: None,
+                    trigger_kind: None,
+                },
             };
 
-            let result = request.request(ctx);
+            let Some(actions) = request.request(ctx) else {
+                continue;
+            };
+            if actions.is_empty() {
+                continue;
+            }
 
-            with_settings!({
-                description => format!("Code Action on {}", make_range_annotation(&source)),
-            }, {
-                assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            })
+            let actions = REDACT_LOC.redact(serde_json::to_value(&actions).unwrap());
+            let range = JsonRepr::range(diag.range);
+            entries.push((
+                range.clone(),
+                json!({
+                    "message": diag.message,
+                    "range": range,
+                    "actions": actions,
+                }),
+            ));
+        }
+
+        entries.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+        let ordered_entries: Vec<_> = entries.into_iter().map(|(_, entry)| entry).collect();
+
+        with_settings!({
+            description => format!("Dead code code actions in {}", path.display()),
+        }, {
+            assert_snapshot!(JsonRepr::new_pure(ordered_entries));
         });
     }
 
@@ -128,6 +190,23 @@ mod tests {
         request_range: &LspRange,
     ) -> CodeActionContext {
         // todo: reuse world compute graph APIs.
+        let diagnostics = gather_diagnostics(ctx, source);
+
+        CodeActionContext {
+            // The filtering here matches the LSP specification and VS Code behavior;
+            // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
+            //   `diagnostics`: An array of diagnostics known on the client side overlapping the
+            // range   provided to the textDocument/codeAction request [...]
+            diagnostics: diagnostics
+                .into_iter()
+                .filter(|diag| ranges_overlap(&diag.range, request_range))
+                .collect(),
+            only: None,
+            trigger_kind: None,
+        }
+    }
+
+    fn gather_diagnostics(ctx: &mut LocalContext, source: &Source) -> Vec<lsp_types::Diagnostic> {
         let Warned {
             output,
             warnings: compiler_warnings,
@@ -138,21 +217,11 @@ mod tests {
         let known_issues = KnownIssues::from_compiler_diagnostics(compiler_diags.clone());
         let lint_warnings = ctx.lint(source, &known_issues);
 
-        let diagnostics = DiagWorker::new(ctx)
+        DiagWorker::new(ctx)
             .convert_all(compiler_diags.chain(lint_warnings.iter()))
             .into_values()
-            .flatten();
-        CodeActionContext {
-            // The filtering here matches the LSP specification and VS Code behavior;
-            // see https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeActionContext:
-            //   `diagnostics`: An array of diagnostics known on the client side overlapping the
-            // range   provided to the textDocument/codeAction request [...]
-            diagnostics: diagnostics
-                .filter(|diag| ranges_overlap(&diag.range, request_range))
-                .collect(),
-            only: None,
-            trigger_kind: None,
-        }
+            .flatten()
+            .collect()
     }
 
     fn ranges_overlap(r1: &LspRange, r2: &LspRange) -> bool {

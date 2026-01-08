@@ -986,6 +986,13 @@ pub struct LintFeat {
     pub enabled: Option<bool>,
     /// When to trigger the lint checks.
     pub when: Option<TaskWhen>,
+    /// Unused declaration detection options.
+    #[serde(
+        default,
+        rename = "unused",
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub unused: UnusedFeat,
 }
 
 impl LintFeat {
@@ -997,6 +1004,33 @@ impl LintFeat {
 
         self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
     }
+
+    /// Gets the unused lint configuration derived from `lint.unused`.
+    pub fn unused_config(&self) -> tinymist_lint::UnusedConfig {
+        let mut config = tinymist_lint::UnusedConfig::default();
+        if let Some(check_exported) = self.unused.check_exported {
+            config.check_exported = check_exported;
+        }
+        if let Some(check_params) = self.unused.check_params {
+            config.check_params = check_params;
+        }
+        if let Some(exceptions) = &self.unused.exceptions {
+            config.exceptions = exceptions.clone();
+        }
+        config
+    }
+}
+
+/// Unused declaration detection options under `lint.unused`.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UnusedFeat {
+    /// Whether to check module-level (exported) symbols.
+    pub check_exported: Option<bool>,
+    /// Whether to check unused function parameters.
+    pub check_params: Option<bool>,
+    /// Patterns for exceptions (e.g., "test_*", "_*").
+    pub exceptions: Option<Vec<String>>,
 }
 /// The lint features.
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -1283,6 +1317,10 @@ mod tests {
         test_good_config("lint");
         test_good_config("lint.enabled");
         test_good_config("lint.when");
+        test_good_config("lint.unused");
+        test_good_config("lint.unused.checkExported");
+        test_good_config("lint.unused.checkParams");
+        test_good_config("lint.unused.exceptions");
 
         test_good_config("preview");
         test_good_config("preview.browsing");
