@@ -274,32 +274,6 @@ impl ExportTask {
         let Some(write_to) = output.substitute(&entry) else {
             return Ok(None);
         };
-        // if the output path corresponds to a non-file URI (e.g. an `oct:` workspace path), export into the current working directory instead
-        // this kinda sucks because its usually like %localappdata%\Programs\Microsoft VS Code
-        // it would be nice to have a system to export it and upload it directly to the virtual workspaces but there seems to be a bug with downloading pdfs from virtual workspaces anyway (https://github.com/microsoft/live-share/issues/3372)
-        #[cfg(not(target_arch = "wasm32"))]
-        let write_to = if let Ok(uri) = tinymist_query::path_to_url(&write_to) {
-            if uri.scheme() != "file" {
-                let cwd = std::env::current_dir()
-                    .context("failed to get current directory for virtual export")?;
-                log::info!(
-                    "ExportTask: non-file scheme detected for substituted output (scheme={scheme}, uri={uri}, write_to={write_to:?}); relocating export to cwd={cwd:?}",
-                    scheme = uri.scheme(),
-                );
-                let name = write_to.file_name().unwrap_or_else(|| std::ffi::OsStr::new("output"));
-                let relocated = cwd.join(name).clean();
-                log::info!("ExportTask: relocated virtual substituted output path -> {relocated:?}");
-                relocated
-            } else {
-                write_to.to_path_buf()
-            }
-        } else {
-            write_to.to_path_buf()
-        };
-
-        #[cfg(target_arch = "wasm32")]
-        let write_to = write_to.to_path_buf();
-
         let write_to = if write_to.is_relative() {
             let cwd = std::env::current_dir().context("failed to get current directory")?;
             cwd.join(write_to).clean()
