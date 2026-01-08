@@ -134,6 +134,8 @@ mod polymorphic {
         pub path: PathBuf,
         /// The export task to run.
         pub task: ProjectTask,
+        /// The inputs of the document.
+        pub inputs: Option<Vec<(String, String)>>,
         /// Whether to write to file.
         pub write: bool,
         /// Whether to open the exported file(s) after the export is done.

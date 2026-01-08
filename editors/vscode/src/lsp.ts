@@ -21,7 +21,7 @@ import {
   getSensibleTextEditorColumn,
   typstDocumentSelector,
 } from "./util";
-import type { ExportActionOpts, ExportOpts } from "./cmd.export";
+import type { ExportActionOpts, ExportCommonOpts, ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
@@ -775,11 +775,13 @@ function exportCommand(command: string) {
     uri: string,
     extraOpts?: ExportOpts,
     actions?: ExportActionOpts,
+    commonOpts?: ExportCommonOpts,
   ): Promise<ExportResponse | null> => {
     return tinymist.executeCommand<ExportResponse | null>(command, [
       uri,
       extraOpts ?? {},
       actions ?? {},
+      commonOpts ?? {},
     ]);
   };
 }

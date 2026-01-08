@@ -1,6 +1,7 @@
 import van from "vanjs-core";
 import "./styles.css";
 
+import { CompilerInputs } from "./components/compiler-inputs";
 import { FormatSelector } from "./components/format-selector";
 import { InputSection } from "./components/inout";
 import { OptionsPanel } from "./components/options-panel";
@@ -19,6 +20,7 @@ const ExportTool = () => {
     outputPath,
     format,
     optionStates,
+    compilerInputs,
     previewGenerating,
     previewData,
     autoPreview,
@@ -44,6 +46,9 @@ const ExportTool = () => {
 
     // Input Document Section
     InputSection({ inputPath, outputPath, actionButton: exportBtn }),
+
+    // Compiler Inputs Section
+    CompilerInputs({ inputs: compilerInputs }),
 
     // Format Selection
     FormatSelector({ selectedFormat: format }),
