@@ -233,8 +233,12 @@ impl ServerState {
             ColorPresentation(req) => CompilerQueryResponse::ColorPresentation(req.request()),
             #[cfg(feature = "export")]
             OnExport(req) => return self.on_export(req),
+            #[cfg(feature = "export")]
+            OnExportMd(req) => return self.on_export_md(req),
             #[cfg(not(feature = "export"))]
             OnExport(_req) => return Err(internal_error("export feature is not enabled")),
+            #[cfg(not(feature = "export"))]
+            OnExportMd(_req) => return Err(internal_error("export feature is not enabled")),
             ServerInfo(_) => return self.collect_server_info(),
             // todo: query on dedicate projects
             _ => return self.query_on(query),

@@ -30,6 +30,8 @@ struct ExportPdfOpts {
     creation_timestamp: Option<String>,
     /// A PDF standard that Typst can enforce conformance with.
     pdf_standard: Option<Vec<PdfStandard>>,
+    /// The processor package to use for the export (only for Markdown).
+    processor: Option<String>,
     /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
     /// document is written to provide a baseline of accessibility. In some
     /// circumstances (for example when trying to reduce the size of a document)
@@ -93,6 +95,7 @@ struct ExportActionOpts {
 impl ServerState {
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportPdfOpts);
 
         let creation_timestamp = if let Some(value) = opts.creation_timestamp {
@@ -104,19 +107,24 @@ impl ServerState {
             self.config.creation_timestamp()
         };
         let no_pdf_tags = opts.no_pdf_tags.unwrap_or(self.config.no_pdf_tags());
-        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
-
+        let pdf_standards = opts
+            .pdf_standard
+            .or_else(|| self.config.pdf_standards())
+            .unwrap_or_default();
         let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportPdf(ExportPdfTask {
-                export,
-                pages: opts.pages,
-                pdf_standards: pdf_standards.unwrap_or_default(),
-                no_pdf_tags,
-                creation_timestamp,
-            }),
-            args,
-        )
+        let task = ProjectTask::ExportPdf(ExportPdfTask {
+            export,
+            pages: opts.pages,
+            pdf_standards,
+            no_pdf_tags,
+            creation_timestamp,
+        });
+
+        if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
+            self.export_md(path, opts.processor, task, args)
+        } else {
+            self.export(task, args)
+        }
     }
 
     /// Export the current document as HTML file(s).
@@ -234,5 +242,20 @@ impl ServerState {
         let open = action_opts.open;
 
         run_query!(self.OnExport(path, task, write, open))
+    }
+
+    /// Exports the a markdown document using a custom template.
+    pub fn export_md(
+        &mut self,
+        path: PathBuf,
+        processor: Option<String>,
+        task: ProjectTask,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduleResult {
+        let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
+        let write = action_opts.write.unwrap_or(true);
+        let open = action_opts.open;
+
+        run_query!(self.OnExportMd(path, processor, task, write, open))
     }
 }

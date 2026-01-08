@@ -1,3 +1,4 @@
+#[cfg(feature = "system")]
 use std::sync::atomic::Ordering;
 
 use dapts::IRequest;
