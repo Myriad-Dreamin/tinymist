@@ -302,13 +302,6 @@ impl ServerState {
             })
             .transpose()?;
 
-        // lets prefer the server's current focusing file instead of a path that the client potentially cannot actually serve
-        if self.config.delegate_fs_requests {
-            if let Some(focusing) = &self.focusing {
-                entry = Some(focusing.as_ref().to_path_buf());
-            }
-        }
-
         let task_id = cli_args.task_id.clone();
         if task_id == "primary" {
             return Err(invalid_params("task id 'primary' is reserved"));
