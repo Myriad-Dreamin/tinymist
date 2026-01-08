@@ -40,6 +40,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.triggerSuggestAndParameterHints = true;
   config.triggerParameterHints = true;
   config.supportHtmlInMarkdown = true;
+  config.supportClientCodelens = true;
   config.supportExtendedCodeAction = true;
   config.customizedShowDocument = true;
   config.delegateFsRequests = false; // todo: detect live sharing.

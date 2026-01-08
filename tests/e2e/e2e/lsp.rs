@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:f5a120d5d309c539e88e532d99cb843c");
+        insta::assert_snapshot!(hash, @"siphash128_13:d34f4196bea99d9d97bfd321df22a8de");
     }
 
     {
@@ -44,7 +44,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode-syntax-only"));
-        insta::assert_snapshot!(hash, @"siphash128_13:bff2030a6c8d2038662fcbb443af583d");
+        insta::assert_snapshot!(hash, @"siphash128_13:27cca1aa737281b12fcbd2ebe027828a");
     }
 }
 
@@ -377,7 +377,13 @@ fn sort_and_redact_value(v: Value) -> Value {
         Value::Null => Value::Null,
         Value::Bool(b) => Value::Bool(b),
         Value::Number(n) => Value::Number(n),
-        Value::String(s) => Value::String(s),
+        Value::String(s) => {
+            if s.starts_with("file:") || s.starts_with("untitled:") {
+                may_redact_uri(&s)
+            } else {
+                Value::String(s)
+            }
+        }
         Value::Array(a) => {
             let mut a = a;
             a.sort_by(json_cmp);
@@ -392,21 +398,8 @@ fn sort_and_redact_value(v: Value) -> Value {
                         (k.clone(), {
                             let v = &o[k];
                             if k == "uri" || k == "targetUri" {
-                                // get uri and set as file name
                                 let uri = v.as_str().unwrap();
-                                if uri == "file://" || uri == "file:///" {
-                                    Value::String("".to_owned())
-                                } else {
-                                    let uri = lsp_types::Url::parse(uri).unwrap();
-
-                                    match uri.to_file_path() {
-                                        Ok(path) => {
-                                            let path = path.file_name().unwrap().to_str().unwrap();
-                                            Value::String(path.to_owned())
-                                        }
-                                        Err(_) => Value::String(uri.to_string()),
-                                    }
-                                }
+                                may_redact_uri(uri)
                             } else if k == "serverInfo" {
                                 // Redact server info to avoid unstable version information
                                 Value::Object(serde_json::Map::from_iter([
@@ -478,5 +471,22 @@ fn json_cmp(a: &Value, b: &Value) -> std::cmp::Ordering {
             std::cmp::Ordering::Equal
         }
         _ => std::cmp::Ordering::Equal,
+    }
+}
+
+/// Gets uri and sets as file name
+fn may_redact_uri(uri: &str) -> Value {
+    if uri == "file://" || uri == "file:///" {
+        Value::String("".to_owned())
+    } else {
+        let uri = lsp_types::Url::parse(uri).unwrap();
+
+        match uri.to_file_path() {
+            Ok(path) => {
+                let path = path.file_name().unwrap().to_str().unwrap();
+                Value::String(path.to_owned())
+            }
+            Err(_) => Value::String(uri.to_string()),
+        }
     }
 }
