@@ -125,10 +125,8 @@ export class LanguageState {
       this.client = undefined;
     }
     // Reset server readiness flag so other code doesn't assume a running server
-    try {
+    if (extensionState?.mut) {
       extensionState.mut.serverReady = false;
-    } catch (_) {
-      // ignore if state not available
     }
   }
 
