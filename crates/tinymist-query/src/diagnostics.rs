@@ -54,7 +54,11 @@ impl<'w> DiagWorker<'w> {
         self.source = "tinymist-lint";
         for dep in self.ctx.world().depended_files() {
             if WorkspaceResolver::is_package_file(dep)
-                || !dep.vpath().as_rooted_path().extension().map_or(false, |e| e == "typ")
+                || dep
+                    .vpath()
+                    .as_rooted_path()
+                    .extension()
+                    .is_none_or(|e| e != "typ")
             {
                 continue;
             }

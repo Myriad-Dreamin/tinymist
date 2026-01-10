@@ -104,6 +104,17 @@ impl ReferencesWorker<'_> {
 
     fn file(&mut self, ref_fid: TypstFileId) -> Option<()> {
         log::debug!("references: file: {ref_fid:?}");
+
+        // todo: find references in data files
+        if ref_fid
+            .vpath()
+            .as_rooted_path()
+            .extension()
+            .is_none_or(|e| e != "typ")
+        {
+            return Some(());
+        }
+
         let src = self.ctx.ctx.source_by_id(ref_fid).ok()?;
         let index = get_index_info(&src);
         match self.def.decl.kind() {
