@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:d34f4196bea99d9d97bfd321df22a8de");
+        insta::assert_snapshot!(hash, @"siphash128_13:cdbe61b5560c7e58851c9466b696531a");
     }
 
     {
