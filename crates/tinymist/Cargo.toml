@@ -133,6 +133,7 @@ system = [
     "open",
     "reflexo-typst/system",
     "tinymist-project/system",
+    "tinymist-query/lsp",
     "tinymist-query/local-registry",
     "sync-ls/system",
     "tokio/rt-multi-thread",

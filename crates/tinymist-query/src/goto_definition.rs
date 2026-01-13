@@ -68,4 +68,19 @@ mod tests {
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
     }
+
+    #[test]
+    fn lsif() {
+        lsif_testing("goto_definition", &|ctx, index, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let req = GotoDefinitionRequest {
+                path: path.clone(),
+                position: find_test_position(&source),
+            };
+
+            let result = index.request(crate::CompilerQueryRequest::GotoDefinition(req));
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
 }

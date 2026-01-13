@@ -1,0 +1,35 @@
+[package]
+name = "tinymist-index"
+description = "A semantic index implementation for Typst."
+categories = ["compilers"]
+keywords = ["api", "language", "typst"]
+authors.workspace = true
+version.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+serde_json.workspace = true
+lsp-types.workspace = true
+tinymist-analysis.workspace = true
+tinymist-project = { workspace = true, features = ["lsp"] }
+tinymist-std.workspace = true
+tinymist-query.workspace = true
+comemo.workspace = true
+miniserde = "0.1"
+
+wasm-minimal-protocol = { git = "https://github.com/astrale-sharp/wasm-minimal-protocol", optional = true }
+
+[features]
+typst-plugin = ["wasm-minimal-protocol"]
+
+default = ["typst-plugin"]
+
+[lints]
+workspace = true
