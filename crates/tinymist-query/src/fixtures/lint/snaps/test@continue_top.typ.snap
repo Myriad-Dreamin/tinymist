@@ -6,10 +6,11 @@ input_file: crates/tinymist-query/src/fixtures/lint/continue_top.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.branch-outside-loop",
    "message": "`continue` statement in a non-loop context",
    "range": "0:1:0:9",
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
   }
  ]
 }

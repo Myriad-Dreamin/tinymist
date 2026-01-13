@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/import_module_alias_mixed.typ
+---
+{}

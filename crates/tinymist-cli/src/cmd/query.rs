@@ -80,6 +80,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
             _ => tinymist_query::ColorTheme::Light,
         },
         lint: config.lint.when().clone(),
+        lint_settings: config.lint.rules.clone(),
         periscope: None,
         local_packages: Arc::default(),
         tokens_caches: Arc::default(),
