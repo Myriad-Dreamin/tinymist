@@ -4823,6 +4823,7 @@ dependencies = [
  "comemo",
  "insta",
  "rayon",
+ "strsim",
  "tinymist-analysis",
  "tinymist-project",
  "tinymist-std",
