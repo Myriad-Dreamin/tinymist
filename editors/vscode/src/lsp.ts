@@ -25,6 +25,7 @@ import type { ExportActionOpts, ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
 
 interface ResourceRoutes {
@@ -123,10 +124,40 @@ export class LanguageState {
       await this.client.stop();
       this.client = undefined;
     }
+    // Reset server readiness flag so other code doesn't assume a running server
+    if (extensionState?.mut) {
+      extensionState.mut.serverReady = false;
+    }
   }
 
   getClient() {
     return this.clientPromise;
+  }
+
+  /**
+   * Checks if the LSP server is available and shows a warning if not.
+   * @returns true if server is available, false otherwise
+   */
+  checkServerHealth(): boolean {
+    if (this.client) return true;
+
+    // Server health check: warn user if server is unavailable
+    if (!extensionState.mut.serverHealthWarningShown) {
+      extensionState.mut.serverHealthWarningShown = true;
+      void vscode.window
+        .showWarningMessage(
+          l10nMsg(
+            "Tinymist server is not available. Some features like auto-formatting on Enter may not work. Try restarting the server.",
+          ),
+          l10nMsg("Restart Server"),
+        )
+        .then((selection) => {
+          if (selection === l10nMsg("Restart Server")) {
+            void vscode.commands.executeCommand("tinymist.restartServer");
+          }
+        });
+    }
+    return false;
   }
 
   probeEnvPath(configName: string, configPath?: string): string {
@@ -325,7 +356,16 @@ export class LanguageState {
     if (extensionState.features.preview) {
       this.registerPreviewNotifications(client);
     }
+
+    // Track server readiness state
+    client.onDidChangeState((event) => {
+      extensionState.mut.serverReady = event.newState === lc.State.Running;
+    });
+
     await client.start();
+
+    // Reset server health warning flag when client successfully starts
+    extensionState.mut.serverHealthWarningShown = false;
 
     return;
   }

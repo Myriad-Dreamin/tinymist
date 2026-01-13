@@ -38,19 +38,43 @@ async function handleKeypress() {
   if (!extensionState.features.onEnter) return false;
 
   const editor = activeTypstEditor();
+  if (!editor) {
+    return false;
+  }
 
   const client = tinymist.client;
-  if (!editor || !client) return false;
+  if (!tinymist.checkServerHealth() || !client) {
+    return false;
+  }
 
-  const lcEdits = await client
-    .sendRequest(onEnter, {
-      textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
-      range: client.code2ProtocolConverter.asRange(editor.selection),
-    })
-    .catch((_error: any) => {
-      // client.handleFailedRequest(OnEnterRequest.type, error, null);
-      return null;
-    });
+  // When the server is not ready, skip the onEnter handling.
+  const serverReady = extensionState.mut.serverReady;
+  if (!serverReady) {
+    console.log("onEnter: waiting for server to be ready...");
+    return false;
+  }
+
+  // Prepare a cancellation token so we can cancel the request if it times out.
+  const cts = new vscode.CancellationTokenSource();
+  const timeout = setTimeout(() => cts.cancel(), 1000);
+
+  let lcEdits: lc.TextEdit[] | null = null;
+  try {
+    lcEdits = await client.sendRequest(
+      onEnter,
+      {
+        textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(editor.document),
+        range: client.code2ProtocolConverter.asRange(editor.selection),
+      },
+      cts.token,
+    );
+  } catch (err) {
+    console.debug("onEnter request failed or was cancelled", err);
+  } finally {
+    clearTimeout(timeout);
+    cts.dispose();
+  }
+
   if (!lcEdits) return false;
 
   const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
