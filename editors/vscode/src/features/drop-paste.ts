@@ -681,14 +681,23 @@ export async function getDesiredNewFilePath(
     if ("error" in pathAt) {
       throw new Error(pathAt.error);
     }
-    const path = pathAt.value;
-    if (typeof path !== "string") {
-      throw new Error(
-        `expect paste script to return an object { value: string }, got { value: ${typeof path} }`,
-      );
+    let dir = pathAt.value;
+    if (typeof dir !== "string") {
+      if (typeof dir !== 'object') {
+        throw new Error(
+          `expect paste script to return an object { value: string | object }, got { value: ${JSON.stringify(dir)} }`,
+        );
+      } else {
+        if (!("dir" in dir)) {
+          throw new Error(
+            `expect paste script to return an object { value: { dir: string } }, got { value: ${JSON.stringify(dir)} }`,
+          );
+        }
+        dir = dir.dir;
+      }
     }
 
-    const newFileDir = vscode.Uri.file(path);
+    const newFileDir = vscode.Uri.file(dir);
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(newFileDir);
     if (!workspaceFolder) {
       throw new Error(
@@ -768,7 +777,7 @@ export class UriList {
 
   constructor(
     public readonly entries: ReadonlyArray<{ readonly uri: vscode.Uri; readonly str: string }>,
-  ) {}
+  ) { }
 }
 
 const externalUriSchemes: ReadonlySet<string> = new Set([
