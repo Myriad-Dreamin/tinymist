@@ -85,8 +85,15 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     fields.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+                    if let Ty::Value(ins) = key
+                        && let Value::Str(s) = &ins.val
+                    {
+                        fields.push((Interned::new_str(s.as_str()), val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -357,6 +364,20 @@ impl TypeChecker<'_> {
 
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
         let args = self.check(&apply.args);
+
+        // Treat `dict.at("key")` as `dict.key` when the key is a constant string.
+        if let Expr::Select(select) = &apply.callee
+            && select.key.name().as_ref() == "at"
+            && let Ty::Args(args_ty) = &args
+            && let Some(Ty::Value(ins)) = args_ty.positional_params().next()
+            && let Value::Str(key) = &ins.val
+        {
+            let base = self.check(&select.lhs);
+            let res = Ty::Select(SelectTy::new(base.into(), Interned::new_str(key.as_str())));
+            self.info.witness_at_least(apply.span, res.clone());
+            return res;
+        }
+
         let callee = self.check(&apply.callee);
 
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
