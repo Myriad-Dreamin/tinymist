@@ -554,7 +554,14 @@ impl TypeChecker<'_> {
         Ty::Builtin(BuiltinTy::None)
     }
 
-    fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
+    fn check_include(&mut self, include: &Interned<IncludeExpr>) -> Ty {
+        let source = self.check(&include.source);
+        self.constrain(
+            &source,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
