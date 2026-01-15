@@ -273,7 +273,19 @@ impl<'a> PostTypeChecker<'a> {
                 Some(resp.finalize())
             }
             SyntaxContext::Element { container, target } => {
-                let container_ty = self.check_or(container, context_ty)?;
+                // The `Array` / `Dict` syntax node is often wrapped by a `Parenthesized`
+                // expression, which is where contextual typing (e.g. let-binding type) applies.
+                // Use the parenthesized container type when available so element types can be
+                // inferred from outer constraints.
+                let container_expr = match container.kind() {
+                    SyntaxKind::Array | SyntaxKind::Dict => container
+                        .parent()
+                        .cloned()
+                        .filter(|p| p.kind() == SyntaxKind::Parenthesized)
+                        .unwrap_or_else(|| container.clone()),
+                    _ => container.clone(),
+                };
+                let container_ty = self.check_or(&container_expr, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
