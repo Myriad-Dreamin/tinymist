@@ -937,17 +937,28 @@ impl ExprWorker<'_> {
                 ast::DictItem::Keyed(item) => {
                     let val = self.check(item.expr());
                     let key = item.key();
-                    let analyzed = self.const_eval_expr(key);
-                    let analyzed = match &analyzed {
-                        Some(Value::Str(s)) => Some(s),
-                        _ => None,
-                    };
+                    let analyzed = self
+                        .const_eval_expr(key)
+                        .and_then(|v| match v {
+                            Value::Str(s) => Some(s),
+                            _ => None,
+                        })
+                        .or_else(|| {
+                            let (_, term) = self.eval_expr(key, InterpretMode::Code);
+                            match term {
+                                Some(Ty::Value(v)) => match &v.val {
+                                    Value::Str(s) => Some(s.clone()),
+                                    _ => None,
+                                },
+                                _ => None,
+                            }
+                        });
                     let Some(analyzed) = analyzed else {
                         let key = self.check(key);
                         items.push(ArgExpr::NamedRt(Box::new((key, val))));
                         continue;
                     };
-                    let key = Decl::str_name(key.to_untyped().clone(), analyzed).into();
+                    let key = Decl::str_name(key.to_untyped().clone(), analyzed.as_str()).into();
                     items.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::DictItem::Spread(s) => {
