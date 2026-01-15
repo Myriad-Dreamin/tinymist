@@ -674,7 +674,13 @@ impl ExprWorker<'_> {
             }
         };
 
-        Expr::Import(ImportExpr { decl: mod_ref }.into())
+        Expr::Import(
+            ImportExpr {
+                source: self.check(source),
+                decl: mod_ref,
+            }
+            .into(),
+        )
     }
 
     fn check_import(
