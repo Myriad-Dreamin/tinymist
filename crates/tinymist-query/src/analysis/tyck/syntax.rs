@@ -550,6 +550,13 @@ impl TypeChecker<'_> {
     }
 
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        let source = self.check(&import.source);
+        self.constrain(
+            &source,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
         self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
