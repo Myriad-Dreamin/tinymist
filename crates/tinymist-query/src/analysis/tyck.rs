@@ -268,6 +268,21 @@ impl TypeChecker<'_> {
         }
 
         match (lhs, rhs) {
+            (Ty::Select(sel), rhs) => {
+                // Constrain field access `base.field` by constraining `base` with a record type
+                // that contains the field. This enables propagating expected types back into
+                // dictionary literals, e.g. `(cjk: "")` from `fonts.cjk` used as `text(font: ...)`.
+                let dict = Ty::Dict(RecordTy::new(vec![(sel.select.clone(), rhs.clone())]));
+                self.constrain(sel.ty.as_ref(), &dict);
+            }
+            (Ty::Array(lhs), Ty::Array(rhs)) => {
+                self.constrain(lhs, rhs);
+            }
+            (Ty::Tuple(lhs), Ty::Tuple(rhs)) => {
+                for (lhs, rhs) in lhs.iter().zip(rhs.iter()) {
+                    self.constrain(lhs, rhs);
+                }
+            }
             (Ty::Var(v), Ty::Var(w)) => {
                 if v.def == w.def {
                     return;
