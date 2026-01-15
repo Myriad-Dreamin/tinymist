@@ -587,8 +587,22 @@ impl TypeChecker<'_> {
     }
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
-        let _iter = self.check(&for_loop.iter);
-        let _pattern = self.check_pattern_exp(&for_loop.pattern);
+        let iter = self.check(&for_loop.iter);
+        let pattern = self.check_pattern_exp(&for_loop.pattern);
+
+        if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
+            self.constrain(&iter, &Ty::Array(pattern.clone().into()));
+
+            match &iter {
+                Ty::Array(elem) => self.constrain(elem, &pattern),
+                Ty::Tuple(elems) => {
+                    for elem in elems.iter() {
+                        self.constrain(elem, &pattern);
+                    }
+                }
+                _ => {}
+            }
+        }
         let _body = self.check(&for_loop.body);
 
         Ty::Any
