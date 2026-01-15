@@ -89,10 +89,36 @@ impl TypeChecker<'_> {
                     let (name, value) = n.as_ref();
                     let key = self.check(name);
                     let val = self.check(value);
-                    if let Ty::Value(ins) = key
-                        && let Value::Str(s) = &ins.val
-                    {
-                        fields.push((Interned::new_str(s.as_str()), val));
+
+                    let const_key = match key {
+                        Ty::Value(ins) => match &ins.val {
+                            Value::Str(s) => Some(Interned::new_str(s.as_str())),
+                            _ => None,
+                        },
+                        Ty::Var(v) => {
+                            match self.info.vars.get(&v.def) {
+                                Some(bounds) => {
+                                    let bounds = bounds.bounds.bounds().read();
+                                    let mut s = None;
+                                    for lb in &bounds.lbs {
+                                        let Ty::Value(ins) = lb else { continue };
+                                        let Value::Str(v) = &ins.val else { continue };
+                                        let v = v.as_str();
+                                        if s.is_some_and(|s| s != v) {
+                                            s = None;
+                                            break;
+                                        }
+                                        s = Some(v);
+                                    }
+                                    s.map(Interned::new_str)
+                                }
+                                None => None,
+                            }
+                        }
+                        _ => None,
+                    };
+                    if let Some(const_key) = const_key {
+                        fields.push((const_key, val));
                     }
                 }
                 ArgExpr::Spread(..) => {
