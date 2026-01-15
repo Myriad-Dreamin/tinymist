@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 196
+description: "Completion on \" (60..61)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/font_destructure_let_dict.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "New Computer Modern",
+     "range": {
+      "end": {
+       "character": 23,
+       "line": 2
+      },
+      "start": {
+       "character": 23,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
