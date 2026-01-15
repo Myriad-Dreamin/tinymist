@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/completion.rs
 assertion_line: 196
-description: "Completion on \" (56..57)"
+description: "Completion on \" (67..68)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_kind_bibliography_let.typ
 ---
@@ -33,6 +33,24 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_kind_bibliography
     "sortText": "001",
     "textEdit": {
      "newText": "refs.yaml",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 1
+      },
+      "start": {
+       "character": 10,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "refs.yml",
+    "sortText": "002",
+    "textEdit": {
+     "newText": "refs.yml",
      "range": {
       "end": {
        "character": 10,
