@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 192
+description: "Completion on \" (44..45)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_let.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "img.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "img.png",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 1
+      },
+      "start": {
+       "character": 10,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

@@ -1,0 +1,50 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 196
+description: "Completion on \" (56..57)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_kind_bibliography_let.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "refs.bib",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "refs.bib",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 1
+      },
+      "start": {
+       "character": 10,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "refs.yaml",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "refs.yaml",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 1
+      },
+      "start": {
+       "character": 10,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]
