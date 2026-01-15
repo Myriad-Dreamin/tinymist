@@ -1237,6 +1237,7 @@ impl ExprWorker<'_> {
         crate::log_debug_ct!("checking expr: {expr:?}");
 
         match expr {
+            ast::Expr::Parenthesized(paren) => self.eval_expr(paren.expr(), mode),
             ast::Expr::FieldAccess(field_access) => {
                 let field = Decl::ident_ref(field_access.field());
 
