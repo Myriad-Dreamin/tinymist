@@ -391,10 +391,62 @@ impl<'a> PostTypeChecker<'a> {
             ast::Pattern::Parenthesized(paren_expr) => {
                 self.destruct_let(paren_expr.expr().to_untyped().cast()?, node)
             }
-            // todo: pattern matching
-            ast::Pattern::Destructuring(_d) => {
+            ast::Pattern::Destructuring(d) => {
                 let _ = node;
-                None
+
+                fn pattern_binding_ty(this: &PostTypeChecker<'_>, pat: ast::Pattern) -> Ty {
+                    match pat {
+                        ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
+                            this.info.type_of_span(ident.span()).unwrap_or(Ty::Any)
+                        }
+                        ast::Pattern::Parenthesized(paren) => {
+                            pattern_binding_ty(this, paren.pattern())
+                        }
+                        ast::Pattern::Destructuring(d) => destructuring_binding_ty(this, d)
+                            .unwrap_or(Ty::Any),
+                        ast::Pattern::Normal(..) | ast::Pattern::Placeholder(..) => Ty::Any,
+                    }
+                }
+
+                fn destructuring_binding_ty(
+                    this: &PostTypeChecker<'_>,
+                    destructuring: ast::Destructuring,
+                ) -> Option<Ty> {
+                    let mut pos = vec![];
+                    let mut named = vec![];
+                    let mut has_pos = false;
+                    let mut has_named = false;
+                    let mut has_spread = false;
+
+                    for item in destructuring.items() {
+                        match item {
+                            ast::DestructuringItem::Pattern(pat) => {
+                                has_pos = true;
+                                pos.push(pattern_binding_ty(this, pat));
+                            }
+                            ast::DestructuringItem::Named(named_item) => {
+                                has_named = true;
+                                let key = Interned::new_str(named_item.name().get().as_str());
+                                let ty = pattern_binding_ty(this, named_item.pattern());
+                                named.push((key, ty));
+                            }
+                            ast::DestructuringItem::Spread(..) => {
+                                has_spread = true;
+                            }
+                        }
+                    }
+
+                    // Spreads make positional mapping ambiguous; fall back to no contextual typing.
+                    if has_spread {
+                        return None;
+                    }
+
+                    let tuple_ty = has_pos.then(|| Ty::Tuple(pos.into()));
+                    let dict_ty = has_named.then(|| Ty::Dict(RecordTy::new(named)));
+                    Ty::union(tuple_ty, dict_ty)
+                }
+
+                destructuring_binding_ty(self, d)
             }
         }
     }
