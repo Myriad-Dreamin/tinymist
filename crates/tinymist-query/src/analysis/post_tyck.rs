@@ -352,10 +352,10 @@ impl<'a> PostTypeChecker<'a> {
     }
 
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
-        if let Some(binary) = context.cast::<ast::Binary>() {
-            if binary.op() == ast::BinOp::Add {
+        if let Some(binary) = context.cast::<ast::Binary>()
+            && binary.op() == ast::BinOp::Add {
                 let parent = context.parent()?;
-                let expected = self.check_context(&parent, context)?;
+                let expected = self.check_context(parent, context)?;
 
                 fn has_path(this: &PostTypeChecker<'_>, ty: &Ty) -> bool {
                     match ty {
@@ -415,7 +415,6 @@ impl<'a> PostTypeChecker<'a> {
                     return Some(expected);
                 }
             }
-        }
 
         match context.kind() {
             SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
