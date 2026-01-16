@@ -12,7 +12,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_for_lo
    {
     "kind": 17,
     "label": "a.png",
-    "sortText": "000",
+    "sortText": "001",
     "textEdit": {
      "newText": "a.png",
      "range": {
@@ -30,7 +30,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_for_lo
    {
     "kind": 17,
     "label": "b.png",
-    "sortText": "001",
+    "sortText": "002",
     "textEdit": {
      "newText": "b.png",
      "range": {
