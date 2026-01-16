@@ -95,26 +95,24 @@ impl TypeChecker<'_> {
                             Value::Str(s) => Some(Interned::new_str(s.as_str())),
                             _ => None,
                         },
-                        Ty::Var(v) => {
-                            match self.info.vars.get(&v.def) {
-                                Some(bounds) => {
-                                    let bounds = bounds.bounds.bounds().read();
-                                    let mut s = None;
-                                    for lb in &bounds.lbs {
-                                        let Ty::Value(ins) = lb else { continue };
-                                        let Value::Str(v) = &ins.val else { continue };
-                                        let v = v.as_str();
-                                        if s.is_some_and(|s| s != v) {
-                                            s = None;
-                                            break;
-                                        }
-                                        s = Some(v);
+                        Ty::Var(v) => match self.info.vars.get(&v.def) {
+                            Some(bounds) => {
+                                let bounds = bounds.bounds.bounds().read();
+                                let mut s = None;
+                                for lb in &bounds.lbs {
+                                    let Ty::Value(ins) = lb else { continue };
+                                    let Value::Str(v) = &ins.val else { continue };
+                                    let v = v.as_str();
+                                    if s.is_some_and(|s| s != v) {
+                                        s = None;
+                                        break;
                                     }
-                                    s.map(Interned::new_str)
+                                    s = Some(v);
                                 }
-                                None => None,
+                                s.map(Interned::new_str)
                             }
-                        }
+                            None => None,
+                        },
                         _ => None,
                     };
                     if let Some(const_key) = const_key {
@@ -407,30 +405,27 @@ impl TypeChecker<'_> {
             && select.key.name().as_ref() == "at"
             && let Ty::Args(args_ty) = &args
         {
-            let key = args_ty
-                .positional_params()
-                .next()
-                .and_then(|ty| match ty {
-                    Ty::Value(ins) => match &ins.val {
-                        Value::Str(key) => Some(Interned::new_str(key.as_str())),
-                        _ => None,
-                    },
-                    Ty::Var(v) => self.info.vars.get(&v.def).and_then(|bounds| {
-                        let bounds = bounds.bounds.bounds().read();
-                        let mut key = None;
-                        for lb in &bounds.lbs {
-                            let Ty::Value(ins) = lb else { continue };
-                            let Value::Str(v) = &ins.val else { continue };
-                            let v = Interned::new_str(v.as_str());
-                            if key.is_some_and(|key| key != v) {
-                                return None;
-                            }
-                            key = Some(v);
-                        }
-                        key
-                    }),
+            let key = args_ty.positional_params().next().and_then(|ty| match ty {
+                Ty::Value(ins) => match &ins.val {
+                    Value::Str(key) => Some(Interned::new_str(key.as_str())),
                     _ => None,
-                });
+                },
+                Ty::Var(v) => self.info.vars.get(&v.def).and_then(|bounds| {
+                    let bounds = bounds.bounds.bounds().read();
+                    let mut key = None;
+                    for lb in &bounds.lbs {
+                        let Ty::Value(ins) = lb else { continue };
+                        let Value::Str(v) = &ins.val else { continue };
+                        let v = Interned::new_str(v.as_str());
+                        if key.is_some_and(|key| key != v) {
+                            return None;
+                        }
+                        key = Some(v);
+                    }
+                    key
+                }),
+                _ => None,
+            });
 
             if let Some(key) = key {
                 let base = self.check(&select.lhs);
