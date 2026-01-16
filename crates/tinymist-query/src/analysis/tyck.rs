@@ -278,6 +278,11 @@ impl TypeChecker<'_> {
             (Ty::Array(lhs), Ty::Array(rhs)) => {
                 self.constrain(lhs, rhs);
             }
+            (Ty::Tuple(lhs), Ty::Array(rhs)) => {
+                for lhs in lhs.iter() {
+                    self.constrain(lhs, rhs);
+                }
+            }
             (Ty::Tuple(lhs), Ty::Tuple(rhs)) => {
                 for (lhs, rhs) in lhs.iter().zip(rhs.iter()) {
                     self.constrain(lhs, rhs);
