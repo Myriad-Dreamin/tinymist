@@ -367,6 +367,17 @@ impl TypeChecker<'_> {
             }
         }
 
+        if op == ast::BinOp::Add
+            && let Ty::Value(lhs_val) = &lhs
+            && let Ty::Value(rhs_val) = &rhs
+            && let Value::Str(lhs_str) = &lhs_val.val
+            && let Value::Str(rhs_str) = &rhs_val.val
+        {
+            return Ty::Value(InsTy::new(Value::Str(
+                eco_format!("{}{}", lhs_str.as_str(), rhs_str.as_str()).into(),
+            )));
+        }
+
         Ty::Binary(TypeBinary::new(op, lhs, rhs))
     }
 
