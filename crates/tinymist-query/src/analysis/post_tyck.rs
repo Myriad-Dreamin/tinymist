@@ -341,66 +341,64 @@ impl<'a> PostTypeChecker<'a> {
 
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
         if let Some(binary) = context.cast::<ast::Binary>()
-            && binary.op() == ast::BinOp::Add {
-                let parent = context.parent()?;
-                let expected = self.check_context(parent, context)?;
+            && binary.op() == ast::BinOp::Add
+        {
+            let parent = context.parent()?;
+            let expected = self.check_context(parent, context)?;
 
-                fn has_path(this: &PostTypeChecker<'_>, ty: &Ty) -> bool {
-                    match ty {
-                        Ty::Builtin(BuiltinTy::Path(..)) => true,
-                        Ty::Builtin(_) => false,
-                        Ty::Param(p) => has_path(this, &p.ty),
-                        Ty::Let(b) => {
-                            b.lbs.iter().any(|ty| has_path(this, ty))
-                                || b.ubs.iter().any(|ty| has_path(this, ty))
-                        }
-                        Ty::Union(types) => types.iter().any(|ty| has_path(this, ty)),
-                        Ty::Array(elem) => has_path(this, elem),
-                        Ty::Tuple(elems) => elems.iter().any(|ty| has_path(this, ty)),
-                        Ty::Dict(record) => record.interface().any(|(_, ty)| has_path(this, ty)),
-                        Ty::Select(sel) => has_path(this, &sel.ty),
-                        Ty::With(with) => {
-                            has_path(this, &with.sig)
-                                || with.with.inputs().any(|ty| has_path(this, ty))
-                        }
-                        Ty::Args(args) => args.inputs().any(|ty| has_path(this, ty)),
-                        Ty::Func(sig) | Ty::Pattern(sig) => {
-                            sig.inputs().any(|ty| has_path(this, ty))
-                        }
-                        Ty::Unary(unary) => has_path(this, &unary.lhs),
-                        Ty::Binary(binary) => {
-                            let [lhs, rhs] = binary.operands();
-                            has_path(this, lhs) || has_path(this, rhs)
-                        }
-                        Ty::If(if_) => {
-                            has_path(this, &if_.cond)
-                                || has_path(this, &if_.then)
-                                || has_path(this, &if_.else_)
-                        }
-                        Ty::Var(v) => this.info.vars.get(&v.def).is_some_and(|bounds| {
-                            let bounds = bounds.bounds.bounds().read();
-                            bounds.lbs.iter().any(|ty| has_path(this, ty))
-                                || bounds.ubs.iter().any(|ty| has_path(this, ty))
-                        }),
-                        Ty::Any | Ty::Boolean(_) | Ty::Value(_) => false,
+            fn has_path(this: &PostTypeChecker<'_>, ty: &Ty) -> bool {
+                match ty {
+                    Ty::Builtin(BuiltinTy::Path(..)) => true,
+                    Ty::Builtin(_) => false,
+                    Ty::Param(p) => has_path(this, &p.ty),
+                    Ty::Let(b) => {
+                        b.lbs.iter().any(|ty| has_path(this, ty))
+                            || b.ubs.iter().any(|ty| has_path(this, ty))
                     }
-                }
-
-                // Only propagate expected types for path concatenations so string literals in
-                // `"dir/" + ""` get path completion.
-                if !has_path(self, &expected) {
-                    return None;
-                }
-
-                // Ensure the queried node is part of the binary expression.
-                let lhs = binary.lhs();
-                let rhs = binary.rhs();
-                let lhs_node = context.find(lhs.span())?;
-                let rhs_node = context.find(rhs.span())?;
-                if lhs_node.find(node.span()).is_some() || rhs_node.find(node.span()).is_some() {
-                    return Some(expected);
+                    Ty::Union(types) => types.iter().any(|ty| has_path(this, ty)),
+                    Ty::Array(elem) => has_path(this, elem),
+                    Ty::Tuple(elems) => elems.iter().any(|ty| has_path(this, ty)),
+                    Ty::Dict(record) => record.interface().any(|(_, ty)| has_path(this, ty)),
+                    Ty::Select(sel) => has_path(this, &sel.ty),
+                    Ty::With(with) => {
+                        has_path(this, &with.sig) || with.with.inputs().any(|ty| has_path(this, ty))
+                    }
+                    Ty::Args(args) => args.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Func(sig) | Ty::Pattern(sig) => sig.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Unary(unary) => has_path(this, &unary.lhs),
+                    Ty::Binary(binary) => {
+                        let [lhs, rhs] = binary.operands();
+                        has_path(this, lhs) || has_path(this, rhs)
+                    }
+                    Ty::If(if_) => {
+                        has_path(this, &if_.cond)
+                            || has_path(this, &if_.then)
+                            || has_path(this, &if_.else_)
+                    }
+                    Ty::Var(v) => this.info.vars.get(&v.def).is_some_and(|bounds| {
+                        let bounds = bounds.bounds.bounds().read();
+                        bounds.lbs.iter().any(|ty| has_path(this, ty))
+                            || bounds.ubs.iter().any(|ty| has_path(this, ty))
+                    }),
+                    Ty::Any | Ty::Boolean(_) | Ty::Value(_) => false,
                 }
             }
+
+            // Only propagate expected types for path concatenations so string literals in
+            // `"dir/" + ""` get path completion.
+            if !has_path(self, &expected) {
+                return None;
+            }
+
+            // Ensure the queried node is part of the binary expression.
+            let lhs = binary.lhs();
+            let rhs = binary.rhs();
+            let lhs_node = context.find(lhs.span())?;
+            let rhs_node = context.find(rhs.span())?;
+            if lhs_node.find(node.span()).is_some() || rhs_node.find(node.span()).is_some() {
+                return Some(expected);
+            }
+        }
 
         match context.kind() {
             SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
