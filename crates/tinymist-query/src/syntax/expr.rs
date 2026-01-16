@@ -944,14 +944,21 @@ impl ExprWorker<'_> {
                             _ => None,
                         })
                         .or_else(|| {
-                            let (_, term) = self.eval_expr(key, InterpretMode::Code);
-                            match term {
-                                Some(Ty::Value(v)) => match &v.val {
-                                    Value::Str(s) => Some(s.clone()),
-                                    _ => None,
-                                },
-                                _ => None,
+                            let (expr, term) = self.eval_expr(key, InterpretMode::Code);
+
+                            if let Some(Ty::Value(v)) = term
+                                && let Value::Str(s) = &v.val
+                            {
+                                return Some(s.clone());
                             }
+
+                            if let Some(Expr::Type(Ty::Value(v))) = expr
+                                && let Value::Str(s) = &v.val
+                            {
+                                return Some(s.clone());
+                            }
+
+                            None
                         });
                     let Some(analyzed) = analyzed else {
                         let key = self.check(key);
