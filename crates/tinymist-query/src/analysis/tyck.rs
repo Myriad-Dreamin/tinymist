@@ -303,10 +303,24 @@ impl TypeChecker<'_> {
                 let w = self.info.vars.get_mut(&v.def).unwrap();
                 // strict constraint on upper bound
                 let bound = rhs.clone();
-                match &w.bounds {
+                let (inserted, lbs) = match &w.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let mut w = w.write();
-                        w.ubs.insert_mut(bound);
+                        if w.ubs.contains(&bound) {
+                            (false, vec![])
+                        } else {
+                            w.ubs.insert_mut(bound.clone());
+                            (true, w.lbs.iter().cloned().collect())
+                        }
+                    }
+                };
+
+                // Propagate newly-added upper bounds into existing lower bounds.
+                // This enables expected types from usages to refine literal elements in
+                // initializers like `#let files = ("a.typ", ...)`.
+                if inserted {
+                    for lb in lbs {
+                        self.constrain(&lb, &bound);
                     }
                 }
             }
@@ -314,10 +328,24 @@ impl TypeChecker<'_> {
                 let w = self.info.vars.get(&v.def).unwrap();
                 let bound = self.weaken_constraint(lhs, &w.bounds);
                 crate::log_debug_ct!("constrain var {v:?} ⪰ {bound:?}");
-                match &w.bounds {
+
+                let w = self.info.vars.get_mut(&v.def).unwrap();
+                let (inserted, ubs) = match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
-                        v.lbs.insert_mut(bound);
+                        if v.lbs.contains(&bound) {
+                            (false, vec![])
+                        } else {
+                            v.lbs.insert_mut(bound.clone());
+                            (true, v.ubs.iter().cloned().collect())
+                        }
+                    }
+                };
+
+                // Propagate newly-added lower bounds into existing upper bounds.
+                if inserted {
+                    for ub in ubs {
+                        self.constrain(&bound, &ub);
                     }
                 }
             }
