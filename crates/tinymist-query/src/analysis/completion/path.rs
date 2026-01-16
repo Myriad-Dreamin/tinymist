@@ -57,8 +57,8 @@ impl CompletionPair<'_, '_, '_> {
             return self.const_string_expr(&expr_node);
         }
 
-        if let Some(binary) = node.cast::<ast::Binary>() {
-            if binary.op() == ast::BinOp::Add {
+        if let Some(binary) = node.cast::<ast::Binary>()
+            && binary.op() == ast::BinOp::Add {
                 let lhs = binary.lhs();
                 let rhs = binary.rhs();
                 let lhs_node = node.find(lhs.span())?;
@@ -67,14 +67,12 @@ impl CompletionPair<'_, '_, '_> {
                 let rhs = self.const_string_expr(&rhs_node)?;
                 return Some(eco_format!("{lhs}{rhs}"));
             }
-        }
 
         // Resolve constant string values through type checking info (e.g. `#let dir = "dir/"`).
-        if let Some(ty) = self.worker.ctx.post_type_of_node(node.clone()) {
-            if let Some(s) = Self::unique_const_string(&ty) {
+        if let Some(ty) = self.worker.ctx.post_type_of_node(node.clone())
+            && let Some(s) = Self::unique_const_string(&ty) {
                 return Some(s);
             }
-        }
 
         None
     }
