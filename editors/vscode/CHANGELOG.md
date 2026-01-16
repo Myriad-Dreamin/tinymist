@@ -9,11 +9,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.13.41-rc1 - [2026-01-15]
+## v0.13.41 - [2026-01-16]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev 6f1437e](https://github.com/ParaN3xus/typst/commit/6f1437e54a235c343604c1b17d502ccbfdb12198), a.k.a. [typst/typst Add file `path` type (#7555)](https://github.com/typst/typst/commit/e707a5c2874535d450233df11345a309e06a726b).
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.39...v0.13.41-rc1
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.39...v0.13.41
 
 ## v0.13.39 - [2025-10-11]
 
