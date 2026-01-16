@@ -44,6 +44,57 @@ impl TypeChecker<'_> {
         })
     }
 
+    fn unique_const_string_key(&self, ty: &Ty) -> Option<Interned<str>> {
+        fn unify(acc: &mut Option<Interned<str>>, next: Interned<str>) -> Option<()> {
+            if acc.as_ref().is_some_and(|prev| prev != &next) {
+                return None;
+            }
+            *acc = Some(next);
+            Some(())
+        }
+
+        fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
+            match ty {
+                Ty::Value(ins) => match &ins.val {
+                    Value::Str(s) => unify(acc, Interned::new_str(s.as_str())),
+                    _ => None,
+                },
+                Ty::Var(v) => {
+                    let bounds = this.info.vars.get(&v.def)?;
+                    let bounds_guard = bounds.bounds.bounds().read();
+                    if bounds_guard.lbs.is_empty() {
+                        return None;
+                    }
+                    for lb in &bounds_guard.lbs {
+                        visit(this, lb, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Let(bounds) => {
+                    if bounds.lbs.is_empty() {
+                        return None;
+                    }
+                    for lb in &bounds.lbs {
+                        visit(this, lb, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Union(types) => {
+                    for ty in types.iter() {
+                        visit(this, ty, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Param(p) => visit(this, &p.ty, acc),
+                _ => None,
+            }
+        }
+
+        let mut acc = None;
+        visit(self, ty, &mut acc)?;
+        acc
+    }
+
     fn check_block(&mut self, exprs: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
@@ -89,33 +140,7 @@ impl TypeChecker<'_> {
                     let (name, value) = n.as_ref();
                     let key = self.check(name);
                     let val = self.check(value);
-
-                    let const_key = match key {
-                        Ty::Value(ins) => match &ins.val {
-                            Value::Str(s) => Some(Interned::new_str(s.as_str())),
-                            _ => None,
-                        },
-                        Ty::Var(v) => match self.info.vars.get(&v.def) {
-                            Some(bounds) => {
-                                let bounds = bounds.bounds.bounds().read();
-                                let mut s = None;
-                                for lb in &bounds.lbs {
-                                    let Ty::Value(ins) = lb else { continue };
-                                    let Value::Str(v) = &ins.val else { continue };
-                                    let v = v.as_str();
-                                    if s.is_some_and(|s| s != v) {
-                                        s = None;
-                                        break;
-                                    }
-                                    s = Some(v);
-                                }
-                                s.map(Interned::new_str)
-                            }
-                            None => None,
-                        },
-                        _ => None,
-                    };
-                    if let Some(const_key) = const_key {
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
                         fields.push((const_key, val));
                     }
                 }
@@ -146,8 +171,14 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     named.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
+                        named.push((const_key, val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -404,28 +435,13 @@ impl TypeChecker<'_> {
         if let Expr::Select(select) = &apply.callee
             && select.key.name().as_ref() == "at"
             && let Ty::Args(args_ty) = &args
+            && args_ty.positional_params().len() == 1
+            && args_ty.named_params().len() == 0
+            && args_ty.rest_param().is_none()
         {
-            let key = args_ty.positional_params().next().and_then(|ty| match ty {
-                Ty::Value(ins) => match &ins.val {
-                    Value::Str(key) => Some(Interned::new_str(key.as_str())),
-                    _ => None,
-                },
-                Ty::Var(v) => self.info.vars.get(&v.def).and_then(|bounds| {
-                    let bounds = bounds.bounds.bounds().read();
-                    let mut key = None;
-                    for lb in &bounds.lbs {
-                        let Ty::Value(ins) = lb else { continue };
-                        let Value::Str(v) = &ins.val else { continue };
-                        let v = Interned::new_str(v.as_str());
-                        if key.is_some_and(|key| key != v) {
-                            return None;
-                        }
-                        key = Some(v);
-                    }
-                    key
-                }),
-                _ => None,
-            });
+            let key = args_ty
+                .pos(0)
+                .and_then(|ty| self.unique_const_string_key(ty));
 
             if let Some(key) = key {
                 let base = self.check(&select.lhs);
