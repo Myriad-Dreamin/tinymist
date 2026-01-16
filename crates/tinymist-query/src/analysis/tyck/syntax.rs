@@ -392,13 +392,38 @@ impl TypeChecker<'_> {
         if let Expr::Select(select) = &apply.callee
             && select.key.name().as_ref() == "at"
             && let Ty::Args(args_ty) = &args
-            && let Some(Ty::Value(ins)) = args_ty.positional_params().next()
-            && let Value::Str(key) = &ins.val
         {
-            let base = self.check(&select.lhs);
-            let res = Ty::Select(SelectTy::new(base.into(), Interned::new_str(key.as_str())));
-            self.info.witness_at_least(apply.span, res.clone());
-            return res;
+            let key = args_ty
+                .positional_params()
+                .next()
+                .and_then(|ty| match ty {
+                    Ty::Value(ins) => match &ins.val {
+                        Value::Str(key) => Some(Interned::new_str(key.as_str())),
+                        _ => None,
+                    },
+                    Ty::Var(v) => self.info.vars.get(&v.def).and_then(|bounds| {
+                        let bounds = bounds.bounds.bounds().read();
+                        let mut key = None;
+                        for lb in &bounds.lbs {
+                            let Ty::Value(ins) = lb else { continue };
+                            let Value::Str(v) = &ins.val else { continue };
+                            let v = Interned::new_str(v.as_str());
+                            if key.is_some_and(|key| key != v) {
+                                return None;
+                            }
+                            key = Some(v);
+                        }
+                        key
+                    }),
+                    _ => None,
+                });
+
+            if let Some(key) = key {
+                let base = self.check(&select.lhs);
+                let res = Ty::Select(SelectTy::new(base.into(), key));
+                self.info.witness_at_least(apply.span, res.clone());
+                return res;
+            }
         }
 
         let callee = self.check(&apply.callee);
