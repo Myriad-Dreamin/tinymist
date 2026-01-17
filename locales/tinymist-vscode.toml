@@ -1451,6 +1451,14 @@ zh = "启用预览功能。"
 en = "Disable preview features."
 zh = "禁用预览功能。"
 
+[extension.tinymist.config.tinymist.previewExtension.title]
+en = "Preview Extension"
+zh = "预览扩展"
+
+[extension.tinymist.config.tinymist.previewExtension.desc]
+en = "The name of a VS Code extension to customize preview, like hardware-accelerated rendering or previewing with a different theme. If not set, the extension will use the embedded preview feature. The default value is `myriad-dreamin.tinymist` (the main tinymist extension)."
+zh = "使用哪个 VS Code 扩展来定制预览功能，例如硬件加速渲染或使用不同的主题预览。如果未设置，则使用内置的预览功能。默认值为 `myriad-dreamin.tinymist` (tinymist 主扩展)。"
+
 [extension.tinymist.config.tinymist.preview.sysInputs.title]
 en = "Preview Sys Inputs"
 zh = "预览系统输入"
