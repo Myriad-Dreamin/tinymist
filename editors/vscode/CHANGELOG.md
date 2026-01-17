@@ -10,11 +10,31 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.10 - [2026-01-19]
+
+### Code Analysis
+
+* (Fix) Skipping non-source files for linting and references in https://github.com/Myriad-Dreamin/tinymist/pull/2348
+
+### Editor
+
+* Added support for exporting markdown documents to PDF in https://github.com/Myriad-Dreamin/tinymist/pull/2241
+
+### Preview
+
+* Added hotkey to toggle light/dark theme by @funkeleinhorn in https://github.com/Myriad-Dreamin/tinymist/pull/2325
+
+### Codelens
+
+* Skipping emitting specific codelens for clients that don't have a client-side handler in https://github.com/Myriad-Dreamin/tinymist/pull/2246
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.8...v0.14.10
+
 ## v0.14.8 - [2026-01-08]
 
 ### Rename
 
-* Renaming labels (#1858) by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2133 and https://github.com/Myriad-Dreamin/tinymist/pull/2339
+* Renaming labels (#1858) in https://github.com/Myriad-Dreamin/tinymist/pull/2133 and https://github.com/Myriad-Dreamin/tinymist/pull/2339
 
 ### Code Analysis
 
