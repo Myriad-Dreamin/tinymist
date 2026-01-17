@@ -52,7 +52,6 @@ body {
 
 #typst-container-main {
   flex: 1;
-  overflow: auto;
   position: relative;
 }
 
