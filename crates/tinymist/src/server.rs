@@ -118,7 +118,9 @@ impl ServerState {
         let (dep_tx, rx) = mpsc::unbounded_channel();
         // todo: notify feature?
         #[cfg(feature = "system")]
-        let dep_rx = {
+        let dep_rx = if config.delegate_fs_requests { // skip the OS watcher and instead let `ServerState::handle_deps` handle it on a delegated fs
+            Some(rx)
+        } else {
             let fs_client = client.clone().to_untyped();
             let async_handle = client.handle.clone();
             async_handle.spawn(crate::project::watch_deps(rx, move |event| {

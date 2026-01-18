@@ -5,15 +5,16 @@ mod export;
 use std::ops::Range;
 use std::path::PathBuf;
 
-use lsp_types::TextDocumentIdentifier;
+use lsp_types::{TextDocumentIdentifier, Url};
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 #[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{LocalContextGuard, LspRange};
+use tinymist_query::{url_to_path, LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
+use tinymist_std::ImmutPath;
 use typst::syntax::{LinkedNode, Source};
 
 use super::*;
@@ -36,6 +37,21 @@ struct ExportSyntaxRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
+    /// Parse a string as either a URI or a filesystem path.
+    ///
+    /// - If `s` parses as a `Url`, convert it using `url_to_path()` which
+    ///   preserves the scheme (e.g. `oct:`) embedded in the textual path for
+    ///   delegated filesystem providers.
+    /// - Otherwise, treat `s` as a raw path string.
+    fn parse_uri_or_path(s: &str) -> ImmutPath {
+        if let Ok(uri) = Url::parse(s) {
+            // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
+            ImmutPath::from(url_to_path(&uri))
+        } else {
+            ImmutPath::from(PathBuf::from(s))
+        }
+    }
+
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
@@ -102,7 +118,8 @@ impl ServerState {
 
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+        let raw: Option<String> = get_arg!(args[0] as Option<String>);
+        let entry = raw.as_deref().map(Self::parse_uri_or_path);
 
         let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
@@ -113,7 +130,8 @@ impl ServerState {
 
     /// Focus main file to some path.
     pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let entry = get_arg!(args[0] as Option<PathBuf>).map(From::from);
+        let raw: Option<String> = get_arg!(args[0] as Option<String>);
+        let entry = raw.as_deref().map(Self::parse_uri_or_path);
 
         if !self.ever_manual_focusing {
             self.ever_manual_focusing = true;
@@ -573,5 +591,32 @@ impl ServerState {
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let snap = self.query_snapshot().map_err(internal_error)?;
         Ok(async move { snap.run_within_package(&info, f).map_err(internal_error) })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_uri_or_path_parses_uri() {
+        let p = ServerState::parse_uri_or_path("oct:/workspace/file typst");
+        assert_eq!(p.as_ref().to_string_lossy(), "oct:/workspace/file typst");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_parse_uri_or_path_falls_back_to_path_unix() {
+        let p = ServerState::parse_uri_or_path("/home/user/file.typ");
+        assert!(p.is_absolute());
+        assert_eq!(p.as_ref().to_string_lossy(), "/home/user/file.typ");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_parse_uri_or_path_falls_back_to_path_windows() {
+        // On Windows, "/home/user/file.typ" is not considered absolute.
+        let p = ServerState::parse_uri_or_path("/home/user/file.typ");
+        assert_eq!(p.as_ref().to_string_lossy(), "/home/user/file.typ");
     }
 }
