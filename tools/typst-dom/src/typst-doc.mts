@@ -8,9 +8,12 @@ export interface ContainerDOMState {
   height: number;
   /// cached `hookedElem.getBoundingClientRect()`
   /// We only use `left` and `top` here.
-  boundingRect: { left: number; top: number };
+  boundingRect: {
+    left: number;
+    top: number;
+  };
   /// cached `hookedElem.firstElement.getBoundingClientRect()`
-  scrollPosition?: { left: number; top: number; width: number; height: number };
+  scrollPosition?: DOMRect;
 }
 
 export type RenderMode = "svg" | "canvas";
@@ -127,7 +130,14 @@ export class TypstDocumentContext<O = any> {
   /// Cache fields
 
   /// cached state of container, default to retrieve state from `this.hookedElem`
-  cachedDOMState: ContainerDOMState = { width: 0, height: 0, boundingRect: { left: 0, top: 0 } };
+  cachedDOMState: ContainerDOMState = {
+    width: 0,
+    height: 0,
+    boundingRect: {
+      left: 0,
+      top: 0,
+    },
+  };
 
   constructor(opts: Options & O) {
     this.windowElem = opts.windowElem;
@@ -331,12 +341,16 @@ export class TypstDocumentContext<O = any> {
 
     const vscodeAPI = typeof acquireVsCodeApi !== "undefined";
     if (vscodeAPI) {
-      window.addEventListener("wheel", wheelEventHandler, { passive: false });
+      window.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
       this.disposeList.push(() => {
         window.removeEventListener("wheel", wheelEventHandler);
       });
     } else {
-      document.body.addEventListener("wheel", wheelEventHandler, { passive: false });
+      document.body.addEventListener("wheel", wheelEventHandler, {
+        passive: false,
+      });
       document.body.addEventListener("keydown", keydownEventHandler);
       this.disposeList.push(() => {
         document.body.removeEventListener("wheel", wheelEventHandler);
