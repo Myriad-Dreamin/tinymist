@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ezsockets::ClientConfig;
-use vello::kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke};
-use vello::peniko::Color;
+use reflexo::vector::incr::IncrDocClient;
+use reflexo::vector::stream::BytesModuleStream;
 use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
@@ -16,8 +16,10 @@ use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::window::Window;
+
+use tinymist_render_vello::incr::IncrVelloDocClient;
 
 #[derive(Debug)]
 enum RenderState {
@@ -50,7 +52,7 @@ struct SimpleVelloApp {
     scene: Scene,
 }
 
-impl ApplicationHandler for SimpleVelloApp {
+impl ApplicationHandler<RenderRequest> for SimpleVelloApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let RenderState::Suspended(cached_window) = &mut self.state else {
             return;
@@ -89,6 +91,15 @@ impl ApplicationHandler for SimpleVelloApp {
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         if let RenderState::Active { window, .. } = &self.state {
             self.state = RenderState::Suspended(Some(window.clone()));
+        }
+    }
+
+    fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: RenderRequest) {
+        match event {
+            RenderRequest::New(scene) => {
+                self.scene = scene;
+                self.render();
+            }
         }
     }
 
@@ -144,14 +155,6 @@ impl SimpleVelloApp {
             return;
         };
 
-        // Empty the scene of objects to draw. You could create a new Scene each time,
-        // but in this case the same Scene is reused so that the
-        // underlying memory allocation can also be reused.
-        self.scene.reset();
-
-        // Re-add the objects to draw to the scene.
-        add_shapes_to_scene(&mut self.scene);
-
         // Get the window size
         let width = surface.config.width;
         let height = surface.config.height;
@@ -169,7 +172,7 @@ impl SimpleVelloApp {
                 &self.scene,
                 &surface.target_view,
                 &vello::RenderParams {
-                    base_color: palette::css::BLACK, // Background color
+                    base_color: palette::css::WHITE, // Background color
                     width,
                     height,
                     antialiasing_method: AaConfig::Msaa16,
@@ -207,7 +210,10 @@ impl SimpleVelloApp {
 }
 
 struct Client {
+    proxy: EventLoopProxy<RenderRequest>,
     client: ezsockets::Client<Self>,
+    doc: IncrDocClient,
+    vello: IncrVelloDocClient,
 }
 
 #[async_trait::async_trait]
@@ -220,7 +226,30 @@ impl ezsockets::ClientExt for Client {
     }
 
     async fn on_binary(&mut self, bytes: ezsockets::Bytes) -> Result<(), ezsockets::Error> {
-        log::info!("received bytes: {bytes:?}");
+        const DIFF_V1_PREFIX: &[u8] = b"diff-v1,";
+
+        if bytes.starts_with(DIFF_V1_PREFIX) {
+            let diff = bytes.slice(DIFF_V1_PREFIX.len()..);
+
+            // todo: cloned on unaligned data.
+            let delta = BytesModuleStream::from_slice(&diff).checkout_owned();
+
+            self.doc.merge_delta(delta);
+
+            let scene = match self.vello.render_pages(&mut self.doc) {
+                Ok(scene) => scene,
+                Err(err) => {
+                    log::error!("Error rendering pages: {err}");
+                    return Ok(());
+                }
+            };
+
+            let _ = self.proxy.send_event(RenderRequest::New(scene));
+        } else {
+            log::info!("received bytes: {bytes:?}");
+        }
+
+        let _ = self.proxy;
         Ok(())
     }
 
@@ -250,19 +279,6 @@ fn main() -> Result<()> {
         .build()
         .unwrap();
 
-    tokio_runtime.spawn(async move {
-        let config =
-            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
-        let (_handle, future) = ezsockets::connect(|client| Client { client }, config).await;
-
-        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
-
-        let res = future.await;
-        if let Err(err) = res {
-            log::error!("Error connecting to websocket: {err}");
-        }
-    });
-
     // Sets up a bunch of state:
     let mut app = SimpleVelloApp {
         context: RenderContext::new(),
@@ -272,12 +288,43 @@ fn main() -> Result<()> {
     };
 
     // Creates and run a winit event loop
-    let event_loop = EventLoop::new()?;
+    let event_loop = EventLoop::<RenderRequest>::with_user_event().build()?;
+
+    let proxy = event_loop.create_proxy();
+
+    tokio_runtime.spawn(async move {
+        let config =
+            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
+        let (_handle, future) = ezsockets::connect(
+            |client| Client {
+                proxy,
+                client,
+                doc: IncrDocClient::default(),
+                vello: IncrVelloDocClient::default(),
+            },
+            config,
+        )
+        .await;
+
+        log::info!("from_secs");
+        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+        log::info!("from_secs end");
+
+        let res = future.await;
+        if let Err(err) = res {
+            log::error!("Error connecting to websocket: {err}");
+        }
+    });
+
     event_loop
         .run_app(&mut app)
         .context("Couldn't run event loop")?;
 
     Ok(())
+}
+
+enum RenderRequest {
+    New(vello::Scene),
 }
 
 /// Helper function that creates a Winit window and returns it (wrapped in an
@@ -298,42 +345,4 @@ fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>)
         RendererOptions::default(),
     )
     .expect("Couldn't create renderer")
-}
-
-/// Add shapes to a vello scene. This does not actually render the shapes, but
-/// adds them to the Scene data structure which represents a set of objects to
-/// draw.
-fn add_shapes_to_scene(scene: &mut Scene) {
-    // Draw an outlined rectangle
-    let stroke = Stroke::new(6.0);
-    let rect = RoundedRect::new(10.0, 10.0, 240.0, 240.0, 20.0);
-    let rect_stroke_color = Color::new([0.9804, 0.702, 0.5294, 1.]);
-    scene.stroke(&stroke, Affine::IDENTITY, rect_stroke_color, None, &rect);
-
-    // Draw a filled circle
-    let circle = Circle::new((420.0, 200.0), 120.0);
-    let circle_fill_color = Color::new([0.9529, 0.5451, 0.6588, 1.]);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        circle_fill_color,
-        None,
-        &circle,
-    );
-
-    // Draw a filled ellipse
-    let ellipse = Ellipse::new((250.0, 420.0), (100.0, 160.0), -90.0);
-    let ellipse_fill_color = Color::new([0.7961, 0.651, 0.9686, 1.]);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        ellipse_fill_color,
-        None,
-        &ellipse,
-    );
-
-    // Draw a straight line
-    let line = Line::new((260.0, 20.0), (620.0, 100.0));
-    let line_stroke_color = Color::new([0.5373, 0.7059, 0.9804, 1.]);
-    scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
 }

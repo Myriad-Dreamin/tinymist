@@ -27,6 +27,7 @@ serde.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
 typst-library.workspace = true
+reflexo.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
 tinymist-preview.workspace = true
@@ -38,6 +39,8 @@ vello_svg = "0.8.0"
 winit = "0.30.12"
 smallvec = "1"
 ezsockets = "0.7.1"
+svgtypes = "0.15.2"
+ecow.workspace = true
 async-trait.workspace = true
 ttf-parser.workspace = true
 

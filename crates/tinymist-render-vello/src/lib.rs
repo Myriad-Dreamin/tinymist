@@ -6,19 +6,76 @@
 
 use std::collections::HashMap;
 
+use ecow::EcoVec;
 use image::{ImageScene, render_image};
+use reflexo::hash::Fingerprint;
 use shape::{ShapeScene, convert_curve, render_shape};
 use smallvec::SmallVec;
+use std::sync::Arc;
 use text::{TextScene, render_text};
 use typst_library::foundations::Label;
 use typst_library::layout::{Frame, FrameItem, FrameKind, GroupItem, Point, Size, Transform};
 use utils::convert_transform;
-use vello::kurbo;
+use vello::kurbo::{self, Affine};
+use vello::peniko;
 
 pub mod image;
+pub mod incr;
+mod render;
 pub mod shape;
 pub mod text;
 pub mod utils;
+
+#[derive(Debug, Clone)]
+pub struct VecPage {
+    size: kurbo::Vec2,
+    elem: Arc<VecScene>,
+    content_hash: Fingerprint,
+}
+
+#[derive(Debug, Clone)]
+pub enum VecScene {
+    Group(GroupScene),
+    Path(kurbo::BezPath),
+}
+
+impl VecScene {
+    pub fn render(&self, scene: &mut vello::Scene) {
+        match self {
+            VecScene::Group(group) => group.render(scene),
+            VecScene::Path(path) => {
+                scene.fill(
+                    peniko::Fill::NonZero,
+                    Affine::IDENTITY,
+                    &peniko::Brush::Solid(peniko::Color::BLACK),
+                    None,
+                    path,
+                );
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupScene {
+    ts: Affine,
+    scenes: EcoVec<(kurbo::Vec2, Arc<VecScene>)>,
+}
+
+impl GroupScene {
+    pub fn render(&self, scene: &mut vello::Scene) {
+        let ts = self.ts;
+        for (pos, elem) in self.scenes.iter() {
+            let ts = ts.pre_translate(*pos);
+            let mut sub_scene = vello::Scene::new();
+            elem.render(&mut sub_scene);
+            scene.append(&sub_scene, Some(ts));
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VecGroupScene {}
 
 /// Every group is layouted in a flat list.
 /// Each group will have a parent index associated with it.
