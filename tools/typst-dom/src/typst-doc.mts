@@ -419,10 +419,8 @@ export class TypstDocumentContext<O = any> {
 
     this.isRendering = true;
     const doUpdate = async () => {
-      const lastWidth = this.cachedDOMState.width;
+      const lastScrollPosition = this.cachedDOMState.scrollPosition;
       this.cachedDOMState = this.retrieveDOMState();
-      const currentWidth = this.cachedDOMState.width;
-      const scrollPosition = this.cachedDOMState.scrollPosition;
 
       if (this.patchQueue.length === 0) {
         this.isRendering = false;
@@ -445,16 +443,13 @@ export class TypstDocumentContext<O = any> {
           this.r.rescale();
           await this.r.rerender();
           this.r.rescale();
-
           /// Adjusts scroll position to keep visual position in "doc" mode.
-          if (
-            scrollPosition &&
-            this.previewMode === PreviewMode.Doc &&
-            lastWidth > 0 &&
-            lastWidth !== currentWidth
-          ) {
-            this.keepScrollPosition(scrollPosition);
-          }
+          /// Using `requestAnimationFrame` ensures the scroll adjustment happens after DOM updates.
+          requestAnimationFrame(() => {
+            if (lastScrollPosition && this.previewMode === PreviewMode.Doc) {
+              this.keepScrollPosition(lastScrollPosition);
+            }
+          });
         }
 
         let t2 = performance.now();
@@ -532,26 +527,19 @@ export class TypstDocumentContext<O = any> {
     return this.partialRenderPage + 1;
   }
 
-  _scrollAdjustTimeout: any = undefined;
-  _scrollAdjustLeftRatio: number = 0;
-  _scrollAdjustTopRatio: number = 0;
+  _scrollAdjustTimeout: ReturnType<typeof setTimeout> | undefined;
+  _lastScrollPosition: DOMRect | undefined;
   /// Adjusts scroll position with a debounce time.
-  private keepScrollPosition(scrollPosition: {
-    left: number;
-    top: number;
-    width: number;
-    height: number;
-  }) {
+  private keepScrollPosition(scrollPosition: DOMRect) {
     /// The debounce time for `scrollAdjust` task.
     /// todo: better interval.
     const KEEP_SCROLL_DEBOUNCE_TIME_MS = 300;
 
     /// If a `scrollAdjust` task is already scheduled, we register again to debounce
     /// the scroll adjustment.
-    /// Otherwise, we record an initial ratio to adjust later.
+    /// Otherwise, we record the initial position to adjust later.
     if (!this._scrollAdjustTimeout) {
-      this._scrollAdjustLeftRatio = scrollPosition.left / scrollPosition.width;
-      this._scrollAdjustTopRatio = scrollPosition.top / scrollPosition.height;
+      this._lastScrollPosition = scrollPosition;
     } else {
       clearTimeout(this._scrollAdjustTimeout);
     }
@@ -560,11 +548,13 @@ export class TypstDocumentContext<O = any> {
       this._scrollAdjustTimeout = undefined;
       const domState = this.retrieveDOMState();
       const newBBox = domState.scrollPosition;
-      if (!newBBox) {
+      if (!(newBBox && this._lastScrollPosition && newBBox.width !== this._lastScrollPosition.width)) {
         return;
       }
-      const expectedLeft = newBBox.width * this._scrollAdjustLeftRatio;
-      const expectedTop = newBBox.height * this._scrollAdjustTopRatio;
+      const scrollAdjustLeftRatio = this._lastScrollPosition.left / this._lastScrollPosition.width;
+      const scrollAdjustTopRatio = this._lastScrollPosition.top / this._lastScrollPosition.height;
+      const expectedLeft = newBBox.width * scrollAdjustLeftRatio;
+      const expectedTop = newBBox.height * scrollAdjustTopRatio;
 
       const adjustedDiffLeft = newBBox.left - expectedLeft;
       const adjustedDiffTop = newBBox.top - expectedTop;
