@@ -1,6 +1,6 @@
 [package]
-name = "tinymist-preview-vello"
-description = "A previewer for the Typst typesetting system using Vello."
+name = "tinymist-render-vello"
+description = "A renderer for the Typst typesetting system using Vello."
 categories = ["compilers"]
 keywords = ["api", "language", "typst"]
 version.workspace = true
@@ -26,13 +26,20 @@ serde_json.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
+typst-library.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
 tinymist-preview.workspace = true
 anyhow.workspace = true
 pollster = "0.4.0"
-vello = { version = "0.7.0" }
+vello = "0.6.0"
+hayro = "0.4"
+vello_svg = "0.8.0"
 winit = "0.30.12"
+smallvec = "1"
+ezsockets = "0.7.1"
+async-trait.workspace = true
+ttf-parser.workspace = true
 
 clap = { workspace = true, optional = true }
 
@@ -44,5 +51,5 @@ default = ["no-content-hint"]
 # This requires modifying typst.
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
-[lints]
-workspace = true
+# [lints]
+# workspace = true

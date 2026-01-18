@@ -3,20 +3,21 @@
 
 //! Simple example.
 
-use anyhow::Result;
 use std::sync::Arc;
+
+use anyhow::{Context, Result};
+use ezsockets::ClientConfig;
 use vello::kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke};
 use vello::peniko::Color;
 use vello::peniko::color::palette;
 use vello::util::{RenderContext, RenderSurface};
+use vello::wgpu;
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::window::Window;
-
-use vello::wgpu;
 
 #[derive(Debug)]
 enum RenderState {
@@ -128,73 +129,141 @@ impl ApplicationHandler for SimpleVelloApp {
                     return;
                 }
 
-                // Empty the scene of objects to draw. You could create a new Scene each time,
-                // but in this case the same Scene is reused so that the
-                // underlying memory allocation can also be reused.
-                self.scene.reset();
-
-                // Re-add the objects to draw to the scene.
-                add_shapes_to_scene(&mut self.scene);
-
-                // Get the window size
-                let width = surface.config.width;
-                let height = surface.config.height;
-
-                // Get a handle to the device
-                let device_handle = &self.context.devices[surface.dev_id];
-
-                // Render to a texture, which we will later copy into the surface
-                self.renderers[surface.dev_id]
-                    .as_mut()
-                    .unwrap()
-                    .render_to_texture(
-                        &device_handle.device,
-                        &device_handle.queue,
-                        &self.scene,
-                        &surface.target_view,
-                        &vello::RenderParams {
-                            base_color: palette::css::BLACK, // Background color
-                            width,
-                            height,
-                            antialiasing_method: AaConfig::Msaa16,
-                        },
-                    )
-                    .expect("failed to render to surface");
-
-                // Get the surface's texture
-                let surface_texture = surface
-                    .surface
-                    .get_current_texture()
-                    .expect("failed to get surface texture");
-
-                // Perform the copy
-                let mut encoder =
-                    device_handle
-                        .device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("Surface Blit"),
-                        });
-                surface.blitter.copy(
-                    &device_handle.device,
-                    &mut encoder,
-                    &surface.target_view,
-                    &surface_texture
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default()),
-                );
-                device_handle.queue.submit([encoder.finish()]);
-                // Queue the texture to be presented on the surface
-                surface_texture.present();
-
-                device_handle.device.poll(wgpu::PollType::Poll).unwrap();
+                self.render();
             }
             _ => {}
         }
     }
 }
 
+impl SimpleVelloApp {
+    /// Renders the scene to the surface.
+    fn render(&mut self) {
+        // Only process events for our window, and only when we have a surface.
+        let RenderState::Active { surface, .. } = &mut self.state else {
+            return;
+        };
+
+        // Empty the scene of objects to draw. You could create a new Scene each time,
+        // but in this case the same Scene is reused so that the
+        // underlying memory allocation can also be reused.
+        self.scene.reset();
+
+        // Re-add the objects to draw to the scene.
+        add_shapes_to_scene(&mut self.scene);
+
+        // Get the window size
+        let width = surface.config.width;
+        let height = surface.config.height;
+
+        // Get a handle to the device
+        let device_handle = &self.context.devices[surface.dev_id];
+
+        // Render to a texture, which we will later copy into the surface
+        self.renderers[surface.dev_id]
+            .as_mut()
+            .unwrap()
+            .render_to_texture(
+                &device_handle.device,
+                &device_handle.queue,
+                &self.scene,
+                &surface.target_view,
+                &vello::RenderParams {
+                    base_color: palette::css::BLACK, // Background color
+                    width,
+                    height,
+                    antialiasing_method: AaConfig::Msaa16,
+                },
+            )
+            .expect("failed to render to surface");
+
+        // Get the surface's texture
+        let surface_texture = surface
+            .surface
+            .get_current_texture()
+            .expect("failed to get surface texture");
+
+        // Perform the copy
+        let mut encoder =
+            device_handle
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Surface Blit"),
+                });
+        surface.blitter.copy(
+            &device_handle.device,
+            &mut encoder,
+            &surface.target_view,
+            &surface_texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default()),
+        );
+        device_handle.queue.submit([encoder.finish()]);
+        // Queue the texture to be presented on the surface
+        surface_texture.present();
+
+        device_handle.device.poll(wgpu::PollType::Poll).unwrap();
+    }
+}
+
+struct Client {
+    client: ezsockets::Client<Self>,
+}
+
+#[async_trait::async_trait]
+impl ezsockets::ClientExt for Client {
+    type Call = ();
+
+    async fn on_text(&mut self, text: ezsockets::Utf8Bytes) -> Result<(), ezsockets::Error> {
+        log::info!("received message: {text}");
+        Ok(())
+    }
+
+    async fn on_binary(&mut self, bytes: ezsockets::Bytes) -> Result<(), ezsockets::Error> {
+        log::info!("received bytes: {bytes:?}");
+        Ok(())
+    }
+
+    async fn on_connect(&mut self) -> Result<(), ezsockets::Error> {
+        log::info!("connected to websocket");
+
+        let res = self.client.text("current");
+        if let Err(err) = res {
+            log::error!("Error sending message to websocket: {err}");
+        }
+        Ok(())
+    }
+
+    async fn on_call(&mut self, call: Self::Call) -> Result<(), ezsockets::Error> {
+        let () = call;
+        Ok(())
+    }
+}
+
 fn main() -> Result<()> {
-    // Setup a bunch of state:
+    env_logger::builder()
+        .filter_module("tinymist", log::LevelFilter::Info)
+        .try_init()?;
+
+    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    tokio_runtime.spawn(async move {
+        let config =
+            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
+        let (_handle, future) = ezsockets::connect(|client| Client { client }, config).await;
+
+        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+
+        let res = future.await;
+        if let Err(err) = res {
+            log::error!("Error connecting to websocket: {err}");
+        }
+    });
+
+    // Sets up a bunch of state:
     let mut app = SimpleVelloApp {
         context: RenderContext::new(),
         renderers: vec![],
@@ -202,11 +271,12 @@ fn main() -> Result<()> {
         scene: Scene::new(),
     };
 
-    // Create and run a winit event loop
+    // Creates and run a winit event loop
     let event_loop = EventLoop::new()?;
     event_loop
         .run_app(&mut app)
-        .expect("Couldn't run event loop");
+        .context("Couldn't run event loop")?;
+
     Ok(())
 }
 
@@ -216,7 +286,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
         .with_inner_size(LogicalSize::new(1044, 800))
         .with_resizable(true)
-        .with_title("Vello Shapes");
+        .with_title("Tinymist Preview");
     Arc::new(event_loop.create_window(attr).unwrap())
 }
 
