@@ -1,7 +1,4 @@
-// Copyright 2024 the Vello Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
-//! Simple example.
+//! Connects to tinymist language server and renders the document to a vello
 
 use std::sync::Arc;
 
@@ -20,6 +17,59 @@ use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::window::Window;
 
 use tinymist_render_vello::incr::IncrVelloDocClient;
+
+fn main() -> Result<()> {
+    env_logger::builder()
+        .filter_module("tinymist", log::LevelFilter::Info)
+        .try_init()?;
+
+    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    // Sets up a bunch of state:
+    let mut app = SimpleVelloApp {
+        context: RenderContext::new(),
+        renderers: vec![],
+        state: RenderState::Suspended(None),
+        scene: Scene::new(),
+    };
+
+    // Creates and run a winit event loop
+    let event_loop = EventLoop::<RenderRequest>::with_user_event().build()?;
+
+    let proxy = event_loop.create_proxy();
+
+    tokio_runtime.spawn(async move {
+        let config =
+            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
+        let (_handle, future) = ezsockets::connect(
+            |client| Client {
+                proxy,
+                client,
+                doc: IncrDocClient::default(),
+                vello: IncrVelloDocClient::default(),
+            },
+            config,
+        )
+        .await;
+
+        // todo: the client is down if we don't sleep for a while.
+        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+
+        let res = future.await;
+        if let Err(err) = res {
+            log::error!("Error connecting to websocket: {err}");
+        }
+    });
+
+    event_loop
+        .run_app(&mut app)
+        .context("Couldn't run event loop")?;
+
+    Ok(())
+}
 
 #[derive(Debug)]
 enum RenderState {
@@ -267,60 +317,6 @@ impl ezsockets::ClientExt for Client {
         let () = call;
         Ok(())
     }
-}
-
-fn main() -> Result<()> {
-    env_logger::builder()
-        .filter_module("tinymist", log::LevelFilter::Info)
-        .try_init()?;
-
-    let tokio_runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    // Sets up a bunch of state:
-    let mut app = SimpleVelloApp {
-        context: RenderContext::new(),
-        renderers: vec![],
-        state: RenderState::Suspended(None),
-        scene: Scene::new(),
-    };
-
-    // Creates and run a winit event loop
-    let event_loop = EventLoop::<RenderRequest>::with_user_event().build()?;
-
-    let proxy = event_loop.create_proxy();
-
-    tokio_runtime.spawn(async move {
-        let config =
-            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
-        let (_handle, future) = ezsockets::connect(
-            |client| Client {
-                proxy,
-                client,
-                doc: IncrDocClient::default(),
-                vello: IncrVelloDocClient::default(),
-            },
-            config,
-        )
-        .await;
-
-        log::info!("from_secs");
-        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
-        log::info!("from_secs end");
-
-        let res = future.await;
-        if let Err(err) = res {
-            log::error!("Error connecting to websocket: {err}");
-        }
-    });
-
-    event_loop
-        .run_app(&mut app)
-        .context("Couldn't run event loop")?;
-
-    Ok(())
 }
 
 enum RenderRequest {
