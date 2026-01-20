@@ -212,7 +212,7 @@ impl LinkStrWorker {
             return Some(());
         }
 
-        let id = node.span().id()?;
+        let id = node.span().id()?.join(&content);
         self.info.objects.push(LinkObject {
             range,
             span: s.span(),
