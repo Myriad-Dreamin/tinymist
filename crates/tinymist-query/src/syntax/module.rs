@@ -41,14 +41,14 @@ pub fn construct_module_dependencies(
         let file_id = source.id();
         let ei = ctx.shared.expr_stage(&source);
 
-        let mut deps: FxHashSet<TypstFileId> = ei.imports.keys().cloned().collect();
-        for r in ei.resolves.values() {
+        let mut deps: FxHashSet<TypstFileId> = ei.imports.keys().copied().collect();
+        deps.extend(ei.resolves.values().filter_map(|r| {
             if matches!(r.decl.as_ref(), Decl::IncludePath(..)) {
-                if let Some(dep) = r.root.as_ref().and_then(|expr| expr.file_id()) {
-                    deps.insert(dep);
-                }
+                r.root.as_ref().and_then(|expr| expr.file_id())
+            } else {
+                None
             }
-        }
+        }));
 
         dependencies
             .entry(file_id)
