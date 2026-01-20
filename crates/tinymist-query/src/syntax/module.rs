@@ -1,6 +1,7 @@
 use std::sync::Once;
 
 use regex::RegexSet;
+use rustc_hash::FxHashSet;
 
 use crate::prelude::*;
 
@@ -40,13 +41,22 @@ pub fn construct_module_dependencies(
         let file_id = source.id();
         let ei = ctx.shared.expr_stage(&source);
 
+        let mut deps: FxHashSet<TypstFileId> = ei.imports.keys().cloned().collect();
+        for r in ei.resolves.values() {
+            if matches!(r.decl.as_ref(), Decl::IncludePath(..)) {
+                if let Some(dep) = r.root.as_ref().and_then(|expr| expr.file_id()) {
+                    deps.insert(dep);
+                }
+            }
+        }
+
         dependencies
             .entry(file_id)
             .or_insert_with(|| ModuleDependency {
-                dependencies: ei.imports.keys().cloned().collect(),
+                dependencies: deps.iter().copied().collect(),
                 dependents: EcoVec::default(),
             });
-        for (dep, _) in ei.imports.clone() {
+        for dep in deps {
             dependents
                 .entry(dep)
                 .or_insert_with(EcoVec::new)
