@@ -12,16 +12,16 @@ use super::prelude::*;
 #[comemo::memoize]
 pub fn get_link_exprs(src: &Source) -> Arc<LinkInfo> {
     let root = LinkedNode::new(src.root());
-    Arc::new(get_link_exprs_in(&root).unwrap_or_default())
+    Arc::new(get_link_exprs_in(&root))
 }
 
 /// Get link expressions in a source node.
-pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
+pub fn get_link_exprs_in(node: &LinkedNode) -> LinkInfo {
     let mut worker = LinkStrWorker {
         info: LinkInfo::default(),
     };
-    worker.collect_links(node)?;
-    Some(worker.info)
+    worker.collect_links(node);
+    worker.info
 }
 
 /// Link information in a source file.
@@ -74,30 +74,28 @@ struct LinkStrWorker {
 }
 
 impl LinkStrWorker {
-    fn collect_links(&mut self, node: &LinkedNode) -> Option<()> {
+    fn collect_links(&mut self, node: &LinkedNode) {
         match node.kind() {
             // SyntaxKind::Link => { }
             SyntaxKind::FuncCall => {
                 let fc = self.analyze_call(node);
                 if fc.is_some() {
-                    return Some(());
+                    return;
                 }
             }
             SyntaxKind::ModuleInclude => {
-                let inc = node.cast::<ast::ModuleInclude>()?;
+                let inc = node.cast::<ast::ModuleInclude>().expect("checked cast");
                 let path = inc.source();
                 self.analyze_path_expr(node, path);
             }
             // early exit
-            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return Some(()),
+            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return,
             _ => {}
         };
 
         for child in node.children() {
             self.collect_links(&child);
         }
-
-        Some(())
     }
 
     fn analyze_call(&mut self, node: &LinkedNode) -> Option<()> {
