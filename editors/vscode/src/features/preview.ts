@@ -58,6 +58,30 @@ type PreviewFileCommandOpts = {
   isNotPrimary?: boolean;
 };
 
+async function launchPreviewWithCompat(
+  task: LaunchInBrowserTask | LaunchInWebViewTask,
+  isCompat: boolean,
+) {
+  // compat mode requires a TextEditor
+  if (!isCompat) {
+    return launchImpl(task);
+  }
+
+  const editor =
+    task.editor ??
+    (await vscode.window.showTextDocument(
+      task.bindDocument,
+      getSensibleTextEditorColumn(),
+      true,
+    ));
+
+  return launchImpl({
+    ...task,
+    editor,
+    bindDocument: editor.document,
+  });
+}
+
 async function previewFileCommand(
   context: vscode.ExtensionContext,
   isCompat: boolean,
@@ -124,36 +148,18 @@ async function previewFileCommand(
       return;
     }
 
-    // compat mode requires a TextEditor
-    if (isCompat) {
-      const editor = await vscode.window.showTextDocument(
-        doc,
-        getSensibleTextEditorColumn(),
-        true,
-      );
-
-      await launchImpl({
+    await launchPreviewWithCompat(
+      {
         kind,
         context,
-        editor,
-        bindDocument: editor.document,
+        bindDocument: doc,
         mode,
         isBrowsing,
         isDev,
         isNotPrimary,
-      });
-      return;
-    }
-
-    await launchImpl({
-      kind,
-      context,
-      bindDocument: doc,
-      mode,
-      isBrowsing,
-      isDev,
-      isNotPrimary,
-    });
+      },
+      isCompat,
+    );
   } catch (e) {
     vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
   }
@@ -317,37 +323,18 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
 
-    // compat mode requires a TextEditor
-    if (isCompat) {
-      const editor = await vscode.window.showTextDocument(
-        doc,
-        getSensibleTextEditorColumn(),
-        true,
-      );
-      const bindDocument = editor.document;
-
-      await launchImpl({
+    await launchPreviewWithCompat(
+      {
         kind,
         context,
-        editor,
-        bindDocument,
+        bindDocument: doc,
         mode,
         isBrowsing,
         isDev,
         isNotPrimary,
-      });
-      return;
-    }
-
-    await launchPreviewLsp({
-      kind,
-      context,
-      bindDocument: doc,
-      mode,
-      isBrowsing,
-      isDev,
-      isNotPrimary,
-    });
+      },
+      isCompat,
+    );
   }
 
   /**
@@ -1042,38 +1029,18 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPre
     const isBrowsing = state.isBrowsing;
     const isDev = state.isDev;
 
-    // compat mode requires a TextEditor
-    if (launchImpl === launchPreviewCompat) {
-      const editor = await vscode.window.showTextDocument(
-        doc,
-        getSensibleTextEditorColumn(),
-        true,
-      );
-      const bindDocument = editor.document;
-
-      await launchImpl({
+    await launchPreviewWithCompat(
+      {
         kind: "webview",
         context: this.context,
-        editor,
-        bindDocument,
+        bindDocument: doc,
         mode,
         webviewPanel,
         isBrowsing,
         isDev,
         isNotPrimary,
-      });
-      return;
-    }
-
-    await launchPreviewLsp({
-      kind: "webview",
-      context: this.context,
-      bindDocument: doc,
-      mode,
-      webviewPanel,
-      isBrowsing,
-      isDev,
-      isNotPrimary,
-    });
+      },
+      launchImpl === launchPreviewCompat,
+    );
   }
 }
