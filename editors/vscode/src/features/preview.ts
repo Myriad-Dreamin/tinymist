@@ -50,6 +50,93 @@ export function previewPreload(context: vscode.ExtensionContext) {
   getPreviewHtml(context);
 }
 
+type PreviewFileCommandOpts = {
+  kind?: "webview" | "browser";
+  mode?: "doc" | "slide";
+  isBrowsing?: boolean;
+  isDev?: boolean;
+  isNotPrimary?: boolean;
+};
+
+async function previewFileCommand(
+  context: vscode.ExtensionContext,
+  uriLike?: vscode.Uri | string,
+  opts?: PreviewFileCommandOpts,
+) {
+  try {
+    const resolveUri = async (): Promise<vscode.Uri | undefined> => {
+      if (!uriLike) {
+        const workspaceFolderCount = vscode.workspace.workspaceFolders?.length ?? 0;
+        if (workspaceFolderCount === 0) {
+          vscode.window.showWarningMessage("No workspace folder is open");
+          return;
+        }
+
+        const files = await vscode.workspace.findFiles(
+          "**/*.typ",
+          "{**/node_modules/**,**/target/**,**/.git/**,**/.vscode/**,**/dist/**,**/out/**}",
+          500,
+        );
+        if (files.length === 0) {
+          vscode.window.showWarningMessage("No Typst files found in the workspace");
+          return;
+        }
+
+        const items = files.map((u) => {
+          const rel = vscode.workspace.asRelativePath(u, true);
+          return {
+            label: rel,
+            description: u.fsPath,
+            uri: u,
+          };
+        });
+        const picked = await vscode.window.showQuickPick(items, {
+          title: "Preview Typst File",
+          placeHolder: "Select a .typ file to preview",
+          matchOnDescription: true,
+        });
+        return picked?.uri;
+      }
+
+      if (typeof uriLike === "string") {
+        return uriLike.includes("://") ? vscode.Uri.parse(uriLike) : vscode.Uri.file(uriLike);
+      }
+      return uriLike;
+    };
+
+    const uri = await resolveUri();
+    if (!uri) {
+      return;
+    }
+
+    const kind = opts?.kind ?? "webview";
+    const mode = opts?.mode ?? "doc";
+    const isBrowsing = opts?.isBrowsing ?? false;
+    const isDev = opts?.isDev ?? false;
+    const isNotPrimary = opts?.isNotPrimary ?? false;
+
+    const doc =
+      vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString()) ||
+      (await vscode.workspace.openTextDocument(uri));
+    if (doc.languageId !== "typst") {
+      vscode.window.showWarningMessage("The specified file is not a Typst document");
+      return;
+    }
+
+    await launchPreviewLsp({
+      kind,
+      context,
+      bindDocument: doc,
+      mode,
+      isBrowsing,
+      isDev,
+      isNotPrimary,
+    });
+  } catch (e) {
+    vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
+  }
+}
+
 /**
  * Activate the typst preview feature. This is the "the main entry" of the preview feature.
  *
@@ -104,6 +191,11 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
+    vscode.commands.registerCommand(
+      "typst-preview.previewFile",
+      (uriLike?: vscode.Uri | string, opts?: PreviewFileCommandOpts) =>
+        previewFileCommand(context, uriLike, opts),
+    ),
     vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview("doc")),
     vscode.commands.registerCommand("tinymist.previewDevSlide", launchDevPreview("slide")),
     ...(isCompat
@@ -199,18 +291,36 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       vscode.workspace.textDocuments.find((doc) => {
         return doc.uri.toString() === uri.toString();
       }) || (await vscode.workspace.openTextDocument(uri));
-    const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-
-    const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
 
-    await launchImpl({
+    // compat mode requires a TextEditor
+    if (isCompat) {
+      const editor = await vscode.window.showTextDocument(
+        doc,
+        getSensibleTextEditorColumn(),
+        true,
+      );
+      const bindDocument = editor.document;
+
+      await launchImpl({
+        kind,
+        context,
+        editor,
+        bindDocument,
+        mode,
+        isBrowsing,
+        isDev,
+        isNotPrimary,
+      });
+      return;
+    }
+
+    await launchPreviewLsp({
       kind,
       context,
-      editor,
-      bindDocument,
+      bindDocument: doc,
       mode,
       isBrowsing,
       isDev,
@@ -267,11 +377,20 @@ interface OpenPreviewInWebViewArgs {
   /**
    * The preview task arguments.
    */
-  task: LaunchInWebViewTask;
+  task: {
+    mode: "doc" | "slide";
+    isNotPrimary?: boolean;
+    isBrowsing?: boolean;
+    isDev?: boolean;
+  };
   /**
-   * The active editor owning *typst language document*.
+   * The previewing document.
    */
-  activeEditor: vscode.TextEditor;
+  document: vscode.TextDocument;
+  /**
+   * The view column of the source editor (if any).
+   */
+  viewColumn?: vscode.ViewColumn;
   /**
    * The port number of the data plane server.
    *
@@ -297,12 +416,13 @@ interface OpenPreviewInWebViewArgs {
 export async function openPreviewInWebView({
   context,
   task,
-  activeEditor,
+  document,
+  viewColumn,
   dataPlanePort,
   webviewPanel,
   panelDispose,
 }: OpenPreviewInWebViewArgs) {
-  const basename = path.basename(activeEditor.document.fileName);
+  const basename = path.basename(document.fileName);
   const fontendPath = path.resolve(context.extensionPath, "out/frontend");
   // Create and show a new WebView
   const panel =
@@ -311,7 +431,7 @@ export async function openPreviewInWebView({
       : vscode.window.createWebviewPanel(
           "typst-preview",
           `${basename}${l10nMsg(" (Preview)")}`,
-          getTargetViewColumn(activeEditor.viewColumn),
+          getTargetViewColumn(viewColumn),
           {
             enableScripts: true,
             retainContextWhenHidden: true,
@@ -323,7 +443,7 @@ export async function openPreviewInWebView({
     isNotPrimary: !!task.isNotPrimary,
     isBrowsing: !!task.isBrowsing,
     isDev: !!task.isDev,
-    uri: activeEditor.document.uri.toString(),
+    uri: document.uri.toString(),
   };
 
   const updateActivePanel = () => {
@@ -429,7 +549,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       panel = await openPreviewInWebView({
         context,
         task,
-        activeEditor: editor,
+        document: bindDocument,
+        viewColumn: editor?.viewColumn ?? getSensibleTextEditorColumn(),
         dataPlanePort,
         webviewPanel,
         async panelDispose() {
@@ -484,11 +605,13 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       `Launched preview, browsing:${isBrowsing}, data plane port:${dataPlanePort}, static server port:${staticServerPort}`,
     );
 
-    if (enableCursor) {
+    // editor required feature for cursor indicator
+    if (editor && enableCursor) {
       reportPosition(editor, "changeCursorPosition");
     }
-
-    if (scrollSyncMode !== ScrollSyncModeEnum.never) {
+    
+    // editor required feature for scroll sync
+    if (editor && scrollSyncMode !== ScrollSyncModeEnum.never) {
       const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
         const editor = e.textEditor;
         const kind = e.kind;
@@ -892,19 +1015,38 @@ class TypstPreviewSerializer implements vscode.WebviewPanelSerializer<PersistPre
       vscode.workspace.textDocuments.find((doc) => {
         return doc.uri.toString() === uriStr;
       }) || (await vscode.workspace.openTextDocument(uri));
-    const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-
-    const bindDocument = editor.document;
     const mode = state.mode;
     const isNotPrimary = state.isNotPrimary;
     const isBrowsing = state.isBrowsing;
     const isDev = state.isDev;
 
-    await launchImpl({
+    // compat mode requires a TextEditor
+    if (launchImpl === launchPreviewCompat) {
+      const editor = await vscode.window.showTextDocument(
+        doc,
+        getSensibleTextEditorColumn(),
+        true,
+      );
+      const bindDocument = editor.document;
+
+      await launchImpl({
+        kind: "webview",
+        context: this.context,
+        editor,
+        bindDocument,
+        mode,
+        webviewPanel,
+        isBrowsing,
+        isDev,
+        isNotPrimary,
+      });
+      return;
+    }
+
+    await launchPreviewLsp({
       kind: "webview",
       context: this.context,
-      editor,
-      bindDocument,
+      bindDocument: doc,
       mode,
       webviewPanel,
       isBrowsing,
