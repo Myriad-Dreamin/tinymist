@@ -60,6 +60,7 @@ type PreviewFileCommandOpts = {
 
 async function previewFileCommand(
   context: vscode.ExtensionContext,
+  isCompat: boolean,
   uriLike?: vscode.Uri | string,
   opts?: PreviewFileCommandOpts,
 ) {
@@ -123,7 +124,28 @@ async function previewFileCommand(
       return;
     }
 
-    await launchPreviewLsp({
+    // compat mode requires a TextEditor
+    if (isCompat) {
+      const editor = await vscode.window.showTextDocument(
+        doc,
+        getSensibleTextEditorColumn(),
+        true,
+      );
+
+      await launchImpl({
+        kind,
+        context,
+        editor,
+        bindDocument: editor.document,
+        mode,
+        isBrowsing,
+        isDev,
+        isNotPrimary,
+      });
+      return;
+    }
+
+    await launchImpl({
       kind,
       context,
       bindDocument: doc,
@@ -194,7 +216,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand(
       "typst-preview.previewFile",
       (uriLike?: vscode.Uri | string, opts?: PreviewFileCommandOpts) =>
-        previewFileCommand(context, uriLike, opts),
+        previewFileCommand(context, isCompat, uriLike, opts),
     ),
     vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview("doc")),
     vscode.commands.registerCommand("tinymist.previewDevSlide", launchDevPreview("slide")),
