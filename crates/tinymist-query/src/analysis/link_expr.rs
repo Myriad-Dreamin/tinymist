@@ -49,7 +49,13 @@ pub enum LinkTarget {
     Package(Box<PackageSpec>),
     /// A URL.
     Url(Box<Url>),
-    /// A file path.
+    /// A file path reference with its associated Typst file identifier and path
+    /// string.
+    ///
+    /// # Fields
+    /// * `TypstFileId` - The unique identifier for the Typst file emits the
+    ///   link
+    /// * `EcoString` - An string representation of the target file path
     Path(TypstFileId, EcoString),
 }
 
@@ -212,7 +218,7 @@ impl LinkStrWorker {
             return Some(());
         }
 
-        let id = node.span().id()?.join(&content);
+        let id = node.span().id()?;
         self.info.objects.push(LinkObject {
             range,
             span: s.span(),
