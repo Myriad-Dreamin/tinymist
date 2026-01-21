@@ -10,6 +10,14 @@ input_file: crates/tinymist-query/src/fixtures/rename/include_path.typ
     {
      "newText": "\"new_name.typ\"",
      "range": "0:30:0:43"
+    },
+    {
+     "newText": "\"new_name.typ\"",
+     "range": "1:9:1:24"
+    },
+    {
+     "newText": "\"/new_name.typ\"",
+     "range": "2:9:2:23"
     }
    ],
    "textDocument": {
