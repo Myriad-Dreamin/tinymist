@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on [1], [2],\n||)/* range "
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_table.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  caption: [Caption],\n  table(\n  columns: 2,\n  [A], [B],\n  [1], [2],\n)\n)",
+      "range": "0:1:4:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap tablein figure with caption before"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  table(\n  columns: 2,\n  [A], [B],\n  [1], [2],\n),\n  caption: [Caption],\n)",
+      "range": "0:1:4:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap tablein figure with caption after"
+ }
+]

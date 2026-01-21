@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on \"test.png\"||) /* range"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_image.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  caption: [Caption],\n  image(\"test.png\")\n)",
+      "range": "1:2:1:19"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap imagein figure with caption before"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  image(\"test.png\"),\n  caption: [Caption],\n)",
+      "range": "1:2:1:19"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap imagein figure with caption after"
+ }
+]

@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on ng: \"rust\"||)/* range "
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_func.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  caption: [Caption],\n  raw(\"let x = 1\", lang: \"rust\")\n)",
+      "range": "0:1:0:31"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap rawin figure with caption before"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  raw(\"let x = 1\", lang: \"rust\"),\n  caption: [Caption],\n)",
+      "range": "0:1:0:31"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap rawin figure with caption after"
+ }
+]

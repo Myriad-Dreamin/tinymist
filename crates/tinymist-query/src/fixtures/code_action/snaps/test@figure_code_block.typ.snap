@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on arguments\n||}/* range "
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_code_block.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  caption: [Caption],\n  {\n  arguments\n}\n)",
+      "range": "0:1:2:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap code blockin figure with caption before"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  {\n  arguments\n},\n  caption: [Caption],\n)",
+      "range": "0:1:2:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap code blockin figure with caption after"
+ }
+]
