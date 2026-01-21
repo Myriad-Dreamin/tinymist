@@ -3,6 +3,7 @@ use lsp_types::InsertTextFormat;
 use serde::{Deserialize, Serialize};
 
 use crate::StrRef;
+use crate::prelude::Documentation;
 
 use super::LspRange;
 
@@ -270,6 +271,10 @@ pub struct CompletionItem {
     /// be described with the additionalTextEdits-property.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<LspCompletionCommand>,
+
+    /// A human-readable string that represents a doc-comment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub documentation: Option<Documentation>,
 }
 
 /// Represents a reference to a command. Provides a title which will be used to

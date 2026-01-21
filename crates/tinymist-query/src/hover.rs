@@ -7,7 +7,7 @@ use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::analysis::get_link_exprs_in;
+use crate::analysis::{file_preview, get_link_exprs_in};
 use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
 use crate::prelude::*;
@@ -442,8 +442,31 @@ impl HoverWorker<'_> {
             if let Some(kind) = PathKind::from_ext(target.path()) {
                 self.def.push(format!("A `{kind:?}` file."));
             }
+
+            // Add file preview for images and text files
+            if let Ok(file_path) = target.to_file_path() {
+                self.generate_file_preview(&file_path);
+            }
         }
 
+        Some(())
+    }
+
+    /// Generate preview for files (images and text files)
+    fn generate_file_preview(&mut self, file_path: &Path) -> Option<()> {
+        let extension = file_path.extension()?.to_str()?.to_lowercase();
+
+        if !file_preview::is_previewable(&extension) {
+            return None;
+        }
+
+        // Read file content
+        let file_id = self.ctx.file_id_by_path(file_path).ok()?;
+        let content = self.ctx.file_by_id(file_id).ok()?;
+
+        // Generate preview
+        let preview = file_preview::generate_file_preview(&content, &extension, true)?;
+        self.preview.push(preview);
         Some(())
     }
 

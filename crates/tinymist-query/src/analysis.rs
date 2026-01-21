@@ -21,6 +21,8 @@ pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
 
+pub mod file_preview;
+
 mod global;
 mod post_tyck;
 mod prelude;
