@@ -24,7 +24,7 @@
     "build:preview": "node scripts/build.mjs build:preview",
     "build:syntax": "node scripts/build.mjs build:syntax",
     "build:l10n": "node scripts/build.mjs build:l10n",
-    "build:docker": "docker build -t myriaddreamin/tinymist:0.14.10-rc1 .",
+    "build:docker": "docker build -t myriaddreamin/tinymist:0.14.10-rc2 .",
     "build:web": "node scripts/build.mjs build:web",
     "test:vsc": "node scripts/build.mjs test:vsc",
     "watch:web": "cd crates/tinymist && yarn watch",
