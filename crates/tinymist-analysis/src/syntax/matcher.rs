@@ -890,7 +890,10 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
     // Identifies convenient expression kinds.
     let expr = adjusted.cast::<ast::Expr>()?;
     Some(match expr {
-        ast::Expr::Label(..) => SyntaxClass::label(adjusted),
+        ast::Expr::Label(..) => {
+            // todo: unclosed label
+            SyntaxClass::label(adjusted)
+        }
         ast::Expr::Ref(..) => SyntaxClass::Ref {
             node: adjusted,
             suffix_colon: false,
