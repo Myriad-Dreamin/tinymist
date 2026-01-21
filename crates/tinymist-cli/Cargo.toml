@@ -47,7 +47,7 @@ hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
 lsp-types.workspace = true
 log.workspace = true
-open.workspace = true
+open = { workspace = true, optional = true }
 parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
@@ -98,6 +98,7 @@ default = [
     "l10n",
     "lock",
     "export",
+    "open",
     "preview",
     "trace",
     "embed-fonts",
@@ -132,6 +133,7 @@ no-content-hint = [
 
 export = ["tinymist/export"]
 lock = ["tinymist/lock"]
+open = ["tinymist/open", "dep:open"]
 preview = ["tinymist/preview", "hyper-tungstenite"]
 trace = ["tinymist/trace"]
 battery = ["tinymist/battery"]
