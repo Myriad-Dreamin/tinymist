@@ -232,7 +232,7 @@ impl RenameFileWorker<'_> {
         let edits = edits.entry(uri).or_default();
         for obj in &link_info.objects {
             if !matches!(&obj.target,
-                LinkTarget::Path(file_id, _) if *file_id == self.def_fid
+                LinkTarget::Path(file_id, path) if file_id.join(path) == self.def_fid
             ) {
                 continue;
             }
