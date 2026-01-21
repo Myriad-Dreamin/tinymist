@@ -10,6 +10,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.10 - [2026-01-22]
+
 ### Server
 
 * (Fix) Parsed path arguments of export commands exactly once in https://github.com/Myriad-Dreamin/tinymist/pull/2363
