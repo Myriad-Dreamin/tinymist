@@ -130,18 +130,26 @@ export async function tinymistActivate(
   configureEditorAndLanguage(context, trait);
 
   // Initializes language client
+  let initialized = false;
   if (extensionState.features.lsp) {
-    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
-    config.probedServerPath = executable;
-    // todo: guide installation?
+    try {
+      const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+      config.probedServerPath = executable;
+      // todo: guide installation?
 
-    if (config.probedServerPath) {
-      tinymist.initClient(config);
+      if (config.probedServerPath) {
+        tinymist.initClient(config);
+      }
+
+      contextExt.tinymistExecutable = executable;
+      contextExt.tinymistExec = makeExecCommand(contextExt, executable);
+      initialized = true;
+    } catch (e) {
+      vscode.window.showErrorMessage(`Cannot find a valid tinymist binary. Some features like auto-formatting on Enter may not work. Please check your tinymist.serverPath configuration. Exception: ${e}`);
     }
-
-    contextExt.tinymistExecutable = executable;
-    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
   }
+  const lspInitialized = extensionState.features.lsp && initialized;
+
   // Register Shared commands
   context.subscriptions.push(
     commands.registerCommand("tinymist.onEnter", onEnterHandler),
@@ -158,11 +166,11 @@ export async function tinymistActivate(
     }
   }
   // Starts language client
-  if (extensionState.features.lsp) {
+  if (lspInitialized) {
     await tinymist.startClient();
   }
   // Loads the preview HTML from the binary
-  if (extensionState.features.lsp && extensionState.features.preview) {
+  if (lspInitialized && extensionState.features.preview) {
     previewPreload(context);
   }
 
