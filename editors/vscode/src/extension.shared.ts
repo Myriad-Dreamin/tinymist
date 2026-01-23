@@ -130,24 +130,12 @@ export async function tinymistActivate(
   configureEditorAndLanguage(context, trait);
 
   // Initializes language client
-  if (extensionState.features.lsp) {
-    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
-    config.probedServerPath = executable;
-    // todo: guide installation?
-
-    if (config.probedServerPath) {
-      tinymist.initClient(config);
-    }
-
-    contextExt.tinymistExecutable = executable;
-    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
-  }
-
   /// If `system`, we need to probe the binary path, otherwise, we directly set `probed` to be true.
   let isProbed = !extensionState.features.lspSystem;
   if (extensionState.features.lsp && extensionState.features.lspSystem) {
     try {
       const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+      // todo: guide installation?
       config.probedServerPath = executable;
       contextExt.tinymistExecutable = executable;
       isProbed = true;
