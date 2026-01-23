@@ -1,6 +1,6 @@
-use super::*;
-
 use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
+
+use super::*;
 
 type PureHandler<S, T> = fn(srv: &mut S, args: T) -> LspResult<()>;
 
@@ -200,7 +200,7 @@ where
 
         while let Ok(msg) = inbox.recv() {
             const EXIT_METHOD: &str = notification::Exit::METHOD;
-            let loop_start = Instant::now();
+            let loop_start = tinymist_std::time::now();
             match msg {
                 Evt(event) => {
                     let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
@@ -229,11 +229,14 @@ where
                 }
                 Msg(LspMessage::Notification(not)) => {
                     let is_exit = not.method == EXIT_METHOD;
-                    self.client.hook.start_notification(&not.method);
+                    let track_id = self
+                        .next_not_id
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    self.client.hook.start_notification(track_id, &not.method);
                     let result = self.on_notification(&not.method, not.params);
                     self.client
                         .hook
-                        .stop_notification(&not.method, loop_start, result);
+                        .stop_notification(track_id, &not.method, loop_start, result);
                     if is_exit {
                         return Ok(());
                     }

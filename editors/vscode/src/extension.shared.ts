@@ -40,6 +40,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.triggerSuggestAndParameterHints = true;
   config.triggerParameterHints = true;
   config.supportHtmlInMarkdown = true;
+  config.supportClientCodelens = true;
   config.supportExtendedCodeAction = true;
   config.customizedShowDocument = true;
   config.delegateFsRequests = false; // todo: detect live sharing.
@@ -100,6 +101,29 @@ export async function tinymistActivate(
   context.subscriptions.push({
     dispose: () => {
       vscode.commands.executeCommand("setContext", "ext.tinymistActivated", false);
+    },
+  });
+  // Sets a global context key to indicate that the navigate Md to Pdf icon is enabled
+  const enableNavigateMdToPdfIcon =
+    config.convertExtension instanceof Array &&
+    config.convertExtension.some(
+      (item: any) =>
+        item === "markdown" ||
+        (typeof item === "object" &&
+          item.language === "markdown" &&
+          item.showNavigationIcon !== false),
+    );
+  console.log("enableNavigateMdToPdfIcon:", config.convertExtension, enableNavigateMdToPdfIcon);
+  vscode.commands.executeCommand(
+    "setContext",
+    "ext.navigateMdToPdfIcon",
+    enableNavigateMdToPdfIcon,
+  );
+  context.subscriptions.push({
+    dispose: () => {
+      if (enableNavigateMdToPdfIcon) {
+        vscode.commands.executeCommand("setContext", "ext.navigateMdToPdfIcon", false);
+      }
     },
   });
 

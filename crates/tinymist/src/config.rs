@@ -89,6 +89,11 @@ pub struct Config {
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,
+    /// Whether the client has a handler for client-side code lenses.
+    /// When true, the server uses the `tinymist.runCodeLens` command and lets
+    /// the client handle code lens execution. When false, the server provides
+    /// direct export commands instead of client-side code lenses.
+    pub support_client_codelens: bool,
     /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
     /// side.
     pub extended_code_action: bool,
@@ -360,6 +365,7 @@ impl Config {
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
         assign_config!(delegate_fs_requests := "delegateFsRequests"?: bool);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(support_client_codelens := "supportClientCodelens"?: bool);
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(development := "development"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
@@ -1264,6 +1270,7 @@ mod tests {
         test_good_config("semanticTokens");
         test_good_config("delegateFsRequests");
         test_good_config("supportHtmlInMarkdown");
+        test_good_config("supportClientCodelens");
         test_good_config("supportExtendedCodeAction");
         test_good_config("development");
         test_good_config("systemFonts");

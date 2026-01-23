@@ -10,6 +10,53 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.10 - [2026-01-22]
+
+### Server
+
+* (Fix) Parsed path arguments of export commands exactly once in https://github.com/Myriad-Dreamin/tinymist/pull/2363
+* (Fix) Specified and propagated "open" feature in https://github.com/Myriad-Dreamin/tinymist/pull/2365
+  * This caused ineffective `--open` flag (https://github.com/Myriad-Dreamin/tinymist/issues/2361).
+
+### Editor
+
+* Added support for exporting markdown documents to PDF in https://github.com/Myriad-Dreamin/tinymist/pull/2241
+
+### Code Analysis
+
+* (Fix) Skipping non-source files for linting and references in https://github.com/Myriad-Dreamin/tinymist/pull/2348
+* (Fix) Corrected `ModuleInclude` syntax identification in collecting links by @BlueQuantumx in https://github.com/Myriad-Dreamin/tinymist/pull/2364
+
+### Preview
+
+* Added hotkey to toggle light/dark theme by @funkeleinhorn in https://github.com/Myriad-Dreamin/tinymist/pull/2325
+
+### Codelens
+
+* Skipping emitting specific codelens for clients that don't have a client-side handler in https://github.com/Myriad-Dreamin/tinymist/pull/2246
+
+### Misc
+
+* Updated mason.nvim link in documentation by @gustavakerstrom in https://github.com/Myriad-Dreamin/tinymist/pull/2370
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.8...v0.14.10
+
+## v0.14.8 - [2026-01-08]
+
+### Rename
+
+* Renaming labels (#1858) in https://github.com/Myriad-Dreamin/tinymist/pull/2133 and https://github.com/Myriad-Dreamin/tinymist/pull/2339
+
+### Code Analysis
+
+* Added hover tooltip for package import by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2095
+
+### Typlite
+
+* (Fix) Corrected space handling among html element tags by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2243
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.6...v0.14.8
+
 ## v0.14.6 - [2026-01-02]
 
 * Bumped typst to v0.14.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2312

@@ -177,6 +177,14 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       }
     };
 
+    const toggleTheme = () => {
+      const typstApp = document.getElementById("typst-app");
+      console.log("toggleTheme", typstApp);
+      if (typstApp) {
+        typstApp.classList.toggle("invert-colors");
+      }
+    };
+
     const helpButton = document.getElementById("typst-top-help-button");
     helpButton?.addEventListener("click", toggleHelp);
 
@@ -227,6 +235,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           removeHelp();
           blurInput();
           handled = false;
+          break;
+        case "t":
+          toggleTheme();
           break;
         default:
           handled = false;
