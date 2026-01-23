@@ -29,6 +29,7 @@
     "test:firefox": "wasm-pack test --firefox --headless --release"
   },
   "devDependencies": {
+    "typescript": "^5.0.0",
     "turbo": "^2.3.3"
   }
 }

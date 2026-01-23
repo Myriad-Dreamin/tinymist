@@ -130,25 +130,39 @@ export async function tinymistActivate(
   configureEditorAndLanguage(context, trait);
 
   // Initializes language client
-  let initialized = false;
   if (extensionState.features.lsp) {
+    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+    config.probedServerPath = executable;
+    // todo: guide installation?
+
+    if (config.probedServerPath) {
+      tinymist.initClient(config);
+    }
+
+    contextExt.tinymistExecutable = executable;
+    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
+  }
+
+  /// If `system`, we need to probe the binary path, otherwise, we directly set `probed` to be true.
+  let isProbed = !extensionState.features.lspSystem;
+  if (extensionState.features.lsp && extensionState.features.lspSystem) {
     try {
       const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
       config.probedServerPath = executable;
-      // todo: guide installation?
-
-      if (config.probedServerPath) {
-        tinymist.initClient(config);
-      }
-
       contextExt.tinymistExecutable = executable;
+      isProbed = true;
       contextExt.tinymistExec = makeExecCommand(contextExt, executable);
-      initialized = true;
     } catch (e) {
       vscode.window.showErrorMessage(`Cannot find a valid tinymist binary. Some features like auto-formatting on Enter may not work. Please check your tinymist.serverPath configuration. Exception: ${e}`);
     }
   }
-  const lspInitialized = extensionState.features.lsp && initialized;
+
+  let isInitialized = false;
+  if (extensionState.features.lsp && isProbed) {
+    await tinymist.initClient(config);
+    isInitialized = true;
+  }
+  const isLspInitialized = extensionState.features.lsp && isInitialized;
 
   // Register Shared commands
   context.subscriptions.push(
@@ -166,11 +180,11 @@ export async function tinymistActivate(
     }
   }
   // Starts language client
-  if (lspInitialized) {
+  if (isLspInitialized) {
     await tinymist.startClient();
   }
   // Loads the preview HTML from the binary
-  if (lspInitialized && extensionState.features.preview) {
+  if (isLspInitialized && extensionState.features.preview) {
     previewPreload(context);
   }
 
@@ -251,4 +265,12 @@ function makeExecCommand(
       });
     },
   };
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }

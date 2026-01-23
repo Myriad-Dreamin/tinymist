@@ -7,6 +7,7 @@ interface ExtensionState {
   features: {
     web: boolean;
     lsp: boolean;
+    lspSystem: boolean;
     export: boolean;
     task: boolean;
     devKit: boolean;
@@ -39,6 +40,7 @@ export const extensionState: ExtensionState = {
   features: {
     web: false,
     lsp: true,
+    lspSystem: true,
     export: true,
     testingDebug: true,
     task: true,

@@ -1521,6 +1521,7 @@
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
     "vscode-languageclient": "^9.0.0",
+    "tinymist-web": "link:../../crates/tinymist",
     "ws": "^8.13.0"
   },
   "devDependencies": {
