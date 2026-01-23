@@ -6,14 +6,17 @@ import {
 
 import { InitializeRequest } from "vscode-languageserver";
 
-if ("stackTraceLimit" in Error) {
-  Error.stackTraceLimit = 64;
-}
-
 // @ts-ignore
 import { initSync, TinymistLanguageServer } from "tinymist-web";
 // @ts-ignore
 import wasmURL from "../../out/tinymist_bg.wasm";
+
+/**
+ * The rust stack trace is deep and so we have to increase the limit to check full content.
+ */
+if ("stackTraceLimit" in Error) {
+  Error.stackTraceLimit = 64;
+}
 
 (async function startServer() {
   const connection = createConnection(
@@ -23,16 +26,17 @@ import wasmURL from "../../out/tinymist_bg.wasm";
     new BrowserMessageWriter(self),
   );
 
-  // const wasmModule = fetch(wasmURL, {
-  //   headers: {
-  //     "Accept-Encoding": "Accept-Encoding: gzip",
-  //   },
-  // }).then((wasm) => wasm.arrayBuffer());
-  // initSync(await wasmModule);
   initSync(wasmURL);
   console.log(`tinymist-web ${TinymistLanguageServer.version()} wasm is loaded...`);
 
+  /**
+   * The events are stored in the array and will be processed after the response is sent to the client.
+   */
   let events: any[] = [];
+
+  /**
+   * The bridge between the server in wasm and the client.
+   */
   const bridge = new TinymistLanguageServer({
     sendEvent: (event: any): void => void events.push(event),
     sendRequest({ id, method, params }: any): void {
@@ -47,6 +51,7 @@ import wasmURL from "../../out/tinymist_bg.wasm";
       void connection.sendNotification(method, params),
   });
 
+  // Post-processes server events after sent responses to the client.
   const h = <T>(res: T): T => {
     while (events.length > 0) {
       for (const event of events.splice(0)) {
