@@ -157,12 +157,11 @@ export async function tinymistActivate(
     }
   }
 
-  let isInitialized = false;
-  if (extensionState.features.lsp && isProbed) {
+  /// Language server is valid if it is enabled and the binary is probed.
+  const isLsEnabledAndProbed = extensionState.features.lsp && isProbed;
+  if (isLsEnabledAndProbed) {
     await tinymist.initClient(config);
-    isInitialized = true;
   }
-  const isLspInitialized = extensionState.features.lsp && isInitialized;
 
   // Register Shared commands
   context.subscriptions.push(
@@ -180,11 +179,11 @@ export async function tinymistActivate(
     }
   }
   // Starts language client
-  if (isLspInitialized) {
+  if (isLsEnabledAndProbed) {
     await tinymist.startClient();
   }
   // Loads the preview HTML from the binary
-  if (isLspInitialized && extensionState.features.preview) {
+  if (isLsEnabledAndProbed && extensionState.features.preview) {
     previewPreload(context);
   }
 
