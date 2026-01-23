@@ -123,6 +123,7 @@ web = [
     "serde-wasm-bindgen",
     "wasm-bindgen-futures",
     "reflexo-typst/web",
+    "sync-ls/web",
     "tinymist-project/web",
     "sync-ls/web",
 ]

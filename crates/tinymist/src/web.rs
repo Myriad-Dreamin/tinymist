@@ -1,11 +1,8 @@
 //! Tinymist Web APIs.
 
-#![allow(unused)]
-
 use std::sync::LazyLock;
 
 use futures::future::MaybeDone;
-use js_sys::{Function, Promise};
 use sync_ls::{
     internal_error, invalid_params, JsTransportSender, LsDriver, LspBuilder, LspClientRoot,
     LspMessage, ResponseError,
