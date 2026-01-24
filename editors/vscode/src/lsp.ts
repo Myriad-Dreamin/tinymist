@@ -595,7 +595,6 @@ export class LanguageState {
       const sendForDocument = async (doc: vscode.TextDocument, isSync: boolean) => {
         const uriStr = doc.uri.toString();
         const currentClock = watchClock++;
-        console.log("fs doc update", uriStr, currentClock, watches);
         if (!watches.has(uriStr)) {
           return;
         }
