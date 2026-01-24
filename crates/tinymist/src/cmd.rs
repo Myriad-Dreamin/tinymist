@@ -339,7 +339,7 @@ impl ServerState {
     #[cfg(feature = "trace")]
     pub fn get_document_trace(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use std::ops::Deref;
-        let path = get_arg!(args[0] as PathBuf).into();
+        let path = Self::parse_uri_or_path(&get_arg!(args[0] as String));
 
         // get path to self program
         let self_path = std::env::current_exe()
@@ -431,7 +431,7 @@ impl ServerState {
 
     /// Get the metrics of the document.
     pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let path = get_arg!(args[0] as PathBuf);
+        let path = Self::parse_uri_or_path(&get_arg!(args[0] as String));
         run_query!(self.DocumentMetrics(path))
     }
 
@@ -466,7 +466,7 @@ impl ServerState {
     }
 
     /// Get tutorial web page
-    pub fn resource_tutoral(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
+    pub fn resource_tutorial(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         Err(method_not_found())
     }
 
