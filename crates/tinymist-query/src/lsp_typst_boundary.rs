@@ -2,9 +2,9 @@
 
 use anyhow::Context;
 use percent_encoding::percent_decode_str;
+use tinymist_std::path::looks_like_uri;
 use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::PathResolution;
-use tinymist_std::path::looks_like_uri;
 
 use crate::prelude::*;
 
@@ -41,14 +41,13 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
                 let raw_path = &rest[1..]; // skip ':'
 
                 let mut url = Url::parse(&format!("{scheme}:"))
-                    .with_context(|| {
-                        format!("could not convert path to URI: path: {path:?}")
-                    })?;
+                    .with_context(|| format!("could not convert path to URI: path: {path:?}"))?;
                 url.set_path(raw_path);
                 return Ok(url);
             }
 
-            // this should never happen given `looks_like_uri`, but the old behaviour is here anyway
+            // this should never happen given `looks_like_uri`, but the old behaviour is
+            // here anyway
             return Url::parse(&path_str)
                 .with_context(|| format!("could not convert path to URI: path: {path:?}"));
         }
@@ -58,7 +57,8 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     let path_str = path.to_string_lossy();
     let backslash_prefix = UNTITLED_ROOT.replace('/', "\\");
 
-    let is_untitled = path_str.starts_with(UNTITLED_ROOT) || path_str.starts_with(&backslash_prefix);
+    let is_untitled =
+        path_str.starts_with(UNTITLED_ROOT) || path_str.starts_with(&backslash_prefix);
 
     if is_untitled {
         if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
@@ -66,7 +66,7 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
             if untitled == Path::new("nEoViM-BuG") {
                 return Ok(EMPTY_URL.clone());
             }
-            
+
             return untitled_url(untitled);
         }
 
@@ -74,10 +74,15 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
         let trimmed = if path_str.starts_with(UNTITLED_ROOT) {
             path_str.strip_prefix(UNTITLED_ROOT).unwrap_or(&path_str)
         } else {
-            path_str.strip_prefix(&backslash_prefix).unwrap_or(&path_str)
+            path_str
+                .strip_prefix(&backslash_prefix)
+                .unwrap_or(&path_str)
         };
 
-        let normalized = trimmed.trim_start_matches('/').trim_start_matches('\\').replace('\\', "/");
+        let normalized = trimmed
+            .trim_start_matches('/')
+            .trim_start_matches('\\')
+            .replace('\\', "/");
         return untitled_url(Path::new(&normalized));
     }
 
@@ -117,8 +122,10 @@ pub fn url_to_path(uri: &Url) -> PathBuf {
         return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
     }
 
-    // for non-file, non-untitled schemes (virtual filesystem providers), encode the scheme back into the path while decoding any percent-encoding from the URL
-    // it means that filesystem paths can use the same textual representation as Typst virtual paths, which may contain characters like spaces
+    // for non-file, non-untitled schemes (virtual filesystem providers), encode the
+    // scheme back into the path while decoding any percent-encoding from the URL
+    // it means that filesystem paths can use the same textual representation as
+    // Typst virtual paths, which may contain characters like spaces
     let decoded_path = percent_decode_str(uri.path()).decode_utf8_lossy();
     let raw = format!("{}:{}", uri.scheme(), decoded_path);
     PathBuf::from(raw)
@@ -126,18 +133,19 @@ pub fn url_to_path(uri: &Url) -> PathBuf {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
-    // Prefer `Url::from_file_path` for correctness; fall back to manual construction
-    // to handle edge cases like UNC paths, leading double slashes, or drive letters.
+    // Prefer `Url::from_file_path` for correctness; fall back to manual
+    // construction to handle edge cases like UNC paths, leading double slashes,
+    // or drive letters.
     Url::from_file_path(path).or_else(|never| {
         let _: () = never;
 
         let p = path.to_string_lossy().replace('\\', "/");
         let url_str = if p.starts_with("//") {
-            format!("file:{}", p)
+            format!("file:{p}")
         } else if p.starts_with('/') {
-            format!("file://{}", p)
+            format!("file://{p}")
         } else {
-            format!("file:///{}", p)
+            format!("file:///{p}")
         };
 
         Url::parse(&url_str)
@@ -195,7 +203,7 @@ mod test {
         let uri2 = path_to_url(&path).unwrap();
         assert_eq!(EMPTY_URL.clone(), uri2);
     }
-    
+
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_path_to_url_file_scheme_roundtrip() {

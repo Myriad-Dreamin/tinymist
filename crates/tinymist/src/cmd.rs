@@ -45,7 +45,8 @@ impl ServerState {
     /// - Otherwise, treat `s` as a raw path string.
     fn parse_uri_or_path(s: &str) -> ImmutPath {
         if let Ok(uri) = Url::parse(s) {
-            // `url_to_path` encodes the uri scheme into the path while preserving forward slashes so that a delegated filesystem can turn it back into a proper URI
+            // `url_to_path` encodes the uri scheme into the path while preserving forward
+            // slashes so that a delegated filesystem can turn it back into a proper URI
             ImmutPath::from(url_to_path(&uri))
         } else {
             ImmutPath::from(PathBuf::from(s))

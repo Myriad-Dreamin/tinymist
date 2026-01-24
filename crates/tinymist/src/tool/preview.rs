@@ -275,10 +275,11 @@ impl ServerState {
 
         // todo: preview specific arguments are not used
         let cli_entry = cli_args.compile.input.as_ref();
-        let mut entry = cli_entry
+        let entry = cli_entry
             .map(|input| {
                 if self.config.delegate_fs_requests {
-                    if let Ok(uri) = Url::parse(input) { // treat the input as a URI string if possible
+                    if let Ok(uri) = Url::parse(input) {
+                        // treat the input as a URI string if possible
                         return Ok(url_to_path(&uri));
                     }
 
@@ -298,7 +299,7 @@ impl ServerState {
                     }
                 }
 
-                return Err(invalid_params("entry file must be absolute path"));
+                Err(invalid_params("entry file must be absolute path"))
             })
             .transpose()?;
 
@@ -334,7 +335,8 @@ impl ServerState {
             let id = primary.id.clone();
 
             if let Some(entry) = entry {
-                self.change_main_file(Some(entry.into())).map_err(internal_error)?;
+                self.change_main_file(Some(entry.into()))
+                    .map_err(internal_error)?;
             }
             self.set_pin_by_preview(true, is_browsing);
 
