@@ -184,7 +184,7 @@ async function languageActivate(context: IContext) {
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
         if (isTypstDocument(doc)) {
-          return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
+          return commandActivateDocPath(doc, doc.uri);
         } else {
           return commandActivateDoc(undefined);
         }
@@ -202,8 +202,8 @@ async function languageActivate(context: IContext) {
 
   const initTemplateCommand =
     (inPlace: boolean) =>
-    (...args: string[]) =>
-      initTemplate(context.context, inPlace, ...args);
+      (...args: string[]) =>
+        initTemplate(context.context, inPlace, ...args);
 
   // prettier-ignore
   context.subscriptions.push(
@@ -514,11 +514,11 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
 }
 
 function commandActivateDoc(doc: vscode.TextDocument | undefined) {
-  commandActivateDocPath(doc, doc?.uri.toString());
+  commandActivateDocPath(doc, doc?.uri);
 }
 
 let focusMainTimeout: NodeJS.Timeout | undefined = undefined;
-function commandActivateDocPath(doc: vscode.TextDocument | undefined, fsPath: string | undefined) {
+function commandActivateDocPath(doc: vscode.TextDocument | undefined, fsPath: Uri | undefined) {
   // console.log("focus main", fsPath, new Error().stack);
   extensionState.mut.focusingFile = fsPath;
   if (fsPath) {

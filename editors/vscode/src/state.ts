@@ -25,11 +25,11 @@ interface ExtensionState {
     renderDocs: boolean;
   };
   mut: {
-    focusingFile: string | undefined;
+    focusingFile: vscode.Uri | undefined;
     focusingDoc: vscode.TextDocument | undefined;
     focusingPreviewPanelContext: PreviewPanelContext | undefined;
   };
-  getFocusingFile(): string | undefined;
+  getFocusingFile(): vscode.Uri | undefined;
   getFocusingDoc(): vscode.TextDocument | undefined;
   getFocusingPreviewPanelContext(): PreviewPanelContext | undefined;
 }
