@@ -764,6 +764,11 @@
   dependencies:
     undici-types "~6.21.0"
 
+"@types/vscode@^1.82.0":
+  version "1.101.0"
+  resolved "https://registry.npmjs.org/@types/vscode/-/vscode-1.101.0.tgz#0622ca26ea15aafbe570dc4d25917c75cafe578a"
+  integrity sha512-ZWf0IWa+NGegdW3iU42AcDTFHWW7fApLdkdnBqwYEtHVIBGbTu0ZNQKP/kX3Ds/uMJXIMQNAojHR4vexCEEz5Q==
+
 "@types/vscode@^1.97.0":
   version "1.105.0"
   resolved "https://registry.npmjs.org/@types/vscode/-/vscode-1.105.0.tgz#774c54cdb62409afeb0cb2a96f75c2e06ef3f97a"
