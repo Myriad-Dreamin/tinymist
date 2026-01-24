@@ -207,6 +207,16 @@ impl WorkspaceResolver {
 
     /// Gets or creates a workspace ID for the given root path.
     pub fn workspace_id(root: &ImmutPath) -> WorkspaceId {
+        // Try to find an existing entry that we can reuse.
+        //
+        // We could check with just a read lock, but if the pair is not yet
+        // present, we would then need to recheck after acquiring a write lock,
+        // which is probably not worth it.
+        let mut interner = INTERNER.write();
+        if let Some(&id) = interner.to_id.get(root) {
+            return id;
+        }
+
         let root: ImmutPath = {
             let as_str = unix_slash(root);
             if looks_like_uri(&as_str) {
@@ -217,16 +227,6 @@ impl WorkspaceResolver {
                 ImmutPath::from(root.clean())
             }
         };
-
-        // Try to find an existing entry that we can reuse.
-        //
-        // We could check with just a read lock, but if the pair is not yet
-        // present, we would then need to recheck after acquiring a write lock,
-        // which is probably not worth it.
-        let mut interner = INTERNER.write();
-        if let Some(&id) = interner.to_id.get(&root) {
-            return id;
-        }
 
         // Create a new entry forever by leaking the pair. We can't leak more
         // than 2^16 pair (and typically will leak a lot less), so its not a
