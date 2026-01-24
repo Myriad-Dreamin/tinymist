@@ -609,6 +609,12 @@ mod test {
         assert_eq!(p.as_ref().to_string_lossy(), "oct:/workspace/file typst");
     }
 
+    #[test]
+    fn test_parse_bad_path_with_tilde() {
+        let p = ServerState::parse_uri_or_path("~/main.typ");
+        assert_eq!(p.as_ref().to_string_lossy(), "~/main.typ");
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_parse_uri_or_path_falls_back_to_path_unix() {
