@@ -39,18 +39,22 @@ struct ExportSyntaxRangeOpts {
 impl ServerState {
     /// Parse a string as either a URI or a filesystem path.
     ///
-    /// - If `s` parses as a `Url`, convert it using `url_to_path()` which
-    ///   preserves the scheme (e.g. `oct:`) embedded in the textual path for
-    ///   delegated filesystem providers.
-    /// - Otherwise, treat `s` as a raw path string.
+    /// - If `s` has legal schema prefix, and is parsed as a `Url`, converts it
+    ///   using `url_to_path()` which preserves the scheme embedded in the
+    ///   textual path for delegated filesystem providers.
+    ///   - Currently supported schemes: `untitled`, `file`, `oct`.
+    /// - Otherwise, treats `s` as a raw path string.
     fn parse_uri_or_path(s: &str) -> ImmutPath {
-        if let Ok(uri) = Url::parse(s) {
-            // `url_to_path` encodes the uri scheme into the path while preserving forward
-            // slashes so that a delegated filesystem can turn it back into a proper URI
-            ImmutPath::from(url_to_path(&uri))
-        } else {
-            ImmutPath::from(PathBuf::from(s))
+        // todo: more schemes to support
+        if s.starts_with("untitled:") || s.starts_with("file:") || s.starts_with("oct:") {
+            if let Ok(uri) = Url::parse(s) {
+                // `url_to_path` encodes the uri scheme into the path while preserving forward
+                // slashes so that a delegated filesystem can turn it back into a proper URI
+                return ImmutPath::from(url_to_path(&uri));
+            }
         }
+
+        ImmutPath::from(PathBuf::from(s))
     }
 
     /// Export a range of the current document as Ansi highlighted text.
@@ -619,5 +623,14 @@ mod test {
         // On Windows, "/home/user/file.typ" is not considered absolute.
         let p = ServerState::parse_uri_or_path("/home/user/file.typ");
         assert_eq!(p.as_ref().to_string_lossy(), "/home/user/file.typ");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_parse_uri_with_drive() {
+        let p = ServerState::parse_uri_or_path("C:\\Windows\\main.typ");
+        assert_eq!(p.as_ref().to_string_lossy(), "C:\\Windows\\main.typ");
+        let p = ServerState::parse_uri_or_path("\\\\?\\C:\\Windows\\main.typ");
+        assert_eq!(p.as_ref().to_string_lossy(), "\\\\?\\C:\\Windows\\main.typ");
     }
 }
