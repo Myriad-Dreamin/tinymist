@@ -74,11 +74,16 @@ For a full list of available settings see [Tinymist Server Configuration](/edito
 
 ## Formatting
 
-Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
+Either [`typstyle`](https://typstyle-rs.github.io/typstyle/) or [`typstfmt`](https://github.com/astrale-sharp/typstfmt) can be used. Both are now included in `tinymist`, so you do not need to install them separately if you only intend to use them through `tinymist`. You can select the one you prefer using the `formatterMode` setting. The following snippet shows all formatting settings that you can put in the `settings` table of the snippets from the previous section:
 
 ```lua
-formatterMode = "typstyle"
+formatterMode = "typstyle", -- or "typstfmt"
+formatterProseWrap = true, -- wrap lines in content mode
+formatterPrintWidth = 80,  -- limit line length to 80 if possible
+formatterIndentSize = 4,   -- indentation width
 ```
+
+Note that, since [this Neovim PR](https://github.com/neovim/neovim/pull/19677), neovim uses LSP servers (hence `tinymist` in our case) by default when formatting code. This applies to calls to `vim.lsp.buf.format()` (which formats the whole current buffer) and also to the `gq` command.
 
 ## Live Preview
 
@@ -118,6 +123,12 @@ end, {})
 > > For Neovim prior to v0.9.5, `os.execute` can be used instead. This is not suggested. See [Issue #1606](https://github.com/Myriad-Dreamin/tinymist/issues/1606) for more information.
 
 Make sure to change `exportPdf` to “onType” or “onSave”.
+
+### Working under Power-Saving Mode or with Resource-consumed Projects
+
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
+
+For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
 
 ### Working with Multiple-Files Projects
 

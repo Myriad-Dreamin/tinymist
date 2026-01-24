@@ -13,8 +13,4 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
 </html>
 
 =====
-<p align="center">
-
-<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
-
-</p>
+<p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>

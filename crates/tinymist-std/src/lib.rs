@@ -1,6 +1,7 @@
 //! Additional functions wrapping Rust's standard library.
 
 pub mod adt;
+#[cfg(feature = "battery")]
 pub mod battery;
 pub mod error;
 pub mod fs;

@@ -10,7 +10,7 @@ use tinymist_std::ImmutPath;
 use typst::diag::{PackageResult, StrResult, eco_format};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
 
-use crate::registry::PackageIndexEntry;
+use crate::registry::{PREVIEW_NS, PackageIndexEntry, PackageSpecExt};
 
 use super::{
     DEFAULT_REGISTRY, DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec,
@@ -179,7 +179,7 @@ impl PackageStorage {
             }
 
             // Download from network if it doesn't exist yet.
-            if spec.namespace == "preview" {
+            if spec.is_preview() {
                 self.download_package(spec, &dir)?;
                 if dir.exists() {
                     return Ok(dir.into());
@@ -195,7 +195,7 @@ impl PackageStorage {
         &self,
         spec: &VersionlessPackageSpec,
     ) -> StrResult<PackageVersion> {
-        if spec.namespace == "preview" {
+        if spec.is_preview() {
             // For `@preview`, download the package index and find the latest
             // version.
             self.download_index()
@@ -249,7 +249,7 @@ impl PackageStorage {
                     }
                 };
                 for entry in &mut entries {
-                    entry.namespace = "preview".into();
+                    entry.namespace = PREVIEW_NS.into();
                 }
 
                 entries
@@ -263,7 +263,7 @@ impl PackageStorage {
     /// # Panics
     /// Panics if the package spec namespace isn't `preview`.
     pub fn download_package(&self, spec: &PackageSpec, package_dir: &Path) -> PackageResult<()> {
-        assert_eq!(spec.namespace, "preview");
+        assert!(spec.is_preview(), "only preview packages can be downloaded");
 
         let url = format!(
             "{DEFAULT_REGISTRY}/preview/{}-{}.tar.gz",

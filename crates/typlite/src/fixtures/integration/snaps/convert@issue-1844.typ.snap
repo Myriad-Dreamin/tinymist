@@ -9,7 +9,7 @@ input_file: crates/typlite/src/fixtures/integration/issue-1844.typ
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
   </head>
-  <body><m1document><m1parbreak></m1parbreak><m1parbreak></m1parbreak><m1heading level="1"><span style="display: inline-block">Reproducer document</span></m1heading><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">Example</span></m1heading><m1parbreak></m1parbreak><m1parbreak></m1parbreak><p>Just the source (ok)</p><m1parbreak></m1parbreak><m1verbatim src="````
+  <body><m1document><m1parbreak></m1parbreak><m1parbreak></m1parbreak><m1heading level="1"><span style="display: inline-block">Reproducer document</span></m1heading><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">Example</span></m1heading><m1parbreak></m1parbreak><m1parbreak></m1parbreak><p>Just the source (ok)</p><m1parbreak></m1parbreak><m1verbatim block="true" src="````
 
 == Under the Greenwood Tree
 by Shakespeare.
@@ -19,7 +19,7 @@ Under the greenwood tree #emoji.tree
 Who loves to lie with me,
 ...
 ```)
-````"></m1verbatim><m1parbreak></m1parbreak><p>Source in grid</p><m1parbreak></m1parbreak><table x="test"><tr><td><p>Placeholder for</p><m1linebreak></m1linebreak><p>separately rendered SVG</p></td><td><m1verbatim src="````
+````"></m1verbatim><m1parbreak></m1parbreak><p>Source in grid</p><m1parbreak></m1parbreak><table x="test"><tr><td><p>Placeholder for</p><m1linebreak></m1linebreak><p>separately rendered SVG</p></td><td><m1verbatim block="true" src="````
 
 == Under the Greenwood Tree
 by Shakespeare.
@@ -39,6 +39,8 @@ Who loves to lie with me,
 
 Just the source (ok)
 
+
+
 ````
 
 == Under the Greenwood Tree
@@ -53,16 +55,8 @@ Who loves to lie with me,
 
 Source in grid
 
-<table x="test">
-
-<tr>
-
-<td>
-
-Placeholder for<br />
-separately rendered SVG
-
-</td><td>
+<table x="test"><tr><td>Placeholder for<br />
+separately rendered SVG</td><td>
 
 ````
 
@@ -76,8 +70,4 @@ Who loves to lie with me,
 ```)
 ````
 
-</td>
-
-</tr>
-
-</table>
+</td></tr></table>

@@ -40,6 +40,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   config.triggerSuggestAndParameterHints = true;
   config.triggerParameterHints = true;
   config.supportHtmlInMarkdown = true;
+  config.supportClientCodelens = true;
   config.supportExtendedCodeAction = true;
   config.customizedShowDocument = true;
   const isVirtualWorkspace = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.every(f => f.uri.scheme !== "file"); // https://code.visualstudio.com/api/extension-guides/virtual-workspaces#detect-virtual-workspaces-programmatically
@@ -104,21 +105,42 @@ export async function tinymistActivate(
       vscode.commands.executeCommand("setContext", "ext.tinymistActivated", false);
     },
   });
+  // Sets a global context key to indicate that the navigate Md to Pdf icon is enabled
+  const enableNavigateMdToPdfIcon =
+    config.convertExtension instanceof Array &&
+    config.convertExtension.some(
+      (item: any) =>
+        item === "markdown" ||
+        (typeof item === "object" &&
+          item.language === "markdown" &&
+          item.showNavigationIcon !== false),
+    );
+  console.log("enableNavigateMdToPdfIcon:", config.convertExtension, enableNavigateMdToPdfIcon);
+  vscode.commands.executeCommand(
+    "setContext",
+    "ext.navigateMdToPdfIcon",
+    enableNavigateMdToPdfIcon,
+  );
+  context.subscriptions.push({
+    dispose: () => {
+      if (enableNavigateMdToPdfIcon) {
+        vscode.commands.executeCommand("setContext", "ext.navigateMdToPdfIcon", false);
+      }
+    },
+  });
 
   configureEditorAndLanguage(context, trait);
 
   // Initializes language client
   if (extensionState.features.lsp) {
-    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
-    config.probedServerPath = executable;
-    // todo: guide installation?
-
-    if (config.probedServerPath) {
-      tinymist.initClient(config);
+    if (extensionState.features.lspSystem) {
+      const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+      config.probedServerPath = executable;
+      contextExt.tinymistExecutable = executable;
+      contextExt.tinymistExec = makeExecCommand(contextExt, executable);
     }
 
-    contextExt.tinymistExecutable = executable;
-    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
+    await tinymist.initClient(config);
   }
   // Register Shared commands
   context.subscriptions.push(
@@ -221,4 +243,12 @@ function makeExecCommand(
       });
     },
   };
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }

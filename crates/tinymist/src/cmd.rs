@@ -502,10 +502,13 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let packages = tinymist_query::package::list_package(snap.world(), Some(ns))
-                .into_iter()
-                .map(PackageInfo::from)
-                .collect::<Vec<_>>();
+            let packages = tinymist_query::package::list_package(
+                snap.world(),
+                tinymist_query::package::PackageFilter::For(ns),
+            )
+            .into_iter()
+            .map(PackageInfo::from)
+            .collect::<Vec<_>>();
 
             serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
         })

@@ -30,6 +30,8 @@ struct ExportPdfOpts {
     creation_timestamp: Option<String>,
     /// A PDF standard that Typst can enforce conformance with.
     pdf_standard: Option<Vec<PdfStandard>>,
+    /// The processor package to use for the export (only for Markdown).
+    processor: Option<String>,
     /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
     /// document is written to provide a baseline of accessibility. In some
     /// circumstances (for example when trying to reduce the size of a document)
@@ -93,6 +95,7 @@ struct ExportActionOpts {
 impl ServerState {
     /// Export the current document as PDF file(s).
     pub fn export_pdf(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportPdfOpts);
 
         let creation_timestamp = if let Some(value) = opts.creation_timestamp {
@@ -104,33 +107,45 @@ impl ServerState {
             self.config.creation_timestamp()
         };
         let no_pdf_tags = opts.no_pdf_tags.unwrap_or(self.config.no_pdf_tags());
-        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
-
+        let pdf_standards = opts
+            .pdf_standard
+            .or_else(|| self.config.pdf_standards())
+            .unwrap_or_default();
         let export = self.config.export_task();
-        self.export(
-            ProjectTask::ExportPdf(ExportPdfTask {
-                export,
-                pages: opts.pages,
-                pdf_standards: pdf_standards.unwrap_or_default(),
-                no_pdf_tags,
-                creation_timestamp,
-            }),
-            args,
-        )
+        let task = ProjectTask::ExportPdf(ExportPdfTask {
+            export,
+            pages: opts.pages,
+            pdf_standards,
+            no_pdf_tags,
+            creation_timestamp,
+        });
+
+        if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
+            self.export_md(path, opts.processor, task, args)
+        } else {
+            self.export(path, task, args)
+        }
     }
 
     /// Export the current document as HTML file(s).
     pub fn export_html(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(ProjectTask::ExportHtml(ExportHtmlTask { export }), args)
+        self.export(
+            path,
+            ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            args,
+        )
     }
 
     /// Export the current document as Markdown file(s).
     pub fn export_markdown(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportMd(ExportMarkdownTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -142,9 +157,11 @@ impl ServerState {
 
     /// Export the current document as Tex file(s).
     pub fn export_tex(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportTeX(ExportTeXTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -156,13 +173,19 @@ impl ServerState {
 
     /// Export the current document as Text file(s).
     pub fn export_text(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(ProjectTask::ExportText(ExportTextTask { export }), args)
+        self.export(
+            path,
+            ProjectTask::ExportText(ExportTextTask { export }),
+            args,
+        )
     }
 
     /// Query the current document and export the result as JSON file(s).
     pub fn export_query(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportQueryOpts);
         // todo: deprecate it
         let _ = opts.strict;
@@ -173,6 +196,7 @@ impl ServerState {
         }
 
         self.export(
+            path,
             ProjectTask::Query(QueryTask {
                 format: opts.format,
                 output_extension: opts.output_extension,
@@ -187,10 +211,12 @@ impl ServerState {
 
     /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportSvgOpts);
 
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportSvg(ExportSvgTask {
                 export,
                 pages: opts.pages,
@@ -203,6 +229,7 @@ impl ServerState {
 
     /// Export the current document as Png file(s).
     pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportPngOpts);
 
         let ppi = opts.ppi.or_else(|| self.config.ppi()).unwrap_or(144.);
@@ -213,6 +240,7 @@ impl ServerState {
 
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportPng(ExportPngTask {
                 export,
                 pages: opts.pages,
@@ -227,15 +255,36 @@ impl ServerState {
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
+    pub fn export(
+        &mut self,
+        path: PathBuf,
+        task: ProjectTask,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduleResult {
         if self.config.delegate_fs_requests {
-            return Err(invalid_params("Export is not supported in virtual workspaces"));
+            return Err(invalid_params(
+                "Export is not supported in virtual workspaces",
+            ));
         }
-        let path = get_arg!(args[0] as PathBuf);
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
         let write = action_opts.write.unwrap_or(true);
         let open = action_opts.open;
 
         run_query!(self.OnExport(path, task, write, open))
+    }
+
+    /// Exports the a markdown document using a custom template.
+    pub fn export_md(
+        &mut self,
+        path: PathBuf,
+        processor: Option<String>,
+        task: ProjectTask,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduleResult {
+        let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
+        let write = action_opts.write.unwrap_or(true);
+        let open = action_opts.open;
+
+        run_query!(self.OnExportMd(path, processor, task, write, open))
     }
 }

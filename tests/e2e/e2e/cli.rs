@@ -96,7 +96,7 @@ fn test_help_lsp() {
 #[test]
 fn test_help_compile_alias() {
     apply_common_filters!();
-    insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg("--help"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg("--help"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -126,6 +126,9 @@ fn test_help_compile_alias() {
               resolved relative to the current working directory (PWD)
               
               [env: TYPST_ROOT=REDACTED]
+
+          --input <key=value>
+              Add a string key-value pair visible through `sys.inputs`
 
           --font-path <DIR>
               Add additional directories that are recursively searched for fonts.
@@ -231,7 +234,7 @@ fn test_help_compile_alias() {
 #[test]
 fn test_help_compile() {
     apply_common_filters!();
-    insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--help"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--help"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -261,6 +264,9 @@ fn test_help_compile() {
               resolved relative to the current working directory (PWD)
               
               [env: TYPST_ROOT=REDACTED]
+
+          --input <key=value>
+              Add a string key-value pair visible through `sys.inputs`
 
           --font-path <DIR>
               Add additional directories that are recursively searched for fonts.
@@ -382,12 +388,12 @@ fn test_help_preview() {
     Options:
           --preview-mode <MODE>
               Configure the preview mode
-              
-              [default: document]
 
               Possible values:
               - document: Would like to preview a regular document
               - slide:    Would like to preview slides
+              
+              [default: document]
 
           --partial-rendering <ENABLE_PARTIAL_RENDERING>
               Only render visible part of the document.
@@ -481,12 +487,12 @@ fn test_help_preview() {
 
           --features <FEATURES>
               Enable in-development features that may be changed or removed at any time
-              
-              [env: TYPST_FEATURES=REDACTED]
 
               Possible values:
               - html:        The HTML feature
               - a11y-extras: The A11yExtras feature
+              
+              [env: TYPST_FEATURES=REDACTED]
 
           --input <key=value>
               Add a string key-value pair visible through `sys.inputs`.

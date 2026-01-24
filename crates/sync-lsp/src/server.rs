@@ -11,6 +11,7 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::atomic::AtomicI32;
 #[cfg(feature = "web")]
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Weak};
@@ -19,7 +20,7 @@ use futures::future::MaybeDone;
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, from_value};
-use tinymist_std::time::Instant;
+use tinymist_std::time::Time;
 
 use crate::msg::*;
 use crate::req_queue;
@@ -239,7 +240,7 @@ impl LspClientRoot {
 }
 
 type ReqHandler = Box<dyn for<'a> FnOnce(&'a mut dyn Any, LspOrDapResponse) + Send + Sync>;
-type ReqQueue = req_queue::ReqQueue<(String, Instant), ReqHandler>;
+type ReqQueue = req_queue::ReqQueue<(String, Time), ReqHandler>;
 
 /// Different transport mechanisms for communication.
 #[derive(Debug, Clone)]
@@ -475,7 +476,7 @@ impl LspClient {
     }
 
     /// Registers an client2server request in the request queue.
-    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Instant) {
+    pub fn register_request(&self, method: &str, id: &RequestId, received_at: Time) {
         let mut req_queue = self.req_queue.lock();
         self.hook.start_request(id, method);
         req_queue
@@ -508,6 +509,30 @@ impl LspClient {
 
         self.hook.stop_request(&id, &method, received_at);
 
+        let delay = tinymist_std::time::now().duration_since(received_at);
+        match delay {
+            Ok(delay) => {
+                if delay.as_secs() > 10 {
+                    let worst_outgoing =
+                        req_queue.incoming.pending().max_by_key(|(_, data)| data.1);
+                    let worst_case = if let Some((id, (method, since))) = worst_outgoing {
+                        let duration = tinymist_std::time::now().duration_since(*since);
+                        format!(", worst case: req({method:?}, {id:?}) - {duration:?}")
+                    } else {
+                        String::new()
+                    };
+                    log::warn!(
+                        "request {id:?} is completed after {delay:?}, pending incoming requests: {:?}, pending outgoing requests: {:?}{worst_case}",
+                        req_queue.incoming,
+                        req_queue.outgoing
+                    );
+                }
+            }
+            Err(err) => {
+                log::error!("failed to get delay for request {id:?}: {err:?}");
+            }
+        }
+
         self.sender.send_message(response);
     }
 }
@@ -539,11 +564,17 @@ pub trait LsHook: fmt::Debug + Send + Sync {
     /// Starts a request.
     fn start_request(&self, req_id: &RequestId, method: &str);
     /// Stops a request.
-    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant);
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Time);
     /// Starts a notification.
-    fn start_notification(&self, method: &str);
+    fn start_notification(&self, track_id: i32, method: &str);
     /// Stops a notification.
-    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>);
+    fn stop_notification(
+        &self,
+        track_id: i32,
+        method: &str,
+        received_at: Time,
+        result: LspResult<()>,
+    );
 }
 
 impl LsHook for () {
@@ -551,21 +582,29 @@ impl LsHook for () {
         log::info!("handling {method} - ({req_id})");
     }
 
-    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Instant) {
+    fn stop_request(&self, req_id: &RequestId, method: &str, received_at: Time) {
         let duration = received_at.elapsed();
         log::info!("handled  {method} - ({req_id}) in {duration:0.2?}");
     }
 
-    fn start_notification(&self, method: &str) {
-        log::info!("notifying {method}");
+    fn start_notification(&self, track_id: i32, method: &str) {
+        log::info!("notifying ({track_id}) - {method}");
     }
 
-    fn stop_notification(&self, method: &str, received_at: Instant, result: LspResult<()>) {
+    fn stop_notification(
+        &self,
+        track_id: i32,
+        method: &str,
+        received_at: Time,
+        result: LspResult<()>,
+    ) {
         let request_duration = received_at.elapsed();
         if let Err(err) = result {
-            log::error!("notify {method} failed in {request_duration:0.2?}: {err:?}");
+            log::error!(
+                "notify ({track_id}) - {method} failed in {request_duration:0.2?}: {err:?}"
+            );
         } else {
-            log::info!("notify {method} succeeded in {request_duration:0.2?}");
+            log::info!("notify ({track_id}) - {method} succeeded in {request_duration:0.2?}");
         }
     }
 }
@@ -667,6 +706,7 @@ where
     pub fn build(self) -> LsDriver<M, Args> {
         LsDriver {
             state: State::Uninitialized(Some(Box::new(self.args))),
+            next_not_id: AtomicI32::new(1),
             events: self.events,
             client: self.client,
             commands: self.command_handlers,
@@ -726,6 +766,8 @@ pub struct LsDriver<M, Args: Initializer> {
     state: State<Args, Args::S>,
     /// The language server client.
     pub client: LspClient,
+    /// The next notification ID.
+    pub next_not_id: AtomicI32,
 
     // Handle maps
     /// Events for dispatching.
