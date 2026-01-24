@@ -123,8 +123,7 @@ impl ServerState {
 
     /// Pin main file to some path.
     pub fn pin_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let raw: Option<String> = get_arg!(args[0] as Option<String>);
-        let entry = raw.as_deref().map(Self::parse_uri_or_path);
+        let entry = get_arg!(args[0] as Option<String>).map(|x| Self::parse_uri_or_path(&x));
 
         let update_result = self.pin_main_file(entry.clone());
         update_result.map_err(|err| internal_error(format!("could not pin file: {err}")))?;
@@ -135,8 +134,7 @@ impl ServerState {
 
     /// Focus main file to some path.
     pub fn focus_document(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        let raw: Option<String> = get_arg!(args[0] as Option<String>);
-        let entry = raw.as_deref().map(Self::parse_uri_or_path);
+        let entry = get_arg!(args[0] as Option<String>).map(|x| Self::parse_uri_or_path(&x));
 
         if !self.ever_manual_focusing {
             self.ever_manual_focusing = true;
