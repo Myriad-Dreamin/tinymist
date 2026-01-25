@@ -627,38 +627,6 @@ export class LanguageState {
         client.sendRequest(fsChange, { inserts, removes, isSync: true });
       })();
     });
-
-    // in delegated filesystem mode events dont surface through createFileSystemWatcher
-    // keep the preview's delegated view in sync by using text document notifications for any URI that the server asked us to watch
-    if (this.delegateFsRequests) {
-      const sendForDocument = async (doc: vscode.TextDocument, isSync: boolean) => {
-        const uriStr = doc.uri.toString();
-        const currentClock = watchClock++;
-        if (!watches.has(uriStr)) {
-          return;
-        }
-
-        // we already have the latest text in memory, so send that directly instead of going through workspace.fs.readFile
-        const text = doc.getText();
-        const data = Buffer.from(text, "utf8");
-        const content: FileResult = { type: "ok", content: bytesBase64Encode(data) };
-        if (!registerHasRead(uriStr, currentClock, content)) {
-          return;
-        }
-
-        const inserts: FileChange[] = [{ uri: uriStr, content }];
-        const removes: string[] = [];
-
-        client.sendRequest(fsChange, { inserts, removes, isSync }).then(
-          () => {
-            console.log("sent fsChange (doc)", uriStr, currentClock, { isSync });
-          },
-          (err) => {
-            console.error("fsChange request failed (doc)", uriStr, err);
-          },
-        );
-      };
-    }
   }
 
   /**
