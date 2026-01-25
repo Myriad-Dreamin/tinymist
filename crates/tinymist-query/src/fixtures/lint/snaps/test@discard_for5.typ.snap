@@ -6,10 +6,39 @@ input_file: crates/tinymist-query/src/fixtures/lint/discard_for5.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.ineffective-show-set",
    "message": "This show statement doesn't take effect.\nHint: consider changing parent to `show: range(10).fold(it => it, (style-it, i) => it => { show: it => it; style-it(it) })`",
    "range": "1:2:1:16",
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
+  },
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused function: `f`\nHint: consider removing this function or prefixing with underscore: `_f`",
+   "range": "0:5:0:6",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
+  },
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused variable: `i`\nHint: consider removing this variable or prefixing with underscore: `_i`",
+   "range": "0:15:0:16",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
   }
  ]
 }

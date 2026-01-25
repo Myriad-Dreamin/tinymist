@@ -3,4 +3,21 @@ source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/lint/return_partial2.typ
 ---
-{}
+{
+ "s0.typ": [
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused function: `as-padding-dict`\nHint: consider removing this function or prefixing with underscore: `_as-padding-dict`",
+   "range": "0:5:0:20",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}

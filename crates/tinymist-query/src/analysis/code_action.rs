@@ -1,11 +1,14 @@
 //! Provides code actions for the document.
 
-use ecow::eco_format;
-use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
+use ecow::{EcoString, eco_format};
+use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions, DiagnosticTag, NumberOrString};
 use regex::Regex;
+use serde_json;
 use tinymist_analysis::syntax::{
-    PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
+    ExprInfo, ModuleItemLayout, PreviousItem, SyntaxClass, adjust_expr, node_ancestors,
+    previous_items,
 };
+use tinymist_lint::{DeadCodeKind, LintMetadata, LintRule};
 use tinymist_std::path::{diff, unix_slash};
 use typst::syntax::Side;
 
@@ -24,6 +27,8 @@ pub struct CodeActionWorker<'a> {
     pub actions: Vec<CodeAction>,
     /// The lazily calculated local URL to [`Self::source`].
     local_url: OnceLock<Option<Url>>,
+    /// Cached expression information for the current source file.
+    expr_info: Option<ExprInfo>,
 }
 
 impl<'a> CodeActionWorker<'a> {
@@ -34,6 +39,7 @@ impl<'a> CodeActionWorker<'a> {
             source,
             actions: Vec::new(),
             local_url: OnceLock::new(),
+            expr_info: None,
         }
     }
 
@@ -59,7 +65,6 @@ impl<'a> CodeActionWorker<'a> {
     pub(crate) fn autofix(
         &mut self,
         root: &LinkedNode<'_>,
-        range: &Range<usize>,
         context: &lsp_types::CodeActionContext,
     ) -> Option<()> {
         if let Some(only) = &context.only
@@ -72,16 +77,28 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         for diag in &context.diagnostics {
-            if diag.source.as_ref().is_none_or(|t| t != "typst") {
+            let Some(source) = diag.source.as_deref() else {
                 continue;
-            }
+            };
 
-            match match_autofix_kind(diag.message.as_str()) {
+            let Some(diag_range) = self.ctx.to_typst_range(diag.range, &self.source) else {
+                continue;
+            };
+
+            match match_autofix_kind(source, diag) {
                 Some(AutofixKind::UnknownVariable) => {
-                    self.autofix_unknown_variable(root, range);
+                    self.autofix_unknown_variable(root, &diag_range);
                 }
                 Some(AutofixKind::FileNotFound) => {
-                    self.autofix_file_not_found(root, range);
+                    self.autofix_file_not_found(root, &diag_range);
+                }
+                Some(AutofixKind::RemoveUnusedImport) => {
+                    self.autofix_remove_unused_import(root, &diag_range);
+                }
+                Some(AutofixKind::MarkUnusedSymbol) => {
+                    self.autofix_unused_symbol(&diag_range);
+                    self.autofix_replace_with_placeholder(root, &diag_range);
+                    self.autofix_remove_declaration(root, &diag_range);
                 }
                 _ => {}
             }
@@ -271,6 +288,350 @@ impl<'a> CodeActionWorker<'a> {
         self.actions.push(action);
 
         Some(())
+    }
+
+    /// Prefix unused bindings with `_` to silence dead-code lint diagnostics.
+    fn autofix_unused_symbol(&mut self, range: &Range<usize>) -> Option<()> {
+        if range.is_empty() {
+            return None;
+        }
+
+        let name = self.source.text().get(range.clone())?;
+        if !is_plain_identifier(name) || name.starts_with('_') {
+            return None;
+        }
+
+        let replacement = eco_format!("_{name}");
+        let lsp_range = self.ctx.to_lsp_range(range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, replacement))?;
+        let action = CodeAction {
+            title: format!("Prefix `_` to `{name}`"),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    fn autofix_replace_with_placeholder(
+        &mut self,
+        root: &LinkedNode<'_>,
+        range: &Range<usize>,
+    ) -> Option<()> {
+        if range.is_empty() {
+            return None;
+        }
+
+        let cursor = (range.start + range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        if self.is_spread_binding(&node) || self.is_function_binding(&node) {
+            return None;
+        }
+
+        let name = self.source.text().get(range.clone())?;
+        if !is_plain_identifier(name) {
+            return None;
+        }
+
+        let lsp_range = self.ctx.to_lsp_range(range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(
+            lsp_range,
+            EcoString::from("_"),
+        ))?;
+        let action = CodeAction {
+            title: "Replace with `_`".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    fn is_spread_binding(&self, node: &LinkedNode<'_>) -> bool {
+        if node.kind() == SyntaxKind::Spread {
+            return true;
+        }
+
+        node_ancestors(node).any(|ancestor| ancestor.kind() == SyntaxKind::Spread)
+    }
+
+    fn is_function_binding(&self, node: &LinkedNode<'_>) -> bool {
+        self.find_let_binding_ancestor(node)
+            .map(|let_binding| matches!(let_binding.kind(), ast::LetBindingKind::Closure(..)))
+            .unwrap_or(false)
+    }
+
+    fn find_let_binding_ancestor<'b>(
+        &self,
+        node: &'b LinkedNode<'b>,
+    ) -> Option<ast::LetBinding<'b>> {
+        let mut current = Some(node);
+        while let Some(n) = current {
+            if n.kind() == SyntaxKind::LetBinding {
+                return n.cast::<ast::LetBinding>();
+            }
+            current = n.parent();
+        }
+        None
+    }
+
+    fn find_declaration_ancestor<'b>(
+        &self,
+        node: &'b LinkedNode<'b>,
+    ) -> Option<&'b LinkedNode<'b>> {
+        let mut current = Some(node);
+        while let Some(n) = current {
+            match n.kind() {
+                SyntaxKind::LetBinding | SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                    return Some(n);
+                }
+                _ => {
+                    current = n.parent();
+                }
+            }
+        }
+        None
+    }
+
+    fn expand_declaration_range(&self, mut range: Range<usize>) -> Range<usize> {
+        let bytes = self.source.text().as_bytes();
+
+        if range.start > 0 {
+            let mut idx = range.start;
+            while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
+                idx -= 1;
+            }
+
+            if idx > 0 && bytes[idx - 1] == b'#' {
+                range.start = idx - 1;
+            }
+        }
+
+        if range.end < bytes.len() && bytes[range.end] == b'\n' {
+            range.end += 1;
+        } else if range.start > 0 && bytes[range.start - 1] == b'\n' {
+            range.start -= 1;
+        }
+
+        range
+    }
+
+    /// Remove the declaration corresponding to an unused binding.
+    fn autofix_remove_declaration(
+        &mut self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<()> {
+        if name_range.is_empty() {
+            return None;
+        }
+
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+        let decl_node = self.find_declaration_ancestor(&node)?;
+
+        if decl_node.kind() == SyntaxKind::LetBinding {
+            let let_binding = decl_node.cast::<ast::LetBinding>()?;
+            let bindings = let_binding.kind().bindings();
+
+            // remove declarations only when the let binding introduces a single identifier
+            // that corresponds to the unused diagnostic.
+            if bindings.len() != 1 {
+                return None;
+            }
+
+            let binding_ident = bindings.first()?;
+            let binding_node = decl_node.find(binding_ident.span())?;
+            if binding_node.range() != *name_range {
+                return None;
+            }
+        }
+
+        let remove_range = self.expand_declaration_range(decl_node.range());
+
+        let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
+        let action = CodeAction {
+            title: "Remove unused declaration".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    /// Remove an unused import item, handling trailing commas.
+    fn autofix_remove_unused_import(
+        &mut self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<()> {
+        // Calculate the range to remove, expand to cover the whole import item
+        // (e.g. `foo as bar`) and include trailing comma if present.
+        let mut remove_range = if let Some(layout) = self.module_item_layout_for_range(name_range) {
+            layout.item_range.clone()
+        } else {
+            self.module_alias_remove_range(root, name_range)
+                .or_else(|| self.find_import_item_range(root, name_range))
+                .unwrap_or_else(|| name_range.clone())
+        };
+        remove_range = self.expand_import_item_range(remove_range);
+
+        let lsp_range = self.ctx.to_lsp_range(remove_range.clone(), &self.source);
+        let edit = self.local_edit(EcoSnippetTextEdit::new_plain(lsp_range, EcoString::new()))?;
+        let action = CodeAction {
+            title: "Remove unused import".to_string(),
+            kind: Some(CodeActionKind::QUICKFIX),
+            edit: Some(edit),
+            ..CodeAction::default()
+        };
+        self.actions.push(action);
+
+        Some(())
+    }
+
+    fn module_item_layout_for_range(
+        &mut self,
+        binding_range: &Range<usize>,
+    ) -> Option<ModuleItemLayout> {
+        let info = self.expr_info()?;
+        info.module_items
+            .values()
+            .find(|layout| layout.binding_range == *binding_range)
+            .cloned()
+    }
+
+    fn expand_import_item_range(&self, mut range: Range<usize>) -> Range<usize> {
+        let bytes = self.source.text().as_bytes();
+        let len = bytes.len();
+
+        let mut idx = range.end;
+        while idx < len && matches!(bytes[idx], b' ' | b'\t' | b'\r' | b'\n') {
+            idx += 1;
+        }
+        if idx < len && bytes[idx] == b',' {
+            range.end = idx + 1;
+            let mut tail = range.end;
+            while tail < len && matches!(bytes[tail], b' ' | b'\t') {
+                tail += 1;
+            }
+            range.end = tail;
+            return range;
+        }
+
+        let mut idx = range.start;
+        while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t' | b'\r' | b'\n') {
+            idx -= 1;
+        }
+        if idx > 0 && bytes[idx - 1] == b',' {
+            range.start = idx - 1;
+            while range.start > 0 && matches!(bytes[range.start - 1], b' ' | b'\t') {
+                range.start -= 1;
+            }
+        }
+
+        range
+    }
+
+    fn expr_info(&mut self) -> Option<ExprInfo> {
+        if self.expr_info.is_none() {
+            let info = self.ctx.expr_stage(&self.source);
+            self.expr_info = Some(info);
+        }
+        self.expr_info.clone()
+    }
+
+    fn find_import_item_range(
+        &self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<Range<usize>> {
+        if name_range.is_empty() {
+            return None;
+        }
+
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        node_ancestors(&node).find_map(|ancestor| match ancestor.kind() {
+            SyntaxKind::RenamedImportItem => Some(ancestor.range()),
+            _ => None,
+        })
+    }
+
+    fn module_alias_remove_range(
+        &self,
+        root: &LinkedNode<'_>,
+        name_range: &Range<usize>,
+    ) -> Option<Range<usize>> {
+        if name_range.is_empty() {
+            return None;
+        }
+
+        let cursor = (name_range.start + name_range.end) / 2;
+        let node = root.leaf_at_compat(cursor)?;
+
+        let mut in_module_import = false;
+        for ancestor in node_ancestors(&node) {
+            match ancestor.kind() {
+                SyntaxKind::RenamedImportItem => return None,
+                SyntaxKind::ModuleImport => {
+                    in_module_import = true;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        if !in_module_import {
+            return None;
+        }
+
+        let bytes = self.source.text().as_bytes();
+        if name_range.end > bytes.len() || name_range.start > bytes.len() {
+            return None;
+        }
+
+        let mut idx = name_range.start;
+        while idx > 0 && matches!(bytes[idx - 1], b' ' | b'\t') {
+            idx -= 1;
+        }
+
+        if idx < 2 {
+            return None;
+        }
+
+        let as_end = idx;
+        let as_start = as_end - 2;
+        if &bytes[as_start..as_end] != b"as" {
+            return None;
+        }
+
+        if as_start > 0 && is_ascii_ident(bytes[as_start - 1]) {
+            return None;
+        }
+        if as_end < bytes.len() && is_ascii_ident(bytes[as_end]) {
+            return None;
+        }
+
+        let mut removal_start = as_start;
+        while removal_start > 0 && matches!(bytes[removal_start - 1], b' ' | b'\t') {
+            removal_start -= 1;
+        }
+
+        let mut removal_end = name_range.end;
+        while removal_end < bytes.len() && matches!(bytes[removal_end], b' ' | b'\t') {
+            removal_end += 1;
+        }
+
+        Some(removal_start..removal_end)
     }
 
     /// Starts to work.
@@ -610,19 +971,72 @@ impl<'a> CodeActionWorker<'a> {
 enum AutofixKind {
     UnknownVariable,
     FileNotFound,
+    MarkUnusedSymbol,
+    RemoveUnusedImport,
 }
 
-fn match_autofix_kind(msg: &str) -> Option<AutofixKind> {
-    static PATTERNS: &[(&str, AutofixKind)] = &[
-        ("unknown variable", AutofixKind::UnknownVariable), // typst compiler error
-        ("file not found", AutofixKind::FileNotFound),
-    ];
+fn match_autofix_kind(source: &str, diag: &lsp_types::Diagnostic) -> Option<AutofixKind> {
+    if source == "tinymist-lint" {
+        if let Some(NumberOrString::String(code)) = diag.code.as_ref() {
+            if code == LintRule::DeadCode.code() {
+                let metadata = lint_metadata_from_diag(diag);
+                if metadata.is_some_and(|meta| {
+                    matches!(
+                        meta,
+                        LintMetadata::DeadCode {
+                            kind: DeadCodeKind::Import
+                        }
+                    )
+                }) {
+                    return Some(AutofixKind::RemoveUnusedImport);
+                }
 
-    for (pattern, kind) in PATTERNS {
-        if msg.starts_with(pattern) {
-            return Some(*kind);
+                return Some(AutofixKind::MarkUnusedSymbol);
+            }
         }
     }
 
+    if source == "typst" {
+        if let Some(NumberOrString::String(code)) = diag.code.as_ref() {
+            return match code.as_str() {
+                "typst.unknown-variable" => Some(AutofixKind::UnknownVariable),
+                "typst.file-not-found" => Some(AutofixKind::FileNotFound),
+                "typst.unused" => Some(AutofixKind::MarkUnusedSymbol),
+                _ => None,
+            };
+        }
+    }
+
+    if diag
+        .tags
+        .as_ref()
+        .is_some_and(|tags| tags.contains(&DiagnosticTag::UNNECESSARY))
+    {
+        return Some(AutofixKind::MarkUnusedSymbol);
+    }
+
     None
+}
+
+fn lint_metadata_from_diag(diag: &lsp_types::Diagnostic) -> Option<LintMetadata> {
+    diag.data
+        .as_ref()
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
+}
+
+fn is_ascii_ident(ch: u8) -> bool {
+    matches!(ch, b'_' | b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9')
+}
+
+fn is_plain_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }

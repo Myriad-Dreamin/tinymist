@@ -6,6 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/lint/break_func_for.typ
 {
  "s0.typ": [
   {
+   "code": "tinymist-lint.branch-outside-loop",
    "message": "`break` statement in a non-loop context",
    "range": "1:16:1:21",
    "relatedInformation": [
@@ -17,7 +18,21 @@ input_file: crates/tinymist-query/src/fixtures/lint/break_func_for.typ
     }
    ],
    "severity": 2,
-   "source": "typst"
+   "source": "tinymist-lint"
+  },
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused variable: `value`\nHint: consider removing this variable or prefixing with underscore: `_value`",
+   "range": "0:5:0:10",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
   }
  ]
 }

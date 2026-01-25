@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
-use tinymist_lint::KnownIssues;
+use lsp_types::NumberOrString;
+use tinymist_lint::{KnownIssues, LintDiagnostic, LintLevel, LintMetadata, LintRule};
 use tinymist_world::vfs::WorkspaceResolver;
 use typst::syntax::Span;
 
@@ -68,7 +69,7 @@ impl<'w> DiagWorker<'w> {
             };
 
             for diag in self.ctx.lint(&source, known_issues) {
-                self.handle(&diag);
+                self.handle_lint(&diag);
             }
         }
         self.source = source;
@@ -88,9 +89,30 @@ impl<'w> DiagWorker<'w> {
         self.results
     }
 
+    /// Extends the worker with lint diagnostics.
+    #[cfg(test)]
+    pub fn push_lints<'a>(&mut self, diagnostics: impl IntoIterator<Item = &'a LintDiagnostic>) {
+        let source = self.source;
+        self.source = "tinymist-lint";
+        for diag in diagnostics {
+            self.handle_lint(diag);
+        }
+        self.source = source;
+    }
+
+    /// Converts a list of lint diagnostics to LSP diagnostics. (tests only)
+    #[cfg(test)]
+    pub fn convert_lints<'a>(
+        mut self,
+        diagnostics: impl IntoIterator<Item = &'a LintDiagnostic>,
+    ) -> DiagnosticsMap {
+        self.push_lints(diagnostics);
+        self.results
+    }
+
     /// Converts a list of Typst diagnostics to LSP diagnostics.
     pub fn handle(&mut self, diag: &TypstDiagnostic) {
-        match self.convert_diagnostic(diag) {
+        match self.convert_diagnostic(diag, None, None, None) {
             Ok((uri, diagnostic)) => {
                 self.results.entry(uri).or_default().push(diagnostic);
             }
@@ -100,9 +122,42 @@ impl<'w> DiagWorker<'w> {
         }
     }
 
+    fn handle_lint(&mut self, diag: &LintDiagnostic) {
+        match self.convert_lint_diagnostic(diag) {
+            Ok(Some((uri, diagnostic))) => {
+                self.results.entry(uri).or_default().push(diagnostic);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                log::error!("Failed to convert lint diagnostic: {error:?}");
+            }
+        }
+    }
+
+    fn convert_lint_diagnostic(
+        &self,
+        lint_diagnostic: &LintDiagnostic,
+    ) -> anyhow::Result<Option<(Url, Diagnostic)>> {
+        let level = self.ctx.analysis.lint_settings.level(lint_diagnostic.rule);
+        if matches!(level, LintLevel::Off) {
+            return Ok(None);
+        }
+        let severity = lint_level_to_severity(level);
+        self.convert_diagnostic(
+            &lint_diagnostic.diagnostic,
+            Some(lint_diagnostic.rule),
+            Some(severity),
+            lint_diagnostic.metadata(),
+        )
+        .map(Some)
+    }
+
     fn convert_diagnostic(
         &self,
         typst_diagnostic: &TypstDiagnostic,
+        lint_rule: Option<LintRule>,
+        severity_override: Option<DiagnosticSeverity>,
+        lint_metadata: Option<LintMetadata>,
     ) -> anyhow::Result<(Url, Diagnostic)> {
         let typst_diagnostic = {
             let mut diag = Cow::Borrowed(typst_diagnostic);
@@ -125,14 +180,25 @@ impl<'w> DiagWorker<'w> {
         let source = self.ctx.source_by_id(id)?;
         let lsp_range = self.diagnostic_range(&source, span);
 
-        let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
+        let typst_kind = classify_typst_diagnostic(&typst_diagnostic.message);
+        let lsp_severity =
+            severity_override.unwrap_or_else(|| diagnostic_severity(&typst_diagnostic, typst_kind));
         let lsp_message = diagnostic_message(&typst_diagnostic);
+        let is_unused = matches!(lint_rule, Some(LintRule::DeadCode))
+            || matches!(typst_kind, Some(TypstDiagKind::Unused));
+        let code = lint_rule
+            .map(|rule| NumberOrString::String(rule.code().into()))
+            .or_else(|| typst_kind.map(|kind| NumberOrString::String(kind.code().into())));
+        let data = lint_metadata.and_then(|meta| serde_json::to_value(meta).ok());
 
         let diagnostic = Diagnostic {
             range: lsp_range,
             severity: Some(lsp_severity),
             message: lsp_message,
             source: Some(self.source.to_owned()),
+            code,
+            tags: is_unused.then(|| vec![DiagnosticTag::UNNECESSARY]),
+            data,
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
                     .trace
@@ -188,10 +254,27 @@ impl<'w> DiagWorker<'w> {
     }
 }
 
-fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
-    match typst_severity {
+fn diagnostic_severity(
+    typst_diagnostic: &TypstDiagnostic,
+    kind: Option<TypstDiagKind>,
+) -> DiagnosticSeverity {
+    if matches!(kind, Some(TypstDiagKind::Unused)) {
+        return DiagnosticSeverity::HINT;
+    }
+
+    match typst_diagnostic.severity {
         TypstSeverity::Error => DiagnosticSeverity::ERROR,
         TypstSeverity::Warning => DiagnosticSeverity::WARNING,
+    }
+}
+
+fn lint_level_to_severity(level: LintLevel) -> DiagnosticSeverity {
+    match level {
+        LintLevel::Error => DiagnosticSeverity::ERROR,
+        LintLevel::Warning => DiagnosticSeverity::WARNING,
+        LintLevel::Info => DiagnosticSeverity::INFORMATION,
+        LintLevel::Hint => DiagnosticSeverity::HINT,
+        LintLevel::Off => unreachable!("disabled lints should be filtered early"),
     }
 }
 
@@ -202,6 +285,35 @@ fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
         message.push_str(hint);
     }
     message
+}
+
+fn classify_typst_diagnostic(message: &str) -> Option<TypstDiagKind> {
+    if message.starts_with("unknown variable") {
+        Some(TypstDiagKind::UnknownVariable)
+    } else if message.starts_with("file not found") {
+        Some(TypstDiagKind::FileNotFound)
+    } else if message.starts_with("unused ") {
+        Some(TypstDiagKind::Unused)
+    } else {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TypstDiagKind {
+    UnknownVariable,
+    FileNotFound,
+    Unused,
+}
+
+impl TypstDiagKind {
+    fn code(self) -> &'static str {
+        match self {
+            TypstDiagKind::UnknownVariable => "typst.unknown-variable",
+            TypstDiagKind::FileNotFound => "typst.file-not-found",
+            TypstDiagKind::Unused => "typst.unused",
+        }
+    }
 }
 
 trait DiagnosticRefiner {

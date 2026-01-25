@@ -50,6 +50,40 @@ pub fn snapshot_testing_with(name: &str, opts: Opts, f: &impl Fn(&mut LocalConte
     });
 }
 
+pub fn snapshot_testing_with_snapshots(
+    fixture_name: &str,
+    snapshot_name: &str,
+    opts: Opts,
+    f: &impl Fn(&mut LocalContext, PathBuf),
+) {
+    let fixture_name = if fixture_name.is_empty() {
+        "playground"
+    } else {
+        fixture_name
+    };
+    let snapshot_name = if snapshot_name.is_empty() {
+        fixture_name
+    } else {
+        snapshot_name
+    };
+
+    let mut settings = tinymist_tests::Settings::new();
+    settings.set_prepend_module_to_snapshot(false);
+    settings.set_snapshot_path(format!("fixtures/{snapshot_name}/snaps"));
+    settings.bind(|| {
+        let glob_path = format!("fixtures/{fixture_name}/*.typ");
+        tinymist_tests::glob!(&glob_path, |path| {
+            let contents = std::fs::read_to_string(path).unwrap();
+            #[cfg(windows)]
+            let contents = contents.replace("\r\n", "\n");
+
+            tinymist_tests::run_with_sources(&contents, |verse, path| {
+                run_with_ctx_(verse, path, opts, f);
+            });
+        });
+    });
+}
+
 pub fn run_with_ctx<T>(
     verse: &mut LspUniverse,
     path: PathBuf,

@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/show_set_rules.typ
+---
+{
+ "s0.typ": [
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused variable: `unused_style`\nHint: consider removing this variable or prefixing with underscore: `_unused_style`",
+   "range": "1:5:1:17",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}

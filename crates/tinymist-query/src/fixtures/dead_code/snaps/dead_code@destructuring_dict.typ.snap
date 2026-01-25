@@ -1,0 +1,37 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/dead_code/destructuring_dict.typ
+---
+{
+ "s0.typ": [
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused variable: `unused_x`\nHint: consider removing this variable or prefixing with underscore: `_unused_x`",
+   "range": "6:18:6:26",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
+  },
+  {
+   "code": "tinymist-lint.dead-code",
+   "data": {
+    "kind": "binding",
+    "type": "dead-code"
+   },
+   "message": "unused variable: `c2`\nHint: consider removing this variable or prefixing with underscore: `_c2`",
+   "range": "6:37:6:39",
+   "severity": 4,
+   "source": "tinymist-lint",
+   "tags": [
+    1
+   ]
+  }
+ ]
+}
