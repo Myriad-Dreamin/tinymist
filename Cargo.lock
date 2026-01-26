@@ -4946,6 +4946,7 @@ dependencies = [
  "siphasher",
  "strum",
  "tinymist-analysis",
+ "tinymist-debug",
  "tinymist-derive",
  "tinymist-l10n",
  "tinymist-lint",
