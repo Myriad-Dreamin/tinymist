@@ -1,5 +1,7 @@
 //! Tinymist's localization library.
 
+mod msg_parser;
+
 use core::panic;
 use std::{
     borrow::Cow,
@@ -202,60 +204,34 @@ impl<T: std::fmt::Debug> DebugL10n for T {
     }
 }
 
-/// Tries to translate a string to the current language.
+/// Translates a message with placeholder substitution.
 ///
 /// Substitutes placeholders in the format `{key}` with provided argument values.
-/// If a placeholder argument is not found, outputs the placeholder as-is.
-/// If a placeholder is malformed (missing closing brace), outputs what was collected.
+/// Escaped braces `{{` and `}}` are converted to literal `{` and `}`.
+///
+/// If a placeholder argument is not found, the placeholder is output as-is.
+/// If a placeholder is malformed (missing closing brace), the literal characters are output.
+///
+/// # Arguments
+///
+/// * `key` - Translation key for lookup (used only for translation retrieval)
+/// * `message` - Default message with placeholders
+/// * `args` - Slice of key-value pairs for substitution
 pub fn t_with_args(
     key: &'static str,
     message: &'static str,
     args: &[(&'static str, Arg)],
 ) -> Cow<'static, str> {
     let message = find_message(key, message);
-    let mut result = String::with_capacity(message.len());
-    let mut chars = message.chars();
-
-    while let Some(c) = chars.next() {
-        if c != '{' {
-            // Not a placeholder, just add the character
-            result.push(c);
-            continue;
-        }
-
-        let mut arg_name = String::new();
-        let mut found_close_brace = false;
-
-        // Collect characters until we find '}'
-        for next_char in chars.by_ref() {
-            if next_char == '}' {
-                found_close_brace = true;
-                break;
-            }
-            arg_name.push(next_char);
-        }
-
-        // If we found a valid placeholder, try to substitute it
-        if found_close_brace {
-            if let Some(arg) = args.iter().find(|(k, _)| k == &arg_name).map(|(_, v)| v) {
-                match arg {
-                    Arg::Str(s) => result.push_str(s.as_ref()),
-                    Arg::Int(i) => result.push_str(&i.to_string()),
-                    Arg::Float(f) => result.push_str(&f.to_string()),
-                }
-            } else {
-                // Placeholder not found, output it as-is (with braces)
-                result.push('{');
-                result.push_str(&arg_name);
-                result.push('}');
-            }
-        } else {
-            // Didn't find closing brace, output what we have
-            result.push('{');
-            result.push_str(&arg_name);
-        }
-    }
-
+    let result = msg_parser::parse_message(message, |arg_name| {
+        args.iter()
+            .find(|(k, _)| k == &arg_name)
+            .map(|(_, v)| match v {
+                Arg::Str(s) => s.clone(),
+                Arg::Int(i) => i.to_string().into(),
+                Arg::Float(f) => f.to_string().into(),
+            })
+    });
     Cow::Owned(result)
 }
 
@@ -347,5 +323,37 @@ mod tests {
         let args = &[("name", "John".into())];
         let result = t_with_args("test.key", "Hello {name world", args);
         assert_eq!(result, "Hello {name world");
+    }
+
+    #[test]
+    fn test_escaped_opening_brace() {
+        // {{ should output as single {
+        let args = &[];
+        let result = t_with_args("test.key", "Use {{ to escape", args);
+        assert_eq!(result, "Use { to escape");
+    }
+
+    #[test]
+    fn test_escaped_closing_brace() {
+        // }} should output as single }
+        let args = &[];
+        let result = t_with_args("test.key", "Close with }}", args);
+        assert_eq!(result, "Close with }");
+    }
+
+    #[test]
+    fn test_escaped_braces() {
+        // {{arg}} should output {arg} literally (not treated as placeholder)
+        let args = &[("arg", "value".into())];
+        let result = t_with_args("test.key", "Pattern: {{arg}}", args);
+        assert_eq!(result, "Pattern: {arg}");
+    }
+
+    #[test]
+    fn test_multiple_escaped_braces() {
+        // Test multiple escape sequences
+        let args = &[("x", "value".into())];
+        let result = t_with_args("test.key", "{{ {x} }}", args);
+        assert_eq!(result, "{ value }");
     }
 }
