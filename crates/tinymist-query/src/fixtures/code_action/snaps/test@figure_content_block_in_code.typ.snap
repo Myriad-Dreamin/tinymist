@@ -11,7 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_content_block_
     "s0.typ": [
      {
       "insertTextFormat": 2,
-      "newText": "figure(\n  caption: [Caption],\n  [\n    content\n  ]\n)",
+      "newText": "figure(\n  caption: [Caption],\n  [\n    content\n  ]\n)$0",
       "range": "1:2:3:3"
      }
     ]
@@ -26,7 +26,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_content_block_
     "s0.typ": [
      {
       "insertTextFormat": 2,
-      "newText": "figure(\n  [\n    content\n  ],\n  caption: [Caption],\n)",
+      "newText": "figure(\n  [\n    content\n  ],\n  caption: [Caption],\n)$0",
       "range": "1:2:3:3"
      }
     ]

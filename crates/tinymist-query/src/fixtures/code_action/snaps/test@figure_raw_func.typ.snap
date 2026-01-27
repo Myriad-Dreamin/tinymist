@@ -11,7 +11,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_func.typ
     "s0.typ": [
      {
       "insertTextFormat": 2,
-      "newText": "figure(\n  caption: [Caption],\n  raw(\"let x = 1\", lang: \"rust\")\n)",
+      "newText": "figure(\n  caption: [Caption],\n  raw(\"let x = 1\", lang: \"rust\")\n)$0",
       "range": "0:1:0:31"
      }
     ]
@@ -26,7 +26,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_func.typ
     "s0.typ": [
      {
       "insertTextFormat": 2,
-      "newText": "figure(\n  raw(\"let x = 1\", lang: \"rust\"),\n  caption: [Caption],\n)",
+      "newText": "figure(\n  raw(\"let x = 1\", lang: \"rust\"),\n  caption: [Caption],\n)$0",
       "range": "0:1:0:31"
      }
     ]
