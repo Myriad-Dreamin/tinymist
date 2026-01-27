@@ -1,6 +1,7 @@
 //! Package management tools.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use ecow::eco_format;
 #[cfg(feature = "local-registry")]
@@ -12,7 +13,7 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, VirtualPath};
+use typst::syntax::{FileId, LinkedNode, SyntaxKind, VirtualPath, ast};
 
 use crate::LocalContext;
 
@@ -39,6 +40,26 @@ impl From<PackageIndexEntry> for PackageInfo {
             version: spec.version.to_string(),
         }
     }
+}
+
+/// Parses a package import from a string literal node in an import statement.
+/// Returns the PackageSpec if it's a valid package import.
+pub fn parse_package_import(node: &LinkedNode) -> Option<PackageSpec> {
+    if !matches!(node.kind(), SyntaxKind::Str) {
+        return None;
+    }
+
+    let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
+
+    let ast::Expr::Str(str_node) = import_node.source() else {
+        return None;
+    };
+    let import_str = str_node.get();
+    if !import_str.starts_with("@") {
+        return None;
+    }
+
+    PackageSpec::from_str(&import_str).ok()
 }
 
 /// Parses the manifest of the package located at `package_path`.

@@ -1,11 +1,12 @@
 use std::cmp::Reverse;
-use std::str::FromStr;
 
 use lsp_types::{InlayHintKind, InlayHintLabel};
-use tinymist_world::package::{PackageSpec, PackageSpecExt};
+use tinymist_world::package::PackageSpecExt;
+use typst::syntax::{LinkedNode, SyntaxKind, ast};
 
 use crate::{
     analysis::{ParamKind, analyze_call},
+    package::parse_package_import,
     prelude::*,
 };
 
@@ -287,27 +288,7 @@ impl InlayHintWorker<'_> {
     }
 
     fn check_package_import(&mut self, node: &LinkedNode) -> Option<()> {
-        // Node should be a Str (string literal)
-        if !matches!(node.kind(), SyntaxKind::Str) {
-            return None;
-        }
-
-        // Navigate up to find the ModuleImport node
-        let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
-
-        // Check if this is a package import (starts with @)
-        let ast::Expr::Str(str_node) = import_node.source() else {
-            return None;
-        };
-        let import_str = str_node.get();
-        if !import_str.starts_with("@") {
-            return None;
-        }
-
-        // Parse the package spec
-        let Ok(package_spec) = PackageSpec::from_str(&import_str) else {
-            return None;
-        };
+        let package_spec = parse_package_import(node)?;
 
         let versionless_spec = package_spec.versionless();
 
