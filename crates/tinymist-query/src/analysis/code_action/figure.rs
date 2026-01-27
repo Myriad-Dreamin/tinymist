@@ -34,12 +34,10 @@ impl<'a> CodeActionWorker<'a> {
     }
 
     fn figure_actions_for_code_block(&mut self, node: &LinkedNode) -> Option<()> {
-        let _block = node.cast::<ast::CodeBlock>()?;
         self.wrap_in_figure(node, "code block", false)
     }
 
     fn figure_actions_for_content_block(&mut self, node: &LinkedNode) -> Option<()> {
-        let _block = node.cast::<ast::ContentBlock>()?;
         self.wrap_in_figure(node, "content block", false)
     }
 
@@ -61,12 +59,9 @@ impl<'a> CodeActionWorker<'a> {
 
         // Create action for caption before
         let caption_before = if self.ctx.analysis.extended_code_action {
-            eco_format!(
-                "{mode}figure(\n  caption: [${{1:Caption}}],\n  {}\n)$0",
-                call_text
-            )
+            eco_format!("{mode}figure(\n  caption: [${{1:Caption}}],\n  {call_text}\n)$0")
         } else {
-            eco_format!("{mode}figure(\n  caption: [Caption],\n  {}\n)", call_text)
+            eco_format!("{mode}figure(\n  caption: [Caption],\n  {call_text}\n)$0")
         };
 
         let edit_before = self.local_edit(EcoSnippetTextEdit::new(
@@ -89,12 +84,9 @@ impl<'a> CodeActionWorker<'a> {
 
         // Create action for caption after
         let caption_after = if self.ctx.analysis.extended_code_action {
-            eco_format!(
-                "{mode}figure(\n  {},\n  caption: [${{1:Caption}}],\n)$0",
-                call_text
-            )
+            eco_format!("{mode}figure(\n  {call_text},\n  caption: [${{1:Caption}}],\n)$0")
         } else {
-            eco_format!("{mode}figure(\n  {},\n  caption: [Caption],\n)", call_text)
+            eco_format!("{mode}figure(\n  {call_text},\n  caption: [Caption],\n)$0")
         };
 
         let edit_after = self.local_edit(EcoSnippetTextEdit::new(
