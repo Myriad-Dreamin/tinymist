@@ -4,13 +4,8 @@ import { resolve } from "path";
 import * as vscode from "vscode";
 import * as lc from "vscode-languageclient";
 import * as Is from "vscode-languageclient/lib/common/utils/is";
-import { ExtensionMode } from "vscode";
-import type {
-  LanguageClient,
-  SymbolInformation,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import type { SymbolInformation, LanguageClientOptions } from "vscode-languageclient/node";
+import type { BaseLanguageClient as LanguageClient } from "vscode-languageclient";
 
 import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
@@ -25,7 +20,9 @@ import type { ExportActionOpts, ExportOpts } from "./cmd.export";
 import { substVscodeVarsInConfig, TinymistConfig } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
+import type { createSystemLanguageClient } from "./lsp.system";
 
 interface ResourceRoutes {
   "/fonts": any;
@@ -97,20 +94,20 @@ interface JumpInfo {
 }
 
 export class LanguageState {
-  static Client: typeof LanguageClient = undefined!;
+  static Client: typeof createSystemLanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
 
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => {};
+  clientPromiseResolve = (_client: LanguageClient) => { };
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => {};
+    this.clientPromiseResolve = (_client: LanguageClient) => { };
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -123,10 +120,40 @@ export class LanguageState {
       await this.client.stop();
       this.client = undefined;
     }
+    // Reset server readiness flag so other code doesn't assume a running server
+    if (extensionState?.mut) {
+      extensionState.mut.serverReady = false;
+    }
   }
 
   getClient() {
     return this.clientPromise;
+  }
+
+  /**
+   * Checks if the LSP server is available and shows a warning if not.
+   * @returns true if server is available, false otherwise
+   */
+  checkServerHealth(): boolean {
+    if (this.client) return true;
+
+    // Server health check: warn user if server is unavailable
+    if (!extensionState.mut.serverHealthWarningShown) {
+      extensionState.mut.serverHealthWarningShown = true;
+      void vscode.window
+        .showWarningMessage(
+          l10nMsg(
+            "Tinymist server is not available. Some features like auto-formatting on Enter may not work. Try restarting the server.",
+          ),
+          l10nMsg("Restart Server"),
+        )
+        .then((selection) => {
+          if (selection === l10nMsg("Restart Server")) {
+            void vscode.commands.executeCommand("tinymist.restartServer");
+          }
+        });
+    }
+    return false;
   }
 
   probeEnvPath(configName: string, configPath?: string): string {
@@ -137,9 +164,9 @@ export class LanguageState {
     const serverPaths: [string, string][] = configPath
       ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
-          ["Bundled", resolve(__dirname, binaryName)],
-          ["In PATH", binaryName],
-        ];
+        ["Bundled", resolve(__dirname, binaryName)],
+        ["In PATH", binaryName],
+      ];
 
     return tinymist.probePaths(serverPaths);
   }
@@ -176,29 +203,8 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: TinymistConfig) {
+  async initClient(config: TinymistConfig) {
     const context = this.context;
-    const isProdMode = context.extensionMode === ExtensionMode.Production;
-
-    /// The `--mirror` flag is only used in development/test mode for testing
-    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
-    /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
-    /// production mode because we don't put the debug information in the binary.
-    ///
-    /// Note: Developers can still download the debug information from the GitHub Releases and enable the backtrace
-    /// manually by themselves.
-    const RUST_BACKTRACE = isProdMode ? "1" : "full";
-
-    const run = {
-      command: config.probedServerPath,
-      args: ["lsp", ...mirrorFlag],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
-    };
-    // console.log("use arguments", run);
-    const serverOptions: ServerOptions = {
-      run,
-      debug: run,
-    };
 
     const trustedCommands = {
       enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText"],
@@ -301,12 +307,7 @@ export class LanguageState {
       },
     };
 
-    const client = (this.client = new LanguageState.Client(
-      "tinymist",
-      "Tinymist Typst Language Server",
-      serverOptions,
-      clientOptions,
-    ));
+    const client = (this.client = await LanguageState.Client(context, config, clientOptions));
 
     this.clientPromiseResolve(client);
     return client;
@@ -314,6 +315,7 @@ export class LanguageState {
 
   async startClient(): Promise<void> {
     const client = this.client;
+    console.log("this.client", !!this.client);
     if (!client) {
       throw new Error("Language client is not set");
     }
@@ -325,7 +327,16 @@ export class LanguageState {
     if (extensionState.features.preview) {
       this.registerPreviewNotifications(client);
     }
+
+    // Track server readiness state
+    client.onDidChangeState((event) => {
+      extensionState.mut.serverReady = event.newState === lc.State.Running;
+    });
+
     await client.start();
+
+    // Reset server health warning flag when client successfully starts
+    extensionState.mut.serverHealthWarningShown = false;
 
     return;
   }
@@ -815,17 +826,17 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
   ? CodeContextQueryResult
   : Q extends ModeAtQuery
-    ? ModeAtQueryResult
-    : Q extends StyleAtQuery
-      ? StyleAtQueryResult
-      : never;
+  ? ModeAtQueryResult
+  : Q extends StyleAtQuery
+  ? StyleAtQueryResult
+  : never;
 export type CodeContextQueryResult<T = any> =
   | {
-      value: T;
-    }
+    value: T;
+  }
   | {
-      error: string;
-    };
+    error: string;
+  };
 export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
 export type StyleAtQueryResult = {
   style: any[];
