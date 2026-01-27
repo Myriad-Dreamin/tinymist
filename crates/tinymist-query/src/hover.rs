@@ -444,9 +444,7 @@ impl HoverWorker<'_> {
             }
 
             // Add file preview for images and text files
-            if let Ok(file_path) = target.to_file_path() {
-                self.generate_file_preview(&file_path);
-            }
+            self.generate_file_preview(Path::new(target.path()));
         }
 
         Some(())
