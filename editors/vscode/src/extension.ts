@@ -20,7 +20,6 @@ import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-ma
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
 import { activeTypstEditor, isTypstDocument, statusBarFormatString } from "./util";
-import { LanguageClient } from "vscode-languageclient/node";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import { previewActivate, previewDeactivate } from "./features/preview";
@@ -36,8 +35,9 @@ import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.
 import { askPageSelection, commandShow, exportActivate, quickExports } from "./features/export";
 import { resolveCodeAction } from "./lsp.code-action";
 import { HoverTmpStorage } from "./features/hover-storage.tmp";
+import { createSystemLanguageClient } from "./lsp.system";
 
-LanguageState.Client = LanguageClient;
+LanguageState.Client = createSystemLanguageClient;
 LanguageState.HoverTmpStorage = HoverTmpStorage;
 
 const systemActivateTable = (): FeatureEntry[] => [

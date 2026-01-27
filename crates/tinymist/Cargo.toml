@@ -105,7 +105,6 @@ cargo_metadata = "0.18.0"
 dap = ["sync-ls/dap", "tinymist-debug"]
 default = ["web", "no-content-hint"]
 preview = [
-    "open",
     "http-body-util",
     "hyper",
     "hyper-util",
@@ -124,6 +123,7 @@ web = [
     "serde-wasm-bindgen",
     "wasm-bindgen-futures",
     "reflexo-typst/web",
+    "sync-ls/web",
     "tinymist-project/web",
     "sync-ls/web",
 ]
