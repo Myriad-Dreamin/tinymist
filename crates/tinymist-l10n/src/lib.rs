@@ -203,59 +203,56 @@ impl<T: std::fmt::Debug> DebugL10n for T {
 }
 
 /// Tries to translate a string to the current language.
+///
+/// Substitutes placeholders in the format `{key}` with provided argument values.
+/// If a placeholder argument is not found, outputs the placeholder as-is.
+/// If a placeholder is malformed (missing closing brace), outputs what was collected.
 pub fn t_with_args(
     key: &'static str,
     message: &'static str,
     args: &[(&'static str, Arg)],
 ) -> Cow<'static, str> {
     let message = find_message(key, message);
-    let mut result = String::new();
+    let mut result = String::with_capacity(message.len());
+    let mut chars = message.chars();
 
-    // for c in message.chars() {
-    //     if c == '{' {
-    //         let Some(bracket_index) = message[arg_index..].find('}') else {
-    //             result.push(c);
-    //             continue;
-    //         };
+    while let Some(c) = chars.next() {
+        if c != '{' {
+            // Not a placeholder, just add the character
+            result.push(c);
+            continue;
+        }
 
-    //         let arg_index_str = &message[arg_index + 1..arg_index +
-    // bracket_index];
+        let mut arg_name = String::new();
+        let mut found_close_brace = false;
 
-    //         match arg {
-    //             Arg::Str(s) => result.push_str(s.as_ref()),
-    //             Arg::Int(i) => result.push_str(&i.to_string()),
-    //             Arg::Float(f) => result.push_str(&f.to_string()),
-    //         }
+        // Collect characters until we find '}'
+        for next_char in chars.by_ref() {
+            if next_char == '}' {
+                found_close_brace = true;
+                break;
+            }
+            arg_name.push(next_char);
+        }
 
-    //         arg_index += arg_index_str.len() + 2;
-    //     } else {
-    //         result.push(c);
-    //     }
-    // }
-
-    let message_iter = &mut message.chars();
-    while let Some(c) = message_iter.next() {
-        if c == '{' {
-            let arg_index_str = message_iter.take_while(|c| *c != '}').collect::<String>();
-            message_iter.next();
-
-            let Some(arg) = args
-                .iter()
-                .find(|(k, _)| k == &arg_index_str)
-                .map(|(_, v)| v)
-            else {
-                result.push(c);
-                result.push_str(&arg_index_str);
-                continue;
-            };
-
-            match arg {
-                Arg::Str(s) => result.push_str(s.as_ref()),
-                Arg::Int(i) => result.push_str(&i.to_string()),
-                Arg::Float(f) => result.push_str(&f.to_string()),
+        // If we found a valid placeholder, try to substitute it
+        if found_close_brace {
+            if let Some(arg) = args.iter().find(|(k, _)| k == &arg_name).map(|(_, v)| v) {
+                match arg {
+                    Arg::Str(s) => result.push_str(s.as_ref()),
+                    Arg::Int(i) => result.push_str(&i.to_string()),
+                    Arg::Float(f) => result.push_str(&f.to_string()),
+                }
+            } else {
+                // Placeholder not found, output it as-is (with braces)
+                result.push('{');
+                result.push_str(&arg_name);
+                result.push('}');
             }
         } else {
-            result.push(c);
+            // Didn't find closing brace, output what we have
+            result.push('{');
+            result.push_str(&arg_name);
         }
     }
 
@@ -303,4 +300,52 @@ pub fn deserialize(input: &str, key_first: bool) -> anyhow::Result<TranslationMa
     }
 
     Ok(translations)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_placeholder() {
+        let args = &[("x", "value".into())];
+        let result = t_with_args("test.key", "Result: {} end", args);
+        assert_eq!(result, "Result: {} end");
+    }
+
+    #[test]
+    fn test_consecutive_placeholders() {
+        let args = &[("x", "A".into()), ("y", "B".into())];
+        let result = t_with_args("test.key", "{x}{y}", args);
+        assert_eq!(result, "AB");
+    }
+
+    #[test]
+    fn test_placeholder_missing_arg() {
+        let args = &[];
+        let result = t_with_args("test.key", "Hello {name} world", args);
+        assert_eq!(result, "Hello {name} world");
+    }
+
+    #[test]
+    fn test_int_argument() {
+        let args = &[("count", Arg::Int(42))];
+        let result = t_with_args("test.key", "You have {count} items", args);
+        assert_eq!(result, "You have 42 items");
+    }
+
+    #[test]
+    fn test_float_argument() {
+        let args = &[("price", Arg::Float(9.15))];
+        let result = t_with_args("test.key", "Price: {price} dollars", args);
+        assert_eq!(result, "Price: 9.15 dollars");
+    }
+
+    #[test]
+    fn test_malformed_placeholder_no_closing_brace() {
+        // Test placeholder without closing brace outputs as-is
+        let args = &[("name", "John".into())];
+        let result = t_with_args("test.key", "Hello {name world", args);
+        assert_eq!(result, "Hello {name world");
+    }
 }
