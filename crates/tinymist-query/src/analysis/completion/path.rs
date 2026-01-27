@@ -163,9 +163,12 @@ impl CompletionPair<'_, '_, '_> {
 
     /// Generate documentation with preview for file completions
     fn generate_file_documentation(&self, file_id: &TypstFileId) -> Option<Documentation> {
-        let path = file_id.vpath();
-        let path_str = path.as_rooted_path().to_string_lossy();
-        let extension = path_str.rsplit('.').next()?.to_lowercase();
+        let extension = file_id
+            .vpath()
+            .as_rootless_path()
+            .extension()?
+            .to_str()?
+            .to_lowercase();
 
         if !file_preview::is_previewable(&extension) {
             return None;

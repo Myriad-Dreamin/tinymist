@@ -86,14 +86,21 @@ fn generate_image_preview(
 
 /// Generate text file preview
 fn generate_text_preview(content: &[u8], extension: &str, size: u64) -> Option<String> {
+    const LENGTH_LIMIT: usize = 500;
+    const LINE_LIMIT: usize = 20;
+
     // Convert to string
     let text_content = String::from_utf8_lossy(content);
 
-    // Limit preview length (first 500 characters or 20 lines)
-    let lines: Vec<&str> = text_content.lines().take(20).collect();
+    // Limit preview length (first LENGTH_LIMIT characters or LINE_LIMIT lines)
+    let lines: Vec<&str> = text_content.lines().take(LINE_LIMIT).collect();
     let preview_text = lines.join("\n");
-    let preview_text = if preview_text.len() > 500 {
-        format!("{}...", &preview_text[..500])
+    let preview_text = if preview_text.len() > LENGTH_LIMIT {
+        let mut boundary = LENGTH_LIMIT;
+        while !preview_text.is_char_boundary(boundary) {
+            boundary -= 1;
+        }
+        format!("{}...", &preview_text[..boundary])
     } else {
         preview_text
     };
@@ -113,7 +120,7 @@ fn generate_text_preview(content: &[u8], extension: &str, size: u64) -> Option<S
         _ => "text",
     };
 
-    let truncated = if lines.len() >= 20 || text_content.len() > 500 {
+    let truncated = if lines.len() >= LINE_LIMIT || text_content.len() > LENGTH_LIMIT {
         " (truncated)"
     } else {
         ""
