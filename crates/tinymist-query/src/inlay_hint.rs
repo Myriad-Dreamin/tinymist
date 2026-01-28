@@ -1,12 +1,9 @@
-use std::cmp::Reverse;
-
 use lsp_types::{InlayHintKind, InlayHintLabel};
-use tinymist_world::package::PackageSpecExt;
 use typst::syntax::{LinkedNode, SyntaxKind, ast};
 
 use crate::{
     analysis::{ParamKind, analyze_call},
-    package::parse_package_import,
+    package::{find_package_and_latest, parse_package_import},
     prelude::*,
 };
 
@@ -290,37 +287,7 @@ impl InlayHintWorker<'_> {
     fn check_package_import(&mut self, node: &LinkedNode) -> Option<()> {
         let package_spec = parse_package_import(node)?;
 
-        let versionless_spec = package_spec.versionless();
-
-        // Get all matching packages
-        let w = self.ctx.world().clone();
-        let mut packages = vec![];
-        if package_spec.is_preview() {
-            packages.extend(
-                w.packages()
-                    .iter()
-                    .filter(|it| it.matches_versionless(&versionless_spec)),
-            );
-        }
-        // Add non-preview packages
-        #[cfg(feature = "local-registry")]
-        let local_packages = self.ctx.non_preview_packages();
-        #[cfg(feature = "local-registry")]
-        if !package_spec.is_preview() {
-            packages.extend(
-                local_packages
-                    .iter()
-                    .filter(|it| it.matches_versionless(&versionless_spec)),
-            );
-        }
-
-        // Sort by version descending
-        packages.sort_by_key(|entry| Reverse(entry.package.version));
-
-        // Determine version status
-        let current_entry = packages
-            .iter()
-            .find(|entry| entry.package.version == package_spec.version);
+        let (current_entry, latest) = find_package_and_latest(self.ctx.shared(), &package_spec);
 
         let (label, tooltip) = if current_entry.is_none() {
             // Version not found - invalid
@@ -333,36 +300,33 @@ impl InlayHintWorker<'_> {
                     version = version_str.as_str().into()
                 )),
             )
-        } else if let Some(latest) = packages.first() {
-            let latest_version = &latest.package.version;
-            if *latest_version != package_spec.version {
-                // Upgradable - newer version available
-                let latest_str = latest_version.to_string();
-                (
-                    tinymist_l10n::t!(
-                        "inlay-hint.package.upgradable",
-                        "⬆️ {version}",
-                        version = latest_str.as_str().into()
-                    ),
-                    Some(tinymist_l10n::t!(
-                        "inlay-hint.package.upgradable-tooltip",
-                        "Newer version available: {version}",
-                        version = latest_str.as_str().into()
-                    )),
-                )
-            } else {
-                // Up to date - latest version
-                (
-                    tinymist_l10n::t!("inlay-hint.package.up-to-date", "✅ latest"),
-                    Some(tinymist_l10n::t!(
-                        "inlay-hint.package.up-to-date-tooltip",
-                        "Up to date (latest version)"
-                    )),
-                )
-            }
+        } else if let Some(latest) = latest
+            && let latest_version = latest.package.version
+            && latest_version != package_spec.version
+        {
+            // Upgradable - newer version available
+            let latest_str = latest_version.to_string();
+            (
+                tinymist_l10n::t!(
+                    "inlay-hint.package.upgradable",
+                    "⬆️ {version}",
+                    version = latest_str.as_str().into()
+                ),
+                Some(tinymist_l10n::t!(
+                    "inlay-hint.package.upgradable-tooltip",
+                    "Newer version available: {version}",
+                    version = latest_str.as_str().into()
+                )),
+            )
         } else {
-            // No packages found at all
-            return None;
+            // Up to date - latest version
+            (
+                tinymist_l10n::t!("inlay-hint.package.up-to-date", "✅"),
+                Some(tinymist_l10n::t!(
+                    "inlay-hint.package.up-to-date-tooltip",
+                    "Up to date (latest version)"
+                )),
+            )
         };
 
         // Position for the hint - at the end of the string node

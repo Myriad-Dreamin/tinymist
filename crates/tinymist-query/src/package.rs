@@ -1,21 +1,22 @@
 //! Package management tools.
 
+use std::borrow::Cow;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use ecow::eco_format;
 #[cfg(feature = "local-registry")]
 use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::PackageSpec;
 use tinymist_world::package::registry::PackageIndexEntry;
+use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, LinkedNode, SyntaxKind, VirtualPath, ast};
 
 use crate::LocalContext;
+use crate::analysis::SharedContext;
 
 /// Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,11 +56,50 @@ pub fn parse_package_import(node: &LinkedNode) -> Option<PackageSpec> {
         return None;
     };
     let import_str = str_node.get();
-    if !import_str.starts_with("@") {
-        return None;
+    if import_str.starts_with('@') {
+        import_str.parse().ok()
+    } else {
+        None
     }
+}
 
-    PackageSpec::from_str(&import_str).ok()
+/// Finds the package entry for a given package spec, and also the latest
+/// version entry.
+pub fn find_package_and_latest<'a>(
+    ctx: &'a SharedContext,
+    package_spec: &PackageSpec,
+) -> (
+    Option<Cow<'a, PackageIndexEntry>>,
+    Option<Cow<'a, PackageIndexEntry>>,
+) {
+    let versionless_spec = package_spec.versionless();
+
+    if package_spec.is_preview() {
+        let packages = ctx.world().packages();
+
+        let current = packages.iter().find(|it| it.matches(package_spec));
+        let latest = packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (current.map(Cow::Borrowed), latest.map(Cow::Borrowed))
+    } else if cfg!(feature = "local-registry") {
+        let local_packages = ctx.non_preview_packages();
+
+        let current = local_packages.iter().find(|it| it.matches(package_spec));
+        let latest = local_packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (
+            current.map(|p| Cow::Owned(p.clone())),
+            latest.map(|p| Cow::Owned(p.clone())),
+        )
+    } else {
+        (None, None)
+    }
 }
 
 /// Parses the manifest of the package located at `package_path`.
