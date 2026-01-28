@@ -367,7 +367,7 @@ mod polymorphic {
                 Self::FoldingRange(req) => &req.path,
                 Self::SelectionRange(req) => &req.path,
                 Self::InteractCodeContext(req) => &req.path,
-                Self::ShowFullValue(..) => return None, // No specific path needed
+                Self::ShowFullValue(req) => &req.path,
 
                 Self::OnEnter(req) => &req.path,
 

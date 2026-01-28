@@ -63,7 +63,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
         }
     }
 
-    const SIZE_LIMIT: usize = 512 * 1024 * 1024; // 512MB
+    const SIZE_LIMIT: usize = 8 * 1024 * 1024; // 8MB
 
     let mut buf = String::new();
     let mut limited = false;
