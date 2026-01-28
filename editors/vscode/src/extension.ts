@@ -20,7 +20,6 @@ import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-ma
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
 import { activeTypstEditor, isTypstDocument, statusBarFormatString } from "./util";
-import { LanguageClient } from "vscode-languageclient/node";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import { previewActivate, previewDeactivate } from "./features/preview";
@@ -36,8 +35,9 @@ import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.
 import { askPageSelection, commandShow, exportActivate, quickExports } from "./features/export";
 import { resolveCodeAction } from "./lsp.code-action";
 import { HoverTmpStorage } from "./features/hover-storage.tmp";
+import { createSystemLanguageClient } from "./lsp.system";
 
-LanguageState.Client = LanguageClient;
+LanguageState.Client = createSystemLanguageClient;
 LanguageState.HoverTmpStorage = HoverTmpStorage;
 
 const systemActivateTable = (): FeatureEntry[] => [
@@ -233,8 +233,9 @@ async function languageActivate(context: IContext) {
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
+
+    commands.registerTextEditorCommand("tinymist.replaceText", commandReplaceText),
   );
-  // context.subscriptions.push
   const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
@@ -731,4 +732,18 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
 function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerSuggest");
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
+}
+
+async function commandReplaceText(
+  editor: TextEditor,
+  edit: vscode.TextEditorEdit,
+  args?: { range: vscode.Range; replace: string },
+): Promise<void> {
+  if (editor && args) {
+    const range = new vscode.Range(
+      new vscode.Position(args.range.start.line, args.range.start.character),
+      new vscode.Position(args.range.end.line, args.range.end.character),
+    );
+    edit.replace(range, args.replace);
+  }
 }

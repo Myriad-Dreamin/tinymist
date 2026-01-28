@@ -1,7 +1,9 @@
 export interface ExportPdfOpts {
   pages?: string[];
   creationTimestamp?: string | null;
-  // todo: pdf_standard
+  processor?: string;
+  pdfStandard?: string[];
+  noPdfTags?: boolean;
 }
 
 export interface PageMergeOpts {

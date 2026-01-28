@@ -1103,6 +1103,58 @@ zh = "在文件中输入时导出 PDF。"
 en = "(Deprecated) Export PDFs when a document has a title (and save a file), which is useful to filter out template files."
 zh = "（已废除） 当文档有标题时导出 PDF（并保存文件），这对于过滤模板文件很有用。"
 
+[extension.tinymist.config.tinymist.convertExtension.title]
+en = "Convert Extension using Typst Templates"
+zh = "使用 Typst 模板扩展转换"
+
+[extension.tinymist.config.tinymist.convertExtension.desc]
+en = "This configuration specifies how to let the editor use Typst templates to convert other format files into PDF documents."
+zh = "该配置指定如何让编辑器利用 Typst 模板将其他格式文件转换成PDF文档。"
+
+[extension.tinymist.config.tinymist.convertExtension.items.string.title]
+en = "Matching Markup Language or File Kind to convert to PDF"
+zh = "匹配标记语言或文件类型转换为 PDF"
+
+[extension.tinymist.config.tinymist.convertExtension.items.string.desc]
+en = "The language or file kind to match to convert to PDF using the typst template. For example, `markdown` will convert to PDF using the latest typst package `@preview/cmarker`."
+zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`markdown` 将使用最新版的 typst 包 `@preview/cmarker` 转换为 PDF。"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.title]
+en = "A object to configure the conversion"
+zh = "一个对象，配置转换方式"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.desc]
+en = "A object to configure the conversion"
+zh = "一个对象，配置转换方式"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.language.title]
+en = "Matching Markup Language or File Kind to convert to PDF"
+zh = "匹配标记语言或文件类型转换为 PDF"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.language.desc]
+en = "The language or file kind to match to convert to PDF using the typst template. For example, `markdown` will convert to PDF using the latest typst package `@preview/cmarker`."
+zh = "匹配哪种编程语言或文件类型转换为 PDF。例如，`markdown` 将使用最新版的 typst 包 `@preview/cmarker` 转换为 PDF。"
+
+[extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown]
+en = "Markdown"
+zh = "Markdown"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.title]
+en = "Show Navigation Icon"
+zh = "显示导航图标"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.desc]
+en = "Whether to show the navigation icon in the editor (VSCode only)."
+zh = "是否在编辑器中显示导航图标（仅 VSCode 支持）。"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.processor.title]
+en = "The processor package to use for conversion"
+zh = "使用的处理器包（processor package）"
+
+[extension.tinymist.config.tinymist.convertExtension.items.object.processor.desc]
+en = "The processor package to use for conversion. . For example, the default markdown processor is `@preview/cmarker:0.1.6` which provides a `render(string)` function to convert Markdown to PDF."
+zh = "使用的处理器包（processor package）。例如，默认的 Markdown 处理器是 `@preview/cmarker:0.1.6`，其提供了一个 `render(string)` 函数来转换 Markdown 为 PDF。"
+
 [extension.tinymist.config.tinymist.rootPath.title]
 en = "Root path"
 zh = "根路径"
@@ -1188,8 +1240,8 @@ en = "Status Bar Format"
 zh = "状态栏格式"
 
 [extension.tinymist.config.tinymist.statusBarFormat.desc]
-en = "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty."
-zh = "设置服务器状态的格式字符串。例如，`{compileStatusIcon}{wordCount} [{fileName}]` 将格式化状态为 `$(check) 123 words [main]`。有效的占位符包括：\n\n- `{compileStatusIcon}`：指示编译状态的图标\n- `{wordCount}`：文档中的字数\n- `{fileName}`：正在编译的文件的名称\n\n注意：如果格式字符串为空，则状态栏将被隐藏。"
+en = "Set format string of the server status. For example, `{compileStatusIcon}{wordCount} [{fileName}]` will format the status as `$(check) 123 words [main]`. Valid placeholders are:\n\n- `{compileStatusIcon}`: Icon indicating the compile status\n- `{wordCount}`: Number of words in the document\n- `{charCount}`: Number of characters in the document\n- `{fileName}`: Name of the file being compiled\n\nNote: The status bar will be hidden if the format string is empty."
+zh = "设置服务器状态的格式字符串。例如，`{compileStatusIcon}{wordCount} [{fileName}]` 将格式化状态为 `$(check) 123 words [main]`。有效的占位符包括：\n\n- `{compileStatusIcon}`：指示编译状态的图标\n- `{wordCount}`：文档中的字数\n- `{charCount}`：文档中的字符数\n- `{fileName}`：正在编译的文件的名称\n\n注意：如果格式字符串为空，则状态栏将被隐藏。"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.title]
 en = "Typst Extra Arguments"

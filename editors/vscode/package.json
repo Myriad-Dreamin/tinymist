@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.14.4-rc1",
+  "version": "0.14.10",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -395,6 +395,64 @@
             "%extension.tinymist.config.tinymist.exportPdf.string.enum.onSave%",
             "%extension.tinymist.config.tinymist.exportPdf.string.enum.onType%",
             "%extension.tinymist.config.tinymist.exportPdf.string.enum.onDocumentHasTitle%"
+          ]
+        },
+        "tinymist.convertExtension": {
+          "title": "%extension.tinymist.config.tinymist.convertExtension.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.desc%",
+          "default": [],
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "title": "%extension.tinymist.config.tinymist.convertExtension.items.string.title%",
+                    "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.string.desc%",
+                    "enum": [
+                      "markdown"
+                    ],
+                    "enumDescriptions": [
+                      "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown%"
+                    ]
+                  },
+                  {
+                    "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.title%",
+                    "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.desc%",
+                    "type": "object",
+                    "properties": {
+                      "showNavigationIcon": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.showNavigationIcon.desc%",
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "language": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.language.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.language.desc%",
+                        "type": "string",
+                        "enum": [
+                          "markdown"
+                        ],
+                        "enumDescriptions": [
+                          "%extension.tinymist.config.tinymist.convertExtension.items.string.enum.markdown%"
+                        ]
+                      },
+                      "processor": {
+                        "title": "%extension.tinymist.config.tinymist.convertExtension.items.object.processor.title%",
+                        "markdownDescription": "%extension.tinymist.config.tinymist.convertExtension.items.object.processor.desc%",
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "default": null
+                      }
+                    }
+                  }
+                ]
+              }
+            }
           ]
         },
         "tinymist.rootPath": {
@@ -1370,7 +1428,7 @@
       {
         "command": "tinymist.onEnter",
         "key": "enter",
-        "when": "editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
+        "when": "ext.tinymistActivated && editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
       },
       {
         "command": "typst-preview.preview",
@@ -1405,7 +1463,7 @@
       "editor/title": [
         {
           "command": "tinymist.showPdf",
-          "when": "resourceLangId == typst && editorTextFocus",
+          "when": "(resourceLangId == typst || (resourceLangId == markdown && ext.navigateMdToPdfIcon)) && editorTextFocus",
           "group": "navigation"
         },
         {
@@ -1468,6 +1526,7 @@
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
     "vscode-languageclient": "^9.0.0",
+    "tinymist-web": "link:../../crates/tinymist",
     "ws": "^8.13.0"
   },
   "devDependencies": {

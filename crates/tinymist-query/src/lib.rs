@@ -142,6 +142,21 @@ mod polymorphic {
         pub open: bool,
     }
 
+    /// A request to run an export markdown task.
+    #[derive(Debug, Clone)]
+    pub struct OnExportMdRequest {
+        /// The path of the document to export.
+        pub path: PathBuf,
+        /// The processor package to use for the export.
+        pub processor: Option<String>,
+        /// The export task to run.
+        pub task: ProjectTask,
+        /// Whether to write to file.
+        pub write: bool,
+        /// Whether to open the exported file(s) after the export is done.
+        pub open: bool,
+    }
+
     /// The response to an export request.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(untagged, rename_all = "camelCase")]
@@ -217,6 +232,8 @@ mod polymorphic {
     pub enum CompilerQueryRequest {
         /// A request to run an export task.
         OnExport(OnExportRequest),
+        /// A request to run an export markdown task.
+        OnExportMd(OnExportMdRequest),
         /// A request to get the hover information.
         Hover(HoverRequest),
         /// A request to go to the definition.
@@ -265,6 +282,7 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
         /// A request to interact with the code context.
         InteractCodeContext(InteractCodeContextRequest),
+        /// A request to show the full value.
         ShowFullValue(ShowFullValueRequest),
 
         /// A request to get extra text edits on enter.
@@ -284,6 +302,7 @@ mod polymorphic {
             use FoldRequestFeature::*;
             match self {
                 Self::OnExport(..) => Mergeable,
+                Self::OnExportMd(..) => Mergeable,
                 Self::Hover(..) => PinnedFirst,
                 Self::GotoDefinition(..) => PinnedFirst,
                 Self::GotoDeclaration(..) => PinnedFirst,
@@ -322,6 +341,7 @@ mod polymorphic {
         pub fn associated_path(&self) -> Option<&Path> {
             Some(match self {
                 Self::OnExport(..) => return None,
+                Self::OnExportMd(..) => return None,
                 Self::Hover(req) => &req.path,
                 Self::GotoDefinition(req) => &req.path,
                 Self::GotoDeclaration(req) => &req.path,
@@ -413,6 +433,7 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
         /// The response to the interact code context request.
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
+        /// The response to the show full value request.
         ShowFullValue(Option<String>),
 
         /// The response to the on enter request.

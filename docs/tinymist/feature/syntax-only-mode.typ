@@ -2,7 +2,7 @@
 
 #show: book-page.with(title: [Syntax-Only Mode])
 
-The syntax-only mode is available since `tinymist` v0.14.4-rc1.
+The syntax-only mode is available since `tinymist` v0.14.2.
 
 When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. From a simple test on a typst document with 200 pages, containing complex figures and WASM plugin calls, editing a large `.typ` file on a windows laptop (i9-12900H), the CPU and memory usage are as follows:
 

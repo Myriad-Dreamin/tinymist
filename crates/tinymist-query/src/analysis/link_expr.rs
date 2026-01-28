@@ -83,7 +83,7 @@ impl LinkStrWorker {
                     return Some(());
                 }
             }
-            SyntaxKind::Include => {
+            SyntaxKind::ModuleInclude => {
                 let inc = node.cast::<ast::ModuleInclude>()?;
                 let path = inc.source();
                 self.analyze_path_expr(node, path);

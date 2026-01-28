@@ -42,6 +42,12 @@ Above code adds `tinymist` downloaded by `typst-ts-lsp-download-binary`, `tinymi
 
 You can either use `eglot-workspace-configuration` or specifying launch arguments for `tinymist`.
 
+### Working under Power-Saving Mode or with Resource-consumed Projects
+
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
+
+For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
+
 #### eglot-workspace-configuration
 
 For example, if you want to export PDF on save:

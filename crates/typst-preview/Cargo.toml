@@ -23,7 +23,7 @@ reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
 serde_json.workspace = true
 serde.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true

@@ -7,8 +7,10 @@ use parking_lot::Mutex;
 use reqwest::Certificate;
 use reqwest::blocking::Response;
 use tinymist_std::ImmutPath;
-use typst::diag::{EcoString, PackageResult, StrResult, eco_format};
+use typst::diag::{PackageResult, StrResult, eco_format};
 use typst::syntax::package::{PackageVersion, VersionlessPackageSpec};
+
+use crate::registry::{PREVIEW_NS, PackageIndexEntry, PackageSpecExt};
 
 use super::{
     DEFAULT_REGISTRY, DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec,
@@ -96,7 +98,7 @@ impl HttpRegistry {
     }
 
     /// Set list of packages for testing.
-    pub fn test_package_list(&self, f: impl FnOnce() -> Vec<(PackageSpec, Option<EcoString>)>) {
+    pub fn test_package_list(&self, f: impl FnOnce() -> Vec<PackageIndexEntry>) {
         self.storage().index.get_or_init(f);
     }
 }
@@ -106,7 +108,7 @@ impl PackageRegistry for HttpRegistry {
         self.storage().prepare_package(spec)
     }
 
-    fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    fn packages(&self) -> &[PackageIndexEntry] {
         self.storage().download_index()
     }
 }
@@ -125,7 +127,7 @@ pub struct PackageStorage {
     /// The downloader used for fetching the index and packages.
     cert_path: Option<ImmutPath>,
     /// The cached index of the preview namespace.
-    index: OnceLock<Vec<(PackageSpec, Option<EcoString>)>>,
+    index: OnceLock<Vec<PackageIndexEntry>>,
     notifier: Arc<Mutex<dyn Notifier + Send>>,
 }
 
@@ -177,7 +179,7 @@ impl PackageStorage {
             }
 
             // Download from network if it doesn't exist yet.
-            if spec.namespace == "preview" {
+            if spec.is_preview() {
                 self.download_package(spec, &dir)?;
                 if dir.exists() {
                     return Ok(dir.into());
@@ -193,13 +195,13 @@ impl PackageStorage {
         &self,
         spec: &VersionlessPackageSpec,
     ) -> StrResult<PackageVersion> {
-        if spec.namespace == "preview" {
+        if spec.is_preview() {
             // For `@preview`, download the package index and find the latest
             // version.
             self.download_index()
                 .iter()
-                .filter(|(package, _)| package.name == spec.name)
-                .map(|(package, _)| package.version)
+                .filter(|entry| entry.package.name == spec.name)
+                .map(|entry| entry.package.version)
                 .max()
                 .ok_or_else(|| eco_format!("failed to find package {spec}"))
         } else {
@@ -220,12 +222,12 @@ impl PackageStorage {
     }
 
     /// Get the cached package index without network access.
-    pub fn cached_index(&self) -> Option<&[(PackageSpec, Option<EcoString>)]> {
+    pub fn cached_index(&self) -> Option<&[PackageIndexEntry]> {
         self.index.get().map(Vec::as_slice)
     }
 
     /// Download the package index. The result of this is cached for efficiency.
-    pub fn download_index(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    pub fn download_index(&self) -> &[PackageIndexEntry] {
         self.index.get_or_init(|| {
             let url = format!("{DEFAULT_REGISTRY}/preview/index.json");
 
@@ -239,34 +241,18 @@ impl PackageStorage {
                     }
                 };
 
-                #[derive(serde::Deserialize)]
-                struct RemotePackageIndex {
-                    name: EcoString,
-                    version: PackageVersion,
-                    description: Option<EcoString>,
-                }
-
-                let indices: Vec<RemotePackageIndex> = match serde_json::from_reader(reader) {
-                    Ok(index) => index,
+                let mut entries: Vec<PackageIndexEntry> = match serde_json::from_reader(reader) {
+                    Ok(entry) => entry,
                     Err(err) => {
                         log::error!("Failed to parse package index: {err} from {url}");
                         return vec![];
                     }
                 };
+                for entry in &mut entries {
+                    entry.namespace = PREVIEW_NS.into();
+                }
 
-                indices
-                    .into_iter()
-                    .map(|index| {
-                        (
-                            PackageSpec {
-                                namespace: "preview".into(),
-                                name: index.name,
-                                version: index.version,
-                            },
-                            index.description,
-                        )
-                    })
-                    .collect::<Vec<_>>()
+                entries
             })
             .unwrap_or_default()
         })
@@ -277,7 +263,7 @@ impl PackageStorage {
     /// # Panics
     /// Panics if the package spec namespace isn't `preview`.
     pub fn download_package(&self, spec: &PackageSpec, package_dir: &Path) -> PackageResult<()> {
-        assert_eq!(spec.namespace, "preview");
+        assert!(spec.is_preview(), "only preview packages can be downloaded");
 
         let url = format!(
             "{DEFAULT_REGISTRY}/preview/{}-{}.tar.gz",

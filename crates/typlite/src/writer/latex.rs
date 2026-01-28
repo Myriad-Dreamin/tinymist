@@ -8,8 +8,8 @@ use tinymist_std::path::unix_slash;
 
 use crate::Result;
 use crate::common::{
-    CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, InlineNode, ListState,
-    VerbatimNode,
+    BlockVerbatimNode, CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode,
+    InlineNode, ListState, VerbatimNode,
 };
 
 /// LaTeX writer implementation
@@ -289,6 +289,11 @@ impl LaTeXWriter {
                     self.write_node(child, output)?;
                 }
             }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                let block_node = node.as_custom_type::<BlockVerbatimNode>().unwrap();
+                output.push_str(&block_node.content);
+                output.push_str("\n\n");
+            }
             node if node.is_custom_type::<VerbatimNode>() => {
                 let inline_node = node.as_custom_type::<VerbatimNode>().unwrap();
                 output.push_str(&inline_node.content);
@@ -393,45 +398,45 @@ impl LaTeXWriter {
                 match elem.tag.as_str() {
                     "thead" => {
                         for row_node in &elem.children {
-                            if let Node::HtmlElement(row) = row_node {
-                                if row.tag == "tr" {
-                                    let cells: Vec<Vec<Node>> = row
-                                        .children
-                                        .iter()
-                                        .filter_map(|cell_node| {
-                                            if let Node::HtmlElement(cell) = cell_node {
-                                                if cell.tag == "th" || cell.tag == "td" {
-                                                    return Some(cell.children.clone());
-                                                }
-                                            }
-                                            None
-                                        })
-                                        .collect();
-                                    col_count = col_count.max(cells.len());
-                                    headers.push(cells);
-                                }
+                            if let Node::HtmlElement(row) = row_node
+                                && row.tag == "tr"
+                            {
+                                let cells: Vec<Vec<Node>> = row
+                                    .children
+                                    .iter()
+                                    .filter_map(|cell_node| {
+                                        if let Node::HtmlElement(cell) = cell_node
+                                            && (cell.tag == "th" || cell.tag == "td")
+                                        {
+                                            return Some(cell.children.clone());
+                                        }
+                                        None
+                                    })
+                                    .collect();
+                                col_count = col_count.max(cells.len());
+                                headers.push(cells);
                             }
                         }
                     }
                     "tbody" => {
                         for row_node in &elem.children {
-                            if let Node::HtmlElement(row) = row_node {
-                                if row.tag == "tr" {
-                                    let cells: Vec<Vec<Node>> = row
-                                        .children
-                                        .iter()
-                                        .filter_map(|cell_node| {
-                                            if let Node::HtmlElement(cell) = cell_node {
-                                                if cell.tag == "th" || cell.tag == "td" {
-                                                    return Some(cell.children.clone());
-                                                }
-                                            }
-                                            None
-                                        })
-                                        .collect();
-                                    col_count = col_count.max(cells.len());
-                                    rows.push(cells);
-                                }
+                            if let Node::HtmlElement(row) = row_node
+                                && row.tag == "tr"
+                            {
+                                let cells: Vec<Vec<Node>> = row
+                                    .children
+                                    .iter()
+                                    .filter_map(|cell_node| {
+                                        if let Node::HtmlElement(cell) = cell_node
+                                            && (cell.tag == "th" || cell.tag == "td")
+                                        {
+                                            return Some(cell.children.clone());
+                                        }
+                                        None
+                                    })
+                                    .collect();
+                                col_count = col_count.max(cells.len());
+                                rows.push(cells);
                             }
                         }
                     }
@@ -441,10 +446,10 @@ impl LaTeXWriter {
                             .children
                             .iter()
                             .filter_map(|cell_node| {
-                                if let Node::HtmlElement(cell) = cell_node {
-                                    if cell.tag == "th" || cell.tag == "td" {
-                                        return Some(cell.children.clone());
-                                    }
+                                if let Node::HtmlElement(cell) = cell_node
+                                    && (cell.tag == "th" || cell.tag == "td")
+                                {
+                                    return Some(cell.children.clone());
                                 }
                                 None
                             })

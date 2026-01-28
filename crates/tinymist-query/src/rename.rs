@@ -1,6 +1,6 @@
 use lsp_types::{
-    DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
-    RenameFile, TextDocumentEdit,
+    AnnotatedTextEdit, ChangeAnnotation, DocumentChangeOperation, DocumentChanges, OneOf,
+    OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
 use tinymist_std::path::{PathClean, unix_slash};
@@ -76,7 +76,7 @@ impl SemanticRequest for RenameRequest {
                 let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
                 do_rename_file(ctx, def_fid, diff, &mut edits);
 
-                let mut document_changes = edits_to_document_changes(edits);
+                let mut document_changes = edits_to_document_changes(edits, None);
 
                 document_changes.push(lsp_types::DocumentChangeOperation::Op(
                     lsp_types::ResourceOp::Rename(RenameFile {
@@ -94,6 +94,7 @@ impl SemanticRequest for RenameRequest {
                 })
             }
             _ => {
+                let is_label = matches!(def.decl.kind(), DefKind::Reference);
                 let references = find_references(ctx, &source, syntax)?;
 
                 let mut edits = HashMap::new();
@@ -108,12 +109,30 @@ impl SemanticRequest for RenameRequest {
                     });
                 }
 
-                log::info!("rename edits: {edits:?}");
+                crate::log_debug_ct!("rename edits: {edits:?}");
 
-                Some(WorkspaceEdit {
-                    changes: Some(edits),
-                    ..Default::default()
-                })
+                if !is_label {
+                    Some(WorkspaceEdit {
+                        changes: Some(edits),
+                        ..Default::default()
+                    })
+                } else {
+                    let change_id = "Typst Rename Labels";
+
+                    let document_changes = edits_to_document_changes(edits, Some(change_id));
+
+                    let change_annotations = Some(create_change_annotation(
+                        change_id,
+                        true,
+                        Some("The language server fuzzy searched the labels".to_string()),
+                    ));
+
+                    Some(WorkspaceEdit {
+                        document_changes: Some(DocumentChanges::Operations(document_changes)),
+                        change_annotations,
+                        ..Default::default()
+                    })
+                }
             }
         }
     }
@@ -133,14 +152,14 @@ pub(crate) fn do_rename_file(
         .to_str()
         .unwrap_or_default()
         .into();
-    let mut ctx = RenameFileWorker {
+    let mut worker = RenameFileWorker {
         ctx,
         def_fid,
         def_path,
         diff,
         inserted: FxHashSet::default(),
     };
-    ctx.work(edits)
+    worker.work(edits)
 }
 
 struct RenameFileWorker<'a> {
@@ -300,17 +319,45 @@ impl RenameFileWorker<'_> {
 
 pub(crate) fn edits_to_document_changes(
     edits: HashMap<Url, Vec<TextEdit>>,
+    change_id: Option<&str>,
 ) -> Vec<DocumentChangeOperation> {
     let mut document_changes = vec![];
 
     for (uri, edits) in edits {
         document_changes.push(lsp_types::DocumentChangeOperation::Edit(TextDocumentEdit {
             text_document: OptionalVersionedTextDocumentIdentifier { uri, version: None },
-            edits: edits.into_iter().map(OneOf::Left).collect(),
+            edits: edits
+                .into_iter()
+                .map(|edit| match change_id {
+                    Some(change_id) => OneOf::Right(AnnotatedTextEdit {
+                        text_edit: edit,
+                        annotation_id: change_id.to_owned(),
+                    }),
+                    None => OneOf::Left(edit),
+                })
+                .collect(),
         }));
     }
 
     document_changes
+}
+
+pub(crate) fn create_change_annotation(
+    label: &str,
+    needs_confirmation: bool,
+    description: Option<String>,
+) -> HashMap<String, ChangeAnnotation> {
+    let mut change_annotations = HashMap::new();
+    change_annotations.insert(
+        label.to_owned(),
+        ChangeAnnotation {
+            label: label.to_owned(),
+            needs_confirmation: Some(needs_confirmation),
+            description,
+        },
+    );
+
+    change_annotations
 }
 
 #[cfg(test)]

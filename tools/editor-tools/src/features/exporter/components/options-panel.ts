@@ -5,7 +5,8 @@ const { div, h3, label, input, select, option, span, p } = van.tags;
 
 interface OptionsPanelProps {
   format: ExportFormat;
-  optionStates: Record<string, State<Scalar>>;
+  // optionStates values can be scalar, an array (for multi-select), or undefined
+  optionStates: Record<string, State<Scalar | Scalar[] | undefined>>;
 }
 
 export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
@@ -50,13 +51,17 @@ export const OptionsPanel = ({ format, optionStates }: OptionsPanelProps) => {
   );
 };
 
-const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
-  const { key, label: optionLabel, description } = schema;
+const OptionField = (schema: OptionSchema, valueState: State<Scalar | Scalar[] | undefined>) => {
+  const { key, label: optionLabel, description, type: optionType } = schema;
   const validationError = van.state<string | undefined>();
+  const labelElem =
+    optionType !== "boolean"
+      ? [label({ class: "text-sm font-medium", for: key }, optionLabel)]
+      : [];
 
   return div(
     { class: "flex flex-col gap-xs" },
-    label({ class: "text-sm font-medium", for: key }, optionLabel),
+    ...labelElem,
     renderInput(schema, valueState, validationError),
     () =>
       validationError.val
@@ -67,10 +72,10 @@ const OptionField = (schema: OptionSchema, valueState: State<Scalar>) => {
 
 const renderInput = (
   schema: OptionSchema,
-  valueState: State<Scalar | undefined>,
+  valueState: State<Scalar | Scalar[] | undefined>,
   validationError: State<string | undefined>,
 ) => {
-  const { type, key, options: selectOptions, min, max } = schema;
+  const { type, key, options: selectOptions, label: optionLabel } = schema;
 
   switch (type) {
     case "string":
@@ -96,8 +101,8 @@ const renderInput = (
           const current = valueState.val;
           return current === undefined || current === null ? "" : String(current);
         },
-        min: min?.toString() ?? null,
-        max: max?.toString() ?? null,
+        min: schema.min?.toString() ?? null,
+        max: schema.max?.toString() ?? null,
         oninput: (e: Event) => {
           const target = e.target as HTMLInputElement;
           // Call custom validation function if provided
@@ -119,7 +124,7 @@ const renderInput = (
             valueState.val = target.checked;
           },
         }),
-        span({ class: "text-sm" }, "Enable"),
+        label({ class: "text-sm font-medium", for: key }, optionLabel),
       );
 
     case "color":
@@ -137,8 +142,57 @@ const renderInput = (
         },
       });
 
+    case "datetime":
+      return input({
+        class: "input",
+        type: "datetime-local",
+        id: key,
+        value: () => {
+          const current = valueState.val;
+          return typeof current === "string" ? current : "";
+        },
+        onchange: (e: Event) => {
+          const target = e.target as HTMLInputElement;
+          valueState.val = target.value;
+        },
+      });
+
     case "select":
       if (!selectOptions) return span("No options available");
+      // multi-select
+      if (schema.multiple) {
+        return select(
+          {
+            class: "select",
+            id: key,
+            multiple: true,
+            onchange: (e: Event) => {
+              const target = e.target as HTMLSelectElement;
+              const values = Array.from(target.selectedOptions).map((o) => o.value);
+              const resolved = values
+                .map((v) => selectOptions.find((opt) => opt.value.toString() === v))
+                .filter((o): o is { value: Scalar; label: string } => Boolean(o))
+                .map((opt) => opt.value);
+              valueState.val = resolved;
+            },
+          },
+          ...selectOptions.map((opt) =>
+            option(
+              {
+                value: opt.value.toString(),
+                selected: () =>
+                  Array.isArray(valueState.val) &&
+                  (valueState.val as Scalar[])
+                    .map((v) => v?.toString())
+                    .includes(opt.value.toString()),
+              },
+              opt.label,
+            ),
+          ),
+        );
+      }
+
+      // single-select
       return select(
         {
           class: "select",
@@ -156,6 +210,7 @@ const renderInput = (
             valueState.val = newValue;
           },
         },
+        schema.default ? null : option({ value: "" }, "None"), // if no default, add a "None" option
         ...selectOptions.map((opt) =>
           option(
             {
