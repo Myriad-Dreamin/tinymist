@@ -261,6 +261,11 @@ impl ServerState {
         task: ProjectTask,
         mut args: Vec<JsonValue>,
     ) -> ScheduleResult {
+        if self.config.delegate_fs_requests {
+            return Err(invalid_params(
+                "Export is not supported in virtual workspaces",
+            ));
+        }
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
         let write = action_opts.write.unwrap_or(true);
         let open = action_opts.open;
