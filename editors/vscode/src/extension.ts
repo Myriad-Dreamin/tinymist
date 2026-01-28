@@ -16,6 +16,7 @@ import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool/views";
 import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
+import { l10nMsg } from "./l10n";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
@@ -381,6 +382,7 @@ function commandShowFullValue(ctx: IContext) {
     readonly uri = vscode.Uri.parse(uri);
     readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
     debounce: NodeJS.Timeout | undefined = undefined;
+    currentRequest: AbortController | undefined = undefined;
 
     constructor() {
       vscode.workspace.onDidChangeTextDocument(
@@ -432,10 +434,29 @@ function commandShowFullValue(ctx: IContext) {
 
     async provideTextDocumentContent(
       _uri: vscode.Uri,
-      _ct: vscode.CancellationToken,
+      ct: vscode.CancellationToken,
     ): Promise<string> {
       const editor = ctx.currentActiveEditor();
-      if (!editor) return "No active editor, change selection to view full value.";
+      if (!editor) return l10nMsg("No active editor, change selection to view full value.");
+
+      // Cancel any previous request
+      if (this.currentRequest) {
+        this.currentRequest.abort();
+      }
+
+      // Check if already cancelled
+      if (ct.isCancellationRequested) {
+        return l10nMsg("Request cancelled.");
+      }
+
+      // Create a new abort controller for this request
+      this.currentRequest = new AbortController();
+      const abortController = this.currentRequest;
+
+      // Listen to cancellation
+      ct.onCancellationRequested(() => {
+        abortController.abort();
+      });
 
       try {
         const res = await tinymist.exportValue(editor.document.uri.fsPath, {
@@ -444,9 +465,21 @@ function commandShowFullValue(ctx: IContext) {
           ),
         });
 
-        return res || "No value found at this position.";
+        // Check if cancelled after the request
+        if (ct.isCancellationRequested || abortController.signal.aborted) {
+          return l10nMsg("Request cancelled.");
+        }
+
+        return res || l10nMsg("No value found at this position.");
       } catch (error) {
-        return `Error: ${error}`;
+        if (ct.isCancellationRequested || abortController.signal.aborted) {
+          return l10nMsg("Request cancelled.");
+        }
+        return l10nMsg("Error: {error}", { error: String(error) });
+      } finally {
+        if (this.currentRequest === abortController) {
+          this.currentRequest = undefined;
+        }
       }
     }
 
