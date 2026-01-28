@@ -380,6 +380,7 @@ function commandShowFullValue(ctx: IContext) {
   const FullValueDoc = new (class implements vscode.TextDocumentContentProvider {
     readonly uri = vscode.Uri.parse(uri);
     readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
+    debounce: NodeJS.Timeout | undefined = undefined;
 
     constructor() {
       vscode.workspace.onDidChangeTextDocument(
@@ -406,9 +407,12 @@ function commandShowFullValue(ctx: IContext) {
     private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent) {
       if (isTypstDocument(event.document)) {
         // commandActivateDoc(event.document);
-        // We need to order this after language server updates, but there's no API for that.
-        // Hence, good old sleep().
-        setTimeout(() => this.emitChange(), 10);
+        if (this.debounce) {
+          clearTimeout(this.debounce);
+        }
+        this.debounce = setTimeout(() => {
+          this.emitChange();
+        }, 300); // 300ms debounce delay
       }
     }
 
