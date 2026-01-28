@@ -1484,6 +1484,11 @@
           "command": "tinymist.copyAnsiHighlight",
           "when": "resourceLangId == typst && editorTextFocus",
           "group": "9_cutcopypaste"
+        },
+        {
+          "command": "tinymist.viewAst",
+          "when": "resourceLangId == typst && editorTextFocus",
+          "group": "developer"
         }
       ],
       "view/title": [
