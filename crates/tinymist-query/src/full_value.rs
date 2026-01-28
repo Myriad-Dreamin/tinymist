@@ -33,16 +33,55 @@ impl SemanticRequest for ShowFullValueRequest {
 
 fn get_inspected_expr<'a>(leaf: &'a LinkedNode<'a>) -> Option<&'a LinkedNode<'a>> {
     let mut ancestor = leaf;
+
+    // First, find the innermost expression containing the cursor
     while !ancestor.is::<ast::Expr>() {
         ancestor = ancestor.parent()?;
     }
 
     let expr = ancestor.cast::<ast::Expr>()?;
+
+    // Don't inspect if it's an expression that's too broad
+    // We want to skip block-level expressions and focus on leaf-like expressions
     if !expr.hash() && !matches!(expr, ast::Expr::MathIdent(_)) {
         return None;
     }
 
+    // Try to find a more specific expression (child) if the current one is too broad
+    // This helps with cases like array literals or parenthesized expressions
+    if let Some(best_child) = find_best_child_expr(leaf, ancestor) {
+        return Some(best_child);
+    }
+
     Some(ancestor)
+}
+
+/// Try to find the best child expression of the ancestor that contains the leaf.
+/// This helps narrow down the expression span when the ancestor is too broad.
+fn find_best_child_expr<'a>(
+    leaf: &'a LinkedNode<'a>,
+    ancestor: &'a LinkedNode<'a>,
+) -> Option<&'a LinkedNode<'a>> {
+    let ancestor_span = ancestor.span();
+    let mut current = leaf;
+    let mut best_expr = None;
+
+    // Walk up from leaf to ancestor, finding expressions on the way
+    while let Some(parent) = current.parent() {
+        // Check if we've reached the ancestor by comparing spans
+        if parent.span() == ancestor_span {
+            // Return the last expression we found before reaching the ancestor
+            return best_expr;
+        }
+
+        // If parent is an expression, remember it
+        if parent.is::<ast::Expr>() {
+            best_expr = Some(parent);
+        }
+        current = parent;
+    }
+
+    None
 }
 
 fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
@@ -66,12 +105,23 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
     const SIZE_LIMIT: usize = 8 * 1024 * 1024; // 8MB
 
     let mut buf = String::new();
-    let mut limited = false;
+    let mut value_limit_hit = false;
+    let mut size_limit_hit = false;
+
+    // Add header explaining limitations
+    buf.push_str(&tinymist_l10n::t!(
+        "tinymist-query.full-value.header",
+        "# Tracked Values\n\n"
+    ));
+
     for piece in pieces {
         let item_repr = truncated_repr_::<SIZE_LIMIT>(piece.value);
         if buf.len() + item_repr.len() + 50 > SIZE_LIMIT {
-            buf.push_str("... (reached size limit)\n");
-            limited = true;
+            buf.push_str(&tinymist_l10n::t!(
+                "tinymist-query.full-value.size-limit",
+                "... (reached size limit)\n"
+            ));
+            size_limit_hit = true;
             break;
         }
         buf.push('#');
@@ -81,8 +131,21 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
         }
         buf.push('\n');
     }
-    if !limited && values.len() == Sink::MAX_VALUES {
-        buf.push_str("... (reached max values limit)\n");
+    if !size_limit_hit && values.len() == Sink::MAX_VALUES {
+        buf.push_str(&tinymist_l10n::t!(
+            "tinymist-query.full-value.max-values-limit",
+            "... (reached max values limit)\n"
+        ));
+        value_limit_hit = true;
+    }
+
+    // Add footer with limitation notes if any limits were hit
+    if value_limit_hit || size_limit_hit {
+        buf.push_str("\n\n");
+        buf.push_str(&tinymist_l10n::t!(
+            "tinymist-query.full-value.note-truncated",
+            "**Note:** Values above may be truncated due to internal limits.\n"
+        ));
     }
 
     Some(buf)

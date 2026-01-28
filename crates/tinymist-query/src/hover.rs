@@ -121,7 +121,13 @@ impl HoverWorker<'_> {
                 // Add a button to show full values
                 // todo - we may need only add this button if the code is too long
                 self.actions.push(CommandLink {
-                    title: Some("Show Full Value".to_string()),
+                    title: Some(
+                        tinymist_l10n::t!(
+                            "tinymist-query.hover.show-full-value",
+                            "Show Full Value"
+                        )
+                        .to_string(),
+                    ),
                     command_or_links: vec![CommandOrLink::Command {
                         id: "tinymist.showFullValue".to_string(),
                         args: vec![],

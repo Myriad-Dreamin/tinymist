@@ -12,6 +12,10 @@ en = "A page number template must be present if the source document renders to m
 en = "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"
 zh = "提供一个帮助导出为 TeX 的 typst 文件，例如 `/ieee-tex.typ` 或 `@local/ieee-tex:0.1.0`"
 
+["Error: {error}"]
+en = "Error: {error}"
+zh = "错误：{error}"
+
 ["Export as HTML"]
 en = "Export as HTML"
 zh = "导出为 HTML"
@@ -75,6 +79,18 @@ zh = "无效的页码范围格式：{range}"
 ["Invalid page range: {range}"]
 en = "Invalid page range: {range}"
 zh = "无效的页码范围：{range}"
+
+["No active editor, change selection to view full value."]
+en = "No active editor, change selection to view full value."
+zh = "没有活动的编辑器，更改选择以查看完整值。"
+
+["No value found at this position."]
+en = "No value found at this position."
+zh = "在此位置未找到值。"
+
+["Request cancelled."]
+en = "Request cancelled."
+zh = "请求已取消。"
 
 ["PDF (Specific Pages)"]
 en = "PDF (Specific Pages)"
