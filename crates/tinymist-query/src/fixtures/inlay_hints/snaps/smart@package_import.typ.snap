@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
  },
  {
   "kind": 1,
-  "label": "✅ latest",
+  "label": "✅",
   "paddingLeft": true,
   "position": {
    "character": 32,
