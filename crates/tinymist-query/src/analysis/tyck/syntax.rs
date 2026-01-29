@@ -53,18 +53,17 @@ impl TypeChecker<'_> {
             Some(())
         }
 
-        fn visit_lbs(
+        fn visit_lbs<'a>(
             this: &TypeChecker<'_>,
-            lbs: &[Ty],
+            lbs: impl IntoIterator<Item = &'a Ty>,
             acc: &mut Option<Interned<str>>,
         ) -> Option<()> {
-            if lbs.is_empty() {
-                return None;
-            }
+            let mut any = false;
             for lb in lbs {
+                any = true;
                 visit(this, lb, acc)?;
             }
-            Some(())
+            any.then_some(())
         }
 
         fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
@@ -76,9 +75,9 @@ impl TypeChecker<'_> {
                 Ty::Var(v) => {
                     let bounds = this.info.vars.get(&v.def)?;
                     let bounds_guard = bounds.bounds.bounds().read();
-                    visit_lbs(this, &bounds_guard.lbs, acc)
+                    visit_lbs(this, bounds_guard.lbs.iter(), acc)
                 }
-                Ty::Let(bounds) => visit_lbs(this, &bounds.lbs, acc),
+                Ty::Let(bounds) => visit_lbs(this, bounds.lbs.iter(), acc),
                 Ty::Union(types) => {
                     for ty in types.iter() {
                         visit(this, ty, acc)?;

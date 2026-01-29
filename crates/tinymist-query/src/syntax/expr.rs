@@ -7,7 +7,7 @@ use std::ops::Deref;
 use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::hash::hash128;
 use typst::{
-    foundations::{Element, NativeElement, Type, Value},
+    foundations::{Element, NativeElement, Str, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
     syntax::{Span, SyntaxNode, ast::MathTextKind},
     text::LinebreakElem,
@@ -946,7 +946,7 @@ impl ExprWorker<'_> {
                         .or_else(|| {
                             let (expr, term) = self.eval_expr(key, InterpretMode::Code);
 
-                            fn const_string_from_ty(ty: &Ty) -> Option<EcoString> {
+                            fn const_string_from_ty(ty: &Ty) -> Option<Str> {
                                 match ty {
                                     Ty::Value(v) => match &v.val {
                                         Value::Str(s) => Some(s.clone()),
