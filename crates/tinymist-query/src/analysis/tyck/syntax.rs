@@ -53,6 +53,20 @@ impl TypeChecker<'_> {
             Some(())
         }
 
+        fn visit_lbs(
+            this: &TypeChecker<'_>,
+            lbs: &[Ty],
+            acc: &mut Option<Interned<str>>,
+        ) -> Option<()> {
+            if lbs.is_empty() {
+                return None;
+            }
+            for lb in lbs {
+                visit(this, lb, acc)?;
+            }
+            Some(())
+        }
+
         fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
             match ty {
                 Ty::Value(ins) => match &ins.val {
@@ -62,23 +76,9 @@ impl TypeChecker<'_> {
                 Ty::Var(v) => {
                     let bounds = this.info.vars.get(&v.def)?;
                     let bounds_guard = bounds.bounds.bounds().read();
-                    if bounds_guard.lbs.is_empty() {
-                        return None;
-                    }
-                    for lb in &bounds_guard.lbs {
-                        visit(this, lb, acc)?;
-                    }
-                    Some(())
+                    visit_lbs(this, &bounds_guard.lbs, acc)
                 }
-                Ty::Let(bounds) => {
-                    if bounds.lbs.is_empty() {
-                        return None;
-                    }
-                    for lb in &bounds.lbs {
-                        visit(this, lb, acc)?;
-                    }
-                    Some(())
-                }
+                Ty::Let(bounds) => visit_lbs(this, &bounds.lbs, acc),
                 Ty::Union(types) => {
                     for ty in types.iter() {
                         visit(this, ty, acc)?;

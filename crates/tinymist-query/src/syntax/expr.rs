@@ -946,19 +946,22 @@ impl ExprWorker<'_> {
                         .or_else(|| {
                             let (expr, term) = self.eval_expr(key, InterpretMode::Code);
 
-                            if let Some(Ty::Value(v)) = term
-                                && let Value::Str(s) = &v.val
-                            {
-                                return Some(s.clone());
+                            fn const_string_from_ty(ty: &Ty) -> Option<EcoString> {
+                                match ty {
+                                    Ty::Value(v) => match &v.val {
+                                        Value::Str(s) => Some(s.clone()),
+                                        _ => None,
+                                    },
+                                    _ => None,
+                                }
                             }
 
-                            if let Some(Expr::Type(Ty::Value(v))) = expr
-                                && let Value::Str(s) = &v.val
-                            {
-                                return Some(s.clone());
-                            }
-
-                            None
+                            term.as_ref()
+                                .and_then(const_string_from_ty)
+                                .or_else(|| match expr {
+                                    Some(Expr::Type(ty)) => const_string_from_ty(&ty),
+                                    _ => None,
+                                })
                         });
                     let Some(analyzed) = analyzed else {
                         let key = self.check(key);
