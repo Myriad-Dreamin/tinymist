@@ -241,9 +241,9 @@ zh-TW = "複製為 ANSI 代碼"
 en = "View the AST of the current file"
 zh = "查看当前文件的 AST"
 
-[extension.tinymist.command.tinymist.showFullValue]
-en = "View the full value of the expression under cursor"
-zh = "查看光标下表达式的完整值"
+[extension.tinymist.command.tinymist.inspectValue]
+en = "View the tracked value of the expression under cursor"
+zh = "查看光标下表达式的值"
 
 [extension.tinymist.command.tinymist.showLog]
 en = "Tinymist: Show Log"

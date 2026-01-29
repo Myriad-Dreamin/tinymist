@@ -5,16 +5,16 @@ use typst_shim::syntax::LinkedNodeExt;
 
 use crate::prelude::*;
 
-/// A request to show the full tracked value at a specific position.
+/// A request to inspect expression value at a specific position.
 #[derive(Debug, Clone)]
-pub struct ShowFullValueRequest {
+pub struct InspectExpressionValueRequest {
     /// The source file.
     pub path: PathBuf,
     /// The cursor position.
     pub position: LspPosition,
 }
 
-impl SemanticRequest for ShowFullValueRequest {
+impl SemanticRequest for InspectExpressionValueRequest {
     type Response = String;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
@@ -49,7 +49,7 @@ fn get_inspected_expr<'a>(leaf: &'a LinkedNode<'a>) -> Option<&'a LinkedNode<'a>
 
     // Try to find a more specific expression (child) if the current one is too broad
     // This helps with cases like array literals or parenthesized expressions
-    if let Some(best_child) = find_best_child_expr(leaf, ancestor) {
+    if let Some(best_child) = find_most_specific_expr(leaf, ancestor) {
         return Some(best_child);
     }
 
@@ -58,7 +58,7 @@ fn get_inspected_expr<'a>(leaf: &'a LinkedNode<'a>) -> Option<&'a LinkedNode<'a>
 
 /// Try to find the best child expression of the ancestor that contains the leaf.
 /// This helps narrow down the expression span when the ancestor is too broad.
-fn find_best_child_expr<'a>(
+fn find_most_specific_expr<'a>(
     leaf: &'a LinkedNode<'a>,
     ancestor: &'a LinkedNode<'a>,
 ) -> Option<&'a LinkedNode<'a>> {
@@ -110,7 +110,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
 
     // Add header explaining limitations
     buf.push_str(&tinymist_l10n::t!(
-        "tinymist-query.full-value.header",
+        "tinymist-query.value-inspector.header",
         "# Tracked Values\n\n"
     ));
 
@@ -118,7 +118,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
         let item_repr = truncated_repr_::<SIZE_LIMIT>(piece.value);
         if buf.len() + item_repr.len() + 50 > SIZE_LIMIT {
             buf.push_str(&tinymist_l10n::t!(
-                "tinymist-query.full-value.size-limit",
+                "tinymist-query.value-inspector.size-limit",
                 "... (reached size limit)\n"
             ));
             size_limit_hit = true;
@@ -133,7 +133,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
     }
     if !size_limit_hit && values.len() == Sink::MAX_VALUES {
         buf.push_str(&tinymist_l10n::t!(
-            "tinymist-query.full-value.max-values-limit",
+            "tinymist-query.value-inspector.max-values-limit",
             "... (reached max values limit)\n"
         ));
         value_limit_hit = true;
@@ -143,7 +143,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
     if value_limit_hit || size_limit_hit {
         buf.push_str("\n\n");
         buf.push_str(&tinymist_l10n::t!(
-            "tinymist-query.full-value.note-truncated",
+            "tinymist-query.value-inspector.note-truncated",
             "**Note:** Values above may be truncated due to internal limits.\n"
         ));
     }

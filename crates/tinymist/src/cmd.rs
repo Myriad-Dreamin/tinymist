@@ -86,7 +86,7 @@ impl ServerState {
             .position
             .ok_or_else(|| internal_error("no position provided"))?;
 
-        run_query!(self.ShowFullValue(path, position))
+        run_query!(self.InspectExpressionValue(path, position))
     }
 
     fn select_range<T>(

@@ -216,7 +216,7 @@ export class LanguageState {
         "tinymist.openInternal",
         "tinymist.openExternal",
         "tinymist.replaceText",
-        "tinymist.showFullValue",
+        "tinymist.inspectValue",
       ],
     };
     const hoverStorage =
@@ -372,7 +372,7 @@ export class LanguageState {
   exportQuery = exportCommand("tinymist.exportQuery");
   exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
   exportAst = exportStringCommand("tinymist.exportAst");
-  exportValue = exportStringCommand("tinymist.exportValue");
+  exportTrackedValues = exportStringCommand("tinymist.exportTrackedValues");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);

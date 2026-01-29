@@ -308,7 +308,7 @@ impl ServerState {
                 Symbol(req) => snap.run_semantic(req, R::Symbol),
                 WorkspaceLabel(req) => snap.run_semantic(req, R::WorkspaceLabel),
                 DocumentMetrics(req) => snap.run_semantic(req, R::DocumentMetrics),
-                ShowFullValue(req) => snap.run_semantic(req, R::ShowFullValue),
+                InspectExpressionValue(req) => snap.run_semantic(req, R::InspectExpressionValue),
                 _ => unreachable!(),
             };
 
