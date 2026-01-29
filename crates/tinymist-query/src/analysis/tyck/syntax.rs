@@ -609,11 +609,18 @@ impl TypeChecker<'_> {
                         let lbs = bounds.bounds.bounds().read().lbs.clone();
                         for lb in lbs.iter() {
                             match lb {
-                                Ty::Array(elem) => self.constrain(&elem, &pattern),
+                                Ty::Array(elem) => {
+                                    self.constrain(elem, &pattern);
+                                    self.constrain(&iter, &Ty::Array(pattern.clone().into()));
+                                }
                                 Ty::Tuple(elems) => {
                                     for elem in elems.iter() {
                                         self.constrain(elem, &pattern);
                                     }
+                                    let tuple = Ty::Tuple(Interned::new(
+                                        elems.iter().map(|_| pattern.clone()).collect::<Vec<_>>(),
+                                    ));
+                                    self.constrain(&iter, &tuple);
                                 }
                                 _ => {}
                             }
