@@ -604,6 +604,35 @@ impl TypeChecker<'_> {
                         self.constrain(elem, &pattern);
                     }
                 }
+                Ty::Var(var) => {
+                    if let Some(bounds) = self.info.vars.get(&var.def) {
+                        let lbs = bounds.bounds.bounds().read().lbs.clone();
+                        for lb in lbs.iter() {
+                            match lb {
+                                Ty::Array(elem) => self.constrain(&elem, &pattern),
+                                Ty::Tuple(elems) => {
+                                    for elem in elems.iter() {
+                                        self.constrain(elem, &pattern);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Ty::Let(bounds) => {
+                    for lb in bounds.lbs.iter() {
+                        match lb {
+                            Ty::Array(elem) => self.constrain(elem, &pattern),
+                            Ty::Tuple(elems) => {
+                                for elem in elems.iter() {
+                                    self.constrain(elem, &pattern);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             }
         }

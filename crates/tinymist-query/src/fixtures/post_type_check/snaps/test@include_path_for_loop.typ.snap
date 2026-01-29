@@ -1,8 +1,7 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-assertion_line: 445
 description: "Check on \"\\\"a.typ\\\"\" (35)"
 expression: post_ty
 input_file: crates/tinymist-query/src/fixtures/post_type_check/include_path_for_loop.typ
 ---
-( ⪰ "a.typ" ⪯ Path(Source { allow_package: true }) & "a.typ")
+( ⪰ "a.typ" ⪯ "a.typ")
