@@ -14,4 +14,4 @@ Range: 2:23:2:27
 ======
 
 
-[Show Full Value](command:tinymist.inspectValue)
+[Inspect Values](command:tinymist.inspectValue)
