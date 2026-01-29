@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-assertion_line: 196
 description: "Completion on \" (52..53)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_for_loop.typ
@@ -10,8 +9,8 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_for_lo
   "isIncomplete": false,
   "items": [
    {
-   "kind": 17,
-   "label": "a.png",
+    "kind": 17,
+    "label": "a.png",
     "sortText": "001",
     "textEdit": {
      "newText": "a.png",
@@ -28,8 +27,8 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_kind_image_for_lo
     }
    },
    {
-   "kind": 17,
-   "label": "b.png",
+    "kind": 17,
+    "label": "b.png",
     "sortText": "002",
     "textEdit": {
      "newText": "b.png",
