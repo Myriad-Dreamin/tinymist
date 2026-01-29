@@ -9,7 +9,7 @@ use super::{
 };
 use super::{DynTypeBounds, ParamAttrs, ParamTy, SharedContext, prelude::*};
 use crate::syntax::{ArgClass, SyntaxContext, VarClass, classify_context, classify_context_outer};
-use crate::ty::BuiltinTy;
+use crate::ty::{BuiltinTy, RecordTy, TypeInterface};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -273,7 +273,19 @@ impl<'a> PostTypeChecker<'a> {
                 Some(resp.finalize())
             }
             SyntaxContext::Element { container, target } => {
-                let container_ty = self.check_or(container, context_ty)?;
+                // The `Array` / `Dict` syntax node is often wrapped by a `Parenthesized`
+                // expression, which is where contextual typing (e.g. let-binding type) applies.
+                // Use the parenthesized container type when available so element types can be
+                // inferred from outer constraints.
+                let container_expr = match container.kind() {
+                    SyntaxKind::Array | SyntaxKind::Dict => container
+                        .parent()
+                        .cloned()
+                        .filter(|p| p.kind() == SyntaxKind::Parenthesized)
+                        .unwrap_or_else(|| container.clone()),
+                    _ => container.clone(),
+                };
+                let container_ty = self.check_or(&container_expr, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
@@ -340,13 +352,88 @@ impl<'a> PostTypeChecker<'a> {
     }
 
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
+        if let Some(binary) = context.cast::<ast::Binary>()
+            && binary.op() == ast::BinOp::Add
+        {
+            let parent = context.parent()?;
+            let expected = self.check_context(parent, context)?;
+
+            fn has_path(this: &PostTypeChecker<'_>, ty: &Ty) -> bool {
+                match ty {
+                    Ty::Builtin(BuiltinTy::Path(..)) => true,
+                    Ty::Builtin(_) => false,
+                    Ty::Param(p) => has_path(this, &p.ty),
+                    Ty::Let(b) => {
+                        b.lbs.iter().any(|ty| has_path(this, ty))
+                            || b.ubs.iter().any(|ty| has_path(this, ty))
+                    }
+                    Ty::Union(types) => types.iter().any(|ty| has_path(this, ty)),
+                    Ty::Array(elem) => has_path(this, elem),
+                    Ty::Tuple(elems) => elems.iter().any(|ty| has_path(this, ty)),
+                    Ty::Dict(record) => record.interface().any(|(_, ty)| has_path(this, ty)),
+                    Ty::Select(sel) => has_path(this, &sel.ty),
+                    Ty::With(with) => {
+                        has_path(this, &with.sig) || with.with.inputs().any(|ty| has_path(this, ty))
+                    }
+                    Ty::Args(args) => args.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Func(sig) | Ty::Pattern(sig) => sig.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Unary(unary) => has_path(this, &unary.lhs),
+                    Ty::Binary(binary) => {
+                        let [lhs, rhs] = binary.operands();
+                        has_path(this, lhs) || has_path(this, rhs)
+                    }
+                    Ty::If(if_) => {
+                        has_path(this, &if_.cond)
+                            || has_path(this, &if_.then)
+                            || has_path(this, &if_.else_)
+                    }
+                    Ty::Var(v) => this.info.vars.get(&v.def).is_some_and(|bounds| {
+                        let bounds = bounds.bounds.bounds().read();
+                        bounds.lbs.iter().any(|ty| has_path(this, ty))
+                            || bounds.ubs.iter().any(|ty| has_path(this, ty))
+                    }),
+                    Ty::Any | Ty::Boolean(_) | Ty::Value(_) => false,
+                }
+            }
+
+            // Only propagate expected types for path concatenations so string literals in
+            // `"dir/" + ""` get path completion.
+            if !has_path(self, &expected) {
+                return None;
+            }
+
+            // Ensure the queried node is part of the binary expression.
+            let lhs = binary.lhs();
+            let rhs = binary.rhs();
+            let lhs_node = context.find(lhs.span())?;
+            let rhs_node = context.find(rhs.span())?;
+            if lhs_node.find(node.span()).is_some() || rhs_node.find(node.span()).is_some() {
+                return Some(expected);
+            }
+        }
+
         match context.kind() {
+            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                let source = if context.kind() == SyntaxKind::ModuleImport {
+                    let import = context.cast::<ast::ModuleImport>()?;
+                    import.source()
+                } else {
+                    let include = context.cast::<ast::ModuleInclude>()?;
+                    include.source()
+                };
+
+                let source_node = context.find(source.span())?;
+                source_node.find(node.span())?;
+
+                Some(Ty::Builtin(BuiltinTy::Path(crate::ty::PathKind::Source {
+                    allow_package: true,
+                })))
+            }
             SyntaxKind::LetBinding => {
                 let let_binding = context.cast::<ast::LetBinding>()?;
                 let let_init = let_binding.init()?;
-                if let_init.span() != node.span() {
-                    return None;
-                }
+                let let_init_node = context.find(let_init.span())?;
+                let_init_node.find(node.span())?;
 
                 match let_binding.kind() {
                     ast::LetBindingKind::Closure(_c) => None,
@@ -378,10 +465,54 @@ impl<'a> PostTypeChecker<'a> {
             ast::Pattern::Parenthesized(paren_expr) => {
                 self.destruct_let(paren_expr.expr().to_untyped().cast()?, node)
             }
-            // todo: pattern matching
-            ast::Pattern::Destructuring(_d) => {
+            ast::Pattern::Destructuring(d) => {
                 let _ = node;
-                None
+
+                fn pattern_binding_ty(this: &PostTypeChecker<'_>, pat: ast::Pattern) -> Ty {
+                    match pat {
+                        ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
+                            this.info.type_of_span(ident.span()).unwrap_or(Ty::Any)
+                        }
+                        ast::Pattern::Parenthesized(paren) => {
+                            pattern_binding_ty(this, paren.pattern())
+                        }
+                        ast::Pattern::Destructuring(d) => {
+                            destructuring_binding_ty(this, d).unwrap_or(Ty::Any)
+                        }
+                        ast::Pattern::Normal(..) | ast::Pattern::Placeholder(..) => Ty::Any,
+                    }
+                }
+
+                fn destructuring_binding_ty(
+                    this: &PostTypeChecker<'_>,
+                    destructuring: ast::Destructuring,
+                ) -> Option<Ty> {
+                    let mut pos = vec![];
+                    let mut named = vec![];
+                    let mut has_pos = false;
+                    let mut has_named = false;
+                    for item in destructuring.items() {
+                        match item {
+                            ast::DestructuringItem::Pattern(pat) => {
+                                has_pos = true;
+                                pos.push(pattern_binding_ty(this, pat));
+                            }
+                            ast::DestructuringItem::Named(named_item) => {
+                                has_named = true;
+                                let key = Interned::new_str(named_item.name().get().as_str());
+                                let ty = pattern_binding_ty(this, named_item.pattern());
+                                named.push((key, ty));
+                            }
+                            ast::DestructuringItem::Spread(..) => {}
+                        }
+                    }
+
+                    let tuple_ty = has_pos.then(|| Ty::Tuple(pos.into()));
+                    let dict_ty = has_named.then(|| Ty::Dict(RecordTy::new(named)));
+                    Ty::union(tuple_ty, dict_ty)
+                }
+
+                destructuring_binding_ty(self, d)
             }
         }
     }

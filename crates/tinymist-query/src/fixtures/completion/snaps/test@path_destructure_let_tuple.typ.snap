@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 196
+description: "Completion on \" (38..39)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_destructure_let_tuple.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "a.typ",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "a.typ",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 2
+      },
+      "start": {
+       "character": 16,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
