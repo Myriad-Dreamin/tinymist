@@ -549,26 +549,25 @@ impl TypeChecker<'_> {
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
-    fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
-        let source = self.check(&import.source);
+    fn check_path_source(&mut self, source: &Expr) -> Ty {
+        let ty = self.check(source);
         self.constrain(
-            &source,
+            &ty,
             &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
                 allow_package: true,
             })),
         );
+        ty
+    }
+
+    fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        self.check_path_source(&import.source);
         self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
 
     fn check_include(&mut self, include: &Interned<IncludeExpr>) -> Ty {
-        let source = self.check(&include.source);
-        self.constrain(
-            &source,
-            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
-                allow_package: true,
-            })),
-        );
+        self.check_path_source(&include.source);
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
@@ -598,8 +597,6 @@ impl TypeChecker<'_> {
         let pattern = self.check_pattern_exp(&for_loop.pattern);
 
         if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
-            self.constrain(&iter, &Ty::Array(pattern.clone().into()));
-
             match &iter {
                 Ty::Array(elem) => self.constrain(elem, &pattern),
                 Ty::Tuple(elems) => {
