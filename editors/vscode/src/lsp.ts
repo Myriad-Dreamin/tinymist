@@ -207,7 +207,7 @@ export class LanguageState {
     const context = this.context;
 
     const trustedCommands = {
-      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText"],
+      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText", "tinymist.showFullValue"],
     };
     const hoverStorage =
       extensionState.features.renderDocs && LanguageState.HoverTmpStorage
@@ -360,6 +360,7 @@ export class LanguageState {
   exportQuery = exportCommand("tinymist.exportQuery");
   exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
   exportAst = exportStringCommand("tinymist.exportAst");
+  exportValue = exportStringCommand("tinymist.exportValue");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
