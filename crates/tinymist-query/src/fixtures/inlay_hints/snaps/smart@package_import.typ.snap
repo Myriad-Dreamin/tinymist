@@ -32,6 +32,6 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
    "character": 32,
    "line": 2
   },
-  "tooltip": "Version 0.2.0not found"
+  "tooltip": "Version 0.2.0 not found"
  }
 ]
