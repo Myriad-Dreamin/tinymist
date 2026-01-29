@@ -121,10 +121,7 @@ impl CompletionPair<'_, '_, '_> {
 
             if rhs_node.find(focus.span()).is_some() {
                 if let Some(lhs) = self.const_string_expr(&lhs_node) {
-                    let mut new_prefix = EcoString::new();
-                    new_prefix.push_str(lhs.as_str());
-                    new_prefix.push_str(prefix.as_str());
-                    prefix = new_prefix;
+                    prefix.insert_str(0, lhs.as_str());
                 }
                 focus = parent;
                 continue;
