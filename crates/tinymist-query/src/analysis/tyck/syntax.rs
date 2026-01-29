@@ -549,12 +549,25 @@ impl TypeChecker<'_> {
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
+    fn check_path_source(&mut self, source: &Interned<Expr>) -> Ty {
+        let ty = self.check(source);
+        self.constrain(
+            &ty,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
+        ty
+    }
+
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        self.check_path_source(&import.source);
         self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
 
-    fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
+    fn check_include(&mut self, include: &Interned<IncludeExpr>) -> Ty {
+        self.check_path_source(&include.source);
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
@@ -580,8 +593,20 @@ impl TypeChecker<'_> {
     }
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
-        let _iter = self.check(&for_loop.iter);
-        let _pattern = self.check_pattern_exp(&for_loop.pattern);
+        let iter = self.check(&for_loop.iter);
+        let pattern = self.check_pattern_exp(&for_loop.pattern);
+
+        if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
+            match &iter {
+                Ty::Array(elem) => self.constrain(elem, &pattern),
+                Ty::Tuple(elems) => {
+                    for elem in elems.iter() {
+                        self.constrain(elem, &pattern);
+                    }
+                }
+                _ => {}
+            }
+        }
         let _body = self.check(&for_loop.body);
 
         Ty::Any
