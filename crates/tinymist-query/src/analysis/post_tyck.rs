@@ -415,18 +415,11 @@ impl<'a> PostTypeChecker<'a> {
                     let mut named = vec![];
                     let mut has_pos = false;
                     let mut has_named = false;
-                    let mut saw_spread = false;
-                    let mut trailing_pos_after_spread = false;
-
                     for item in destructuring.items() {
                         match item {
                             ast::DestructuringItem::Pattern(pat) => {
-                                if saw_spread {
-                                    trailing_pos_after_spread = true;
-                                } else {
-                                    has_pos = true;
-                                    pos.push(pattern_binding_ty(this, pat));
-                                }
+                                has_pos = true;
+                                pos.push(pattern_binding_ty(this, pat));
                             }
                             ast::DestructuringItem::Named(named_item) => {
                                 has_named = true;
@@ -434,17 +427,8 @@ impl<'a> PostTypeChecker<'a> {
                                 let ty = pattern_binding_ty(this, named_item.pattern());
                                 named.push((key, ty));
                             }
-                            ast::DestructuringItem::Spread(..) => {
-                                saw_spread = true;
-                            }
+                            ast::DestructuringItem::Spread(..) => {}
                         }
-                    }
-
-                    // Spreads make trailing positional mapping ambiguous. Still keep a
-                    // prefix mapping like `(a, ..rest)` and always keep named fields.
-                    if trailing_pos_after_spread {
-                        has_pos = false;
-                        pos.clear();
                     }
 
                     let tuple_ty = has_pos.then(|| Ty::Tuple(pos.into()));
