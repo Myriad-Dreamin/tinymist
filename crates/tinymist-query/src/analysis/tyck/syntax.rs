@@ -44,6 +44,57 @@ impl TypeChecker<'_> {
         })
     }
 
+    fn unique_const_string_key(&self, ty: &Ty) -> Option<Interned<str>> {
+        fn unify(acc: &mut Option<Interned<str>>, next: Interned<str>) -> Option<()> {
+            if acc.as_ref().is_some_and(|prev| prev != &next) {
+                return None;
+            }
+            *acc = Some(next);
+            Some(())
+        }
+
+        fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
+            match ty {
+                Ty::Value(ins) => match &ins.val {
+                    Value::Str(s) => unify(acc, Interned::new_str(s.as_str())),
+                    _ => None,
+                },
+                Ty::Var(v) => {
+                    let bounds = this.info.vars.get(&v.def)?;
+                    let bounds_guard = bounds.bounds.bounds().read();
+                    if bounds_guard.lbs.is_empty() {
+                        return None;
+                    }
+                    for lb in &bounds_guard.lbs {
+                        visit(this, lb, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Let(bounds) => {
+                    if bounds.lbs.is_empty() {
+                        return None;
+                    }
+                    for lb in &bounds.lbs {
+                        visit(this, lb, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Union(types) => {
+                    for ty in types.iter() {
+                        visit(this, ty, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Param(p) => visit(this, &p.ty, acc),
+                _ => None,
+            }
+        }
+
+        let mut acc = None;
+        visit(self, ty, &mut acc)?;
+        acc
+    }
+
     fn check_block(&mut self, exprs: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
@@ -85,8 +136,13 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     fields.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
+                        fields.push((const_key, val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -115,8 +171,14 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     named.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
+                        named.push((const_key, val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -334,6 +396,17 @@ impl TypeChecker<'_> {
             }
         }
 
+        if op == ast::BinOp::Add
+            && let Ty::Value(lhs_val) = &lhs
+            && let Ty::Value(rhs_val) = &rhs
+            && let Value::Str(lhs_str) = &lhs_val.val
+            && let Value::Str(rhs_str) = &rhs_val.val
+        {
+            return Ty::Value(InsTy::new(Value::Str(
+                eco_format!("{}{}", lhs_str.as_str(), rhs_str.as_str()).into(),
+            )));
+        }
+
         Ty::Binary(TypeBinary::new(op, lhs, rhs))
     }
 
@@ -357,6 +430,27 @@ impl TypeChecker<'_> {
 
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
         let args = self.check(&apply.args);
+
+        // Treat `dict.at("key")` as `dict.key` when the key is a constant string.
+        if let Expr::Select(select) = &apply.callee
+            && select.key.name().as_ref() == "at"
+            && let Ty::Args(args_ty) = &args
+            && args_ty.positional_params().len() == 1
+            && args_ty.named_params().len() == 0
+            && args_ty.rest_param().is_none()
+        {
+            let key = args_ty
+                .pos(0)
+                .and_then(|ty| self.unique_const_string_key(ty));
+
+            if let Some(key) = key {
+                let base = self.check(&select.lhs);
+                let res = Ty::Select(SelectTy::new(base.into(), key));
+                self.info.witness_at_least(apply.span, res.clone());
+                return res;
+            }
+        }
+
         let callee = self.check(&apply.callee);
 
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
@@ -550,11 +644,25 @@ impl TypeChecker<'_> {
     }
 
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        let source = self.check(&import.source);
+        self.constrain(
+            &source,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
         self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
 
-    fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
+    fn check_include(&mut self, include: &Interned<IncludeExpr>) -> Ty {
+        let source = self.check(&include.source);
+        self.constrain(
+            &source,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
@@ -580,8 +688,22 @@ impl TypeChecker<'_> {
     }
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
-        let _iter = self.check(&for_loop.iter);
-        let _pattern = self.check_pattern_exp(&for_loop.pattern);
+        let iter = self.check(&for_loop.iter);
+        let pattern = self.check_pattern_exp(&for_loop.pattern);
+
+        if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
+            self.constrain(&iter, &Ty::Array(pattern.clone().into()));
+
+            match &iter {
+                Ty::Array(elem) => self.constrain(elem, &pattern),
+                Ty::Tuple(elems) => {
+                    for elem in elems.iter() {
+                        self.constrain(elem, &pattern);
+                    }
+                }
+                _ => {}
+            }
+        }
         let _body = self.check(&for_loop.body);
 
         Ty::Any
