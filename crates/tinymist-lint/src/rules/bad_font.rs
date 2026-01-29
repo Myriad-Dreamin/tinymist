@@ -80,16 +80,15 @@ impl<'w> Linter<'w> {
 
         // 2. Check for non-ASCII characters
         if !unknown_font.is_ascii() {
-            diag .hint("font family names in Typst should usually be English (PostScript) names. Try using the English name of the font.");
+            diag.hint("font family names in Typst should usually be English (PostScript) names. Try using the English name of the font.");
         }
 
         // 3. Check for localized mapping
         let mapped_suggestions: Vec<_> = LOCALIZED_FONT_MAPPING
             .iter()
             .find(|(localized, _)| *localized == unknown_font)
-            .map(|(_, english)| {
-                english
-                    .iter()
+            .map(|(_, en)| {
+                en.iter()
                     .filter(|&name| available_fonts.contains(name))
                     .copied()
                     .collect::<Vec<_>>()
@@ -97,12 +96,7 @@ impl<'w> Linter<'w> {
             .unwrap_or_default();
 
         if !mapped_suggestions.is_empty() {
-            if mapped_suggestions.len() == 1 {
-                diag.hint(eco_format!("did you mean '{}'?", mapped_suggestions[0]));
-            } else {
-                let suggestion_list = mapped_suggestions.join("', '");
-                diag.hint(eco_format!("did you mean one of: '{}'?", suggestion_list));
-            }
+            add_suggestion_hints(&mut diag, &mapped_suggestions);
             self.diag.push(diag);
             return Some(());
         }
@@ -111,12 +105,7 @@ impl<'w> Linter<'w> {
         let suggestions = find_similar_fonts(unknown_font.as_str(), available_fonts, 3);
 
         if !suggestions.is_empty() {
-            if suggestions.len() == 1 {
-                diag.hint(eco_format!("did you mean '{}'?", suggestions[0]));
-            } else {
-                let suggestion_list = suggestions.join("', '");
-                diag.hint(eco_format!("did you mean one of: '{}'?", suggestion_list));
-            }
+            add_suggestion_hints(&mut diag, &suggestions);
         }
 
         // Only push if we added some hint, otherwise it's just a duplicate of compiler warning
@@ -125,6 +114,15 @@ impl<'w> Linter<'w> {
         }
 
         Some(())
+    }
+}
+
+fn add_suggestion_hints(diag: &mut SourceDiagnostic, suggestions: &[&str]) {
+    if suggestions.len() == 1 {
+        diag.hint(eco_format!("did you mean '{}'?", suggestions[0]));
+    } else {
+        let suggestion_list = suggestions.join("', '");
+        diag.hint(eco_format!("did you mean one of: '{}'?", suggestion_list));
     }
 }
 
@@ -141,7 +139,7 @@ pub(crate) fn extract_unknown_font(message: &str) -> Option<EcoString> {
 /// Returns up to `max_suggestions` fonts sorted by similarity score (highest first).
 fn find_similar_fonts<'a>(
     target: &str,
-    available: &[&'a str],
+    available: impl IntoIterator<Item = &'a &'a str>,
     max_suggestions: usize,
 ) -> Vec<&'a str> {
     use strsim::jaro_winkler;
@@ -150,7 +148,7 @@ fn find_similar_fonts<'a>(
 
     let target_lower = target.to_lowercase();
     let mut scored_fonts: Vec<_> = available
-        .iter()
+        .into_iter()
         .map(|&font| {
             let font_lower = font.to_lowercase();
             let similarity = jaro_winkler(&target_lower, &font_lower);

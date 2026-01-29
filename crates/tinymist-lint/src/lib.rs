@@ -2,7 +2,7 @@
 
 mod rules;
 
-use std::{cell::OnceCell, sync::Arc};
+use std::{cell::OnceCell, collections::BTreeSet, sync::Arc};
 
 use tinymist_analysis::{
     adt::interner::Interned,
@@ -102,7 +102,8 @@ struct Linter<'w> {
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 
-    available_fonts: OnceCell<Vec<&'w str>>,
+    // Use BTreeSet to have a stable order for suggestions
+    available_fonts: OnceCell<BTreeSet<&'w str>>,
 }
 
 impl<'w> Linter<'w> {
