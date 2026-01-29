@@ -400,8 +400,9 @@ impl<'a> PostTypeChecker<'a> {
                         ast::Pattern::Parenthesized(paren) => {
                             pattern_binding_ty(this, paren.pattern())
                         }
-                        ast::Pattern::Destructuring(d) => destructuring_binding_ty(this, d)
-                            .unwrap_or(Ty::Any),
+                        ast::Pattern::Destructuring(d) => {
+                            destructuring_binding_ty(this, d).unwrap_or(Ty::Any)
+                        }
                         ast::Pattern::Normal(..) | ast::Pattern::Placeholder(..) => Ty::Any,
                     }
                 }
