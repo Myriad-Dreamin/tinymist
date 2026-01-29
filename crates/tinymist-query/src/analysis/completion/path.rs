@@ -121,7 +121,7 @@ impl CompletionPair<'_, '_, '_> {
 
             if rhs_node.find(focus.span()).is_some() {
                 if let Some(lhs) = self.const_string_expr(&lhs_node) {
-                    prefix.insert_str(0, lhs.as_str());
+                    prefix = lhs + prefix;
                 }
                 focus = parent;
                 continue;
