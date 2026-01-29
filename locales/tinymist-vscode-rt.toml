@@ -80,9 +80,9 @@ zh = "无效的页码范围格式：{range}"
 en = "Invalid page range: {range}"
 zh = "无效的页码范围：{range}"
 
-["No active editor, change selection to view full value."]
-en = "No active editor, change selection to view full value."
-zh = "没有活动的编辑器，更改选择以查看完整值。"
+["No active editor, change selection to inspect expression values."]
+en = "No active editor, change selection to inspect expression values."
+zh = "没有活动的编辑器，更改选择以查看表达式值。"
 
 ["No value found at this position."]
 en = "No value found at this position."

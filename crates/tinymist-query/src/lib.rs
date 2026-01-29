@@ -433,7 +433,7 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
         /// The response to the interact code context request.
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
-        /// The response to the show full value request.
+        /// The response to the inspect values request.
         InspectExpressionValue(Option<String>),
 
         /// The response to the on enter request.

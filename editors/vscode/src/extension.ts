@@ -437,7 +437,8 @@ function commandInspectValue(ctx: IContext) {
       ct: vscode.CancellationToken,
     ): Promise<string> {
       const editor = ctx.currentActiveEditor();
-      if (!editor) return l10nMsg("No active editor, change selection to view full value.");
+      if (!editor)
+        return l10nMsg("No active editor, change selection to inspect expression values.");
 
       // Cancel any previous request
       if (this.currentRequest) {

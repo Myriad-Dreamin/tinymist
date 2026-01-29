@@ -118,15 +118,12 @@ impl HoverWorker<'_> {
         self.value.push(match typst_tooltip {
             Tooltip::Text(text) => text.to_string(),
             Tooltip::Code(code) => {
-                // Add a button to show full values
+                // Add a button to inspect values
                 // todo - we may need only add this button if the code is too long
                 self.actions.push(CommandLink {
                     title: Some(
-                        tinymist_l10n::t!(
-                            "tinymist-query.hover.inspect-value",
-                            "Show Full Value"
-                        )
-                        .to_string(),
+                        tinymist_l10n::t!("tinymist-query.hover.inspect-value", "Inspect Values")
+                            .to_string(),
                     ),
                     command_or_links: vec![CommandOrLink::Command {
                         id: "tinymist.inspectValue".to_string(),

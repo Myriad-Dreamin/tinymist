@@ -108,12 +108,6 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
     let mut value_limit_hit = false;
     let mut size_limit_hit = false;
 
-    // Add header explaining limitations
-    buf.push_str(&tinymist_l10n::t!(
-        "tinymist-query.value-inspector.header",
-        "# Tracked Values\n\n"
-    ));
-
     for piece in pieces {
         let item_repr = truncated_repr_::<SIZE_LIMIT>(piece.value);
         if buf.len() + item_repr.len() + 50 > SIZE_LIMIT {
@@ -144,7 +138,7 @@ fn format_values(world: &dyn World, expr: &LinkedNode) -> Option<String> {
         buf.push_str("\n\n");
         buf.push_str(&tinymist_l10n::t!(
             "tinymist-query.value-inspector.note-truncated",
-            "**Note:** Values above may be truncated due to internal limits.\n"
+            "*Note:* Values above may be truncated due to internal limits.\n"
         ));
     }
 
