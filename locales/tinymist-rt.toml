@@ -57,19 +57,15 @@ en = "Wrap {func_name} in figure with a caption"
 zh = "将 {func_name} 包裹在 figure 中，并添加一个标题"
 
 [tinymist-query.hover.inspect-value]
-en = "Show Full Value"
+en = "Inspect Values"
 zh = "检查表达式值"
-
-[tinymist-query.value-inspector.header]
-en = "# Tracked Values\n\n"
-zh = "# 跟踪的值\n\n"
 
 [tinymist-query.value-inspector.max-values-limit]
 en = "... (reached max values limit)\n"
 zh = "... (已达到最大值数量限制)\n"
 
 [tinymist-query.value-inspector.note-truncated]
-en = "**Note:** Values above may be truncated due to internal limits.\n"
+en = "*Note:* Values above may be truncated due to internal limits.\n"
 zh = "**注意：** 上述值可能因内部限制而被截断。\n"
 
 [tinymist-query.value-inspector.size-limit]
