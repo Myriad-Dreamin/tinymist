@@ -24,7 +24,6 @@ pub use document_link::*;
 pub use document_metrics::*;
 pub use document_symbol::*;
 pub use folding_range::*;
-pub use full_value::*;
 pub use goto_declaration::*;
 pub use goto_definition::*;
 pub use hover::*;
@@ -40,6 +39,7 @@ pub use semantic_tokens_delta::*;
 pub use semantic_tokens_full::*;
 pub use signature_help::*;
 pub use symbol::*;
+pub use value_inspector::*;
 pub use will_rename_files::*;
 pub use workspace_label::*;
 
@@ -72,7 +72,6 @@ mod document_link;
 mod document_metrics;
 mod document_symbol;
 mod folding_range;
-mod full_value;
 mod goto_declaration;
 mod goto_definition;
 mod hover;
@@ -87,6 +86,7 @@ mod semantic_tokens_delta;
 mod semantic_tokens_full;
 mod signature_help;
 mod symbol;
+mod value_inspector;
 mod will_rename_files;
 mod workspace_label;
 
@@ -282,8 +282,8 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
         /// A request to interact with the code context.
         InteractCodeContext(InteractCodeContextRequest),
-        /// A request to show the full value.
-        ShowFullValue(ShowFullValueRequest),
+        /// A request to inspect the expression value.
+        InspectExpressionValue(InspectExpressionValueRequest),
 
         /// A request to get extra text edits on enter.
         OnEnter(OnEnterRequest),
@@ -328,7 +328,7 @@ mod polymorphic {
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,
                 Self::InteractCodeContext(..) => PinnedFirst,
-                Self::ShowFullValue(..) => PinnedFirst,
+                Self::InspectExpressionValue(..) => PinnedFirst,
 
                 Self::OnEnter(..) => ContextFreeUnique,
 
@@ -367,7 +367,7 @@ mod polymorphic {
                 Self::FoldingRange(req) => &req.path,
                 Self::SelectionRange(req) => &req.path,
                 Self::InteractCodeContext(req) => &req.path,
-                Self::ShowFullValue(req) => &req.path,
+                Self::InspectExpressionValue(req) => &req.path,
 
                 Self::OnEnter(req) => &req.path,
 
@@ -434,7 +434,7 @@ mod polymorphic {
         /// The response to the interact code context request.
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
         /// The response to the show full value request.
-        ShowFullValue(Option<String>),
+        InspectExpressionValue(Option<String>),
 
         /// The response to the on enter request.
         OnEnter(Option<Vec<TextEdit>>),

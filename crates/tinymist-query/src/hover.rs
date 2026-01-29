@@ -123,13 +123,13 @@ impl HoverWorker<'_> {
                 self.actions.push(CommandLink {
                     title: Some(
                         tinymist_l10n::t!(
-                            "tinymist-query.hover.show-full-value",
+                            "tinymist-query.hover.inspect-value",
                             "Show Full Value"
                         )
                         .to_string(),
                     ),
                     command_or_links: vec![CommandOrLink::Command {
-                        id: "tinymist.showFullValue".to_string(),
+                        id: "tinymist.inspectValue".to_string(),
                         args: vec![],
                     }],
                 });

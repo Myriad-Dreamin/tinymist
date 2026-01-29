@@ -1276,8 +1276,8 @@
         "category": "Typst"
       },
       {
-        "command": "tinymist.showFullValue",
-        "title": "%extension.tinymist.command.tinymist.showFullValue%",
+        "command": "tinymist.inspectValue",
+        "title": "%extension.tinymist.command.tinymist.inspectValue%",
         "category": "Typst"
       },
       {

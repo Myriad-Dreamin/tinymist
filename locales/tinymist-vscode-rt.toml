@@ -88,10 +88,6 @@ zh = "没有活动的编辑器，更改选择以查看完整值。"
 en = "No value found at this position."
 zh = "在此位置未找到值。"
 
-["Request cancelled."]
-en = "Request cancelled."
-zh = "请求已取消。"
-
 ["PDF (Specific Pages)"]
 en = "PDF (Specific Pages)"
 zh = "PDF (指定页码)"
@@ -131,6 +127,10 @@ zh = "查询当前文档并导出结果为 YAML 文件"
 ["Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."]
 en = "Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."
 zh = "查询当前文档并导出结果为文件。我们将会询问一些问题并为您更新 tasks.json 文件。"
+
+["Request cancelled."]
+en = "Request cancelled."
+zh = "请求已取消。"
 
 ["Restart Server"]
 en = "Restart Server"

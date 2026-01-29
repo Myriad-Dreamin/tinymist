@@ -216,7 +216,7 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
     commands.registerCommand("tinymist.viewAst", commandViewAst(context)),
-    commands.registerCommand("tinymist.showFullValue", commandShowFullValue(context)),
+    commands.registerCommand("tinymist.inspectValue", commandInspectValue(context)),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
@@ -374,11 +374,11 @@ function commandViewAst(ctx: IContext) {
   };
 }
 
-function commandShowFullValue(ctx: IContext) {
-  const scheme = "tinymist-full-value";
-  const uri = `${scheme}://showFullValue/values.typ`;
+function commandInspectValue(ctx: IContext) {
+  const scheme = "tinymist-value-inspector";
+  const uri = `${scheme}://inspect/values.typ`;
 
-  const FullValueDoc = new (class implements vscode.TextDocumentContentProvider {
+  const ValueInspectorDoc = new (class implements vscode.TextDocumentContentProvider {
     readonly uri = vscode.Uri.parse(uri);
     readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
     debounce: NodeJS.Timeout | undefined = undefined;
@@ -459,7 +459,7 @@ function commandShowFullValue(ctx: IContext) {
       });
 
       try {
-        const res = await tinymist.exportValue(editor.document.uri.fsPath, {
+        const res = await tinymist.exportTrackedValues(editor.document.uri.fsPath, {
           position: (await tinymist.clientPromise).code2ProtocolConverter.asPosition(
             editor.selection.active,
           ),
@@ -489,12 +489,12 @@ function commandShowFullValue(ctx: IContext) {
   })();
 
   ctx.subscriptions.push(
-    vscode.workspace.registerTextDocumentContentProvider(scheme, FullValueDoc),
+    vscode.workspace.registerTextDocumentContentProvider(scheme, ValueInspectorDoc),
   );
 
   return async () => {
-    const document = await vscode.workspace.openTextDocument(FullValueDoc.uri);
-    setTimeout(() => FullValueDoc.emitChange(), 10);
+    const document = await vscode.workspace.openTextDocument(ValueInspectorDoc.uri);
+    setTimeout(() => ValueInspectorDoc.emitChange(), 10);
     void (await vscode.window.showTextDocument(document, {
       viewColumn: vscode.ViewColumn.Two,
       preserveFocus: true,

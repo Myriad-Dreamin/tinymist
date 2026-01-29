@@ -335,7 +335,7 @@ impl ServerState {
             .with_command_("tinymist.exportQuery", State::export_query)
             .with_command("tinymist.exportAnsiHighlight", State::export_ansi_hl)
             .with_command("tinymist.exportAst", State::export_ast)
-            .with_command("tinymist.exportValue", State::export_value)
+            .with_command("tinymist.exportTrackedValues", State::export_value)
             .with_command("tinymist.doClearCache", State::clear_cache)
             .with_command("tinymist.pinMain", State::pin_document)
             .with_command("tinymist.focusMain", State::focus_document)
