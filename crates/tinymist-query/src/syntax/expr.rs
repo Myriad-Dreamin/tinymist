@@ -674,7 +674,13 @@ impl ExprWorker<'_> {
             }
         };
 
-        Expr::Import(ImportExpr { decl: mod_ref }.into())
+        Expr::Import(
+            ImportExpr {
+                source: self.check(source),
+                decl: mod_ref,
+            }
+            .into(),
+        )
     }
 
     fn check_import(
@@ -931,17 +937,35 @@ impl ExprWorker<'_> {
                 ast::DictItem::Keyed(item) => {
                     let val = self.check(item.expr());
                     let key = item.key();
-                    let analyzed = self.const_eval_expr(key);
-                    let analyzed = match &analyzed {
-                        Some(Value::Str(s)) => Some(s),
-                        _ => None,
-                    };
+                    let analyzed = self
+                        .const_eval_expr(key)
+                        .and_then(|v| match v {
+                            Value::Str(s) => Some(s),
+                            _ => None,
+                        })
+                        .or_else(|| {
+                            let (expr, term) = self.eval_expr(key, InterpretMode::Code);
+
+                            if let Some(Ty::Value(v)) = term
+                                && let Value::Str(s) = &v.val
+                            {
+                                return Some(s.clone());
+                            }
+
+                            if let Some(Expr::Type(Ty::Value(v))) = expr
+                                && let Value::Str(s) = &v.val
+                            {
+                                return Some(s.clone());
+                            }
+
+                            None
+                        });
                     let Some(analyzed) = analyzed else {
                         let key = self.check(key);
                         items.push(ArgExpr::NamedRt(Box::new((key, val))));
                         continue;
                     };
-                    let key = Decl::str_name(key.to_untyped().clone(), analyzed).into();
+                    let key = Decl::str_name(key.to_untyped().clone(), analyzed.as_str()).into();
                     items.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::DictItem::Spread(s) => {
@@ -1231,6 +1255,7 @@ impl ExprWorker<'_> {
         crate::log_debug_ct!("checking expr: {expr:?}");
 
         match expr {
+            ast::Expr::Parenthesized(paren) => self.eval_expr(paren.expr(), mode),
             ast::Expr::FieldAccess(field_access) => {
                 let field = Decl::ident_ref(field_access.field());
 
