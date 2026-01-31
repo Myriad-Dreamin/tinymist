@@ -572,7 +572,7 @@ impl ExprWorker<'_> {
         let is_wildcard_import = matches!(typed.imports(), Some(ast::Imports::Wildcard));
 
         let source = typed.source();
-        let mod_expr = self.check_import(typed.source(), true, is_wildcard_import);
+        let mod_expr = self.check_import(source, true, is_wildcard_import);
         crate::log_debug_ct!("checking import: {source:?} => {mod_expr:?}");
 
         let mod_var = typed.new_name().map(Decl::module_alias).or_else(|| {
@@ -674,7 +674,13 @@ impl ExprWorker<'_> {
             }
         };
 
-        Expr::Import(ImportExpr { decl: mod_ref }.into())
+        Expr::Import(
+            ImportExpr {
+                source: self.check(source),
+                decl: mod_ref,
+            }
+            .into(),
+        )
     }
 
     fn check_import(

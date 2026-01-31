@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+assertion_line: 445
+description: "Check on \"\\\"file.typ\\\"\" (30)"
+expression: post_ty
+input_file: crates/tinymist-query/src/fixtures/post_type_check/import_path_let.typ
+---
+( ⪰ "file.typ" ⪯ Path(Source { allow_package: true }))

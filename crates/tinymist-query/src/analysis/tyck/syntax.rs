@@ -549,12 +549,25 @@ impl TypeChecker<'_> {
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
+    fn check_path_source(&mut self, source: &Expr) -> Ty {
+        let ty = self.check(source);
+        self.constrain(
+            &ty,
+            &Ty::Builtin(BuiltinTy::Path(PathKind::Source {
+                allow_package: true,
+            })),
+        );
+        ty
+    }
+
     fn check_import(&mut self, import: &Interned<ImportExpr>) -> Ty {
+        self.check_path_source(&import.source);
         self.check_ref(&import.decl);
         Ty::Builtin(BuiltinTy::None)
     }
 
-    fn check_include(&mut self, _include: &Interned<IncludeExpr>) -> Ty {
+    fn check_include(&mut self, include: &Interned<IncludeExpr>) -> Ty {
+        self.check_path_source(&include.source);
         Ty::Builtin(BuiltinTy::Content(None))
     }
 
@@ -580,8 +593,61 @@ impl TypeChecker<'_> {
     }
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
-        let _iter = self.check(&for_loop.iter);
-        let _pattern = self.check_pattern_exp(&for_loop.pattern);
+        let iter = self.check(&for_loop.iter);
+        let pattern = self.check_pattern_exp(&for_loop.pattern);
+
+        // todo: This doesn't fully utilize the existing checkers. We have a better way
+        // of implementing this check, add a constraint `array(iter) <: pattern`.
+        // Note: this is not implemented yet in `TypeChecker::constrain`, so we need to
+        // implement similar logic as following checking specific to loop
+        // variables.
+        if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
+            match &iter {
+                Ty::Array(elem) => self.constrain(elem, &pattern),
+                Ty::Tuple(elems) => {
+                    for elem in elems.iter() {
+                        self.constrain(elem, &pattern);
+                    }
+                }
+                Ty::Var(var) => {
+                    if let Some(bounds) = self.info.vars.get(&var.def) {
+                        let lbs = bounds.bounds.bounds().read().lbs.clone();
+                        for lb in lbs.iter() {
+                            match lb {
+                                Ty::Array(elem) => {
+                                    self.constrain(elem, &pattern);
+                                    self.constrain(&iter, &Ty::Array(pattern.clone().into()));
+                                }
+                                Ty::Tuple(elems) => {
+                                    for elem in elems.iter() {
+                                        self.constrain(elem, &pattern);
+                                    }
+                                    let tuple = Ty::Tuple(Interned::new(
+                                        elems.iter().map(|_| pattern.clone()).collect::<Vec<_>>(),
+                                    ));
+                                    self.constrain(&iter, &tuple);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                Ty::Let(bounds) => {
+                    for lb in bounds.lbs.iter() {
+                        match lb {
+                            Ty::Array(elem) => self.constrain(elem, &pattern),
+                            Ty::Tuple(elems) => {
+                                for elem in elems.iter() {
+                                    self.constrain(elem, &pattern);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
         let _body = self.check(&for_loop.body);
 
         Ty::Any
