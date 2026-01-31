@@ -25,7 +25,7 @@ comemo.workspace = true
 dirs = { workspace = true, optional = true }
 ecow.workspace = true
 flate2.workspace = true
-fontdb = { workspace = true, optional = true }
+fontdb = { workspace = true, optional = true, features = ["fs", "memmap"] }
 hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true

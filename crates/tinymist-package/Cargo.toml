@@ -44,7 +44,7 @@ insta.workspace = true
 
 default = []
 fs-pack = ["walkdir"]
-gitcl-pack = ["toml", "tinymist-std/system"]
+gitcl-pack = ["fs-pack", "toml", "tinymist-std/system"]
 http-pack = ["http-registry"]
 release-pack = ["http-pack"]
 universe-pack = ["http-pack"]
