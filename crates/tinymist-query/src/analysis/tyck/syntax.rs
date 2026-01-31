@@ -596,6 +596,11 @@ impl TypeChecker<'_> {
         let iter = self.check(&for_loop.iter);
         let pattern = self.check_pattern_exp(&for_loop.pattern);
 
+        // todo: This doesn't fully utilize the existing checkers. We have a better way
+        // of implementing this check, add a constraint `array(iter) <: pattern`.
+        // Note: this is not implemented yet in `TypeChecker::constrain`, so we need to
+        // implement similar logic as following checking specific to loop
+        // variables.
         if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
             match &iter {
                 Ty::Array(elem) => self.constrain(elem, &pattern),
