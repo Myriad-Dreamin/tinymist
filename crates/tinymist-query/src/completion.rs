@@ -130,6 +130,10 @@ mod tests {
             let mut excludes = HashSet::new();
 
             for kk in properties.get("contains").iter().flat_map(|v| v.split(',')) {
+                let kk = kk.trim();
+                if kk.is_empty() {
+                    continue;
+                }
                 // split first char
                 let (kind, item) = kk.split_at(1);
                 if kind == "+" {
