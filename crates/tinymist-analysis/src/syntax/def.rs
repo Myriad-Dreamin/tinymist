@@ -1250,6 +1250,8 @@ pub struct SetExpr {
 /// Represents an import expression.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ImportExpr {
+    /// The source expression indicating what file or module to import from.
+    pub source: Expr,
     /// The reference expression for what is being imported.
     pub decl: Interned<RefExpr>,
 }
