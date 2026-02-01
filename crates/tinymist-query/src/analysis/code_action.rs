@@ -1,5 +1,7 @@
 //! Provides code actions for the document.
 
+mod figure;
+
 use ecow::eco_format;
 use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
 use regex::Regex;
@@ -282,6 +284,7 @@ impl<'a> CodeActionWorker<'a> {
         let mut heading_resolved = false;
         let mut equation_resolved = false;
         let mut path_resolved = false;
+        let mut figure_resolved = false;
 
         self.wrap_actions(node, range);
 
@@ -300,6 +303,15 @@ impl<'a> CodeActionWorker<'a> {
                 SyntaxKind::Str if !path_resolved => {
                     path_resolved = true;
                     self.path_actions(node, cursor);
+                }
+                SyntaxKind::FuncCall
+                | SyntaxKind::CodeBlock
+                | SyntaxKind::ContentBlock
+                | SyntaxKind::Raw
+                    if !figure_resolved =>
+                {
+                    figure_resolved = true;
+                    self.figure_actions(node);
                 }
                 _ => {}
             }
