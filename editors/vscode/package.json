@@ -492,6 +492,12 @@
             "%extension.tinymist.config.tinymist.semanticTokens.string.enum.disable%"
           ]
         },
+        "tinymist.inlayHints.packageVersionStatus": {
+          "title": "%extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.desc%",
+          "type": "boolean",
+          "default": true
+        },
         "tinymist.lint.enabled": {
           "title": "%extension.tinymist.config.tinymist.lint.enabled.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.lint.enabled.desc%",
