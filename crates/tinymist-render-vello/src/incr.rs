@@ -2,16 +2,13 @@ use reflexo::{
     error::prelude::*,
     vector::{
         incr::IncrDocClient,
-        ir::{ImmutStr, Module, Page, Rect},
+        ir::{ImmutStr, Module, Page},
         vm::RenderVm,
     },
 };
-use vello::kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke, Vec2};
-use vello::peniko::Color;
+use vello::kurbo::{Affine, Vec2};
 
-use crate::{VecPage, VecScene};
-// use crate::{set_transform, CanvasDevice, CanvasOp, CanvasPage, CanvasTask,
-// DefaultExportFeature};
+use crate::VecPage;
 
 /// Incremental pass from vector to canvas
 pub struct IncrVec2VelloPass {
@@ -77,6 +74,9 @@ impl IncrVec2VelloPass {
         let mut elem_scene = vello::Scene::new();
         elem.render(&mut elem_scene);
         scene.append(&elem_scene, Some(ts));
+
+        // todo: fill background size
+        let _ = size;
 
         // , canvas: &dyn CanvasDevice, ts: sk::Transform
         // let pg = &self.pages[idx];

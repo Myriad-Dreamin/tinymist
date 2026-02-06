@@ -14,6 +14,7 @@ rust-version.workspace = true
 [dependencies]
 
 bytes.workspace = true
+clap.workspace = true
 comemo.workspace = true
 env_logger.workspace = true
 futures.workspace = true
@@ -43,8 +44,8 @@ svgtypes = "0.15.2"
 ecow.workspace = true
 async-trait.workspace = true
 ttf-parser.workspace = true
+image.workspace = true
 
-clap = { workspace = true, optional = true }
 
 [features]
 

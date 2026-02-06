@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
+use clap::Parser;
 use ezsockets::ClientConfig;
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
@@ -18,7 +19,21 @@ use winit::window::Window;
 
 use tinymist_render_vello::incr::IncrVelloDocClient;
 
+#[derive(Debug, Clone, Parser)]
+struct Args {
+    /// The address of the preview server.
+    #[clap(
+        long = "data-plane-host",
+        default_value = "127.0.0.1:23625",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub data_plane_host: String,
+}
+
 fn main() -> Result<()> {
+    let args = Args::parse();
+
     env_logger::builder()
         .filter_module("tinymist", log::LevelFilter::Info)
         .try_init()?;
@@ -42,8 +57,12 @@ fn main() -> Result<()> {
     let proxy = event_loop.create_proxy();
 
     tokio_runtime.spawn(async move {
-        let config =
-            ClientConfig::new("ws://127.0.0.1:23625").header("Origin", "http://localhost:23625");
+        let address = if args.data_plane_host.contains("ws://") {
+            args.data_plane_host.clone()
+        } else {
+            format!("ws://{}", args.data_plane_host)
+        };
+        let config = ClientConfig::new(address.as_str()).header("Origin", "http://localhost:23625");
         let (_handle, future) = ezsockets::connect(
             |client| Client {
                 proxy,
