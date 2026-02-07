@@ -102,45 +102,57 @@ vergen.workspace = true
 cargo_metadata = "0.18.0"
 
 [features]
-dap = ["sync-ls/dap", "tinymist-debug"]
+# Default features.
+# todo: remove `web` from default features.
 default = ["web", "no-content-hint"]
+# Disables content hint, which needs patch to official typst.
+no-content-hint = ["reflexo-typst/no-content-hint"]
+
+# Allows to detect battery status (to determine whether to run in syntax-only mode).
+battery = ["tinymist-std/battery"]
+# Enables DAP protocol.
+dap = ["sync-ls/dap", "tinymist-debug"]
+# Enables preview server.
 preview = [
     "http-body-util",
     "hyper",
     "hyper-util",
     "hyper-tungstenite",
+    "tinymist-assets/typst-preview",
     "tinymist-preview",
     "tinymist-preview/clap",
-    "tinymist-assets/typst-preview",
 ]
+# Enables tinymist.lock
 lock = []
+# Enables export command.
 export = []
+# Enables trace command.
 trace = []
+# Enables open feature. (open by system app after export.)
+open = ["dep:open"]
+
+# Targets to web.
 web = [
     "console_error_panic_hook",
     "js-sys",
-    "wasm-bindgen",
-    "serde-wasm-bindgen",
-    "wasm-bindgen-futures",
     "reflexo-typst/web",
+    "serde-wasm-bindgen",
     "sync-ls/web",
     "tinymist-project/web",
-    "sync-ls/web",
+    "wasm-bindgen",
+    "wasm-bindgen-futures",
 ]
-open = ["dep:open"]
+# Targets to system.
 system = [
     "lock",
     "open",
     "reflexo-typst/system",
+    "sync-ls/system",
     "tinymist-project/system",
     "tinymist-query/local-registry",
-    "sync-ls/system",
-    "tokio/rt-multi-thread",
     "tokio/io-std",
+    "tokio/rt-multi-thread",
 ]
-battery = ["tinymist-std/battery"]
-
-no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [lints]
 workspace = true
