@@ -63,10 +63,10 @@ impl IncrVec2VelloPass {
     }
 
     /// Flushes a page to the canvas with the given transform.
-    pub fn flush_page(&mut self, scene: &mut vello::Scene, idx: usize, ts: Affine) {
+    pub fn flush_page(&mut self, scene: &mut vello::Scene, idx: usize, ts: Affine) -> Vec2 {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {}", idx);
-            return;
+            return Vec2::ZERO;
         }
 
         let VecPage { size, elem, .. } = &self.pages[idx];
@@ -76,8 +76,6 @@ impl IncrVec2VelloPass {
         scene.append(&elem_scene, Some(ts));
 
         // todo: fill background size
-        let _ = size;
-
         // , canvas: &dyn CanvasDevice, ts: sk::Transform
         // let pg = &self.pages[idx];
 
@@ -88,6 +86,8 @@ impl IncrVec2VelloPass {
         // canvas.fill_rect(0., 0., pg.size.x.0 as f64, pg.size.y.0 as f64);
 
         // pg.elem.realize(ts, canvas).await;
+
+        *size
     }
 }
 
@@ -131,11 +131,11 @@ impl IncrVelloDocClient {
         &mut self,
         kern: &mut IncrDocClient,
         // canvas: &dyn CanvasDevice,
-    ) -> Result<vello::Scene> {
+    ) -> Result<(vello::Scene, Vec2)> {
         {
             let layouts = kern.doc.layouts[0].by_scalar();
             let Some(layouts) = layouts else {
-                return Ok(vello::Scene::new());
+                return Ok((vello::Scene::new(), Vec2::ZERO));
             };
             let layout = layouts.first().unwrap();
             let layout = layout.clone();
@@ -148,8 +148,8 @@ impl IncrVelloDocClient {
         let s = self.vec2vello.pixel_per_pt;
         // let ts = sk::Transform::from_scale(s, s);
         let ts = Affine::scale(s as f64);
-        self.vec2vello.flush_page(&mut scene, 0, ts);
+        let size = self.vec2vello.flush_page(&mut scene, 0, ts);
 
-        Ok(scene)
+        Ok((scene, size))
     }
 }

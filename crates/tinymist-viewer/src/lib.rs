@@ -12,6 +12,7 @@ use std::sync::Arc;
 use vello::kurbo::{self, Affine};
 use vello::peniko;
 
+pub mod doc;
 pub mod incr;
 mod render;
 

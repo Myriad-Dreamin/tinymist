@@ -1,6 +1,6 @@
 [package]
-name = "tinymist-render-vello"
-description = "A renderer for the Typst typesetting system using Vello."
+name = "tinymist-viewer"
+description = "A WGPU-based viewer for the Typst typesetting system using Vello."
 categories = ["compilers"]
 keywords = ["api", "language", "typst"]
 version.workspace = true
@@ -33,12 +33,16 @@ tinymist-assets.workspace = true
 tinymist-std.workspace = true
 tinymist-preview.workspace = true
 anyhow.workspace = true
+tracing = "0.1"
 pollster = "0.4.0"
-vello = "0.6.0"
+vello = "0.7.0"
 hayro = "0.4"
-vello_svg = "0.8.0"
+vello_svg = "0.9.0"
 winit = "0.30.12"
 smallvec = "1"
+xilem = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
+masonry = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
+masonry_winit = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
 ezsockets = "0.7.1"
 svgtypes = "0.15.2"
 ecow.workspace = true
