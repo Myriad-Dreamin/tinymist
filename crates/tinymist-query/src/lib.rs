@@ -39,6 +39,7 @@ pub use semantic_tokens_delta::*;
 pub use semantic_tokens_full::*;
 pub use signature_help::*;
 pub use symbol::*;
+pub use value_inspector::*;
 pub use will_rename_files::*;
 pub use workspace_label::*;
 
@@ -85,6 +86,7 @@ mod semantic_tokens_delta;
 mod semantic_tokens_full;
 mod signature_help;
 mod symbol;
+mod value_inspector;
 mod will_rename_files;
 mod workspace_label;
 
@@ -280,6 +282,8 @@ mod polymorphic {
         SelectionRange(SelectionRangeRequest),
         /// A request to interact with the code context.
         InteractCodeContext(InteractCodeContextRequest),
+        /// A request to inspect the expression value.
+        InspectExpressionValue(InspectExpressionValueRequest),
 
         /// A request to get extra text edits on enter.
         OnEnter(OnEnterRequest),
@@ -324,6 +328,7 @@ mod polymorphic {
                 Self::FoldingRange(..) => ContextFreeUnique,
                 Self::SelectionRange(..) => ContextFreeUnique,
                 Self::InteractCodeContext(..) => PinnedFirst,
+                Self::InspectExpressionValue(..) => PinnedFirst,
 
                 Self::OnEnter(..) => ContextFreeUnique,
 
@@ -362,6 +367,7 @@ mod polymorphic {
                 Self::FoldingRange(req) => &req.path,
                 Self::SelectionRange(req) => &req.path,
                 Self::InteractCodeContext(req) => &req.path,
+                Self::InspectExpressionValue(req) => &req.path,
 
                 Self::OnEnter(req) => &req.path,
 
@@ -427,6 +433,8 @@ mod polymorphic {
         SelectionRange(Option<Vec<SelectionRange>>),
         /// The response to the interact code context request.
         InteractCodeContext(Option<Vec<Option<InteractCodeContextResponse>>>),
+        /// The response to the inspect values request.
+        InspectExpressionValue(Option<String>),
 
         /// The response to the on enter request.
         OnEnter(Option<Vec<TextEdit>>),

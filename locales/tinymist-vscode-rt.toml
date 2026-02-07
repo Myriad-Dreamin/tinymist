@@ -12,6 +12,10 @@ en = "A page number template must be present if the source document renders to m
 en = "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"
 zh = "提供一个帮助导出为 TeX 的 typst 文件，例如 `/ieee-tex.typ` 或 `@local/ieee-tex:0.1.0`"
 
+["Error: {error}"]
+en = "Error: {error}"
+zh = "错误：{error}"
+
 ["Export as HTML"]
 en = "Export as HTML"
 zh = "导出为 HTML"
@@ -76,6 +80,14 @@ zh = "无效的页码范围格式：{range}"
 en = "Invalid page range: {range}"
 zh = "无效的页码范围：{range}"
 
+["No active editor, change selection to inspect expression values."]
+en = "No active editor, change selection to inspect expression values."
+zh = "没有活动的编辑器，更改选择以查看表达式值。"
+
+["No value found at this position."]
+en = "No value found at this position."
+zh = "在此位置未找到值。"
+
 ["PDF (Specific Pages)"]
 en = "PDF (Specific Pages)"
 zh = "PDF (指定页码)"
@@ -115,6 +127,10 @@ zh = "查询当前文档并导出结果为 YAML 文件"
 ["Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."]
 en = "Query current document and export the result as a file. We will ask a few questions and update the tasks.json file for you."
 zh = "查询当前文档并导出结果为文件。我们将会询问一些问题并为您更新 tasks.json 文件。"
+
+["Request cancelled."]
+en = "Request cancelled."
+zh = "请求已取消。"
 
 ["Restart Server"]
 en = "Restart Server"

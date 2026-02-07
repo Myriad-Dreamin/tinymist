@@ -101,13 +101,13 @@ export class LanguageState {
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => { };
+  clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => { };
+    this.clientPromiseResolve = (_client: LanguageClient) => {};
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -164,9 +164,9 @@ export class LanguageState {
     const serverPaths: [string, string][] = configPath
       ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
-        ["Bundled", resolve(__dirname, binaryName)],
-        ["In PATH", binaryName],
-      ];
+          ["Bundled", resolve(__dirname, binaryName)],
+          ["In PATH", binaryName],
+        ];
 
     return tinymist.probePaths(serverPaths);
   }
@@ -207,7 +207,12 @@ export class LanguageState {
     const context = this.context;
 
     const trustedCommands = {
-      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText"],
+      enabledCommands: [
+        "tinymist.openInternal",
+        "tinymist.openExternal",
+        "tinymist.replaceText",
+        "tinymist.inspectValue",
+      ],
     };
     const hoverStorage =
       extensionState.features.renderDocs && LanguageState.HoverTmpStorage
@@ -360,6 +365,7 @@ export class LanguageState {
   exportQuery = exportCommand("tinymist.exportQuery");
   exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
   exportAst = exportStringCommand("tinymist.exportAst");
+  exportTrackedValues = exportStringCommand("tinymist.exportTrackedValues");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
@@ -826,17 +832,17 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
   ? CodeContextQueryResult
   : Q extends ModeAtQuery
-  ? ModeAtQueryResult
-  : Q extends StyleAtQuery
-  ? StyleAtQueryResult
-  : never;
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
 export type CodeContextQueryResult<T = any> =
   | {
-    value: T;
-  }
+      value: T;
+    }
   | {
-    error: string;
-  };
+      error: string;
+    };
 export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
 export type StyleAtQueryResult = {
   style: any[];
