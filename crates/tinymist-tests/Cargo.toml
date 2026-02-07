@@ -10,13 +10,13 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-typst.workspace = true
+comemo.workspace = true
+insta.workspace = true
+rayon.workspace = true
 tinymist-analysis.workspace = true
 tinymist-project = { workspace = true, features = ["lsp", "system"] }
 tinymist-std.workspace = true
-comemo.workspace = true
-rayon.workspace = true
-insta.workspace = true
+typst.workspace = true
 
 [lints]
 workspace = true
