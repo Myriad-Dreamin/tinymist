@@ -18,17 +18,53 @@ use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
 use tinymist_viewer::incr::IncrVelloDocClient;
 
-struct Circles {
+#[derive(Debug, Clone, Parser)]
+struct Args {
+    /// The address of the preview server.
+    #[clap(
+        long = "data-plane-host",
+        default_value = "127.0.0.1:23625",
+        value_name = "HOST",
+        hide(true)
+    )]
+    pub data_plane_host: String,
+}
+
+fn main() -> Result<()> {
+    let args = Args::parse();
+
+    env_logger::builder()
+        .filter_module("tinymist", log::LevelFilter::Info)
+        .try_init()?;
+
+    let default_size = Size::new(800.0, 800.0);
+    let app = Xilem::new_simple(
+        PreviewState {
+            data_plane_host: args.data_plane_host,
+            scene: Scene::new(),
+            scene_size: default_size,
+            window_size: default_size,
+        },
+        PreviewState::view,
+        WindowOptions::new("Tinymist View").with_min_inner_size(LogicalSize::new(800.0, 800.0)),
+    );
+    app.run_in(EventLoop::with_user_event())
+        .context("Couldn't run event loop")?;
+    Ok(())
+}
+
+struct PreviewState {
     data_plane_host: String,
     scene: Scene,
     scene_size: Size,
     window_size: Size,
 }
 
-impl Circles {
+impl PreviewState {
     fn view(&mut self) -> impl WidgetView<Edit<Self>> + use<> {
+        // Uses an effect that connects to the websocket and receives the document data.
         let effect = task(
-            |proxy, args: &mut Circles| {
+            |proxy, args: &mut PreviewState| {
                 let address = if args.data_plane_host.contains("ws://") {
                     args.data_plane_host.clone()
                 } else {
@@ -57,7 +93,7 @@ impl Circles {
                     }
                 }
             },
-            |arg: &mut Circles, req: RenderRequest| {
+            |arg: &mut PreviewState, req: RenderRequest| {
                 // s.tick();
                 match req {
                     RenderRequest::New(scene, size) => {
@@ -68,14 +104,18 @@ impl Circles {
             },
         );
 
+        // Listens to window size changes and renders the scene.
         resize_observer(
-            |state: &mut Circles, size: Size| {
+            |state: &mut PreviewState, size: Size| {
                 state.window_size = size;
             },
+            // Adds a scroll bar
             portal(fork(
+                // The sized box is necessary to avoid collapsing the canvas.
                 sized_box(canvas(
                     |state: &mut Self, _ctx, scene: &mut Scene, _size: Size| {
                         log::info!("canvas size: {:?}", _size);
+                        // Adjusts width
                         let scale_ts = if state.scene_size.width > 0. {
                             Some(Affine::scale(
                                 state.window_size.width / state.scene_size.width,
@@ -94,41 +134,6 @@ impl Circles {
             )),
         )
     }
-}
-
-#[derive(Debug, Clone, Parser)]
-struct Args {
-    /// The address of the preview server.
-    #[clap(
-        long = "data-plane-host",
-        default_value = "127.0.0.1:23625",
-        value_name = "HOST",
-        hide(true)
-    )]
-    pub data_plane_host: String,
-}
-
-fn main() -> Result<()> {
-    let args = Args::parse();
-
-    env_logger::builder()
-        .filter_module("tinymist", log::LevelFilter::Info)
-        .try_init()?;
-
-    let default_size = Size::new(800.0, 800.0);
-    let app = Xilem::new_simple(
-        Circles {
-            data_plane_host: args.data_plane_host,
-            scene: Scene::new(),
-            scene_size: default_size,
-            window_size: default_size,
-        },
-        Circles::view,
-        WindowOptions::new("Tinymist View").with_min_inner_size(LogicalSize::new(800.0, 800.0)),
-    );
-    app.run_in(EventLoop::with_user_event())
-        .context("Couldn't run event loop")?;
-    Ok(())
 }
 
 struct Client {
