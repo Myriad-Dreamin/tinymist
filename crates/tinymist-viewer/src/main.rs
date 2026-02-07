@@ -7,16 +7,18 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use ezsockets::ClientConfig;
 use masonry::layout::Length;
+use reflexo::debug_loc::DocumentPosition;
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
-use vello::kurbo::Affine;
+use tokio::sync::mpsc;
 use winit::dpi::LogicalSize;
 use xilem::core::{Edit, MessageProxy, fork};
 use xilem::vello::Scene;
 use xilem::vello::kurbo::Size;
-use xilem::view::{canvas, flex_col, portal, resize_observer, sized_box, task};
+use xilem::view::{flex_col, portal, resize_observer, sized_box, task};
 use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
+use tinymist_viewer::doc::doc;
 use tinymist_viewer::incr::IncrVelloDocClient;
 
 #[derive(Debug, Clone, Parser)]
@@ -38,12 +40,16 @@ fn main() -> Result<()> {
         .filter_module("tinymist", log::LevelFilter::Info)
         .try_init()?;
 
+    let (tx, rx) = mpsc::unbounded_channel();
+
     let default_size = Size::new(800.0, 800.0);
     let app = Xilem::new_simple(
         PreviewState {
             data_plane_host: args.data_plane_host,
             pages: vec![],
             window_size: default_size,
+            tx,
+            rx: Some(rx),
         },
         PreviewState::view,
         WindowOptions::new("Tinymist View").with_min_inner_size(LogicalSize::new(800.0, 800.0)),
@@ -57,6 +63,8 @@ struct PreviewState {
     data_plane_host: String,
     pages: Vec<(Arc<Scene>, Size)>,
     window_size: Size,
+    tx: mpsc::UnboundedSender<PreviewEvent>,
+    rx: Option<mpsc::UnboundedReceiver<PreviewEvent>>,
 }
 
 impl PreviewState {
@@ -69,10 +77,16 @@ impl PreviewState {
                 } else {
                     format!("ws://{}", args.data_plane_host)
                 };
+                let rx = args.rx.take();
                 async move {
+                    let Some(mut rx) = rx else {
+                        log::warn!("spawn client multiple times for preview");
+                        return;
+                    };
+
                     let config = ClientConfig::new(address.as_str())
                         .header("Origin", "http://localhost:23625");
-                    let (_handle, future) = ezsockets::connect(
+                    let (handle, future) = ezsockets::connect(
                         |client| Client {
                             proxy,
                             client,
@@ -83,8 +97,27 @@ impl PreviewState {
                     )
                     .await;
 
-                    // todo: the client is down if we don't sleep for a while.
-                    tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+                    while let Some(event) = rx.recv().await {
+                        match event {
+                            PreviewEvent::Click { page_idx, x, y } => {
+                                log::debug!("client click: [{page_idx}] {x}, {y}");
+                                let frame_loc = DocumentPosition {
+                                    page_no: page_idx,
+                                    x,
+                                    y,
+                                };
+                                let frame_loc = match serde_json::to_string(&frame_loc) {
+                                    Ok(frame_loc) => frame_loc,
+                                    Err(err) => {
+                                        log::error!("Error serializing frame location: {err}");
+                                        return;
+                                    }
+                                };
+
+                                let _ = handle.text(format!("src-point {frame_loc}"));
+                            }
+                        }
+                    }
 
                     let res = future.await;
                     if let Err(err) = res {
@@ -105,41 +138,40 @@ impl PreviewState {
         // todo: fill background size
         // , canvas: &dyn CanvasDevice, ts: sk::Transform
         // let pg = &self.pages[idx];
-
-        // if !set_transform(canvas, ts) {
-        //     return;
-        // }
         // canvas.set_fill_style_str(self.fill.as_ref());
         // canvas.fill_rect(0., 0., pg.size.x.0 as f64, pg.size.y.0 as f64);
-
-        // pg.elem.realize(ts, canvas).await;
 
         let page_list = self
             .pages
             .iter()
-            .map(|(page_scene, scene_size)| {
+            .enumerate()
+            .map(|(idx, (page_scene, scene_size))| {
+                let tx = self.tx.clone();
                 let page_scene = page_scene.clone();
                 let width = scene_size.width;
                 let height = scene_size.height;
 
+                // Adjusts size
                 // This is a hack to hide the vertical scrollbar.
                 // todo: hide vertical scrollbar
                 let elem_width = self.window_size.width - 0.5;
-                let elem_scale = elem_width / width;
+                let elem_scale = if width > 0. { elem_width / width } else { 1.0 };
                 let elem_height = elem_scale * height;
                 // The sized box is necessary to avoid collapsing the canvas.
-                sized_box(canvas(
-                    move |_state: &mut Self, _ctx, scene: &mut Scene, _size: Size| {
-                        log::info!("canvas size: {:?}", _size);
-                        // Adjusts width
-                        let scale_ts = if width > 0. {
-                            Some(Affine::scale(elem_scale))
-                        } else {
-                            None
-                        };
-                        scene.append(&page_scene, scale_ts);
-                    },
-                ))
+                sized_box(doc(page_scene, elem_scale, move |pos, bbox| {
+                    if bbox.width() == 0. || bbox.height() == 0. {
+                        return;
+                    }
+
+                    let x = pos.x / bbox.width() * width;
+                    let y = pos.y / bbox.height() * height;
+
+                    let _ = tx.send(PreviewEvent::Click {
+                        page_idx: idx + 1,
+                        x: x as f32,
+                        y: y as f32,
+                    });
+                }))
                 .fixed_width(Length::const_px(elem_width))
                 .fixed_height(Length::const_px(elem_height))
             })
@@ -154,6 +186,10 @@ impl PreviewState {
             fork(portal(flex_col(page_list)), effect),
         )
     }
+}
+
+enum PreviewEvent {
+    Click { page_idx: usize, x: f32, y: f32 },
 }
 
 struct Client {
