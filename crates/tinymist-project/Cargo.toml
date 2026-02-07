@@ -29,9 +29,9 @@ serde.workspace = true
 serde_json.workspace = true
 tinymist-task.workspace = true
 tinymist-world = { workspace = true }
-tinymist-std = { workspace = true, features = ["typst"] }
 tinymist-derive.workspace = true
 tinymist-l10n.workspace = true
+tinymist-std = { workspace = true, features = ["typst"] }
 tokio = { workspace = true, features = ["sync"] }
 toml = { workspace = true, optional = true }
 typst.workspace = true
