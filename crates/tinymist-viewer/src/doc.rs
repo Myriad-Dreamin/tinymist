@@ -5,8 +5,8 @@ use std::marker::PhantomData;
 
 use masonry::accesskit::{Node, Role};
 use masonry::core::{
-    AccessCtx, ArcStr, ChildrenIds, LayoutCtx, MeasureCtx, MutateCtx, PaintCtx, PropertiesRef,
-    RegisterCtx, Widget, WidgetId, WidgetMut,
+    AccessCtx, ArcStr, ChildrenIds, LayoutCtx, MeasureCtx, PaintCtx, PropertiesRef, RegisterCtx,
+    Widget, WidgetId, WidgetMut,
 };
 use masonry::layout::{LenReq, Length};
 use tracing::{Span, trace_span};
@@ -16,13 +16,11 @@ use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewM
 use xilem::{Pod, ViewCtx};
 
 /// Access a raw vello [`Scene`] within a canvas that fills its parent
-pub fn doc<State, F>(draw: F) -> TypstDocPage<State, F>
+pub fn doc<State>() -> TypstDocPage<State>
 where
     State: ViewArgument,
-    F: Fn(Arg<'_, State>, &mut MutateCtx<'_>, &mut Scene, Size) + Send + Sync + 'static,
 {
     TypstDocPage {
-        draw,
         alt_text: Option::default(),
         phantom: PhantomData,
     }
@@ -30,13 +28,12 @@ where
 
 /// The [`View`] created by [`canvas`].
 #[must_use = "View values do nothing unless provided to Xilem."]
-pub struct TypstDocPage<State, F> {
-    draw: F,
+pub struct TypstDocPage<State> {
     alt_text: Option<ArcStr>,
     phantom: PhantomData<fn() -> State>,
 }
 
-impl<State, F> TypstDocPage<State, F> {
+impl<State> TypstDocPage<State> {
     /// Sets alt text for the contents of the canvas.
     ///
     /// Users are strongly encouraged to provide alt text for accessibility
@@ -47,12 +44,11 @@ impl<State, F> TypstDocPage<State, F> {
     }
 }
 
-impl<State, F> ViewMarker for TypstDocPage<State, F> {}
+impl<State> ViewMarker for TypstDocPage<State> {}
 
-impl<State, Action, F> View<State, Action, ViewCtx> for TypstDocPage<State, F>
+impl<State, Action> View<State, Action, ViewCtx> for TypstDocPage<State>
 where
     State: ViewArgument,
-    F: Fn(Arg<'_, State>, &mut MutateCtx<'_>, &mut Scene, Size) + Send + Sync + 'static,
 {
     type Element = Pod<PageCanvas>;
     type ViewState = ();
@@ -76,11 +72,8 @@ where
         (): &mut Self::ViewState,
         _ctx: &mut ViewCtx,
         mut element: Mut<'_, Self::Element>,
-        state: Arg<'_, State>,
+        _state: Arg<'_, State>,
     ) {
-        // , |ctx, scene, size| {
-        //     (self.draw)(state, ctx, scene, size);
-        // }
         PageCanvas::request_render(&mut element);
         if self.alt_text != prev.alt_text {
             PageCanvas::set_alt_text(&mut element, self.alt_text.clone());

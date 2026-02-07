@@ -1,6 +1,7 @@
 //! Renders and views typst document with Xilem & Vello.
 
 use core::fmt;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -13,7 +14,7 @@ use winit::dpi::LogicalSize;
 use xilem::core::{Edit, MessageProxy, fork};
 use xilem::vello::Scene;
 use xilem::vello::kurbo::Size;
-use xilem::view::{canvas, portal, resize_observer, sized_box, task};
+use xilem::view::{canvas, flex_col, portal, resize_observer, sized_box, task};
 use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
 use tinymist_viewer::incr::IncrVelloDocClient;
@@ -41,8 +42,7 @@ fn main() -> Result<()> {
     let app = Xilem::new_simple(
         PreviewState {
             data_plane_host: args.data_plane_host,
-            scene: Scene::new(),
-            scene_size: default_size,
+            pages: vec![],
             window_size: default_size,
         },
         PreviewState::view,
@@ -55,8 +55,7 @@ fn main() -> Result<()> {
 
 struct PreviewState {
     data_plane_host: String,
-    scene: Scene,
-    scene_size: Size,
+    pages: Vec<(Arc<Scene>, Size)>,
     window_size: Size,
 }
 
@@ -96,13 +95,55 @@ impl PreviewState {
             |arg: &mut PreviewState, req: RenderRequest| {
                 // s.tick();
                 match req {
-                    RenderRequest::New(scene, size) => {
-                        arg.scene = scene;
-                        arg.scene_size = size;
+                    RenderRequest::New(pages) => {
+                        arg.pages = pages;
                     }
                 }
             },
         );
+
+        // todo: fill background size
+        // , canvas: &dyn CanvasDevice, ts: sk::Transform
+        // let pg = &self.pages[idx];
+
+        // if !set_transform(canvas, ts) {
+        //     return;
+        // }
+        // canvas.set_fill_style_str(self.fill.as_ref());
+        // canvas.fill_rect(0., 0., pg.size.x.0 as f64, pg.size.y.0 as f64);
+
+        // pg.elem.realize(ts, canvas).await;
+
+        let page_list = self
+            .pages
+            .iter()
+            .map(|(page_scene, scene_size)| {
+                let page_scene = page_scene.clone();
+                let width = scene_size.width;
+                let height = scene_size.height;
+
+                // This is a hack to hide the vertical scrollbar.
+                // todo: hide vertical scrollbar
+                let elem_width = self.window_size.width - 0.5;
+                let elem_scale = elem_width / width;
+                let elem_height = elem_scale * height;
+                // The sized box is necessary to avoid collapsing the canvas.
+                sized_box(canvas(
+                    move |_state: &mut Self, _ctx, scene: &mut Scene, _size: Size| {
+                        log::info!("canvas size: {:?}", _size);
+                        // Adjusts width
+                        let scale_ts = if width > 0. {
+                            Some(Affine::scale(elem_scale))
+                        } else {
+                            None
+                        };
+                        scene.append(&page_scene, scale_ts);
+                    },
+                ))
+                .fixed_width(Length::const_px(elem_width))
+                .fixed_height(Length::const_px(elem_height))
+            })
+            .collect::<Vec<_>>();
 
         // Listens to window size changes and renders the scene.
         resize_observer(
@@ -110,28 +151,7 @@ impl PreviewState {
                 state.window_size = size;
             },
             // Adds a scroll bar
-            portal(fork(
-                // The sized box is necessary to avoid collapsing the canvas.
-                sized_box(canvas(
-                    |state: &mut Self, _ctx, scene: &mut Scene, _size: Size| {
-                        log::info!("canvas size: {:?}", _size);
-                        // Adjusts width
-                        let scale_ts = if state.scene_size.width > 0. {
-                            Some(Affine::scale(
-                                state.window_size.width / state.scene_size.width,
-                            ))
-                        } else {
-                            None
-                        };
-                        scene.append(&state.scene, scale_ts);
-                    },
-                ))
-                // todo: pt or px?
-                // todo: hide vertical scrollbar
-                .fixed_width(Length::const_px(self.window_size.width - 0.5))
-                .fixed_height(Length::const_px(self.scene_size.height)),
-                effect,
-            )),
+            fork(portal(flex_col(page_list)), effect),
         )
     }
 }
@@ -163,7 +183,7 @@ impl ezsockets::ClientExt for Client {
 
             self.doc.merge_delta(delta);
 
-            let (scene, size) = match self.vello.render_pages(&mut self.doc) {
+            let pages = match self.vello.render_pages(&mut self.doc) {
                 Ok(scene) => scene,
                 Err(err) => {
                     log::error!("Error rendering pages: {err}");
@@ -171,11 +191,7 @@ impl ezsockets::ClientExt for Client {
                 }
             };
 
-            let _ = self.proxy.message(RenderRequest::New(
-                scene,
-                // todo: dpi
-                Size::new(size.x * 2., size.y * 2.),
-            ));
+            let _ = self.proxy.message(RenderRequest::New(pages));
         } else {
             log::info!("received bytes: {bytes:?}");
         }
@@ -201,13 +217,13 @@ impl ezsockets::ClientExt for Client {
 }
 
 enum RenderRequest {
-    New(vello::Scene, Size),
+    New(Vec<(Arc<Scene>, Size)>),
 }
 
 impl fmt::Debug for RenderRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::New(.., size) => write!(f, "New({size:?})"),
+            Self::New(scenes) => write!(f, "New(pages = {:?})", scenes.len()),
         }
     }
 }

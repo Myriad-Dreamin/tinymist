@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use reflexo::{
     error::prelude::*,
     vector::{
@@ -6,7 +8,10 @@ use reflexo::{
         vm::RenderVm,
     },
 };
-use vello::kurbo::{Affine, Vec2};
+use vello::{
+    Scene,
+    kurbo::{Size, Vec2},
+};
 
 use crate::VecPage;
 
@@ -63,31 +68,18 @@ impl IncrVec2VelloPass {
     }
 
     /// Flushes a page to the canvas with the given transform.
-    pub fn flush_page(&mut self, scene: &mut vello::Scene, idx: usize, ts: Affine) -> Vec2 {
+    pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {}", idx);
-            return Vec2::ZERO;
+            return (Arc::new(vello::Scene::new()), Vec2::ZERO);
         }
 
         let VecPage { size, elem, .. } = &self.pages[idx];
 
         let mut elem_scene = vello::Scene::new();
         elem.render(&mut elem_scene);
-        scene.append(&elem_scene, Some(ts));
 
-        // todo: fill background size
-        // , canvas: &dyn CanvasDevice, ts: sk::Transform
-        // let pg = &self.pages[idx];
-
-        // if !set_transform(canvas, ts) {
-        //     return;
-        // }
-        // canvas.set_fill_style_str(self.fill.as_ref());
-        // canvas.fill_rect(0., 0., pg.size.x.0 as f64, pg.size.y.0 as f64);
-
-        // pg.elem.realize(ts, canvas).await;
-
-        *size
+        (Arc::new(elem_scene), *size)
     }
 }
 
@@ -127,15 +119,11 @@ impl IncrVelloDocClient {
     }
 
     /// Render a specific page of the document in the given window.
-    pub fn render_pages(
-        &mut self,
-        kern: &mut IncrDocClient,
-        // canvas: &dyn CanvasDevice,
-    ) -> Result<(vello::Scene, Vec2)> {
+    pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
         {
             let layouts = kern.doc.layouts[0].by_scalar();
             let Some(layouts) = layouts else {
-                return Ok((vello::Scene::new(), Vec2::ZERO));
+                return Ok(vec![]);
             };
             let layout = layouts.first().unwrap();
             let layout = layout.clone();
@@ -144,12 +132,16 @@ impl IncrVelloDocClient {
 
         self.patch_delta(kern);
 
-        let mut scene = vello::Scene::new();
-        let s = self.vec2vello.pixel_per_pt;
+        // todo: subpixel: pixel_per_pt
         // let ts = sk::Transform::from_scale(s, s);
-        let ts = Affine::scale(s as f64);
-        let size = self.vec2vello.flush_page(&mut scene, 0, ts);
+        // let ts = Affine::scale(s as f64);
 
-        Ok((scene, size))
+        let res = (0..self.vec2vello.pages.len())
+            .map(|idx| {
+                let (scene, size) = self.vec2vello.flush_page(idx);
+                (scene, Size::new(size.x, size.y))
+            })
+            .collect();
+        Ok(res)
     }
 }
