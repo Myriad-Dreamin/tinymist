@@ -747,6 +747,12 @@
             "%extension.tinymist.config.tinymist.previewFeature.string.enum.disable%"
           ]
         },
+        "tinymist.previewExtension": {
+          "title": "%extension.tinymist.config.tinymist.previewExtension.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.previewExtension.desc%",
+          "type": "string",
+          "default": "myriad-dreamin.tinymist"
+        },
         "tinymist.preview.sysInputs": {
           "title": "%extension.tinymist.config.tinymist.preview.sysInputs.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.preview.sysInputs.desc%",
