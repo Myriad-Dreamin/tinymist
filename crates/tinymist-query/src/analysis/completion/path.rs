@@ -3,6 +3,8 @@
 use tinymist_world::vfs::WorkspaceResolver;
 
 use super::*;
+use crate::analysis::file_preview;
+
 impl CompletionPair<'_, '_, '_> {
     pub fn complete_path(&mut self, preference: &PathKind) -> Option<Vec<CompletionItem>> {
         let id = self.cursor.source.id();
@@ -83,7 +85,7 @@ impl CompletionPair<'_, '_, '_> {
             };
             crate::log_debug_ct!("compl_label: {label:?}");
 
-            module_completions.push((label, CompletionKind::File));
+            module_completions.push((label, CompletionKind::File, *path));
 
             // todo: looks like the folder completion is broken
             // if path.is_dir() {
@@ -134,11 +136,19 @@ impl CompletionPair<'_, '_, '_> {
                     let sort_text = eco_format!("{sorter:0>digits$}");
                     sorter += 1;
 
+                    // Generate documentation with image preview if applicable
+                    let documentation = if typst_completion.1 == CompletionKind::File {
+                        self.generate_file_documentation(&typst_completion.2)
+                    } else {
+                        None
+                    };
+
                     // todo: no all clients support label details
                     LspCompletion {
                         label: typst_completion.0,
                         kind: typst_completion.1,
                         detail: None,
+                        documentation,
                         text_edit: Some(text_edit),
                         // don't sort me
                         sort_text: Some(sort_text),
@@ -149,5 +159,28 @@ impl CompletionPair<'_, '_, '_> {
                 })
                 .collect_vec(),
         )
+    }
+
+    /// Generate documentation with preview for file completions
+    fn generate_file_documentation(&self, file_id: &TypstFileId) -> Option<Documentation> {
+        let extension = file_id
+            .vpath()
+            .as_rootless_path()
+            .extension()?
+            .to_str()?
+            .to_lowercase();
+
+        if !file_preview::is_previewable(&extension) {
+            return None;
+        }
+
+        // Read file content
+        let content = self.worker.ctx.file_by_id(*file_id).ok()?;
+
+        let preview = file_preview::generate_file_preview(&content, &extension, false)?;
+        Some(Documentation::MarkupContent(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: preview,
+        }))
     }
 }
