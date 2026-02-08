@@ -415,6 +415,7 @@ impl PreviewState {
         });
 
         let task_id = args.task_id.clone();
+        #[cfg(feature = "open")]
         let open_in_browser = args.open_in_browser(false);
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 

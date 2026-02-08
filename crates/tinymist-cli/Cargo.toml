@@ -134,7 +134,7 @@ no-content-hint = [
 export = ["tinymist/export"]
 lock = ["tinymist/lock"]
 open = ["tinymist/open", "dep:open"]
-preview = ["tinymist/preview", "hyper-tungstenite"]
+preview = ["tinymist/preview", "tinymist-preview", "hyper-tungstenite"]
 trace = ["tinymist/trace"]
 battery = ["tinymist/battery"]
 
