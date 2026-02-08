@@ -18,6 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_code_block.typ
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap code blockin figure with a caption"
+  "title": "Wrap code block in figure with a caption"
  }
 ]

@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_block_in_m
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap raw blockin figure with a caption"
+  "title": "Wrap raw block in figure with a caption"
  },
  {
   "edit": {

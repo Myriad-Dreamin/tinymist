@@ -18,6 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_table.typ
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap tablein figure with a caption"
+  "title": "Wrap table in figure with a caption"
  }
 ]

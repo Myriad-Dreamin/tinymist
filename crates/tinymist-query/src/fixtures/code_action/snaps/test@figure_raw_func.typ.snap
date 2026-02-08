@@ -18,6 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_func.typ
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap rawin figure with a caption"
+  "title": "Wrap raw in figure with a caption"
  }
 ]
