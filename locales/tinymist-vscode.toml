@@ -745,6 +745,9 @@ vi = "Xem trước duyệt web"
 zh = "浏览预览"
 zh-TW = "瀏覽預覽"
 
+[extension.tinymist.command.typst-preview.previewFile]
+en = "Typst Preview: Preview File..."
+
 [extension.tinymist.command.typst-preview.preview]
 en = "Typst Preview: Preview Opened File"
 ar = "Typst Preview: معاينة الملف المفتوح"
