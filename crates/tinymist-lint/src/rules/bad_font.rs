@@ -65,7 +65,9 @@ impl<'w> Linter<'w> {
         // Get available fonts from the font book
         let available_fonts = self.available_fonts.get_or_init(|| {
             let book = self.world.font_resolver.font_book();
-            book.families().map(|(name, _)| name).collect()
+            let mut fonts = book.families().map(|(name, _)| name).collect::<Vec<_>>();
+            fonts.sort_unstable();
+            fonts
         });
 
         let mut diag = SourceDiagnostic::warning(
@@ -89,7 +91,7 @@ impl<'w> Linter<'w> {
             .find(|(localized, _)| *localized == unknown_font)
             .map(|(_, en)| {
                 en.iter()
-                    .filter(|&name| available_fonts.contains(name))
+                    .filter(|&name| available_fonts.binary_search(name).is_ok())
                     .copied()
                     .collect::<Vec<_>>()
             })
