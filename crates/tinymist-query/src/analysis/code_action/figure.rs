@@ -29,7 +29,8 @@ impl<'a> CodeActionWorker<'a> {
             return None;
         }
 
-        // For function calls, don't add hash - if it's needed, it should already be present
+        // For function calls, don't add hash - if it's needed, it should already be
+        // present
         self.wrap_in_figure(node, func_name, false)
     }
 
@@ -71,8 +72,8 @@ impl<'a> CodeActionWorker<'a> {
 
         let action_before = CodeAction {
             title: tinymist_l10n::t!(
-                "tinymist-query.code-action.wrapFigureCaptionBefore",
-                "Wrap {func_name} in figure with caption before",
+                "tinymist-query.code-action.wrapFigureCaption",
+                "Wrap {func_name} in figure with a caption",
                 func_name = func_name.into()
             )
             .to_string(),
@@ -81,31 +82,6 @@ impl<'a> CodeActionWorker<'a> {
             ..CodeAction::default()
         };
         self.actions.push(action_before);
-
-        // Create action for caption after
-        let caption_after = if self.ctx.analysis.extended_code_action {
-            eco_format!("{mode}figure(\n  {call_text},\n  caption: [${{1:Caption}}],\n)$0")
-        } else {
-            eco_format!("{mode}figure(\n  {call_text},\n  caption: [Caption],\n)$0")
-        };
-
-        let edit_after = self.local_edit(EcoSnippetTextEdit::new(
-            self.ctx.to_lsp_range(call_range, &self.source),
-            caption_after,
-        ))?;
-
-        let action_after = CodeAction {
-            title: tinymist_l10n::t!(
-                "tinymist-query.code-action.wrapFigureCaptionAfter",
-                "Wrap {func_name} in figure with caption after",
-                func_name = func_name.into()
-            )
-            .to_string(),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
-            edit: Some(edit_after),
-            ..CodeAction::default()
-        };
-        self.actions.push(action_after);
 
         Some(())
     }

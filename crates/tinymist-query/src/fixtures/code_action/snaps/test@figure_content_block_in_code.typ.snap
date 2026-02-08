@@ -18,21 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_content_block_
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap content blockin figure with caption before"
- },
- {
-  "edit": {
-   "changes": {
-    "s0.typ": [
-     {
-      "insertTextFormat": 2,
-      "newText": "figure(\n  [\n    content\n  ],\n  caption: [Caption],\n)$0",
-      "range": "1:2:3:3"
-     }
-    ]
-   }
-  },
-  "kind": "refactor.rewrite",
-  "title": "Wrap content blockin figure with caption after"
+  "title": "Wrap content blockin figure with a caption"
  }
 ]

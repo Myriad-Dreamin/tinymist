@@ -29,13 +29,9 @@ zh = "预览"
 en = "Profile"
 zh = "性能分析"
 
-[tinymist-query.code-action.wrapFigureCaptionAfter]
-en = "Wrap {func_name} in figure with caption after"
-zh = "将 {func_name} 包裹在 figure 中，标题在后"
-
-[tinymist-query.code-action.wrapFigureCaptionBefore]
-en = "Wrap {func_name} in figure with caption before"
-zh = "将 {func_name} 包裹在 figure 中，标题在前"
+[tinymist-query.code-action.wrapFigureCaption]
+en = "Wrap {func_name} in figure with a caption"
+zh = "将 {func_name} 包裹在 figure 中，并添加一个标题"
 
 [tinymist.config.badCompileStatus]
 en = "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}"

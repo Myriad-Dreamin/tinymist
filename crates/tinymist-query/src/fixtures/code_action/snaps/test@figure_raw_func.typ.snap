@@ -18,21 +18,6 @@ input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_func.typ
    }
   },
   "kind": "refactor.rewrite",
-  "title": "Wrap rawin figure with caption before"
- },
- {
-  "edit": {
-   "changes": {
-    "s0.typ": [
-     {
-      "insertTextFormat": 2,
-      "newText": "figure(\n  raw(\"let x = 1\", lang: \"rust\"),\n  caption: [Caption],\n)$0",
-      "range": "0:1:0:31"
-     }
-    ]
-   }
-  },
-  "kind": "refactor.rewrite",
-  "title": "Wrap rawin figure with caption after"
+  "title": "Wrap rawin figure with a caption"
  }
 ]
