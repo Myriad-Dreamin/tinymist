@@ -102,6 +102,7 @@ struct Linter<'w> {
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
 
+    /// Cached available fonts (sorted)
     available_fonts: OnceCell<Vec<&'w str>>,
 }
 
