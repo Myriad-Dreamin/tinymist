@@ -344,9 +344,8 @@ impl<'a> PostTypeChecker<'a> {
             SyntaxKind::LetBinding => {
                 let let_binding = context.cast::<ast::LetBinding>()?;
                 let let_init = let_binding.init()?;
-                if let_init.span() != node.span() {
-                    return None;
-                }
+                let let_init_node = context.find(let_init.span())?;
+                let_init_node.find(node.span())?;
 
                 match let_binding.kind() {
                     ast::LetBindingKind::Closure(_c) => None,
