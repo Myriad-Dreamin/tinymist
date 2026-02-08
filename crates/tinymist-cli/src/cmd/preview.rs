@@ -103,8 +103,24 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
                 msg = ws.next() => {
                     let msg = match msg {
                         Some(Ok(Message::Text(msg))) => Some(msg),
-                        Some(Ok(msg)) => {
-                            log::error!("unsupported message: {msg:?}");
+                        Some(Ok(Message::Binary(..))) =>{
+                            log::error!("unsupported binary message");
+                            break;
+                        }
+                        Some(Ok(Message::Ping(..))) =>{
+                            log::error!("unsupported ping message");
+                            break;
+                        }
+                        Some(Ok(Message::Pong(..))) =>{
+                            log::error!("unsupported pong message");
+                            break;
+                        }
+                        Some(Ok(Message::Close(..))) =>{
+                            log::error!("unsupported close message");
+                            break;
+                        }
+                        Some(Ok(Message::Frame(..))) =>{
+                            log::error!("unsupported frame message");
                             break;
                         }
                         Some(Err(e)) => {

@@ -315,6 +315,10 @@ pub enum WsMessage {
     Text(String),
     /// A binary WebSocket message
     Binary(Bytes),
+    /// A ping message
+    Ping(Bytes),
+    /// A pong message
+    Pong(Bytes),
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
