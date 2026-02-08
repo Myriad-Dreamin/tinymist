@@ -44,6 +44,56 @@ impl TypeChecker<'_> {
         })
     }
 
+    fn unique_const_string_key(&self, ty: &Ty) -> Option<Interned<str>> {
+        fn unify(acc: &mut Option<Interned<str>>, next: Interned<str>) -> Option<()> {
+            if acc.as_ref().is_some_and(|prev| prev != &next) {
+                return None;
+            }
+            *acc = Some(next);
+            Some(())
+        }
+
+        fn visit_lbs<'a>(
+            this: &TypeChecker<'_>,
+            lbs: impl IntoIterator<Item = &'a Ty>,
+            acc: &mut Option<Interned<str>>,
+        ) -> Option<()> {
+            let mut any = false;
+            for lb in lbs {
+                any = true;
+                visit(this, lb, acc)?;
+            }
+            any.then_some(())
+        }
+
+        fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
+            match ty {
+                Ty::Value(ins) => match &ins.val {
+                    Value::Str(s) => unify(acc, Interned::new_str(s.as_str())),
+                    _ => None,
+                },
+                Ty::Var(v) => {
+                    let bounds = this.info.vars.get(&v.def)?;
+                    let bounds_guard = bounds.bounds.bounds().read();
+                    visit_lbs(this, bounds_guard.lbs.iter(), acc)
+                }
+                Ty::Let(bounds) => visit_lbs(this, bounds.lbs.iter(), acc),
+                Ty::Union(types) => {
+                    for ty in types.iter() {
+                        visit(this, ty, acc)?;
+                    }
+                    Some(())
+                }
+                Ty::Param(p) => visit(this, &p.ty, acc),
+                _ => None,
+            }
+        }
+
+        let mut acc = None;
+        visit(self, ty, &mut acc)?;
+        acc
+    }
+
     fn check_block(&mut self, exprs: &Interned<Vec<Expr>>) -> Ty {
         let mut joiner = Joiner::default();
 
@@ -85,8 +135,13 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     fields.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
+                        fields.push((const_key, val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -115,8 +170,14 @@ impl TypeChecker<'_> {
                     let val = self.check(value);
                     named.push((name, val));
                 }
-                ArgExpr::NamedRt(_n) => {
-                    // todo: handle non constant keys
+                ArgExpr::NamedRt(n) => {
+                    let (name, value) = n.as_ref();
+                    let key = self.check(name);
+                    let val = self.check(value);
+
+                    if let Some(const_key) = self.unique_const_string_key(&key) {
+                        named.push((const_key, val));
+                    }
                 }
                 ArgExpr::Spread(..) => {
                     // todo: handle spread args
@@ -334,6 +395,18 @@ impl TypeChecker<'_> {
             }
         }
 
+        if op == ast::BinOp::Add
+            && let Ty::Value(lhs_val) = &lhs
+            && let Ty::Value(rhs_val) = &rhs
+            && let Value::Str(lhs_str) = &lhs_val.val
+            && let Value::Str(rhs_str) = &rhs_val.val
+        {
+            let mut combined = EcoString::with_capacity(lhs_str.len() + rhs_str.len());
+            combined.push_str(lhs_str.as_str());
+            combined.push_str(rhs_str.as_str());
+            return Ty::Value(InsTy::new(Value::Str(combined.into())));
+        }
+
         Ty::Binary(TypeBinary::new(op, lhs, rhs))
     }
 
@@ -357,6 +430,27 @@ impl TypeChecker<'_> {
 
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
         let args = self.check(&apply.args);
+
+        // Treat `dict.at("key")` as `dict.key` when the key is a constant string.
+        if let Expr::Select(select) = &apply.callee
+            && select.key.name().as_ref() == "at"
+            && let Ty::Args(args_ty) = &args
+            && args_ty.positional_params().len() == 1
+            && args_ty.named_params().len() == 0
+            && args_ty.rest_param().is_none()
+        {
+            let key = args_ty
+                .pos(0)
+                .and_then(|ty| self.unique_const_string_key(ty));
+
+            if let Some(key) = key {
+                let base = self.check(&select.lhs);
+                let res = Ty::Select(SelectTy::new(base.into(), key));
+                self.info.witness_at_least(apply.span, res.clone());
+                return res;
+            }
+        }
+
         let callee = self.check(&apply.callee);
 
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
