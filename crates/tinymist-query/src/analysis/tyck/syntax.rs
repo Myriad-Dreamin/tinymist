@@ -401,9 +401,10 @@ impl TypeChecker<'_> {
             && let Value::Str(lhs_str) = &lhs_val.val
             && let Value::Str(rhs_str) = &rhs_val.val
         {
-            return Ty::Value(InsTy::new(Value::Str(
-                eco_format!("{}{}", lhs_str.as_str(), rhs_str.as_str()).into(),
-            )));
+            let mut combined = EcoString::with_capacity(lhs_str.len() + rhs_str.len());
+            combined.push_str(lhs_str.as_str());
+            combined.push_str(rhs_str.as_str());
+            return Ty::Value(InsTy::new(Value::Str(combined.into())));
         }
 
         Ty::Binary(TypeBinary::new(op, lhs, rhs))
