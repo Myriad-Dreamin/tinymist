@@ -3522,24 +3522,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37c93d8daa9d8a012fd8ab92f088405fb202ea0b6ab73ee2482ae66af4f42091"
 
 [[package]]
-name = "libdeflate-sys"
-version = "1.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23bd6304ebf75390d8a99b88bdf2a266f62647838140cb64af8e6702f6e3fddc"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "libdeflater"
-version = "1.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5d4880e6d634d3d029d65fa016038e788cc728a17b782684726fb34ee140caf"
-dependencies = [
- "libdeflate-sys",
-]
-
-[[package]]
 name = "libloading"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3578,7 +3560,7 @@ dependencies = [
 [[package]]
 name = "linebender_include_doc_path"
 version = "0.1.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3695,13 +3677,12 @@ dependencies = [
 [[package]]
 name = "masonry"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "accesskit",
  "dpi",
  "linebender_include_doc_path",
  "masonry_core",
- "masonry_testing",
  "parley",
  "smallvec",
  "tracing",
@@ -3711,7 +3692,7 @@ dependencies = [
 [[package]]
 name = "masonry_core"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "accesskit",
  "anymap3",
@@ -3734,23 +3715,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "masonry_testing"
-version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
-dependencies = [
- "accesskit_consumer",
- "futures-intrusive",
- "image",
- "masonry_core",
- "oxipng",
- "pollster",
- "tracing",
-]
-
-[[package]]
 name = "masonry_winit"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "accesskit_winit",
  "copypasta",
@@ -4387,20 +4354,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b"
 dependencies = [
  "ttf-parser",
-]
-
-[[package]]
-name = "oxipng"
-version = "9.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26c613f0f566526a647c7473f6a8556dbce22c91b13485ee4b4ec7ab648e4973"
-dependencies = [
- "bitvec",
- "indexmap 2.12.1",
- "libdeflater",
- "log",
- "rgb",
- "rustc-hash 2.1.1",
 ]
 
 [[package]]
@@ -6998,7 +6951,6 @@ dependencies = [
  "indexmap 2.12.1",
  "log",
  "masonry",
- "masonry_winit",
  "parking_lot",
  "pollster",
  "reflexo",
@@ -7421,7 +7373,7 @@ dependencies = [
 [[package]]
 name = "tree_arena"
 version = "0.2.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "hashbrown 0.16.1",
 ]
@@ -9476,7 +9428,7 @@ checksum = "bec9e4a500ca8864c5b47b8b482a73d62e4237670e5b5f1d6b9e3cae50f28f2b"
 [[package]]
 name = "xilem"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "masonry",
  "masonry_winit",
@@ -9491,7 +9443,7 @@ dependencies = [
 [[package]]
 name = "xilem_core"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "anymore",
  "hashbrown 0.16.1",
@@ -9501,7 +9453,7 @@ dependencies = [
 [[package]]
 name = "xilem_masonry"
 version = "0.4.0"
-source = "git+https://github.com/linebender/xilem?rev=4c9980b9014c5e2d246f3899f5bb5346f591a033#4c9980b9014c5e2d246f3899f5bb5346f591a033"
+source = "git+https://github.com/Myriad-dreamin/xilem?rev=e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863#e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863"
 dependencies = [
  "masonry",
  "tokio",

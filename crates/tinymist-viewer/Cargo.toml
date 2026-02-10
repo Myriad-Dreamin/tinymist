@@ -40,15 +40,18 @@ hayro = "0.4"
 vello_svg = "0.9.0"
 winit = "0.30.12"
 smallvec = "1"
-xilem = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
-masonry = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
-masonry_winit = { git = "https://github.com/linebender/xilem", rev = "4c9980b9014c5e2d246f3899f5bb5346f591a033" }
 ezsockets = "0.7.1"
 svgtypes = "0.15.2"
 ecow.workspace = true
 async-trait.workspace = true
 ttf-parser.workspace = true
 image.workspace = true
+
+xilem = { git = "https://github.com/Myriad-dreamin/xilem", rev = "e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863" }
+masonry = { git = "https://github.com/Myriad-dreamin/xilem", rev = "e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863" }
+
+# xilem = { path = "../../../xilem/xilem/", default-features = false }
+# masonry = { path = "../../../xilem/masonry/", default-features = false }
 
 
 [features]
