@@ -47,8 +47,8 @@ async-trait.workspace = true
 ttf-parser.workspace = true
 image.workspace = true
 
-xilem = { git = "https://github.com/Myriad-dreamin/xilem", rev = "e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863" }
-masonry = { git = "https://github.com/Myriad-dreamin/xilem", rev = "e831f5dc05a2ad153a0ce2148f3dfa6a1cf43863" }
+xilem = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
+masonry = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
 
 # xilem = { path = "../../../xilem/xilem/", default-features = false }
 # masonry = { path = "../../../xilem/masonry/", default-features = false }
