@@ -288,14 +288,12 @@ impl TypeChecker<'_> {
                         let mut w = w.write();
                         w.ubs.insert_mut(bound);
                     }
-                };
+                }
             }
             (lhs, Ty::Var(v)) => {
                 let w = self.info.vars.get(&v.def).unwrap();
                 let bound = self.weaken_constraint(lhs, &w.bounds);
                 crate::log_debug_ct!("constrain var {v:?} ⪰ {bound:?}");
-
-                let w = self.info.vars.get_mut(&v.def).unwrap();
                 match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
