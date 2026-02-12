@@ -1,0 +1,61 @@
+[package]
+name = "tinymist-viewer"
+description = "A WGPU-based viewer for the Typst typesetting system using Vello."
+categories = ["compilers"]
+keywords = ["api", "language", "typst"]
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+
+anyhow.workspace = true
+async-trait.workspace = true
+bytes.workspace = true
+clap.workspace = true
+comemo.workspace = true
+ecow.workspace = true
+env_logger.workspace = true
+ezsockets.workspace = true
+futures.workspace = true
+hayro.workspace = true
+image.workspace = true
+indexmap.workspace = true
+log.workspace = true
+masonry.workspace = true
+parking_lot.workspace = true
+reflexo-vec2svg.workspace = true
+reflexo-typst.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+smallvec.workspace = true
+tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
+typst.workspace = true
+typst-library.workspace = true
+reflexo.workspace = true
+svgtypes.workspace = true
+tinymist-assets.workspace = true
+tinymist-std.workspace = true
+tinymist-preview.workspace = true
+tracing.workspace = true
+ttf-parser.workspace = true
+vello.workspace = true
+vello_svg.workspace = true
+winit.workspace = true
+xilem.workspace = true
+
+[features]
+
+default = ["no-content-hint", "cli"]
+cli = []
+
+# Disable the default content hint.
+# This requires modifying typst.
+no-content-hint = ["reflexo-typst/no-content-hint"]
+
+[lints]
+workspace = true

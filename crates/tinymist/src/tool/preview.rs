@@ -633,17 +633,21 @@ pub fn bind_streams(
                 .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
                 .with(|msg| {
                     Box::pin(async move {
-                        let msg = match msg {
+                        Ok(match msg {
                             WsMessage::Text(msg) => Message::text(msg),
                             WsMessage::Binary(msg) => Message::Binary(msg),
-                        };
-                        Ok(msg)
+                            WsMessage::Ping(msg) => Message::Ping(msg),
+                            WsMessage::Pong(msg) => Message::Pong(msg),
+                        })
                     })
                 })
                 .map_ok(|msg| match msg {
                     Message::Text(msg) => WsMessage::Text(msg.as_str().to_owned()),
                     Message::Binary(msg) => WsMessage::Binary(msg),
-                    _ => WsMessage::Text("unsupported message".to_owned()),
+                    Message::Ping(msg) => WsMessage::Ping(msg),
+                    Message::Pong(msg) => WsMessage::Pong(msg),
+                    Message::Close(..) => WsMessage::Text("bad_client_msg: Close".to_owned()),
+                    Message::Frame(..) => WsMessage::Text("bad_client_msg: Frame".to_owned()),
                 }))
         },
     );
