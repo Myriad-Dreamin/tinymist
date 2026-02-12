@@ -283,26 +283,12 @@ impl TypeChecker<'_> {
                 let w = self.info.vars.get_mut(&v.def).unwrap();
                 // strict constraint on upper bound
                 let bound = rhs.clone();
-                let (inserted, lbs) = match &w.bounds {
+                match &w.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let mut w = w.write();
-                        if w.ubs.contains(&bound) {
-                            (false, vec![])
-                        } else {
-                            w.ubs.insert_mut(bound.clone());
-                            (true, w.lbs.iter().cloned().collect())
-                        }
+                        w.ubs.insert_mut(bound);
                     }
                 };
-
-                // Propagate newly-added upper bounds into existing lower bounds.
-                // This enables expected types from usages to refine literal elements in
-                // initializers like `#let files = ("a.typ", ...)`.
-                if inserted {
-                    for lb in lbs {
-                        self.constrain(&lb, &bound);
-                    }
-                }
             }
             (lhs, Ty::Var(v)) => {
                 let w = self.info.vars.get(&v.def).unwrap();
@@ -310,24 +296,12 @@ impl TypeChecker<'_> {
                 crate::log_debug_ct!("constrain var {v:?} ⪰ {bound:?}");
 
                 let w = self.info.vars.get_mut(&v.def).unwrap();
-                let (inserted, ubs) = match &w.bounds {
+                match &w.bounds {
                     FlowVarKind::Strong(v) | FlowVarKind::Weak(v) => {
                         let mut v = v.write();
-                        if v.lbs.contains(&bound) {
-                            (false, vec![])
-                        } else {
-                            v.lbs.insert_mut(bound.clone());
-                            (true, v.ubs.iter().cloned().collect())
-                        }
+                        v.lbs.insert_mut(bound);
                     }
                 };
-
-                // Propagate newly-added lower bounds into existing upper bounds.
-                if inserted {
-                    for ub in ubs {
-                        self.constrain(&bound, &ub);
-                    }
-                }
             }
             (Ty::Select(sel), rhs) => {
                 // Constrain field access `base.field` by constraining `base` with a record type
