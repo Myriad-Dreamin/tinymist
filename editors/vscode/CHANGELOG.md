@@ -10,6 +10,40 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.12 - [2026-02-14]
+
+### Server
+
+* feat: run tinymist language server in browser by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1944
+* fix(l10n): message arg placeholder parsing by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2380
+
+### Editor
+
+* feat: handle `onEnter` only when server is active and add timeout by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2320
+* feat: add editor menu command to view AST by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2382
+
+### Code Analysis
+
+* feat(tyck): path typing for include/import sources by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2384
+* feat(tyck): const string keys for dict/record typing by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2385
+
+### Linting
+
+* feat(linter): check unknown fonts and give correction suggestions by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2344
+* feat(linter): enhance unknown font suggestions with localized mappings and validation by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2383
+
+### Preview
+
+* fix: follow viewport position when dock resizes by @kazutoiris in https://github.com/Myriad-Dreamin/tinymist/pull/2341
+* feat: add GPU-based typst previewer by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2396
+
+### Misc
+
+* fix: incorrect feature configuration for separate compilation by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2391
+
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.10...v0.14.12
+
 ## v0.14.10 - [2026-01-22]
 
 ### Server
