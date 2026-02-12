@@ -71,7 +71,7 @@ impl RenderActor {
     }
 
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
-        log::info!("RenderActor: received message: {msg:?}");
+        log::debug!("RenderActor: received message: {msg:?}");
 
         let res = msg.is_full_render();
         match msg {
