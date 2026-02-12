@@ -152,14 +152,14 @@ pub(crate) fn do_rename_file(
         .to_str()
         .unwrap_or_default()
         .into();
-    let mut ctx = RenameFileWorker {
+    let mut worker = RenameFileWorker {
         ctx,
         def_fid,
         def_path,
         diff,
         inserted: FxHashSet::default(),
     };
-    ctx.work(edits)
+    worker.work(edits)
 }
 
 struct RenameFileWorker<'a> {

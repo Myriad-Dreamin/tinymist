@@ -1374,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6029,7 +6029,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "clap",
@@ -6161,7 +6161,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -6294,7 +6294,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6339,7 +6339,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.14.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6372,7 +6372,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "comemo",
  "dashmap",
@@ -6404,17 +6404,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.8"
+version = "0.14.10"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.8"
+version = "0.14.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f5b0de04d48c1990489775c8e970b78866bc616067065e1ca457ee4d5f09399"
+checksum = "f2b645bf98fb1555b86632cf6dce274d4587829e1393cfe29e85b9848a255456"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "divan",
  "tinymist",
@@ -6422,7 +6422,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6465,7 +6465,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.14.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6496,7 +6496,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6516,7 +6516,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6557,11 +6557,12 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "comemo",
  "insta",
  "rayon",
+ "strsim",
  "tinymist-analysis",
  "tinymist-project",
  "tinymist-std",
@@ -6598,7 +6599,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "bytes",
  "clap",
@@ -6612,7 +6613,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.14.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
  "tokio",
  "typst",
@@ -6653,7 +6654,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6707,7 +6708,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -6792,7 +6793,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "comemo",
  "insta",
@@ -7345,7 +7346,7 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "typlite"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -8635,7 +8636,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

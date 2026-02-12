@@ -123,22 +123,29 @@ impl ServerState {
         if path.extension().and_then(|ext| ext.to_str()) == Some("md") {
             self.export_md(path, opts.processor, task, args)
         } else {
-            self.export(task, args)
+            self.export(path, task, args)
         }
     }
 
     /// Export the current document as HTML file(s).
     pub fn export_html(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(ProjectTask::ExportHtml(ExportHtmlTask { export }), args)
+        self.export(
+            path,
+            ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            args,
+        )
     }
 
     /// Export the current document as Markdown file(s).
     pub fn export_markdown(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportMd(ExportMarkdownTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -150,9 +157,11 @@ impl ServerState {
 
     /// Export the current document as Tex file(s).
     pub fn export_tex(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportTypliteOpts);
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportTeX(ExportTeXTask {
                 processor: opts.processor,
                 assets_path: opts.assets_path,
@@ -164,13 +173,19 @@ impl ServerState {
 
     /// Export the current document as Text file(s).
     pub fn export_text(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let _opts = get_arg_or_default!(args[1] as ExportOpts);
         let export = self.config.export_task();
-        self.export(ProjectTask::ExportText(ExportTextTask { export }), args)
+        self.export(
+            path,
+            ProjectTask::ExportText(ExportTextTask { export }),
+            args,
+        )
     }
 
     /// Query the current document and export the result as JSON file(s).
     pub fn export_query(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportQueryOpts);
         // todo: deprecate it
         let _ = opts.strict;
@@ -181,6 +196,7 @@ impl ServerState {
         }
 
         self.export(
+            path,
             ProjectTask::Query(QueryTask {
                 format: opts.format,
                 output_extension: opts.output_extension,
@@ -195,10 +211,12 @@ impl ServerState {
 
     /// Export the current document as Svg file(s).
     pub fn export_svg(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportSvgOpts);
 
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportSvg(ExportSvgTask {
                 export,
                 pages: opts.pages,
@@ -211,6 +229,7 @@ impl ServerState {
 
     /// Export the current document as Png file(s).
     pub fn export_png(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
         let opts = get_arg_or_default!(args[1] as ExportPngOpts);
 
         let ppi = opts.ppi.or_else(|| self.config.ppi()).unwrap_or(144.);
@@ -221,6 +240,7 @@ impl ServerState {
 
         let export = self.config.export_task();
         self.export(
+            path,
             ProjectTask::ExportPng(ExportPngTask {
                 export,
                 pages: opts.pages,
@@ -235,8 +255,12 @@ impl ServerState {
 
     /// Export the current document as some format. The client is responsible
     /// for passing the correct absolute path of typst document.
-    pub fn export(&mut self, task: ProjectTask, mut args: Vec<JsonValue>) -> ScheduleResult {
-        let path = get_arg!(args[0] as PathBuf);
+    pub fn export(
+        &mut self,
+        path: PathBuf,
+        task: ProjectTask,
+        mut args: Vec<JsonValue>,
+    ) -> ScheduleResult {
         let action_opts = get_arg_or_default!(args[2] as ExportActionOpts);
         let write = action_opts.write.unwrap_or(true);
         let open = action_opts.open;

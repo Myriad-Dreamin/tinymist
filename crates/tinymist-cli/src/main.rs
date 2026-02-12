@@ -31,6 +31,7 @@ use tinymist_l10n::{load_translations, set_translations};
 use tinymist_std::error::prelude::*;
 
 use crate::cmd::*;
+#[cfg(feature = "export")]
 use crate::compile::CompileArgs;
 use crate::conn::client_root;
 use crate::utils::*;
@@ -89,6 +90,7 @@ enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
     /// Run compile command like `typst-cli compile`
+    #[cfg(feature = "export")]
     #[clap(alias = "c")]
     Compile(CompileArgs),
 
@@ -99,6 +101,7 @@ enum Commands {
     GenerateScript(crate::generate_script::GenerateScriptArgs),
 
     /// Run documents
+    #[cfg(feature = "lock")]
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
     Doc(tinymist::project::DocCommands),
@@ -135,7 +138,10 @@ fn main() -> Result<()> {
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
     // Starts logging
     let _ = tinymist::init_log(tinymist::InitLogOpts {
+        #[cfg(feature = "export")]
         is_transient_cmd: matches!(cmd, Commands::Compile(..)),
+        #[cfg(not(feature = "export"))]
+        is_transient_cmd: false,
         is_test_no_verbose: matches!(&cmd, Commands::Test(test) if !test.verbose),
         output: None,
     });

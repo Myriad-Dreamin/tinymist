@@ -1,6 +1,6 @@
 {
   "name": "tinymist",
-  "version": "0.14.8",
+  "version": "0.14.10",
   "description": "%description%",
   "keywords": [
     "typst",
@@ -1423,7 +1423,7 @@
       {
         "command": "tinymist.onEnter",
         "key": "enter",
-        "when": "editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
+        "when": "ext.tinymistActivated && editorTextFocus && !editorReadonly && editorLangId == typst && !suggestWidgetVisible && !editorHasMultipleSelections && vim.mode != 'Normal' && vim.mode != 'Visual' && vim.mode != 'VisualBlock' && vim.mode != 'VisualLine' && vim.mode != 'SearchInProgressMode' && vim.mode != 'CommandlineInProgress' && vim.mode != 'Replace' && vim.mode != 'EasyMotionMode' && vim.mode != 'EasyMotionInputMode' && vim.mode != 'SurroundInputMode'"
       },
       {
         "command": "typst-preview.preview",
@@ -1484,6 +1484,11 @@
           "command": "tinymist.copyAnsiHighlight",
           "when": "resourceLangId == typst && editorTextFocus",
           "group": "9_cutcopypaste"
+        },
+        {
+          "command": "tinymist.viewAst",
+          "when": "resourceLangId == typst && editorTextFocus",
+          "group": "developer"
         }
       ],
       "view/title": [
@@ -1521,6 +1526,7 @@
     "esbuild-plugin-polyfill-node": "^0.3.0",
     "node-fetch": "^3.3.2",
     "vscode-languageclient": "^9.0.0",
+    "tinymist-web": "link:../../crates/tinymist",
     "ws": "^8.13.0"
   },
   "devDependencies": {

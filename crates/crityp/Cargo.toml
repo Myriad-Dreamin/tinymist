@@ -25,15 +25,14 @@ doc = false
 anyhow.workspace = true
 base64.workspace = true
 clap = { workspace = true, optional = true }
-criterion = "0.5.1"
-# criterion = { path = "../../target/criterion.rs" }
+criterion.workspace = true
 comemo.workspace = true
 ecow.workspace = true
+half.workspace = true
 tinymist-std.workspace = true
 tinymist-project = { workspace = true, features = ["lsp"] }
 typst.workspace = true
 typst-syntax.workspace = true
-half.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

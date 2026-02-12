@@ -1,6 +1,6 @@
 {
   "name": "tinymist-web",
-  "version": "0.14.8",
+  "version": "0.14.10",
   "description": "WASM module for running tinymist analyzers in JavaScript environment.",
   "author": "Myriad-Dreamin",
   "license": "Apache-2.0",
@@ -29,6 +29,7 @@
     "test:firefox": "wasm-pack test --firefox --headless --release"
   },
   "devDependencies": {
+    "typescript": "^5.0.0",
     "turbo": "^2.3.3"
   }
 }

@@ -130,18 +130,27 @@ export async function tinymistActivate(
   configureEditorAndLanguage(context, trait);
 
   // Initializes language client
-  if (extensionState.features.lsp) {
-    const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
-    config.probedServerPath = executable;
-    // todo: guide installation?
-
-    if (config.probedServerPath) {
-      tinymist.initClient(config);
+  /// If `system`, we need to probe the binary path, otherwise, we directly set `probed` to be true.
+  let isProbed = !extensionState.features.lspSystem;
+  if (extensionState.features.lsp && extensionState.features.lspSystem) {
+    try {
+      const executable = tinymist.probeEnvPath("tinymist.serverPath", config.serverPath);
+      // todo: guide installation?
+      config.probedServerPath = executable;
+      contextExt.tinymistExecutable = executable;
+      isProbed = true;
+      contextExt.tinymistExec = makeExecCommand(contextExt, executable);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Cannot find a valid tinymist binary. Some features like auto-formatting on Enter may not work. Please check your tinymist.serverPath configuration. Exception: ${e}`);
     }
-
-    contextExt.tinymistExecutable = executable;
-    contextExt.tinymistExec = makeExecCommand(contextExt, executable);
   }
+
+  /// Language server is valid if it is enabled and the binary is probed.
+  const isLsEnabledAndProbed = extensionState.features.lsp && isProbed;
+  if (isLsEnabledAndProbed) {
+    await tinymist.initClient(config);
+  }
+
   // Register Shared commands
   context.subscriptions.push(
     commands.registerCommand("tinymist.onEnter", onEnterHandler),
@@ -158,11 +167,11 @@ export async function tinymistActivate(
     }
   }
   // Starts language client
-  if (extensionState.features.lsp) {
+  if (isLsEnabledAndProbed) {
     await tinymist.startClient();
   }
   // Loads the preview HTML from the binary
-  if (extensionState.features.lsp && extensionState.features.preview) {
+  if (isLsEnabledAndProbed && extensionState.features.preview) {
     previewPreload(context);
   }
 
@@ -243,4 +252,12 @@ function makeExecCommand(
       });
     },
   };
+}
+
+export function statusBarFormatString() {
+  const formatter = (
+    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
+  ).trim();
+
+  return formatter;
 }
