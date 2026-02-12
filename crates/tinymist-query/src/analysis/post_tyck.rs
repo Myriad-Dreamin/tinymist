@@ -354,6 +354,7 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
+    /// Checks the context of a node and returns the type of the context.
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
         match context.kind() {
             SyntaxKind::LetBinding => {
@@ -364,9 +365,7 @@ impl<'a> PostTypeChecker<'a> {
 
                 match let_binding.kind() {
                     ast::LetBindingKind::Closure(_c) => None,
-                    ast::LetBindingKind::Normal(pattern) => {
-                        self.destruct_let(pattern, node.clone())
-                    }
+                    ast::LetBindingKind::Normal(pattern) => self.check_let_pattern(pattern),
                 }
             }
             SyntaxKind::Args => self.check_cursor(
@@ -380,68 +379,44 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
-    fn destruct_let(&mut self, pattern: ast::Pattern, node: LinkedNode) -> Option<Ty> {
+    /// Checks left-side of a let expression `let lhs = rhs` for the `rhs`.
+    fn check_let_pattern(&mut self, pattern: ast::Pattern) -> Option<Ty> {
         match pattern {
             ast::Pattern::Placeholder(_) => None,
-            ast::Pattern::Normal(n) => {
-                let ast::Expr::Ident(ident) = n else {
-                    return None;
-                };
-                self.info.type_of_span(ident.span())
+            ast::Pattern::Normal(ast::Expr::Ident(ident)) => self.info.type_of_span(ident.span()),
+            ast::Pattern::Normal(..) => None,
+            ast::Pattern::Parenthesized(expr) => {
+                self.check_let_pattern(expr.expr().to_untyped().cast()?)
             }
-            ast::Pattern::Parenthesized(paren_expr) => {
-                self.destruct_let(paren_expr.expr().to_untyped().cast()?, node)
-            }
-            ast::Pattern::Destructuring(d) => {
-                let _ = node;
+            ast::Pattern::Destructuring(expr) => self.check_let_destruct(expr),
+        }
+    }
 
-                fn pattern_binding_ty(this: &PostTypeChecker<'_>, pat: ast::Pattern) -> Ty {
-                    match pat {
-                        ast::Pattern::Normal(ast::Expr::Ident(ident)) => {
-                            this.info.type_of_span(ident.span()).unwrap_or(Ty::Any)
-                        }
-                        ast::Pattern::Parenthesized(paren) => {
-                            pattern_binding_ty(this, paren.pattern())
-                        }
-                        ast::Pattern::Destructuring(d) => {
-                            destructuring_binding_ty(this, d).unwrap_or(Ty::Any)
-                        }
-                        ast::Pattern::Normal(..) | ast::Pattern::Placeholder(..) => Ty::Any,
-                    }
+    /// Checks left-side of a let expression `let lhs = rhs` for the `rhs`.
+    fn check_let_destruct(&mut self, destructuring: ast::Destructuring) -> Option<Ty> {
+        let mut pos = vec![];
+        let mut named = vec![];
+        for item in destructuring.items() {
+            match item {
+                ast::DestructuringItem::Pattern(pat) => {
+                    pos.push(self.check_let_pattern(pat).unwrap_or(Ty::Any));
                 }
-
-                fn destructuring_binding_ty(
-                    this: &PostTypeChecker<'_>,
-                    destructuring: ast::Destructuring,
-                ) -> Option<Ty> {
-                    let mut pos = vec![];
-                    let mut named = vec![];
-                    let mut has_pos = false;
-                    let mut has_named = false;
-                    for item in destructuring.items() {
-                        match item {
-                            ast::DestructuringItem::Pattern(pat) => {
-                                has_pos = true;
-                                pos.push(pattern_binding_ty(this, pat));
-                            }
-                            ast::DestructuringItem::Named(named_item) => {
-                                has_named = true;
-                                let key = Interned::new_str(named_item.name().get().as_str());
-                                let ty = pattern_binding_ty(this, named_item.pattern());
-                                named.push((key, ty));
-                            }
-                            ast::DestructuringItem::Spread(..) => {}
-                        }
-                    }
-
-                    let tuple_ty = has_pos.then(|| Ty::Tuple(pos.into()));
-                    let dict_ty = has_named.then(|| Ty::Dict(RecordTy::new(named)));
-                    Ty::union(tuple_ty, dict_ty)
+                ast::DestructuringItem::Named(named_item) => {
+                    let key = Interned::new_str(named_item.name().get().as_str());
+                    let ty = self
+                        .check_let_pattern(named_item.pattern())
+                        .unwrap_or(Ty::Any);
+                    named.push((key, ty));
                 }
-
-                destructuring_binding_ty(self, d)
+                // `rest` in `(a, b, ..rest) = t` is be ignored because we perform checking for
+                // `t``.
+                ast::DestructuringItem::Spread(..) => {}
             }
         }
+
+        let tuple_ty = (!pos.is_empty()).then(|| Ty::Tuple(pos.into()));
+        let dict_ty = (!named.is_empty()).then(|| Ty::Dict(RecordTy::new(named)));
+        Ty::union(tuple_ty, dict_ty)
     }
 
     fn check_element_of<T>(&mut self, ty: &Ty, pol: bool, context: &LinkedNode, checker: &mut T)
