@@ -160,8 +160,9 @@ impl<C> TransformContext<C> for RenderStack {
         self
     }
 
-    fn transform_rotate(self, _ctx: &mut C, _matrix: Scalar) -> Self {
-        todo!()
+    fn transform_rotate(mut self, _ctx: &mut C, angle: Scalar) -> Self {
+        self.ts *= Affine::rotate(angle.0 as f64);
+        self
     }
 
     fn transform_skew(mut self, _ctx: &mut C, matrix: (Ratio, Ratio)) -> Self {
