@@ -113,11 +113,9 @@ impl IncrVelloDocClient {
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
         {
             let layouts = kern.doc.layouts[0].by_scalar();
-            let Some(layouts) = layouts else {
+            let Some(layout) = layouts.and_then(|layout| layout.first().cloned()) else {
                 return Ok(vec![]);
             };
-            let layout = layouts.first().unwrap();
-            let layout = layout.clone();
             kern.set_layout(layout.1.clone());
         }
 
