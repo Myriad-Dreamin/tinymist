@@ -6824,7 +6824,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-viewer"
-version = "0.14.8"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6848,7 +6848,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "svgtypes 0.15.3",
- "tinymist-assets 0.14.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-preview",
  "tinymist-std",
  "tokio",
