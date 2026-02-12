@@ -232,7 +232,6 @@ impl ezsockets::ClientExt for Client {
             log::info!("received bytes: {bytes:?}");
         }
 
-        let _ = self.proxy;
         Ok(())
     }
 
