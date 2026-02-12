@@ -1,3 +1,5 @@
+//! Incremental data transfer from backend.
+
 use std::sync::Arc;
 
 use reflexo::{
@@ -15,36 +17,29 @@ use vello::{
 
 use crate::VecPage;
 
-/// Incremental pass from vector to canvas
-pub struct IncrVec2VelloPass {
-    /// Canvas's pixel per point
-    pub pixel_per_pt: f32,
+/// Incremental pass from vector to vello scene.
+pub struct IncrVelloPass {
     /// Fills background color with a css color string
     /// Default is white.
     ///
     /// Note: If the string is empty, the background is transparent.
     pub fill: ImmutStr,
-    /// Holds a sequence of canvas pages that are rendered
+    /// Holds a sequence of vello pages that are rendered
     pub pages: Vec<VecPage>,
 }
 
-impl Default for IncrVec2VelloPass {
+impl Default for IncrVelloPass {
     fn default() -> Self {
         Self {
-            pixel_per_pt: 2.,
             fill: "#ffffff".into(),
             pages: vec![],
         }
     }
 }
 
-impl IncrVec2VelloPass {
+impl IncrVelloPass {
     /// Interprets the changes in the given module and pages.
     pub fn interpret_changes(&mut self, module: &Module, pages: &[Page]) {
-        // let mut t = CanvasTask::<DefaultExportFeature>::default();
-
-        // let mut ct = t.fork_canvas_render_task(module);
-
         let mut ct = crate::render::Renderer::new(module);
 
         let pages: Vec<VecPage> = pages
@@ -70,7 +65,7 @@ impl IncrVec2VelloPass {
     /// Flushes a page to the canvas with the given transform.
     pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
         if idx >= self.pages.len() {
-            log::warn!("Index out of bounds: {}", idx);
+            log::warn!("Index out of bounds: {idx}");
             return (Arc::new(vello::Scene::new()), Vec2::ZERO);
         }
 
@@ -87,7 +82,7 @@ impl IncrVec2VelloPass {
 #[derive(Default)]
 pub struct IncrVelloDocClient {
     /// State of converting vector to canvas
-    pub vec2vello: IncrVec2VelloPass,
+    pub vec2vello: IncrVelloPass,
 
     /// Expected exact state of the current DOM.
     /// Initially it is None meaning no any page is rendered.
@@ -95,19 +90,15 @@ pub struct IncrVelloDocClient {
 }
 
 impl IncrVelloDocClient {
-    /// Reset the state of the incremental rendering.
+    /// Resets the state of the incremental rendering.
     pub fn reset(&mut self) {}
 
-    /// Set canvas's pixel per point
-    pub fn set_pixel_per_pt(&mut self, pixel_per_pt: f32) {
-        self.vec2vello.pixel_per_pt = pixel_per_pt;
-    }
-
-    /// Set canvas's background color
+    /// Sets canvas's background color
     pub fn set_fill(&mut self, fill: ImmutStr) {
         self.vec2vello.fill = fill;
     }
 
+    /// Patches the delta of the incremental rendering.
     fn patch_delta(&mut self, kern: &IncrDocClient) {
         if let Some(layout) = &kern.layout {
             let pages = layout.pages(&kern.doc.module);
@@ -118,7 +109,7 @@ impl IncrVelloDocClient {
         }
     }
 
-    /// Render a specific page of the document in the given window.
+    /// Renders a specific page of the document in the given window.
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
         {
             let layouts = kern.doc.layouts[0].by_scalar();

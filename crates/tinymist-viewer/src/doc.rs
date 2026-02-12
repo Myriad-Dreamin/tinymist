@@ -15,7 +15,7 @@ use vello::kurbo::{Affine, Axis, Point, Rect, Size};
 use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewMarker};
 use xilem::{Pod, ViewCtx};
 
-/// Access a raw vello [`Scene`] within a canvas that fills its parent
+/// Accesses a raw vello [`Scene`] within a canvas that fills its parent
 pub fn doc<State, F>(scene: Arc<Scene>, scene_scale: f64, on_click: F) -> TypstDocPage<State, F>
 where
     State: ViewArgument,

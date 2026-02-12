@@ -1,3 +1,11 @@
+//! todo: gradient/tiling support.
+//! todo: develop xilem to support damage tracking.
+//! todo: convert a page into a tree of xilem components instead of a single
+//! todo: test about text color
+//! todo: svg decoder
+//! todo: test about images' iccprofile.
+//! scene. todo: clean up code.
+
 use std::sync::Arc;
 
 use ecow::EcoVec;
@@ -36,7 +44,6 @@ impl<'a> Renderer<'a> {
 }
 
 impl<'m> RenderVm<'m> for Renderer<'m> {
-    // type Resultant = String;
     type Resultant = Arc<VecScene>;
     type Group = RenderStack;
 
@@ -51,34 +58,12 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             clipper: None,
             fill: None,
             inner: EcoVec::new(),
-            // rect: CanvasBBox::Dynamic(Box::new(OnceCell::new())),
         }
     }
 
     fn start_text(&mut self, value: &Fingerprint, text: &ir::TextItem) -> Self::Group {
         let mut g = self.start_group(value);
         g.kind = GroupKind::Text;
-        // g.rect = {
-        //     // upem is the unit per em defined in the font.
-        //     let font = self.get_font(&text.shape.font).unwrap();
-        //     let upem = Scalar(font.units_per_em.0);
-        //     let accender = Scalar(font.ascender.0) * upem;
-
-        //     // todo: glyphs like macron has zero width... why?
-        //     let w = text.width();
-
-        //     if text.shape.size.0 == 0. {
-        //         CanvasBBox::Static(Box::new(Rect {
-        //             lo: Point::new(Scalar(0.), accender - upem),
-        //             hi: Point::new(Scalar(0.), accender),
-        //         }))
-        //     } else {
-        //         CanvasBBox::Static(Box::new(Rect {
-        //             lo: Point::new(Scalar(0.), accender - upem),
-        //             hi: Point::new(w * upem / text.shape.size, accender),
-        //         }))
-        //     }
-        // };
         for style in &text.shape.styles {
             if let ir::PathStyle::Fill(fill) = style {
                 g.fill = Some(fill.clone());
@@ -97,16 +82,7 @@ impl<'m> FontIndice<'m> for Renderer<'m> {
 impl<'m> GlyphFactory for Renderer<'m> {
     fn get_glyph(&mut self, font: &FontItem, glyph: u32, fill: ImmutStr) -> Option<Arc<VecScene>> {
         let glyph_data = font.get_glyph(glyph)?;
-        // Some(Arc::new(CanvasElem::Glyph(CanvasGlyphElem {
-        //     fill,
-        //     upem: font.units_per_em,
-        //     glyph_data: glyph_data.clone(),
-        // })))
 
-        // if !set_transform(canvas, ts) {
-        //     return;
-        // }
-        // canvas.set_fill_style_str(self.fill.as_ref());
         let path = match glyph_data.as_ref() {
             ir::FlatGlyphItem::Outline(path) => svg_path(&path.d)?,
             ir::FlatGlyphItem::Image(..) => return None,
@@ -119,76 +95,6 @@ impl<'m> GlyphFactory for Renderer<'m> {
                 .map(|it| it.to_alpha_color())
                 .unwrap_or(peniko::Color::BLACK),
         )))
-    }
-}
-
-/// Converts an SVG path to a [`kurbo::BezPath`].
-fn svg_path(path_data: &str) -> Option<kurbo::BezPath> {
-    let mut builder = GlyphPathBuilder::default();
-    for segment in svgtypes::SimplifyingPathParser::from(path_data) {
-        let segment = match segment {
-            Ok(v) => v,
-            Err(_) => break,
-        };
-
-        match segment {
-            svgtypes::SimplePathSegment::MoveTo { x, y } => {
-                builder.move_to(x as f32, y as f32);
-            }
-            svgtypes::SimplePathSegment::LineTo { x, y } => {
-                builder.line_to(x as f32, y as f32);
-            }
-            svgtypes::SimplePathSegment::Quadratic { x1, y1, x, y } => {
-                builder.quad_to(x1 as f32, y1 as f32, x as f32, y as f32);
-            }
-            svgtypes::SimplePathSegment::CurveTo {
-                x1,
-                y1,
-                x2,
-                y2,
-                x,
-                y,
-            } => {
-                builder.curve_to(
-                    x1 as f32, y1 as f32, x2 as f32, y2 as f32, x as f32, y as f32,
-                );
-            }
-            svgtypes::SimplePathSegment::ClosePath => {
-                builder.close();
-            }
-        }
-    }
-
-    Some(builder.0)
-}
-
-#[derive(Default)]
-pub struct GlyphPathBuilder(kurbo::BezPath);
-
-impl GlyphPathBuilder {
-    // Y axis is inverted.
-    fn move_to(&mut self, x: f32, y: f32) {
-        self.0.move_to((x as f64, y as f64));
-    }
-
-    fn line_to(&mut self, x: f32, y: f32) {
-        self.0.line_to((x as f64, y as f64));
-    }
-
-    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        self.0.quad_to((x1 as f64, y1 as f64), (x as f64, y as f64));
-    }
-
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.0.curve_to(
-            (x1 as f64, y1 as f64),
-            (x2 as f64, y2 as f64),
-            (x as f64, y as f64),
-        );
-    }
-
-    fn close(&mut self) {
-        self.0.close_path();
     }
 }
 
@@ -210,8 +116,6 @@ pub struct RenderStack {
     // pub rect: CanvasBBox,
 }
 
-// VecScene: std::convert::From<render::RenderStack>
-
 #[derive(Debug, Clone, Copy)]
 pub enum GroupKind {
     General,
@@ -220,23 +124,9 @@ pub enum GroupKind {
 
 impl From<RenderStack> for Arc<VecScene> {
     fn from(s: RenderStack) -> Self {
-        // let inner: VecScene = Arc::new(CanvasElem::Group(CanvasGroupElem {
-        //     ts: Box::new(s.ts),
-        //     inner: s.inner,
-        //     kind: s.kind,
-        //     rect: s.rect,
-        // }));
-        // if let Some(clipper) = s.clipper {
-        //     Arc::new(CanvasElem::Clip(CanvasClipElem {
-        //         d: clipper.d,
-        //         inner,
-        //         clip_bbox: CanvasBBox::Dynamic(Box::new(OnceCell::new())),
-        //     }))
-        // } else {
-        //     inner
-        // }
-
         Arc::new(VecScene::Group(GroupScene {
+            // todo: detect whether there is a failure converting paths.
+            clip: s.clipper.and_then(|it| svg_path(&it.d)),
             ts: s.ts,
             scenes: s.inner,
         }))
@@ -245,7 +135,7 @@ impl From<RenderStack> for Arc<VecScene> {
 
 /// See [`TransformContext`].
 impl<C> TransformContext<C> for RenderStack {
-    fn transform_matrix(self, _ctx: &mut C, m: &ir::Transform) -> Self {
+    fn transform_matrix(mut self, _ctx: &mut C, m: &ir::Transform) -> Self {
         let sub_ts = Affine::new([
             m.sx.0 as f64,
             m.ky.0 as f64,
@@ -254,9 +144,7 @@ impl<C> TransformContext<C> for RenderStack {
             m.tx.0 as f64,
             m.ty.0 as f64,
         ]);
-        // todo
-        // self.ts = self.ts.post_concat(sub_ts);
-        let _ = sub_ts;
+        self.ts *= sub_ts;
         self
     }
 
@@ -276,17 +164,8 @@ impl<C> TransformContext<C> for RenderStack {
         todo!()
     }
 
-    fn transform_skew(self, _ctx: &mut C, _matrix: (Ratio, Ratio)) -> Self {
-        // todo: transform_skew
-        // self.ts = self.ts.post_concat(sk::Transform {
-        //     sx: 1.,
-        //     sy: 1.,
-        //     kx: matrix.0.0,
-        //     ky: matrix.1.0,
-        //     tx: 0.,
-        //     ty: 0.,
-        // });
-        log::info!("transform_skew: {:?}", _matrix);
+    fn transform_skew(mut self, _ctx: &mut C, matrix: (Ratio, Ratio)) -> Self {
+        self.ts *= Affine::skew(matrix.0.0 as f64, matrix.1.0 as f64);
         self
     }
 
@@ -302,7 +181,6 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
 {
     fn render_path(&mut self, _ctx: &mut C, path: &ir::PathItem, _abs_ref: &Fingerprint) {
         let mut scene = Scene::new();
-        // let ts = convert_transform(local_transform);
         let Some(path_data) = svg_path(&path.d) else {
             return;
         };
@@ -502,4 +380,74 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
 
 trait GlyphFactory {
     fn get_glyph(&mut self, font: &FontItem, glyph: u32, fill: ImmutStr) -> Option<Arc<VecScene>>;
+}
+
+/// Converts an SVG path to a [`kurbo::BezPath`].
+fn svg_path(path_data: &str) -> Option<kurbo::BezPath> {
+    let mut builder = GlyphPathBuilder::default();
+    for segment in svgtypes::SimplifyingPathParser::from(path_data) {
+        let segment = match segment {
+            Ok(v) => v,
+            Err(_) => break,
+        };
+
+        match segment {
+            svgtypes::SimplePathSegment::MoveTo { x, y } => {
+                builder.move_to(x as f32, y as f32);
+            }
+            svgtypes::SimplePathSegment::LineTo { x, y } => {
+                builder.line_to(x as f32, y as f32);
+            }
+            svgtypes::SimplePathSegment::Quadratic { x1, y1, x, y } => {
+                builder.quad_to(x1 as f32, y1 as f32, x as f32, y as f32);
+            }
+            svgtypes::SimplePathSegment::CurveTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                builder.curve_to(
+                    x1 as f32, y1 as f32, x2 as f32, y2 as f32, x as f32, y as f32,
+                );
+            }
+            svgtypes::SimplePathSegment::ClosePath => {
+                builder.close();
+            }
+        }
+    }
+
+    Some(builder.0)
+}
+
+#[derive(Default)]
+pub struct GlyphPathBuilder(kurbo::BezPath);
+
+impl GlyphPathBuilder {
+    // Y axis is inverted.
+    fn move_to(&mut self, x: f32, y: f32) {
+        self.0.move_to((x as f64, y as f64));
+    }
+
+    fn line_to(&mut self, x: f32, y: f32) {
+        self.0.line_to((x as f64, y as f64));
+    }
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+        self.0.quad_to((x1 as f64, y1 as f64), (x as f64, y as f64));
+    }
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+        self.0.curve_to(
+            (x1 as f64, y1 as f64),
+            (x2 as f64, y2 as f64),
+            (x as f64, y as f64),
+        );
+    }
+
+    fn close(&mut self) {
+        self.0.close_path();
+    }
 }

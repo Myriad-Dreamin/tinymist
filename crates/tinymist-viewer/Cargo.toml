@@ -13,54 +13,49 @@ rust-version.workspace = true
 
 [dependencies]
 
+anyhow.workspace = true
+async-trait.workspace = true
 bytes.workspace = true
 clap.workspace = true
 comemo.workspace = true
+ecow.workspace = true
 env_logger.workspace = true
+ezsockets.workspace = true
 futures.workspace = true
+hayro.workspace = true
+image.workspace = true
 indexmap.workspace = true
 log.workspace = true
+masonry.workspace = true
 parking_lot.workspace = true
 reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
 serde_json.workspace = true
 serde.workspace = true
+smallvec.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
 typst-library.workspace = true
 reflexo.workspace = true
+svgtypes.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
 tinymist-preview.workspace = true
-anyhow.workspace = true
-tracing = "0.1"
-pollster = "0.4.0"
-vello = "0.7.0"
-hayro = "0.4"
-vello_svg = "0.9.0"
-winit = "0.30.12"
-smallvec = "1"
-ezsockets = "0.7.1"
-svgtypes = "0.15.2"
-ecow.workspace = true
-async-trait.workspace = true
+tracing.workspace = true
 ttf-parser.workspace = true
-image.workspace = true
-
-xilem = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
-masonry = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
-
-# xilem = { path = "../../../xilem/xilem/", default-features = false }
-# masonry = { path = "../../../xilem/masonry/", default-features = false }
-
+vello.workspace = true
+vello_svg.workspace = true
+winit.workspace = true
+xilem.workspace = true
 
 [features]
 
-default = ["no-content-hint"]
+default = ["no-content-hint", "cli"]
+cli = []
 
 # Disable the default content hint.
 # This requires modifying typst.
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
-# [lints]
-# workspace = true
+[lints]
+workspace = true

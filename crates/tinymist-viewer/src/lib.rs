@@ -16,6 +16,7 @@ pub mod doc;
 pub mod incr;
 mod render;
 
+/// A vello scene corresponding to a typst page.
 #[derive(Debug, Clone)]
 pub struct VecPage {
     size: kurbo::Vec2,
@@ -45,6 +46,7 @@ impl fmt::Debug for VecScene {
 }
 
 impl VecScene {
+    /// Renders the scene to a [`vello::Scene`].
     pub fn render(&self, scene: &mut vello::Scene) {
         match self {
             VecScene::Group(group) => group.render(scene),
@@ -62,20 +64,29 @@ impl VecScene {
     }
 }
 
+/// A group of scenes that are rendered together.
 #[derive(Debug, Clone)]
 pub struct GroupScene {
+    clip: Option<kurbo::BezPath>,
     ts: Affine,
     scenes: EcoVec<(kurbo::Vec2, Arc<VecScene>)>,
 }
 
 impl GroupScene {
+    /// Renders the group to a [`vello::Scene`].
     pub fn render(&self, scene: &mut vello::Scene) {
+        if let Some(clip) = &self.clip {
+            scene.push_clip_layer(peniko::Fill::NonZero, self.ts, clip);
+        }
         let ts = self.ts;
         for (pos, elem) in self.scenes.iter() {
             let ts = ts.pre_translate(*pos);
             let mut sub_scene = vello::Scene::new();
             elem.render(&mut sub_scene);
             scene.append(&sub_scene, Some(ts));
+        }
+        if self.clip.is_some() {
+            scene.pop_layer();
         }
     }
 }
