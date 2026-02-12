@@ -71,7 +71,7 @@ impl RenderActor {
     }
 
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
-        log::debug!("RenderActor: received message: {msg:?}");
+        log::trace!("RenderActor: received message: {msg:?}");
 
         let res = msg.is_full_render();
         match msg {
@@ -125,7 +125,7 @@ impl RenderActor {
     pub async fn run(mut self) {
         loop {
             let mut has_full_render = false;
-            log::info!("RenderActor: waiting for message");
+            log::debug!("RenderActor: waiting for message");
             match self.mailbox.recv().await {
                 Ok(msg) => {
                     has_full_render |= self.process_message(msg).await;
@@ -145,7 +145,7 @@ impl RenderActor {
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
-            log::info!("RenderActor: has_full_render: {has_full_render}");
+            log::debug!("RenderActor: has_full_render: {has_full_render}");
             let Some(document) = self.view.read().as_ref().and_then(|view| view.doc()) else {
                 log::info!("RenderActor: document is not ready");
                 continue;
