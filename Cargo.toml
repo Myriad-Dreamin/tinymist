@@ -123,7 +123,6 @@ docx-rs = { version = "0.4.18-rc19", git = "https://github.com/Myriad-Dreamin/do
 flate2 = "1"
 hayagriva = "0.9.1"
 hex = "0.4.3"
-flate2 = "1"
 html-escape = "0.2.13"
 pathdiff = "0.2"
 percent-encoding = "2"
