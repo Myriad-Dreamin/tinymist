@@ -277,6 +277,9 @@ impl<'a> PostTypeChecker<'a> {
                 // expression, which is where contextual typing (e.g. let-binding type) applies.
                 // Use the parenthesized container type when available so element types can be
                 // inferred from outer constraints.
+                // todo: however, user may continue edit a parenthesized expression to become
+                // array or dict in typst. We should ensure that we can identify such cases
+                // correctly.
                 let container_expr = match container.kind() {
                     SyntaxKind::Array | SyntaxKind::Dict => container
                         .parent()
