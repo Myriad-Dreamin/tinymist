@@ -212,7 +212,7 @@ insta = { version = "1.43", features = ["glob", "filters"] }
 insta-cmd = "0.6.0"
 
 # Our Own Crates
-tinymist-assets = { version = "=0.14.12-rc1" }
+tinymist-assets = { version = "=0.14.10" }
 
 tinymist-derive = { path = "./crates/tinymist-derive/", version = "0.14.12-rc1" }
 tinymist-l10n = { path = "./crates/tinymist-l10n/", version = "0.14.12-rc1" }
