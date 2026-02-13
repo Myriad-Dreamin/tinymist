@@ -9,7 +9,7 @@ use super::{
 };
 use super::{DynTypeBounds, ParamAttrs, ParamTy, SharedContext, prelude::*};
 use crate::syntax::{ArgClass, SyntaxContext, VarClass, classify_context, classify_context_outer};
-use crate::ty::{BuiltinTy, RecordTy, TypeInterface};
+use crate::ty::{BuiltinTy, TypeInterface};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
