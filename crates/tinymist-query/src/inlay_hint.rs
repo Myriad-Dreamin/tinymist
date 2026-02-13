@@ -1,7 +1,9 @@
 use lsp_types::{InlayHintKind, InlayHintLabel};
+use typst::syntax::{LinkedNode, SyntaxKind, ast};
 
 use crate::{
     analysis::{ParamKind, analyze_call},
+    package::{find_package_and_latest, parse_package_import},
     prelude::*,
 };
 
@@ -23,6 +25,10 @@ pub struct InlayHintConfig {
     // The typst sugar grammar
     /// Show inlay hints for content block arguments.
     pub on_content_block_args: bool,
+
+    // package version status
+    /// Show package version status decorations.
+    pub on_package_version_status: bool,
 }
 
 impl InlayHintConfig {
@@ -36,6 +42,8 @@ impl InlayHintConfig {
             only_first_variadic_args: true,
 
             on_content_block_args: false,
+
+            on_package_version_status: true,
         }
     }
 }
@@ -118,6 +126,10 @@ impl InlayHintWorker<'_> {
             }
             SyntaxKind::DestructAssignment => {
                 log::trace!("destruct assignment found: {node:?}");
+            }
+            // Package import version status
+            SyntaxKind::Str if SMART.on_package_version_status => {
+                self.check_package_import(node);
             }
             // Parameter inlay hints
             SyntaxKind::FuncCall => {
@@ -270,6 +282,69 @@ impl InlayHintWorker<'_> {
         }
 
         None
+    }
+
+    fn check_package_import(&mut self, node: &LinkedNode) -> Option<()> {
+        let package_spec = parse_package_import(node)?;
+
+        let (current_entry, latest) = find_package_and_latest(self.ctx.shared(), &package_spec);
+
+        let (label, tooltip) = if current_entry.is_none() {
+            // Version not found - invalid
+            let version_str = package_spec.version.to_string();
+            (
+                tinymist_l10n::t!("inlay-hint.package.version-not-found", "❗ not found"),
+                Some(tinymist_l10n::t!(
+                    "inlay-hint.package.version-not-found-tooltip",
+                    "Version {version} not found",
+                    version = version_str.as_str().into()
+                )),
+            )
+        } else if let Some(latest) = latest
+            && let latest_version = latest.package.version
+            && latest_version != package_spec.version
+        {
+            // Upgradable - newer version available
+            let latest_str = latest_version.to_string();
+            (
+                tinymist_l10n::t!(
+                    "inlay-hint.package.upgradable",
+                    "⬆️ {version}",
+                    version = latest_str.as_str().into()
+                ),
+                Some(tinymist_l10n::t!(
+                    "inlay-hint.package.upgradable-tooltip",
+                    "Newer version available: {version}",
+                    version = latest_str.as_str().into()
+                )),
+            )
+        } else {
+            // Up to date - latest version
+            (
+                tinymist_l10n::t!("inlay-hint.package.up-to-date", "✅"),
+                Some(tinymist_l10n::t!(
+                    "inlay-hint.package.up-to-date-tooltip",
+                    "Up to date (latest version)"
+                )),
+            )
+        };
+
+        // Position for the hint - at the end of the string node
+        let pos = node.range().end;
+        let lsp_pos = self.ctx.to_lsp_pos(pos, self.source);
+
+        self.hints.push(InlayHint {
+            position: lsp_pos,
+            label: InlayHintLabel::String(label.to_string()),
+            kind: Some(InlayHintKind::TYPE),
+            text_edits: None,
+            tooltip: tooltip.map(|t| lsp_types::InlayHintTooltip::String(t.to_string())),
+            padding_left: Some(true),
+            padding_right: None,
+            data: None,
+        });
+
+        Some(())
     }
 }
 
