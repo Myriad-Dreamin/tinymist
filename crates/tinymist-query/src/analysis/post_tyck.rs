@@ -9,7 +9,7 @@ use super::{
 };
 use super::{DynTypeBounds, ParamAttrs, ParamTy, SharedContext, prelude::*};
 use crate::syntax::{ArgClass, SyntaxContext, VarClass, classify_context, classify_context_outer};
-use crate::ty::BuiltinTy;
+use crate::ty::{BuiltinTy, RecordTy};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -273,7 +273,22 @@ impl<'a> PostTypeChecker<'a> {
                 Some(resp.finalize())
             }
             SyntaxContext::Element { container, target } => {
-                let container_ty = self.check_or(container, context_ty)?;
+                // The `Array` / `Dict` syntax node is often wrapped by a `Parenthesized`
+                // expression, which is where contextual typing (e.g. let-binding type) applies.
+                // Use the parenthesized container type when available so element types can be
+                // inferred from outer constraints.
+                // todo: however, user may continue edit a parenthesized expression to become
+                // array or dict in typst. We should ensure that we can identify such cases
+                // correctly.
+                let container_expr = match container.kind() {
+                    SyntaxKind::Array | SyntaxKind::Dict => container
+                        .parent()
+                        .cloned()
+                        .filter(|p| p.kind() == SyntaxKind::Parenthesized)
+                        .unwrap_or_else(|| container.clone()),
+                    _ => container.clone(),
+                };
+                let container_ty = self.check_or(&container_expr, context_ty)?;
                 crate::log_debug_ct!("post check element target: ({container_ty:?})::{target:?}");
 
                 let mut resp = SignatureReceiver::default();
@@ -339,6 +354,7 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
+    /// Checks the context of a node and returns the type of the context.
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
         match context.kind() {
             SyntaxKind::LetBinding => {
@@ -349,9 +365,7 @@ impl<'a> PostTypeChecker<'a> {
 
                 match let_binding.kind() {
                     ast::LetBindingKind::Closure(_c) => None,
-                    ast::LetBindingKind::Normal(pattern) => {
-                        self.destruct_let(pattern, node.clone())
-                    }
+                    ast::LetBindingKind::Normal(pattern) => self.check_let_pattern(pattern),
                 }
             }
             SyntaxKind::Args => self.check_cursor(
@@ -365,24 +379,44 @@ impl<'a> PostTypeChecker<'a> {
         }
     }
 
-    fn destruct_let(&mut self, pattern: ast::Pattern, node: LinkedNode) -> Option<Ty> {
+    /// Checks left-side of a let expression `let lhs = rhs` for the `rhs`.
+    fn check_let_pattern(&mut self, pattern: ast::Pattern) -> Option<Ty> {
         match pattern {
             ast::Pattern::Placeholder(_) => None,
-            ast::Pattern::Normal(n) => {
-                let ast::Expr::Ident(ident) = n else {
-                    return None;
-                };
-                self.info.type_of_span(ident.span())
+            ast::Pattern::Normal(ast::Expr::Ident(ident)) => self.info.type_of_span(ident.span()),
+            ast::Pattern::Normal(..) => None,
+            ast::Pattern::Parenthesized(expr) => {
+                self.check_let_pattern(expr.expr().to_untyped().cast()?)
             }
-            ast::Pattern::Parenthesized(paren_expr) => {
-                self.destruct_let(paren_expr.expr().to_untyped().cast()?, node)
-            }
-            // todo: pattern matching
-            ast::Pattern::Destructuring(_d) => {
-                let _ = node;
-                None
+            ast::Pattern::Destructuring(expr) => self.check_let_destruct(expr),
+        }
+    }
+
+    /// Checks left-side of a let expression `let lhs = rhs` for the `rhs`.
+    fn check_let_destruct(&mut self, destructuring: ast::Destructuring) -> Option<Ty> {
+        let mut pos = vec![];
+        let mut named = vec![];
+        for item in destructuring.items() {
+            match item {
+                ast::DestructuringItem::Pattern(pat) => {
+                    pos.push(self.check_let_pattern(pat).unwrap_or(Ty::Any));
+                }
+                ast::DestructuringItem::Named(named_item) => {
+                    let key = Interned::new_str(named_item.name().get().as_str());
+                    let ty = self
+                        .check_let_pattern(named_item.pattern())
+                        .unwrap_or(Ty::Any);
+                    named.push((key, ty));
+                }
+                // `rest` in `(a, b, ..rest) = t` is be ignored because we perform checking for
+                // `t``.
+                ast::DestructuringItem::Spread(..) => {}
             }
         }
+
+        let tuple_ty = (!pos.is_empty()).then(|| Ty::Tuple(pos.into()));
+        let dict_ty = (!named.is_empty()).then(|| Ty::Dict(RecordTy::new(named)));
+        Ty::union(tuple_ty, dict_ty)
     }
 
     fn check_element_of<T>(&mut self, ty: &Ty, pol: bool, context: &LinkedNode, checker: &mut T)

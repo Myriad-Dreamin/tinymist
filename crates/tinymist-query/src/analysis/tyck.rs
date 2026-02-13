@@ -299,6 +299,39 @@ impl TypeChecker<'_> {
                         let mut v = v.write();
                         v.lbs.insert_mut(bound);
                     }
+                };
+            }
+            (Ty::Select(sel), rhs) => {
+                // Constrain field access `base.field` by constraining `base` with a record type
+                // that contains the field. This enables propagating expected types back into
+                // dictionary literals, e.g. `(cjk: "")` from `fonts.cjk` used as `text(font:
+                // ...)`.
+                let dict = Ty::Dict(RecordTy::new(vec![(sel.select.clone(), rhs.clone())]));
+                self.constrain(sel.ty.as_ref(), &dict);
+            }
+            (Ty::Array(lhs), Ty::Array(rhs)) => {
+                self.constrain(lhs, rhs);
+            }
+            (Ty::Tuple(lhs), Ty::Array(rhs)) => {
+                for lhs in lhs.iter() {
+                    self.constrain(lhs, rhs);
+                }
+            }
+            (Ty::Tuple(lhs), Ty::Tuple(rhs)) => {
+                for (lhs, rhs) in lhs.iter().zip(rhs.iter()) {
+                    self.constrain(lhs, rhs);
+                }
+            }
+            (Ty::Dict(lhs), Ty::Dict(rhs)) => {
+                for (key, lhs, rhs) in lhs.common_iface_fields(rhs) {
+                    crate::log_debug_ct!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
+                    self.constrain(lhs, rhs);
+                    // if !sl.is_detached() {
+                    //     self.info.witness_at_most(*sl, rhs.clone());
+                    // }
+                    // if !sr.is_detached() {
+                    //     self.info.witness_at_least(*sr, lhs.clone());
+                    // }
                 }
             }
             (Ty::Union(types), rhs) => {
@@ -371,18 +404,6 @@ impl TypeChecker<'_> {
             (Ty::Builtin(BuiltinTy::TextFont), rhs) => {
                 if rhs.is_dict() {
                     self.constrain(&FLOW_TEXT_FONT_DICT_TYPE, rhs);
-                }
-            }
-            (Ty::Dict(lhs), Ty::Dict(rhs)) => {
-                for (key, lhs, rhs) in lhs.common_iface_fields(rhs) {
-                    crate::log_debug_ct!("constrain record item {key} {lhs:?} ⪯ {rhs:?}");
-                    self.constrain(lhs, rhs);
-                    // if !sl.is_detached() {
-                    //     self.info.witness_at_most(*sl, rhs.clone());
-                    // }
-                    // if !sr.is_detached() {
-                    //     self.info.witness_at_least(*sr, lhs.clone());
-                    // }
                 }
             }
             (Ty::Unary(lhs), Ty::Unary(rhs)) if lhs.op == rhs.op => {
