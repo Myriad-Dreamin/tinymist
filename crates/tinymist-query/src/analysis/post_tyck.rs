@@ -9,7 +9,7 @@ use super::{
 };
 use super::{DynTypeBounds, ParamAttrs, ParamTy, SharedContext, prelude::*};
 use crate::syntax::{ArgClass, SyntaxContext, VarClass, classify_context, classify_context_outer};
-use crate::ty::{BuiltinTy, RecordTy};
+use crate::ty::{BuiltinTy, RecordTy, TypeInterface};
 
 /// With given type information, check the type of a literal expression again by
 /// touching the possible related nodes.
@@ -356,7 +356,83 @@ impl<'a> PostTypeChecker<'a> {
 
     /// Checks the context of a node and returns the type of the context.
     fn check_context(&mut self, context: &LinkedNode, node: &LinkedNode) -> Option<Ty> {
+        if let Some(binary) = context.cast::<ast::Binary>()
+            && binary.op() == ast::BinOp::Add
+        {
+            let parent = context.parent()?;
+            let expected = self.check_context(parent, context)?;
+
+            fn has_path(this: &PostTypeChecker<'_>, ty: &Ty) -> bool {
+                match ty {
+                    Ty::Builtin(BuiltinTy::Path(..)) => true,
+                    Ty::Builtin(_) => false,
+                    Ty::Param(p) => has_path(this, &p.ty),
+                    Ty::Let(b) => {
+                        b.lbs.iter().any(|ty| has_path(this, ty))
+                            || b.ubs.iter().any(|ty| has_path(this, ty))
+                    }
+                    Ty::Union(types) => types.iter().any(|ty| has_path(this, ty)),
+                    Ty::Array(elem) => has_path(this, elem),
+                    Ty::Tuple(elems) => elems.iter().any(|ty| has_path(this, ty)),
+                    Ty::Dict(record) => record.interface().any(|(_, ty)| has_path(this, ty)),
+                    Ty::Select(sel) => has_path(this, &sel.ty),
+                    Ty::With(with) => {
+                        has_path(this, &with.sig) || with.with.inputs().any(|ty| has_path(this, ty))
+                    }
+                    Ty::Args(args) => args.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Func(sig) | Ty::Pattern(sig) => sig.inputs().any(|ty| has_path(this, ty)),
+                    Ty::Unary(unary) => has_path(this, &unary.lhs),
+                    Ty::Binary(binary) => {
+                        let [lhs, rhs] = binary.operands();
+                        has_path(this, lhs) || has_path(this, rhs)
+                    }
+                    Ty::If(if_) => {
+                        has_path(this, &if_.cond)
+                            || has_path(this, &if_.then)
+                            || has_path(this, &if_.else_)
+                    }
+                    Ty::Var(v) => this.info.vars.get(&v.def).is_some_and(|bounds| {
+                        let bounds = bounds.bounds.bounds().read();
+                        bounds.lbs.iter().any(|ty| has_path(this, ty))
+                            || bounds.ubs.iter().any(|ty| has_path(this, ty))
+                    }),
+                    Ty::Any | Ty::Boolean(_) | Ty::Value(_) => false,
+                }
+            }
+
+            // Only propagate expected types for path concatenations so string literals in
+            // `"dir/" + ""` get path completion.
+            if !has_path(self, &expected) {
+                return None;
+            }
+
+            // Ensure the queried node is part of the binary expression.
+            let lhs = binary.lhs();
+            let rhs = binary.rhs();
+            let lhs_node = context.find(lhs.span())?;
+            let rhs_node = context.find(rhs.span())?;
+            if lhs_node.find(node.span()).is_some() || rhs_node.find(node.span()).is_some() {
+                return Some(expected);
+            }
+        }
+
         match context.kind() {
+            SyntaxKind::ModuleImport | SyntaxKind::ModuleInclude => {
+                let source = if context.kind() == SyntaxKind::ModuleImport {
+                    let import = context.cast::<ast::ModuleImport>()?;
+                    import.source()
+                } else {
+                    let include = context.cast::<ast::ModuleInclude>()?;
+                    include.source()
+                };
+
+                let source_node = context.find(source.span())?;
+                source_node.find(node.span())?;
+
+                Some(Ty::Builtin(BuiltinTy::Path(crate::ty::PathKind::Source {
+                    allow_package: true,
+                })))
+            }
             SyntaxKind::LetBinding => {
                 let let_binding = context.cast::<ast::LetBinding>()?;
                 let let_init = let_binding.init()?;
