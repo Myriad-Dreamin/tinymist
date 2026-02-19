@@ -17,6 +17,7 @@ on:
 
 jobs:
   check-and-release:
+    if: ${{ !github.event.repository.fork }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
