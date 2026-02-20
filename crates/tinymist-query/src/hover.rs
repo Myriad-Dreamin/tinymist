@@ -410,7 +410,7 @@ impl HoverWorker<'_> {
             node = node.parent()?;
         }
 
-        let links = get_link_exprs_in(node)?;
+        let links = get_link_exprs_in(node);
         let links = links
             .objects
             .iter()

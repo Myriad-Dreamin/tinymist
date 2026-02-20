@@ -230,9 +230,11 @@ impl RenameFileWorker<'_> {
         let link_info = get_link_exprs(&ref_src);
         let root = LinkedNode::new(ref_src.root());
         let edits = edits.entry(uri).or_default();
+        // compare vpaths rather than file ids because we don't want to allocate file ids eagerly
+        let def_file_vpath = self.def_fid.vpath();
         for obj in &link_info.objects {
             if !matches!(&obj.target,
-                LinkTarget::Path(file_id, _) if *file_id == self.def_fid
+                LinkTarget::Path(file_id, path) if file_id.vpath().join(path.as_ref()) == *def_file_vpath
             ) {
                 continue;
             }
