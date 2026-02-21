@@ -10,27 +10,47 @@ import {
   typstSupportedMimes,
   PasteResourceKind,
   pasteResourceKinds as pasteResourceKinds,
-  typstImageEditKind,
-  typstPasteLinkEditKind,
-  typstUriEditKind,
+  getTypstImageEditKind,
+  getTypstPasteLinkEditKind,
+  getTypstUriEditKind,
   Schemes,
 } from "./drop-paste.def";
 import { IContext } from "../context";
 import { CodeContextQueryResult, tinymist } from "../lsp";
 
-export function dragAndDropActivate(context: IContext) {
+// Type guards for paste API availability
+function hasDocumentPasteAPI(): boolean {
+  return "registerDocumentPasteEditProvider" in vscode.languages;
+}
+
+// Conditional types for compatibility
+type DocumentPasteEditProvider = any;
+type DocumentPasteEditContext = any;
+type DocumentPasteEdit = any;
+
+type SubscriptionContext = Pick<IContext, "subscriptions">;
+
+export function dragAndDropActivate(context: SubscriptionContext) {
   context.subscriptions.push(
     vscode.languages.registerDocumentDropEditProvider(typstDocumentSelector, new DropProvider()),
   );
 }
 
-export function copyAndPasteActivate(context: IContext) {
-  const providedEditKinds = [typstPasteLinkEditKind, typstUriEditKind, typstImageEditKind];
+export function copyAndPasteActivate(context: SubscriptionContext) {
+  // Check if document paste API is available (VS Code 1.97+)
+  if (!hasDocumentPasteAPI()) {
+    console.warn(
+      "Tinymist: Document paste API not available, copy/paste features will be disabled",
+    );
+    return;
+  }
+
+  const providedEditKinds = [getTypstPasteLinkEditKind(), getTypstUriEditKind(), getTypstImageEditKind()];
 
   const sel = typstDocumentSelector;
   context.subscriptions.push(
     vscode.languages.registerDocumentPasteEditProvider(sel, new PasteUriProvider(), {
-      providedPasteEditKinds: [typstPasteLinkEditKind],
+      providedPasteEditKinds: [getTypstPasteLinkEditKind()],
       pasteMimeTypes: PasteUriProvider.mimeTypes,
     }),
     vscode.languages.registerDocumentPasteEditProvider(sel, new PasteResourceProvider(), {
@@ -47,21 +67,21 @@ const enum DropPasteAction {
 
 type EditClass<A extends DropPasteAction> = A extends DropPasteAction.Drop
   ? vscode.DocumentDropEdit
-  : vscode.DocumentPasteEdit;
+  : any; // Use any for DocumentPasteEdit to handle compatibility
 
 interface ResolvedEdits {
   snippet: vscode.SnippetString;
   additionalEdits: vscode.WorkspaceEdit;
-  yieldTo: vscode.DocumentDropOrPasteEditKind[];
+  yieldTo: any[]; // Use any[] for DocumentDropOrPasteEditKind compatibility
 }
 
 class DropOrPasteContext<A extends DropPasteAction> {
   title: string;
-  editKind = typstUriEditKind;
+  editKind = getTypstUriEditKind();
 
   constructor(
     private kind: A,
-    private context: vscode.DocumentPasteEditContext | undefined,
+    private context: DocumentPasteEditContext | undefined,
     private document: vscode.TextDocument,
     private token: vscode.CancellationToken,
   ) {
@@ -72,10 +92,21 @@ class DropOrPasteContext<A extends DropPasteAction> {
     }
   }
 
-  private readonly _yieldTo = [
-    vscode.DocumentDropOrPasteEditKind.Text,
-    vscode.DocumentDropOrPasteEditKind.Empty.append("typst", "link", "image", "attachment"), // Prefer notebook attachments
-  ];
+  private readonly _yieldTo = (() => {
+    // Check if DocumentDropOrPasteEditKind is available
+    if (typeof (vscode as any).DocumentDropOrPasteEditKind !== "undefined") {
+      return [
+        (vscode as any).DocumentDropOrPasteEditKind.Text,
+        (vscode as any).DocumentDropOrPasteEditKind.Empty.append(
+          "typst",
+          "link",
+          "image",
+          "attachment",
+        ), // Prefer notebook attachments
+      ];
+    }
+    return []; // Fallback for older VS Code versions
+  })();
 
   resolved: ResolvedEdits[] = [];
 
@@ -90,10 +121,17 @@ class DropOrPasteContext<A extends DropPasteAction> {
       dropEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
       return dropEdit as EditClass<A>;
     } else {
-      const pasteEdit = new vscode.DocumentPasteEdit(edit.snippet, this.title, this.editKind);
-      pasteEdit.additionalEdit = edit.additionalEdits;
-      pasteEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
-      return pasteEdit as EditClass<A>;
+      // For paste, we need to handle the case where DocumentPasteEdit might not be available
+      const DocumentPasteEdit = (vscode as any).DocumentPasteEdit;
+      if (DocumentPasteEdit) {
+        const pasteEdit = new DocumentPasteEdit(edit.snippet, this.title, this.editKind);
+        pasteEdit.additionalEdit = edit.additionalEdits;
+        pasteEdit.yieldTo = [...this._yieldTo, ...edit.yieldTo];
+        return pasteEdit as EditClass<A>;
+      } else {
+        // Fallback - this should not happen if we check hasDocumentPasteAPI() first
+        throw new Error("DocumentPasteEdit not available");
+      }
     }
   }
 
@@ -106,7 +144,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
       if (mediaFiles) {
         const edit = await this.handleMediaFiles(ranges, mediaFiles);
         if (edit) {
-          this.editKind = typstImageEditKind;
+          this.editKind = getTypstImageEditKind();
           this.resolved.push(edit);
           return this.wrapRangeAsLinkContent();
         }
@@ -126,7 +164,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
   }
 
   async pasteUri(ranges: readonly vscode.Range[], dataTransfer: vscode.DataTransfer) {
-    this.editKind = typstUriEditKind;
+    this.editKind = getTypstUriEditKind();
     this.title = "Paste Link (Typst)";
     const item = dataTransfer.get(Mime.textPlain);
     const text = await item?.asString();
@@ -221,7 +259,7 @@ class DropOrPasteContext<A extends DropPasteAction> {
     if (
       uriList.entries.length === 1 &&
       [Schemes.http, Schemes.https].includes(uriList.entries[0].uri.scheme as Schemes) &&
-      !this.context?.only?.contains(typstUriEditKind)
+      !(this.context?.only as any)?.contains?.(getTypstUriEditKind())
     ) {
       const text = await dataTransfer.get(Mime.textPlain)?.asString();
       if (this.token.isCancellationRequested) {
@@ -543,16 +581,16 @@ export class DropProvider implements vscode.DocumentDropEditProvider {
   }
 }
 
-export class PasteResourceProvider implements vscode.DocumentPasteEditProvider {
+export class PasteResourceProvider implements DocumentPasteEditProvider {
   public static readonly mimeTypes = [Mime.textUriList, "files", ...typstSupportedMimes];
 
   public async provideDocumentPasteEdits(
     document: vscode.TextDocument,
     ranges: readonly vscode.Range[],
     dataTransfer: vscode.DataTransfer,
-    context: vscode.DocumentPasteEditContext,
+    context: DocumentPasteEditContext,
     token: vscode.CancellationToken,
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
+  ): Promise<DocumentPasteEdit[] | undefined> {
     const ctx = new PasteContext(DropPasteAction.Paste, context, document, token);
 
     const transferred = await ctx.transfer(ranges, dataTransfer);
@@ -565,16 +603,16 @@ export class PasteResourceProvider implements vscode.DocumentPasteEditProvider {
   }
 }
 
-export class PasteUriProvider implements vscode.DocumentPasteEditProvider {
+export class PasteUriProvider implements DocumentPasteEditProvider {
   public static readonly mimeTypes = [Mime.textPlain];
 
   public async provideDocumentPasteEdits(
     document: vscode.TextDocument,
     ranges: readonly vscode.Range[],
     dataTransfer: vscode.DataTransfer,
-    context: vscode.DocumentPasteEditContext,
+    context: DocumentPasteEditContext,
     token: vscode.CancellationToken,
-  ): Promise<vscode.DocumentPasteEdit[] | undefined> {
+  ): Promise<DocumentPasteEdit[] | undefined> {
     const ctx = new PasteContext(DropPasteAction.Paste, context, document, token);
 
     const transferred = await ctx.pasteUri(ranges, dataTransfer);
