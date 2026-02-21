@@ -255,7 +255,7 @@ function runServer(
 
 interface LaunchTask {
   context: vscode.ExtensionContext;
-  editor: vscode.TextEditor;
+  editor?: vscode.TextEditor;
   bindDocument: vscode.TextDocument;
   mode: "doc" | "slide";
   webviewPanel?: vscode.WebviewPanel;
@@ -275,6 +275,10 @@ export interface LaunchInWebViewTask extends LaunchTask {
 export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWebViewTask) => {
   let shadowDispose: vscode.Disposable | undefined = undefined;
   let shadowDisposeClose: vscode.Disposable | undefined = undefined;
+  if (!task.editor) {
+    throw new Error("Compat preview requires an active TextEditor");
+  }
+
   const { context, editor: activeEditor, bindDocument, webviewPanel } = task;
   const filePath = bindDocument.uri.fsPath;
 
@@ -326,7 +330,8 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
     panel = await openPreviewInWebView({
       context,
       task,
-      activeEditor,
+      document: bindDocument,
+      viewColumn: activeEditor.viewColumn,
       dataPlanePort,
       webviewPanel,
       async panelDispose() {
