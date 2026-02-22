@@ -40,8 +40,8 @@ async function main() {
   // Run tests using the minimal supported version and the latest one.
   for (const version of [minimalVersion, "stable"]) {
     for (const uri of [
-      // path.resolve(extensionDevelopmentPath, "e2e-workspaces/export"),
-      path.resolve(extensionDevelopmentPath, "e2e-workspaces/book"),
+      path.resolve(extensionDevelopmentPath, "e2e-workspaces/export"),
+      // path.resolve(extensionDevelopmentPath, "e2e-workspaces/book"),
       // undefined,
     ]) {
       await runTests({
