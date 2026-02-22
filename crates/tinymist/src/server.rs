@@ -118,7 +118,11 @@ impl ServerState {
         let (dep_tx, rx) = mpsc::unbounded_channel();
         // todo: notify feature?
         #[cfg(feature = "system")]
-        let dep_rx = {
+        let dep_rx = if config.delegate_fs_requests {
+            // skip the OS watcher and instead let `ServerState::handle_deps` handle it on a
+            // delegated fs
+            Some(rx)
+        } else {
             let fs_client = client.clone().to_untyped();
             let async_handle = client.handle.clone();
             async_handle.spawn(crate::project::watch_deps(rx, move |event| {
@@ -346,7 +350,7 @@ impl ServerState {
             .with_resource("/fonts", State::resource_fonts)
             .with_resource("/symbols", State::resource_symbols)
             .with_resource("/preview/index.html", State::resource_preview_html)
-            .with_resource("/tutorial", State::resource_tutoral)
+            .with_resource("/tutorial", State::resource_tutorial)
             .with_resource("/package/symbol", State::resource_package_symbols)
             .with_resource("/package/docs", State::resource_package_docs);
 

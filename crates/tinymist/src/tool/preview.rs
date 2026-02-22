@@ -22,6 +22,7 @@ use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
     PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
 };
+use tinymist_query::url_to_path;
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
@@ -273,16 +274,32 @@ impl ServerState {
         let config = cli_args.preview.config(&self.config.preview());
 
         // todo: preview specific arguments are not used
-        let entry = cli_args.compile.input.as_ref();
-        let entry = entry
+        let cli_entry = cli_args.compile.input.as_ref();
+        let entry = cli_entry
             .map(|input| {
-                let input = Path::new(&input);
-                if !input.is_absolute() {
-                    // std::env::current_dir().unwrap().join(input)
-                    return Err(invalid_params("entry file must be absolute path"));
-                };
+                if self.config.delegate_fs_requests {
+                    if let Ok(uri) = Url::parse(input) {
+                        // treat the input as a URI string if possible
+                        return Ok(url_to_path(&uri));
+                    }
 
-                Ok(input.into())
+                    return Ok(Path::new(input).into());
+                }
+
+                let path = Path::new(input);
+                if path.is_absolute() {
+                    return Ok(path.into());
+                }
+
+                // still allow absolute paths encoded as URIs
+                if let Ok(uri) = Url::parse(input) {
+                    let p = url_to_path(&uri);
+                    if p.is_absolute() {
+                        return Ok(p);
+                    }
+                }
+
+                Err(invalid_params("entry file must be absolute path"))
             })
             .transpose()?;
 
@@ -318,7 +335,8 @@ impl ServerState {
             let id = primary.id.clone();
 
             if let Some(entry) = entry {
-                self.change_main_file(Some(entry)).map_err(internal_error)?;
+                self.change_main_file(Some(entry.into()))
+                    .map_err(internal_error)?;
             }
             self.set_pin_by_preview(true, is_browsing);
 
@@ -326,7 +344,7 @@ impl ServerState {
                 .start(cli_args, previewer, id, true, is_background)
         } else if let Some(entry) = entry {
             let id = self
-                .restart_dedicate(&task_id, Some(entry))
+                .restart_dedicate(&task_id, Some(entry.into()))
                 .map_err(internal_error)?;
 
             if !self.project.preview.register(&id, watcher) {

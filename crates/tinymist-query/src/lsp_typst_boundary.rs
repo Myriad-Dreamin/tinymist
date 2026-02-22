@@ -1,6 +1,9 @@
 //! Conversions between Typst and LSP types and representations
 
-use tinymist_std::path::PathClean;
+use anyhow::Context;
+use percent_encoding::percent_decode_str;
+use tinymist_std::path::looks_like_uri;
+use tinymist_std::path::{PathClean, unix_slash};
 use tinymist_world::vfs::PathResolution;
 
 use crate::prelude::*;
@@ -27,13 +30,60 @@ pub fn is_untitled_path(p: &Path) -> bool {
 
 /// Convert a path to a URL.
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
-    if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
-        // rust-url will panic on converting an empty path.
-        if untitled == Path::new("nEoViM-BuG") {
-            return Ok(EMPTY_URL.clone());
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let path_str = unix_slash(path);
+        if looks_like_uri(&path_str) {
+            // let `url::Url` handle percent-encoding of the path component
+            // ensures that characters like spaces are encoded as `%20`
+            if let Some(pos) = path_str.find(':') {
+                let (scheme, rest) = path_str.split_at(pos);
+                let raw_path = &rest[1..]; // skip ':'
+
+                let mut url = Url::parse(&format!("{scheme}:"))
+                    .with_context(|| format!("could not convert path to URI: path: {path:?}"))?;
+                url.set_path(raw_path);
+                return Ok(url);
+            }
+
+            // this should never happen given `looks_like_uri`, but the old behaviour is
+            // here anyway
+            return Url::parse(&path_str)
+                .with_context(|| format!("could not convert path to URI: path: {path:?}"));
+        }
+    }
+
+    // on windows, paths with `/untitled` prefix get normalized to backslashes
+    let path_str = path.to_string_lossy();
+    let backslash_prefix = UNTITLED_ROOT.replace('/', "\\");
+
+    let is_untitled =
+        path_str.starts_with(UNTITLED_ROOT) || path_str.starts_with(&backslash_prefix);
+
+    if is_untitled {
+        if let Ok(untitled) = path.strip_prefix(UNTITLED_ROOT) {
+            // rust-url will panic on converting an empty path.
+            if untitled == Path::new("nEoViM-BuG") {
+                return Ok(EMPTY_URL.clone());
+            }
+
+            return untitled_url(untitled);
         }
 
-        return untitled_url(untitled);
+        // fallback: manually extract and normalize for windows backslashes
+        let trimmed = if path_str.starts_with(UNTITLED_ROOT) {
+            path_str.strip_prefix(UNTITLED_ROOT).unwrap_or(&path_str)
+        } else {
+            path_str
+                .strip_prefix(&backslash_prefix)
+                .unwrap_or(&path_str)
+        };
+
+        let normalized = trimmed
+            .trim_start_matches('/')
+            .trim_start_matches('\\')
+            .replace('\\', "/");
+        return untitled_url(Path::new(&normalized));
     }
 
     url_from_file_path(path)
@@ -72,15 +122,34 @@ pub fn url_to_path(uri: &Url) -> PathBuf {
         return Path::new(String::from_utf8_lossy(&bytes).as_ref()).clean();
     }
 
-    url_to_file_path(uri)
+    // for non-file, non-untitled schemes (virtual filesystem providers), encode the
+    // scheme back into the path while decoding any percent-encoding from the URL
+    // it means that filesystem paths can use the same textual representation as
+    // Typst virtual paths, which may contain characters like spaces
+    let decoded_path = percent_decode_str(uri.path()).decode_utf8_lossy();
+    let raw = format!("{}:{}", uri.scheme(), decoded_path);
+    PathBuf::from(raw)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 fn url_from_file_path(path: &Path) -> anyhow::Result<Url> {
+    // Prefer `Url::from_file_path` for correctness; fall back to manual
+    // construction to handle edge cases like UNC paths, leading double slashes,
+    // or drive letters.
     Url::from_file_path(path).or_else(|never| {
         let _: () = never;
 
-        anyhow::bail!("could not convert path to URI: path: {path:?}",)
+        let p = path.to_string_lossy().replace('\\', "/");
+        let url_str = if p.starts_with("//") {
+            format!("file:{p}")
+        } else if p.starts_with('/') {
+            format!("file://{p}")
+        } else {
+            format!("file:///{p}")
+        };
+
+        Url::parse(&url_str)
+            .with_context(|| format!("could not convert path to URI: path: {path:?}"))
     })
 }
 
@@ -110,6 +179,7 @@ fn url_to_file_path(uri: &Url) -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_untitled() {
@@ -132,5 +202,57 @@ mod test {
 
         let uri2 = path_to_url(&path).unwrap();
         assert_eq!(EMPTY_URL.clone(), uri2);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_path_to_url_file_scheme_roundtrip() {
+        // This test uses a Unix-style path; skip on Windows where
+        // `Url::to_file_path` semantics differ for such inputs.
+        #[cfg(unix)]
+        {
+            let p = PathBuf::from("/tmp/example file.typ");
+            let url = path_to_url(&p).expect("file path to url");
+            assert_eq!(url.scheme(), "file");
+            // spaces should be percent-encoded
+            assert!(url.as_str().contains("%20"));
+
+            // url_to_file_path should give us back a cleaned absolute path
+            let back = url_to_file_path(&url);
+            assert!(back.is_absolute());
+            assert!(back.ends_with("example file.typ"));
+        }
+    }
+
+    #[cfg(all(not(target_arch = "wasm32"), windows))]
+    #[test]
+    fn test_path_to_url_file_scheme_roundtrip_windows() {
+        let p = PathBuf::from("C:\\Temp\\example file.typ");
+        let url = path_to_url(&p).expect("file path to url");
+        assert_eq!(url.scheme(), "file");
+        // spaces should be percent-encoded
+        assert!(url.as_str().contains("%20"));
+
+        let back = url_to_file_path(&url);
+        assert!(back.is_absolute());
+        assert!(back.ends_with("example file.typ"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_path_to_url_untitled_special_case() {
+        let p = PathBuf::from("/untitled/nEoViM-BuG");
+        let url = path_to_url(&p).expect("untitled url");
+        // Special case maps to EMPTY_URL which is a placeholder file:// URI
+        assert_eq!(url.scheme(), "file");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_url_to_path_virtual_scheme() {
+        let url = Url::parse("oct:/workspace/My File.typ").unwrap();
+        let p = url_to_path(&url);
+        // scheme should be embedded back into the path text, with decoded spaces
+        assert_eq!(p.to_string_lossy(), "oct:/workspace/My File.typ");
     }
 }

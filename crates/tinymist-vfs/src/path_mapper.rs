@@ -10,24 +10,27 @@ use std::sync::LazyLock;
 
 use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
-use tinymist_std::path::PathClean;
+use tinymist_std::path::{PathClean, looks_like_uri, unix_slash};
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::VirtualPath;
 use typst::syntax::package::{PackageSpec, PackageVersion};
 
 use super::FileId;
 
-/// Represents the resolution of a path to either a physical filesystem path or a virtual path.
+/// Represents the resolution of a path to either a physical filesystem path or
+/// a virtual path.
 #[derive(Debug)]
 pub enum PathResolution {
     /// A path that has been resolved to a physical filesystem path.
     Resolved(PathBuf),
-    /// A path that exists without a physical root, represented as a virtual path.
+    /// A path that exists without a physical root, represented as a virtual
+    /// path.
     Rootless(Cow<'static, VirtualPath>),
 }
 
 impl PathResolution {
-    /// Converts the path resolution to a file result, returning an error for rootless paths.
+    /// Converts the path resolution to a file result, returning an error for
+    /// rootless paths.
     pub fn to_err(self) -> FileResult<PathBuf> {
         match self {
             PathResolution::Resolved(path) => Ok(path),
@@ -181,7 +184,8 @@ struct Interner {
     from_id: Vec<ImmutPath>,
 }
 
-/// Resolver for handling workspace-related path operations and file ID management.
+/// Resolver for handling workspace-related path operations and file ID
+/// management.
 #[derive(Default)]
 pub struct WorkspaceResolver {}
 
@@ -213,7 +217,16 @@ impl WorkspaceResolver {
             return id;
         }
 
-        let root = ImmutPath::from(root.clean());
+        let root: ImmutPath = {
+            let as_str = unix_slash(root);
+            if looks_like_uri(&as_str) {
+                // avoid running URI roots through `PathClean` because they might be
+                // misinterpreted as drive letters
+                root.clone()
+            } else {
+                ImmutPath::from(root.clean())
+            }
+        };
 
         // Create a new entry forever by leaking the pair. We can't leak more
         // than 2^16 pair (and typically will leak a lot less), so its not a
@@ -279,7 +292,8 @@ impl WorkspaceResolver {
         }
     }
 
-    /// Creates a display wrapper for a file ID that can be formatted for output.
+    /// Creates a display wrapper for a file ID that can be formatted for
+    /// output.
     pub fn display(id: Option<FileId>) -> Resolving {
         Resolving { id }
     }
@@ -340,7 +354,30 @@ impl fmt::Display for Resolving {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_interner_untitled() {}
+
+    #[test]
+    fn test_workspace_id_preserves_uri_roots() {
+        let uri_root = ImmutPath::from(PathBuf::from("oct:/workspace/project"));
+        let id = WorkspaceResolver::workspace_id(&uri_root);
+        let interner = INTERNER.read();
+        let stored = interner.from_id.get(id.0 as usize).expect("id present");
+        assert_eq!(stored.as_ref().to_string_lossy(), "oct:/workspace/project");
+    }
+
+    #[test]
+    fn test_workspace_id_cleans_regular_paths() {
+        let p = ImmutPath::from(PathBuf::from("/tmp/../tmp/project"));
+        let id = WorkspaceResolver::workspace_id(&p);
+        let interner = INTERNER.read();
+        let stored = interner.from_id.get(id.0 as usize).expect("id present");
+        // Normalize separators to make the assertion platform-independent.
+        let norm = stored.as_ref().to_string_lossy().replace('\\', "/");
+        assert!(norm.contains("/tmp/project") || norm.ends_with("/project"));
+        assert!(!norm.contains(".."));
+    }
 }

@@ -46,6 +46,36 @@ pub fn unix_slash(root: &Path) -> String {
     res
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+/// Checks if a string looks like a URI by validating its scheme portion.
+/// Requires a non-empty, multi-character scheme starting with an ASCII letter,
+/// followed by ASCII alphanumeric characters or '+', '.', '-'.
+/// This avoids treating Windows drive letters like `C:` as URI schemes.
+pub fn looks_like_uri(s: &str) -> bool {
+    if let Some(pos) = s.find(':') {
+        let (scheme, _) = s.split_at(pos);
+        if scheme.is_empty() || scheme.len() == 1 {
+            return false;
+        }
+
+        let mut bytes = scheme.bytes();
+        match bytes.next() {
+            Some(b) if (b as char).is_ascii_alphabetic() => {}
+            _ => return false,
+        }
+
+        bytes.all(|b| {
+            let c = b as char;
+            c.is_ascii_alphanumeric() || c == '+' || c == '.' || c == '-'
+        })
+    } else {
+        false
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn looks_like_uri(_s: &str) -> bool { false }
+
 /// Gets the path cleaned as a platform-style string.
 pub use path_clean::clean;
 
@@ -71,7 +101,7 @@ pub fn diff(path: &Path, base: &Path) -> Option<PathBuf> {
 mod test {
     use std::path::{Path, PathBuf};
 
-    use super::{PathClean, clean as inner_path_clean, unix_slash};
+    use super::{PathClean, clean as inner_path_clean, unix_slash, looks_like_uri};
 
     pub fn clean<P: AsRef<Path>>(path: P) -> String {
         unix_slash(&inner_path_clean(path))
@@ -246,5 +276,35 @@ mod test {
         for test in tests {
             assert_eq!(clean(test.0), test.1);
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_looks_like_uri_valid_schemes() {
+        assert!(looks_like_uri("http:/path"));
+        assert!(looks_like_uri("file:/C:/Windows"));
+        assert!(looks_like_uri("custom-scheme:/abc"));
+        assert!(looks_like_uri("oct:/workspace/file typst"));
+        assert!(looks_like_uri("a+1.2-3:/zzz"));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_looks_like_uri_rejects_drive_letters_and_edge_cases() {
+        // Single-letter "scheme" like windows drive should be rejected
+        assert!(!looks_like_uri("C:/Windows"));
+        assert!(!looks_like_uri("D:"));
+
+        // No colon -> not a URI
+        assert!(!looks_like_uri("/usr/bin"));
+        assert!(!looks_like_uri("relative/path"));
+
+        // Invalid first character
+        assert!(!looks_like_uri("1abc:/path"));
+        assert!(!looks_like_uri("+abc:/path"));
+
+        // Invalid characters in scheme
+        assert!(!looks_like_uri("ab*c:/path"));
+        assert!(!looks_like_uri("ab c:/path"));
     }
 }

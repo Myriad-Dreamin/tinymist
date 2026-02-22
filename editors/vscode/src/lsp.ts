@@ -101,6 +101,9 @@ export class LanguageState {
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
+  delegateFsRequests = false;
+  // disposables for the watch fallbacks
+  private _watchDisposables: vscode.Disposable[] = [];
   clientPromiseResolve = (_client: LanguageClient) => { };
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
@@ -116,6 +119,14 @@ export class LanguageState {
       this._watcher.dispose();
       this._watcher = undefined;
     }
+    for (const d of this._watchDisposables) {
+      try {
+        d.dispose();
+      } catch (e) {
+        console.error("failed to dispose watch disposable", e);
+      }
+    }
+    this._watchDisposables = [];
     if (this.client) {
       await this.client.stop();
       this.client = undefined;
@@ -306,7 +317,7 @@ export class LanguageState {
         },
       },
     };
-
+    this.delegateFsRequests = !!(config as any).delegateFsRequests;
     const client = (this.client = await LanguageState.Client(context, config, clientOptions));
 
     this.clientPromiseResolve(client);
@@ -477,12 +488,34 @@ export class LanguageState {
   }
 
   registerClientSideWatch(client: LanguageClient) {
+    // clear any existing listeners from a previous client instances
+    for (const d of this._watchDisposables) {
+      try {
+        d.dispose();
+      } catch (e) {
+        console.error("failed to dispose watch disposable", e);
+      }
+    }
+    this._watchDisposables = [];
+
     const watches = new Set<string>();
     const hasRead = new Map<string, [number, FileResult | undefined]>();
     let watchClock = 0;
 
-    const tryRead = async (uri: vscode.Uri) =>
-      vscode.workspace.fs.readFile(uri).then(
+    const tryRead = async (uri: vscode.Uri) => {
+      {
+        // Virtual workspaces don't provide a filesystem provider that supports workspace.fs.readFile
+        // Uses the open TextDocument whenever available.
+        const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+        if (doc) {
+          const text = doc.getText();
+          const data = Buffer.from(text, "utf8");
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        }
+      }
+
+      // Otherwise falls back to workspace.fs for real files
+      return vscode.workspace.fs.readFile(uri).then(
         (data): FileResult => {
           return { type: "ok", content: bytesBase64Encode(data) } as const;
         },
@@ -491,6 +524,7 @@ export class LanguageState {
           return { type: "err", error: err.message as string } as const;
         },
       );
+    };
 
     const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
       const previous = hasRead.get(uri);
@@ -555,35 +589,36 @@ export class LanguageState {
         vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
       );
 
-      const filesToRead = new Set<string>();
-      const filesDeleted = new Set<string>();
+      const filesToRead: vscode.Uri[] = [];
+      const filesDeleted: string[] = [];
 
-      for (const path of params.inserts) {
-        if (!watches.has(path)) {
-          filesToRead.add(path);
-          watches.add(path);
+      for (const uriStr of params.inserts) {
+        const uriObj = vscode.Uri.parse(uriStr);
+        if (!watches.has(uriStr)) {
+          filesToRead.push(uriObj);
+          watches.add(uriStr);
         }
       }
 
-      for (const path of params.removes) {
-        if (watches.has(path)) {
-          filesDeleted.add(path);
-          watches.delete(path);
+      for (const uriStr of params.removes) {
+        if (watches.has(uriStr)) {
+          filesDeleted.push(uriStr);
+          watches.delete(uriStr);
         }
       }
-      const removes: string[] = params.removes.filter((path) => {
-        return filesDeleted.has(path) && registerHasRead(path, currentClock, undefined);
+
+      const removes: string[] = filesDeleted.filter((path) => {
+        return registerHasRead(path, currentClock, undefined);
       });
 
       (async () => {
-        const paths = Array.from(filesToRead);
-        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
-
         watcher();
 
-        const inserts: FileChange[] = paths
-          .map((path, idx) => ({
-            uri: path,
+        const readFiles = await Promise.all(filesToRead.map((uri) => tryRead(uri)));
+
+        const inserts: FileChange[] = filesToRead
+          .map((uri, idx) => ({
+            uri: uri.toString(),
             content: readFiles[idx],
           }))
           .filter((change) => registerHasRead(change.uri, currentClock, change.content));
@@ -883,6 +918,8 @@ function isCodeActionWithoutEditsAndCommands(value: any): boolean {
 }
 
 interface FsWatchRequest {
+  // delivered by vscode-languageclient
+  // can be strings or vscode.Uri objects depending on the transport.
   inserts: string[];
   removes: string[];
 }
