@@ -31,6 +31,10 @@ const STR_VARIABLES = [
   "tinymist.rootPath",
   "outputPath",
   "tinymist.outputPath",
+  "packagePath",
+  "tinymist.packagePath",
+  "packageCachePath",
+  "tinymist.packageCachePath",
 ];
 const STR_ARR_VARIABLES = ["fontPaths", "tinymist.fontPaths"];
 const COLOR_THEME = ["colorTheme", "tinymist.colorTheme"];
