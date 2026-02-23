@@ -1,0 +1,37 @@
+---
+source: crates/tinymist-query/src/inlay_hint.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
+---
+[
+ {
+  "kind": 1,
+  "label": "⬆️ 0.1.1",
+  "paddingLeft": true,
+  "position": {
+   "character": 32,
+   "line": 0
+  },
+  "tooltip": "Newer version available: 0.1.1"
+ },
+ {
+  "kind": 1,
+  "label": "✅",
+  "paddingLeft": true,
+  "position": {
+   "character": 32,
+   "line": 1
+  },
+  "tooltip": "Up to date (latest version)"
+ },
+ {
+  "kind": 1,
+  "label": "❗ not found",
+  "paddingLeft": true,
+  "position": {
+   "character": 32,
+   "line": 2
+  },
+  "tooltip": "Version 0.2.0 not found"
+ }
+]

@@ -1,6 +1,5 @@
 use core::fmt::{self, Write};
 use std::cmp::Reverse;
-use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::{PackageSpec, PackageSpecExt};
@@ -10,6 +9,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::analysis::get_link_exprs_in;
 use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
+use crate::package::parse_package_import;
 use crate::prelude::*;
 use crate::upstream::{Tooltip, route_of_value, truncated_repr};
 
@@ -219,26 +219,10 @@ impl HoverWorker<'_> {
     }
 
     fn package_import(&mut self, node: &LinkedNode) -> Option<()> {
-        // Check if we're in a string literal that's part of an import
-        if !matches!(node.kind(), SyntaxKind::Str) {
-            return None;
-        }
-
-        // Navigate up to find the ModuleImport node
-        let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
-
-        // Check if this is a package import
-        if let ast::Expr::Str(str_node) = import_node.source()
-            && let import_str = str_node.get()
-            && import_str.starts_with("@")
-            && let Ok(package_spec) = PackageSpec::from_str(&import_str)
-        {
-            self.def
-                .push(self.get_package_hover_info(&package_spec, node));
-            return Some(());
-        }
-
-        None
+        let package_spec = parse_package_import(node)?;
+        self.def
+            .push(self.get_package_hover_info(&package_spec, node));
+        Some(())
     }
 
     /// Get package information for hover content
