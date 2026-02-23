@@ -1,0 +1,63 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on et x = 1``||` /* range"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_raw_block_in_math.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "#figure(\n  caption: [Caption],\n  ```rust let x = 1```\n)$0",
+      "range": "0:3:0:23"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap raw block in figure with a caption"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "",
+      "range": "0:1:0:2"
+     },
+     {
+      "insertTextFormat": 1,
+      "newText": "",
+      "range": "0:23:0:43"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to inline equation"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "\n",
+      "range": "0:1:0:2"
+     },
+     {
+      "insertTextFormat": 1,
+      "newText": "\n",
+      "range": "0:23:0:43"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to multiple-line block equation"
+ }
+]
