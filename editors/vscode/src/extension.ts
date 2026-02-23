@@ -16,6 +16,7 @@ import { getUserPackageData } from "./features/tool";
 import { SymbolViewProvider } from "./features/tool/views";
 import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
+import { l10nMsg } from "./l10n";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
@@ -215,6 +216,7 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.runCodeLens", commandRunCodeLens),
     commands.registerCommand("tinymist.copyAnsiHighlight", commandCopyAnsiHighlight),
     commands.registerCommand("tinymist.viewAst", commandViewAst(context)),
+    commands.registerCommand("tinymist.inspectValue", commandInspectValue(context)),
 
     commands.registerCommand("tinymist.pinMainToCurrent", () => commandPinMain(true)),
     commands.registerCommand("tinymist.unpinMain", () => commandPinMain(false)),
@@ -365,6 +367,135 @@ function commandViewAst(ctx: IContext) {
   return async () => {
     const document = await vscode.workspace.openTextDocument(AstDoc.uri);
     setTimeout(() => AstDoc.emitChange(), 10);
+    void (await vscode.window.showTextDocument(document, {
+      viewColumn: vscode.ViewColumn.Two,
+      preserveFocus: true,
+    }));
+  };
+}
+
+function commandInspectValue(ctx: IContext) {
+  const scheme = "tinymist-value-inspector";
+  const uri = `${scheme}://inspect/values.typ`;
+
+  const ValueInspectorDoc = new (class implements vscode.TextDocumentContentProvider {
+    readonly uri = vscode.Uri.parse(uri);
+    readonly eventEmitter = new vscode.EventEmitter<vscode.Uri>();
+    debounce: NodeJS.Timeout | undefined = undefined;
+    currentRequest: AbortController | undefined = undefined;
+
+    constructor() {
+      vscode.workspace.onDidChangeTextDocument(
+        this.onDidChangeTextDocument,
+        this,
+        ctx.subscriptions,
+      );
+      vscode.window.onDidChangeActiveTextEditor(
+        this.onDidChangeActiveTextEditor,
+        this,
+        ctx.subscriptions,
+      );
+      vscode.window.onDidChangeTextEditorSelection(
+        this.onDidChangeTextSelection,
+        this,
+        ctx.subscriptions,
+      );
+    }
+
+    emitChange() {
+      this.eventEmitter.fire(this.uri);
+    }
+
+    private onDidChangeTextDocument(event: vscode.TextDocumentChangeEvent) {
+      if (isTypstDocument(event.document)) {
+        // commandActivateDoc(event.document);
+        if (this.debounce) {
+          clearTimeout(this.debounce);
+        }
+        this.debounce = setTimeout(() => {
+          this.emitChange();
+        }, 300); // 300ms debounce delay
+      }
+    }
+
+    private onDidChangeActiveTextEditor(editor: vscode.TextEditor | undefined) {
+      if (editor && isTypstDocument(editor.document)) {
+        // commandActivateDoc(editor.document);
+        this.emitChange();
+      }
+    }
+
+    private onDidChangeTextSelection(event: vscode.TextEditorSelectionChangeEvent) {
+      if (isTypstDocument(event.textEditor.document)) {
+        // commandActivateDoc(event.textEditor.document);
+        this.emitChange();
+      }
+    }
+
+    async provideTextDocumentContent(
+      _uri: vscode.Uri,
+      ct: vscode.CancellationToken,
+    ): Promise<string> {
+      const editor = ctx.currentActiveEditor();
+      if (!editor)
+        return l10nMsg("No active editor, change selection to inspect expression values.");
+
+      // Cancel any previous request
+      if (this.currentRequest) {
+        this.currentRequest.abort();
+      }
+
+      // Check if already cancelled
+      if (ct.isCancellationRequested) {
+        return l10nMsg("Request cancelled.");
+      }
+
+      // Create a new abort controller for this request
+      this.currentRequest = new AbortController();
+      const abortController = this.currentRequest;
+
+      // Listen to cancellation
+      ct.onCancellationRequested(() => {
+        abortController.abort();
+      });
+
+      try {
+        const res = await tinymist.exportTrackedValues(editor.document.uri.fsPath, {
+          position: (await tinymist.clientPromise).code2ProtocolConverter.asPosition(
+            editor.selection.active,
+          ),
+        });
+
+        // Check if cancelled after the request
+        if (ct.isCancellationRequested || abortController.signal.aborted) {
+          return l10nMsg("Request cancelled.");
+        }
+
+        return res || l10nMsg("No value found at this position.");
+      } catch (error) {
+        if (ct.isCancellationRequested || abortController.signal.aborted) {
+          return l10nMsg("Request cancelled.");
+        }
+        return l10nMsg("Error: {error}", { error: String(error) });
+      } finally {
+        if (this.currentRequest === abortController) {
+          this.currentRequest = undefined;
+        }
+      }
+    }
+
+    get onDidChange(): vscode.Event<vscode.Uri> {
+      return this.eventEmitter.event;
+    }
+  })();
+
+  ctx.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(scheme, ValueInspectorDoc),
+  );
+
+  return async () => {
+    const document = await vscode.workspace.openTextDocument(ValueInspectorDoc.uri);
+    setTimeout(() => ValueInspectorDoc.emitChange(), 10);
     void (await vscode.window.showTextDocument(document, {
       viewColumn: vscode.ViewColumn.Two,
       preserveFocus: true,
