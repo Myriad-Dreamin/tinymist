@@ -654,9 +654,19 @@ impl Config {
 
     /// Determines the package options.
     pub fn package_opts(&self) -> CompilePackageArgs {
+         let extra_package_opts = self.typst_extra_args.as_ref().map(|a| &a.package);
+
+        let package_path = self.package.package_path.as_ref()
+            .or_else(|| extra_package_opts.and_then(|p| p.package_path.as_ref()))
+            .cloned();
+
+        let package_cache_path = self.package.package_cache_path.as_ref()
+            .or_else(|| extra_package_opts.and_then(|p| p.package_cache_path.as_ref()))
+            .cloned();
+
         CompilePackageArgs {
-            package_path: self.package.package_path.as_ref().or_else(|| self.typst_extra_args.as_ref().and_then(|a| a.package.package_path.as_ref())).cloned(),
-            package_cache_path: self.package.package_cache_path.as_ref().or_else(|| self.typst_extra_args.as_ref().and_then(|a| a.package.package_cache_path.as_ref())).cloned(),
+            package_path,
+            package_cache_path,
         }
     }
 
