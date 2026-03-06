@@ -464,18 +464,18 @@
           ],
           "default": null
         },
-        "tinymist.packageCachePath": {
-          "title": "%extension.tinymist.config.tinymist.packageCachePath.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.packageCachePath.desc%",
+        "tinymist.packagePath": {
+          "title": "%extension.tinymist.config.tinymist.packagePath.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.packagePath.desc%",
           "type": [
             "string",
             "null"
           ],
           "default": null
         },
-        "tinymist.packagePath": {
-          "title": "%extension.tinymist.config.tinymist.packagePath.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.packagePath.desc%",
+        "tinymist.packageCachePath": {
+          "title": "%extension.tinymist.config.tinymist.packageCachePath.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.packageCachePath.desc%",
           "type": [
             "string",
             "null"
