@@ -1427,6 +1427,18 @@ zh = "UFCS 风格补全（左变体）"
 en = "Whether to enable left-variant UFCS-style completion. For example, `[A].table|` will be completed to `table(|)[A]`. Hint: Restarting the editor is required to change this setting."
 zh = "是否启用左变体 UFCS 风格补全。例如，`[A].table|` 将被完成为 `table(|)[A]`。提示：更改此设置需要重新启动编辑器。"
 
+[extension.tinymist.config.tinymist.packagePath.title]
+en = "Custom path to local packages"
+
+[extension.tinymist.config.tinymist.packagePath.desc]
+en = "Custom path to local packages, defaults to system-dependent location"
+
+[extension.tinymist.config.tinymist.packageCachePath.title]
+en = "Custom path to package cache"
+
+[extension.tinymist.config.tinymist.packageCachePath.desc]
+en = "Custom path to package cache, defaults to system-dependent location"
+
 [extension.tinymist.config.tinymist.completion.postfixUfcsRight.title]
 en = "UFCS-style Completion (Right Variant)"
 zh = "UFCS 风格补全（右变体）"
