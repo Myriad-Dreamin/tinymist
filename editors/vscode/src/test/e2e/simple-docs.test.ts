@@ -86,6 +86,11 @@ export async function getTests(ctx: Context) {
       const logs = await vscode.commands.executeCommand<string>("tinymist.getLogText");
       ctx.expect(logs).to.include(marker);
 
+      const none = await vscode.commands.executeCommand<string>("tinymist.getLogText", {
+        maxChars: 0,
+      });
+      ctx.expect(none).to.equal("");
+
       const tail = await vscode.commands.executeCommand<string>("tinymist.getLogText", {
         maxChars: 16,
       });

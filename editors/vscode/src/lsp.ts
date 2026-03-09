@@ -162,6 +162,10 @@ class BufferedOutputChannel implements vscode.OutputChannel {
   }
 
   getText(maxChars?: number): string {
+    if (maxChars === 0) {
+      return "";
+    }
+
     if (maxChars === undefined || maxChars < 0 || this.buffer.length <= maxChars) {
       return this.buffer;
     }
@@ -170,7 +174,7 @@ class BufferedOutputChannel implements vscode.OutputChannel {
   }
 
   private push(value: string): void {
-    if (!value) {
+    if (!value || this.maxChars <= 0) {
       return;
     }
 
