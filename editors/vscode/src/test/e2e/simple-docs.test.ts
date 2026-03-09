@@ -1,6 +1,7 @@
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from "vscode";
+import { tinymist } from "../../lsp";
 import type { Context } from ".";
 
 export async function getTests(ctx: Context) {
@@ -76,6 +77,19 @@ export async function getTests(ctx: Context) {
 
       // close the editor
       await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
+    });
+
+    suite.addTest("get recent log text", async () => {
+      const marker = `agent-log-marker-${Date.now()}`;
+      tinymist.outputChannel.append(marker);
+
+      const logs = await vscode.commands.executeCommand<string>("tinymist.getLogText");
+      ctx.expect(logs).to.include(marker);
+
+      const tail = await vscode.commands.executeCommand<string>("tinymist.getLogText", {
+        maxChars: 16,
+      });
+      ctx.expect(tail.length).to.be.lessThanOrEqual(16);
     });
   });
 }
