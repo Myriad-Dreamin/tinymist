@@ -13,7 +13,7 @@ The steps to release are list as following:
 
 = Codex-assisted Release
 
-You can ask Codex to prepare a release with `/tinymist:release v0.14.12-rc1`.
+You can ask Codex to prepare a release with `/tinymist-dev:release v0.14.12-rc1`.
 
 The Codex-assisted release workflow should follow three phases:
 - Inspection and planning.
