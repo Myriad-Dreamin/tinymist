@@ -87,10 +87,10 @@ You can make it with following steps:
   - Edit changeline to fit in our rule:
     - For `feat`, if there is a break change add `(Change)` prefix, otherwise without prefix.
     - For `build`, if there is a upstream dependency update, put it before all other changes, otherwise omit it.
-    - If the developer contribute the only change, never remove it to include the author name in the changelog in this version.
     - For `fix`, `perf`, `test`, `docs`, you should add the prefix `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` respectively.
     - For `refactor`, `ci`, `rename`, `chore`, omit the change because it is not a user-facing change.
     - Put the change with `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` prefix before all other changes.
+    - If a changeline has an author other than "Myriad-Dreamin", and the author doesn't add other contributions, it must be included in the changelog to ensure that the contributor is credited at least once in this version.
 
   Example:
 
