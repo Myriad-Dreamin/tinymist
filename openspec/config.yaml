@@ -18,3 +18,9 @@ schema: spec-driven
 #       - Always include a "Non-goals" section
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+
+rules:
+  proposal:
+    - Docs are written in typst, a new markup language, and stored in the `docs/tinymist` directory
+    - Store all documentation (including that for users) in `docs/tinymist` directory, and development documentation in `docs/tinymist/dev` directory.
+    - Never edit generated markdown docs directly, which contains header containing "This file is generated" note.
