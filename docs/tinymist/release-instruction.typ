@@ -11,6 +11,32 @@ The steps to release are list as following:
 - Making a release PR.
 - Tagging and pushing current revision to release
 
+= Codex-assisted Release
+
+You can ask Codex to prepare a release with `/tinymist:release v0.14.12-rc1`.
+
+The Codex-assisted release workflow should follow three phases:
+- Inspection and planning.
+- Local preparation.
+- External actions.
+
+In the inspection phase, Codex should read this document and run `node scripts/release-preflight.mjs v0.14.12-rc1 --json` or `yarn release:preflight -- v0.14.12-rc1 --json` to list tracked `Cargo.toml` and `package.json` files, detect the version-bearing lines that match the current release version, and generate executable shell commands that apply unified diff patches for those updates and the later release handoff.
+
+In the local preparation phase, Codex may make only reversible, reviewable checkout-local changes, such as:
+- Running the generated patch commands.
+- Drafting `editors/vscode/CHANGELOG.md`.
+- Preparing release PR metadata like `build: bump version to {version}` and `+tag v{version}`.
+- Running generated review commands like `git diff`.
+
+In the external actions phase, Codex must stop and ask for explicit maintainer approval immediately before any command or workflow with side effects outside the current checkout. This includes `yarn release`, `yarn draft-release`, `cargo publish`, `gh workflow run`, `gh release`, `gh pr create`, `git tag`, and `git push --tag`.
+
+The current repository entry points remain the source of truth for those external steps:
+- `scripts/release.mjs` creates the release PR, dispatches `tinymist::assets::publish`, updates the `tinymist-assets` pin in `Cargo.toml`, commits, and pushes.
+- `scripts/draft-release.mjs` and `.github/workflows/announce.yml` generate release announcement content and the GitHub release draft.
+- `.github/workflows/release-nightly.yml` and `scripts/nightly-utils.mjs` remain the nightly and canary release path.
+
+If tooling, authentication, or permissions are missing, Codex should stop, report the blocker, and provide the exact manual shell command needed next.
+
 #set heading(numbering: numbly("Step {1}~"))
 
 = Checking before Releases
@@ -91,6 +117,8 @@ You can make it with following steps:
 
 Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate. Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
 
+If Codex is assisting with the release, this is an approval boundary. Codex should stop and ask for explicit approval before dispatching this workflow directly or via `scripts/release.mjs`.
+
 After publish, you should update `tinymist-assets` version in the `Cargo.toml` file.
 
 = Tagging and Pushing Current Revision to Release
@@ -101,5 +129,7 @@ Push a tag to the repository with the version number. For example, if you are re
 $ git tag v0.12.19
 $ git push --tag
 ```
+
+If Codex is assisting with the release, this is also an approval boundary because it mutates the remote repository and triggers the release pipeline.
 
 This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.

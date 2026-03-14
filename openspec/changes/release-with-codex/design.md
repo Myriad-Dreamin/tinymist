@@ -2,7 +2,7 @@
 
 Tinymist already has a functioning release pipeline, but the knowledge is spread across maintainer docs, helper scripts, and GitHub workflows:
 
-- `docs/release-instruction.md` describes the human checklist and release sequencing.
+- `docs/tinymist/release-instruction.typ` describes the human checklist and release sequencing.
 - `scripts/release.mjs` creates a release PR, kicks off asset publishing, updates `tinymist-assets`, and pushes a commit.
 - `scripts/draft-release.mjs` generates release announcement content and release artifacts metadata.
 - `.github/workflows/detect-pr-tag.yml` and the release workflows encode additional expectations around tags, changelog formatting, and publish prerequisites.
@@ -71,7 +71,7 @@ Alternative considered:
 
 ### 5. Keep maintainer docs aligned with the Codex workflow
 
-The workflow should point back to `docs/release-instruction.md` and update that document if new helper commands or steps are introduced. The documentation remains the human-readable source of policy, while the Codex skill becomes the operational path through that policy.
+The workflow should point back to `docs/tinymist/release-instruction.typ` and update that document if new helper commands or steps are introduced. The documentation remains the human-readable source of policy, while the Codex skill becomes the operational path through that policy.
 
 Alternative considered:
 - Let the skill diverge from the docs. Rejected because drift between human and agent workflows would create confusion during real releases.
