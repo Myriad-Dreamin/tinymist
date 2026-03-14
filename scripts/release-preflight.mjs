@@ -96,7 +96,7 @@ function classifyReleaseType(version) {
 }
 
 function listTrackedManifests(command) {
-  const output = execFileSync("sh", ["-lc", command], {
+  const output = execFileSync("sh", ["-c", command], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
