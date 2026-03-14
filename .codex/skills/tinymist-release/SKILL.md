@@ -2,7 +2,7 @@
 name: tinymist-release
 description: Prepare a tinymist release with an inspect-first workflow that reuses the repository's existing release scripts and stops before external side effects until the maintainer explicitly approves them.
 license: MIT
-compatibility: Requires Node.js and the repository checkout.
+compatibility: Requires Node.js, rg (ripgrep), and the repository checkout.
 metadata:
   author: tinymist
   version: "1.0"
