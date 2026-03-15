@@ -68,6 +68,10 @@ For release candidates and stable releases, the helper should generate the relea
 Alternative considered:
 - Leave the helper as-is and document the correction in prose. Rejected because the helper output is supposed to be the primary handoff artifact for Codex.
 
+### 6. Use GitHub-generated notes instead of local git history for changelog coverage when possible
+
+When GitHub tooling is available, the helper should derive candidate release-note items from the same source as the changelog instructions: GitHub-generated notes based on merged PRs. This ensures the helper's changelog summary reflects the same candidate pool that the maintainer will see when following the release instructions.
+
 ## Risks / Trade-offs
 
 - [Preflight grows more complex] -> Mitigate by keeping checks focused on repository-local signals and emitting structured output instead of narrative-only summaries.
@@ -84,6 +88,5 @@ Alternative considered:
 
 ## Open Questions
 
-- Should the changelog-summary step derive candidate items only from GitHub generated notes, or also from local git history when GitHub tooling is unavailable?
 - Should the release helper merely report the expected `build: bump version to <version>` commit command, or also generate the exact `git add` and `git commit` commands for the skill to reuse?
 - Does the later `scripts/release.mjs` behavior need follow-up refinement so its own asset-update commit remains compatible with the new pre-release checkpoint?
