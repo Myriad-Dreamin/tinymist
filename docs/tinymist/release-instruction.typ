@@ -11,6 +11,32 @@ The steps to release are list as following:
 - Making a release PR.
 - Tagging and pushing current revision to release
 
+= Codex-assisted Release
+
+You can ask Codex to prepare a release with `/tinymist-dev:release v0.14.12-rc1`.
+
+The Codex-assisted release workflow should follow three phases:
+- Inspection and planning.
+- Local preparation.
+- External actions.
+
+In the inspection phase, Codex should read this document and run `node scripts/release-preflight.mjs v0.14.12-rc1 --json` or `yarn release:preflight -- v0.14.12-rc1 --json` to list tracked `Cargo.toml` and `package.json` files, detect the version-bearing lines that match the current release version, and generate executable shell commands that apply unified diff patches for those updates and the later release handoff.
+
+In the local preparation phase, Codex may make only reversible, reviewable checkout-local changes, such as:
+- Running the generated patch commands.
+- Drafting `editors/vscode/CHANGELOG.md`.
+- Preparing release PR metadata like `build: bump version to {version}` and `+tag v{version}`.
+- Running generated review commands like `git diff`.
+
+In the external actions phase, Codex must stop and ask for explicit maintainer approval immediately before any command or workflow with side effects outside the current checkout. This includes `yarn release`, `yarn draft-release`, `cargo publish`, `gh workflow run`, `gh release`, `gh pr create`, `git tag`, and `git push --tag`.
+
+The current repository entry points remain the source of truth for those external steps:
+- `scripts/release.mjs` creates the release PR, dispatches `tinymist::assets::publish`, updates the `tinymist-assets` pin in `Cargo.toml`, commits, and pushes.
+- `scripts/draft-release.mjs` and `.github/workflows/announce.yml` generate release announcement content and the GitHub release draft.
+- `.github/workflows/release-nightly.yml` and `scripts/nightly-utils.mjs` remain the nightly and canary release path.
+
+If tooling, authentication, or permissions are missing, Codex should stop, report the blocker, and provide the exact manual shell command needed next.
+
 #set heading(numbering: numbly("Step {1}~"))
 
 = Checking before Releases
@@ -44,9 +70,54 @@ Update Version String in Codebase other than that of `tinymist-assets`, which wi
 
 All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
 
+You can make it with following steps:
+
+- Get new generated release notes from GitHub API
+  ```
+  gh api 'repos/Myriad-Dreamin/tinymist/releases/generate-notes' -f tag_name=v0.14.12 -f previous_tag_name=v0.14.10 --jq .body
+  ```
+
+  If you are releasing `v0.14.12-rc1` or `v0.14.12`, the `tag_name` will be `v0.14.12`, and `previous_tag_name` is previous stable release, which is `v0.14.10`.
+- Edit the generated release notes to fit the format of the changelog.
+  - The changelog lines unspecified with authors are all written by the "Myriad-Dreamin".
+  - Separate notes into different topics. You can only use the topics in the following list. The valid topics are:
+    - Server: Changes related to the server-side features.
+    - Editor: Changes related to the editor-side features.
+    - Code Analysis: Changes related to the code analysis features.
+  - Edit changeline to fit in our rule:
+    - For `feat`, if there is a break change add `(Change)` prefix, otherwise without prefix.
+    - For `build`, if there is a upstream dependency update, put it before all other changes, otherwise omit it.
+    - For `fix`, `perf`, `test`, `docs`, you should add the prefix `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` respectively.
+    - For `refactor`, `ci`, `rename`, `chore`, omit the change because it is not a user-facing change.
+    - Put the change with `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` prefix before all other changes.
+    - If a changeline has an author other than "Myriad-Dreamin", and the author doesn't add other contributions, it must be included in the changelog to ensure that the contributor is credited at least once in this version.
+
+  Example:
+
+  ```md
+  ## v0.14.6 - [2026-01-02]
+
+  * Bumped typst to v0.14.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2312
+
+  ### Server
+
+  * (Fix) Correctly handled relative user-specified output paths in compile command by @moeleak and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1941 and https://github.com/Myriad-Dreamin/tinymist/pull/1942
+  * Added `--input` flag to CLI commands by @xiyihan0 in https://github.com/Myriad-Dreamin/tinymist/pull/2328
+  ```
+
+  Explanation:
+  - The build change is put before all other changes without under any topic.
+  - The fix change is put before all other changes with `(Fix)` prefix.
+  - The fix change is achieved by two PRs. The LLM cannot determine which of changes could be merged so leave decision to merge by the publisher.
+  - The build change is made by only "Myriad-Dreamin", so it doesn't mention "Myriad-Dreamin".
+  - The fix change is made by "moeleak" and "Myriad-Dreamin", so it mentions both of them.
+  - The feat change is made by "xiyihan0", so it mentions "xiyihan0".
+
 == Publishing the tinymist-assets crate
 
 Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate. Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
+
+If Codex is assisting with the release, this is an approval boundary. Codex should stop and ask for explicit approval before dispatching this workflow directly or via `scripts/release.mjs`.
 
 After publish, you should update `tinymist-assets` version in the `Cargo.toml` file.
 
@@ -58,5 +129,7 @@ Push a tag to the repository with the version number. For example, if you are re
 $ git tag v0.12.19
 $ git push --tag
 ```
+
+If Codex is assisting with the release, this is also an approval boundary because it mutates the remote repository and triggers the release pipeline.
 
 This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.
