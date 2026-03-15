@@ -22,7 +22,7 @@ We need a Codex-native release workflow that can inspect repository state, prepa
 
 ## Impact
 
-- `.github/skills/` and `.github/prompts/` for the new Codex release workflow entry point
+- `.codex/skills/` and `.codex/prompts/` for the new Codex release workflow entry point
 - `docs/tinymist/release-instruction.typ` and related maintainer-facing documentation
 - Potential helper automation in `scripts/` for machine-checkable release validation and release-note preparation
 - Existing release scripts and GitHub workflows as integration points, without replacing the current release pipeline
