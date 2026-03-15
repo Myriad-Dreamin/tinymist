@@ -1,8 +1,5 @@
-# codex-assisted-release Specification
+## MODIFIED Requirements
 
-## Purpose
-The codex-assisted-release specification defines an interactive, Codex-driven workflow that helps maintainers prepare and execute tinymist releases safely and consistently. It provides structured repository preflight checks, prepares reversible and reviewable local release changes, gates any external side effects on explicit maintainer approval, and offers clear fallback guidance when automation cannot proceed. This workflow is intended to reduce release risk, surface blockers early, align with existing repository conventions and tooling, and make the end-to-end release process more predictable and auditable for maintainers.
-## Requirements
 ### Requirement: Release workflow performs repository preflight
 The Codex-assisted release workflow SHALL inspect the repository and summarize release readiness before proposing release edits or external actions. The preflight summary SHALL report the inferred release type, expected branch name, current branch status, relevant version-bearing files, release-sensitive non-manifest files, changelog status, generated-document follow-up commands, release entry points, and any unmet prerequisites it can detect from repository state.
 
@@ -47,15 +44,3 @@ The Codex-assisted release workflow MUST require an explicit maintainer confirma
 #### Scenario: Approved action is reported clearly
 - **WHEN** the maintainer explicitly approves an external release action
 - **THEN** the workflow performs only the approved action and reports the outcome or failure details before continuing
-
-### Requirement: Release workflow provides graceful fallback guidance
-The Codex-assisted release workflow SHALL provide manual next steps when automation cannot continue safely.
-
-#### Scenario: Missing tooling or credentials block automation
-- **WHEN** required tools, authentication, or permissions are unavailable for a release step
-- **THEN** the workflow reports the blocker, explains why automation stopped, and gives the maintainer the concrete manual command or checklist item needed to continue
-
-#### Scenario: Existing release automation is preferred
-- **WHEN** the workflow needs to generate release metadata or execute release-specific logic already implemented in the repository
-- **THEN** it uses the existing script or helper path instead of reimplementing the logic solely in prompt text
-

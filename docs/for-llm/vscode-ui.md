@@ -180,6 +180,15 @@ Whether to configure default word separators on startup
   - `"disable"` : Do not override the default word separators on startup
 - **Default**: `"disable"`
 
+## `tinymist.convertExtension`
+
+This configuration specifies how to let the editor use Typst templates to convert other format files into PDF documents.
+
+This configuration item can be one of following types:
+
+- - **Type**: `array`
+- **Default**: `[]`
+
 ## `tinymist.copyAndPaste`
 
 Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.

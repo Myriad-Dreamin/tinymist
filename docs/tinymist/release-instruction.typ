@@ -25,10 +25,13 @@ In the inspection phase, Codex should read this document and run `node scripts/r
 In the local preparation phase, Codex may make only reversible, reviewable checkout-local changes, such as:
 - Running the generated patch commands.
 - Drafting `editors/vscode/CHANGELOG.md`.
-- Preparing release PR metadata like `build: bump version to {version}` and `+tag v{version}`.
+- Refreshing generated docs with `node scripts/link-docs.mjs` when the preflight report requires it.
 - Running generated review commands like `git diff`.
+- Creating the local checkpoint commit `build: bump version to {version}`.
 
-In the external actions phase, Codex must stop and ask for explicit maintainer approval immediately before any command or workflow with side effects outside the current checkout. This includes `yarn release`, `yarn draft-release`, `cargo publish`, `gh workflow run`, `gh release`, `gh pr create`, `git tag`, and `git push --tag`.
+After local preparation, Codex should rerun the preflight helper and keep the maintainer in the Codex console. If the refreshed readiness report is clean, Codex should explicitly report that `yarn release {version}` is the next external action. If the refreshed readiness report still shows blockers or omitted changelog items, Codex should stop and surface them before moving on.
+
+In the external actions phase, Codex must stop and ask for explicit maintainer approval immediately before any command or workflow with side effects outside the current checkout. For regular and release-candidate releases, the first approval boundary is `yarn release {version}` after the local checkpoint commit.
 
 The current repository entry points remain the source of truth for those external steps:
 - `scripts/release.mjs` creates the release PR, dispatches `tinymist::assets::publish`, updates the `tinymist-assets` pin in `Cargo.toml`, commits, and pushes.
@@ -66,6 +69,10 @@ Before release, you should determine the version number to release.
 
 Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI. You can `grep` the version number in the repository to check if all the version numbers in the `Cargo.toml` and `package.json` files are updated. Some CI script will also assert failing to help you catch the issue.
 
+Release-sensitive non-manifest files should be reviewed as well, especially `editors/neovim/bootstrap.sh` and `editors/neovim/samples/lazyvim-dev/Dockerfile`.
+
+After the version-bearing source files are updated, refresh generated docs with `node scripts/link-docs.mjs`. This updates generated outputs such as `crates/typlite/README.md`, which may embed release download URLs.
+
 == Updating the Changelog
 
 All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
@@ -79,11 +86,60 @@ You can make it with following steps:
 
   If you are releasing `v0.14.12-rc1` or `v0.14.12`, the `tag_name` will be `v0.14.12`, and `previous_tag_name` is previous stable release, which is `v0.14.10`.
 - Edit the generated release notes to fit the format of the changelog.
+  - If Codex is assisting with the release, review the preflight changelog summary before finalizing the changelog. It reports which candidate generated-note items are already represented in the changelog and which still need maintainer judgment.
   - The changelog lines unspecified with authors are all written by the "Myriad-Dreamin".
   - Separate notes into different topics. You can only use the topics in the following list. The valid topics are:
-    - Server: Changes related to the server-side features.
-    - Editor: Changes related to the editor-side features.
-    - Code Analysis: Changes related to the code analysis features.
+    - Announcement: New Maintainers
+    - AST Matchers
+    - Autocompletion
+    - CLI
+    - Codelens
+    - Code Action
+    - Code Analysis
+    - Color Provider
+    - Commands/Tools
+    - Completion
+    - Compiler
+    - Crityp
+    - Definition
+    - Diagnostics
+    - Docs
+    - Docstring
+    - Document Highlighting
+    - Document Link
+    - Document Symbol
+    - Drop and Paste
+    - Editor
+    - Editor Tools
+    - Export
+    - Folding Range
+    - Formatting
+    - Hover
+    - Hover (Tooltip)
+    - HTML Export
+    - Inlay Hint
+    - Internal Optimization
+    - Label View
+    - Linting
+    - Localization
+    - LSIF
+    - Misc
+    - On Enter
+    - Preview
+    - Profiling
+    - References
+    - Rename
+    - Server
+    - Signature Help
+    - Symbols
+    - Syntax Highlighting
+    - Syntax/Semantic Highlighting
+    - Testing
+    - tinymist.lock
+    - Type Checking
+    - Type Checking (Docstring)
+    - Typlite
+    - Wasm
   - Edit changeline to fit in our rule:
     - For `feat`, if there is a break change add `(Change)` prefix, otherwise without prefix.
     - For `build`, if there is a upstream dependency update, put it before all other changes, otherwise omit it.
