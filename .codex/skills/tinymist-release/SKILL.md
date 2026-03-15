@@ -1,7 +1,7 @@
 ---
 name: tinymist-release
-description: Prepare a tinymist release with an inspect-first workflow that reuses the repository's existing release scripts and stops before external side effects until the maintainer explicitly approves them.
-license: MIT
+description: For command `/tinymist-dev:release version`, prepare a tinymist release with an inspect-first workflow that reuses the repository's existing release scripts and stops before external side effects until the maintainer explicitly approves them.
+license: Apache-2.0
 compatibility: Requires Node.js, rg (ripgrep), git, a POSIX sh, the repository checkout, and optionally gh for GitHub handoff commands.
 metadata:
   author: tinymist

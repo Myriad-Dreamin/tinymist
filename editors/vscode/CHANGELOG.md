@@ -10,6 +10,37 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.12 - [2026-03-15]
+
+### Server
+
+* (Fix) Configured separate compilation features correctly by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2391
+
+### Editor
+
+* (Fix) Corrected localized message argument placeholder parsing by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2380
+* Added browser support for running the tinymist language server in https://github.com/Myriad-Dreamin/tinymist/pull/1944
+* Added an editor menu command to view the AST by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2382
+* Added timeout handling and active-server checks for `onEnter` by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2320
+
+### Preview
+
+* (Fix) Followed viewport position when the dock resizes by @kazutoiris in https://github.com/Myriad-Dreamin/tinymist/pull/2341
+* Added a GPU-based Typst previewer in https://github.com/Myriad-Dreamin/tinymist/pull/2396
+
+### Code Analysis
+
+* Added unknown font diagnostics with correction suggestions by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2344 and https://github.com/Myriad-Dreamin/tinymist/pull/2383
+* Added path typing for include/import sources by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2384
+* Added const string key support for dict and record typing by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2385
+* Added contextual typing for destructuring and tuple/array flows by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2386
+
+### Misc
+
+* Added tinymist release skill by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2420
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.10...v0.14.12
+
 ## v0.14.10 - [2026-01-22]
 
 ### Server
