@@ -64,6 +64,8 @@ const CONFIG_ITEMS: &[&str] = &[
     "semanticTokens",
     "systemFonts",
     "typstExtraArgs",
+    "packagePath",
+    "packageCachePath",
 ];
 // endregion Configuration Items
 
@@ -156,6 +158,8 @@ pub struct Config {
     pub formatter_prose_wrap: Option<bool>,
     /// The warnings during configuration update.
     pub warnings: Vec<CowStr>,
+    /// The package arguments
+    pub package: CompilePackageArgs,
 }
 
 impl Config {
@@ -369,6 +373,8 @@ impl Config {
         assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
         assign_config!(development := "development"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
+        assign_config!(package.package_path := "packagePath"?: Option<PathBuf>);
+        assign_config!(package.package_cache_path := "packageCachePath"?: Option<PathBuf>);
 
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
             Some("enable") => true,
@@ -648,10 +654,20 @@ impl Config {
 
     /// Determines the package options.
     pub fn package_opts(&self) -> CompilePackageArgs {
-        if let Some(extras) = &self.typst_extra_args {
-            return extras.package.clone();
+         let extra_package_opts = self.typst_extra_args.as_ref().map(|a| &a.package);
+
+        let package_path = self.package.package_path.as_ref()
+            .or_else(|| extra_package_opts.and_then(|p| p.package_path.as_ref()))
+            .cloned();
+
+        let package_cache_path = self.package.package_cache_path.as_ref()
+            .or_else(|| extra_package_opts.and_then(|p| p.package_cache_path.as_ref()))
+            .cloned();
+
+        CompilePackageArgs {
+            package_path,
+            package_cache_path,
         }
-        CompilePackageArgs::default()
     }
 
     /// Determines the font resolver.

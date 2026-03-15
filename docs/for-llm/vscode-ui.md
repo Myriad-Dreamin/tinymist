@@ -180,6 +180,15 @@ Whether to configure default word separators on startup
   - `"disable"` : Do not override the default word separators on startup
 - **Default**: `"disable"`
 
+## `tinymist.convertExtension`
+
+This configuration specifies how to let the editor use Typst templates to convert other format files into PDF documents.
+
+This configuration item can be one of following types:
+
+- - **Type**: `array`
+- **Default**: `[]`
+
 ## `tinymist.copyAndPaste`
 
 Whether to handle paste of resources into the editing typst document. Note: restarting the editor is required to change this setting.
@@ -297,6 +306,18 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 
 - **Type**: `string`
 - **Default**: `""`
+
+## `tinymist.packageCachePath`
+
+Custom path to package cache, defaults to system-dependent location
+
+- **Type**: string | null
+
+## `tinymist.packagePath`
+
+Custom path to local packages, defaults to system-dependent location
+
+- **Type**: string | null
 
 ## `tinymist.preview.background.args`
 
