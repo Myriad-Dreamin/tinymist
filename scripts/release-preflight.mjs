@@ -137,7 +137,10 @@ function buildFilePatch(filePath, currentVersionValue, targetVersionValue) {
     if (filePath.endsWith("Cargo.toml")) {
       if (
         !line.includes(`version = "${currentVersionValue}"`) &&
-        !line.includes(`version = "=${currentVersionValue}"`)
+        !(
+          line.includes(`version = "=${currentVersionValue}"`) &&
+          !line.includes("tinymist-assets")
+        )
       ) {
         return line;
       }
