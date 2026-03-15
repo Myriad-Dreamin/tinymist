@@ -19,7 +19,7 @@ export default {
       await vscode.window.showErrorMessage("No focusing typst file");
       return;
     }
-    const traceDataTask = vscode.commands.executeCommand("tinymist.getDocumentTrace", focusingFile);
+    const traceDataTask = vscode.commands.executeCommand("tinymist.getDocumentTrace", focusingFile.toString());
 
     // do that after the html is reloaded
     const traceData = await traceDataTask;

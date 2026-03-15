@@ -1,5 +1,5 @@
+use std::collections::HashMap;
 use std::sync::Arc;
-use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
@@ -92,7 +92,7 @@ pub struct DocumentMetricsResponse {
 #[derive(Debug, Clone)]
 pub struct DocumentMetricsRequest {
     /// The path of the document to compute DocumentMetricss.
-    pub path: PathBuf,
+    pub path: Arc<Path>,
 }
 
 impl SemanticRequest for DocumentMetricsRequest {

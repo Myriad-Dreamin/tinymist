@@ -75,7 +75,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
     onDidWrite: vc.writeEmitter.event,
     onDidClose: closeEmitter.event,
     open,
-    close() {},
+    close() { },
   });
 
   async function open() {
@@ -134,7 +134,7 @@ export const exportOps = (exportArgs: ExportArgs) => ({
   resolveInputPath() {
     const inputPath = exportArgs.inputPath;
     if (inputPath === "$focused" || inputPath === undefined) {
-      return extensionState.getFocusingFile();
+      return extensionState.getFocusingFile()?.toString();
     }
 
     return inputPath;
