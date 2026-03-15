@@ -38,7 +38,7 @@ jobs:
     steps:
       - name: Allow Linux musl containers on ARM64 runners
         if: matrix.runner == 'ubuntu-24.04-arm'
-        uses: laverdet/alpine-arm64@d2537d5baf850ea4ce12d2ef1d2106dd94150f4d
+        uses: laverdet/alpine-arm64@v1
 
       - name: Install dependencies
         # bash is required by setup-rust-toolchain
