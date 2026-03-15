@@ -1374,7 +1374,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2781,7 +2781,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -6029,7 +6029,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "clap",
@@ -6161,7 +6161,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -6294,7 +6294,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6339,7 +6339,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6372,7 +6372,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "comemo",
  "dashmap",
@@ -6405,16 +6405,16 @@ dependencies = [
 [[package]]
 name = "tinymist-assets"
 version = "0.14.10"
-
-[[package]]
-name = "tinymist-assets"
-version = "0.14.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2b645bf98fb1555b86632cf6dce274d4587829e1393cfe29e85b9848a255456"
 
 [[package]]
+name = "tinymist-assets"
+version = "0.14.12-rc1"
+
+[[package]]
 name = "tinymist-bench-font-load"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "divan",
  "tinymist",
@@ -6422,7 +6422,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6465,7 +6465,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6496,7 +6496,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6516,7 +6516,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6557,7 +6557,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "comemo",
  "insta",
@@ -6599,7 +6599,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "bytes",
  "clap",
@@ -6613,7 +6613,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10",
  "tinymist-std",
  "tokio",
  "typst",
@@ -6654,7 +6654,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6708,7 +6708,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -6793,7 +6793,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "comemo",
  "insta",
@@ -6824,7 +6824,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-viewer"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6848,7 +6848,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "svgtypes 0.15.3",
- "tinymist-assets 0.14.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.14.10",
  "tinymist-preview",
  "tinymist-std",
  "tokio",
@@ -7346,7 +7346,7 @@ checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
 
 [[package]]
 name = "typlite"
-version = "0.14.10"
+version = "0.14.12-rc1"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -8636,7 +8636,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8701,19 +8701,6 @@ dependencies = [
  "windows-link 0.1.3",
  "windows-result 0.3.4",
  "windows-strings 0.4.2",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -8812,15 +8799,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
-dependencies = [
- "windows-link 0.2.1",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8837,15 +8815,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link 0.2.1",
 ]
 
 [[package]]
