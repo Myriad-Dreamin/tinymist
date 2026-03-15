@@ -30,7 +30,7 @@ This change is cross-cutting because it touches Codex-facing prompts/skills, mai
 
 ### 1. Add a repo-local Codex skill/prompt for release preparation
 
-The entry point should live alongside the existing repo-local OpenSpec prompts and skills under `.github/skills/` and `.github/prompts/`. This keeps the workflow versioned with the repository and makes the release procedure discoverable to Codex without relying on external instructions.
+The entry point should live alongside the existing repo-local OpenSpec prompts and skills under `.codex/skills/` and `.codex/prompts/`. This keeps the workflow versioned with the repository and makes the release procedure discoverable to Codex without relying on external instructions.
 
 Alternative considered:
 - Put all release guidance in prose documentation only. Rejected because Codex would still need to reconstruct the workflow from scattered files every time, increasing variance and the chance of missing safety constraints.
