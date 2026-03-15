@@ -477,7 +477,12 @@ function inspectChangelog(filePath, releaseVersion) {
   };
 }
 
-function inspectReleaseNotes({ releaseType, releaseNotesTag, previousStableTag, changelog: changelogInfo }) {
+function inspectReleaseNotes({
+  releaseType,
+  releaseNotesTag,
+  previousStableTag,
+  changelog: changelogInfo,
+}) {
   if (releaseType === "nightly") {
     return {
       applicable: false,
@@ -730,7 +735,7 @@ function buildCommands({
 
   const prepareCommands = [
     ...generatedFollowUps.map((item) => item.command),
-    stagePaths.length > 0 ? `git add ${stagePaths.map(shellQuote).join(" ")}` : null,
+    stagePaths.length > 0 ? `git add .` : null,
     `git commit -m ${shellQuote(`build: bump version to ${targetVersionValue}`)}`,
   ].filter(Boolean);
 
@@ -754,7 +759,12 @@ function buildCommands({
   };
 }
 
-function buildHandoffCommands({ targetVersion: targetVersionValue, releaseType, releaseNotesVersion: releaseNotesVersionValue, releaseNotes: releaseNotesInfo }) {
+function buildHandoffCommands({
+  targetVersion: targetVersionValue,
+  releaseType,
+  releaseNotesVersion: releaseNotesVersionValue,
+  releaseNotes: releaseNotesInfo,
+}) {
   if (releaseType === "nightly") {
     return [
       "gh workflow run release-nightly.yml -f release_type=nightly",
@@ -762,16 +772,14 @@ function buildHandoffCommands({ targetVersion: targetVersionValue, releaseType, 
     ];
   }
 
-  return [
-    releaseNotesInfo.command,
-    `yarn release ${targetVersionValue}`,
-    `yarn draft-release v${releaseNotesVersionValue}`,
-    `git tag v${targetVersionValue}`,
-    "git push --tag",
-  ].filter(Boolean);
+  return [releaseNotesInfo.command, `yarn release ${targetVersionValue}`].filter(Boolean);
 }
 
-function buildReleaseEntryPoints({ targetReleaseType: releaseType, targetVersion: targetVersionValue, releaseNotesVersion: releaseNotesVersionValue }) {
+function buildReleaseEntryPoints({
+  targetReleaseType: releaseType,
+  targetVersion: targetVersionValue,
+  releaseNotesVersion: releaseNotesVersionValue,
+}) {
   if (releaseType === "nightly") {
     return [
       {
@@ -793,24 +801,6 @@ function buildReleaseEntryPoints({ targetReleaseType: releaseType, targetVersion
       command: `yarn release ${targetVersionValue}`,
       description: "Create the release PR and dispatch the assets publish workflow.",
       requiresApproval: true,
-    },
-    {
-      path: "scripts/draft-release.mjs",
-      command: `yarn draft-release v${releaseNotesVersionValue}`,
-      description: "Draft the GitHub release announcement after the release tag is ready.",
-      requiresApproval: true,
-    },
-    {
-      path: ".github/workflows/release-asset-crate.yml",
-      description: "Assets publish workflow dispatched during the release flow.",
-    },
-    {
-      path: ".github/workflows/auto-tag.yml",
-      description: "Triggered by pushing the release tag.",
-    },
-    {
-      path: ".github/workflows/announce.yml",
-      description: "Announcement and release-draft workflow.",
     },
   ];
 }

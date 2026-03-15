@@ -89,9 +89,57 @@ You can make it with following steps:
   - If Codex is assisting with the release, review the preflight changelog summary before finalizing the changelog. It reports which candidate generated-note items are already represented in the changelog and which still need maintainer judgment.
   - The changelog lines unspecified with authors are all written by the "Myriad-Dreamin".
   - Separate notes into different topics. You can only use the topics in the following list. The valid topics are:
-    - Server: Changes related to the server-side features.
-    - Editor: Changes related to the editor-side features.
-    - Code Analysis: Changes related to the code analysis features.
+    - Announcement: New Maintainers
+    - AST Matchers
+    - Autocompletion
+    - CLI
+    - Codelens
+    - Code Action
+    - Code Analysis
+    - Color Provider
+    - Commands/Tools
+    - Completion
+    - Compiler
+    - Crityp
+    - Definition
+    - Diagnostics
+    - Docs
+    - Docstring
+    - Document Highlighting
+    - Document Link
+    - Document Symbol
+    - Drop and Paste
+    - Editor
+    - Editor Tools
+    - Export
+    - Folding Range
+    - Formatting
+    - Hover
+    - Hover (Tooltip)
+    - HTML Export
+    - Inlay Hint
+    - Internal Optimization
+    - Label View
+    - Linting
+    - Localization
+    - LSIF
+    - Misc
+    - On Enter
+    - Preview
+    - Profiling
+    - References
+    - Rename
+    - Server
+    - Signature Help
+    - Symbols
+    - Syntax Highlighting
+    - Syntax/Semantic Highlighting
+    - Testing
+    - tinymist.lock
+    - Type Checking
+    - Type Checking (Docstring)
+    - Typlite
+    - Wasm
   - Edit changeline to fit in our rule:
     - For `feat`, if there is a break change add `(Change)` prefix, otherwise without prefix.
     - For `build`, if there is a upstream dependency update, put it before all other changes, otherwise omit it.
