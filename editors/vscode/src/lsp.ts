@@ -93,11 +93,103 @@ interface JumpInfo {
   end: [number, number] | null;
 }
 
+class BufferedOutputChannel implements vscode.OutputChannel {
+  private readonly channel: vscode.OutputChannel;
+  private buffer = "";
+
+  constructor(
+    name: string,
+    languageId?: string,
+    private readonly maxChars: number = 200_000,
+  ) {
+    this.channel = languageId
+      ? vscode.window.createOutputChannel(name, languageId)
+      : vscode.window.createOutputChannel(name);
+  }
+
+  get name(): string {
+    return this.channel.name;
+  }
+
+  append(value: string): void {
+    this.push(value);
+    this.channel.append(value);
+  }
+
+  appendLine(value: string): void {
+    this.push(`${value}\n`);
+    this.channel.appendLine(value);
+  }
+
+  clear(): void {
+    this.buffer = "";
+    this.channel.clear();
+  }
+
+  show(preserveFocus?: boolean): void;
+  show(column?: vscode.ViewColumn, preserveFocus?: boolean): void;
+  show(
+    columnOrPreserveFocus?: vscode.ViewColumn | boolean,
+    preserveFocus?: boolean,
+  ): void {
+    if (typeof columnOrPreserveFocus === "boolean" || columnOrPreserveFocus === undefined) {
+      this.channel.show(columnOrPreserveFocus);
+      return;
+    }
+
+    this.channel.show(columnOrPreserveFocus, preserveFocus);
+  }
+
+  hide(): void {
+    this.channel.hide();
+  }
+
+  replace(value: string): void {
+    this.buffer = "";
+    this.push(value);
+
+    if ("replace" in this.channel && typeof this.channel.replace === "function") {
+      this.channel.replace(value);
+      return;
+    }
+
+    this.channel.clear();
+    this.channel.append(value);
+  }
+
+  dispose(): void {
+    this.channel.dispose();
+  }
+
+  getText(maxChars?: number): string {
+    if (maxChars === 0) {
+      return "";
+    }
+
+    if (maxChars === undefined || maxChars < 0 || this.buffer.length <= maxChars) {
+      return this.buffer;
+    }
+
+    return this.buffer.slice(-maxChars);
+  }
+
+  private push(value: string): void {
+    if (!value || this.maxChars <= 0) {
+      return;
+    }
+
+    this.buffer += value;
+    if (this.buffer.length > this.maxChars) {
+      this.buffer = this.buffer.slice(-this.maxChars);
+    }
+  }
+}
+
 export class LanguageState {
   static Client: typeof createSystemLanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
 
-  outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
+  outputChannel = new BufferedOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
@@ -387,6 +479,10 @@ export class LanguageState {
     if (this.client) {
       this.client.outputChannel.show();
     }
+  }
+
+  getLogText(maxChars?: number) {
+    return this.outputChannel.getText(maxChars);
   }
 
   /**
