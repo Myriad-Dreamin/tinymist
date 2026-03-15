@@ -1,7 +1,7 @@
 # codex-assisted-release Specification
 
 ## Purpose
-TBD - created by archiving change release-with-codex. Update Purpose after archive.
+The codex-assisted-release specification defines an interactive, Codex-driven workflow that helps maintainers prepare and execute tinymist releases safely and consistently. It provides structured repository preflight checks, prepares reversible and reviewable local release changes, gates any external side effects on explicit maintainer approval, and offers clear fallback guidance when automation cannot proceed. This workflow is intended to reduce release risk, surface blockers early, align with existing repository conventions and tooling, and make the end-to-end release process more predictable and auditable for maintainers.
 ## Requirements
 ### Requirement: Release workflow performs repository preflight
 The Codex-assisted release workflow SHALL inspect the repository and summarize release readiness before proposing release edits or external actions.
