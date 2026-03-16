@@ -25,10 +25,6 @@ jobs:
             target: alpine-x64
             RUST_TARGET: x86_64-unknown-linux-musl
             runner: ubuntu-24.04
-          - arch: arm64
-            target: alpine-arm64
-            RUST_TARGET: aarch64-unknown-linux-musl
-            runner: ubuntu-24.04-arm
     env:
       target: ${{ matrix.target }}
       RUST_TARGET: ${{ matrix.RUST_TARGET }}
@@ -36,10 +32,6 @@ jobs:
       isRelease: ${{ (startsWith(github.ref, 'refs/tags/') && (!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))) }}
       isNightly: ${{ ((startsWith(github.ref, 'refs/tags/') && !((!contains(github.ref, 'rc') && (endsWith(github.ref, '0') || endsWith(github.ref, '2') || endsWith(github.ref, '4') || endsWith(github.ref, '6') || endsWith(github.ref, '8')))))) }}
     steps:
-      - name: Allow Linux musl containers on ARM64 runners
-        if: matrix.runner == 'ubuntu-24.04-arm'
-        uses: laverdet/alpine-arm64@v1
-
       - name: Install dependencies
         # bash is required by setup-rust-toolchain
         run: apk add --no-cache git clang lld musl-dev nodejs-current npm yarn binutils bash

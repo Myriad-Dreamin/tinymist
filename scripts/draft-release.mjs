@@ -61,7 +61,9 @@ const generateExtensionInstall = (version) => {
     platform("darwin-x64", "Intel macOS"),
     platform("darwin-arm64", "Apple Silicon macOS"),
     platform("alpine-x64", "x64 Alpine Linux"),
-    platform("alpine-arm64", "ARM64 Alpine Linux"),
+    // This is broken since v0.14.12 for github doesn't support ARM64 Alpine well.
+    // If you feel like adding alpine-arm64, feel free to make a PR to recover it.
+    // platform("alpine-arm64", "ARM64 Alpine Linux"),
     {
       name: "web",
       displayName: "Browser (Web)",
