@@ -19,6 +19,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Editor
 
 * (Fix) Corrected localized message argument placeholder parsing by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2380
+* (Fix) Removed VS Code `alpine-arm64` support in https://github.com/Myriad-Dreamin/tinymist/pull/2424
 * Added browser support for running the tinymist language server in https://github.com/Myriad-Dreamin/tinymist/pull/1944
 * Added an editor menu command to view the AST by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2382
 * Added timeout handling and active-server checks for `onEnter` by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2320
@@ -34,6 +35,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Added path typing for include/import sources by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2384
 * Added const string key support for dict and record typing by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2385
 * Added contextual typing for destructuring and tuple/array flows by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2386
+
+### Testing
+
+* (Test) Ensured diagnostics testing passes on Windows in https://github.com/Myriad-Dreamin/tinymist/pull/1604
 
 ### Misc
 
