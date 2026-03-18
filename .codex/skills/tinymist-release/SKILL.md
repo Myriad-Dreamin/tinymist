@@ -70,7 +70,7 @@ If the version is missing, ask for the exact version before doing anything else.
    Summarize:
    - the inferred release type
    - the helper's readiness status, blockers, pending local-preparation items, and warnings
-   - the expected `bump-version-<version>` branch and whether the current branch matches it
+   - the expected `bump-version-<version>` branch and whether the current branch matches it and is pushed to remote.
    - the tracked manifest scan command
    - the exact update, review, prepare, re-check, and handoff commands the helper generated
    - the changelog summary: which candidate release-note items are represented in `editors/vscode/CHANGELOG.md`, which are omitted for maintainer review, or why the helper could not compute that summary
