@@ -15,7 +15,7 @@ RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovi
 USER root
 RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
 
-FROM myriaddreamin/tinymist:0.14.12-rc1 as tinymist
+FROM myriaddreamin/tinymist:0.14.12-rc2 as tinymist
 
 FROM debian:12
 
@@ -59,4 +59,3 @@ COPY lazyvim/plugins/tinymist.lua $XDG_CONFIG_HOME/nvim/lua/others/tinymist.lua
 
 # SHELL isn't supported by OCI images
 ENTRYPOINT []
-
