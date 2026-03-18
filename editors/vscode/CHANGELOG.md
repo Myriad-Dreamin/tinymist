@@ -31,6 +31,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 ### Code Analysis
 
+* (Fix) Checked callees for `dict.at` by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2415
 * Added unknown font diagnostics with correction suggestions by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2344 and https://github.com/Myriad-Dreamin/tinymist/pull/2383
 * Added path typing for include/import sources by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2384
 * Added const string key support for dict and record typing by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2385
