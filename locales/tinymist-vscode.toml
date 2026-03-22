@@ -1459,6 +1459,14 @@ zh = "预览扩展"
 en = "The name of a VS Code extension to customize preview, like hardware-accelerated rendering or previewing with a different theme. If not set, the extension will use the embedded preview feature. The default value is `myriad-dreamin.tinymist` (the main tinymist extension)."
 zh = "使用哪个 VS Code 扩展来定制预览功能，例如硬件加速渲染或使用不同的主题预览。如果未设置，则使用内置的预览功能。默认值为 `myriad-dreamin.tinymist` (tinymist 主扩展)。"
 
+[extension.tinymist.config.tinymist.previewer.title]
+en = "Previewer"
+zh = "预览器"
+
+[extension.tinymist.config.tinymist.previewer.desc]
+en = "Select the previewer for Typst. Leave this empty to use Tinymist's built-in preview. Values starting with `html:` are treated as absolute HTML file paths after VS Code variable substitution, and other non-empty values are treated as extension ids. Overrides are ignored in untrusted workspaces."
+zh = "为 Typst 选择预览器。留空时使用 Tinymist 内置预览。以 `html:` 开头的值会在 VS Code 变量替换后被视为绝对 HTML 文件路径，其他非空值会被视为扩展 id。在不受信任的工作区中会忽略此覆盖。"
+
 [extension.tinymist.config.tinymist.preview.sysInputs.title]
 en = "Preview Sys Inputs"
 zh = "预览系统输入"

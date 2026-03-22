@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tinymist Preview Theme Fixture</title>
+  </head>
+  <body>
+    <main id="fixture-preview-theme">Hello from the fixture preview provider</main>
+    <script src="/typst-webview-assets/provider.js"></script>
+    <script>
+      window.__TINYMIST_PROVIDER_FIXTURE__ = {
+        ws: "ws://127.0.0.1:23625",
+        mode: "preview-arg:previewMode:Doc",
+        state: "preview-arg:state:",
+      };
+    </script>
+  </body>
+</html>

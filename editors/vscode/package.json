@@ -747,9 +747,9 @@
             "%extension.tinymist.config.tinymist.previewFeature.string.enum.disable%"
           ]
         },
-        "tinymist.previewExtension": {
-          "title": "%extension.tinymist.config.tinymist.previewExtension.title%",
-          "markdownDescription": "%extension.tinymist.config.tinymist.previewExtension.desc%",
+        "tinymist.previewer": {
+          "title": "%extension.tinymist.config.tinymist.previewer.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.previewer.desc%",
           "type": "string",
           "default": "myriad-dreamin.tinymist"
         },
@@ -1524,7 +1524,7 @@
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
-    "test:vsc": "rimraf test-dist/ && tsc -p tsconfig.test.json && node test-dist/test/runTests.js",
+    "test:vsc": "rimraf test-dist/ ../../contrib/preview-theme-provider/editors/vscode/out && tsc -p tsconfig.test.json && tsc -p ../../contrib/preview-theme-provider/editors/vscode/tsconfig.json && node test-dist/test/runTests.js",
     "test": "vitest run && yarn test:vsc"
   },
   "dependencies": {

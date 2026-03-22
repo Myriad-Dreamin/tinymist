@@ -9,9 +9,9 @@ The change spans runtime resolution, configuration schema, webview resource hand
 ## Goals / Non-Goals
 
 **Goals:**
-- Allow trusted workspaces to override preview HTML with a single `tinymist.preview.provider` setting.
-- Treat `tinymist.preview.provider` values beginning with `html:` as filesystem paths to HTML files compatible with `tools/typst-preview-frontend`.
-- Treat any other non-empty `tinymist.preview.provider` value as an extension id for an external preview provider.
+- Allow trusted workspaces to override preview HTML with a single `tinymist.previewer` setting.
+- Treat `tinymist.previewer` values beginning with `html:` as filesystem paths to HTML files compatible with `tools/typst-preview-frontend`.
+- Treat any other non-empty `tinymist.previewer` value as an extension id for an external preview provider.
 - Keep the built-in preview as the default and fallback source.
 - Define a stable provider contract for VS Code extensions that want to supply preview HTML.
 - Enforce provider compatibility with the running Tinymist extension, using exact version matching by default.
@@ -37,9 +37,9 @@ Tinymist will introduce a resolver layer that decides which preview HTML source 
 Resolution order:
 
 1. If the workspace is untrusted, always use the built-in Tinymist HTML.
-2. If `tinymist.preview.provider` is unset or empty, use the built-in Tinymist HTML.
-3. If `tinymist.preview.provider` starts with `html:`, treat the suffix as a path to an HTML file and try to load it.
-4. Otherwise, treat `tinymist.preview.provider` as an extension id and try to resolve an extension-based provider.
+2. If `tinymist.previewer` is unset or empty, use the built-in Tinymist HTML.
+3. If `tinymist.previewer` starts with `html:`, treat the suffix as a path to an HTML file and try to load it.
+4. Otherwise, treat `tinymist.previewer` as an extension id and try to resolve an extension-based provider.
 5. If any configured provider cannot be read or fails compatibility checks, report the problem and fall back to the built-in Tinymist HTML.
 
 Alternative considered:
@@ -49,7 +49,7 @@ Why not:
 
 ### 2. Use an `html:` prefix for local HTML providers
 
-`tinymist.preview.provider` values with the `html:` prefix will be interpreted as filesystem-backed HTML providers. The suffix participates in VS Code variable substitution and must resolve to a readable HTML file. The target HTML must be compatible with the preview frontend contract used by `tools/typst-preview-frontend`.
+`tinymist.previewer` values with the `html:` prefix will be interpreted as filesystem-backed HTML providers. The suffix participates in VS Code variable substitution and must resolve to a readable HTML file. The target HTML must be compatible with the preview frontend contract used by `tools/typst-preview-frontend`.
 
 To avoid multi-root ambiguity and accidental path drift, implementation should treat the substituted suffix as an absolute path requirement and surface a warning if it is not absolute or unreadable.
 
@@ -131,7 +131,7 @@ This keeps the provider fixture in-repo, versioned with Tinymist, and easy to ev
 
 - [Provider API drift] -> If the extension export contract changes without updating fixtures or third-party extensions, Tinymist must surface a clear warning and fall back to the built-in preview.
 - [Absolute-only `html:` suffix is stricter than some users may expect] -> Document the intended use with `${workspaceFolder}`-style substitution in examples and diagnostics.
-- [Cached HTML may hide configuration changes] -> Cache the resolved theme by source key or clear caches when `tinymist.preview.provider` changes.
+- [Cached HTML may hide configuration changes] -> Cache the resolved theme by source key or clear caches when `tinymist.previewer` changes.
 - [Loading arbitrary HTML increases attack surface] -> Honor overrides only in trusted workspaces and limit webview local resource roots to the resolved HTML directory and any required extension roots.
 - [E2E tests still cannot inspect rendered DOM] -> Use internal source-inspection metadata and a very small provider fixture to validate behavior without UI scraping.
 
@@ -141,11 +141,11 @@ No migration is required for existing users because the default behavior remains
 
 Rollout steps:
 
-1. Add `tinymist.preview.provider` and the new resolver behind the existing preview feature.
+1. Add `tinymist.previewer` and the new resolver behind the existing preview feature.
 2. Keep built-in preview HTML as the fallback for all error paths.
 3. Land the `contrib/` provider fixture and the accompanying tests in the same change.
 
-Rollback is straightforward: removing or ignoring `tinymist.preview.provider` returns Tinymist to its current built-in HTML path.
+Rollback is straightforward: removing or ignoring `tinymist.previewer` returns Tinymist to its current built-in HTML path.
 
 ## Open Questions
 
