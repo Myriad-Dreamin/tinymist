@@ -1524,7 +1524,7 @@
     "format-check": "prettier --check .",
     "format": "prettier --write .",
     "test:unit": "vitest",
-    "test:vsc": "rimraf test-dist/ ../../contrib/preview-theme-provider/editors/vscode/out && tsc -p tsconfig.test.json && tsc -p ../../contrib/preview-theme-provider/editors/vscode/tsconfig.json && node test-dist/test/runTests.js",
+    "test:vsc": "rimraf test-dist/ ../../contrib/previewer/editors/vscode/out && tsc -p tsconfig.test.json && tsc -p ../../contrib/previewer/editors/vscode/tsconfig.json && node test-dist/test/runTests.js",
     "test": "vitest run && yarn test:vsc"
   },
   "dependencies": {

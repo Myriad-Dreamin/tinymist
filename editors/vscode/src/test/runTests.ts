@@ -8,6 +8,10 @@ async function main() {
   // The folder containing the Extension Manifest package.json
   // Passed to `--extensionDevelopmentPath`
   const extensionDevelopmentPath = path.resolve(__dirname, "../../");
+  const previewProviderFixturePath = path.resolve(
+    extensionDevelopmentPath,
+    "../../contrib/previewer/editors/vscode",
+  );
 
   const userDataDirectory = fs.mkdtempSync(path.join(tmpdir(), "vsce"));
 
@@ -47,7 +51,7 @@ async function main() {
       await runTests({
         version,
         launchArgs: uri ? [...launchArgs, uri] : launchArgs,
-        extensionDevelopmentPath,
+        extensionDevelopmentPath: [extensionDevelopmentPath, previewProviderFixturePath],
         extensionTestsPath,
         extensionTestsEnv,
       });

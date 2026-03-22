@@ -8,6 +8,8 @@ export interface TinymistConfig {
   serverPath?: string;
 }
 
+export const HTML_PREVIEW_PROVIDER_PREFIX = "html:";
+
 export function loadTinymistConfig(): TinymistConfig {
   let config: Record<string, any> = JSON.parse(
     JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
@@ -20,6 +22,12 @@ export function loadTinymistConfig(): TinymistConfig {
   config = {};
   for (let i = 0; i < keys.length; i++) {
     config[keys[i]] = values[i];
+  }
+  if (typeof config.preview?.provider === "string") {
+    config.preview.provider = resolvePreviewProviderValue(config.preview.provider);
+  }
+  if (typeof config["preview.provider"] === "string") {
+    config["preview.provider"] = resolvePreviewProviderValue(config["preview.provider"]);
   }
   return config;
 }
@@ -72,6 +80,24 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
     console.error("failed to substitute vscode variables", e);
     return str;
   }
+}
+
+export function resolvePreviewProviderValue(value: string | null | undefined): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (!trimmedValue.startsWith(HTML_PREVIEW_PROVIDER_PREFIX)) {
+    return trimmedValue;
+  }
+
+  const providerPath = trimmedValue.slice(HTML_PREVIEW_PROVIDER_PREFIX.length);
+  return `${HTML_PREVIEW_PROVIDER_PREFIX}${substVscodeVars(providerPath) ?? providerPath}`;
 }
 
 function determineVscodeTheme(): any {

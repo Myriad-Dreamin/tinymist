@@ -14,7 +14,7 @@ Tinymist currently hardcodes preview HTML to its built-in frontend or the legacy
 ## Capabilities
 
 ### New Capabilities
-- `preview-theme-provider`: Let the VS Code extension resolve preview HTML from a built-in source, an external provider extension, or a configured local HTML file selected through a single `tinymist.previewer` setting with compatibility and trust checks.
+- `previewer`: Let the VS Code extension resolve preview HTML from a built-in source, an external provider extension, or a configured local HTML file selected through a single `tinymist.previewer` setting with compatibility and trust checks.
 
 ### Modified Capabilities
 
