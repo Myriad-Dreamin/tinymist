@@ -12,6 +12,8 @@ export interface ContainerDOMState {
     left: number;
     top: number;
   };
+  /// cached `hookedElem.firstElement.getBoundingClientRect()`
+  scrollPosition?: DOMRect;
 }
 
 export type RenderMode = "svg" | "canvas";
@@ -150,7 +152,7 @@ export class TypstDocumentContext<O = any> {
       this.renderMode = renderMode ?? this.renderMode;
       this.previewMode = previewMode ?? this.previewMode;
       this.isContentPreview = isContentPreview || false;
-      this.retrieveDOMState =
+      const retrieveDOMStateBase: () => ContainerDOMState =
         retrieveDOMState ??
         (() => {
           return {
@@ -159,6 +161,16 @@ export class TypstDocumentContext<O = any> {
             boundingRect: this.hookedElem.getBoundingClientRect(),
           };
         });
+      /// If configured retrieveDOMState does not provide scrollPosition, get it by ourselves.
+      this.retrieveDOMState = () => {
+        const base = retrieveDOMStateBase();
+        if (base.scrollPosition) {
+          return base;
+        }
+        const bbox = this.hookedElem.firstElementChild?.getBoundingClientRect();
+        base.scrollPosition = bbox;
+        return base;
+      };
       this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
         "--typst-preview-background-color",
       );
@@ -407,6 +419,7 @@ export class TypstDocumentContext<O = any> {
 
     this.isRendering = true;
     const doUpdate = async () => {
+      const lastScrollPosition = this.cachedDOMState.scrollPosition;
       this.cachedDOMState = this.retrieveDOMState();
 
       if (this.patchQueue.length === 0) {
@@ -430,10 +443,18 @@ export class TypstDocumentContext<O = any> {
           this.r.rescale();
           await this.r.rerender();
           this.r.rescale();
+          /// Adjusts scroll position to keep visual position in "doc" mode.
+          /// Using `requestAnimationFrame` ensures the scroll adjustment happens after DOM updates.
+          requestAnimationFrame(() => {
+            if (lastScrollPosition && this.previewMode === PreviewMode.Doc) {
+              this.keepScrollPosition(lastScrollPosition);
+            }
+          });
         }
+
         let t2 = performance.now();
 
-        /// perf event
+        /// Perf event
         const d = (e: string, x: number, y: number) => `${e} ${(y - x).toFixed(2)} ms`;
         this.sampledRenderTime = t2 - t0;
         console.log([d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", "));
@@ -504,6 +525,50 @@ export class TypstDocumentContext<O = any> {
 
   getPartialPageNumber(): number {
     return this.partialRenderPage + 1;
+  }
+
+  _scrollAdjustTimeout: ReturnType<typeof setTimeout> | undefined;
+  _lastScrollPosition: DOMRect | undefined;
+  /// Adjusts scroll position with a debounce time.
+  private keepScrollPosition(scrollPosition: DOMRect) {
+    /// The debounce time for `scrollAdjust` task.
+    /// todo: better interval.
+    const KEEP_SCROLL_DEBOUNCE_TIME_MS = 300;
+
+    /// If a `scrollAdjust` task is already scheduled, we register again to debounce
+    /// the scroll adjustment.
+    /// Otherwise, we record the initial position to adjust later.
+    if (!this._scrollAdjustTimeout) {
+      this._lastScrollPosition = scrollPosition;
+    } else {
+      clearTimeout(this._scrollAdjustTimeout);
+    }
+
+    this._scrollAdjustTimeout = setTimeout(() => {
+      this._scrollAdjustTimeout = undefined;
+      const domState = this.retrieveDOMState();
+      const newBBox = domState.scrollPosition;
+      if (!(newBBox && this._lastScrollPosition && newBBox.width !== this._lastScrollPosition.width)) {
+        return;
+      }
+      const scrollAdjustLeftRatio = this._lastScrollPosition.left / this._lastScrollPosition.width;
+      const scrollAdjustTopRatio = this._lastScrollPosition.top / this._lastScrollPosition.height;
+      const expectedLeft = newBBox.width * scrollAdjustLeftRatio;
+      const expectedTop = newBBox.height * scrollAdjustTopRatio;
+
+      const adjustedDiffLeft = newBBox.left - expectedLeft;
+      const adjustedDiffTop = newBBox.top - expectedTop;
+      if (Math.abs(adjustedDiffLeft) < 1e-1 && Math.abs(adjustedDiffTop) < 1e-1) {
+        return;
+      }
+
+      this.hookedElem.parentElement!.scrollBy({
+        left: adjustedDiffLeft,
+        top: adjustedDiffTop,
+        /// "instant" behavior is disgusting, use "smooth" instead
+        behavior: "smooth",
+      });
+    }, KEEP_SCROLL_DEBOUNCE_TIME_MS);
   }
 }
 
