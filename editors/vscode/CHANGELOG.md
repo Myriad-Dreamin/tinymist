@@ -10,6 +10,14 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.14 - [2026-03-23]
+
+### Preview
+
+* (Fix) Reverted the preview viewport-position tracking change during dock resize in https://github.com/Myriad-Dreamin/tinymist/pull/2433
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.12...v0.14.14
+
 ## v0.14.12 - [2026-03-21]
 
 ### Server
