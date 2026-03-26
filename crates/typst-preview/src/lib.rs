@@ -57,16 +57,18 @@ pub struct PreviewConfig {
 }
 
 /// Gets the HTML for the frontend by a given preview mode and server to connect
-pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
+pub fn frontend_html(html: &str, mode: PreviewMode, to: &str, page_title: &str) -> String {
     let mode = match mode {
         PreviewMode::Document => "Doc",
         PreviewMode::Slide => "Slide",
     };
 
-    html.replace("ws://127.0.0.1:23625", to).replace(
-        "preview-arg:previewMode:Doc",
-        format!("preview-arg:previewMode:{mode}").as_str(),
-    )
+    html.replace("ws://127.0.0.1:23625", to)
+        .replace(
+            "preview-arg:previewMode:Doc",
+            format!("preview-arg:previewMode:{mode}").as_str(),
+        )
+        .replace("preview-arg:pageTitle:", page_title)
 }
 
 /// Simply creates a previewer.

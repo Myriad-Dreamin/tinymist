@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt};
@@ -156,7 +157,24 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
+    let page_title = args
+        .preview
+        .page_title
+        .clone()
+        .or_else(|| {
+            args.compile
+                .input
+                .as_deref()
+                .and_then(|input| Path::new(input).file_name())
+                .map(|name| name.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "Typst Preview".to_string());
+    let frontend_html = frontend_html(
+        TYPST_PREVIEW_HTML,
+        args.preview.preview_mode,
+        "/",
+        &page_title,
+    );
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!(
