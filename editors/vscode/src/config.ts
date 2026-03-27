@@ -75,19 +75,15 @@ function substFontPaths(value: unknown): string[] | undefined {
     return undefined;
   }
   if (!isStringArray(value)) {
+    const invalidFontPathsShape = Array.isArray(value)
+      ? "an array with non-string entries"
+      : typeof value;
     void vscode.window.showErrorMessage(
-      `Tinymist ignored "tinymist.fontPaths" setting because it must be an array of strings, for example \`["fonts"]\`. Received ${describeInvalidFontPathsShape(value)}.`,
+      `Tinymist ignored "tinymist.fontPaths" setting because it must be an array of strings, for example \`["fonts"]\`. Received ${invalidFontPathsShape}.`,
     );
     return undefined;
   }
   return value.map((path) => substVscodeVars(path) ?? path);
-
-  function describeInvalidFontPathsShape(value: unknown): string {
-    if (Array.isArray(value)) {
-      return "an array with non-string entries";
-    }
-    return typeof value;
-  }
 }
 
 function isStringArray(value: unknown): value is string[] {
