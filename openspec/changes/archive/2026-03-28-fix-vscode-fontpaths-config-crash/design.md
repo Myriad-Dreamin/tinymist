@@ -2,7 +2,7 @@
 
 The VS Code extension loads the full `tinymist` workspace configuration during activation and again when the language client answers `workspace/configuration` requests. Both paths reuse `substVscodeVarsInConfig` in [`editors/vscode/src/config.ts`](/home/kamiyoru/work/rust/tinymist/editors/vscode/src/config.ts), and that helper currently assumes `tinymist.fontPaths` is always a string array. When a user sets `tinymist.fontPaths` to a singleton string, the helper calls `.map()` on a non-array value and activation aborts before the extension can show anything more helpful than a generic failure toast.
 
-This change is small in surface area but slightly cross-cutting in behavior: the same normalization logic feeds initial activation and later configuration refreshes. The design therefore needs to keep those paths consistent and avoid replacing one crash with repeated warning spam.
+This change is small in surface area but slightly cross-cutting in behavior: the same normalization logic feeds initial activation and later configuration refreshes. The design therefore needs to keep those paths consistent and avoid replacing one crash with repeated error-message spam.
 
 ## Goals / Non-Goals
 
@@ -35,9 +35,9 @@ If `tinymist.fontPaths` is not an array of strings, Tinymist should ignore that 
 Alternative considered:
 - Coerce a singleton string into a one-element array. Rejected because it turns a user mistake into an undocumented supported shape and leaves ambiguity about how to handle other malformed values such as numbers, objects, or mixed-type arrays.
 
-### 3. Show a deduplicated actionable warning for malformed `fontPaths`
+### 3. Show a deduplicated actionable error message for malformed `fontPaths`
 
-When Tinymist ignores a malformed `fontPaths` value, the extension should surface a warning that names the setting and shows the expected JSON shape, for example `{\"tinymist.fontPaths\": [\"fonts\"]}`. The warning should be deduplicated so repeated config reads during the same session do not spam the user.
+When Tinymist ignores a malformed `fontPaths` value, the extension should surface an error message that names the setting and shows the expected JSON shape, for example `{\"tinymist.fontPaths\": [\"fonts\"]}`. The error message should be deduplicated so repeated config reads during the same session do not spam the user.
 
 Alternative considered:
 - Throw an activation error. Rejected because the goal is to preserve extension availability.
@@ -57,8 +57,8 @@ Alternative considered:
 
 ## Risks / Trade-offs
 
-- [Ignoring invalid `fontPaths` means custom fonts stay disabled until the user fixes settings] -> Mitigate with a clear warning that explains the exact JSON shape required.
-- [Deduplication could hide repeated configuration problems after the first warning] -> Mitigate by keeping a console log alongside the user-facing warning for later inspection.
+- [Ignoring invalid `fontPaths` means custom fonts stay disabled until the user fixes settings] -> Mitigate with a clear error message that explains the exact JSON shape required.
+- [Deduplication could hide repeated configuration problems after the first error message] -> Mitigate by keeping a console log alongside the user-facing error message for later inspection.
 - [Tests may require extra mocking around VS Code configuration objects] -> Mitigate by testing the pure normalization helper as directly as possible.
 
 ## Migration Plan
@@ -66,7 +66,7 @@ Alternative considered:
 1. Refactor `editors/vscode/src/config.ts` so `fontPaths` validation and substitution happen through a shared guarded helper.
 2. Update the activation and configuration-response flow to reuse the guarded result without throwing on malformed input.
 3. Add tests for valid and invalid `fontPaths` inputs.
-4. Verify that Tinymist still activates when `tinymist.fontPaths` is a string and that the warning explains the fix.
+4. Verify that Tinymist still activates when `tinymist.fontPaths` is a string and that the error message explains the fix.
 
 ## Open Questions
 

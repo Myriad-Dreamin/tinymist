@@ -17,17 +17,17 @@ The Tinymist VS Code extension SHALL validate `tinymist.fontPaths` before iterat
 - **THEN** Tinymist continues activation without throwing an exception
 - **AND** Tinymist ignores the malformed `fontPaths` value for that configuration load
 
-### Requirement: Tinymist warns users when `tinymist.fontPaths` is malformed
-When Tinymist ignores a malformed `tinymist.fontPaths` value, the VS Code extension SHALL show an actionable warning that names the setting and explains that the expected shape is an array of strings.
+### Requirement: Tinymist shows an actionable error when `tinymist.fontPaths` is malformed
+When Tinymist ignores a malformed `tinymist.fontPaths` value, the VS Code extension SHALL show an actionable error message that names the setting and explains that the expected shape is an array of strings.
 
-#### Scenario: Warning explains the expected JSON shape
+#### Scenario: Error message explains the expected JSON shape
 - **WHEN** Tinymist detects that `tinymist.fontPaths` is malformed
-- **THEN** the warning message mentions `tinymist.fontPaths`
-- **AND** the warning explains that the setting must be an array of strings, such as `["fonts"]`
+- **THEN** the error message mentions `tinymist.fontPaths`
+- **AND** the error message explains that the setting must be an array of strings, such as `["fonts"]`
 
-#### Scenario: Repeated reads do not spam the same warning
+#### Scenario: Repeated reads do not spam the same error message
 - **WHEN** the extension reads the same malformed `tinymist.fontPaths` setting multiple times during one VS Code session
-- **THEN** Tinymist does not repeatedly show duplicate warnings for the same invalid setting shape
+- **THEN** Tinymist does not repeatedly show duplicate error messages for the same invalid setting shape
 
 ### Requirement: Valid `tinymist.fontPaths` arrays preserve variable substitution
 For valid `tinymist.fontPaths` arrays, Tinymist SHALL preserve the existing behavior that expands VS Code variables for each configured path entry.

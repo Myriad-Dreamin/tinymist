@@ -6,7 +6,7 @@ Tinymist's VS Code extension currently crashes during activation if `tinymist.fo
 
 - Make VS Code-side Tinymist configuration loading resilient to invalid `tinymist.fontPaths` values so extension activation continues instead of throwing `TypeError: paths.map is not a function`.
 - Add explicit validation for `tinymist.fontPaths` before variable substitution so only arrays of strings are expanded as font paths.
-- Surface an actionable error or warning message that tells the user `tinymist.fontPaths` must be an array of strings and points them at the corrected JSON shape.
+- Surface an actionable error message that tells the user `tinymist.fontPaths` must be an array of strings and points them at the corrected JSON shape.
 - Add coverage for the invalid-setting path so regressions are caught before release.
 
 ## Capabilities
