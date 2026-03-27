@@ -14,7 +14,7 @@ This is the VS Code extension for the tinymist language service, providing langu
 - Edit source files under `editors/vscode/src/` for extension logic.
 - Edit `editors/vscode/package.json` for extension manifest, commands, contributions, and configuration that ships in the main manifest.
 - Edit `editors/vscode/package.other.json` for additional configuration definitions that are consumed by the shared docs pipeline.
-- Edit `locales/tinymist-vscode.toml` and `locales/tinymist-vscode-rt.toml` for localization source text. Before that, running `yarn build:l10n` will extract text to translate for you.
+- Edit `locales/tinymist-vscode.toml` and `locales/tinymist-vscode-rt.toml` for localization source text. Before that, from the repository root, run `yarn build:l10n` to extract text to translate for you.
 - Edit `docs/tinymist/frontend/vscode.typ` and `docs/tinymist/config/vscode.typ` for generated VS Code docs.
 - Edit `syntaxes/textmate/` for grammar changes, not the generated copies bundled into the extension.
 
