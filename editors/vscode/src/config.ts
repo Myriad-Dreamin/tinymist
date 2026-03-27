@@ -86,9 +86,6 @@ function substFontPaths(value: unknown): string[] | undefined {
     if (Array.isArray(value)) {
       return "an array with non-string entries";
     }
-    if (value === null) {
-      return "null";
-    }
     return typeof value;
   }
 }
