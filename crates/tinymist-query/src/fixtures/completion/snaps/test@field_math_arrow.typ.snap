@@ -1,0 +1,57 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (47..48)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/field_math_arrow.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "abs",
+    "labelDetails": {
+     "description": "(content, size: relative) => content"
+    },
+    "textEdit": {
+     "newText": "",
+     "range": {
+      "end": {
+       "character": 8,
+       "line": 3
+      },
+      "start": {
+       "character": 8,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "kind": 5,
+    "label": "b",
+    "labelDetails": {
+     "description": "↓"
+    },
+    "textEdit": {
+     "newText": "b",
+     "range": {
+      "end": {
+       "character": 8,
+       "line": 3
+      },
+      "start": {
+       "character": 8,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
