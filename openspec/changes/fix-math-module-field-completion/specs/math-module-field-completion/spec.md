@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
-### Requirement: Math-mode module field access includes exported functions
-Tinymist SHALL include exported pure functions when completing a module-valued field access expression inside math mode.
+### Requirement: Math-mode code-interpolated module field access includes exported functions
+Tinymist SHALL include exported pure functions when completing a code-interpolated module-valued field access expression (for example, `#calc.`) inside math-mode equations.
 
 #### Scenario: Builtin module functions appear for `#calc.`
 - **WHEN** a user requests completion on a math-mode expression like `$ #calc. $`
