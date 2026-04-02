@@ -1,0 +1,111 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on > (83..84)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/completion_title2_explicit.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "additionalTextEdits": [
+     {
+      "newText": "",
+      "range": {
+       "end": {
+        "character": 7,
+        "line": 3
+       },
+       "start": {
+        "character": 6,
+        "line": 3
+       }
+      }
+     },
+     {
+      "newText": "",
+      "range": {
+       "end": {
+        "character": 12,
+        "line": 3
+       },
+       "start": {
+        "character": 11,
+        "line": 3
+       }
+      }
+     }
+    ],
+    "kind": 18,
+    "label": "DBLP:books/lib/Knuth86a",
+    "labelDetails": {
+     "description": "The TeXbook"
+    },
+    "sortText": "000",
+    "textEdit": {
+     "newText": "label(\"DBLP:books/lib/Knuth86a\")",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   },
+   {
+    "additionalTextEdits": [
+     {
+      "newText": "",
+      "range": {
+       "end": {
+        "character": 7,
+        "line": 3
+       },
+       "start": {
+        "character": 6,
+        "line": 3
+       }
+      }
+     },
+     {
+      "newText": "",
+      "range": {
+       "end": {
+        "character": 12,
+        "line": 3
+       },
+       "start": {
+        "character": 11,
+        "line": 3
+       }
+      }
+     }
+    ],
+    "kind": 21,
+    "label": "The TeXbook",
+    "labelDetails": {
+     "description": "DBLP:books/lib/Knuth86a"
+    },
+    "sortText": "001",
+    "textEdit": {
+     "newText": "label(\"DBLP:books/lib/Knuth86a\")",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 3
+      },
+      "start": {
+       "character": 7,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]
