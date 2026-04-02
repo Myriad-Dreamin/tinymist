@@ -106,7 +106,7 @@ impl CompletionPair<'_, '_, '_> {
         self.label_completions_(only_citation, false);
     }
 
-    fn citation_completion_apply(
+    fn label_completion_apply(
         &mut self,
         label: &EcoString,
         open: bool,
@@ -199,8 +199,7 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
             let label: EcoString = label.resolve().as_str().into();
-            let (apply, additional_text_edits) =
-                self.citation_completion_apply(&label, open, close);
+            let (apply, additional_text_edits) = self.label_completion_apply(&label, open, close);
             let completion = Completion {
                 kind: CompletionKind::Reference,
                 apply: Some(apply),
