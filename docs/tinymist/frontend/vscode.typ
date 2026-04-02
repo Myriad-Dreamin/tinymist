@@ -214,11 +214,12 @@ There is a *global* configuration `tinymist.typstExtraArgs` to pass extra argume
 typst watch --input=awa=1 --input=abaaba=2 main.typ
 ```
 
+#let font-path-ref = heading-reference[= `tinymist.fontPaths`]
 Supported arguments:
 - entry file: The last string in the array will be treated as the entry file.
   - This is used to specify the *default* entry file for the compiler, which may be overridden by other settings.
 - `--input`: Add a string key-value pair visible through `sys.inputs`.
-- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
+- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by #cross-link("/config/vscode.html", reference: font-path-ref)[`tinymist.fontPaths`].
 - `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
 - `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a #link("https://reproducible-builds.org/specs/source-date-epoch/")[UNIX timestamp].
 - `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
