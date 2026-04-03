@@ -1,0 +1,36 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 192
+description: Completion on / (49..50)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/dict_at_named_param.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 5,
+    "label": "default",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "default: ${1:}",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 3
+      },
+      "start": {
+       "character": 10,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

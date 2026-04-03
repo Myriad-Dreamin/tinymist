@@ -1,6 +1,8 @@
 //! A linter for Typst.
 
-use std::sync::Arc;
+mod rules;
+
+use std::{cell::OnceCell, sync::Arc};
 
 use tinymist_analysis::{
     adt::interner::Interned,
@@ -52,6 +54,7 @@ pub fn lint_file(
 #[derive(Default, Clone, Hash)]
 pub struct KnownIssues {
     unknown_vars: EcoVec<Span>,
+    unknown_fonts: EcoVec<(Span, EcoString)>,
 }
 
 impl KnownIssues {
@@ -60,18 +63,33 @@ impl KnownIssues {
         diags: impl Iterator<Item = &'a SourceDiagnostic>,
     ) -> Self {
         let mut unknown_vars = Vec::default();
+        let mut unknown_fonts = Vec::default();
         for diag in diags {
             if diag.message.starts_with("unknown variable") {
                 unknown_vars.push(diag.span);
+            } else if let Some(font_name) = rules::bad_font::extract_unknown_font(&diag.message) {
+                unknown_fonts.push((diag.span, font_name));
             }
         }
         unknown_vars.sort_by_key(|span| span.into_raw());
+        unknown_fonts.sort_by_key(|(span, _)| span.into_raw());
         let unknown_vars = EcoVec::from(unknown_vars);
-        Self { unknown_vars }
+        let unknown_fonts = EcoVec::from(unknown_fonts);
+        Self {
+            unknown_vars,
+            unknown_fonts,
+        }
     }
 
     pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
         self.unknown_vars.contains(&ident.span())
+    }
+
+    pub(crate) fn get_unknown_font(&self, span: Span) -> Option<&EcoString> {
+        self.unknown_fonts
+            .binary_search_by_key(&span.into_raw(), |(s, _)| s.into_raw())
+            .ok()
+            .map(|i| &self.unknown_fonts[i].1)
     }
 }
 
@@ -83,6 +101,9 @@ struct Linter<'w> {
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
+
+    /// Cached available fonts (sorted)
+    available_fonts: OnceCell<Vec<&'w str>>,
 }
 
 impl<'w> Linter<'w> {
@@ -100,6 +121,8 @@ impl<'w> Linter<'w> {
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
+
+            available_fonts: OnceCell::new(),
         }
     }
 
@@ -259,49 +282,6 @@ impl<'w> Linter<'w> {
             ty: self.ti.type_of_span(expr.span()),
         }
     }
-
-    fn check_variable_font<'a>(&mut self, args: impl IntoIterator<Item = ast::Arg<'a>>) {
-        for arg in args {
-            if let ast::Arg::Named(arg) = arg
-                && arg.name().as_str() == "font"
-            {
-                self.check_variable_font_object(arg.expr().to_untyped());
-                if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
-                    for item in array.items() {
-                        self.check_variable_font_object(item.to_untyped());
-                    }
-                }
-            }
-        }
-    }
-
-    fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
-        if let Some(font_dict) = expr.cast::<ast::Dict>() {
-            for item in font_dict.items() {
-                if let ast::DictItem::Named(arg) = item
-                    && arg.name().as_str() == "name"
-                {
-                    self.check_variable_font_str(arg.expr().to_untyped());
-                }
-            }
-        }
-
-        self.check_variable_font_str(expr)
-    }
-    fn check_variable_font_str(&mut self, expr: &SyntaxNode) -> Option<()> {
-        if !expr.cast::<ast::Str>()?.get().ends_with("VF") {
-            return None;
-        }
-
-        let _ = self.world;
-
-        let diag =
-            SourceDiagnostic::warning(expr.span(), "variable font is not supported by typst yet");
-        let diag = diag.with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185");
-        self.diag.push(diag);
-
-        Some(())
-    }
 }
 
 impl DataFlowVisitor for Linter<'_> {
@@ -319,7 +299,7 @@ impl DataFlowVisitor for Linter<'_> {
         self.exprs(expr.args().to_untyped().exprs());
 
         if expr.target().to_untyped().text() == "text" {
-            self.check_variable_font(expr.args().items());
+            self.check_bad_font(expr.args().items());
         }
 
         self.expr(expr.target())
@@ -428,7 +408,7 @@ impl DataFlowVisitor for Linter<'_> {
         // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
         // "VF"
         if expr.callee().to_untyped().text() == "text" {
-            self.check_variable_font(expr.args().items());
+            self.check_bad_font(expr.args().items());
         }
         self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
         Some(())

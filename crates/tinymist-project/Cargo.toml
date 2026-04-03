@@ -18,9 +18,10 @@ clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
 ecow.workspace = true
+js-sys = { workspace = true, optional = true }
 log.workspace = true
+notify = { workspace = true, optional = true }
 parking_lot.workspace = true
-tokio = { workspace = true, features = ["sync"] }
 rayon.workspace = true
 rpds.workspace = true
 semver.workspace = true
@@ -28,14 +29,13 @@ serde.workspace = true
 serde_json.workspace = true
 tinymist-task.workspace = true
 tinymist-world = { workspace = true }
-tinymist-std = { workspace = true, features = ["typst"] }
 tinymist-derive.workspace = true
 tinymist-l10n.workspace = true
+tinymist-std = { workspace = true, features = ["typst"] }
+tokio = { workspace = true, features = ["sync"] }
 toml = { workspace = true, optional = true }
 typst.workspace = true
 typst-assets.workspace = true
-notify = { workspace = true, optional = true }
-js-sys = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 
 [features]

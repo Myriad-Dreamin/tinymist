@@ -5,7 +5,7 @@ use reflexo::ImmutPath;
 use sync_ls::transport::{MirrorArgs, with_stdio_transport};
 use sync_ls::{LspBuilder, LspMessage, RequestId};
 use tinymist::world::TaskInputs;
-use tinymist::{CompileOnceArgs, Config, ServerState, SuperInit, UserActionTask};
+use tinymist::{CompileOnceArgs, Config, ServerState, SuperInit};
 use tinymist_project::EntryResolver;
 use tinymist_std::{bail, error::prelude::*};
 
@@ -85,13 +85,14 @@ pub fn trace_lsp_main(args: TraceLspArgs) -> Result<()> {
 
         let snap = state.snapshot().unwrap();
 
+        #[cfg(feature = "trace")]
         RUNTIMES.tokio_runtime.block_on(async {
             let g = snap.task(TaskInputs {
                 entry: Some(entry),
                 inputs,
             });
 
-            UserActionTask::trace_main(client, state, g, args.rpc_kind, req_id).await
+            tinymist::UserActionTask::trace_main(client, state, g, args.rpc_kind, req_id).await
         });
 
         Ok(())

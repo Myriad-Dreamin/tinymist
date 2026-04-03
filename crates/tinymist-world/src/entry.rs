@@ -166,7 +166,7 @@ impl EntryState {
 }
 
 /// The options to create the entry
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum EntryOpts {
     /// Creates the entry with a specified root directory and a main file.
     Workspace {
@@ -182,13 +182,8 @@ pub enum EntryOpts {
         entry: PathBuf,
     },
     /// Creates the entry with no root and no main file.
+    #[default]
     Detached,
-}
-
-impl Default for EntryOpts {
-    fn default() -> Self {
-        Self::Detached
-    }
 }
 
 impl EntryOpts {

@@ -30,7 +30,7 @@ pub type LspResult<T> = Result<T, ResponseError>;
 pub type Event = Box<dyn Any + Send>;
 
 /// Note that we must have our logging only write out to stderr.
-#[cfg(feature = "web")]
+#[cfg(all(feature = "server", feature = "web"))]
 fn dummy_transport<M: TryFrom<Message, Error = anyhow::Error> + GetMessageKind>() -> Connection<M> {
     let (event_sender, event_receiver) = crossbeam_channel::bounded::<crate::Event>(0);
     let (writer_sender, writer_receiver) = crossbeam_channel::bounded::<Message>(0);

@@ -118,13 +118,6 @@ impl PathAccessModel for WatchAccessModel {
     }
 }
 
-/// The file content request for the client.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DelegateFileContent {
-    // default encoding is base64
-    content: String,
-}
-
 /// The file system watch request for the client.
 /// This is used to watch the file content from the client.
 #[derive(Debug, Serialize, Deserialize)]

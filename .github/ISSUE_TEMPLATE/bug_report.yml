@@ -22,7 +22,6 @@ body:
       - ARMv7 Linux (linux-armhf)
       - Intel macOS (darwin-x64)
       - x64 Alpine Linux (alpine-x64)
-      - ARM64 Alpine Linux (alpine-arm64)
       - Browser (web)
       - Other Platforms (universal)
   validations:

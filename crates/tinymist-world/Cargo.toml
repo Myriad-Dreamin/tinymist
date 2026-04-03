@@ -25,7 +25,7 @@ comemo.workspace = true
 dirs = { workspace = true, optional = true }
 ecow.workspace = true
 flate2.workspace = true
-fontdb = { workspace = true, optional = true }
+fontdb = { workspace = true, optional = true, features = ["fs", "memmap"] }
 hex.workspace = true
 js-sys = { workspace = true, optional = true }
 log.workspace = true
@@ -44,10 +44,10 @@ tar.workspace = true
 tinymist-package.workspace = true
 tinymist-std.workspace = true
 tinymist-vfs.workspace = true
-typst-shim.workspace = true
-typst.workspace = true
-typst-assets.workspace = true
 ttf-parser.workspace = true
+typst-shim.workspace = true
+typst-assets.workspace = true
+typst.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
 

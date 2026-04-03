@@ -39,18 +39,18 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 siphasher.workspace = true
 strum.workspace = true
+tinymist-analysis.workspace = true
+tinymist-derive.workspace = true
+tinymist-l10n.workspace = true
+tinymist-lint.workspace = true
+tinymist-project = { workspace = true, features = ["lsp"] }
+tinymist-std.workspace = true
+tinymist-world = { workspace = true }
 toml.workspace = true
 ttf-parser.workspace = true
 typlite = { workspace = true, default-features = false, features = [
     "no-content-hint",
 ] }
-tinymist-world = { workspace = true }
-tinymist-project = { workspace = true, features = ["lsp"] }
-tinymist-analysis.workspace = true
-tinymist-derive.workspace = true
-tinymist-std.workspace = true
-tinymist-l10n.workspace = true
-tinymist-lint.workspace = true
 typst.workspace = true
 typst-macros.workspace = true
 typst-shim.workspace = true

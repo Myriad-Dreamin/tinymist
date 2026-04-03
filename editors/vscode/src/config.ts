@@ -52,11 +52,7 @@ export function substVscodeVarsInConfig(
       return substVscodeVars(value as string);
     }
     if (STR_ARR_VARIABLES.includes(k)) {
-      const paths = value as string[];
-      if (!paths) {
-        return undefined;
-      }
-      return paths.map((path) => substVscodeVars(path));
+      return substFontPaths(value);
     }
     return value;
   });
@@ -72,6 +68,26 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
     console.error("failed to substitute vscode variables", e);
     return str;
   }
+}
+
+function substFontPaths(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isStringArray(value)) {
+    const invalidFontPathsShape = Array.isArray(value)
+      ? "an array with non-string entries"
+      : typeof value;
+    void vscode.window.showErrorMessage(
+      `Tinymist ignored "tinymist.fontPaths" setting because it must be an array of strings, for example \`["fonts"]\`. Received ${invalidFontPathsShape}.`,
+    );
+    return undefined;
+  }
+  return value.map((path) => substVscodeVars(path) ?? path);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
 function determineVscodeTheme(): any {

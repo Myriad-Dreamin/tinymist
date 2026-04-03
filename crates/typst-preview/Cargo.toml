@@ -13,6 +13,7 @@ rust-version.workspace = true
 [dependencies]
 
 bytes.workspace = true
+clap = { workspace = true, optional = true }
 comemo.workspace = true
 env_logger.workspace = true
 futures.workspace = true
@@ -23,15 +24,14 @@ reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
 serde_json.workspace = true
 serde.workspace = true
-tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
-typst.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
+tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
+typst.workspace = true
 typst-macros.workspace = true
 typst-timing.workspace = true
 typst-assets.workspace = true
 
-clap = { workspace = true, optional = true }
 
 [features]
 

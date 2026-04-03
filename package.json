@@ -45,6 +45,7 @@
     "generate-ci": "dist generate",
     "generate-nix": "nix run github:cargo2nix/cargo2nix --locked",
     "project-build-script:ps1": "cargo run --bin tinymist -- generate-script -o ./scripts/project-build.ps1",
+    "release:preflight": "node scripts/release-preflight.mjs",
     "release": "node scripts/release.mjs",
     "draft-release": "node scripts/draft-release.mjs"
   },

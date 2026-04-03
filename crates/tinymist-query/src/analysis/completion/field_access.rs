@@ -12,9 +12,23 @@ impl CompletionPair<'_, '_, '_> {
             .or_else(|| self.type_dot_access_completions(target))
     }
 
+    /// Dot-access can sit inside a math equation while still targeting a code
+    /// interpolation like `$ #calc. $`. In that case, the accessed expression's
+    /// mode is the one that matters for completion behavior.
+    fn dot_access_mode(&self, target: &LinkedNode) -> InterpretMode {
+        let mode = self.cursor.leaf_mode();
+        let target_mode = interpret_mode_at(Some(target));
+
+        if matches!(mode, InterpretMode::Math) && matches!(target_mode, InterpretMode::Code) {
+            return target_mode;
+        }
+
+        mode
+    }
+
     /// Add completions for all fields on a type.
     fn type_dot_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
-        let mode = self.cursor.leaf_mode();
+        let mode = self.dot_access_mode(target);
 
         if matches!(mode, InterpretMode::Math) {
             return None;
@@ -54,7 +68,7 @@ impl CompletionPair<'_, '_, '_> {
     fn value_dot_access_completions(&mut self, target: &LinkedNode) -> Option<()> {
         let (value, styles) = self.worker.ctx.analyze_expr(target).into_iter().next()?;
 
-        let mode = self.cursor.leaf_mode();
+        let mode = self.dot_access_mode(target);
         let valid_field_access_syntax =
             !matches!(mode, InterpretMode::Math) || is_valid_math_field_access(target);
         let valid_postfix_target =

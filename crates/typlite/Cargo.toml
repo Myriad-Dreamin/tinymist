@@ -26,6 +26,8 @@ clap = { workspace = true, optional = true }
 cmark-writer.workspace = true
 comemo.workspace = true
 ecow.workspace = true
+env_logger = { workspace = true, optional = true }
+log.workspace = true
 regex.workspace = true
 tinymist-std.workspace = true
 tinymist-derive.workspace = true
@@ -34,8 +36,6 @@ typst.workspace = true
 typst-svg.workspace = true
 typst-syntax.workspace = true
 typst-html.workspace = true
-log.workspace = true
-env_logger = { workspace = true, optional = true }
 
 # Feature: docx
 docx-rs = { workspace = true, optional = true }
