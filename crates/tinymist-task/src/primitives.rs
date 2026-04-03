@@ -167,10 +167,6 @@ impl PathPattern {
             return Some(path.as_path().into());
         }
 
-        if self.0.is_empty() {
-            return Some(path.to_path_buf().clean().into());
-        }
-
         let path = path.strip_prefix(&root).ok()?;
         let dir = path.parent();
         let file_name = path.file_name().unwrap_or_default();
@@ -178,6 +174,15 @@ impl PathPattern {
         let w = root.to_string_lossy();
         let f = file_name.to_string_lossy();
         let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
+
+        if self.0.is_empty() {
+            let mut default_path = root.to_path_buf();
+            if let Some(dir) = dir {
+                default_path.push(dir);
+            }
+            default_path.push(f);
+            return Some(default_path.clean().into());
+        }
 
         // replace all $root
         let mut path = self.0.replace("$root", &w);
@@ -496,6 +501,17 @@ mod tests {
         assert_eq!(
             PathPattern::new("$dir/$name").substitute(&entry),
             Some(PathBuf::from("Chapter 1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_default_path_matches_documented_behavior() {
+        let root = test_root();
+        let entry = test_entry("/Chapter 1.1.typ");
+
+        assert_eq!(
+            PathPattern::default().substitute(&entry),
+            Some(root.join("Chapter 1.1").into())
         );
     }
 
