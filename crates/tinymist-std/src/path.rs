@@ -49,6 +49,8 @@ pub fn unix_slash(root: &Path) -> String {
 
 /// Parses if a string has legal schema prefix, and is parsed as a `Url`.
 /// Currently supported schemes are: `untitled`, `file`, `oct`.
+/// Note that some schemes like `zhihu` on unix is rejected and viewed as a
+/// normal path.
 pub fn parse_uri(s: &str) -> Option<Url> {
     // todo: more schemes to support
     if s.starts_with("untitled:") || s.starts_with("file:") || s.starts_with("oct:") {

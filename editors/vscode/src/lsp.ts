@@ -102,15 +102,13 @@ export class LanguageState {
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
   delegateFsRequests = false;
-  // disposables for the watch fallbacks
-  private _watchDisposables: vscode.Disposable[] = [];
-  clientPromiseResolve = (_client: LanguageClient) => { };
+  clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => { };
+    this.clientPromiseResolve = (_client: LanguageClient) => {};
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -119,14 +117,6 @@ export class LanguageState {
       this._watcher.dispose();
       this._watcher = undefined;
     }
-    for (const d of this._watchDisposables) {
-      try {
-        d.dispose();
-      } catch (e) {
-        console.error("failed to dispose watch disposable", e);
-      }
-    }
-    this._watchDisposables = [];
     if (this.client) {
       await this.client.stop();
       this.client = undefined;
@@ -175,9 +165,9 @@ export class LanguageState {
     const serverPaths: [string, string][] = configPath
       ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
-        ["Bundled", resolve(__dirname, binaryName)],
-        ["In PATH", binaryName],
-      ];
+          ["Bundled", resolve(__dirname, binaryName)],
+          ["In PATH", binaryName],
+        ];
 
     return tinymist.probePaths(serverPaths);
   }
@@ -488,16 +478,6 @@ export class LanguageState {
   }
 
   registerClientSideWatch(client: LanguageClient) {
-    // clear any existing listeners from a previous client instances
-    for (const d of this._watchDisposables) {
-      try {
-        d.dispose();
-      } catch (e) {
-        console.error("failed to dispose watch disposable", e);
-      }
-    }
-    this._watchDisposables = [];
-
     const watches = new Set<string>();
     const hasRead = new Map<string, [number, FileResult | undefined]>();
     let watchClock = 0;
@@ -861,17 +841,17 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
   ? CodeContextQueryResult
   : Q extends ModeAtQuery
-  ? ModeAtQueryResult
-  : Q extends StyleAtQuery
-  ? StyleAtQueryResult
-  : never;
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
 export type CodeContextQueryResult<T = any> =
   | {
-    value: T;
-  }
+      value: T;
+    }
   | {
-    error: string;
-  };
+      error: string;
+    };
 export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
 export type StyleAtQueryResult = {
   style: any[];
