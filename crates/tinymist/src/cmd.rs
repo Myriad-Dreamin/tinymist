@@ -5,14 +5,14 @@ mod export;
 use std::ops::Range;
 use std::path::PathBuf;
 
-use lsp_types::{TextDocumentIdentifier, Url};
+use lsp_types::TextDocumentIdentifier;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 #[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_query::package::PackageInfo;
-use tinymist_query::{url_to_path, LocalContextGuard, LspRange};
+use tinymist_query::{path_arg, LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::syntax::{LinkedNode, Source};
@@ -38,20 +38,9 @@ struct ExportSyntaxRangeOpts {
 /// Here are implemented the handlers for each command.
 impl ServerState {
     /// Parse a string as either a URI or a filesystem path.
-    ///
-    /// - If `s` has legal schema prefix, and is parsed as a `Url`, converts it
-    ///   using `url_to_path()` which preserves the scheme embedded in the
-    ///   textual path for delegated filesystem providers.
-    ///   - Currently supported schemes: `untitled`, `file`, `oct`.
-    /// - Otherwise, treats `s` as a raw path string.
     fn parse_uri_or_path(s: &str) -> ImmutPath {
-        // todo: more schemes to support
-        if s.starts_with("untitled:") || s.starts_with("file:") || s.starts_with("oct:") {
-            if let Ok(uri) = Url::parse(s) {
-                // `url_to_path` encodes the uri scheme into the path while preserving forward
-                // slashes so that a delegated filesystem can turn it back into a proper URI
-                return ImmutPath::from(url_to_path(&uri));
-            }
+        if let Ok(path) = path_arg(s, "entry path") {
+            return path;
         }
 
         ImmutPath::from(PathBuf::from(s))

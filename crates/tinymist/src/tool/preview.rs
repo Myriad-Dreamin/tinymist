@@ -310,8 +310,7 @@ impl ServerState {
             let id = primary.id.clone();
 
             if let Some(entry) = entry {
-                self.change_main_file(Some(entry.into()))
-                    .map_err(internal_error)?;
+                self.change_main_file(Some(entry)).map_err(internal_error)?;
             }
             self.set_pin_by_preview(true, is_browsing);
 
@@ -319,7 +318,7 @@ impl ServerState {
                 .start(cli_args, previewer, id, true, is_background)
         } else if let Some(entry) = entry {
             let id = self
-                .restart_dedicate(&task_id, Some(entry.into()))
+                .restart_dedicate(&task_id, Some(entry))
                 .map_err(internal_error)?;
 
             if !self.project.preview.register(&id, watcher) {

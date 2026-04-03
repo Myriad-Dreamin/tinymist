@@ -2,8 +2,8 @@
 
 use anyhow::{Context, bail};
 use percent_encoding::percent_decode_str;
-use tinymist_std::path::looks_like_uri;
-use tinymist_std::path::{PathClean, unix_slash};
+use tinymist_std::ImmutPath;
+use tinymist_std::path::{PathClean, parse_uri, unix_slash};
 use tinymist_world::vfs::PathResolution;
 
 use crate::prelude::*;
@@ -29,17 +29,24 @@ pub fn is_untitled_path(p: &Path) -> bool {
 }
 
 /// Extracts a path argument.
-pub fn path_arg(input: &str, param_name: &str) -> anyhow::Result<PathBuf> {
-    let path = if looks_like_uri(input) {
-        let uri = Url::parse(input)
-            .with_context(|| format!("could not convert path to URI: path: {input:?}"))?;
-        // treat the input as a URI string if possible
-        url_to_path(&uri)
+pub fn path_arg(input: &str, param_name: &str) -> anyhow::Result<ImmutPath> {
+    let (path, is_absolute) = if let Some(uri) = parse_uri(input) {
+        let path = url_to_path(&uri);
+        let is_absolute = match uri.scheme() {
+            "file" => path.is_absolute(),
+            // Virtual filesystem URIs are rooted by their URI path rather than
+            // the host platform's path semantics.
+            _ => uri.path().starts_with('/'),
+        };
+
+        (path.into(), is_absolute)
     } else {
-        PathBuf::from(input)
+        let path: ImmutPath = Path::new(input).into();
+        let is_absolute = path.is_absolute();
+        (path, is_absolute)
     };
 
-    if !path.is_absolute() {
+    if !is_absolute {
         bail!("{param_name} must be absolute path");
     }
 
@@ -51,23 +58,10 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let path_str = unix_slash(path);
-        if looks_like_uri(&path_str) {
-            // let `url::Url` handle percent-encoding of the path component
-            // ensures that characters like spaces are encoded as `%20`
-            if let Some(pos) = path_str.find(':') {
-                let (scheme, rest) = path_str.split_at(pos);
-                let raw_path = &rest[1..]; // skip ':'
-
-                let mut url = Url::parse(&format!("{scheme}:"))
-                    .with_context(|| format!("could not convert path to URI: path: {path:?}"))?;
-                url.set_path(raw_path);
-                return Ok(url);
-            }
-
-            // this should never happen given `looks_like_uri`, but the old behaviour is
-            // here anyway
-            return Url::parse(&path_str)
-                .with_context(|| format!("could not convert path to URI: path: {path:?}"));
+        if let Some(uri) = parse_uri(&path_str) {
+            // If the path looks like a URI, encode it as an untitled URI to preserve the
+            // text.
+            return Ok(uri);
         }
     }
 
@@ -220,6 +214,54 @@ mod test {
 
         let uri2 = path_to_url(&path).unwrap();
         assert_eq!(EMPTY_URL.clone(), uri2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_path_arg_accepts_unix_paths() {
+        let path = path_arg("/tmp/example.typ", "entry file").unwrap();
+        assert_eq!(path, Path::new("/tmp/example.typ").into());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_path_arg_accepts_windows_paths() {
+        let path = path_arg(r"C:\Temp\example.typ", "entry file").unwrap();
+        assert_eq!(path, Path::new(r"C:\Temp\example.typ").into());
+    }
+
+    #[cfg(all(not(target_arch = "wasm32"), unix))]
+    #[test]
+    fn test_path_arg_accepts_file_uri() {
+        let path = path_arg("file:///tmp/example%20file.typ", "entry file").unwrap();
+        assert_eq!(path, Path::new("/tmp/example file.typ").into());
+    }
+
+    #[cfg(all(not(target_arch = "wasm32"), windows))]
+    #[test]
+    fn test_path_arg_accepts_file_uri() {
+        let path = path_arg("file:///C:/Temp/example%20file.typ", "entry file").unwrap();
+        assert_eq!(path, Path::new(r"C:\Temp\example file.typ").into());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn test_path_arg_accepts_virtual_uri_schemes() {
+        let cases = [
+            (
+                "oct:///workspace/example.typ",
+                Path::new("oct:/workspace/example.typ").into(),
+            ),
+            (
+                "/zhihu:///column/article.typ",
+                Path::new("/zhihu:/column/article.typ").into(),
+            ),
+        ];
+
+        for (input, expected) in cases {
+            let path = path_arg(input, "entry file").unwrap();
+            assert_eq!(path, expected);
+        }
     }
 
     #[cfg(not(target_arch = "wasm32"))]

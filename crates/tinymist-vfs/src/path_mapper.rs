@@ -10,7 +10,7 @@ use std::sync::LazyLock;
 
 use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
-use tinymist_std::path::{PathClean, looks_like_uri, unix_slash};
+use tinymist_std::path::{PathClean, parse_uri, unix_slash};
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::VirtualPath;
 use typst::syntax::package::{PackageSpec, PackageVersion};
@@ -219,7 +219,7 @@ impl WorkspaceResolver {
 
         let root: ImmutPath = {
             let as_str = unix_slash(root);
-            if looks_like_uri(&as_str) {
+            if parse_uri(&as_str).is_some() {
                 // avoid running URI roots through `PathClean` because they might be
                 // misinterpreted as drive letters
                 root.clone()

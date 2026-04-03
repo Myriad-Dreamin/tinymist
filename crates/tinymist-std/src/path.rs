@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
+use lsp_types::Url;
 pub use path_clean::PathClean;
 
 /// Gets the path cleaned as a unix-style string.
@@ -46,35 +47,17 @@ pub fn unix_slash(root: &Path) -> String {
     res
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-/// Checks if a string looks like a URI by validating its scheme portion.
-/// Requires a non-empty, multi-character scheme starting with an ASCII letter,
-/// followed by ASCII alphanumeric characters or '+', '.', '-'.
-/// This avoids treating Windows drive letters like `C:` as URI schemes.
-pub fn looks_like_uri(s: &str) -> bool {
-    if let Some(pos) = s.find(':') {
-        let (scheme, _) = s.split_at(pos);
-        if scheme.is_empty() || scheme.len() == 1 {
-            return false;
-        }
-
-        let mut bytes = scheme.bytes();
-        match bytes.next() {
-            Some(b) if (b as char).is_ascii_alphabetic() => {}
-            _ => return false,
-        }
-
-        bytes.all(|b| {
-            let c = b as char;
-            c.is_ascii_alphanumeric() || c == '+' || c == '.' || c == '-'
-        })
-    } else {
-        false
+/// Parses if a string has legal schema prefix, and is parsed as a `Url`.
+/// Currently supported schemes are: `untitled`, `file`, `oct`.
+pub fn parse_uri(s: &str) -> Option<Url> {
+    // todo: more schemes to support
+    if s.starts_with("untitled:") || s.starts_with("file:") || s.starts_with("oct:") {
+        // `url_to_path` encodes the uri scheme into the path while preserving forward
+        // slashes so that a delegated filesystem can turn it back into a proper URI
+        return Url::parse(s).ok();
     }
+    None
 }
-
-#[cfg(target_arch = "wasm32")]
-pub fn looks_like_uri(_s: &str) -> bool { false }
 
 /// Gets the path cleaned as a platform-style string.
 pub use path_clean::clean;
@@ -101,10 +84,15 @@ pub fn diff(path: &Path, base: &Path) -> Option<PathBuf> {
 mod test {
     use std::path::{Path, PathBuf};
 
-    use super::{PathClean, clean as inner_path_clean, unix_slash, looks_like_uri};
+    use super::{PathClean, clean as inner_path_clean, parse_uri, unix_slash};
 
     pub fn clean<P: AsRef<Path>>(path: P) -> String {
         unix_slash(&inner_path_clean(path))
+    }
+
+    /// Checks if a string looks like a URI.
+    fn looks_like_uri(s: &str) -> bool {
+        parse_uri(s).is_some()
     }
 
     #[test]
