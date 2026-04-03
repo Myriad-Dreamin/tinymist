@@ -944,9 +944,9 @@ impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
 #[serde(rename_all = "camelCase")]
 pub enum FormatterMode {
     /// Disable the formatter.
-    #[default]
     Disable,
     /// Use `typstyle` formatter.
+    #[default]
     Typstyle,
     /// Use `typstfmt` formatter.
     Typstfmt,
