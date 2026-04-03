@@ -10,6 +10,23 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.16 - [2026-04-03]
+
+### Completion
+
+* (Fix) Used `label("...")` for incompatible citation keys while keeping `<key>` for compatible keys in https://github.com/Myriad-Dreamin/tinymist/pull/2464
+* (Fix) Detected math code interpolation mode correctly for field and method completion in https://github.com/Myriad-Dreamin/tinymist/pull/2453
+
+### Editor
+
+* (Fix) Ignored malformed `tinymist.fontPaths` config values instead of crashing extension activation in https://github.com/Myriad-Dreamin/tinymist/pull/2446
+
+### Rename
+
+* (Fix) Correctly resolved `LinkTarget::Path` against the source file during rename and link updates by @BlueQuantumx and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2368
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.14...v0.14.16
+
 ## v0.14.14 - [2026-03-27]
 
 ### Preview
