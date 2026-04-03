@@ -1034,7 +1034,8 @@ pub struct BackgroundPreviewOpts {
 
 /// The extra typst arguments passed to the language server. You can pass any
 /// arguments as you like, and we will try to follow behaviors of the **same
-/// version** of typst-cli.
+/// version** of typst-cli. On arguments with values, you need to replace
+/// spaces with equal signs: `--pdf-standard=2.0 --input=foo=bar`
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TypstExtraArgs {
     /// The root directory for the compilation routine.
