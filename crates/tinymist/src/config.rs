@@ -1446,7 +1446,7 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert!(matches!(config.config, FormatterConfig::Disable));
+        assert!(matches!(config.config, FormatterConfig::Typstyle(_)));
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 
