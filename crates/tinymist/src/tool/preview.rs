@@ -22,8 +22,7 @@ use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
     PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
 };
-use tinymist_query::url_to_path;
-use tinymist_query::{LspPosition, LspRange};
+use tinymist_query::{path_arg, LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 
@@ -276,31 +275,7 @@ impl ServerState {
         // todo: preview specific arguments are not used
         let cli_entry = cli_args.compile.input.as_ref();
         let entry = cli_entry
-            .map(|input| {
-                if self.config.delegate_fs_requests {
-                    if let Ok(uri) = Url::parse(input) {
-                        // treat the input as a URI string if possible
-                        return Ok(url_to_path(&uri));
-                    }
-
-                    return Ok(Path::new(input).into());
-                }
-
-                let path = Path::new(input);
-                if path.is_absolute() {
-                    return Ok(path.into());
-                }
-
-                // still allow absolute paths encoded as URIs
-                if let Ok(uri) = Url::parse(input) {
-                    let p = url_to_path(&uri);
-                    if p.is_absolute() {
-                        return Ok(p);
-                    }
-                }
-
-                Err(invalid_params("entry file must be absolute path"))
-            })
+            .map(|input| path_arg(input, "entry file").map_err(invalid_params))
             .transpose()?;
 
         let task_id = cli_args.task_id.clone();

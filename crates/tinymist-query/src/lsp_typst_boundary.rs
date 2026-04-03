@@ -1,6 +1,6 @@
 //! Conversions between Typst and LSP types and representations
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use percent_encoding::percent_decode_str;
 use tinymist_std::path::looks_like_uri;
 use tinymist_std::path::{PathClean, unix_slash};
@@ -18,7 +18,7 @@ pub use tinymist_analysis::location::*;
 const UNTITLED_ROOT: &str = "/untitled";
 static EMPTY_URL: LazyLock<Url> = LazyLock::new(|| Url::parse("file://").unwrap());
 
-/// Convert a path to a URL.
+/// Converts a path to a URL.
 pub fn untitled_url(path: &Path) -> anyhow::Result<Url> {
     Ok(Url::parse(&format!("untitled:{}", path.display()))?)
 }
@@ -28,7 +28,25 @@ pub fn is_untitled_path(p: &Path) -> bool {
     p.starts_with(UNTITLED_ROOT)
 }
 
-/// Convert a path to a URL.
+/// Extracts a path argument.
+pub fn path_arg(input: &str, param_name: &str) -> anyhow::Result<PathBuf> {
+    let path = if looks_like_uri(input) {
+        let uri = Url::parse(input)
+            .with_context(|| format!("could not convert path to URI: path: {input:?}"))?;
+        // treat the input as a URI string if possible
+        url_to_path(&uri)
+    } else {
+        PathBuf::from(input)
+    };
+
+    if !path.is_absolute() {
+        bail!("{param_name} must be absolute path");
+    }
+
+    Ok(path)
+}
+
+/// Converts a path to a URL.
 pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -89,7 +107,7 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
     url_from_file_path(path)
 }
 
-/// Convert a path resolution to a URL.
+/// Converts a path resolution to a URL.
 pub fn path_res_to_url(path: PathResolution) -> anyhow::Result<Url> {
     match path {
         PathResolution::Rootless(path) => untitled_url(path.as_rooted_path()),
@@ -97,7 +115,7 @@ pub fn path_res_to_url(path: PathResolution) -> anyhow::Result<Url> {
     }
 }
 
-/// Convert a URL to a path.
+/// Converts a URL to a path.
 pub fn url_to_path(uri: &Url) -> PathBuf {
     if uri.scheme() == "file" {
         // typst converts an empty path to `Path::new("/")`, which is undesirable.
