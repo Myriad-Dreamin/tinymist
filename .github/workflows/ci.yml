@@ -53,7 +53,7 @@ jobs:
         run: |
           yarn build:preview
           yarn build:l10n
-      - run: cargo clippy --workspace --all-targets
+      - run: cargo clippy --workspace --all-targets --locked
       - run: scripts/feature-testing.sh
       - run: cargo fmt --check --all
       - run: cargo doc --workspace --no-deps
@@ -75,11 +75,11 @@ jobs:
           name: tinymist-completion-scripts
           path: tinymist-completions.tar.gz
       - name: Test tinymist
-        run: cargo test --workspace -- --skip=e2e
+        run: cargo test --workspace --locked -- --skip=e2e
       - name: Test Lockfile (Prepare)
         run: ./scripts/test-lock.sh
       - name: Test Lockfile (Check)
-        run: cargo test --package tinymist --lib -- route::tests --show-output --ignored 
+        run: cargo test --package tinymist --lib --locked -- route::tests --show-output --ignored 
 
   checks-windows:
     name: Check Minimum Rust version and Tests (Windows)
@@ -101,9 +101,9 @@ jobs:
         run: |
           yarn build:preview
           yarn build:l10n
-      - run: cargo check --workspace
+      - run: cargo check --workspace --locked
       - name: Test tinymist
-        run: cargo test --workspace -- --skip=e2e
+        run: cargo test --workspace --locked -- --skip=e2e
 
   prepare-build:
     runs-on: "ubuntu-latest"
