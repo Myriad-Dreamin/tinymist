@@ -6,28 +6,17 @@ use super::*;
 
 /// Options for initializing the logger.
 pub struct InitLogOpts {
-    /// Whether the command is transient (e.g., compile).   
-    pub is_transient_cmd: bool,
-    /// Whether the command is a test without verbose output.
-    pub is_test_no_verbose: bool,
+    /// Whether the command should use verbose logging.
+    pub verbose: bool,
     /// Redirects output via LSP/DAP notification.
     pub output: Option<LspClient>,
 }
 
 /// Initializes the logger for the Tinymist library.
-pub fn init_log(
-    InitLogOpts {
-        is_transient_cmd,
-        is_test_no_verbose,
-        output,
-    }: InitLogOpts,
-) -> anyhow::Result<()> {
+pub fn init_log(InitLogOpts { verbose, output }: InitLogOpts) -> anyhow::Result<()> {
     use log::LevelFilter::*;
 
-    let base_no_info = is_transient_cmd || is_test_no_verbose;
-    let base_level = if base_no_info { Warn } else { Info };
-    let preview_level = if is_test_no_verbose { Warn } else { Info };
-    let diag_level = if is_test_no_verbose { Warn } else { Info };
+    let base_level = if verbose { Info } else { Warn };
 
     let mut builder = env_logger::builder();
     if let Some(output) = output {
@@ -59,12 +48,12 @@ pub fn init_log(
 
     Ok(builder
         .filter_module("tinymist", base_level)
-        .filter_module("tinymist_preview", preview_level)
+        .filter_module("tinymist_preview", base_level)
         .filter_module("typlite", base_level)
         .filter_module("reflexo", base_level)
         .filter_module("sync_ls", base_level)
         .filter_module("reflexo_typst2vec::pass::span2vec", Error)
-        .filter_module("reflexo_typst::diag::console", diag_level)
+        .filter_module("reflexo_typst::diag::console", base_level)
         .try_init()?)
 }
 

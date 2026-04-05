@@ -137,12 +137,29 @@ fn main() -> Result<()> {
     #[cfg(feature = "l10n")]
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
     // Starts logging
-    let _ = tinymist::init_log(tinymist::InitLogOpts {
+    let verbose = match &cmd {
+        // Short-running commands, usually run from the CLI.
+        Commands::Completion(..) | Commands::Probe => false,
         #[cfg(feature = "export")]
-        is_transient_cmd: matches!(cmd, Commands::Compile(..)),
-        #[cfg(not(feature = "export"))]
-        is_transient_cmd: false,
-        is_test_no_verbose: matches!(&cmd, Commands::Test(test) if !test.verbose),
+        Commands::Compile(..) => false,
+
+        // Long-running commands, usually run from the CLI.
+        Commands::Test(test) => test.verbose,
+        Commands::Preview(preview) => preview.verbose,
+
+        // Long-running commands, usually run from an editor.
+        Commands::Lsp(..) | Commands::Dap(..) => true,
+
+        // Hidden commands.
+        Commands::TraceLsp(..)
+        | Commands::Query(..)
+        | Commands::GenerateScript(..)
+        | Commands::Doc(..)
+        | Commands::Task(..)
+        | Commands::Cov(..) => true,
+    };
+    let _ = tinymist::init_log(tinymist::InitLogOpts {
+        verbose,
         output: None,
     });
 

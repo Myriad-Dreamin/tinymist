@@ -203,6 +203,10 @@ pub struct PreviewCliArgs {
     /// set as well, this flag will win.
     #[clap(long = "no-open")]
     pub no_open: bool,
+
+    /// Emit INFO level logging. The default is WARN.
+    #[clap(long = "verbose")]
+    pub verbose: bool,
 }
 
 impl PreviewCliArgs {

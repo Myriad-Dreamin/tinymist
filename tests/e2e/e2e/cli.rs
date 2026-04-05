@@ -524,6 +524,9 @@ fn test_help_preview() {
               Don't open the preview in the browser after compilation. If `--open` is set as well, this
               flag will win
 
+          --verbose
+              Emit INFO level logging. The default is WARN
+
       -h, --help
               Print help (see a summary with '-h')
 
