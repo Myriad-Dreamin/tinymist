@@ -8,12 +8,14 @@ use super::*;
 pub struct InitLogOpts {
     /// Whether the command should use verbose logging.
     pub verbose: bool,
+    /// Additional filters to pass directly to `env_logger`.
+    pub filter: Option<String>,
     /// Redirects output via LSP/DAP notification.
     pub output: Option<LspClient>,
 }
 
 /// Initializes the logger for the Tinymist library.
-pub fn init_log(InitLogOpts { verbose, output }: InitLogOpts) -> anyhow::Result<()> {
+pub fn init_log(InitLogOpts { verbose, filter, output }: InitLogOpts) -> anyhow::Result<()> {
     use log::LevelFilter::*;
 
     let base_level = if verbose { Info } else { Warn };
@@ -46,15 +48,20 @@ pub fn init_log(InitLogOpts { verbose, output }: InitLogOpts) -> anyhow::Result<
         });
     }
 
-    Ok(builder
+    builder
         .filter_module("tinymist", base_level)
         .filter_module("tinymist_preview", base_level)
         .filter_module("typlite", base_level)
         .filter_module("reflexo", base_level)
         .filter_module("sync_ls", base_level)
         .filter_module("reflexo_typst2vec::pass::span2vec", Error)
-        .filter_module("reflexo_typst::diag::console", base_level)
-        .try_init()?)
+        .filter_module("reflexo_typst::diag::console", base_level);
+
+    if let Some(f) = filter {
+        builder.parse_filters(&f);
+    }
+
+    Ok(builder.try_init()?)
 }
 
 struct LogNotification(LspClient, Vec<u8>);

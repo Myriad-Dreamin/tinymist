@@ -87,3 +87,13 @@ tinymist completion bash
 ```
 
 Available values for the shell parameter are `bash`, `elvish`, `fig`, `fish`, `powershell`, `zsh`, and `nushell`.
+
+== Logging
+
+By default, logging is set to `INFO` for LSP and DAP modes, and `WARN` otherwise.
+This can be overridden with `--verbose` for `preview` and `test`.
+
+You can use more granular overrides by setting `TINYMIST_LOG` in the environment, or passing
+it as an argument with `tinymist --log-filter`.
+Note that to override tinymist itself you will need to override individual modules; for
+example `tinymist --log-filter tinymist_preview=debug preview main.typ`.

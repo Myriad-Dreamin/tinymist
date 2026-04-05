@@ -42,6 +42,7 @@ impl TinymistLanguageServer {
         // Starts logging
         let _ = crate::init_log(crate::InitLogOpts {
             verbose: true,
+            filter: None,
             output: Some(_client.weak()),
         });
         let state = ServerState::install_lsp(LspBuilder::new(

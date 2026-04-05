@@ -62,6 +62,10 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(tinymist::LONG_VERSION.as_str()))]
 struct Args {
+    /// Configure log filter of tinymist
+    #[clap(long = "log-filter", env = "TINYMIST_LOG")]
+    pub log_filter: Option<String>,
+
     /// Mode of the binary
     #[clap(subcommand)]
     pub cmd: Option<Commands>,
@@ -125,8 +129,8 @@ fn main() -> Result<()> {
     let _profiler = dhat::Profiler::new_heap();
 
     // Parses command line arguments
-    let cmd = Args::parse().cmd;
-    let cmd = cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
+    let args = Args::parse();
+    let cmd = args.cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
 
     // Probes soon to avoid other initializations causing errors
     if matches!(cmd, Commands::Probe) {
@@ -160,6 +164,7 @@ fn main() -> Result<()> {
     };
     let _ = tinymist::init_log(tinymist::InitLogOpts {
         verbose,
+        filter: args.log_filter,
         output: None,
     });
 
