@@ -176,12 +176,10 @@ impl PathPattern {
         let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
 
         if self.0.is_empty() {
-            let mut default_path = root.to_path_buf();
-            if let Some(dir) = dir {
-                default_path.push(dir);
-            }
-            default_path.push(f);
-            return Some(default_path.clean().into());
+            let dest = dir
+                .map(|d| root.join(d).join(f))
+                .unwrap_or_else(|| root.join(f));
+            return Some(dest.clean().into());
         }
 
         // replace all $root
