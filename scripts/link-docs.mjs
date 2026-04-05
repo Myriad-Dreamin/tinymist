@@ -26,6 +26,24 @@ const typlite = (input, output) => {
 
 const isCheck = process.argv.includes("--check");
 
+const generatedInputs = [
+  {
+    command:
+      "cargo run --quiet --bin tinymist-docs-tool -- --output docs/tinymist/generated/compiler-settings-fonts.json",
+  },
+];
+
+const prepareGeneratedInputs = () => {
+  if (dry) {
+    return;
+  }
+
+  for (const input of generatedInputs) {
+    const command = `${input.command}${isCheck ? " --check" : ""}`;
+    execSync(command, { cwd: root, stdio: "inherit" });
+  }
+};
+
 const convert = async ({ input: inp, output: out }) => {
   const input = resolve(root, inp);
   const output = resolve(root, out);
@@ -173,6 +191,9 @@ const tasks = [
   },
 ];
 
-const main = async () => await Promise.all([...tasks.map(convert), maintainerMd()]);
+const main = async () => {
+  prepareGeneratedInputs();
+  await Promise.all([...tasks.map(convert), maintainerMd()]);
+};
 
 main();

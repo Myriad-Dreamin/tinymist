@@ -1,0 +1,178 @@
+{
+  "generatedBy": "cargo run --quiet --bin tinymist-docs-tool -- --output docs/tinymist/generated/compiler-settings-fonts.json",
+  "typstAssets": {
+    "version": "0.14.2"
+  },
+  "fonts": [
+    {
+      "family": "DejaVu Sans Mono",
+      "displayFamily": "DejaVu Sans Mono",
+      "style": "Book",
+      "fullName": "DejaVu Sans Mono",
+      "displayName": "DejaVu Sans Mono",
+      "postscriptName": "DejaVuSansMono",
+      "fileName": "DejaVuSansMono.ttf",
+      "relativePath": "fonts/DejaVuSansMono.ttf"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "displayFamily": "DejaVu Sans Mono",
+      "style": "Bold",
+      "fullName": "DejaVu Sans Mono Bold",
+      "displayName": "DejaVu Sans Mono Bold",
+      "postscriptName": "DejaVuSansMono-Bold",
+      "fileName": "DejaVuSansMono-Bold.ttf",
+      "relativePath": "fonts/DejaVuSansMono-Bold.ttf"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "displayFamily": "DejaVu Sans Mono",
+      "style": "Bold Oblique",
+      "fullName": "DejaVu Sans Mono Bold Oblique",
+      "displayName": "DejaVu Sans Mono Bold Oblique",
+      "postscriptName": "DejaVuSansMono-BoldOblique",
+      "fileName": "DejaVuSansMono-BoldOblique.ttf",
+      "relativePath": "fonts/DejaVuSansMono-BoldOblique.ttf"
+    },
+    {
+      "family": "DejaVu Sans Mono",
+      "displayFamily": "DejaVu Sans Mono",
+      "style": "Oblique",
+      "fullName": "DejaVu Sans Mono Oblique",
+      "displayName": "DejaVu Sans Mono Oblique",
+      "postscriptName": "DejaVuSansMono-Oblique",
+      "fileName": "DejaVuSansMono-Oblique.ttf",
+      "relativePath": "fonts/DejaVuSansMono-Oblique.ttf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Bold",
+      "fullName": "Libertinus Serif Bold",
+      "displayName": "Libertinus Serif Bold",
+      "postscriptName": "LibertinusSerif-Bold",
+      "fileName": "LibertinusSerif-Bold.otf",
+      "relativePath": "fonts/LibertinusSerif-Bold.otf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Bold Italic",
+      "fullName": "Libertinus Serif Bold Italic",
+      "displayName": "Libertinus Serif Bold Italic",
+      "postscriptName": "LibertinusSerif-BoldItalic",
+      "fileName": "LibertinusSerif-BoldItalic.otf",
+      "relativePath": "fonts/LibertinusSerif-BoldItalic.otf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Italic",
+      "fullName": "Libertinus Serif Italic",
+      "displayName": "Libertinus Serif Italic",
+      "postscriptName": "LibertinusSerif-Italic",
+      "fileName": "LibertinusSerif-Italic.otf",
+      "relativePath": "fonts/LibertinusSerif-Italic.otf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Regular",
+      "fullName": "Libertinus Serif Regular",
+      "displayName": "Libertinus Serif Regular",
+      "postscriptName": "LibertinusSerif-Regular",
+      "fileName": "LibertinusSerif-Regular.otf",
+      "relativePath": "fonts/LibertinusSerif-Regular.otf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Semibold",
+      "fullName": "Libertinus Serif Semibold",
+      "displayName": "Libertinus Serif Semibold",
+      "postscriptName": "LibertinusSerif-Semibold",
+      "fileName": "LibertinusSerif-Semibold.otf",
+      "relativePath": "fonts/LibertinusSerif-Semibold.otf"
+    },
+    {
+      "family": "Libertinus Serif",
+      "displayFamily": "Libertinus Serif",
+      "style": "Semibold Italic",
+      "fullName": "Libertinus Serif Semibold Italic",
+      "displayName": "Libertinus Serif Semibold Italic",
+      "postscriptName": "LibertinusSerif-SemiboldItalic",
+      "fileName": "LibertinusSerif-SemiboldItalic.otf",
+      "relativePath": "fonts/LibertinusSerif-SemiboldItalic.otf"
+    },
+    {
+      "family": "NewComputerModern10",
+      "displayFamily": "New Computer Modern 10",
+      "style": "Bold",
+      "fullName": "NewComputerModern10-Bold",
+      "displayName": "New Computer Modern 10 Bold",
+      "postscriptName": "NewCM10-Bold",
+      "fileName": "NewCM10-Bold.otf",
+      "relativePath": "fonts/NewCM10-Bold.otf"
+    },
+    {
+      "family": "NewComputerModern10",
+      "displayFamily": "New Computer Modern 10",
+      "style": "BoldItalic",
+      "fullName": "NewComputerModern10-BoldItalic",
+      "displayName": "New Computer Modern 10 Bold Italic",
+      "postscriptName": "NewCM10-BoldItalic",
+      "fileName": "NewCM10-BoldItalic.otf",
+      "relativePath": "fonts/NewCM10-BoldItalic.otf"
+    },
+    {
+      "family": "NewComputerModern10",
+      "displayFamily": "New Computer Modern 10",
+      "style": "Italic",
+      "fullName": "NewComputerModern10-Italic",
+      "displayName": "New Computer Modern 10 Italic",
+      "postscriptName": "NewCM10-Italic",
+      "fileName": "NewCM10-Italic.otf",
+      "relativePath": "fonts/NewCM10-Italic.otf"
+    },
+    {
+      "family": "NewComputerModern10",
+      "displayFamily": "New Computer Modern 10",
+      "style": "Regular",
+      "fullName": "NewComputerModern10-Regular",
+      "displayName": "New Computer Modern 10 Regular",
+      "postscriptName": "NewCM10-Regular",
+      "fileName": "NewCM10-Regular.otf",
+      "relativePath": "fonts/NewCM10-Regular.otf"
+    },
+    {
+      "family": "NewComputerModernMath",
+      "displayFamily": "New Computer Modern Math",
+      "style": "Bold",
+      "fullName": "NewComputerModernMath-Bold",
+      "displayName": "New Computer Modern Math Bold",
+      "postscriptName": "NewCMMath-Bold",
+      "fileName": "NewCMMath-Bold.otf",
+      "relativePath": "fonts/NewCMMath-Bold.otf"
+    },
+    {
+      "family": "NewComputerModernMath",
+      "displayFamily": "New Computer Modern Math",
+      "style": "Book",
+      "fullName": "NewComputerModernMath-Book",
+      "displayName": "New Computer Modern Math Book",
+      "postscriptName": "NewCMMath-Book",
+      "fileName": "NewCMMath-Book.otf",
+      "relativePath": "fonts/NewCMMath-Book.otf"
+    },
+    {
+      "family": "NewComputerModernMath",
+      "displayFamily": "New Computer Modern Math",
+      "style": "Regular",
+      "fullName": "NewComputerModernMath-Regular",
+      "displayName": "New Computer Modern Math Regular",
+      "postscriptName": "NewCMMath-Regular",
+      "fileName": "NewCMMath-Regular.otf",
+      "relativePath": "fonts/NewCMMath-Regular.otf"
+    }
+  ]
+}

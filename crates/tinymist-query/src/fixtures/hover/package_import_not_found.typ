@@ -1,1 +1,1 @@
-#import /* position after */ "@preview/shiroa:0.2.3"
+#import /* position after */ "@preview/shiroa:0.3.1"

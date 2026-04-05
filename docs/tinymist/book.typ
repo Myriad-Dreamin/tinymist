@@ -1,5 +1,5 @@
 
-#import "@preview/shiroa:0.2.3": *
+#import "@preview/shiroa:0.3.1": *
 
 #show: book
 
@@ -27,6 +27,7 @@
     - #chapter("feature/cli.typ")[Command line interface]
     - #chapter("feature/syntax-only-mode.typ")[Syntax-Only Mode]
     - #chapter("feature/docs.typ")[Code Documentation]
+    - #chapter("feature/compiler-settings.typ")[Compiler Settings]
     - #chapter("guide/completion.typ")[Code Completion]
     - #chapter("feature/export.typ")[Exporting Documents]
     - #chapter("feature/typlite.typ")[Exporting to Other Markup Formats]
