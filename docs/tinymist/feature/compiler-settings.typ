@@ -92,7 +92,7 @@ Supported arguments:
 - entry file: The last positional argument string in the array will be treated as the entry file.
   - This is used to specify the *default* entry file for the compiler, which may be overridden by other settings.
 - `--input=key=value` adds values to `sys.inputs`.
-- `--feature` adds typst features to the compiler.
+- `--features` adds typst features to the compiler.
 - `--root` sets the Typst project root.
 - `--font-path` adds explicit font paths.
 - `--ignore-system-fonts` disables system-font discovery.
@@ -106,7 +106,7 @@ Example:
 {
   "tinymist.typstExtraArgs": [
     "--input=mode=print",
-    "--feature", "html",
+    "--features", "html",
     "--root", "/abs/path/to/workspace",
     "--font-path", "/abs/path/to/workspace/fonts",
     "--ignore-system-fonts",
