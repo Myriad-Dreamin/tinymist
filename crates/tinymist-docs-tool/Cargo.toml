@@ -3,8 +3,7 @@ name = "tinymist-docs-tool"
 description = "Documentation support tools for tinymist."
 categories = ["compilers", "command-line-utilities"]
 keywords = ["typst", "documentation"]
-# group: docs
-version = "0.14.6"
+version.workspace = true
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
