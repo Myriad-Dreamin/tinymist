@@ -271,11 +271,15 @@ mod test {
     #[cfg(not(target_arch = "wasm32"))]
     #[test]
     fn test_looks_like_uri_valid_schemes() {
-        assert!(looks_like_uri("http:/path"));
+        // These schemes are recognized by tinymist.
         assert!(looks_like_uri("file:/C:/Windows"));
-        assert!(looks_like_uri("custom-scheme:/abc"));
         assert!(looks_like_uri("oct:/workspace/file typst"));
-        assert!(looks_like_uri("a+1.2-3:/zzz"));
+
+        // while these URI are valid,
+        // they are not identified as URI and is valid path on unix.
+        assert!(!looks_like_uri("http:/path"));
+        assert!(!looks_like_uri("custom-scheme:/abc"));
+        assert!(!looks_like_uri("a+1.2-3:/zzz"));
     }
 
     #[cfg(not(target_arch = "wasm32"))]
