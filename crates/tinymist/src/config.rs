@@ -366,7 +366,7 @@ impl Config {
 
         if let Some(v) = try_deserialize!(bool, "delegateFsRequests") {
             self.delegate_fs_requests = v; // only update this flag when the key is actually present in the update map.
-            // `delegate_fs_requests` is configured on startup, but vscode doesn't include this field in new workspace configuration updates. if we treat a missing key as "reset to default" here new config changes would turn it off again
+                                           // `delegate_fs_requests` is configured on startup, but vscode doesn't include this field in new workspace configuration updates. if we treat a missing key as "reset to default" here new config changes would turn it off again
         }
 
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
