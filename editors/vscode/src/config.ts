@@ -8,20 +8,26 @@ export interface TinymistConfig {
   serverPath?: string;
 }
 
-export function loadTinymistConfig(): TinymistConfig {
-  let config: Record<string, any> = JSON.parse(
-    JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
-  );
-  config.colorTheme = "light";
+const EXTENSION_MANAGED_TINYMIST_CONFIG = {
+  triggerSuggest: true,
+  triggerSuggestAndParameterHints: true,
+  triggerParameterHints: true,
+  supportHtmlInMarkdown: true,
+  supportClientCodelens: true,
+  supportExtendedCodeAction: true,
+  customizedShowDocument: true,
+  delegateFsRequests: false,
+} as const;
 
-  const keys = Object.keys(config);
-  let values = keys.map((key) => config[key]);
-  values = substVscodeVarsInConfig(keys, values);
-  config = {};
-  for (let i = 0; i < keys.length; i++) {
-    config[keys[i]] = values[i];
+export function applyExtensionManagedTinymistConfig(config: TinymistConfig): TinymistConfig {
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return { ...EXTENSION_MANAGED_TINYMIST_CONFIG };
   }
-  return config;
+  return Object.assign(config, EXTENSION_MANAGED_TINYMIST_CONFIG);
+}
+
+export function loadTinymistConfig(): TinymistConfig {
+  return normalizeTinymistConfigValue(vscode.workspace.getConfiguration("tinymist"));
 }
 
 const STR_VARIABLES = [
@@ -45,6 +51,20 @@ export function substVscodeVarsInConfig(
     if (!k) {
       return value;
     }
+    if (EXTENSION_MANAGED_TINYMIST_CONFIG.hasOwnProperty(k)) {
+      return EXTENSION_MANAGED_TINYMIST_CONFIG[k as keyof typeof EXTENSION_MANAGED_TINYMIST_CONFIG];
+    }
+    if (k.startsWith("tinymist.")) {
+      const subKey = k.substring("tinymist.".length);
+      if (EXTENSION_MANAGED_TINYMIST_CONFIG.hasOwnProperty(subKey)) {
+        return EXTENSION_MANAGED_TINYMIST_CONFIG[
+          subKey as keyof typeof EXTENSION_MANAGED_TINYMIST_CONFIG
+        ];
+      }
+    }
+    if (k === "tinymist") {
+      return normalizeTinymistConfigValue(value);
+    }
     if (COLOR_THEME.includes(k)) {
       return determineVscodeTheme();
     }
@@ -56,6 +76,23 @@ export function substVscodeVarsInConfig(
     }
     return value;
   });
+}
+
+function normalizeTinymistConfigValue(configValue: unknown): TinymistConfig {
+  let config: Record<string, any> = {};
+  if (configValue && typeof configValue === "object" && !Array.isArray(configValue)) {
+    config = JSON.parse(JSON.stringify(configValue));
+  }
+  config.colorTheme = "light";
+
+  const keys = Object.keys(config);
+  let values = keys.map((key) => config[key]);
+  values = substVscodeVarsInConfig(keys, values);
+  config = {};
+  for (let i = 0; i < keys.length; i++) {
+    config[keys[i]] = values[i];
+  }
+  return applyExtensionManagedTinymistConfig(config);
 }
 
 function substVscodeVars(str: string | null | undefined): string | undefined {

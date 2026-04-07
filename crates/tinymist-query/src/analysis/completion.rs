@@ -65,7 +65,7 @@ use type_::*;
 type LspCompletion = CompletionItem;
 
 /// Tinymist's completion features.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
     /// Whether to trigger completions on arguments (placeholders) of snippets.

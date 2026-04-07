@@ -24,7 +24,22 @@ vi.mock("./vscode-variables", () => ({
   vscodeVariables: hoisted.vscodeVariables,
 }));
 
-import { loadTinymistConfig, substVscodeVarsInConfig } from "./config.js";
+import {
+  applyExtensionManagedTinymistConfig,
+  loadTinymistConfig,
+  substVscodeVarsInConfig,
+} from "./config.js";
+
+const EXTENSION_MANAGED_SETTINGS = {
+  triggerSuggest: true,
+  triggerSuggestAndParameterHints: true,
+  triggerParameterHints: true,
+  supportHtmlInMarkdown: true,
+  supportClientCodelens: true,
+  supportExtendedCodeAction: true,
+  customizedShowDocument: true,
+  delegateFsRequests: false,
+};
 
 beforeEach(() => {
   hoisted.getConfiguration.mockReset();
@@ -47,6 +62,47 @@ test("loadTinymistConfig preserves substitution for valid fontPaths arrays", () 
     ["/workspace/fonts"],
   ]);
   expect(hoisted.showErrorMessage).not.toHaveBeenCalled();
+});
+
+test("loadTinymistConfig injects extension-managed defaults", () => {
+  hoisted.getConfiguration.mockReturnValue({
+    preview: "enable",
+  });
+
+  expect(loadTinymistConfig()).toMatchObject({
+    ...EXTENSION_MANAGED_SETTINGS,
+    preview: "enable",
+  });
+});
+
+test("substVscodeVarsInConfig overrides extension-managed keys", () => {
+  expect(
+    substVscodeVarsInConfig(
+      ["supportHtmlInMarkdown", "tinymist.supportClientCodelens", "triggerSuggest"],
+      [false, false, false],
+    ),
+  ).toEqual([true, true, true]);
+});
+
+test("substVscodeVarsInConfig augments tinymist section payloads", () => {
+  const [config] = substVscodeVarsInConfig(["tinymist"], [
+    {
+      fontPaths: ["${workspaceFolder}/fonts"],
+      preview: "disable",
+    },
+  ]) as Record<string, unknown>[];
+
+  expect(config).toMatchObject({
+    ...EXTENSION_MANAGED_SETTINGS,
+    fontPaths: ["/workspace/fonts"],
+    preview: "disable",
+  });
+});
+
+test("applyExtensionManagedTinymistConfig tolerates non-object inputs", () => {
+  expect(applyExtensionManagedTinymistConfig(undefined as unknown as {})).toMatchObject(
+    EXTENSION_MANAGED_SETTINGS,
+  );
 });
 
 test("substVscodeVarsInConfig ignores mixed-type fontPaths arrays", () => {

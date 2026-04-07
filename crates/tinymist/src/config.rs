@@ -64,6 +64,14 @@ const CONFIG_ITEMS: &[&str] = &[
     "semanticTokens",
     "systemFonts",
     "typstExtraArgs",
+    "triggerSuggest",
+    "triggerSuggestAndParameterHints",
+    "triggerParameterHints",
+    "supportHtmlInMarkdown",
+    "supportClientCodelens",
+    "supportExtendedCodeAction",
+    "customizedShowDocument",
+    "delegateFsRequests",
 ];
 // endregion Configuration Items
 
@@ -728,11 +736,13 @@ impl Config {
         self.typst_extra_args.as_ref()?.cert.clone()
     }
 
-    /// Applies the primary options related to compilation.
+    /// Applies the primary options related to analysis or compilation.
     #[allow(clippy::type_complexity)]
     pub fn primary_opts(
         &self,
     ) -> (
+        CompletionFeat,
+        (bool, bool, bool, bool, bool),
         bool,
         ImmutDict,
         ExportTarget,
@@ -745,6 +755,14 @@ impl Config {
         Option<Arc<Path>>,
     ) {
         (
+            self.completion.clone(),
+            (
+                self.support_html_in_markdown,
+                self.support_client_codelens,
+                self.customized_show_document,
+                self.extended_code_action,
+                self.delegate_fs_requests,
+            ),
             // server
             self.syntax_only,
             // typst library

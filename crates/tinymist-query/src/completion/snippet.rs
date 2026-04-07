@@ -11,7 +11,7 @@ use crate::prelude::*;
 use crate::syntax::{InterpretMode, SurroundingSyntax};
 
 /// This is the poorman's type filter, which is less powerful but more steady.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PostfixSnippetScope {
     /// Any "dottable" value, i.e. having type `Ty::Any`.
     Value,
@@ -145,6 +145,20 @@ pub struct PostfixSnippet {
     #[serde(skip)]
     pub parsed_snippet: OnceLock<Option<ParsedSnippet>>,
 }
+
+impl PartialEq for PostfixSnippet {
+    fn eq(&self, other: &Self) -> bool {
+        // parsed_snippet is not considered for equality
+        self.mode == other.mode
+            && self.scope == other.scope
+            && self.label == other.label
+            && self.label_detail == other.label_detail
+            && self.snippet == other.snippet
+            && self.description == other.description
+    }
+}
+
+impl Eq for PostfixSnippet {}
 
 /// A prefix completion snippet.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

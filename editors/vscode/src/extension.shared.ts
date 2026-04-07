@@ -1,7 +1,11 @@
 import { type ExtensionContext, commands } from "vscode";
 import * as vscode from "vscode";
 
-import { loadTinymistConfig, TinymistConfig } from "./config";
+import {
+  applyExtensionManagedTinymistConfig,
+  loadTinymistConfig,
+  TinymistConfig,
+} from "./config";
 import { tinymist } from "./lsp";
 import { extensionState } from "./state";
 
@@ -35,15 +39,7 @@ function configureEditorAndLanguage(context: ExtensionContext, trait: TinymistTr
   const isWeb = extensionState.features.web;
   const { config } = trait;
 
-  // Inform server that we support named completion callback at the client side
-  config.triggerSuggest = true;
-  config.triggerSuggestAndParameterHints = true;
-  config.triggerParameterHints = true;
-  config.supportHtmlInMarkdown = true;
-  config.supportClientCodelens = true;
-  config.supportExtendedCodeAction = true;
-  config.customizedShowDocument = true;
-  config.delegateFsRequests = false; // todo: detect live sharing.
+  applyExtensionManagedTinymistConfig(config);
   // Sets shared features
   extensionState.features.preview = !isWeb && config.previewFeature === "enable";
   extensionState.features.wordSeparator = config.configureDefaultWordSeparator !== "disable";
