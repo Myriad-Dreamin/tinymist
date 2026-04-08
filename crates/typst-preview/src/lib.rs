@@ -62,13 +62,21 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str, page_title: &str) 
         PreviewMode::Document => "Doc",
         PreviewMode::Slide => "Slide",
     };
+    let page_title = escape_html_text(page_title);
 
     html.replace("ws://127.0.0.1:23625", to)
         .replace(
             "preview-arg:previewMode:Doc",
             format!("preview-arg:previewMode:{mode}").as_str(),
         )
-        .replace("preview-arg:pageTitle:", page_title)
+        .replace("preview-arg:pageTitle:", &page_title)
+}
+
+fn escape_html_text(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 /// Simply creates a previewer.

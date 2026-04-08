@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::sync::Arc;
 
 use futures::{SinkExt, StreamExt};
@@ -157,18 +156,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let page_title = args
-        .preview
-        .page_title
-        .clone()
-        .or_else(|| {
-            args.compile
-                .input
-                .as_deref()
-                .and_then(|input| Path::new(input).file_name())
-                .map(|name| name.to_string_lossy().into_owned())
-        })
-        .unwrap_or_else(|| "Typst Preview".to_string());
+    let page_title = tinymist::tool::preview::resolve_page_title(
+        args.preview.page_title.as_deref(),
+        args.compile.input.as_deref(),
+    );
     let frontend_html = frontend_html(
         TYPST_PREVIEW_HTML,
         args.preview.preview_mode,
