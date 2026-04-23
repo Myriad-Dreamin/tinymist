@@ -1244,8 +1244,8 @@ en = "Typst Extra Arguments"
 zh = "Typst 额外参数"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.desc]
-en = "CLI-shaped arguments for the supported Typst subset that Tinymist parses today. Supported examples include `--input`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`, plus a final entry file. Dedicated settings such as `tinymist.rootPath`, `tinymist.fontPaths`, and `tinymist.systemFonts` override overlapping arguments. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples."
-zh = "Tinymist 会解析一组受支持的 Typst CLI 风格参数，而不是无条件透传所有参数。当前支持的示例包括 `--input`、`--root`、`--font-path`、`--ignore-system-fonts`、`--package-path`、`--package-cache-path`、`--creation-timestamp`、`--cert`，以及最后一个作为入口文件的字符串。像 `tinymist.rootPath`、`tinymist.fontPaths` 和 `tinymist.systemFonts` 这样的专用设置会覆盖对应参数。示例请参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。"
+en = "CLI-shaped arguments for the supported Typst subset that Tinymist parses today. Supported examples include `--input`, `--features=html`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`, plus a final entry file. Dedicated settings such as `tinymist.rootPath`, `tinymist.fontPaths`, and `tinymist.systemFonts` override overlapping arguments. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples."
+zh = "Tinymist 会解析一组受支持的 Typst CLI 风格参数，而不是无条件透传所有参数。当前支持的示例包括 `--input`、`--features=html`、`--root`、`--font-path`、`--ignore-system-fonts`、`--package-path`、`--package-cache-path`、`--creation-timestamp`、`--cert`，以及最后一个作为入口文件的字符串。像 `tinymist.rootPath`、`tinymist.fontPaths` 和 `tinymist.systemFonts` 这样的专用设置会覆盖对应参数。示例请参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.items.title]
 en = "arguments in order"

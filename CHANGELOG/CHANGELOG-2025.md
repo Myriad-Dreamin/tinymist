@@ -408,7 +408,7 @@ There is a [sample workspace](https://github.com/Myriad-Dreamin/tinymist/tree/ma
 ### Server
 
 * Hot updating configuratuion item `tinymist.compileStatus` in https://github.com/Myriad-Dreamin/tinymist/pull/1584
-* Supporting `--feature` and `--pdf-standard` in `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/1596
+* Supporting `--features` and `--pdf-standard` in `typstExtraArgs` in https://github.com/Myriad-Dreamin/tinymist/pull/1596
 * Resolving roots of typst packages in https://github.com/Myriad-Dreamin/tinymist/pull/1663
 
 ### Compiler

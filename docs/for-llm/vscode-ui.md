@@ -525,7 +525,7 @@ Whether to prefix newlines after comments with the corresponding comment prefix.
 
 ## `tinymist.typstExtraArgs`
 
-CLI-shaped arguments for the supported Typst subset that Tinymist parses today. Supported examples include `--input`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`, plus a final entry file. Dedicated settings such as `tinymist.rootPath`, `tinymist.fontPaths`, and `tinymist.systemFonts` override overlapping arguments. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples.
+CLI-shaped arguments for the supported Typst subset that Tinymist parses today. Supported examples include `--input`, `--features=html`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`, plus a final entry file. Dedicated settings such as `tinymist.rootPath`, `tinymist.fontPaths`, and `tinymist.systemFonts` override overlapping arguments. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples.
 
 - **Type**: `array`
 - **Default**: `[]`

@@ -20,7 +20,7 @@ Tinymist documentation SHALL include a shared guide that explains how compiler s
 
 #### Scenario: Shared guide limits extra-argument examples to supported settings
 - **WHEN** the docs show `tinymist.typstExtraArgs` examples
-- **THEN** the examples use arguments Tinymist parses today, such as `--input`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`
+- **THEN** the examples use arguments Tinymist parses today, such as `--input`, `--features`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`
 - **AND** the docs do not imply that unsupported flags are accepted automatically
 
 ### Requirement: Friendly VS Code docs remain in place while linking to canonical compiler-setting details
