@@ -120,6 +120,6 @@ Example:
 ```
 
 *Note:* Fix entry to `main.typ` may help multiple-file projects
-but you may loss diagnostics and autocompletions in unrelated files.
+but you may lose diagnostics and autocompletions in unrelated files.
 
-*Note:* Please use `tinymist.typstExtraArgs` for the remaining CLI-shaped inputs only if you doesn't find a dedicated tinymist setting. For example, `--root` has a corresponding dedicated `tinymist.rootPath` setting.
+*Note:* Please use `tinymist.typstExtraArgs` for the remaining CLI-shaped inputs only if you don't find a dedicated tinymist setting. For example, `--root` has a corresponding dedicated `tinymist.rootPath` setting.
