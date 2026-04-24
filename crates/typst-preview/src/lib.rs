@@ -12,7 +12,7 @@ pub use crate::actor::editor::{
 pub use crate::outline::Outline;
 
 use std::sync::{Arc, OnceLock};
-use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
+use std::{borrow::Cow, collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
 use bytes::Bytes;
 use futures::sink::SinkExt;
@@ -72,7 +72,10 @@ pub fn frontend_html(html: &str, mode: PreviewMode, to: &str, page_title: &str) 
         .replace("preview-arg:pageTitle:", &page_title)
 }
 
-fn escape_html_text(value: &str) -> String {
+// TODO: Drop this local copy after upstreaming the fix to reflexo's vendored
+// XML escape helper, which still predates
+// https://github.com/netvl/xml-rs/commit/59d629458f596611f6627357e522af4d7bcba13e.
+escape_html_text(value: &str) -> String {
     value
         .replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -332,6 +335,17 @@ pub enum WsMessage {
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
+
+#[cfg(test)]
+mod tests {
+    use super::escape_html_text;
+
+    #[test]
+    fn escapes_html_text_without_breaking_multibyte_code_points() {
+        assert_eq!(escape_html_text("☃<>&"), "☃&lt;&gt;&amp;");
+        assert_eq!(escape_html_text("plain text"), "plain text");
+    }
+}
 
 pub enum Location {
     Src(SourceLocation),
