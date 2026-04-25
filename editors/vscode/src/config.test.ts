@@ -24,7 +24,11 @@ vi.mock("./vscode-variables", () => ({
   vscodeVariables: hoisted.vscodeVariables,
 }));
 
-import { loadTinymistConfig, substVscodeVarsInConfig } from "./config.js";
+import {
+  loadTinymistConfig,
+  patchInjectedClientOptionsInConfig,
+  substVscodeVarsInConfig,
+} from "./config.js";
 
 beforeEach(() => {
   hoisted.getConfiguration.mockReset();
@@ -54,4 +58,43 @@ test("substVscodeVarsInConfig ignores mixed-type fontPaths arrays", () => {
     substVscodeVarsInConfig(["tinymist.fontPaths"], [["${workspaceFolder}/fonts", 1]]),
   ).toEqual([undefined]);
   expect(hoisted.showErrorMessage).toHaveBeenCalledTimes(1);
+});
+
+test("patchInjectedClientOptionsInConfig fills requested injected flags", () => {
+  expect(
+    patchInjectedClientOptionsInConfig(
+      ["tinymist.supportClientCodelens", "supportExtendedCodeAction", "tinymist.compileStatus"],
+      [undefined, null, "disable"],
+      {
+        supportClientCodelens: true,
+        supportExtendedCodeAction: false,
+        compileStatus: "enable",
+      },
+    ),
+  ).toEqual([true, false, "disable"]);
+});
+
+test("patchInjectedClientOptionsInConfig patches tinymist objects without overriding values", () => {
+  expect(
+    patchInjectedClientOptionsInConfig(
+      ["tinymist"],
+      [
+        {
+          supportClientCodelens: false,
+          supportExtendedCodeAction: null,
+        },
+      ],
+      {
+        supportClientCodelens: true,
+        supportExtendedCodeAction: true,
+        delegateFsRequests: false,
+      },
+    ),
+  ).toEqual([
+    {
+      supportClientCodelens: false,
+      supportExtendedCodeAction: true,
+      delegateFsRequests: false,
+    },
+  ]);
 });

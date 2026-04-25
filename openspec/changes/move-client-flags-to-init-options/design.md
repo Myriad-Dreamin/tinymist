@@ -1,57 +1,63 @@
 ## Context
 
-Tinymist's server configuration currently has one broad parsing path:
+Tinymist currently has one broad configuration parsing path:
 
 - `Config::extract_lsp_params` reads `initializationOptions` during `initialize`
-- later `workspace/didChangeConfiguration` notifications and `workspace/configuration` polling feed back into the same `Config::update_by_map` logic
+- `workspace/didChangeConfiguration` notifications and `workspace/configuration` polling later feed back into `Config::update_by_map`
 
-That shared path is appropriate for real workspace settings such as `exportPdf`, `semanticTokens`, or formatter options. It is not a good fit for client-session metadata that is injected by the editor integration at startup and is not meant to be requested from workspace settings afterward.
+That shared path is useful and should stay. Issue `#2390` highlights that options such as `supportClientCodelens` and `compileStatus` can be editor-integration values rather than ordinary user workspace settings, but making them init-only would create a different problem: some clients can only expose these values through workspace configuration and configuration-change notifications.
 
-Issue `#2390` highlights the problem with `supportClientCodelens` and `compileStatus`, but the current runtime config list also includes other initialize-time client flags:
+The right boundary is therefore not a separate parse path. These options should remain configuration-wide, and the special handling should be limited to their apply semantics:
 
-- `triggerSuggest`
-- `triggerParameterHints`
-- `triggerSuggestAndParameterHints`
-- `supportHtmlInMarkdown`
-- `supportClientCodelens`
-- `supportExtendedCodeAction`
-- `customizedShowDocument`
-- `delegateFsRequests`
-
-When a client later refreshes configuration, missing or `null` values for those keys can fall back to defaults and silently change server behavior mid-session. That means code-lens handling, completion callbacks, markdown rendering expectations, and other client-coupled behavior can drift away from the values the client declared during `initialize`.
+```text
+initializationOptions
+workspace/configuration
+workspace/didChangeConfiguration
+        │
+        ▼
+ unified Config parse/update
+        │
+        ▼
+ effective Config snapshot
+        │
+        ▼
+ diff by apply scope
+        │
+        ├─ hot-reload fields
+        ├─ editor actor fields
+        └─ restart-scoped client options -> reload projects
+```
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Separate session-scoped client options from hot-reloadable workspace config.
-- Make the initialize-time values for client capability flags stable for the lifetime of an LSP session.
-- Treat `compileStatus` as a session-scoped opt-in that is declared during initialization rather than polled as ordinary workspace config.
-- Prevent runtime configuration refreshes from clearing or mutating initialize-time client flags.
-- Add regression coverage for both initialize payloads and later config-refresh behavior.
+- Keep editor-integration options in the normal configuration lifecycle.
+- Add the missing client option keys to runtime configuration polling so refreshes provide complete effective values.
+- Ensure configuration parsing updates these options from both initialization and runtime configuration sources.
+- Reload projects when restart-scoped client options change.
+- Ensure shipped editor integrations return injected client-capability values during runtime configuration polling.
+- Add regression coverage for request lists, parsing, and restart-scope diffing.
 
 **Non-Goals:**
 
-- Redesign every Tinymist config field or rename all existing options.
-- Change unrelated runtime settings such as formatter, export, preview, lint, or semantic token behavior.
+- Move client options to an init-only protocol.
+- Redesign every Tinymist config field.
+- Expose non-user client capability flags as user settings.
 - Fix the fallback `tinymist.exportPdf` relative-path error also mentioned in `#2390`.
-- Define a brand-new cross-editor config protocol beyond what Tinymist already passes in `initializationOptions`.
+- Define a new cross-editor protocol beyond LSP initialization options and workspace configuration.
 
 ## Decisions
 
-### 1. Split session-scoped client options from runtime workspace config
+### 1. Keep one configuration parse path
 
-Tinymist should model initialize-time client metadata separately from ordinary workspace settings, even if both are still represented inside the same top-level `initializationOptions` JSON object on the wire. The important distinction is lifecycle: session-scoped options are captured once during `initialize` and then treated as immutable for that server session.
+Tinymist should continue parsing these values through `Config::update_by_map`. Initialization options are an early configuration source, not a separate lifetime class. Runtime configuration responses and complete runtime configuration notifications should be able to update the same fields.
 
-Alternative considered:
+This avoids per-key preservation logic such as "keep the initialize value if runtime config omits this key." Instead, the configuration source is responsible for returning the complete effective value for keys Tinymist requests.
 
-- Keep one config bucket and only special-case `supportClientCodelens`. Rejected because `#2390` exposes a broader lifecycle problem and the same config-refresh bug already applies to other injected client flags.
+### 2. Poll the complete client option set
 
-### 2. Stop requesting session-scoped keys through `workspace/configuration`
-
-Runtime config polling should only ask the client for settings that are truly workspace configuration. Session-scoped keys should be removed from the request list and ignored if a client still includes them in `didChangeConfiguration`.
-
-This change should cover at least:
+Runtime configuration polling should include the editor-integration options that Tinymist parses today:
 
 - `compileStatus`
 - `triggerSuggest`
@@ -63,43 +69,30 @@ This change should cover at least:
 - `customizedShowDocument`
 - `delegateFsRequests`
 
-Alternative considered:
+This makes parsing deterministic: when Tinymist asks for configuration, it asks for all fields needed to build the effective config snapshot.
 
-- Continue requesting the keys but preserve previous values when the response is `null`. Rejected because it keeps the protocol boundary ambiguous and still treats client metadata as if it were workspace config.
+### 3. Apply these options through a project restart boundary
 
-### 3. Treat `compileStatus` as a session-scoped opt-in
+Some consumers of these values are project-facing or actor-facing and are not clean hot-reload fields. Tinymist should compare a focused restart-scoped client option snapshot after config parsing and call `reload_projects` when it changes.
 
-`compileStatus` controls whether Tinymist sends `tinymist/compileStatus` notifications and performs related status-word-count integration. That behavior should be decided for the current LSP session during initialization and remain stable until the next `initialize`.
+This keeps the parse model ordinary while making the application boundary explicit.
 
-Clients that expose `compileStatus` as a user-facing setting may still let users change it, but the effect should be applied by starting a new server session rather than by mutating the running server through `workspace/didChangeConfiguration`.
+### 4. Editor integrations must return injected capability values
 
-Alternative considered:
+The VS Code extension injects capability values such as `supportClientCodelens` and `triggerSuggest` into the initialization config object. Those keys are not normal user-facing VS Code settings, so a plain `workspace/configuration` lookup can return `null` or `undefined` for them.
 
-- Keep `compileStatus` hot-reloadable while moving only `supportClientCodelens` to initialize-time config. Rejected because `#2390` explicitly calls out `compileStatus` as the same kind of session property, and changing it live would preserve the current split-brain config model.
-
-### 4. Lock the lifecycle with focused config and LSP tests
-
-The change should add or adjust tests that prove:
-
-- initialize-time session options are parsed from `initializationOptions`
-- later config refreshes do not overwrite those options
-- `supportClientCodelens` keeps the same code-lens mode across config reloads
-- `compileStatus` keeps the same notification behavior for the whole session
-
-Alternative considered:
-
-- Rely on existing smoke coverage only. Rejected because the bug is specifically about the interaction between initialization and later config refreshes.
+The extension's configuration middleware should fill those requested sections from the injected config object when VS Code has no user setting value. User-facing settings such as `compileStatus` should remain driven by the normal VS Code configuration result.
 
 ## Risks / Trade-offs
 
-- [Users may expect `compileStatus` changes to apply instantly] -> Mitigate with clear docs and client behavior that treats the setting as restart-scoped instead of silently pretending it is hot-reloadable.
-- [Some third-party clients may currently send these keys via runtime config only] -> Mitigate by keeping initialize-time defaults conservative and updating shipped integrations and docs to show the intended contract.
-- [Separating session and runtime config could touch several code paths] -> Mitigate by keeping the split narrow and test-driven around the request list, config parsing, and the specific behaviors from `#2390`.
+- [Third-party clients may send partial `didChangeConfiguration` objects] -> Tinymist's direct notification path continues to expect an effective configuration object. Clients that cannot provide one should send an empty or non-object settings payload so Tinymist polls `workspace/configuration`.
+- [Project reloads may be broader than strictly necessary] -> The restart-scoped option set is intentionally focused on editor-integration values where a consistent boundary is more important than micro-optimizing hot updates.
+- [Injected client flags are not user settings] -> Keep them out of user-facing config surfaces and only synthesize them inside editor integration configuration responses.
 
 ## Migration Plan
 
-1. Introduce a dedicated session-scoped config path for initialize-time client options.
-2. Remove session-scoped keys from runtime config polling and ignore them during `didChangeConfiguration`.
-3. Update shipped editor integrations and initialization fixtures to send the session-scoped values through `initializationOptions`.
-4. Add regression tests around config refreshes so initialize-time client flags stay stable.
-5. Update docs to distinguish session-scoped options from normal workspace settings, especially for `compileStatus`.
+1. Update the OpenSpec capability and tasks from init-only session options to configuration-wide restart-scoped client options.
+2. Add missing editor-integration keys to `Config::get_items` polling.
+3. Add a restart-scoped client option diff in server config application and reload projects when it changes.
+4. Update VS Code configuration middleware to return injected capability values for requested sections.
+5. Add focused regression tests for config polling, parsing updates, and VS Code response synthesis.

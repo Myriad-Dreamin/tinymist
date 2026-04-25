@@ -163,8 +163,18 @@ impl ServerState {
                 .log_error("could not change editor actor configuration");
         }
 
-        if old_config.primary_opts() != self.config.primary_opts() {
-            self.config.fonts = OnceLock::new(); // todo: don't reload fonts if not changed
+        let primary_opts_changed = old_config.primary_opts() != self.config.primary_opts();
+        let restart_scoped_client_opts_changed =
+            old_config.restart_scoped_client_opts() != self.config.restart_scoped_client_opts();
+        if primary_opts_changed || restart_scoped_client_opts_changed {
+            if old_config.delegate_fs_requests != self.config.delegate_fs_requests {
+                self.config.access_model = OnceLock::new();
+                self.config.watch_access_model = OnceLock::new();
+            }
+            if primary_opts_changed {
+                // todo: don't reload fonts if not changed
+                self.config.fonts = OnceLock::new();
+            }
             self.reload_projects()
                 .log_error("could not restart primary");
         }

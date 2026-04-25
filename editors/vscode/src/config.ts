@@ -8,6 +8,17 @@ export interface TinymistConfig {
   serverPath?: string;
 }
 
+const INJECTED_CLIENT_OPTION_CONFIG_KEYS = [
+  "triggerSuggest",
+  "triggerParameterHints",
+  "triggerSuggestAndParameterHints",
+  "supportHtmlInMarkdown",
+  "supportClientCodelens",
+  "supportExtendedCodeAction",
+  "customizedShowDocument",
+  "delegateFsRequests",
+];
+
 export function loadTinymistConfig(): TinymistConfig {
   let config: Record<string, any> = JSON.parse(
     JSON.stringify(vscode.workspace.getConfiguration("tinymist")),
@@ -22,6 +33,31 @@ export function loadTinymistConfig(): TinymistConfig {
     config[keys[i]] = values[i];
   }
   return config;
+}
+
+export function patchInjectedClientOptionsInConfig(
+  keys: (string | undefined)[],
+  values: unknown[],
+  config: TinymistConfig,
+): unknown[] {
+  return values.map((value, i) => {
+    const section = keys[i];
+    if (section === "tinymist" && isObjectRecord(value)) {
+      return patchInjectedClientOptionsObject(value, config);
+    }
+
+    const key = tinymistConfigKey(section);
+    if (
+      key &&
+      INJECTED_CLIENT_OPTION_CONFIG_KEYS.includes(key) &&
+      (value === undefined || value === null) &&
+      Object.prototype.hasOwnProperty.call(config, key)
+    ) {
+      return config[key];
+    }
+
+    return value;
+  });
 }
 
 const STR_VARIABLES = [
@@ -88,6 +124,33 @@ function substFontPaths(value: unknown): string[] | undefined {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function tinymistConfigKey(section: string | undefined): string | undefined {
+  if (!section) {
+    return undefined;
+  }
+  return section.startsWith("tinymist.") ? section.slice("tinymist.".length) : section;
+}
+
+function patchInjectedClientOptionsObject(
+  value: Record<string, unknown>,
+  config: TinymistConfig,
+): Record<string, unknown> {
+  const next = { ...value };
+  for (const key of INJECTED_CLIENT_OPTION_CONFIG_KEYS) {
+    if (
+      (next[key] === undefined || next[key] === null) &&
+      Object.prototype.hasOwnProperty.call(config, key)
+    ) {
+      next[key] = config[key];
+    }
+  }
+  return next;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function determineVscodeTheme(): any {
