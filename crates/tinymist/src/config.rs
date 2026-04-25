@@ -40,18 +40,6 @@ use tinymist_preview::{PreviewConfig, PreviewInvertColors};
 use crate::project::{ExportPdfTask, ProjectTask};
 
 // region Configuration Items
-const RESTART_SCOPED_CLIENT_CONFIG_ITEMS: &[&str] = &[
-    "compileStatus",
-    "triggerSuggest",
-    "triggerParameterHints",
-    "triggerSuggestAndParameterHints",
-    "supportHtmlInMarkdown",
-    "supportClientCodelens",
-    "supportExtendedCodeAction",
-    "customizedShowDocument",
-    "delegateFsRequests",
-];
-
 const CONFIG_ITEMS: &[&str] = &[
     "tinymist",
     "colorTheme",
@@ -1249,19 +1237,12 @@ mod tests {
             .into_iter()
             .filter_map(|item| item.section)
             .collect::<Vec<_>>();
+        let expected = CONFIG_ITEMS
+            .iter()
+            .flat_map(|&item| [format!("tinymist.{item}"), item.to_owned()])
+            .collect::<Vec<_>>();
 
-        for key in RESTART_SCOPED_CLIENT_CONFIG_ITEMS {
-            assert!(
-                sections
-                    .iter()
-                    .any(|section| section == &format!("tinymist.{key}")),
-                "missing tinymist.{key}"
-            );
-            assert!(
-                sections.iter().any(|section| section == key),
-                "missing {key}"
-            );
-        }
+        assert_eq!(sections, expected);
     }
 
     #[test]
