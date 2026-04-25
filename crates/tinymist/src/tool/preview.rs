@@ -122,6 +122,7 @@ pub struct PreviewArgs {
     pub refresh_style: Option<RefreshStyle>,
 }
 
+/// Resolves the browser page title for preview HTML.
 pub fn resolve_page_title(page_title: Option<&str>, input: Option<&str>) -> String {
     if let Some(title) = page_title {
         return title.to_owned();

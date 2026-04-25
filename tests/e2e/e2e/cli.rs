@@ -395,6 +395,12 @@ fn test_help_preview() {
               
               [default: document]
 
+          --page-title <TITLE>
+              Set the preview page title.
+              
+              If not specified, the title falls back to the input filename when available, or otherwise
+              to `"Typst Preview"`.
+
           --partial-rendering <ENABLE_PARTIAL_RENDERING>
               Only render visible part of the document.
               
