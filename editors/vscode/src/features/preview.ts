@@ -108,15 +108,15 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("tinymist.previewDevSlide", launchDevPreview("slide")),
     ...(isCompat
       ? [
-          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelCompat),
-          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentCompat),
-          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollCompat),
-        ]
+        vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelCompat),
+        vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentCompat),
+        vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollCompat),
+      ]
       : [
-          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelLsp),
-          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentLsp),
-          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollLsp),
-        ]),
+        vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelLsp),
+        vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentLsp),
+        vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollLsp),
+      ]),
     vscode.commands.registerCommand("tinymist.doInspectPreviewState", () => {
       const tasks = Array.from(activeTask.values()).map((t) => {
         return {
@@ -309,14 +309,14 @@ export async function openPreviewInWebView({
     webviewPanel !== undefined
       ? webviewPanel
       : vscode.window.createWebviewPanel(
-          "typst-preview",
-          `${basename}${l10nMsg(" (Preview)")}`,
-          getTargetViewColumn(activeEditor.viewColumn),
-          {
-            enableScripts: true,
-            retainContextWhenHidden: true,
-          },
-        );
+        "typst-preview",
+        `${basename}${l10nMsg(" (Preview)")}`,
+        getTargetViewColumn(activeEditor.viewColumn),
+        {
+          enableScripts: true,
+          retainContextWhenHidden: true,
+        },
+      );
 
   const previewState: PersistPreviewState = {
     mode: task.mode,
@@ -401,7 +401,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   }
 
   const taskId = Math.random().toString(36).substring(7);
-  const filePath = bindDocument.uri.fsPath;
+  const fileUri = bindDocument.uri.toString();
 
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
@@ -409,7 +409,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   const { dataPlanePort, staticServerPort, isPrimary } = await invokeLspCommand();
   if (!dataPlanePort || !staticServerPort) {
     disposes.dispose();
-    throw new Error(`Failed to launch preview ${filePath}`);
+    throw new Error(`Failed to launch preview ${fileUri}`);
   }
 
   // update real primary state
@@ -464,7 +464,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
     const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
 
-    console.log(`Preview Command ${filePath}`);
+    console.log(`Preview Command ${fileUri}`);
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
 
@@ -474,7 +474,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       ...dataPlaneHostArgs,
       ...previewInSlideModeArgs,
       ...(isNotPrimary ? ["--not-primary"] : []),
-      filePath,
+      fileUri,
     ];
 
     const { dataPlanePort, staticServerPort, isPrimary } = await (isBrowsing
@@ -636,12 +636,12 @@ async function scrollPreviewPanel(taskId: string, scrollRequest: ScrollPreviewRe
   tinymist.scrollPreview(taskId, scrollRequest);
 }
 
-let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => {};
+let resolveContentPreviewProvider: (value: ContentPreviewProvider) => void = () => { };
 export const contentPreviewProvider = new Promise<ContentPreviewProvider>((resolve) => {
   resolveContentPreviewProvider = resolve;
 });
 
-let resolveOutlineProvider: (value: OutlineProvider) => void = () => {};
+let resolveOutlineProvider: (value: OutlineProvider) => void = () => { };
 export const outlineProvider = new Promise<OutlineProvider>((resolve) => {
   resolveOutlineProvider = resolve;
 });
@@ -666,7 +666,7 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
     private readonly context: vscode.ExtensionContext,
     private readonly extensionUri: vscode.Uri,
     private readonly htmlContent: string,
-  ) {}
+  ) { }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
@@ -782,7 +782,7 @@ interface OutlineItemData {
 }
 
 class OutlineProvider implements vscode.TreeDataProvider<OutlineItem> {
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) { }
 
   private _onDidChangeTreeData: vscode.EventEmitter<OutlineItem | undefined | void> =
     new vscode.EventEmitter<OutlineItem | undefined | void>();

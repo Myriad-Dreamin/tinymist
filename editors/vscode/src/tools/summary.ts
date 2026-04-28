@@ -96,7 +96,7 @@ async function fetchSummaryInfo(): Promise<[string | undefined, string | undefin
       return res;
     }
 
-    await work(focusingFile, res);
+    await work(focusingFile.toString(), res);
     if (res[0] && res[1]) {
       break;
     }

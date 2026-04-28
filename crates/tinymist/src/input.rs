@@ -173,14 +173,16 @@ impl ServerState {
 
     /// Changes main file to the given path.
     pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
-        if path.as_deref().is_some_and(|p| {
-            let is_absolute = if cfg!(target_arch = "wasm32") {
-                p.has_root()
-            } else {
-                p.is_absolute()
-            };
-            !is_absolute && !p.starts_with("/untitled")
-        }) {
+        if !self.config.delegate_fs_requests
+            && path.as_deref().is_some_and(|p| {
+                let is_absolute = if cfg!(target_arch = "wasm32") {
+                    p.has_root()
+                } else {
+                    p.is_absolute()
+                };
+                !is_absolute && !p.starts_with("/untitled")
+            })
+        {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 

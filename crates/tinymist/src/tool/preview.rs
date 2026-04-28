@@ -22,7 +22,7 @@ use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
     PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
 };
-use tinymist_query::{LspPosition, LspRange};
+use tinymist_query::{path_arg, LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 
@@ -292,17 +292,9 @@ impl ServerState {
         let config = cli_args.preview.config(&self.config.preview());
 
         // todo: preview specific arguments are not used
-        let entry = cli_args.compile.input.as_ref();
-        let entry = entry
-            .map(|input| {
-                let input = Path::new(&input);
-                if !input.is_absolute() {
-                    // std::env::current_dir().unwrap().join(input)
-                    return Err(invalid_params("entry file must be absolute path"));
-                };
-
-                Ok(input.into())
-            })
+        let cli_entry = cli_args.compile.input.as_ref();
+        let entry = cli_entry
+            .map(|input| path_arg(input, "entry file").map_err(invalid_params))
             .transpose()?;
 
         let task_id = cli_args.task_id.clone();

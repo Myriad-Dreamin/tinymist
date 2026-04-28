@@ -101,13 +101,14 @@ export class LanguageState {
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => { };
+  delegateFsRequests = false;
+  clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => { };
+    this.clientPromiseResolve = (_client: LanguageClient) => {};
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -164,9 +165,9 @@ export class LanguageState {
     const serverPaths: [string, string][] = configPath
       ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
-        ["Bundled", resolve(__dirname, binaryName)],
-        ["In PATH", binaryName],
-      ];
+          ["Bundled", resolve(__dirname, binaryName)],
+          ["In PATH", binaryName],
+        ];
 
     return tinymist.probePaths(serverPaths);
   }
@@ -306,7 +307,7 @@ export class LanguageState {
         },
       },
     };
-
+    this.delegateFsRequests = !!(config as any).delegateFsRequests;
     const client = (this.client = await LanguageState.Client(context, config, clientOptions));
 
     this.clientPromiseResolve(client);
@@ -481,8 +482,20 @@ export class LanguageState {
     const hasRead = new Map<string, [number, FileResult | undefined]>();
     let watchClock = 0;
 
-    const tryRead = async (uri: vscode.Uri) =>
-      vscode.workspace.fs.readFile(uri).then(
+    const tryRead = async (uri: vscode.Uri) => {
+      {
+        // Virtual workspaces don't provide a filesystem provider that supports workspace.fs.readFile
+        // Uses the open TextDocument whenever available.
+        const doc = vscode.workspace.textDocuments.find((d) => d.uri.toString() === uri.toString());
+        if (doc) {
+          const text = doc.getText();
+          const data = Buffer.from(text, "utf8");
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        }
+      }
+
+      // Otherwise falls back to workspace.fs for real files
+      return vscode.workspace.fs.readFile(uri).then(
         (data): FileResult => {
           return { type: "ok", content: bytesBase64Encode(data) } as const;
         },
@@ -491,6 +504,7 @@ export class LanguageState {
           return { type: "err", error: err.message as string } as const;
         },
       );
+    };
 
     const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
       const previous = hasRead.get(uri);
@@ -555,35 +569,36 @@ export class LanguageState {
         vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
       );
 
-      const filesToRead = new Set<string>();
-      const filesDeleted = new Set<string>();
+      const filesToRead: vscode.Uri[] = [];
+      const filesDeleted: string[] = [];
 
-      for (const path of params.inserts) {
-        if (!watches.has(path)) {
-          filesToRead.add(path);
-          watches.add(path);
+      for (const uriStr of params.inserts) {
+        const uriObj = vscode.Uri.parse(uriStr);
+        if (!watches.has(uriStr)) {
+          filesToRead.push(uriObj);
+          watches.add(uriStr);
         }
       }
 
-      for (const path of params.removes) {
-        if (watches.has(path)) {
-          filesDeleted.add(path);
-          watches.delete(path);
+      for (const uriStr of params.removes) {
+        if (watches.has(uriStr)) {
+          filesDeleted.push(uriStr);
+          watches.delete(uriStr);
         }
       }
-      const removes: string[] = params.removes.filter((path) => {
-        return filesDeleted.has(path) && registerHasRead(path, currentClock, undefined);
+
+      const removes: string[] = filesDeleted.filter((path) => {
+        return registerHasRead(path, currentClock, undefined);
       });
 
       (async () => {
-        const paths = Array.from(filesToRead);
-        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
-
         watcher();
 
-        const inserts: FileChange[] = paths
-          .map((path, idx) => ({
-            uri: path,
+        const readFiles = await Promise.all(filesToRead.map((uri) => tryRead(uri)));
+
+        const inserts: FileChange[] = filesToRead
+          .map((uri, idx) => ({
+            uri: uri.toString(),
             content: readFiles[idx],
           }))
           .filter((change) => registerHasRead(change.uri, currentClock, change.content));
@@ -826,17 +841,17 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
   ? CodeContextQueryResult
   : Q extends ModeAtQuery
-  ? ModeAtQueryResult
-  : Q extends StyleAtQuery
-  ? StyleAtQueryResult
-  : never;
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
 export type CodeContextQueryResult<T = any> =
   | {
-    value: T;
-  }
+      value: T;
+    }
   | {
-    error: string;
-  };
+      error: string;
+    };
 export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
 export type StyleAtQueryResult = {
   style: any[];
@@ -883,6 +898,8 @@ function isCodeActionWithoutEditsAndCommands(value: any): boolean {
 }
 
 interface FsWatchRequest {
+  // delivered by vscode-languageclient
+  // can be strings or vscode.Uri objects depending on the transport.
   inserts: string[];
   removes: string[];
 }
