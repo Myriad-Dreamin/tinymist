@@ -1,4 +1,4 @@
-use lsp_types::{InlayHintKind, InlayHintLabel};
+use lsp_types::{InlayHintKind, Label};
 use typst::syntax::{LinkedNode, SyntaxKind, ast};
 
 use crate::{
@@ -253,7 +253,7 @@ impl InlayHintWorker<'_> {
                     let pos = arg_node.range().start;
                     let lsp_pos = self.ctx.to_lsp_pos(pos, self.source);
 
-                    let label = InlayHintLabel::String(if info.kind == ParamKind::Rest {
+                    let label = Label::String(if info.kind == ParamKind::Rest {
                         format!("..{name}:")
                     } else {
                         format!("{name}:")
@@ -262,7 +262,7 @@ impl InlayHintWorker<'_> {
                     self.hints.push(InlayHint {
                         position: lsp_pos,
                         label,
-                        kind: Some(InlayHintKind::PARAMETER),
+                        kind: Some(InlayHintKind::Parameter),
                         text_edits: None,
                         tooltip: None,
                         padding_left: None,
@@ -333,10 +333,10 @@ impl InlayHintWorker<'_> {
 
         self.hints.push(InlayHint {
             position: lsp_pos,
-            label: InlayHintLabel::String(label.to_string()),
-            kind: Some(InlayHintKind::TYPE),
+            label: Label::String(label.to_string()),
+            kind: Some(InlayHintKind::Type),
             text_edits: None,
-            tooltip: tooltip.map(|t| lsp_types::InlayHintTooltip::String(t.to_string())),
+            tooltip: tooltip.map(|t| lsp_types::Tooltip::String(t.to_string())),
             padding_left: Some(true),
             padding_right: None,
             data: None,

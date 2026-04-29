@@ -32,7 +32,7 @@ pub struct PrepareRenameRequest {
 // todo: rename alias
 // todo: rename import path?
 impl SemanticRequest for PrepareRenameRequest {
-    type Response = PrepareRenameResponse;
+    type Response = PrepareRenameResult;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -59,10 +59,12 @@ impl SemanticRequest for PrepareRenameRequest {
 
         let name = prepare_renaming(&syntax, &def)?;
 
-        Some(PrepareRenameResponse::RangeWithPlaceholder {
-            range: origin_selection_range,
-            placeholder: name,
-        })
+        Some(PrepareRenameResult::PrepareRenamePlaceholder(
+            PrepareRenamePlaceholder {
+                range: origin_selection_range,
+                placeholder: name,
+            },
+        ))
     }
 }
 

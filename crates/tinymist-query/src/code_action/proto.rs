@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use ecow::EcoString;
 use lsp_types::{
     ChangeAnnotation, ChangeAnnotationIdentifier, CodeActionDisabled, CodeActionKind, Command,
-    Diagnostic, InsertTextFormat, OneOf, OptionalVersionedTextDocumentIdentifier, ResourceOp, Url,
+    CreateFile, DeleteFile, Diagnostic, InsertTextFormat, OptionalVersionedTextDocumentIdentifier,
+    RenameFile, Uri as Url,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -27,7 +28,7 @@ impl EcoSnippetTextEdit {
     pub fn new_plain(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
         EcoSnippetTextEdit {
             edit: EcoTextEdit::new(range, new_text),
-            insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+            insert_text_format: Some(InsertTextFormat::PlainText),
         }
     }
 
@@ -35,7 +36,7 @@ impl EcoSnippetTextEdit {
     pub fn new(range: LspRange, new_text: EcoString) -> EcoSnippetTextEdit {
         EcoSnippetTextEdit {
             edit: EcoTextEdit::new(range, new_text),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            insert_text_format: Some(InsertTextFormat::Snippet),
         }
     }
 }
@@ -52,6 +53,15 @@ pub struct EcoAnnotatedTextEdit {
 
     /// The actual annotation
     pub annotation_id: ChangeAnnotationIdentifier,
+}
+
+/// A value that can be one of two types.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OneOf<T, U> {
+    #[allow(missing_docs)]
+    Left(T),
+    #[allow(missing_docs)]
+    Right(U),
 }
 
 /// Describes textual changes on a single text document. The text document is
@@ -201,8 +211,12 @@ pub enum EcoDocumentChanges {
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(untagged, rename_all = "lowercase")]
 pub enum EcoDocumentChangeOperation {
-    /// A resource operation.
-    Op(ResourceOp),
+    /// Create file operation.
+    CreateFile(CreateFile),
+    /// Rename file operation.
+    RenameFile(RenameFile),
+    /// Delete file operation.
+    DeleteFile(DeleteFile),
     /// A text document edit.
     Edit(EcoTextDocumentEdit),
 }
@@ -211,7 +225,7 @@ mod url_map {
     use std::marker::PhantomData;
     use std::{collections::HashMap, fmt};
 
-    use lsp_types::Url;
+    use lsp_types::Uri as Url;
     use serde::de;
 
     pub fn deserialize<'de, D, V>(deserializer: D) -> Result<Option<HashMap<Url, V>>, D::Error>

@@ -91,7 +91,7 @@ impl SemanticRequest for SignatureHelpRequest {
             let documentation = param.docs.as_ref().map(|docs| markdown_docs(ctx, docs));
 
             params.push(ParameterInformation {
-                label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
+                label: lsp_types::ParameterInformationLabel::String(format!("{}:", param.name)),
                 documentation,
             });
         }
@@ -118,7 +118,7 @@ impl SemanticRequest for SignatureHelpRequest {
                     .as_ref()
                     .map(|docs| markdown_docs(ctx, docs)),
                 parameters: Some(params),
-                active_parameter: active_parameter.map(|x| x as u32),
+                active_parameter: active_parameter.map(|x| ActiveParameter::Int(x as u32)),
             }],
             active_signature: Some(0),
             active_parameter: None,

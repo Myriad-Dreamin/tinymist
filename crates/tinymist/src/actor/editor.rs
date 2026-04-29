@@ -3,8 +3,10 @@
 
 use std::collections::HashMap;
 
-use lsp_types::notification::{Notification, PublishDiagnostics as PublishDiagnosticsBase};
-use lsp_types::{Diagnostic, Url};
+use lsp_types::{
+    Diagnostic, LspNotificationMethod, Notification,
+    PublishDiagnosticsNotification as PublishDiagnosticsBase, Uri as Url,
+};
 use reflexo::path::unix_slash;
 use reflexo_typst::typst::prelude::{eco_vec, EcoVec};
 use serde::{Deserialize, Serialize};
@@ -245,9 +247,12 @@ struct StatusAll {
     pub words_count: Option<WordsCount>,
 }
 
-impl lsp_types::notification::Notification for StatusAll {
+impl lsp_types::Notification for StatusAll {
     type Params = Self;
-    const METHOD: &'static str = "tinymist/compileStatus";
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ClientToServer;
+    const METHOD: LspNotificationMethod<'_> =
+        LspNotificationMethod::Custom("tinymist/compileStatus");
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
@@ -271,7 +276,9 @@ pub enum PublishDiagnostics {}
 
 impl Notification for PublishDiagnostics {
     type Params = PublishDiagnosticsParams;
-    const METHOD: &'static str = PublishDiagnosticsBase::METHOD;
+    const METHOD: LspNotificationMethod<'_> = PublishDiagnosticsBase::METHOD;
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ServerToClient;
 }
 
 /// A scatter vector that is serialized as a flatten representation.
