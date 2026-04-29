@@ -97,16 +97,16 @@ impl Initializer for SuperInit {
             return (state, Err(err));
         }
 
-        let semantic_tokens_provider = (!const_config.tokens_dynamic_registration).then(|| {
-            SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options())
-        });
+        let semantic_tokens_provider = (!const_config.tokens_dynamic_registration)
+            .then(|| SemanticTokensProvider::SemanticTokensOptions(get_semantic_tokens_options()));
         let document_formatting_provider =
-            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
+            (!const_config.doc_fmt_dynamic_registration).then_some(true.into());
         let document_range_formatting_provider =
-            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
+            (!const_config.doc_fmt_dynamic_registration).then_some(true.into());
 
-        let file_operations = const_config.notify_will_rename_files.then(|| {
-            WorkspaceFileOperationsServerCapabilities {
+        let file_operations = const_config
+            .notify_will_rename_files
+            .then(|| FileOperationOptions {
                 will_rename: Some(FileOperationRegistrationOptions {
                     filters: vec![FileOperationFilter {
                         scheme: Some("file".to_string()),
@@ -117,14 +117,13 @@ impl Initializer for SuperInit {
                         },
                     }],
                 }),
-                ..WorkspaceFileOperationsServerCapabilities::default()
-            }
-        });
+                ..FileOperationOptions::default()
+            });
 
         let res = InitializeResult {
             capabilities: ServerCapabilities {
                 position_encoding: Some(const_config.position_encoding.into()),
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
+                hover_provider: Some(true.into()),
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec![
                         String::from("("),
@@ -136,8 +135,8 @@ impl Initializer for SuperInit {
                         work_done_progress: None,
                     },
                 }),
-                definition_provider: Some(OneOf::Left(true)),
-                references_provider: Some(OneOf::Left(true)),
+                definition_provider: Some(true.into()),
+                references_provider: Some(true.into()),
                 completion_provider: Some(CompletionOptions {
                     // Please update the language-configuration.json if you are changing this
                     // setting.
@@ -154,14 +153,15 @@ impl Initializer for SuperInit {
                     ]),
                     ..CompletionOptions::default()
                 }),
-                text_document_sync: Some(TextDocumentSyncCapability::Options(
+                text_document_sync: Some(
                     TextDocumentSyncOptions {
                         open_close: Some(true),
-                        change: Some(TextDocumentSyncKind::INCREMENTAL),
-                        save: Some(TextDocumentSyncSaveOptions::Supported(true)),
+                        change: Some(TextDocumentSyncKind::Incremental),
+                        save: Some(true.into()),
                         ..TextDocumentSyncOptions::default()
-                    },
-                )),
+                    }
+                    .into(),
+                ),
                 semantic_tokens_provider,
                 execute_command_provider: Some(ExecuteCommandOptions {
                     commands: exec_cmds,
@@ -169,37 +169,44 @@ impl Initializer for SuperInit {
                         work_done_progress: None,
                     },
                 }),
-                color_provider: Some(ColorProviderCapability::Simple(true)),
-                document_highlight_provider: Some(OneOf::Left(true)),
-                document_symbol_provider: Some(OneOf::Left(true)),
-                workspace_symbol_provider: Some(OneOf::Left(true)),
-                selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-                rename_provider: Some(OneOf::Right(RenameOptions {
-                    prepare_provider: Some(true),
-                    work_done_progress_options: WorkDoneProgressOptions {
-                        work_done_progress: None,
-                    },
-                })),
+                color_provider: Some(true.into()),
+                document_highlight_provider: Some(true.into()),
+                document_symbol_provider: Some(true.into()),
+                workspace_symbol_provider: Some(true.into()),
+                selection_range_provider: Some(true.into()),
+                rename_provider: Some(
+                    RenameOptions {
+                        prepare_provider: Some(true),
+                        work_done_progress_options: WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                    }
+                    .into(),
+                ),
                 document_link_provider: Some(DocumentLinkOptions {
                     resolve_provider: None,
                     work_done_progress_options: WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
                 }),
-                folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-                workspace: Some(WorkspaceServerCapabilities {
+                folding_range_provider: Some(true.into()),
+                workspace: Some(WorkspaceOptions {
                     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
                         supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
+                        change_notifications: Some(true.into()),
                     }),
                     file_operations,
+                    text_document_content: None,
                 }),
                 document_formatting_provider,
                 document_range_formatting_provider,
-                inlay_hint_provider: Some(OneOf::Left(true)),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                inlay_hint_provider: Some(true.into()),
+                code_action_provider: Some(true.into()),
                 code_lens_provider: Some(CodeLensOptions {
                     resolve_provider: Some(false),
+                    work_done_progress_options: WorkDoneProgressOptions {
+                        work_done_progress: None,
+                    },
                 }),
 
                 experimental: Some(json!({

@@ -143,7 +143,7 @@ impl CompletionPair<'_, '_, '_> {
                         // don't sort me
                         sort_text: Some(sort_text),
                         filter_text: Some("".into()),
-                        insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                        insert_text_format: Some(InsertTextFormat::PlainText),
                         ..Default::default()
                     }
                 })

@@ -378,7 +378,7 @@ impl<'a> CompletionCursor<'a> {
             label_details: item.label_details.clone().map(From::from),
             text_edit: Some(text_edit),
             additional_text_edits: item.additional_text_edits.clone(),
-            insert_text_format: Some(InsertTextFormat::SNIPPET),
+            insert_text_format: Some(InsertTextFormat::Snippet),
             command: item.command.clone(),
             ..Default::default()
         }

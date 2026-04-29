@@ -1,9 +1,7 @@
 use std::sync::OnceLock;
 
-use lsp_types::request::*;
 use lsp_types::*;
 use reflexo::ImmutPath;
-use request::{RegisterCapability, UnregisterCapability};
 use serde_json::{Map, Value as JsonValue};
 use sync_ls::*;
 use tinymist_std::error::{prelude::*, IgnoreLogging};
@@ -112,7 +110,9 @@ impl ServerState {
     }
 
     pub(crate) fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(&params.text_document.uri).as_path().into();
+        let path = as_path_(&params.text_document.text_document_identifier.uri)
+            .as_path()
+            .into();
         let changes = params.content_changes;
 
         self.edit_source(path, changes, self.const_config().position_encoding)
@@ -211,7 +211,7 @@ impl ServerState {
             return self.on_changed_configuration(settings);
         };
 
-        self.client.send_lsp_request::<WorkspaceConfiguration>(
+        self.client.send_lsp_request::<ConfigurationRequest>(
             ConfigurationParams {
                 items: Config::get_items(),
             },
@@ -247,7 +247,7 @@ impl ServerState {
 impl ServerState {
     // todo: handle error
     pub(crate) fn register_capability(&self, registrations: Vec<Registration>) -> Result<()> {
-        self.client.send_lsp_request_::<RegisterCapability>(
+        self.client.send_lsp_request_::<RegistrationRequest>(
             RegistrationParams { registrations },
             |_, resp| {
                 if let Some(err) = resp.error {
@@ -262,7 +262,7 @@ impl ServerState {
         &self,
         unregisterations: Vec<Unregistration>,
     ) -> Result<()> {
-        self.client.send_lsp_request_::<UnregisterCapability>(
+        self.client.send_lsp_request_::<UnregistrationRequest>(
             UnregistrationParams { unregisterations },
             |_, resp| {
                 if let Some(err) = resp.error {
@@ -332,7 +332,7 @@ impl ServerState {
         pub fn get_formatting_registration() -> Registration {
             Registration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: Formatting::METHOD.to_owned(),
+                method: DocumentFormattingRequest::METHOD.to_string(),
                 register_options: None,
             }
         }
@@ -340,7 +340,7 @@ impl ServerState {
         pub fn get_range_formatting_registration() -> Registration {
             Registration {
                 id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
-                method: RangeFormatting::METHOD.to_owned(),
+                method: DocumentRangeFormattingRequest::METHOD.to_string(),
                 register_options: None,
             }
         }
@@ -348,14 +348,14 @@ impl ServerState {
         pub fn get_formatting_unregistration() -> Unregistration {
             Unregistration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: Formatting::METHOD.to_owned(),
+                method: DocumentFormattingRequest::METHOD.to_string(),
             }
         }
 
         pub fn get_range_formatting_unregistration() -> Unregistration {
             Unregistration {
                 id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
-                method: RangeFormatting::METHOD.to_owned(),
+                method: DocumentRangeFormattingRequest::METHOD.to_string(),
             }
         }
 

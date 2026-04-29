@@ -1,6 +1,6 @@
 //! tinymist's language server
 
-use lsp_types::request::GotoDeclarationParams;
+use lsp_types::DeclarationParams;
 use lsp_types::*;
 use serde::{Deserialize, Serialize};
 use sync_ls::*;
@@ -26,18 +26,18 @@ pub(crate) use run_query;
 
 /// LSP Standard Language Features
 impl ServerState {
-    pub(crate) fn goto_definition(&mut self, params: GotoDefinitionParams) -> ScheduleResult {
+    pub(crate) fn goto_definition(&mut self, params: DefinitionParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.GotoDefinition(path, position))
     }
 
-    pub(crate) fn goto_declaration(&mut self, params: GotoDeclarationParams) -> ScheduleResult {
+    pub(crate) fn goto_declaration(&mut self, params: DeclarationParams) -> ScheduleResult {
         let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.GotoDeclaration(path, position))
     }
 
     pub(crate) fn references(&mut self, params: ReferenceParams) -> ScheduleResult {
-        let (path, position) = as_path_pos(params.text_document_position);
+        let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.References(path, position))
     }
 
@@ -148,10 +148,10 @@ impl ServerState {
     }
 
     pub(crate) fn completion(&mut self, params: CompletionParams) -> ScheduleResult {
-        let (path, position) = as_path_pos(params.text_document_position);
+        let (path, position) = as_path_pos(params.text_document_position_params);
         let context = params.context.as_ref();
         let explicit =
-            context.is_some_and(|context| context.trigger_kind == CompletionTriggerKind::INVOKED);
+            context.is_some_and(|context| context.trigger_kind == CompletionTriggerKind::Invoked);
         let trigger_character = context
             .and_then(|c| c.trigger_character.as_ref())
             .and_then(|c| c.chars().next());
@@ -168,13 +168,13 @@ impl ServerState {
     }
 
     pub(crate) fn rename(&mut self, params: RenameParams) -> ScheduleResult {
-        let (path, position) = as_path_pos(params.text_document_position);
+        let (path, position) = as_path_pos(params.text_document_position_params);
         let new_name = params.new_name;
         run_query!(self.Rename(path, position, new_name))
     }
 
-    pub(crate) fn prepare_rename(&mut self, params: TextDocumentPositionParams) -> ScheduleResult {
-        let (path, position) = as_path_pos(params);
+    pub(crate) fn prepare_rename(&mut self, params: PrepareRenameParams) -> ScheduleResult {
+        let (path, position) = as_path_pos(params.text_document_position_params);
         run_query!(self.PrepareRename(path, position))
     }
 
@@ -197,8 +197,8 @@ impl ServerState {
             .iter()
             .map(|f| {
                 Some((
-                    as_path_(&Url::parse(&f.old_uri).ok()?),
-                    as_path_(&Url::parse(&f.new_uri).ok()?),
+                    as_path_(&Uri::parse(&f.old_uri).ok()?),
+                    as_path_(&Uri::parse(&f.new_uri).ok()?),
                 ))
             })
             .collect::<Option<Vec<_>>>()
@@ -330,8 +330,9 @@ pub struct OnEnterParams {
 }
 
 pub struct OnEnter;
-impl lsp_types::request::Request for OnEnter {
+impl lsp_types::Request for OnEnter {
     type Params = OnEnterParams;
     type Result = Option<Vec<TextEdit>>;
-    const METHOD: &'static str = "experimental/onEnter";
+    const MESSAGE_DIRECTION: MessageDirection = MessageDirection::ClientToServer;
+    const METHOD: LspRequestMethod<'_> = LspRequestMethod::Custom("experimental/onEnter");
 }

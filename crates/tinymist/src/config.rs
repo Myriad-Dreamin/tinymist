@@ -213,7 +213,14 @@ impl Config {
         font_args: CompileFontArgs,
     ) -> (Self, Option<ResponseError>) {
         // Initialize configurations
-        let roots = match params.workspace_folders.as_ref() {
+        let roots = match params
+            .workspace_folders_initialize_params
+            .workspace_folders
+            .as_ref()
+            .and_then(|folders| match folders {
+                WorkspaceFolders::WorkspaceFolderList(folders) => Some(folders),
+                WorkspaceFolders::Null => None,
+            }) {
             Some(roots) => roots
                 .iter()
                 .map(|root| ImmutPath::from(url_to_path(&root.uri)))
@@ -223,7 +230,15 @@ impl Config {
                 .root_uri
                 .as_ref()
                 .map(|uri| ImmutPath::from(url_to_path(uri)))
-                .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
+                .or_else(|| {
+                    Some(
+                        Path::new(&params.root_path.as_ref().and_then(|p| match p {
+                            RootPath::String(string) => Some(string),
+                            RootPath::Null => None,
+                        })?)
+                        .into(),
+                    )
+                })
                 .into_iter()
                 .collect(),
         };
@@ -1110,11 +1125,15 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
         legend: SemanticTokensLegend {
             token_types: TokenType::iter()
                 .filter(|e| *e != TokenType::None)
-                .map(Into::into)
+                .map(|e| SemanticTokenTypes::from(e).into())
                 .collect(),
-            token_modifiers: Modifier::iter().map(Into::into).collect(),
+            token_modifiers: Modifier::iter()
+                .map(|e| SemanticTokenModifiers::from(e).into())
+                .collect(),
         },
-        full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
+        full: Some(Full::SemanticTokensFullDelta(SemanticTokensFullDelta {
+            delta: Some(true),
+        })),
         ..SemanticTokensOptions::default()
     }
 }

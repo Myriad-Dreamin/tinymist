@@ -48,7 +48,7 @@ impl SemanticRequest for WillRenameFilesRequest {
 
         Some(WorkspaceEdit {
             changes: None,
-            document_changes: Some(lsp_types::DocumentChanges::Operations(document_changes)),
+            document_changes: Some(document_changes),
             change_annotations,
         })
     }
