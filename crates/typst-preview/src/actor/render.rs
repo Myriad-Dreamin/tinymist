@@ -43,6 +43,7 @@ impl RenderActorRequest {
 
 pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
+    direct_mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
     view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     renderer: IncrSvgDocServer,
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
@@ -53,6 +54,7 @@ pub struct RenderActor {
 impl RenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
+        direct_mailbox: mpsc::UnboundedReceiver<RenderActorRequest>,
         view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
         editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
@@ -60,6 +62,7 @@ impl RenderActor {
     ) -> Self {
         let mut res = Self {
             mailbox,
+            direct_mailbox,
             view,
             renderer: IncrSvgDocServer::default(),
             editor_conn_sender,
@@ -70,10 +73,11 @@ impl RenderActor {
         res
     }
 
-    async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
+    async fn process_message(&mut self, msg: RenderActorRequest) -> (bool, bool) {
         log::trace!("RenderActor: received message: {msg:?}");
 
-        let res = msg.is_full_render();
+        let is_full_render = msg.is_full_render();
+        let is_incremental_render = matches!(msg, RenderActorRequest::RenderIncremental);
         match msg {
             RenderActorRequest::EditorResolveSpanRange(span_range) => {
                 log::debug!("RenderActor: resolving EditorResolveSpanRange: {span_range:?}");
@@ -86,7 +90,7 @@ impl RenderActor {
                     Ok(spans) => spans,
                     Err(err) => {
                         log::info!("RenderActor: failed to resolve span: {err}");
-                        return false;
+                        return (false, false);
                     }
                 };
 
@@ -119,28 +123,50 @@ impl RenderActor {
             RenderActorRequest::RenderFullLatest | RenderActorRequest::RenderIncremental => {}
         }
 
-        res
+        (is_full_render, is_incremental_render)
     }
 
     pub async fn run(mut self) {
         loop {
             let mut has_full_render = false;
+            let mut has_incremental_render = false;
             log::debug!("RenderActor: waiting for message");
-            match self.mailbox.recv().await {
-                Ok(msg) => {
-                    has_full_render |= self.process_message(msg).await;
+            tokio::select! {
+                msg = self.mailbox.recv() => {
+                    match msg {
+                        Ok(msg) => {
+                            let (full, incremental) = self.process_message(msg).await;
+                            has_full_render |= full;
+                            has_incremental_render |= incremental;
+                        }
+                        Err(broadcast::error::RecvError::Closed) => {
+                            log::info!("RenderActor: no more messages");
+                            break;
+                        }
+                        Err(broadcast::error::RecvError::Lagged(_)) => {
+                            log::info!("RenderActor: lagged message. Some events are dropped");
+                        }
+                    }
                 }
-                Err(broadcast::error::RecvError::Closed) => {
-                    log::info!("RenderActor: no more messages");
+                Some(msg) = self.direct_mailbox.recv() => {
+                    let (full, incremental) = self.process_message(msg).await;
+                    has_full_render |= full;
+                    has_incremental_render |= incremental;
+                }
+                else => {
                     break;
-                }
-                Err(broadcast::error::RecvError::Lagged(_)) => {
-                    log::info!("RenderActor: lagged message. Some events are dropped");
                 }
             }
             // read the queue to empty
             while let Ok(msg) = self.mailbox.try_recv() {
-                has_full_render |= self.process_message(msg).await;
+                let (full, incremental) = self.process_message(msg).await;
+                has_full_render |= full;
+                has_incremental_render |= incremental;
+            }
+            while let Ok(msg) = self.direct_mailbox.try_recv() {
+                let (full, incremental) = self.process_message(msg).await;
+                has_full_render |= full;
+                has_incremental_render |= incremental;
             }
             // if a full render is requested, we render the latest document
             // otherwise, we render the incremental changes for only once
@@ -151,7 +177,7 @@ impl RenderActor {
                 continue;
             };
 
-            let data = self.render(has_full_render, &document);
+            let data = self.render(has_full_render, has_incremental_render, &document);
             let Ok(_) = self.svg_sender.send(data) else {
                 log::info!("RenderActor: svg_sender is dropped");
                 break;
@@ -160,13 +186,22 @@ impl RenderActor {
         log::info!("RenderActor: exiting")
     }
 
-    fn render(&mut self, has_full_render: bool, document: &TypstDocument) -> Vec<u8> {
-        if has_full_render {
-            if let Some(data) = self.render_full() {
-                data
+    fn render(
+        &mut self,
+        has_full_render: bool,
+        has_incremental_render: bool,
+        document: &TypstDocument,
+    ) -> Vec<u8> {
+        if has_incremental_render {
+            let delta = self.render_delta(document);
+            if has_full_render {
+                self.render_full().unwrap_or(delta)
             } else {
-                self.render_delta(document)
+                delta
             }
+        } else if has_full_render {
+            self.render_full()
+                .unwrap_or_else(|| self.render_delta(document))
         } else {
             self.render_delta(document)
         }
