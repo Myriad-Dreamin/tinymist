@@ -6339,7 +6339,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
- "tinymist-assets 0.14.16-rc1",
+ "tinymist-assets",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6404,12 +6404,6 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.16-rc1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "532e1cb1dece79b299072ffdac768b9882607ebbf4e54719b3aff6656a0d51ae"
-
-[[package]]
-name = "tinymist-assets"
 version = "0.14.16"
 
 [[package]]
@@ -6465,7 +6459,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.14.16-rc1",
+ "tinymist-assets",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6626,7 +6620,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.14.16-rc1",
+ "tinymist-assets",
  "tinymist-std",
  "tokio",
  "typst",
@@ -6861,7 +6855,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "svgtypes 0.15.3",
- "tinymist-assets 0.14.16-rc1",
+ "tinymist-assets",
  "tinymist-preview",
  "tinymist-std",
  "tokio",

@@ -10,6 +10,12 @@ export interface TypstSvgDocument {
   setCursorPaths(paths: ElementPoint[][]): void;
 }
 
+interface SvgResizePageAnchor {
+  pageNumber: number;
+  pageLocalY: number;
+  pageHeight: number;
+}
+
 export function provideSvgDoc<
   TBase extends GConstructor<TypstDocumentContext & Partial<TypstCanvasDocument>>,
 >(Base: TBase): TBase & GConstructor<TypstSvgDocument> {
@@ -20,6 +26,7 @@ export function provideSvgDoc<
     constructor(...args: any[]) {
       super(...args);
       this.registerMode("svg");
+      this.disposeList.push(() => this.clearSvgResizeAnchor());
     }
 
     shouldMixinCanvas(): this is TypstCanvasDocument {
@@ -28,6 +35,21 @@ export function provideSvgDoc<
 
     /// cursor path is a list of element point from root to leaf
     cursorPaths?: ElementPoint[][] = undefined;
+    /// last applied svg total scale (currentRealScale * currentScaleRatio); used for
+    /// scroll anchoring when the panel/container is resized.
+    private lastSvgScale?: number;
+    /// last currentScaleRatio captured alongside lastSvgScale; used to detect
+    /// whether a scale change came from manual zoom (Ctrl+scroll) or panel resize.
+    private lastSvgScaleRatio?: number;
+    /// document y-coordinate at the top of the viewport for the current resize
+    /// burst. Reused across consecutive resize frames so the anchor is the y
+    /// from before dragging started, not a value re-sampled mid-drag.
+    private svgResizeAnchor?: {
+      contentY: number;
+      scaleRatio: number;
+      pageAnchor?: SvgResizePageAnchor;
+    };
+    private svgResizeAnchorTimeout?: ReturnType<typeof setTimeout>;
     setCursorPaths(paths: ElementPoint[][]) {
       this.cursorPaths = paths;
       this.addViewportChange();
@@ -268,6 +290,86 @@ export function provideSvgDoc<
       }
     }
 
+    private clearSvgResizeAnchor() {
+      if (this.svgResizeAnchorTimeout !== undefined) {
+        clearTimeout(this.svgResizeAnchorTimeout);
+        this.svgResizeAnchorTimeout = undefined;
+      }
+      this.svgResizeAnchor = undefined;
+    }
+
+    private keepSvgResizeAnchorAlive() {
+      if (this.svgResizeAnchorTimeout !== undefined) {
+        clearTimeout(this.svgResizeAnchorTimeout);
+      }
+      this.svgResizeAnchorTimeout = setTimeout(() => {
+        this.svgResizeAnchor = undefined;
+        this.svgResizeAnchorTimeout = undefined;
+      }, 600);
+    }
+
+    private resolveViewportTopY(svg: SVGElement, scrollEl: HTMLElement) {
+      const svgRect = svg.getBoundingClientRect();
+      const containerRect = scrollEl.getBoundingClientRect();
+      const dataHeight = Number.parseFloat(
+        svg.getAttribute("data-height") || svg.getAttribute("height") || "0",
+      );
+      const actualScaleY = dataHeight > 0 ? svgRect.height / dataHeight : undefined;
+      return actualScaleY && actualScaleY > 0
+        ? (containerRect.top - svgRect.top) / actualScaleY
+        : undefined;
+    }
+
+    private captureViewportTopPageAnchor(svg: SVGElement, scrollEl: HTMLElement) {
+      const syntheticTopY = this.resolveViewportTopY(svg, scrollEl);
+      if (syntheticTopY === undefined) {
+        return undefined;
+      }
+
+      for (const elem of svg.children) {
+        if (!elem.classList.contains("typst-page")) {
+          continue;
+        }
+
+        const pageNumber = Number.parseInt(elem.getAttribute("data-page-number") || "-1");
+        const y = Number.parseFloat(elem.getAttribute("data-y") || "NaN");
+        const height = Number.parseFloat(elem.getAttribute("data-page-height") || "NaN");
+        if (!Number.isFinite(pageNumber) || !Number.isFinite(y) || !Number.isFinite(height)) {
+          continue;
+        }
+        if (height <= 0 || syntheticTopY < y || syntheticTopY > y + height) {
+          continue;
+        }
+
+        return {
+          pageNumber,
+          pageLocalY: syntheticTopY - y,
+          pageHeight: height,
+        };
+      }
+
+      return undefined;
+    }
+
+    private resolveSyntheticYForPageAnchor(svg: SVGElement, anchor: SvgResizePageAnchor) {
+      const page = Array.from(svg.children).find(
+        (elem) =>
+          elem.classList.contains("typst-page") &&
+          Number.parseInt(elem.getAttribute("data-page-number") || "-1") === anchor.pageNumber,
+      );
+      if (!page) {
+        return undefined;
+      }
+
+      const pageY = Number.parseFloat(page.getAttribute("data-y") || "NaN");
+      const pageHeight = Number.parseFloat(page.getAttribute("data-page-height") || "NaN");
+      if (!Number.isFinite(pageY) || !Number.isFinite(pageHeight) || pageHeight <= 0) {
+        return undefined;
+      }
+
+      return pageY + (anchor.pageLocalY * pageHeight) / anchor.pageHeight;
+    }
+
     // Note: one should retrieve dom state before rescale
     rescale$svg() {
       // get dom state from cache, so we are free from layout reflowing
@@ -280,6 +382,63 @@ export function provideSvgDoc<
       if (scale === 0) {
         console.warn("determine scale as 0, skip rescale");
         return;
+      }
+
+      // Lock the document y-coordinate at the top of the viewport while the panel is resized
+      // (i.e. the auto-fit scale changes while the user-driven scale ratio does not).
+      //
+      // We skip when the user manually zooms (currentScaleRatio changed),
+      // since installRescaleHandler already anchors at the cursor.
+      const scrollElement = this.hookedElem.parentElement;
+      const prevScale = this.lastSvgScale;
+      const prevScaleRatio = this.lastSvgScaleRatio;
+      const scaleRatioChanged =
+        prevScaleRatio !== undefined && Math.abs(this.currentScaleRatio - prevScaleRatio) >= 1e-6;
+      if (scaleRatioChanged) {
+        this.clearSvgResizeAnchor();
+      }
+      const shouldAnchor =
+        this.previewMode === PreviewMode.Doc &&
+        scrollElement instanceof HTMLElement &&
+        prevScale !== undefined &&
+        prevScale > 0 &&
+        prevScaleRatio !== undefined &&
+        !scaleRatioChanged &&
+        (Math.abs(scale - prevScale) > 1e-6 || this.svgResizeAnchor !== undefined);
+
+      let restoreScroll: (() => void) | undefined;
+      if (shouldAnchor) {
+        const scrollEl = scrollElement as HTMLElement;
+        const svgRect = svg.getBoundingClientRect();
+        const containerRect = scrollEl.getBoundingClientRect();
+        const fixedTopOffset = svgRect.top - containerRect.top + scrollEl.scrollTop;
+        const sampledContentY = (scrollEl.scrollTop - fixedTopOffset) / prevScale!;
+        const reusableAnchor =
+          this.svgResizeAnchor &&
+          Math.abs(this.svgResizeAnchor.scaleRatio - this.currentScaleRatio) < 1e-6
+            ? this.svgResizeAnchor
+            : undefined;
+        const contentY = reusableAnchor?.contentY ?? sampledContentY;
+        if (Number.isFinite(contentY)) {
+          const pageAnchor =
+            reusableAnchor?.pageAnchor ?? this.captureViewportTopPageAnchor(svg, scrollEl);
+          this.svgResizeAnchor = {
+            contentY,
+            scaleRatio: this.currentScaleRatio,
+            pageAnchor,
+          };
+          this.keepSvgResizeAnchorAlive();
+          restoreScroll = () => {
+            const pageY = pageAnchor
+              ? this.resolveSyntheticYForPageAnchor(svg, pageAnchor)
+              : undefined;
+            // Use contentY as fallback when page anchor cannot be resolved
+            const targetY = pageY ?? contentY;
+            const target = targetY * scale + fixedTopOffset;
+            const max = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+            scrollEl.scrollTop = Math.max(0, Math.min(max, target));
+          };
+        }
       }
 
       // get dom state from cache, so we are free from layout reflowing
@@ -309,6 +468,13 @@ export function provideSvgDoc<
       if (this.hookedElem.style.height) {
         this.hookedElem.style.removeProperty("height");
       }
+
+      if (restoreScroll) {
+        restoreScroll();
+      }
+
+      this.lastSvgScale = scale;
+      this.lastSvgScaleRatio = this.currentScaleRatio;
     }
 
     private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
