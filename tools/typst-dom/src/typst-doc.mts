@@ -527,48 +527,26 @@ export class TypstDocumentContext<O = any> {
     return this.partialRenderPage + 1;
   }
 
-  _scrollAdjustTimeout: ReturnType<typeof setTimeout> | undefined;
-  _lastScrollPosition: DOMRect | undefined;
-  /// Adjusts scroll position with a debounce time.
+  /// Adjusts scroll position.
   private keepScrollPosition(scrollPosition: DOMRect) {
-    /// The debounce time for `scrollAdjust` task.
-    /// todo: better interval.
-    const KEEP_SCROLL_DEBOUNCE_TIME_MS = 300;
+    const domState = this.retrieveDOMState();
+    const newBBox = domState.scrollPosition;
+    if (!(newBBox && scrollPosition && newBBox.width !== scrollPosition.width)) {
+      return;
+    }
+    const scrollAdjustLeftRatio = scrollPosition.left / scrollPosition.width;
+    const scrollAdjustTopRatio = scrollPosition.top / scrollPosition.height;
+    const expectedLeft = newBBox.width * scrollAdjustLeftRatio;
+    const expectedTop = newBBox.height * scrollAdjustTopRatio;
 
-    /// If a `scrollAdjust` task is already scheduled, we register again to debounce
-    /// the scroll adjustment.
-    /// Otherwise, we record the initial position to adjust later.
-    if (!this._scrollAdjustTimeout) {
-      this._lastScrollPosition = scrollPosition;
-    } else {
-      clearTimeout(this._scrollAdjustTimeout);
+    const adjustedDiffLeft = newBBox.left - expectedLeft;
+    const adjustedDiffTop = newBBox.top - expectedTop;
+    if (Math.abs(adjustedDiffLeft) < 1e-1 && Math.abs(adjustedDiffTop) < 1e-1) {
+      return;
     }
 
-    this._scrollAdjustTimeout = setTimeout(() => {
-      this._scrollAdjustTimeout = undefined;
-      const domState = this.retrieveDOMState();
-      const newBBox = domState.scrollPosition;
-      if (!(newBBox && this._lastScrollPosition && newBBox.width !== this._lastScrollPosition.width)) {
-        return;
-      }
-      const scrollAdjustLeftRatio = this._lastScrollPosition.left / this._lastScrollPosition.width;
-      const scrollAdjustTopRatio = this._lastScrollPosition.top / this._lastScrollPosition.height;
-      const expectedLeft = newBBox.width * scrollAdjustLeftRatio;
-      const expectedTop = newBBox.height * scrollAdjustTopRatio;
-
-      const adjustedDiffLeft = newBBox.left - expectedLeft;
-      const adjustedDiffTop = newBBox.top - expectedTop;
-      if (Math.abs(adjustedDiffLeft) < 1e-1 && Math.abs(adjustedDiffTop) < 1e-1) {
-        return;
-      }
-
-      this.hookedElem.parentElement!.scrollBy({
-        left: adjustedDiffLeft,
-        top: adjustedDiffTop,
-        /// "instant" behavior is disgusting, use "smooth" instead
-        behavior: "smooth",
-      });
-    }, KEEP_SCROLL_DEBOUNCE_TIME_MS);
+    this.hookedElem.parentElement!.scrollTop = expectedTop;
+    this.hookedElem.parentElement!.scrollLeft = expectedLeft;
   }
 }
 
