@@ -1232,7 +1232,7 @@ mod tests {
     }
 
     #[test]
-    fn test_restart_scoped_client_options_are_polled() {
+    fn test_all_config_items_are_polled() {
         let sections = Config::get_items()
             .into_iter()
             .filter_map(|item| item.section)
