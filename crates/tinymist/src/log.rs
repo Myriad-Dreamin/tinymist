@@ -15,7 +15,13 @@ pub struct InitLogOpts {
 }
 
 /// Initializes the logger for the Tinymist library.
-pub fn init_log(InitLogOpts { verbose, filter, output }: InitLogOpts) -> anyhow::Result<()> {
+pub fn init_log(
+    InitLogOpts {
+        verbose,
+        filter,
+        output,
+    }: InitLogOpts,
+) -> anyhow::Result<()> {
     use log::LevelFilter::*;
 
     let base_level = if verbose { Info } else { Warn };

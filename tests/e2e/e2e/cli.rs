@@ -33,7 +33,7 @@ fn test_help() {
     ----- stdout -----
     An integrated language service for Typst.
 
-    Usage: tinymist [COMMAND]
+    Usage: tinymist [OPTIONS] [COMMAND]
 
     Commands:
       probe       Probe existence (Nop run)
@@ -46,8 +46,9 @@ fn test_help() {
       help        Print this message or the help of the given subcommand(s)
 
     Options:
-      -h, --help     Print help
-      -V, --version  Print version
+          --log-filter <LOG_FILTER>  Configure log filter of tinymist [env: TINYMIST_LOG=REDACTED]
+      -h, --help                     Print help
+      -V, --version                  Print version
 
     ----- stderr -----
     ");

@@ -130,7 +130,9 @@ fn main() -> Result<()> {
 
     // Parses command line arguments
     let args = Args::parse();
-    let cmd = args.cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
+    let cmd = args
+        .cmd
+        .unwrap_or_else(|| Commands::Lsp(Default::default()));
 
     // Probes soon to avoid other initializations causing errors
     if matches!(cmd, Commands::Probe) {
