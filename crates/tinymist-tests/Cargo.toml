@@ -14,13 +14,11 @@ comemo.workspace = true
 insta.workspace = true
 rayon.workspace = true
 tinymist-analysis.workspace = true
-tinymist-project = { workspace = true, features = ["lsp", "system", "no-content-hint"] }
+tinymist-project = { workspace = true, features = ["lsp", "system", "mock"] }
 tinymist-std.workspace = true
-tinymist-vfs.workspace = true
-tinymist-world.workspace = true
-tokio = { workspace = true, features = ["sync"] }
+tinymist-vfs = { workspace = true, features = ["mock"] }
+tinymist-world = { workspace = true, features = ["mock"] }
 typst.workspace = true
-typst-assets = { workspace = true, features = ["fonts"] }
 
 [lints]
 workspace = true

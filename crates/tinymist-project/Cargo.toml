@@ -41,12 +41,16 @@ wasm-bindgen = { workspace = true, optional = true }
 [features]
 
 fonts = ["typst-assets/fonts"]
+mock = ["tinymist-world/mock", "no-content-hint"]
 no-content-hint = ["tinymist-task/no-content-hint"]
 lsp = ["toml"]
 # "system", 
 
 system = ["tinymist-std/system", "tinymist-world/system", "toml", "notify"]
 web = ["tinymist-std/web", "tinymist-world/web", "js-sys", "wasm-bindgen"]
+
+[dev-dependencies]
+tinymist-world = { workspace = true, features = ["mock"] }
 
 [lints]
 workspace = true

@@ -26,12 +26,20 @@ Because the desired tests span `tinymist-vfs`, `tinymist-world`, and `tinymist-p
 
 ## Decisions
 
-### 1. Put reusable test support in a shared workspace crate or equivalent shared support module
+### 1. Put reusable mock layers in their owning crates with an aggregate test-support re-export
 
-The harness should live in shared Rust test support that multiple crates can depend on, rather than being hidden behind `#[cfg(test)]` inside one crate. This avoids dependency inversion problems and lets VFS, world, project, and later server-side tests all reuse the same workspace builder and mutation helpers.
+The harness should be reusable across crate boundaries, but each mock layer should live no higher than the crate that owns the behavior:
+
+- `tinymist-vfs::mock` owns the in-memory workspace, path access model, mutation helpers, and `FileChangeSet`/`FilesystemEvent` conversion.
+- `tinymist-world::mock` owns deterministic `CompilerUniverse`/`CompilerWorld` builders over the VFS mock, embedded fonts, and dummy package behavior.
+- `tinymist-project::mock` owns project compiler helpers that route mock changes through runtime interrupts.
+- `tinymist-tests::mock` re-exports those layers for crates that already use aggregate test support.
+
+This avoids dependency inversion problems: `tinymist-vfs` cannot depend on `tinymist-tests` if `tinymist-tests` depends on `tinymist-vfs`. Feature-gated mock modules let downstream crates opt into the layers they need while keeping crate-local tests able to use their own mocks directly.
 
 Alternative considered:
-- Add ad hoc helpers separately inside `tinymist-vfs`, `tinymist-world`, and `tinymist-project`. Rejected because the bug class we care about crosses those boundaries and duplicated helpers would drift quickly.
+- Put all helpers in `tinymist-tests`. Rejected because lower-level crates cannot depend on an aggregate support crate that already depends on them.
+- Add duplicated ad hoc helpers separately inside `tinymist-vfs`, `tinymist-world`, and `tinymist-project`. Rejected because the bug class we care about crosses those boundaries and duplicated helpers would drift quickly.
 - Place everything under the existing `tests/` e2e crate. Rejected because lower-level crate tests should be able to use the harness directly without going through e2e-only structure.
 
 ### 2. Model the filesystem as an in-memory workspace with explicit mutations
@@ -57,17 +65,17 @@ Alternative considered:
 
 ## Risks / Trade-offs
 
-- [A shared support crate adds workspace surface area] -> Mitigate by keeping the public API narrow and clearly test-focused.
+- [Mock feature modules add public test-facing API surface] -> Mitigate by keeping each layer narrow, feature-gated, and colocated with the owning crate.
 - [Mocked runtime tests may diverge from production watcher behavior] -> Mitigate by driving the same `FileChangeSet` and runtime invalidation entry points used in production, while keeping e2e tests for integration coverage.
 - [Deterministic fonts/package setup may still be more than some tests need] -> Mitigate by exposing small builders so tests can choose VFS-only, world-level, or project-level setup as needed.
 
 ## Migration Plan
 
-1. Add the shared mock runtime test support and wire it into workspace dev-dependencies.
+1. Add crate-local mock modules for VFS, world, and project runtime layers, plus aggregate re-exports in `tinymist-tests`.
 2. Add initial VFS/world/project tests that use the harness for file-manipulation flows.
 3. Use the new harness in the follow-up `fix-source-rename-cache-invalidation` implementation work.
 4. Rollback, if needed, is a straightforward revert because the change only affects test infrastructure.
 
 ## Open Questions
 
-- Whether the shared support should be a dedicated `crates/` member or a lighter-weight shared module arrangement, as long as multiple crate tests can depend on it without duplicating code.
+- None.

@@ -11,6 +11,10 @@ pub mod parser;
 pub mod source;
 pub mod world;
 
+/// Provides mock world builders for tests.
+#[cfg(any(test, feature = "mock"))]
+pub mod mock;
+
 pub use compute::*;
 pub use entry::*;
 pub use snapshot::*;

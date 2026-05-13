@@ -6816,9 +6816,7 @@ dependencies = [
  "tinymist-std",
  "tinymist-vfs",
  "tinymist-world",
- "tokio",
  "typst",
- "typst-assets",
 ]
 
 [[package]]

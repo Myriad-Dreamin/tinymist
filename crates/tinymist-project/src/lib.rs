@@ -6,6 +6,9 @@ mod entry;
 mod lock;
 mod model;
 
+#[cfg(any(test, feature = "mock"))]
+pub mod mock;
+
 #[cfg(feature = "lsp")]
 mod lsp;
 #[cfg(feature = "system")]
