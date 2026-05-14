@@ -267,7 +267,7 @@ fn extract_rendered_symbols<'a>(
             paged_doc: &TypstPagedDocument,
             symbols: impl Iterator<Item = &'a String>,
         ) {
-            for (pg, s) in paged_doc.pages.iter().zip(symbols) {
+            for (pg, s) in paged_doc.pages().iter().zip(symbols) {
                 self.work_frame(&pg.frame, s);
             }
         }

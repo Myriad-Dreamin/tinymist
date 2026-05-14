@@ -150,7 +150,7 @@ impl SpanMapper {
     fn doc(&mut self, doc: &TypstDocument) {
         match doc {
             TypstDocument::Paged(paged_doc) => {
-                for page in paged_doc.pages.iter() {
+                for page in paged_doc.pages().iter() {
                     self.frame(&page.frame);
                 }
             }
