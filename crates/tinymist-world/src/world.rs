@@ -895,10 +895,7 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
         let now = offset
             .and_then(|offset| {
                 let seconds = offset.seconds();
-                if !seconds.is_finite()
-                    || seconds < i64::MIN as f64
-                    || seconds > i64::MAX as f64
-                {
+                if !seconds.is_finite() || seconds < i64::MIN as f64 || seconds > i64::MAX as f64 {
                     return None;
                 }
                 let timestamp = now.unix_timestamp().checked_add(seconds.trunc() as i64)?;
