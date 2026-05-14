@@ -740,6 +740,7 @@ trait DataFlowVisitor {
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
             ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
             ast::Expr::MathFieldAccess(expr) => self.math_field_access(expr),
+            ast::Expr::MathCall(expr) => self.math_call(expr),
 
             ast::Expr::Ident(expr) => self.ident(expr),
             ast::Expr::MathIdent(expr) => self.math_ident(expr),
@@ -831,6 +832,20 @@ trait DataFlowVisitor {
 
     fn math_field_access(&mut self, expr: ast::MathFieldAccess<'_>) -> Option<()> {
         self.math_access(expr.target())
+    }
+
+    fn math_call(&mut self, expr: ast::MathCall<'_>) -> Option<()> {
+        self.math_access(expr.callee())?;
+        let args = expr
+            .args()
+            .arg_items()
+            .flat_map(|arg| match arg.arg {
+                ast::Arg::Pos(expr) => Some(expr),
+                ast::Arg::Named(named) => Some(named.expr()),
+                ast::Arg::Spread(spread) => Some(spread.expr()),
+            })
+            .collect::<Vec<_>>();
+        self.exprs(args.into_iter())
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
