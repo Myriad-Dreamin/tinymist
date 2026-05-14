@@ -212,7 +212,7 @@ fn is_valid_math_postfix(target: &SyntaxNode) -> bool {
 
     if let Some(target) = target.cast::<ast::MathText>() {
         return match target.get() {
-            MathTextKind::Character(ch) => !bad_punc_text(ch),
+            MathTextKind::Grapheme(ch) => !ch.chars().any(bad_punc_text),
             MathTextKind::Number(..) => true,
         };
     }

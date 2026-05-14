@@ -320,7 +320,7 @@ impl ExprWorker<'_> {
             >())))),
             MathText(t) => Expr::Type(Ty::Builtin(BuiltinTy::Content(Some({
                 match t.get() {
-                    MathTextKind::Character(..) => Element::of::<typst::foundations::SymbolElem>(),
+                    MathTextKind::Grapheme(..) => Element::of::<typst::foundations::SymbolElem>(),
                     MathTextKind::Number(..) => Element::of::<typst::foundations::SymbolElem>(),
                 }
             })))),
@@ -386,10 +386,14 @@ impl ExprWorker<'_> {
             MathFieldAccess(expr) => self.check_math(expr.to_untyped().children()),
             MathCall(expr) => self.check_math(expr.to_untyped().children()),
             MathAttach(attach) => {
-                let base = attach.base().to_untyped().clone();
-                let bottom = attach.bottom().unwrap_or_default().to_untyped().clone();
-                let top = attach.top().unwrap_or_default().to_untyped().clone();
-                self.check_math([base, bottom, top].iter())
+                let mut nodes = vec![attach.base().to_untyped().clone()];
+                if let Some(bottom) = attach.bottom() {
+                    nodes.push(bottom.to_untyped().clone());
+                }
+                if let Some(top) = attach.top() {
+                    nodes.push(top.to_untyped().clone());
+                }
+                self.check_math(nodes.iter())
             }
             MathPrimes(..) => Expr::Type(Ty::Builtin(BuiltinTy::None)),
             MathFrac(frac) => {
