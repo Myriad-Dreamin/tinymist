@@ -3,7 +3,7 @@ use lsp_types::{
     OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
-use tinymist_std::path::{PathClean, unix_slash};
+use tinymist_std::path::{unix_slash, PathClean};
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,
@@ -11,11 +11,11 @@ use typst::{
 
 use crate::adt::interner::Interned;
 use crate::{
-    analysis::{LinkObject, LinkTarget, get_link_exprs},
+    analysis::{get_link_exprs, LinkObject, LinkTarget},
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{Decl, RefExpr, SyntaxClass, first_ancestor_expr, get_index_info, node_ancestors},
+    syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -168,6 +168,8 @@ fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str)
     file_id.package() == def_fid.package()
         && file_id
             .vpath()
+            .parent()
+            .unwrap_or_else(|| file_id.vpath().clone())
             .join(path)
             .ok()
             .is_some_and(|path| path == *def_fid.vpath())
