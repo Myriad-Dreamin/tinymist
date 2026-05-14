@@ -68,12 +68,12 @@ pub fn run_with_ctx_<T>(
     let paths = verse
         .shadow_paths()
         .into_iter()
-        .map(|path| {
-            WorkspaceResolver::workspace_file(
-                Some(&root),
-                VirtualPath::virtualize(&root, path.as_path()).unwrap(),
-            )
-        })
+            .map(|path| {
+                WorkspaceResolver::workspace_file(
+                    Some(&root),
+                    VirtualPath::virtualize(&root, &path).unwrap(),
+                )
+            })
         .collect::<Vec<_>>();
 
     let mut world = verse.snapshot();
