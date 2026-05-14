@@ -383,8 +383,8 @@ impl ExprWorker<'_> {
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }
-            MathFieldAccess(expr) => self.check_math(expr.to_untyped().children()),
-            MathCall(expr) => self.check_math(expr.to_untyped().children()),
+            MathFieldAccess(expr) => self.check_math_field_access(expr),
+            MathCall(expr) => self.check_math_call(expr),
             MathAttach(attach) => {
                 let mut nodes = vec![attach.base().to_untyped().clone()];
                 if let Some(bottom) = attach.bottom() {
@@ -989,21 +989,33 @@ impl ExprWorker<'_> {
     fn check_args(&mut self, typed: ast::Args) -> Expr {
         let mut args = vec![];
         for arg in typed.items() {
-            match arg {
-                ast::Arg::Pos(arg) => {
-                    args.push(ArgExpr::Pos(self.check(arg)));
-                }
-                ast::Arg::Named(arg) => {
-                    let key = Decl::ident_ref(arg.name()).into();
-                    let val = self.check(arg.expr());
-                    args.push(ArgExpr::Named(Box::new((key, val))));
-                }
-                ast::Arg::Spread(s) => {
-                    args.push(ArgExpr::Spread(self.check(s.expr())));
-                }
-            }
+            self.check_arg(arg, &mut args);
         }
         Expr::Args(ArgsExpr::new(typed.span(), args))
+    }
+
+    fn check_math_args(&mut self, typed: ast::MathArgs) -> Expr {
+        let mut args = vec![];
+        for arg in typed.arg_items() {
+            self.check_arg(arg.arg, &mut args);
+        }
+        Expr::Args(ArgsExpr::new(typed.span(), args))
+    }
+
+    fn check_arg(&mut self, typed: ast::Arg, args: &mut Vec<ArgExpr>) {
+        match typed {
+            ast::Arg::Pos(arg) => {
+                args.push(ArgExpr::Pos(self.check(arg)));
+            }
+            ast::Arg::Named(arg) => {
+                let key = Decl::ident_ref(arg.name()).into();
+                let val = self.check(arg.expr());
+                args.push(ArgExpr::Named(Box::new((key, val))));
+            }
+            ast::Arg::Spread(s) => {
+                args.push(ArgExpr::Spread(self.check(s.expr())));
+            }
+        }
     }
 
     fn check_unary(&mut self, typed: ast::Unary) -> Expr {
@@ -1036,9 +1048,30 @@ impl ExprWorker<'_> {
         Expr::Select(SelectExpr { lhs, key, span }.into())
     }
 
+    fn check_math_access(&mut self, typed: ast::MathAccess) -> Expr {
+        match typed {
+            ast::MathAccess::MathIdent(ident) => self.check_math_ident(ident),
+            ast::MathAccess::MathFieldAccess(access) => self.check_math_field_access(access),
+        }
+    }
+
+    fn check_math_field_access(&mut self, typed: ast::MathFieldAccess) -> Expr {
+        let lhs = self.check_math_access(typed.target());
+        let key = Decl::math_ident_ref(typed.field()).into();
+        let span = typed.span();
+        Expr::Select(SelectExpr { lhs, key, span }.into())
+    }
+
     fn check_func_call(&mut self, typed: ast::FuncCall) -> Expr {
         let callee = self.check(typed.callee());
         let args = self.check_args(typed.args());
+        let span = typed.span();
+        Expr::Apply(ApplyExpr { callee, args, span }.into())
+    }
+
+    fn check_math_call(&mut self, typed: ast::MathCall) -> Expr {
+        let callee = self.check_math_access(typed.callee());
+        let args = self.check_math_args(typed.args());
         let span = typed.span();
         Expr::Apply(ApplyExpr { callee, args, span }.into())
     }

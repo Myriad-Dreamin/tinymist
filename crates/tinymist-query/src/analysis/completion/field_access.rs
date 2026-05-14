@@ -198,6 +198,9 @@ fn is_valid_math_field_access(target: &SyntaxNode) -> bool {
     if let Some(field_access) = target.cast::<ast::FieldAccess>() {
         return is_valid_math_field_access(field_access.target().to_untyped());
     }
+    if let Some(field_access) = target.cast::<ast::MathFieldAccess>() {
+        return is_valid_math_field_access(field_access.target().to_untyped());
+    }
     if matches!(target.kind(), SyntaxKind::Ident | SyntaxKind::MathIdent) {
         return true;
     }

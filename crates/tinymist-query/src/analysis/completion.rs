@@ -279,7 +279,7 @@ impl<'a> CompletionCursor<'a> {
 
             match self.syntax_context.clone() {
                 Some(SyntaxContext::Arg { args, .. }) => {
-                    args_node = Some(args.cast::<ast::Args>()?.to_untyped().clone());
+                    args_node = Some(args.get().clone());
                 }
                 Some(SyntaxContext::Normal(node))
                     if (matches!(node.kind(), SyntaxKind::ContentBlock)
@@ -617,12 +617,11 @@ impl CompletionPair<'_, '_, '_> {
                 };
             }
             Some(SyntaxContext::Arg { args, .. }) => {
-                // The existing arguments are not interesting
-                let args = args.cast::<ast::Args>()?;
-                for arg in args.items() {
-                    if let ast::Arg::Named(named) = arg {
-                        self.worker.seen_field(named.name().into());
-                    }
+                for arg in args.children() {
+                    let Some(ast::Arg::Named(named)) = arg.cast::<ast::Arg>() else {
+                        continue;
+                    };
+                    self.worker.seen_field(named.name().into());
                 }
             }
             // todo: complete field by types
