@@ -77,7 +77,7 @@ jobs:
       - name: Test tinymist
         run: cargo test --workspace --locked -- --skip=e2e
       - name: Test real filesystem watcher
-        run: cargo test -p tinymist-project --features system,mock --locked watch::tests::watch_deps_entrypoint_uses_real_watcher_on_temp_file -- --ignored --exact
+        run: cargo test -p tinymist-project --features system,mock --locked real_fs_ -- --ignored
       - name: Test Lockfile (Prepare)
         run: ./scripts/test-lock.sh
       - name: Test Lockfile (Check)

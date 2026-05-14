@@ -1344,37 +1344,187 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    #[ignore = "uses the host filesystem watcher; CI runs it explicitly"]
-    async fn watch_deps_entrypoint_uses_real_watcher_on_temp_file() {
-        let dir = tempfile::tempdir().expect("tempdir should be created");
-        let path = dir.path().join("real-watch.typ");
-        std::fs::write(&path, "initial").expect("initial temp file should be written");
-        let path = Arc::<Path>::from(path.into_boxed_path());
+    #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+    async fn real_fs_sync_dependency_updates_and_readds_dependencies() {
+        let mut harness = RealFsHarness::new();
+        let first = harness.write("sync-first.typ", "first-v1");
+        let second = harness.write("sync-second.typ", "second-v1");
+        let third = harness.write("sync-third.typ", "third-v1");
 
-        let (sender, inbox) = mpsc::unbounded_channel();
-        let (events_send, mut events_recv) = mpsc::unbounded_channel();
-        let handle = spawn_watch_deps(inbox, move |event| {
-            events_send
-                .send(event)
-                .expect("real watcher event receiver should stay open");
-        });
+        harness.sync(&[first.clone(), second.clone()]);
+        harness
+            .expect_update_all(
+                true,
+                &[
+                    (&first, ExpectedSnapshot::Content("first-v1")),
+                    (&second, ExpectedSnapshot::Content("second-v1")),
+                ],
+            )
+            .await;
 
-        sender
-            .send(NotifyMessage::SyncDependency(Box::new(vec![path.clone()])))
-            .expect("sync dependency send should succeed");
+        harness.write_path(&first, "first-v2");
+        harness
+            .expect_update(&first, false, ExpectedSnapshot::Content("first-v2"))
+            .await;
 
-        expect_real_watcher_update(&mut events_recv, &path, true, "initial").await;
+        harness.sync(std::slice::from_ref(&first));
 
-        std::fs::write(path.as_ref(), "updated").expect("updated temp file should be written");
-        expect_real_watcher_update(&mut events_recv, &path, false, "updated").await;
+        harness.sync(&[first.clone(), third.clone()]);
+        harness
+            .expect_update(&third, true, ExpectedSnapshot::Content("third-v1"))
+            .await;
+        harness.settle().await;
+    }
 
-        sender
-            .send(NotifyMessage::Settle)
-            .expect("settle send should succeed");
-        tokio::time::timeout(std::time::Duration::from_millis(500), handle)
-            .await
-            .expect("production notify actor did not settle")
-            .expect("production notify actor task failed");
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+    async fn real_fs_modify_unwatched_and_multi_file_updates() {
+        let mut harness = RealFsHarness::new();
+        let watched = harness.write("watched.typ", "watched-v1");
+        let other = harness.write("other.typ", "other-v1");
+        let unwatched = harness.write("unwatched.typ", "unwatched-v1");
+
+        harness.sync(&[watched.clone(), other.clone()]);
+        harness
+            .expect_update_all(
+                true,
+                &[
+                    (&watched, ExpectedSnapshot::Content("watched-v1")),
+                    (&other, ExpectedSnapshot::Content("other-v1")),
+                ],
+            )
+            .await;
+
+        harness.write_path(&watched, "watched-v2");
+        harness
+            .expect_update(&watched, false, ExpectedSnapshot::Content("watched-v2"))
+            .await;
+
+        harness.drain_events();
+        harness.write_path(&unwatched, "unwatched-v2");
+        harness.expect_no_update(&unwatched).await;
+
+        harness.write_path(&watched, "watched-v3");
+        harness.write_path(&other, "other-v2");
+        harness
+            .expect_update(&watched, false, ExpectedSnapshot::Content("watched-v3"))
+            .await;
+        harness
+            .expect_update(&other, false, ExpectedSnapshot::Content("other-v2"))
+            .await;
+        harness.settle().await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+    async fn real_fs_remove_rename_away_and_readd_dependencies() {
+        let mut harness = RealFsHarness::new();
+        let remove = harness.write("remove.typ", "remove-v1");
+        let rename = harness.write("rename-away.typ", "rename-v1");
+        let renamed = harness.path("renamed-away.typ");
+
+        harness.sync(&[remove.clone(), rename.clone()]);
+        harness
+            .expect_update_all(
+                true,
+                &[
+                    (&remove, ExpectedSnapshot::Content("remove-v1")),
+                    (&rename, ExpectedSnapshot::Content("rename-v1")),
+                ],
+            )
+            .await;
+
+        harness.remove(&remove);
+        harness
+            .expect_update(&remove, false, ExpectedSnapshot::NotFound)
+            .await;
+
+        harness.write_path(&remove, "remove-v2");
+        harness.sync(&[remove.clone(), rename.clone()]);
+        harness
+            .expect_update(&remove, true, ExpectedSnapshot::Content("remove-v2"))
+            .await;
+
+        harness.rename(&rename, &renamed);
+        harness
+            .expect_update(&rename, false, ExpectedSnapshot::NotFound)
+            .await;
+        harness.settle().await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+    async fn real_fs_atomic_replace_empty_missing_and_recovery() {
+        let mut harness = RealFsHarness::new();
+        let atomic = harness.write("atomic.typ", "atomic-v1");
+        let empty = harness.write("empty.typ", "stable");
+        let missing = harness.write("missing.typ", "stable");
+        let recovery = harness.write("recovery.typ", "stable");
+
+        harness.sync(&[
+            atomic.clone(),
+            empty.clone(),
+            missing.clone(),
+            recovery.clone(),
+        ]);
+        harness
+            .expect_update_all(
+                true,
+                &[
+                    (&atomic, ExpectedSnapshot::Content("atomic-v1")),
+                    (&empty, ExpectedSnapshot::Content("stable")),
+                    (&missing, ExpectedSnapshot::Content("stable")),
+                    (&recovery, ExpectedSnapshot::Content("stable")),
+                ],
+            )
+            .await;
+
+        let atomic_tmp = harness.write("atomic.tmp", "atomic-v2");
+        harness.rename(&atomic_tmp, &atomic);
+        harness
+            .expect_update(&atomic, false, ExpectedSnapshot::Content("atomic-v2"))
+            .await;
+
+        harness.write_path(&empty, "");
+        harness
+            .expect_update(&empty, false, ExpectedSnapshot::Content(""))
+            .await;
+
+        harness.remove(&missing);
+        harness
+            .expect_update(&missing, false, ExpectedSnapshot::NotFound)
+            .await;
+
+        harness.write_path(&recovery, "");
+        harness.write_path(&recovery, "recovered");
+        harness
+            .expect_update(&recovery, false, ExpectedSnapshot::Content("recovered"))
+            .await;
+        harness.settle().await;
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+    async fn real_fs_upstream_invalidation_refreshes_watches() {
+        let mut harness = RealFsHarness::new();
+        let existing = harness.write("upstream-existing.typ", "existing-v1");
+        let added = harness.write("upstream-added.typ", "added-v1");
+
+        harness.sync(std::slice::from_ref(&existing));
+        harness
+            .expect_update(&existing, true, ExpectedSnapshot::Content("existing-v1"))
+            .await;
+
+        harness.write_path(&existing, "existing-v2");
+        harness.upstream(&[existing.clone(), added.clone()], 7);
+        harness
+            .expect_upstream(&existing, ExpectedSnapshot::Content("existing-v2"), 7)
+            .await;
+        harness.write_path(&added, "added-v2");
+        harness
+            .expect_update(&added, false, ExpectedSnapshot::Content("added-v2"))
+            .await;
+        harness.settle().await;
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -1429,55 +1579,267 @@ mod tests {
         assert_changeset(changeset, expected);
     }
 
-    async fn expect_real_watcher_update(
-        events_recv: &mut mpsc::UnboundedReceiver<FilesystemEvent>,
-        expected_path: &ImmutPath,
-        expected_is_sync: bool,
-        expected_content: &str,
-    ) {
-        tokio::time::timeout(std::time::Duration::from_secs(3), async {
-            loop {
-                let event = events_recv
-                    .recv()
-                    .await
-                    .expect("real watcher event sender should stay open");
-                if update_contains_content(
-                    &event,
-                    expected_path,
-                    expected_is_sync,
-                    expected_content,
-                ) {
-                    return;
-                }
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "timed out waiting for real watcher update: path={expected_path:?}, is_sync={expected_is_sync}, content={expected_content:?}"
-            )
-        });
+    struct RealFsHarness {
+        _dir: tempfile::TempDir,
+        sender: mpsc::UnboundedSender<NotifyMessage>,
+        events_recv: mpsc::UnboundedReceiver<FilesystemEvent>,
+        handle: tokio::task::JoinHandle<()>,
     }
 
-    fn update_contains_content(
+    impl RealFsHarness {
+        fn new() -> Self {
+            let dir = tempfile::tempdir().expect("tempdir should be created");
+            let (sender, inbox) = mpsc::unbounded_channel();
+            let (events_send, events_recv) = mpsc::unbounded_channel();
+            let handle = spawn_watch_deps(inbox, move |event| {
+                events_send
+                    .send(event)
+                    .expect("real watcher event receiver should stay open");
+            });
+
+            Self {
+                _dir: dir,
+                sender,
+                events_recv,
+                handle,
+            }
+        }
+
+        fn path(&self, name: &str) -> ImmutPath {
+            Arc::from(self._dir.path().join(name).into_boxed_path())
+        }
+
+        fn write(&self, name: &str, content: &str) -> ImmutPath {
+            let path = self.path(name);
+            self.write_path(&path, content);
+            path
+        }
+
+        fn write_path(&self, path: &ImmutPath, content: &str) {
+            std::fs::write(path.as_ref(), content).expect("temp file should be written");
+        }
+
+        fn remove(&self, path: &ImmutPath) {
+            std::fs::remove_file(path.as_ref()).expect("temp file should be removed");
+        }
+
+        fn rename(&self, from: &ImmutPath, to: &ImmutPath) {
+            std::fs::rename(from.as_ref(), to.as_ref()).expect("temp file should be renamed");
+        }
+
+        fn sync(&self, paths: &[ImmutPath]) {
+            self.sender
+                .send(NotifyMessage::SyncDependency(Box::new(paths.to_vec())))
+                .expect("sync dependency send should succeed");
+        }
+
+        fn upstream(&self, invalidates: &[ImmutPath], opaque: usize) {
+            self.sender
+                .send(NotifyMessage::UpstreamUpdate(UpstreamUpdateEvent {
+                    invalidates: invalidates.to_vec(),
+                    opaque: Box::new(opaque),
+                }))
+                .expect("upstream update send should succeed");
+        }
+
+        async fn expect_update(
+            &mut self,
+            expected_path: &ImmutPath,
+            expected_is_sync: bool,
+            expected: ExpectedSnapshot<'_>,
+        ) {
+            self.expect_event(
+                || {
+                    format!(
+                        "update path={expected_path:?}, is_sync={expected_is_sync}, snapshot={expected:?}"
+                    )
+                },
+                |event| update_contains(event, expected_path, expected_is_sync, expected),
+            )
+            .await;
+        }
+
+        async fn expect_update_all(
+            &mut self,
+            expected_is_sync: bool,
+            expected: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+        ) {
+            self.expect_event(
+                || format!("update is_sync={expected_is_sync}, snapshots={expected:?}"),
+                |event| update_contains_all(event, expected_is_sync, expected),
+            )
+            .await;
+        }
+
+        async fn expect_upstream(
+            &mut self,
+            expected_path: &ImmutPath,
+            expected: ExpectedSnapshot<'_>,
+            expected_opaque: usize,
+        ) {
+            self.expect_event(
+                || format!("upstream path={expected_path:?}, snapshot={expected:?}"),
+                |event| upstream_contains(event, expected_path, expected, expected_opaque),
+            )
+            .await;
+        }
+
+        async fn expect_no_update(&mut self, expected_path: &ImmutPath) {
+            let res = tokio::time::timeout(std::time::Duration::from_millis(250), async {
+                loop {
+                    let event = self
+                        .events_recv
+                        .recv()
+                        .await
+                        .expect("real watcher event sender should stay open");
+                    if update_mentions_path(&event, expected_path) {
+                        panic!("unexpected real watcher update for {expected_path:?}: {event:?}");
+                    }
+                }
+            })
+            .await;
+            assert!(
+                res.is_err(),
+                "no-update wait should end by timeout, not by matching an event"
+            );
+        }
+
+        async fn expect_event(
+            &mut self,
+            description: impl Fn() -> String,
+            mut matches: impl FnMut(&FilesystemEvent) -> bool,
+        ) {
+            let mut last_event = None;
+            let res = tokio::time::timeout(std::time::Duration::from_secs(3), async {
+                loop {
+                    let event = self
+                        .events_recv
+                        .recv()
+                        .await
+                        .expect("real watcher event sender should stay open");
+                    if matches(&event) {
+                        return;
+                    }
+                    last_event = Some(format!("{event:?}"));
+                }
+            })
+            .await;
+
+            if res.is_err() {
+                panic!(
+                    "timed out waiting for real watcher {}; last event: {}",
+                    description(),
+                    last_event.unwrap_or_else(|| "<none>".to_owned())
+                );
+            }
+        }
+
+        fn drain_events(&mut self) {
+            while self.events_recv.try_recv().is_ok() {}
+        }
+
+        async fn settle(self) {
+            self.sender
+                .send(NotifyMessage::Settle)
+                .expect("settle send should succeed");
+            tokio::time::timeout(std::time::Duration::from_millis(500), self.handle)
+                .await
+                .expect("production notify actor did not settle")
+                .expect("production notify actor task failed");
+        }
+    }
+
+    fn update_contains(
         event: &FilesystemEvent,
         expected_path: &ImmutPath,
         expected_is_sync: bool,
-        expected_content: &str,
+        expected: ExpectedSnapshot<'_>,
     ) -> bool {
         let FilesystemEvent::Update(changeset, is_sync) = event else {
             return false;
         };
-        if *is_sync != expected_is_sync {
-            return false;
-        }
+        *is_sync == expected_is_sync && changeset_contains(changeset, expected_path, expected)
+    }
 
+    fn update_contains_all(
+        event: &FilesystemEvent,
+        expected_is_sync: bool,
+        expected: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+    ) -> bool {
+        let FilesystemEvent::Update(changeset, is_sync) = event else {
+            return false;
+        };
+        *is_sync == expected_is_sync
+            && expected
+                .iter()
+                .all(|(path, snapshot)| changeset_contains(changeset, path, *snapshot))
+    }
+
+    fn upstream_contains(
+        event: &FilesystemEvent,
+        expected_path: &ImmutPath,
+        expected: ExpectedSnapshot<'_>,
+        expected_opaque: usize,
+    ) -> bool {
+        let FilesystemEvent::UpstreamUpdate {
+            changeset,
+            upstream_event: Some(upstream_event),
+        } = event
+        else {
+            return false;
+        };
+
+        upstream_event
+            .opaque
+            .downcast_ref::<usize>()
+            .is_some_and(|opaque| *opaque == expected_opaque)
+            && changeset_contains(changeset, expected_path, expected)
+    }
+
+    fn update_mentions_path(event: &FilesystemEvent, expected_path: &ImmutPath) -> bool {
+        let FilesystemEvent::Update(changeset, ..) = event else {
+            return false;
+        };
+
+        changeset
+            .inserts
+            .iter()
+            .any(|(path, _)| path == expected_path)
+            || changeset.removes.iter().any(|path| path == expected_path)
+    }
+
+    fn changeset_contains(
+        changeset: &FileChangeSet,
+        expected_path: &ImmutPath,
+        expected: ExpectedSnapshot<'_>,
+    ) -> bool {
         changeset.inserts.iter().any(|(path, snapshot)| {
-            path == expected_path
-                && snapshot
-                    .content()
-                    .is_ok_and(|bytes| bytes.as_slice() == expected_content.as_bytes())
+            path == expected_path && snapshot_matches(snapshot, expected_path, expected)
         })
+    }
+
+    fn snapshot_matches(
+        snapshot: &FileSnapshot,
+        expected_path: &ImmutPath,
+        expected: ExpectedSnapshot<'_>,
+    ) -> bool {
+        match expected {
+            ExpectedSnapshot::Content(content) => snapshot
+                .content()
+                .is_ok_and(|bytes| bytes.as_slice() == content.as_bytes()),
+            ExpectedSnapshot::NotFound => {
+                let Err(err) = snapshot.as_ref() else {
+                    return false;
+                };
+                let FileError::NotFound(actual_path) = err.as_ref() else {
+                    return false;
+                };
+                actual_path.as_path() == expected_path.as_ref()
+            }
+            ExpectedSnapshot::Other => snapshot
+                .as_ref()
+                .is_err_and(|err| matches!(err.as_ref(), FileError::Other(_))),
+        }
     }
 
     fn assert_upstream_update(
