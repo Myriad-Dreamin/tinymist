@@ -223,7 +223,7 @@ impl Ty {
     pub fn element(&self) -> Option<Element> {
         match self {
             Ty::Value(ins_ty) => match &ins_ty.val {
-                Value::Func(func) => func.element(),
+                Value::Func(func) => func.to_element(),
                 _ => None,
             },
             Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),

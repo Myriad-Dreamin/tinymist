@@ -110,7 +110,7 @@ impl CompletionPair<'_, '_, '_> {
             }
             Value::Func(func) if valid_field_access_syntax => {
                 // Autocomplete get rules.
-                if let Some((elem, styles)) = func.element().zip(styles.as_ref()) {
+                if let Some((elem, styles)) = func.to_element().zip(styles.as_ref()) {
                     for param in elem.params().iter().filter(|param| !param.required) {
                         if let Some(value) = elem
                             .field_id(param.name)
@@ -191,7 +191,7 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn is_func(read: &Value) -> bool {
-    matches!(read, Value::Func(func) if func.element().is_none())
+    matches!(read, Value::Func(func) if func.to_element().is_none())
 }
 
 fn is_valid_math_field_access(target: &SyntaxNode) -> bool {
