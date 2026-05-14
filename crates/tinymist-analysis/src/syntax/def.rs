@@ -786,7 +786,11 @@ impl StrictCmp for TypstFileId {
     fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
         format!("{:?}", self.root())
             .cmp(&format!("{:?}", other.root()))
-            .then_with(|| self.vpath().get_with_slash().cmp(other.vpath().get_with_slash()))
+            .then_with(|| {
+                self.vpath()
+                    .get_with_slash()
+                    .cmp(other.vpath().get_with_slash())
+            })
     }
 }
 impl<T: StrictCmp> StrictCmp for Option<T> {

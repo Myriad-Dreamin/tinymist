@@ -12,8 +12,8 @@ use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
 use tinymist_std::path::PathClean;
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
-use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 use typst::syntax::package::{PackageSpec, PackageVersion};
+use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 /// Represents the resolution of a path to either a physical filesystem path or a virtual path.
 #[derive(Debug)]
@@ -45,11 +45,9 @@ impl PathResolution {
     pub fn join(&self, path: &str) -> FileResult<PathResolution> {
         match self {
             PathResolution::Resolved(root) => Ok(PathResolution::Resolved(root.join(path))),
-            PathResolution::Rootless(root) => {
-                Ok(PathResolution::Rootless(Cow::Owned(
-                    root.join(path).map_err(|_| FileError::AccessDenied)?,
-                )))
-            }
+            PathResolution::Rootless(root) => Ok(PathResolution::Rootless(Cow::Owned(
+                root.join(path).map_err(|_| FileError::AccessDenied)?,
+            ))),
         }
     }
 
@@ -71,14 +69,14 @@ pub trait RootResolver {
         use WorkspaceResolution::*;
         let root = match WorkspaceResolver::resolve(file_id)? {
             Workspace(id) => id.path().clone(),
-            Package => {
-                self.resolve_package_root(match file_id.root() {
-                    VirtualRoot::Package(package) => package,
-                    _ => unreachable!("not a file in package"),
-                })?
-            }
+            Package => self.resolve_package_root(match file_id.root() {
+                VirtualRoot::Package(package) => package,
+                _ => unreachable!("not a file in package"),
+            })?,
             UntitledRooted(..) | Rootless => {
-                return Ok(PathResolution::Rootless(Cow::Owned(file_id.vpath().clone())));
+                return Ok(PathResolution::Rootless(Cow::Owned(
+                    file_id.vpath().clone(),
+                )));
             }
         };
 
@@ -274,7 +272,9 @@ impl WorkspaceResolver {
     pub fn resolve(fid: FileId) -> FileResult<WorkspaceResolution> {
         match fid.root() {
             VirtualRoot::Project => Ok(WorkspaceResolution::Rootless),
-            VirtualRoot::Package(package) if package.namespace == WorkspaceResolver::WORKSPACE_NS => {
+            VirtualRoot::Package(package)
+                if package.namespace == WorkspaceResolver::WORKSPACE_NS =>
+            {
                 let id = WorkspaceId::from_package_name(&package.name).ok_or_else(|| {
                     FileError::Other(Some(eco_format!("bad workspace id: {fid:?}")))
                 })?;
@@ -339,7 +339,11 @@ impl fmt::Display for Resolving {
         } else {
             match id.root() {
                 VirtualRoot::Package(pkg) => {
-                    write!(f, "{pkg}{}", Path::new(id.vpath().get_with_slash()).display())
+                    write!(
+                        f,
+                        "{pkg}{}",
+                        Path::new(id.vpath().get_with_slash()).display()
+                    )
                 }
                 _ => write!(f, "{}", Path::new(id.vpath().get_with_slash()).display()),
             }
