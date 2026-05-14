@@ -22,9 +22,10 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
+use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
-use typst::layout::Position;
+use typst::introspection::PagedPosition as Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
@@ -1445,9 +1446,20 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    introspector: Tracked<Introspector>,
+    introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
-    let bib_elem = BibliographyElem::find(introspector).ok()?;
+    let library = world.library();
+    let traced = Traced::default();
+    let mut sink = Sink::new();
+    let mut engine = Engine {
+        library,
+        world: world.clone(),
+        route: Route::default(),
+        introspector: typst::utils::Protected::new(introspector),
+        traced: traced.track(),
+        sink: sink.track_mut(),
+    };
+    let bib_elem = BibliographyElem::find(&mut engine, Span::detached()).ok()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`
