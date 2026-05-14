@@ -7,7 +7,8 @@ use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::SourceSpanOffset;
 use typst::{
     World,
-    layout::{Frame, FrameItem, Point, Position, Size},
+    introspection::PagedPosition as Position,
+    layout::{Frame, FrameItem, Point, Size},
     syntax::{LinkedNode, Source, Span, SyntaxKind},
     visualize::Geometry,
 };
@@ -135,7 +136,7 @@ fn jump_from_cursor_(
             let mut min_point = Point::default();
             let mut min_dis = u64::MAX;
 
-            for (idx, page) in paged_doc.pages.iter().enumerate() {
+            for (idx, page) in paged_doc.pages().iter().enumerate() {
                 // In a page, we try to find a closer span than the existing found one.
                 let mut p_dis = min_dis;
 
