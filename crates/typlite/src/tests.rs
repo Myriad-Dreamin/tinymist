@@ -120,7 +120,7 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {
     let mut doc = doc;
-    for node in doc.root.children.make_mut().iter_mut() {
+    for node in doc.root_mut().children.make_mut().iter_mut() {
         redact_node(node);
     }
     doc
