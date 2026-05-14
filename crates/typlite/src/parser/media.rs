@@ -6,13 +6,16 @@ use std::sync::{Arc, LazyLock};
 
 use base64::Engine;
 use cmark_writer::ast::{HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
+use comemo::Track;
 use ecow::{EcoString, eco_format};
 use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowApi};
 use typst::{
     World,
     foundations::{Bytes, Dict, IntoValue},
+    introspection::EmptyIntrospector,
     layout::{Abs, Frame},
+    model::LateLinkResolver,
     utils::LazyHash,
 };
 use typst_html::{HtmlElement, HtmlNode};
@@ -78,7 +81,16 @@ impl HtmlToAstParser {
             });
         };
 
-        let svg = typst_svg::svg_frame(&frame.inner);
+        let introspector = EmptyIntrospector;
+        let link_resolver = LateLinkResolver::new(None, &introspector);
+        let svg = typst_svg::svg_in_html(
+            &frame.inner,
+            frame.text_size,
+            frame.id.as_deref(),
+            &eco_format!("{}", frame.css.to_inline()),
+            &frame.anchors,
+            link_resolver.track(),
+        );
         let frame_url = match self.create_asset_url(&svg) {
             Ok(url) => url,
             Err(e) => {
@@ -127,7 +139,10 @@ impl HtmlToAstParser {
             return Node::Text(EcoString::new());
         }
 
-        let svg = typst_svg::svg_frame(frame);
+        let introspector = EmptyIntrospector;
+        let link_resolver = LateLinkResolver::new(None, &introspector);
+        let svg =
+            typst_svg::svg_in_html(frame, Abs::pt(12.0), None, "", &[], link_resolver.track());
         self.convert_svg(svg)
     }
 
