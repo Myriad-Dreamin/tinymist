@@ -121,7 +121,7 @@ impl fmt::Display for SummarizedCoverage<'_> {
             a.package()
                 .map(crate::PackageSpecCmp::from)
                 .cmp(&b.package().map(crate::PackageSpecCmp::from))
-                .then_with(|| a.vpath().cmp(b.vpath()))
+                .then_with(|| a.vpath().get_with_slash().cmp(b.vpath().get_with_slash()))
         });
 
         let summary = ids
@@ -290,7 +290,10 @@ impl InstrumentWorker {
                     self.instrument_block_child(
                         node,
                         cond_expr.if_body().span(),
-                        cond_expr.else_body().unwrap_or_default().span(),
+                        cond_expr
+                            .else_body()
+                            .map(|expr| expr.span())
+                            .unwrap_or(Span::detached()),
                     );
                     return;
                 }
@@ -350,6 +353,7 @@ impl InstrumentWorker {
                 | ast::Expr::MathFrac(..)
                 | ast::Expr::MathRoot(..)
                 | ast::Expr::MathFieldAccess(..)
+                | ast::Expr::MathCall(..)
                 | ast::Expr::Ident(..)
                 | ast::Expr::None(..)
                 | ast::Expr::Auto(..)
