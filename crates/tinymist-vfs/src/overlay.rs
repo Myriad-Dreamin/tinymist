@@ -1,7 +1,6 @@
-use std::{borrow::Borrow, cmp::Ord, path::Path};
+use std::{borrow::Borrow, hash::Hash, path::Path};
 
-use rpds::RedBlackTreeMapSync;
-use tinymist_std::ImmutPath;
+use tinymist_std::{ImmutPath, hash::FxHashMap};
 use typst::diag::FileResult;
 
 use crate::{AccessModel, Bytes, FileId, FileSnapshot, PathAccessModel};
@@ -9,17 +8,17 @@ use crate::{AccessModel, Bytes, FileId, FileSnapshot, PathAccessModel};
 /// Provides overlay access model which allows to shadow the underlying access
 /// model with memory contents.
 #[derive(Default, Debug, Clone)]
-pub struct OverlayAccessModel<K: Ord, M> {
-    files: RedBlackTreeMapSync<K, FileSnapshot>,
+pub struct OverlayAccessModel<K: Eq + Hash, M> {
+    files: FxHashMap<K, FileSnapshot>,
     /// The underlying access model
     pub inner: M,
 }
 
-impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
+impl<K: Eq + Hash + Clone, M> OverlayAccessModel<K, M> {
     /// Create a new [`OverlayAccessModel`] with the given inner access model
     pub fn new(inner: M) -> Self {
         Self {
-            files: RedBlackTreeMapSync::default(),
+            files: FxHashMap::default(),
             inner,
         }
     }
@@ -36,7 +35,7 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
 
     /// Clear the shadowed files
     pub fn clear_shadow(&mut self) {
-        self.files = RedBlackTreeMapSync::default();
+        self.files = FxHashMap::default();
     }
 
     /// Get the shadowed file paths
@@ -45,7 +44,7 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
     }
 
     /// Add a shadow file to the [`OverlayAccessModel`]
-    pub fn add_file<Q: Ord + ?Sized>(
+    pub fn add_file<Q: Eq + Hash + ?Sized>(
         &mut self,
         path: &Q,
         snap: FileSnapshot,
@@ -58,17 +57,17 @@ impl<K: Ord + Clone, M> OverlayAccessModel<K, M> {
                 *e = snap;
             }
             None => {
-                self.files.insert_mut(cast(path), snap);
+                self.files.insert(cast(path), snap);
             }
         }
     }
 
     /// Remove a shadow file from the [`OverlayAccessModel`]
-    pub fn remove_file<Q: Ord + ?Sized>(&mut self, path: &Q)
+    pub fn remove_file<Q: Eq + Hash + ?Sized>(&mut self, path: &Q)
     where
         K: Borrow<Q>,
     {
-        self.files.remove_mut(path);
+        self.files.remove(path);
     }
 }
 

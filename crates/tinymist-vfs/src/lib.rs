@@ -50,7 +50,6 @@ use std::{path::Path, sync::Arc};
 
 use ecow::EcoVec;
 use parking_lot::Mutex;
-use rpds::RedBlackTreeMapSync;
 use typst::diag::{FileError, FileResult};
 use typst::foundations::Dict;
 use typst::syntax::Source;
@@ -170,7 +169,7 @@ impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vfs")
             .field("revision", &self.revision)
-            .field("managed", &self.managed.lock().entries.size())
+            .field("managed", &self.managed.lock().entries.len())
             .field("paths", &self.paths.lock().paths.len())
             .finish()
     }
@@ -288,7 +287,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
         for (id, entry) in m.entries.clone().iter() {
             let entry_rev = entry.bytes.get().map(|e| e.1).unwrap_or_default();
             if entry_rev + threshold < rev {
-                m.entries.remove_mut(id);
+                m.entries.remove(id);
             }
         }
     }
@@ -591,21 +590,14 @@ struct VfsEntry {
 
 #[derive(Debug, Clone, Default)]
 struct EntryMap {
-    entries: RedBlackTreeMapSync<FileId, VfsEntry>,
+    entries: FxHashMap<FileId, VfsEntry>,
 }
 
 impl EntryMap {
     /// Read a slot.
     #[inline(always)]
     fn slot<T>(&mut self, path: FileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
-        if let Some(entry) = self.entries.get_mut(&path) {
-            f(entry)
-        } else {
-            let mut entry = VfsEntry::default();
-            let res = f(&mut entry);
-            self.entries.insert_mut(path, entry);
-            res
-        }
+        f(self.entries.entry(path).or_default())
     }
 
     fn display(&self) -> DisplayEntryMap<'_> {
