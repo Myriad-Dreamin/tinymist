@@ -19,8 +19,8 @@ Tinymist SHALL define a deterministic notify actor test matrix for low-level wat
 - **WHEN** different watcher backends can represent the same user operation with different raw event shapes
 - **THEN** the matrix MUST either cover each meaningful shape or document why one shape is represented by another deterministic row
 
-### Requirement: Notify actor tests use deterministic injected inputs
-Tinymist SHALL test notify actor behavior without relying on host filesystem timing for core matrix coverage.
+### Requirement: Notify actor tests cover deterministic and real watcher inputs
+Tinymist SHALL test notify actor behavior with both deterministic injected inputs and ignored-by-default real filesystem watcher inputs.
 
 #### Scenario: Actor reads from injected file state
 - **WHEN** a notify actor matrix test needs file content for a watched path
@@ -34,8 +34,9 @@ Tinymist SHALL test notify actor behavior without relying on host filesystem tim
 
 #### Scenario: Production watcher wiring remains covered
 - **WHEN** deterministic actor tests are added
-- **THEN** Tinymist SHOULD retain or add a bounded smoke test for the production watcher wiring when it can be made stable
-- **AND** correctness of the full matrix MUST NOT depend on backend-specific watcher timing
+- **THEN** Tinymist SHOULD add bounded real filesystem watcher tests for the production `watch_deps` wiring
+- **AND** those tests SHOULD be ignored by default and run explicitly in CI
+- **AND** they SHOULD exercise representative user-level file operations so OS/backend-specific watcher defects can be exposed
 
 ### Requirement: Notify actor outputs and watch lifecycle are asserted
 Tinymist SHALL assert both emitted filesystem events and watch lifecycle side effects for notify actor event combinations.

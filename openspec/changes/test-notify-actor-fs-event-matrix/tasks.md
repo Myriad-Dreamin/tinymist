@@ -22,7 +22,7 @@
 - [x] 3.5 Test rename-to, paired rename, and multi-path event shapes.
 - [x] 3.6 Test transient empty content, missing files, read errors, delayed recheck, and recovery before confirmation.
 - [x] 3.7 Test upstream invalidation refreshes watches and emits `FilesystemEvent::UpstreamUpdate` with the original upstream payload.
-- [x] 3.8 Add a bounded production wiring smoke test for `watch_deps` if it can be kept stable.
+- [x] 3.8 Add bounded ignored-by-default real filesystem watcher integration tests for `watch_deps` and run them explicitly in CI.
 
 ## 4. Validate notify actor coverage
 
