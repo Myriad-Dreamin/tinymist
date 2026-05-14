@@ -225,7 +225,8 @@ fn render_symbols(
 
     let entry_path: Arc<Path> = Path::new("/._sym_.typ").into();
 
-    let new_entry = EntryState::new_rootless(VirtualPath::new(&entry_path));
+    let new_entry =
+        EntryState::new_rootless(VirtualPath::new(entry_path.as_ref().to_string_lossy()).unwrap());
 
     let mut forked = snap.world().task(TaskInputs {
         entry: Some(new_entry),

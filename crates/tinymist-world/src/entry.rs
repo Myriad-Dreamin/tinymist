@@ -41,22 +41,20 @@ pub struct EntryState {
 }
 
 /// The detached entry.
-pub static DETACHED_ENTRY: LazyLock<FileId> =
-    LazyLock::new(|| {
-        FileId::unique(RootedPath::new(
-            VirtualRoot::Project,
-            VirtualPath::new("/__detached.typ").unwrap(),
-        ))
-    });
+pub static DETACHED_ENTRY: LazyLock<FileId> = LazyLock::new(|| {
+    FileId::unique(RootedPath::new(
+        VirtualRoot::Project,
+        VirtualPath::new("/__detached.typ").unwrap(),
+    ))
+});
 
 /// The memory main entry.
-pub static MEMORY_MAIN_ENTRY: LazyLock<FileId> =
-    LazyLock::new(|| {
-        FileId::unique(RootedPath::new(
-            VirtualRoot::Project,
-            VirtualPath::new("/__main__.typ").unwrap(),
-        ))
-    });
+pub static MEMORY_MAIN_ENTRY: LazyLock<FileId> = LazyLock::new(|| {
+    FileId::unique(RootedPath::new(
+        VirtualRoot::Project,
+        VirtualPath::new("/__main__.typ").unwrap(),
+    ))
+});
 
 impl EntryState {
     /// Creates an entry state with no workspace root and no main file.

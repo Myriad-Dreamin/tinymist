@@ -7,7 +7,7 @@ use reflexo_typst::{Bytes, ImmutPath, TypstFileId};
 use tinymist_query::package::get_manifest;
 use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageSpec, TemplateInfo};
-use typst::syntax::VirtualPath;
+use typst::syntax::{RootedPath, VirtualPath, VirtualRoot};
 use typst::World;
 
 use crate::project::LspWorld;
@@ -31,7 +31,10 @@ pub struct InitTask {
 pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
     let TemplateSource::Package(spec) = tmpl;
 
-    let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+    let toml_id = TypstFileId::new(RootedPath::new(
+        VirtualRoot::Package(spec.clone()),
+        VirtualPath::new("typst.toml").expect("valid manifest path"),
+    ));
     let manifest = get_manifest(world, toml_id)?;
 
     // Ensure that it is indeed a template.
@@ -39,9 +42,11 @@ pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
         bail!("package {spec} is not a template");
     };
 
-    let entry_point = toml_id
-        .join(&(tmpl_info.path.to_string() + "/main.typ"))
-        .join(&tmpl_info.entrypoint);
+    let entry_point = TypstFileId::new(RootedPath::new(
+        toml_id.root().clone(),
+        VirtualPath::new(format!("{}/{}", tmpl_info.path, tmpl_info.entrypoint))
+            .expect("valid template entrypoint"),
+    ));
 
     world.file(entry_point).map_err(|e| eco_format!("{e}"))
 }
@@ -53,7 +58,10 @@ pub fn init(world: &LspWorld, task: InitTask) -> StrResult<PathBuf> {
         .dir
         .unwrap_or_else(|| Path::new(spec.name.as_str()).into());
 
-    let toml_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+    let toml_id = TypstFileId::new(RootedPath::new(
+        VirtualRoot::Package(spec.clone()),
+        VirtualPath::new("typst.toml").expect("valid manifest path"),
+    ));
     let manifest = get_manifest(world, toml_id)?;
 
     // Ensure that it is indeed a template.
@@ -105,7 +113,10 @@ fn scaffold_project(
         .parent()
         .ok_or_else(|| eco_format!("package root is not a directory (at {:?})", toml_id))?;
 
-    let template_dir = toml_id.join(tmpl_info.path.as_str());
+    let template_dir = TypstFileId::new(RootedPath::new(
+        toml_id.root().clone(),
+        VirtualPath::new(tmpl_info.path.as_str()).expect("valid template path"),
+    ));
     // todo: template in memory
     let real_template_dir = world.path_for_id(template_dir)?.to_err()?;
     if !real_template_dir.exists() {
@@ -165,7 +176,10 @@ fn scan_package_files(
             }
         };
 
-        let id = TypstFileId::new(package.clone(), VirtualPath::new(relative_path));
+        let id = TypstFileId::new(RootedPath::new(
+            VirtualRoot::Package(package.clone().expect("template package")),
+            VirtualPath::new(relative_path.to_string_lossy()).expect("valid template file path"),
+        ));
         res.push(id);
     }
 

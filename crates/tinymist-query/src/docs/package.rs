@@ -42,7 +42,12 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let manifest = ctx.get_manifest(toml_id)?;
 
     let for_spec = toml_id.package().unwrap();
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = toml_id
+        .map(|path| {
+            path.join(&manifest.package.entrypoint)
+                .expect("valid package entrypoint")
+        })
+        .intern();
 
     ctx.preload_package(entry_point);
 

@@ -357,8 +357,13 @@ impl LocalContext {
             .get_or_init(|| {
                 if let Some(root) = self.world().entry_state().workspace_root() {
                     scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
-                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
+                        VirtualPath::virtualize(&root, path)
+                            .ok()
+                            .map(|path| WorkspaceResolver::workspace_file(Some(&root), path))
                     })
+                    .into_iter()
+                    .flatten()
+                    .collect()
                 } else {
                     vec![]
                 }

@@ -22,7 +22,12 @@ pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResu
     let toml_id = get_manifest_id(pkg)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = toml_id
+        .map(|path| {
+            path.join(&manifest.package.entrypoint)
+                .expect("valid package entrypoint")
+        })
+        .intern();
     module_docs(ctx, entry_point)
 }
 

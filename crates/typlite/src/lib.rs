@@ -152,7 +152,7 @@ impl MarkdownDocument {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        parser.parse(&self.base.root).context_ut("failed to parse")
+        parser.parse(self.base.root()).context_ut("failed to parse")
     }
 
     /// Convert content to markdown string

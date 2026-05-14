@@ -41,7 +41,10 @@ pub fn resolve_id_by_path(
         VirtualPath::new(import_path).ok()?
     };
 
-    Some(TypstFileId::new(RootedPath::new(current.root().clone(), vpath)))
+    Some(TypstFileId::new(RootedPath::new(
+        current.root().clone(),
+        vpath,
+    )))
 }
 
 /// Finds a source instance by its import node.

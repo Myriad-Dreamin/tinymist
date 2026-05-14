@@ -137,7 +137,12 @@ impl LspQuerySnapshot {
                 .ok_or_else(|| eco_format!("cannot get package root (parent of {toml_path:?})"))?;
 
             let manifest = crate::package::get_manifest(world, toml_id)?;
-            let entry_point = toml_id.join(&manifest.package.entrypoint);
+            let entry_point = toml_id
+                .map(|path| {
+                    path.join(&manifest.package.entrypoint)
+                        .expect("valid package entrypoint")
+                })
+                .intern();
 
             Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
         });
