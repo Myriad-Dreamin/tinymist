@@ -56,6 +56,7 @@ typst-macros.workspace = true
 typst-shim.workspace = true
 typst-timing.workspace = true
 typst-library.workspace = true
+typst-layout.workspace = true
 typst-utils.workspace = true
 unscanny.workspace = true
 walkdir.workspace = true
