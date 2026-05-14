@@ -263,7 +263,7 @@ enum CatKey {
 
 impl PartialEq for CatKey {
     fn eq(&self, other: &Self) -> bool {
-        use typst::foundations::func::Repr::*;
+        use typst::foundations::FuncInner::*;
         match (self, other) {
             (CatKey::Func(a), CatKey::Func(b)) => match (a.inner(), b.inner()) {
                 (Native(a), Native(b)) => a == b,

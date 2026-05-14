@@ -146,15 +146,15 @@ impl Ty {
 
     /// Converts a parameter site to a type.
     pub fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         match func.inner() {
-            Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
+            FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
                 if let Some(ty) = param_mapping(func, param) {
                     return ty;
                 }
             }
-            Repr::Closure(_) => {}
-            Repr::With(w) => return Ty::from_param_site(&w.0, param),
+            FuncInner::Closure(_) => {}
+            FuncInner::With(w) => return Ty::from_param_site(&w.0, param),
         };
 
         Self::from_cast_info(&param.input)
@@ -162,12 +162,12 @@ impl Ty {
 
     /// Converts a return site to a type.
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         match func.inner() {
-            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
-            Repr::Closure(_) | Repr::Plugin(_) => {}
-            Repr::With(w) => return Ty::from_return_site(&w.0, ty),
-            Repr::Native(_) => {}
+            FuncInner::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
+            FuncInner::Closure(_) | FuncInner::Plugin(_) => {}
+            FuncInner::With(w) => return Ty::from_return_site(&w.0, ty),
+            FuncInner::Native(_) => {}
         };
 
         Self::from_cast_info(ty)
