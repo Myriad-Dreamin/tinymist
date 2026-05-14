@@ -194,7 +194,8 @@ impl TestSuitesWorker<'_> {
 
     fn discover_tests(&mut self) -> Result<()> {
         for (source, module) in self.files.iter() {
-            let vpath = source.id().vpath().as_rooted_path();
+            let source_id = source.id();
+            let vpath = source_id.vpath().as_rooted_path();
             let file_name = vpath.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if file_name.starts_with(self.config.example_pattern.as_str()) {
                 self.examples.push(source.clone());

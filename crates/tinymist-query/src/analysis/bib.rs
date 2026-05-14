@@ -233,7 +233,10 @@ Euclid2:
 "#;
         let bib = super::YamlBib::from_content(
             content,
-            FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
+            FileId::unique(typst::syntax::RootedPath::new(
+                typst::syntax::VirtualRoot::Project,
+                VirtualPath::new("test.yml").expect("valid test path"),
+            )),
         );
         assert_eq!(bib.entries.len(), 2);
         assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63, raw_entry: None })"###);
@@ -248,7 +251,10 @@ Euclid:
   title: '{Elements, {V}ols.\ 1--13}'
 Euclid3
 "#;
-        let file_id = FileId::new_fake(VirtualPath::new(Path::new("test.yml")));
+        let file_id = FileId::unique(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Project,
+            VirtualPath::new("test.yml").expect("valid test path"),
+        ));
         super::YamlBib::from_content(content, file_id);
     }
 }

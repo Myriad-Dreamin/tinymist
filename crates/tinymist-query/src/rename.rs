@@ -165,7 +165,12 @@ pub(crate) fn do_rename_file(
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
     // Compare package and vpath so we avoid allocating a joined file id while
     // still distinguishing package files that share the same internal path.
-    file_id.package() == def_fid.package() && file_id.vpath().join(path) == *def_fid.vpath()
+    file_id.package() == def_fid.package()
+        && file_id
+            .vpath()
+            .join(path)
+            .ok()
+            .is_some_and(|path| path == *def_fid.vpath())
 }
 
 struct RenameFileWorker<'a> {
@@ -407,18 +412,18 @@ mod tests {
     fn link_path_match_requires_same_package_spec() {
         let package_v010 = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
         let package_v011 = PackageSpec::from_str("@preview/example:0.1.1").unwrap();
-        let def_fid = TypstFileId::new(
-            Some(package_v010.clone()),
-            VirtualPath::new(Path::new("/assets/logo.typ")),
-        );
-        let same_package_ref = TypstFileId::new(
-            Some(package_v010),
-            VirtualPath::new(Path::new("/docs/main.typ")),
-        );
-        let other_package_ref = TypstFileId::new(
-            Some(package_v011),
-            VirtualPath::new(Path::new("/docs/main.typ")),
-        );
+        let def_fid = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010.clone()),
+            VirtualPath::new("/assets/logo.typ").unwrap(),
+        ));
+        let same_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
+        let other_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v011),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
 
         assert!(link_path_matches_def(
             def_fid,

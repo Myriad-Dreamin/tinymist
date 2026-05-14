@@ -71,7 +71,7 @@ pub fn run_with_ctx_<T>(
         .map(|path| {
             WorkspaceResolver::workspace_file(
                 Some(&root),
-                VirtualPath::new(path.strip_prefix(&root).unwrap()),
+                VirtualPath::virtualize(&root, path.as_path()).unwrap(),
             )
         })
         .collect::<Vec<_>>();

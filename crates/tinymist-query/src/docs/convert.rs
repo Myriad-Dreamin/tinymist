@@ -26,7 +26,7 @@ pub(crate) fn convert_docs(
         let root = ctx
             .world()
             .vfs()
-            .file_path(fid.join("/"))
+            .file_path(fid)
             .ok()
             .and_then(|e| e.to_err().ok());
         if let Some(root) = root {
@@ -43,7 +43,7 @@ pub(crate) fn convert_docs(
         }
         imports.push(format!(
             "#import {:?}: *",
-            unix_slash(fid.vpath().as_rooted_path())
+            unix_slash(Path::new(fid.vpath().get_with_slash()))
         ));
         imports.join("; ")
     });

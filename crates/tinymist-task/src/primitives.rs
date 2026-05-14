@@ -367,7 +367,10 @@ impl ResourcePath {
             ),
             VirtualRoot::Project => ResourcePath(
                 "file_id".into(),
-                format!("$root{}", unix_slash(Path::new(id.vpath().get_with_slash()))),
+                format!(
+                    "$root{}",
+                    unix_slash(Path::new(id.vpath().get_with_slash()))
+                ),
             ),
         }
     }
