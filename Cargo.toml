@@ -170,6 +170,7 @@ reflexo-typst = { version = "=0.7.0-rc2", default-features = false }
 reflexo-vec2svg = { version = "=0.7.0-rc2" }
 
 typst = "0.15.0"
+typst-layout = "0.15.0"
 typst-html = "0.15.0"
 typst-library = "0.15.0"
 typst-macros = "0.15.0"
@@ -181,8 +182,8 @@ typst-syntax = "0.15.0"
 typst-eval = "0.15.0"
 typst-assets = "0.14.2"
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
-typst-ansi-hl = "0.4.0"
-typstyle-core = { version = "=0.14.0", default-features = false }
+typst-ansi-hl = "0.5.0"
+typstyle-core = { version = "0.14.4", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.15"
@@ -307,19 +308,22 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst = { path = "../typst/crates/typst" }
+typst-eval = { path = "../typst/crates/typst-eval" }
+typst-html = { path = "../typst/crates/typst-html" }
+typst-layout = { path = "../typst/crates/typst-layout" }
+typst-library = { path = "../typst/crates/typst-library" }
+typst-macros = { path = "../typst/crates/typst-macros" }
+typst-pdf = { path = "../typst/crates/typst-pdf" }
+typst-realize = { path = "../typst/crates/typst-realize" }
+typst-render = { path = "../typst/crates/typst-render" }
+typst-svg = { path = "../typst/crates/typst-svg" }
+typst-syntax = { path = "../typst/crates/typst-syntax" }
+typst-timing = { path = "../typst/crates/typst-timing" }
+typst-utils = { path = "../typst/crates/typst-utils" }
 
-# typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-# typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "34869bfa9db089c5196be5fac2a5e9d752904ca2" }
+typst-ansi-hl = { path = "../typst-ansi-hl/lib" }
+typstyle-core = { path = "../typstyle/crates/typstyle-core" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
