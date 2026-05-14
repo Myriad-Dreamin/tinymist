@@ -1344,6 +1344,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
+    #[ignore = "uses the host filesystem watcher; CI runs it explicitly"]
     async fn watch_deps_entrypoint_uses_real_watcher_on_temp_file() {
         let dir = tempfile::tempdir().expect("tempdir should be created");
         let path = dir.path().join("real-watch.typ");
