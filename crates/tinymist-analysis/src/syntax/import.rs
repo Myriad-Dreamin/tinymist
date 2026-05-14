@@ -21,10 +21,13 @@ pub fn resolve_id_by_path(
         manifest.validate(&spec).ok()?;
 
         // Evaluates the entry point.
+        let package_root = manifest_id
+            .vpath()
+            .parent()
+            .unwrap_or_else(|| manifest_id.vpath().clone());
         return Some(TypstFileId::new(RootedPath::new(
             manifest_id.root().clone(),
-            manifest_id
-                .vpath()
+            package_root
                 .join(manifest.package.entrypoint.as_str())
                 .ok()?,
         )));
