@@ -532,17 +532,17 @@ impl ExternalDocLink {
             return None;
         };
 
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         let mut func = &func;
         loop {
             match func.inner() {
-                Repr::Element(..) | Repr::Native(..) => {
+                FuncInner::Element(..) | FuncInner::Native(..) => {
                     return Self::builtin_value_tooltip(base, &Value::Func(func.clone()));
                 }
-                Repr::With(w) => {
+                FuncInner::With(w) => {
                     func = &w.0;
                 }
-                Repr::Closure(..) | Repr::Plugin(..) => {
+                FuncInner::Closure(..) | FuncInner::Plugin(..) => {
                     return None;
                 }
             }

@@ -164,10 +164,10 @@ pub struct PartialSignature {
 /// Gets the signature of a function.
 #[comemo::memoize]
 pub fn func_signature(func: Func) -> Signature {
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     let mut with_stack = eco_vec![];
     let mut func = func;
-    while let Repr::With(with) = func.inner() {
+    while let FuncInner::With(with) = func.inner() {
         let (inner, args) = with.as_ref();
         with_stack.push(ArgsInfo {
             items: args
@@ -218,12 +218,12 @@ pub fn func_signature(func: Func) -> Signature {
     };
 
     let ret_ty = match func.inner() {
-        Repr::With(..) => unreachable!(),
-        Repr::Closure(closure) => {
+        FuncInner::With(..) => unreachable!(),
+        FuncInner::Closure(closure) => {
             analyze_closure_signature(closure.clone(), &mut add_param);
             None
         }
-        Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
+        FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
             for param in func.params().unwrap_or_default() {
                 add_param(Interned::new(ParamTy {
                     name: param.name.into(),
