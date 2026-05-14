@@ -7119,6 +7119,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-layout",
  "typst-library",
  "typst-macros",
  "typst-shim",
