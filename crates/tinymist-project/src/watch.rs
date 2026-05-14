@@ -9,16 +9,16 @@
 //! Hopefully, one day a reliable file watching/walking crate appears on
 //! crates.io, and we can reduce this to trivial glue code.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt, path::Path};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use tinymist_std::{ImmutPath, error::IgnoreLogging};
 use tinymist_world::vfs::notify::NotifyDeps;
 use tokio::sync::mpsc;
-use typst::diag::FileError;
+use typst::diag::{FileError, FileResult};
 
 use tinymist_world::vfs::{
-    FileChangeSet, FileSnapshot, PathAccessModel,
+    Bytes, FileChangeSet, FileSnapshot, PathAccessModel,
     notify::{FilesystemEvent, NotifyMessage, UpstreamUpdateEvent},
     system::SystemAccessModel,
 };
@@ -26,6 +26,104 @@ use tinymist_world::vfs::{
 type WatcherPair = (RecommendedWatcher, mpsc::UnboundedReceiver<NotifyEvent>);
 type NotifyEvent = notify::Result<notify::Event>;
 type FileEntry = (/* key */ ImmutPath, /* value */ FileSnapshot);
+
+trait NotifyActorAccess: fmt::Debug + Send + Sync {
+    fn content(&self, src: &Path) -> FileResult<Bytes>;
+
+    fn is_watchable_file(&self, src: &Path) -> bool;
+}
+
+#[derive(Debug)]
+struct SystemNotifyActorAccess(SystemAccessModel);
+
+impl NotifyActorAccess for SystemNotifyActorAccess {
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        self.0.content(src)
+    }
+
+    fn is_watchable_file(&self, src: &Path) -> bool {
+        src.metadata().is_ok_and(|meta| !meta.is_dir())
+    }
+}
+
+#[derive(Debug)]
+enum NotifyWatcher {
+    System(WatcherPair),
+    #[cfg(test)]
+    Fake(FakeWatcher),
+}
+
+impl NotifyWatcher {
+    async fn recv(&mut self) -> Option<NotifyEvent> {
+        match self {
+            Self::System((_, watcher_receiver)) => watcher_receiver.recv().await,
+            #[cfg(test)]
+            Self::Fake(_) => None,
+        }
+    }
+
+    fn watch(&mut self, path: &Path, recursive_mode: RecursiveMode) -> notify::Result<()> {
+        match self {
+            Self::System((watcher, _)) => watcher.watch(path, recursive_mode),
+            #[cfg(test)]
+            Self::Fake(watcher) => watcher.watch(path),
+        }
+    }
+
+    fn unwatch(&mut self, path: &Path) -> notify::Result<()> {
+        match self {
+            Self::System((watcher, _)) => watcher.unwatch(path),
+            #[cfg(test)]
+            Self::Fake(watcher) => watcher.unwatch(path),
+        }
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FakeWatchCommand {
+    Watch(std::path::PathBuf),
+    Unwatch(std::path::PathBuf),
+}
+
+#[cfg(test)]
+#[derive(Debug, Default, Clone)]
+struct FakeWatchCommands(std::sync::Arc<std::sync::Mutex<Vec<FakeWatchCommand>>>);
+
+#[cfg(test)]
+impl FakeWatchCommands {
+    fn push(&self, command: FakeWatchCommand) {
+        self.0
+            .lock()
+            .expect("fake watch commands poisoned")
+            .push(command);
+    }
+
+    fn take(&self) -> Vec<FakeWatchCommand> {
+        std::mem::take(&mut *self.0.lock().expect("fake watch commands poisoned"))
+    }
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct FakeWatcher {
+    commands: FakeWatchCommands,
+}
+
+#[cfg(test)]
+impl FakeWatcher {
+    fn watch(&self, path: &Path) -> notify::Result<()> {
+        self.commands
+            .push(FakeWatchCommand::Watch(path.to_path_buf()));
+        Ok(())
+    }
+
+    fn unwatch(&self, path: &Path) -> notify::Result<()> {
+        self.commands
+            .push(FakeWatchCommand::Unwatch(path.to_path_buf()));
+        Ok(())
+    }
+}
 
 /// The state of a watched file.
 ///
@@ -85,8 +183,7 @@ struct UndeterminedNotifyEvent {
 #[derive(Debug)]
 pub struct NotifyActor<F: FnMut(FilesystemEvent)> {
     /// The access model of the actor.
-    /// We concrete the access model to `SystemAccessModel` for now.
-    inner: SystemAccessModel,
+    inner: Box<dyn NotifyActorAccess>,
 
     /// The lifetime of the watched files.
     lifetime: usize,
@@ -103,7 +200,7 @@ pub struct NotifyActor<F: FnMut(FilesystemEvent)> {
     interrupted_by_events: F,
 
     /// The builtin watcher object.
-    watcher: Option<WatcherPair>,
+    watcher: Option<NotifyWatcher>,
 }
 
 impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
@@ -122,7 +219,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         );
 
         NotifyActor {
-            inner: SystemAccessModel,
+            inner: Box::new(SystemNotifyActorAccess(SystemAccessModel)),
             // we start from 1 to distinguish from 0 (default value)
             lifetime: 1,
             logical_tick: 1,
@@ -133,14 +230,38 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             undetermined_recv,
 
             watched_entries: HashMap::new(),
-            watcher: watcher.map(|it| (it, watcher_rx)),
+            watcher: watcher.map(|it| NotifyWatcher::System((it, watcher_rx))),
+        }
+    }
+
+    #[cfg(test)]
+    fn new_for_test(
+        inner: Box<dyn NotifyActorAccess>,
+        commands: FakeWatchCommands,
+        interrupted_by_events: F,
+    ) -> Self {
+        let (undetermined_send, undetermined_recv) = mpsc::unbounded_channel();
+
+        NotifyActor {
+            inner,
+            // we start from 1 to distinguish from 0 (default value)
+            lifetime: 1,
+            logical_tick: 1,
+
+            interrupted_by_events,
+
+            undetermined_send,
+            undetermined_recv,
+
+            watched_entries: HashMap::new(),
+            watcher: Some(NotifyWatcher::Fake(FakeWatcher { commands })),
         }
     }
 
     /// Get the notify event from the watcher.
-    async fn get_notify_event(watcher: &mut Option<WatcherPair>) -> Option<NotifyEvent> {
+    async fn get_notify_event(watcher: &mut Option<NotifyWatcher>) -> Option<NotifyEvent> {
         match watcher {
-            Some((_, watcher_receiver)) => watcher_receiver.recv().await,
+            Some(watcher) => watcher.recv().await,
             None => None,
         }
     }
@@ -255,24 +376,22 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             }
             entry.seen = true;
 
-            // Update in-memory metadata for now.
-            let meta = path.metadata().map_err(|e| FileError::from_io(e, path));
+            if self.watcher.is_some() {
+                let watchable = self.inner.is_watchable_file(path.as_ref());
 
-            if let Some((watcher, _)) = &mut self.watcher {
                 // Case1. meta = Err(..) We cannot get the metadata successfully, so we
                 // are okay to ignore this file for watching.
                 //
                 // Case2. meta = Ok(..) Watch the file if it's not watched.
-                if meta
-                    .as_ref()
-                    .is_ok_and(|meta| !meta.is_dir() && (!contained || !entry.watching))
-                {
+                if watchable && (!contained || !entry.watching) {
                     log::debug!("watching {path:?}");
-                    entry.watching = log_notify_error(
-                        watcher.watch(path.as_ref(), RecursiveMode::NonRecursive),
-                        "failed to watch",
-                    )
-                    .is_some();
+                    if let Some(watcher) = &mut self.watcher {
+                        entry.watching = log_notify_error(
+                            watcher.watch(path.as_ref(), RecursiveMode::NonRecursive),
+                            "failed to watch",
+                        )
+                        .is_some();
+                    }
                 }
 
                 changeset.may_insert(self.notify_entry_update(path.clone()));
@@ -289,7 +408,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             if !entry.seen && entry.watching {
                 log::debug!("unwatch {path:?}");
                 if let Some(watcher) = &mut self.watcher {
-                    log_notify_error(watcher.0.unwatch(path), "failed to unwatch");
+                    log_notify_error(watcher.unwatch(path), "failed to unwatch");
                     entry.watching = false;
                 }
             }
@@ -335,7 +454,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 // Remove affected path from the watched map to restart
                 // watching on it later again.
                 if let Some(watcher) = &mut self.watcher {
-                    log_notify_error(watcher.0.unwatch(path), "failed to unwatch");
+                    log_notify_error(watcher.unwatch(path), "failed to unwatch");
                 }
                 entry.watching = false;
             }
@@ -486,10 +605,6 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 if recheck_at == event.at_logical_tick {
                     log::debug!("notify event real happened {event:?}, state: {payload:?}");
 
-                    if Some(&payload) == entry.prev.as_ref() {
-                        return None;
-                    }
-
                     // Send the underlying change to the consumer
                     let mut changeset = FileChangeSet::default();
                     changeset.inserts.push((event.path, payload));
@@ -522,5 +637,845 @@ pub async fn watch_deps(
 ) {
     log::info!("NotifyActor: start watching files...");
     // Watch messages to notify
-    tokio::spawn(NotifyActor::new(interrupted_by_events).run(inbox));
+    spawn_watch_deps(inbox, interrupted_by_events);
+}
+
+fn spawn_watch_deps(
+    inbox: mpsc::UnboundedReceiver<NotifyMessage>,
+    interrupted_by_events: impl FnMut(FilesystemEvent) + Send + Sync + 'static,
+) -> tokio::task::JoinHandle<()> {
+    tokio::spawn(NotifyActor::new(interrupted_by_events).run(inbox))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        path::{Path, PathBuf},
+        sync::{Arc, Mutex},
+    };
+
+    use notify::event::{CreateKind, DataChange, ModifyKind, RemoveKind, RenameMode};
+
+    use super::*;
+
+    type EventSink = Box<dyn FnMut(FilesystemEvent) + Send + Sync>;
+
+    // Matrix coverage note:
+    // Different notify backends can report the same editor operation as
+    // rename-from/rename-to pairs, RenameMode::Both, create/modify batches, or
+    // multi-path modify events. These deterministic rows model the equivalent
+    // actor inputs directly so the core expectations do not depend on a host
+    // backend's timing or coalescing policy.
+
+    #[derive(Debug, Clone)]
+    struct TestFile {
+        snapshot: FileSnapshot,
+        watchable: bool,
+    }
+
+    #[derive(Debug, Default, Clone)]
+    struct TestAccess {
+        files: Arc<Mutex<HashMap<PathBuf, TestFile>>>,
+    }
+
+    impl TestAccess {
+        fn set_content(&self, path: &ImmutPath, content: &str) {
+            self.set_snapshot(path, content_snapshot(content), true);
+        }
+
+        fn set_empty(&self, path: &ImmutPath) {
+            self.set_content(path, "");
+        }
+
+        fn set_error(&self, path: &ImmutPath) {
+            self.set_snapshot(
+                path,
+                Err::<Bytes, FileError>(FileError::Other(None)).into(),
+                true,
+            );
+        }
+
+        fn set_missing(&self, path: &ImmutPath) {
+            self.files
+                .lock()
+                .expect("test access poisoned")
+                .remove(path.as_ref());
+        }
+
+        fn set_snapshot(&self, path: &ImmutPath, snapshot: FileSnapshot, watchable: bool) {
+            self.files.lock().expect("test access poisoned").insert(
+                path.as_ref().to_path_buf(),
+                TestFile {
+                    snapshot,
+                    watchable,
+                },
+            );
+        }
+    }
+
+    impl NotifyActorAccess for TestAccess {
+        fn content(&self, src: &Path) -> FileResult<Bytes> {
+            self.files
+                .lock()
+                .expect("test access poisoned")
+                .get(src)
+                .map_or_else(
+                    || Err(FileError::NotFound(src.into())),
+                    |file| file.snapshot.content().cloned(),
+                )
+        }
+
+        fn is_watchable_file(&self, src: &Path) -> bool {
+            self.files
+                .lock()
+                .expect("test access poisoned")
+                .get(src)
+                .is_some_and(|file| file.watchable)
+        }
+    }
+
+    #[derive(Debug)]
+    enum MatrixInput {
+        SyncDependency(Vec<ImmutPath>),
+        UpstreamInvalidation {
+            invalidates: Vec<ImmutPath>,
+            opaque: usize,
+        },
+        WatcherEvent {
+            kind: notify::EventKind,
+            paths: Vec<ImmutPath>,
+        },
+        DelayedRecheck(ImmutPath),
+        DelayedRecheckAt {
+            path: ImmutPath,
+            recheck_at: usize,
+        },
+    }
+
+    struct NotifyActorHarness {
+        access: TestAccess,
+        commands: FakeWatchCommands,
+        events: Arc<Mutex<Vec<FilesystemEvent>>>,
+        actor: NotifyActor<EventSink>,
+    }
+
+    impl NotifyActorHarness {
+        fn new() -> Self {
+            let access = TestAccess::default();
+            let commands = FakeWatchCommands::default();
+            let events = Arc::new(Mutex::new(Vec::new()));
+            let sink_events = events.clone();
+            let sink: EventSink = Box::new(move |event| {
+                sink_events
+                    .lock()
+                    .expect("test event sink poisoned")
+                    .push(event);
+            });
+            let actor = NotifyActor::new_for_test(Box::new(access.clone()), commands.clone(), sink);
+
+            Self {
+                access,
+                commands,
+                events,
+                actor,
+            }
+        }
+
+        async fn apply(&mut self, input: MatrixInput) {
+            self.actor.logical_tick += 1;
+
+            match input {
+                MatrixInput::SyncDependency(paths) => {
+                    if let Some(changeset) = self.actor.update_watches(&paths) {
+                        (self.actor.interrupted_by_events)(FilesystemEvent::Update(
+                            changeset, true,
+                        ));
+                    }
+                }
+                MatrixInput::UpstreamInvalidation {
+                    invalidates,
+                    opaque,
+                } => {
+                    self.actor.invalidate_upstream(UpstreamUpdateEvent {
+                        invalidates,
+                        opaque: Box::new(opaque),
+                    });
+                }
+                MatrixInput::WatcherEvent { kind, paths } => {
+                    self.actor.notify_event(notify_event(kind, paths));
+                }
+                MatrixInput::DelayedRecheck(path) => {
+                    let recheck_at = self.pending_recheck_at(&path);
+                    self.force_recheck_at(path, recheck_at).await;
+                }
+                MatrixInput::DelayedRecheckAt { path, recheck_at } => {
+                    self.force_recheck_at(path, recheck_at).await;
+                }
+            }
+        }
+
+        fn pending_recheck_at(&self, path: &ImmutPath) -> usize {
+            match self
+                .actor
+                .watched_entries
+                .get(path)
+                .expect("watched entry must exist for delayed recheck")
+                .state
+            {
+                WatchState::EmptyOrRemoval { recheck_at, .. } => recheck_at,
+                WatchState::Stable => panic!("watched entry must be pending recheck"),
+            }
+        }
+
+        async fn force_recheck_at(&mut self, path: ImmutPath, recheck_at: usize) {
+            self.actor
+                .recheck_notify_event(UndeterminedNotifyEvent {
+                    at_realtime: tinymist_std::time::Instant::now()
+                        - tinymist_std::time::Duration::from_millis(60),
+                    at_logical_tick: recheck_at,
+                    path,
+                })
+                .await;
+        }
+
+        fn take_events(&self) -> Vec<FilesystemEvent> {
+            std::mem::take(&mut *self.events.lock().expect("test event sink poisoned"))
+        }
+
+        fn assert_no_events(&self) {
+            assert!(
+                self.events
+                    .lock()
+                    .expect("test event sink poisoned")
+                    .is_empty(),
+                "expected no filesystem events"
+            );
+        }
+
+        fn take_commands(&self) -> Vec<FakeWatchCommand> {
+            self.commands.take()
+        }
+
+        fn assert_watching(&self, path: &ImmutPath, expected: bool) {
+            assert_eq!(
+                self.actor
+                    .watched_entries
+                    .get(path)
+                    .map(|entry| entry.watching),
+                Some(expected)
+            );
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn sync_dependency_updates_watch_set_and_changed_contents() {
+        let mut harness = NotifyActorHarness::new();
+        let first = test_path("sync-first.typ");
+        let second = test_path("sync-second.typ");
+
+        harness.access.set_content(&first, "first-v1");
+        harness.access.set_content(&second, "second-v1");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![
+                first.clone(),
+                second.clone(),
+            ]))
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![watch(&first), watch(&second)]);
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            true,
+            &[
+                (&first, ExpectedSnapshot::Content("first-v1")),
+                (&second, ExpectedSnapshot::Content("second-v1")),
+            ],
+        );
+
+        harness.access.set_content(&first, "first-v2");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![
+                first.clone(),
+                second.clone(),
+            ]))
+            .await;
+
+        assert_eq!(harness.take_commands(), Vec::new());
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            true,
+            &[(&first, ExpectedSnapshot::Content("first-v2"))],
+        );
+
+        harness
+            .apply(MatrixInput::SyncDependency(vec![first.clone()]))
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![unwatch(&second)]);
+        harness.assert_no_events();
+
+        harness.access.set_content(&second, "second-v2");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![
+                first.clone(),
+                second.clone(),
+            ]))
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![watch(&second)]);
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            true,
+            &[(&second, ExpectedSnapshot::Content("second-v2"))],
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn create_and_modify_events_update_watched_dependencies() {
+        let mut harness = NotifyActorHarness::new();
+        let dep = test_path("create-modify.typ");
+
+        harness.access.set_content(&dep, "initial");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![dep.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_content(&dep, "created");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Create(CreateKind::File),
+                paths: vec![dep.clone()],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&dep, ExpectedSnapshot::Content("created"))],
+        );
+
+        harness.access.set_content(&dep, "modified");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![dep.clone()],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&dep, ExpectedSnapshot::Content("modified"))],
+        );
+
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![dep.clone()],
+            })
+            .await;
+
+        harness.assert_no_events();
+        assert_eq!(harness.take_commands(), Vec::new());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn raw_events_for_unwatched_paths_are_ignored() {
+        let mut harness = NotifyActorHarness::new();
+        let watched = test_path("watched.typ");
+        let unwatched = test_path("unwatched.typ");
+
+        harness.access.set_content(&watched, "watched");
+        harness.access.set_content(&unwatched, "unwatched");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![watched.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_content(&unwatched, "unwatched-change");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![unwatched],
+            })
+            .await;
+
+        harness.assert_no_events();
+        assert_eq!(harness.take_commands(), Vec::new());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn remove_and_rename_from_reset_watch_state_and_confirm_changes() {
+        let mut harness = NotifyActorHarness::new();
+        let dep = test_path("remove-rename-from.typ");
+
+        harness.access.set_content(&dep, "alive");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![dep.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_missing(&dep);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Remove(RemoveKind::File),
+                paths: vec![dep.clone()],
+            })
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![unwatch(&dep)]);
+        harness.assert_watching(&dep, false);
+        harness.assert_no_events();
+
+        harness
+            .apply(MatrixInput::DelayedRecheck(dep.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(&events[0], false, &[(&dep, ExpectedSnapshot::NotFound)]);
+
+        harness.access.set_content(&dep, "restored");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![dep.clone()]))
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![watch(&dep)]);
+        harness.assert_watching(&dep, true);
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            true,
+            &[(&dep, ExpectedSnapshot::Content("restored"))],
+        );
+
+        harness.access.set_missing(&dep);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Modify(ModifyKind::Name(RenameMode::From)),
+                paths: vec![dep.clone()],
+            })
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![unwatch(&dep)]);
+        harness.assert_watching(&dep, false);
+        harness.assert_no_events();
+
+        harness
+            .apply(MatrixInput::DelayedRecheck(dep.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(&events[0], false, &[(&dep, ExpectedSnapshot::NotFound)]);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn rename_to_paired_rename_and_multi_path_events_are_mapped() {
+        let mut harness = NotifyActorHarness::new();
+        let rename_to = test_path("rename-to.typ");
+        let rename_from = test_path("paired-from.typ");
+        let paired_to = test_path("paired-to.typ");
+        let multi_first = test_path("multi-first.typ");
+        let multi_second = test_path("multi-second.typ");
+        let ignored = test_path("multi-ignored.typ");
+
+        for path in [
+            &rename_to,
+            &rename_from,
+            &paired_to,
+            &multi_first,
+            &multi_second,
+        ] {
+            harness.access.set_content(path, "initial");
+        }
+        harness.access.set_content(&ignored, "ignored");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![
+                rename_to.clone(),
+                rename_from.clone(),
+                paired_to.clone(),
+                multi_first.clone(),
+                multi_second.clone(),
+            ]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_content(&rename_to, "rename-to-content");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Modify(ModifyKind::Name(RenameMode::To)),
+                paths: vec![rename_to.clone()],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&rename_to, ExpectedSnapshot::Content("rename-to-content"))],
+        );
+        assert_eq!(harness.take_commands(), Vec::new());
+
+        harness.access.set_missing(&rename_from);
+        harness.access.set_content(&paired_to, "paired-to-content");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+                paths: vec![rename_from.clone(), paired_to.clone()],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&paired_to, ExpectedSnapshot::Content("paired-to-content"))],
+        );
+        assert_eq!(harness.take_commands(), Vec::new());
+
+        harness
+            .apply(MatrixInput::DelayedRecheck(rename_from.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&rename_from, ExpectedSnapshot::NotFound)],
+        );
+
+        harness
+            .access
+            .set_content(&multi_first, "multi-first-content");
+        harness
+            .access
+            .set_content(&multi_second, "multi-second-content");
+        harness.access.set_content(&ignored, "ignored-content");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![multi_first.clone(), multi_second.clone(), ignored],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[
+                (
+                    &multi_first,
+                    ExpectedSnapshot::Content("multi-first-content"),
+                ),
+                (
+                    &multi_second,
+                    ExpectedSnapshot::Content("multi-second-content"),
+                ),
+            ],
+        );
+        assert_eq!(harness.take_commands(), Vec::new());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn unstable_reads_delay_confirmation_and_recover_before_recheck() {
+        let mut harness = NotifyActorHarness::new();
+        let empty = test_path("unstable-empty.typ");
+        let missing = test_path("unstable-missing.typ");
+        let errored = test_path("unstable-error.typ");
+        let recovery = test_path("unstable-recovery.typ");
+
+        for path in [&empty, &missing, &errored, &recovery] {
+            harness.access.set_content(path, "stable");
+        }
+        harness
+            .apply(MatrixInput::SyncDependency(vec![
+                empty.clone(),
+                missing.clone(),
+                errored.clone(),
+                recovery.clone(),
+            ]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_empty(&empty);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![empty.clone()],
+            })
+            .await;
+        harness.assert_no_events();
+        harness
+            .apply(MatrixInput::DelayedRecheck(empty.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&empty, ExpectedSnapshot::Content(""))],
+        );
+
+        harness.access.set_missing(&missing);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![missing.clone()],
+            })
+            .await;
+        harness.assert_no_events();
+        harness
+            .apply(MatrixInput::DelayedRecheck(missing.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(&events[0], false, &[(&missing, ExpectedSnapshot::NotFound)]);
+
+        harness.access.set_error(&errored);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![errored.clone()],
+            })
+            .await;
+        harness.assert_no_events();
+        harness
+            .apply(MatrixInput::DelayedRecheck(errored.clone()))
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(&events[0], false, &[(&errored, ExpectedSnapshot::Other)]);
+
+        harness.access.set_empty(&recovery);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![recovery.clone()],
+            })
+            .await;
+        harness.assert_no_events();
+        let recovery_recheck_at = harness.pending_recheck_at(&recovery);
+
+        harness.access.set_content(&recovery, "recovered");
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![recovery.clone()],
+            })
+            .await;
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&recovery, ExpectedSnapshot::Content("recovered"))],
+        );
+
+        harness
+            .apply(MatrixInput::DelayedRecheckAt {
+                path: recovery.clone(),
+                recheck_at: recovery_recheck_at,
+            })
+            .await;
+        harness.assert_no_events();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn upstream_invalidation_refreshes_watches_and_carries_payload() {
+        let mut harness = NotifyActorHarness::new();
+        let existing = test_path("upstream-existing.typ");
+        let added = test_path("upstream-added.typ");
+
+        harness.access.set_content(&existing, "existing-v1");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![existing.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_content(&existing, "existing-v2");
+        harness.access.set_content(&added, "added-v1");
+        harness
+            .apply(MatrixInput::UpstreamInvalidation {
+                invalidates: vec![existing.clone(), added.clone()],
+                opaque: 42,
+            })
+            .await;
+
+        assert_eq!(harness.take_commands(), vec![watch(&added)]);
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_upstream_update(
+            &events[0],
+            &[
+                (&existing, ExpectedSnapshot::Content("existing-v2")),
+                (&added, ExpectedSnapshot::Content("added-v1")),
+            ],
+            &[existing.clone(), added.clone()],
+            42,
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn watch_deps_entrypoint_settles_under_timeout() {
+        let (sender, inbox) = mpsc::unbounded_channel();
+        let handle = spawn_watch_deps(inbox, |event| {
+            panic!("unexpected production smoke event: {event:?}")
+        });
+        sender
+            .send(NotifyMessage::Settle)
+            .expect("settle send should succeed");
+
+        tokio::time::timeout(std::time::Duration::from_millis(500), handle)
+            .await
+            .expect("production notify actor did not settle")
+            .expect("production notify actor task failed");
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    enum ExpectedSnapshot<'a> {
+        Content(&'a str),
+        NotFound,
+        Other,
+    }
+
+    fn test_path(name: &str) -> ImmutPath {
+        Arc::from(
+            PathBuf::from("/tinymist-notify-actor-test")
+                .join(name)
+                .into_boxed_path(),
+        )
+    }
+
+    fn notify_event(kind: notify::EventKind, paths: Vec<ImmutPath>) -> notify::Event {
+        paths
+            .into_iter()
+            .fold(notify::Event::new(kind), |event, path| {
+                event.add_path(path.as_ref().to_path_buf())
+            })
+    }
+
+    fn modify_data_event() -> notify::EventKind {
+        notify::EventKind::Modify(ModifyKind::Data(DataChange::Content))
+    }
+
+    fn content_snapshot(content: &str) -> FileSnapshot {
+        Ok::<Bytes, FileError>(Bytes::from_string(content.to_owned())).into()
+    }
+
+    fn watch(path: &ImmutPath) -> FakeWatchCommand {
+        FakeWatchCommand::Watch(path.as_ref().to_path_buf())
+    }
+
+    fn unwatch(path: &ImmutPath) -> FakeWatchCommand {
+        FakeWatchCommand::Unwatch(path.as_ref().to_path_buf())
+    }
+
+    fn assert_update(
+        event: &FilesystemEvent,
+        expected_is_sync: bool,
+        expected: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+    ) {
+        let FilesystemEvent::Update(changeset, is_sync) = event else {
+            panic!("expected update event, got {event:?}");
+        };
+
+        assert_eq!(*is_sync, expected_is_sync);
+        assert_changeset(changeset, expected);
+    }
+
+    fn assert_upstream_update(
+        event: &FilesystemEvent,
+        expected: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+        expected_invalidates: &[ImmutPath],
+        expected_opaque: usize,
+    ) {
+        let FilesystemEvent::UpstreamUpdate {
+            changeset,
+            upstream_event: Some(upstream_event),
+        } = event
+        else {
+            panic!("expected upstream update event, got {event:?}");
+        };
+
+        assert_changeset(changeset, expected);
+        assert_eq!(upstream_event.invalidates, expected_invalidates);
+        assert_eq!(
+            upstream_event
+                .opaque
+                .downcast_ref::<usize>()
+                .copied()
+                .expect("opaque payload should be usize"),
+            expected_opaque
+        );
+    }
+
+    fn assert_changeset(
+        changeset: &FileChangeSet,
+        expected: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+    ) {
+        assert_eq!(changeset.removes, Vec::<ImmutPath>::new());
+        assert_eq!(changeset.inserts.len(), expected.len());
+
+        for ((actual_path, actual_snapshot), (expected_path, expected_snapshot)) in
+            changeset.inserts.iter().zip(expected)
+        {
+            assert_eq!(actual_path, *expected_path);
+            assert_snapshot(expected_path, actual_snapshot, *expected_snapshot);
+        }
+    }
+
+    fn assert_snapshot(path: &ImmutPath, snapshot: &FileSnapshot, expected: ExpectedSnapshot<'_>) {
+        match expected {
+            ExpectedSnapshot::Content(content) => {
+                let bytes = snapshot.content().expect("expected file content");
+                assert_eq!(bytes.as_slice(), content.as_bytes());
+            }
+            ExpectedSnapshot::NotFound => {
+                let Err(err) = snapshot.as_ref() else {
+                    panic!("expected not found snapshot for {path:?}");
+                };
+                let FileError::NotFound(actual_path) = err.as_ref() else {
+                    panic!("expected not found snapshot for {path:?}, got {err:?}");
+                };
+                assert_eq!(actual_path.as_path(), path.as_ref());
+            }
+            ExpectedSnapshot::Other => {
+                let Err(err) = snapshot.as_ref() else {
+                    panic!("expected other-error snapshot for {path:?}");
+                };
+                assert!(
+                    matches!(err.as_ref(), FileError::Other(_)),
+                    "expected other-error snapshot for {path:?}, got {err:?}"
+                );
+            }
+        }
+    }
 }
