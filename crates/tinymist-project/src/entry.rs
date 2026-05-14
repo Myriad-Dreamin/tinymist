@@ -226,7 +226,7 @@ mod entry_tests {
             entry.main(),
             Some(WorkspaceResolver::workspace_file(
                 entry.root().as_ref(),
-                VirtualPath::new("main.typ")
+                VirtualPath::new("main.typ").unwrap()
             ))
         );
     }
@@ -250,7 +250,7 @@ mod entry_tests {
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }
@@ -263,7 +263,7 @@ mod entry_tests {
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }
