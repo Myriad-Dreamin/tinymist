@@ -6,8 +6,8 @@ use parking_lot::Mutex;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use typst::diag::{At, SourceResult, Warned};
-use typst::foundations::Output;
 use typst::ecow::EcoVec;
+use typst::foundations::Output;
 use typst::syntax::Span;
 
 use crate::snapshot::CompileSnapshot;
