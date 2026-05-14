@@ -20,7 +20,7 @@ use tinymist_std::typst_shim::eval::eval_compat;
 use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Value};
-use typst::introspection::Introspector;
+use typst::introspection::EmptyIntrospector;
 
 /// Runs benchmarks on the given world. An entry point must be provided in the
 /// world.
@@ -29,8 +29,9 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
     let main_source = world.source(world.main())?;
     let main_path = unix_slash(world.main().vpath().as_rooted_path());
 
+    let library = world.library();
     let traced = Traced::default();
-    let introspector = Introspector::default();
+    let introspector = EmptyIntrospector;
 
     // Evaluates the main source file.
     let module = eval_compat(world, &main_source);
@@ -55,9 +56,9 @@ pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
         let route = Route::default();
         let mut sink = Sink::default();
         let engine = &mut Engine {
-            routines: &typst::ROUTINES,
+            library,
             world: ((world) as &dyn World).track(),
-            introspector: introspector.track(),
+            introspector: typst::utils::Protected::new(introspector.track()),
             traced: traced.track(),
             sink: sink.track_mut(),
             route,
