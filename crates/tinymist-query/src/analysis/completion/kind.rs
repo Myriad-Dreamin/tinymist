@@ -121,11 +121,11 @@ impl FnCompletionFeat {
                     self.has_static_member = has_static_member(func);
                     let sig = func_signature(func.clone()).type_sig();
                     let has_only_self = self.has_only_self;
+                    let mut params = func.params().peekable();
                     self.has_only_self = has_only_self
                         || (self.bound_self
-                            && func.params().is_some_and(|params| {
-                                params.iter().all(|param| param.name == "self")
-                            }));
+                            && params.peek().is_some()
+                            && params.all(|param| param.name() == Some("self")));
                     self.check_sig(&sig, pos);
                 }
                 Value::None
@@ -363,11 +363,8 @@ fn is_static_member(v: &Binding) -> bool {
     match v.read() {
         Value::Func(func) => func
             .params()
-            .iter()
-            .copied()
-            .flatten()
-            .find(|s| s.positional)
-            .is_none_or(|s| s.name != "self"),
+            .find(|param| param.positional())
+            .is_none_or(|param| param.name() != Some("self")),
         _ => false,
     }
 }

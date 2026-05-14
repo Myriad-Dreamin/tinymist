@@ -224,13 +224,14 @@ pub fn func_signature(func: Func) -> Signature {
             None
         }
         FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
-            for param in func.params().unwrap_or_default() {
+            for param in func.params() {
+                let name = param.name().unwrap_or_default();
                 add_param(Interned::new(ParamTy {
-                    name: param.name.into(),
-                    docs: Some(param.docs.into()),
-                    default: param.default.map(|default| truncated_repr(&default())),
-                    ty: Ty::from_param_site(&func, param),
-                    attrs: param.into(),
+                    name: name.into(),
+                    docs: param.to_native().map(|native| native.docs.into()),
+                    default: param.default().map(|default| truncated_repr(&default)),
+                    ty: Ty::from_param_site(&func, &param),
+                    attrs: (&param).into(),
                 }));
             }
 
