@@ -1032,7 +1032,7 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+    pub fn analyze_bib(&self, introspector: &dyn Introspector) -> Option<Arc<BibInfo>> {
         let world = self.world();
         let world = (world as &dyn World).track();
 

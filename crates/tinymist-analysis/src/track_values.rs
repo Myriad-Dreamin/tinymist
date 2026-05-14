@@ -132,7 +132,7 @@ pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let _guard = GLOBAL_STATS.stat(None, "analyze_labels");
 
     // Labels in the document.
-    for elem in document.introspector().all() {
+    for elem in document.introspector().query_labelled() {
         let Some(label) = elem.label() else { continue };
         let (is_derived, details) = {
             let derived = elem

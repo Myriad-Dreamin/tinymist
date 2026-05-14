@@ -610,7 +610,7 @@ impl ExportTask {
                     .as_ref()
                     .map_err(|e| e.clone())
             };
-            let total_pages = || paged_doc().map(|d| d.pages.len()).unwrap_or_default();
+            let total_pages = || paged_doc().map(|d| d.pages().len()).unwrap_or_default();
 
             Ok(match task {
                 Preview(..) => Bytes::new([]).into(),
@@ -766,15 +766,21 @@ fn log_err<T>(artifact: Result<T>) -> Option<T> {
     }
 }
 
-fn extra_compile_for_export<D: typst::Document + Send + Sync + 'static>(
+fn extra_compile_for_export<
+    D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
+>(
     world: &LspWorld,
 ) -> Result<Arc<D>> {
     let res = tokio::task::block_in_place(|| CompilationTask::<D>::execute(world));
 
     match res.output {
         Ok(v) => Ok(v),
-        Err(e) if e.is_empty() => bail!("failed to compile: internal error"),
-        Err(e) => bail!("failed to compile: {}", e[0].message),
+        Err(e) => {
+            if e.is_empty() {
+                bail!("failed to compile: internal error");
+            }
+            bail!("failed to compile: {}", e[0].message);
+        }
     }
 }
 
