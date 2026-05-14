@@ -351,6 +351,7 @@ impl InstrumentWorker {
                 | ast::Expr::MathPrimes(..)
                 | ast::Expr::MathFrac(..)
                 | ast::Expr::MathRoot(..)
+                | ast::Expr::MathFieldAccess(..)
                 | ast::Expr::Ident(..)
                 | ast::Expr::None(..)
                 | ast::Expr::Auto(..)
