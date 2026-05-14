@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use typst::{
-    Document, World,
+    World,
     diag::{SourceDiagnostic, SourceResult, Warned},
     ecow::eco_vec,
+    foundations::Output,
 };
 use typst_syntax::Span;
 
@@ -18,7 +19,7 @@ pub fn is_syntax_only() -> bool {
 /// error.
 pub fn compile_opt<D>(world: &dyn World) -> Warned<SourceResult<D>>
 where
-    D: Document,
+    D: Output,
 {
     if is_syntax_only() {
         Warned {
