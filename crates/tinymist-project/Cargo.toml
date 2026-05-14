@@ -51,6 +51,7 @@ web = ["tinymist-std/web", "tinymist-world/web", "js-sys", "wasm-bindgen"]
 
 [dev-dependencies]
 tinymist-world = { workspace = true, features = ["mock"] }
+tempfile.workspace = true
 
 [lints]
 workspace = true

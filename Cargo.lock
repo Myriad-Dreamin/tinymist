@@ -6653,6 +6653,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "tempfile",
  "tinymist-derive",
  "tinymist-l10n",
  "tinymist-std",

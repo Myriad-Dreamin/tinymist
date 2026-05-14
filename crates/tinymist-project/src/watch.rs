@@ -1344,15 +1344,32 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn watch_deps_entrypoint_settles_under_timeout() {
+    async fn watch_deps_entrypoint_uses_real_watcher_on_temp_file() {
+        let dir = tempfile::tempdir().expect("tempdir should be created");
+        let path = dir.path().join("real-watch.typ");
+        std::fs::write(&path, "initial").expect("initial temp file should be written");
+        let path = Arc::<Path>::from(path.into_boxed_path());
+
         let (sender, inbox) = mpsc::unbounded_channel();
-        let handle = spawn_watch_deps(inbox, |event| {
-            panic!("unexpected production smoke event: {event:?}")
+        let (events_send, mut events_recv) = mpsc::unbounded_channel();
+        let handle = spawn_watch_deps(inbox, move |event| {
+            events_send
+                .send(event)
+                .expect("real watcher event receiver should stay open");
         });
+
+        sender
+            .send(NotifyMessage::SyncDependency(Box::new(vec![path.clone()])))
+            .expect("sync dependency send should succeed");
+
+        expect_real_watcher_update(&mut events_recv, &path, true, "initial").await;
+
+        std::fs::write(path.as_ref(), "updated").expect("updated temp file should be written");
+        expect_real_watcher_update(&mut events_recv, &path, false, "updated").await;
+
         sender
             .send(NotifyMessage::Settle)
             .expect("settle send should succeed");
-
         tokio::time::timeout(std::time::Duration::from_millis(500), handle)
             .await
             .expect("production notify actor did not settle")
@@ -1409,6 +1426,57 @@ mod tests {
 
         assert_eq!(*is_sync, expected_is_sync);
         assert_changeset(changeset, expected);
+    }
+
+    async fn expect_real_watcher_update(
+        events_recv: &mut mpsc::UnboundedReceiver<FilesystemEvent>,
+        expected_path: &ImmutPath,
+        expected_is_sync: bool,
+        expected_content: &str,
+    ) {
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            loop {
+                let event = events_recv
+                    .recv()
+                    .await
+                    .expect("real watcher event sender should stay open");
+                if update_contains_content(
+                    &event,
+                    expected_path,
+                    expected_is_sync,
+                    expected_content,
+                ) {
+                    return;
+                }
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "timed out waiting for real watcher update: path={expected_path:?}, is_sync={expected_is_sync}, content={expected_content:?}"
+            )
+        });
+    }
+
+    fn update_contains_content(
+        event: &FilesystemEvent,
+        expected_path: &ImmutPath,
+        expected_is_sync: bool,
+        expected_content: &str,
+    ) -> bool {
+        let FilesystemEvent::Update(changeset, is_sync) = event else {
+            return false;
+        };
+        if *is_sync != expected_is_sync {
+            return false;
+        }
+
+        changeset.inserts.iter().any(|(path, snapshot)| {
+            path == expected_path
+                && snapshot
+                    .content()
+                    .is_ok_and(|bytes| bytes.as_slice() == expected_content.as_bytes())
+        })
     }
 
     fn assert_upstream_update(
