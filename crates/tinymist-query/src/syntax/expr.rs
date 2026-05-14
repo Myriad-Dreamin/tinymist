@@ -383,6 +383,7 @@ impl ExprWorker<'_> {
             MathDelimited(math_delimited) => {
                 self.check_math(math_delimited.body().to_untyped().children())
             }
+            MathFieldAccess(expr) => self.check_math(expr.to_untyped().children()),
             MathAttach(attach) => {
                 let base = attach.base().to_untyped().clone();
                 let bottom = attach.bottom().unwrap_or_default().to_untyped().clone();
