@@ -28,7 +28,8 @@ pub(crate) fn convert_docs(
             .vfs()
             .file_path(fid)
             .ok()
-            .and_then(|e| e.to_err().ok());
+            .and_then(|e| e.to_err().ok())
+            .and_then(|path| path.parent().map(|root| root.to_path_buf()));
         if let Some(root) = root {
             entry = EntryState::new_workspace(root.into());
         }
