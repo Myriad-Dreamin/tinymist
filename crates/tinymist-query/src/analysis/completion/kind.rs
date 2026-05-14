@@ -115,7 +115,7 @@ impl FnCompletionFeat {
                     self.check_one(&Ty::Builtin(BuiltinTy::Type(*ty)), pos);
                 }
                 Value::Func(func) => {
-                    if func.element().is_some() {
+                    if func.to_element().is_some() {
                         self.is_element = true;
                     }
                     self.has_static_member = has_static_member(func);
