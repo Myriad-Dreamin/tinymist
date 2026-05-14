@@ -65,8 +65,9 @@ pub fn run_with_ctx_<T>(
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
     let root = verse.entry_state().workspace_root().unwrap();
-    let paths = verse
-        .shadow_paths()
+    let mut shadow_paths = verse.shadow_paths();
+    shadow_paths.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+    let paths = shadow_paths
         .into_iter()
             .map(|path| {
                 WorkspaceResolver::workspace_file(
