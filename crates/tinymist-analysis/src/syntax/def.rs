@@ -14,7 +14,7 @@ use tinymist_std::DefId;
 use tinymist_world::package::PackageSpec;
 use typst::{
     foundations::{Element, Func, Module, Type, Value},
-    syntax::{Span, SyntaxNode},
+    syntax::{Span, SyntaxNode, VirtualRoot},
     utils::LazyHash,
 };
 
@@ -95,7 +95,7 @@ impl std::hash::Hash for ExprInfoRepr {
         resolves.sort_by_key(|(fid, _)| fid.into_raw());
         resolves.hash(state);
         let mut imports = self.imports.iter().collect::<Vec<_>>();
-        imports.sort_by_key(|(fid, _)| *fid);
+        imports.sort_by_key(|(fid, _)| fid.into_raw());
         imports.hash(state);
         let mut module_items = self.module_items.iter().collect::<Vec<_>>();
         module_items.sort_by_key(|(decl, _)| decl.span().into_raw());
@@ -750,7 +750,7 @@ impl Ord for Decl {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let base = match (self, other) {
             (Self::Generated(l), Self::Generated(r)) => l.0.0.cmp(&r.0.0),
-            (Self::Module(l), Self::Module(r)) => l.fid.cmp(&r.fid),
+            (Self::Module(l), Self::Module(r)) => l.fid.into_raw().cmp(&r.fid.into_raw()),
             (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
             _ => self.span().into_raw().cmp(&other.span().into_raw()),
         };
@@ -784,10 +784,24 @@ impl Decl {
 
 impl StrictCmp for TypstFileId {
     fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.package()
-            .map(ToString::to_string)
-            .cmp(&other.package().map(ToString::to_string))
-            .then_with(|| self.vpath().cmp(other.vpath()))
+        fn root_cmp(left: &VirtualRoot, right: &VirtualRoot) -> std::cmp::Ordering {
+            match (left, right) {
+                (VirtualRoot::Project, VirtualRoot::Project) => std::cmp::Ordering::Equal,
+                (VirtualRoot::Project, VirtualRoot::Package(_)) => std::cmp::Ordering::Less,
+                (VirtualRoot::Package(_), VirtualRoot::Project) => std::cmp::Ordering::Greater,
+                (VirtualRoot::Package(left), VirtualRoot::Package(right)) => left
+                    .namespace
+                    .cmp(&right.namespace)
+                    .then_with(|| left.name.cmp(&right.name))
+                    .then_with(|| left.version.cmp(&right.version)),
+            }
+        }
+
+        root_cmp(self.root(), other.root()).then_with(|| {
+            self.vpath()
+                .get_with_slash()
+                .cmp(other.vpath().get_with_slash())
+        })
     }
 }
 impl<T: StrictCmp> StrictCmp for Option<T> {

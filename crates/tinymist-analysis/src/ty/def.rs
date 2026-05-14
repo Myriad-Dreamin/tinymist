@@ -600,7 +600,7 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
             ptr_cmp(x, y)
         }
         (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
-            (Some(x), Some(y)) => x.cmp(&y),
+            (Some(x), Some(y)) => x.into_raw().cmp(&y.into_raw()),
             (Some(..), None) => std::cmp::Ordering::Less,
             (None, Some(..)) => std::cmp::Ordering::Greater,
             (None, None) => ptr_cmp(x, y),
