@@ -6925,6 +6925,7 @@ dependencies = [
  "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "typst-eval 0.15.0",
  "typst-html 0.15.0",
+ "typst-layout 0.15.0",
  "typst-pdf",
  "typst-render",
  "typst-shim",

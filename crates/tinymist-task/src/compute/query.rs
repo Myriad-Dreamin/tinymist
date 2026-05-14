@@ -10,7 +10,9 @@ use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::World;
 use typst::diag::{SourceResult, StrResult};
 use typst::engine::Sink;
-use typst::foundations::{Content, IntoValue, LocatableSelector, Scope, Value};
+use typst::foundations::{Content, Context, IntoValue, LocatableSelector, Output, Scope, Value};
+use typst::model::Document;
+use typst::routines::SpanMode;
 use typst::syntax::Span;
 use typst::syntax::SyntaxMode;
 use typst_eval::eval_string;
@@ -23,17 +25,19 @@ pub struct DocumentQuery;
 impl DocumentQuery {
     // todo: query exporter
     /// Retrieve the matches for the selector.
-    pub fn retrieve<D: typst::Document>(
+    pub fn retrieve<D: Document + Output>(
         world: &dyn World,
         selector: &str,
         document: &D,
     ) -> StrResult<Vec<Content>> {
         let selector = eval_string(
-            &typst::ROUTINES,
             world.track(),
+            world.library(),
             Sink::new().track_mut(),
+            document.introspector().track(),
+            Context::none().track(),
             selector,
-            Span::detached(),
+            SpanMode::Uniform(Span::detached()),
             SyntaxMode::Code,
             Scope::default(),
         )
@@ -55,7 +59,7 @@ impl DocumentQuery {
             .collect::<Vec<_>>())
     }
 
-    fn run_inner<F: CompilerFeat, D: typst::Document>(
+    fn run_inner<F: CompilerFeat, D: Document + Output>(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<D>,
         config: &QueryTask,
@@ -89,7 +93,7 @@ impl DocumentQuery {
     }
 
     /// Queries the document and returns the result as a value.
-    pub fn get_as_value<F: CompilerFeat, D: typst::Document>(
+    pub fn get_as_value<F: CompilerFeat, D: Document + Output>(
         g: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<D>,
         config: &QueryTask,
@@ -109,7 +113,7 @@ impl DocumentQuery {
     }
 }
 
-impl<F: CompilerFeat, D: typst::Document> ExportComputation<F, D> for DocumentQuery {
+impl<F: CompilerFeat, D: Document + Output> ExportComputation<F, D> for DocumentQuery {
     type Output = SourceResult<String>;
     type Config = QueryTask;
 
