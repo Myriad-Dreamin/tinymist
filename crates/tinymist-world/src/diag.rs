@@ -56,10 +56,10 @@ pub fn print_diagnostics_to<'d, 'files>(
         }
         .with_message(diagnostic.message.clone())
         .with_notes(
-            diagnostic
+                diagnostic
                 .hints
                 .iter()
-                .map(|e| (eco_format!("hint: {e}")).into())
+                .map(|e| (eco_format!("hint: {}", e.v)).into())
                 .collect(),
         )
         .with_labels(label(world.world, diagnostic.span).into_iter().collect());
