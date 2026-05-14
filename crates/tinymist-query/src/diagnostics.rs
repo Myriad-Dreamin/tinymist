@@ -218,7 +218,7 @@ fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
     let mut message = typst_diagnostic.message.to_string();
     for hint in &typst_diagnostic.hints {
         message.push_str("\nHint: ");
-        message.push_str(hint);
+        message.push_str(&hint.v);
     }
     message
 }
@@ -263,7 +263,7 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
             && raw
                 .hints
                 .iter()
-                .any(|hint| hint.contains("cannot read file outside of project root"))
+                .any(|hint| hint.v.contains("cannot read file outside of project root"))
     }
 
     fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {
