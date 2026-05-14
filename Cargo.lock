@@ -6905,6 +6905,7 @@ dependencies = [
  "tinymist-std",
  "tinymist-world",
  "typst",
+ "typst-layout",
  "typst-library",
  "typst-shim",
 ]
