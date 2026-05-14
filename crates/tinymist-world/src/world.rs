@@ -166,7 +166,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             self.snapshot_with(Some(TaskInputs {
                 entry: Some(
                     self.entry_state()
-                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path()),
+                        .select_in_workspace(Path::new(MEMORY_MAIN_ENTRY.vpath().get_with_slash())),
                 ),
                 inputs: inputs.and_then(|i| i.inputs),
             }))
@@ -265,7 +265,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 
@@ -647,7 +647,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 
