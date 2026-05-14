@@ -586,9 +586,9 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 return x.span().into_raw().cmp(&y.span().into_raw());
             }
 
-            use typst::foundations::func::Repr;
+            use typst::foundations::FuncInner;
             match (x.inner(), y.inner()) {
-                (Repr::Element(x), Repr::Element(y)) => x.cmp(y),
+                (FuncInner::Element(x), FuncInner::Element(y)) => x.cmp(y),
                 _ => ptr_cmp(x, y),
             }
         }

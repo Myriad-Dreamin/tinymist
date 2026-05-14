@@ -311,10 +311,10 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
         return false;
     };
 
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     match (x.inner(), y.inner()) {
-        (Repr::Native(x), Repr::Native(y)) => x == y,
-        (Repr::Element(x), Repr::Element(y)) => x == y,
+        (FuncInner::Native(x), FuncInner::Native(y)) => x == y,
+        (FuncInner::Element(x), FuncInner::Element(y)) => x == y,
         _ => false,
     }
 }
