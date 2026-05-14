@@ -372,8 +372,10 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         | Named | Keyed | Spread | Error | End => return Option::None,
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
-        MathIdent | MathFieldAccess | MathAlignPoint | MathDelimited | MathAttach | MathPrimes
-        | MathFrac | MathRoot | MathShorthand | MathText => InterpretMode::Math,
+        MathIdent | MathFieldAccess | MathAlignPoint | MathCall | MathArgs | MathDelimited
+        | MathAttach | MathPrimes | MathFrac | MathRoot | MathShorthand | MathText => {
+            InterpretMode::Math
+        }
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
         | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
