@@ -819,10 +819,10 @@ impl ParamAttrs {
 impl From<&ParamInfo> for ParamAttrs {
     fn from(param: &ParamInfo) -> Self {
         ParamAttrs {
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
+            positional: param.positional(),
+            named: param.named(),
+            variadic: param.variadic(),
+            settable: param.settable(),
         }
     }
 }
