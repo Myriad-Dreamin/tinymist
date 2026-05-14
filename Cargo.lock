@@ -6926,6 +6926,7 @@ dependencies = [
  "typst",
  "typst-library",
  "typst-shim",
+ "typst-utils 0.15.0",
 ]
 
 [[package]]

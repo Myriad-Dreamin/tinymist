@@ -452,14 +452,15 @@ pub fn with_vm<T>(
     use typst::introspection::*;
     use typst_shim::eval::*;
 
-    let introspector = Introspector::default();
+    let library = world.library();
+    let introspector = EmptyIntrospector;
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
-        routines: &typst::ROUTINES,
+        library,
         world,
         route: Route::default(),
-        introspector: introspector.track(),
+        introspector: typst::utils::Protected::new(introspector.track()),
         traced: traced.track(),
         sink: sink.track_mut(),
     };
