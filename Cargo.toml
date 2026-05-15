@@ -309,21 +309,21 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { path = "../typst/crates/typst" }
-typst-eval = { path = "../typst/crates/typst-eval" }
-typst-html = { path = "../typst/crates/typst-html" }
-typst-layout = { path = "../typst/crates/typst-layout" }
-typst-library = { path = "../typst/crates/typst-library" }
-typst-macros = { path = "../typst/crates/typst-macros" }
-typst-pdf = { path = "../typst/crates/typst-pdf" }
-typst-realize = { path = "../typst/crates/typst-realize" }
-typst-render = { path = "../typst/crates/typst-render" }
-typst-svg = { path = "../typst/crates/typst-svg" }
-typst-syntax = { path = "../typst/crates/typst-syntax" }
-typst-timing = { path = "../typst/crates/typst-timing" }
-typst-utils = { path = "../typst/crates/typst-utils" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-layout = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-realize = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-utils = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 
-typst-ansi-hl = { path = "../typst-ansi-hl/lib" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
 typstyle-core = { path = "../typstyle/crates/typstyle-core" }
 
 # These patches use local `typst` for development.
