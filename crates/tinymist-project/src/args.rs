@@ -1,13 +1,13 @@
 use std::{path::Path, sync::OnceLock};
 
-use clap::{ArgAction, ValueHint, builder::ValueParser};
+use clap::{builder::ValueParser, ArgAction, ValueHint};
 use tinymist_std::{bail, error::prelude::Result};
 
+use tinymist_world::args::{parse_input_pair, PdfExportArgs, PngExportArgs};
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
-use tinymist_world::args::{PdfExportArgs, PngExportArgs, parse_input_pair};
 
-use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
 use crate::model::*;
+use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
 
 /// Project document commands.
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -254,6 +254,14 @@ impl TaskCompileArgs {
                 merge: None,
             }),
             OutputFormat::Html => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            OutputFormat::Bundle => ProjectTask::ExportBundle(ExportBundleTask {
+                export,
+                pages: self.pages.clone(),
+                pdf_standards: self.pdf.standard.clone(),
+                no_pdf_tags: self.pdf.no_tags,
+                creation_timestamp: None,
+                ppi: self.png.ppi.try_into().unwrap(),
+            }),
         };
 
         Ok(ApplyProjectTask {

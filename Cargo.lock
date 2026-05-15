@@ -6750,6 +6750,7 @@ dependencies = [
  "typlite",
  "typst",
  "typst-ansi-hl",
+ "typst-bundle",
  "typst-html",
  "typst-pdf",
  "typst-render",
@@ -7838,6 +7839,29 @@ version = "0.14.2"
 source = "git+https://github.com/typst/typst-assets?rev=955ae8d#955ae8db08d6e36694eb9cc61e61f586032ea572"
 dependencies = [
  "bitflags 2.13.0",
+]
+
+[[package]]
+name = "typst-bundle"
+version = "0.15.0"
+source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+dependencies = [
+ "comemo",
+ "ecow",
+ "either",
+ "indexmap 2.14.0",
+ "rayon",
+ "rustc-hash 2.1.2",
+ "typst-html",
+ "typst-layout",
+ "typst-library",
+ "typst-macros",
+ "typst-pdf",
+ "typst-render",
+ "typst-svg",
+ "typst-syntax 0.15.0",
+ "typst-timing 0.15.0",
+ "typst-utils 0.15.0",
 ]
 
 [[package]]
@@ -10237,8 +10261,3 @@ dependencies = [
  "syn 2.0.117",
  "winnow 1.0.3",
 ]
-
-[[patch.unused]]
-name = "typst-bundle"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
