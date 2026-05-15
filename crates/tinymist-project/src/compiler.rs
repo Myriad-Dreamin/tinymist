@@ -105,6 +105,16 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
         }
     }
 
+    /// Runs diagnostics without precompiling a paged or HTML document.
+    pub fn from_graph_without_doc(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
+        CompiledArtifact {
+            diag: graph.shared_diagnostics().expect("diag"),
+            graph,
+            doc: None,
+            deps: OnceLock::default(),
+        }
+    }
+
     /// Returns the error count.
     pub fn error_cnt(&self) -> usize {
         self.diag.error_cnt()

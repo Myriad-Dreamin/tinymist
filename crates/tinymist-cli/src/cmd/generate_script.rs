@@ -198,6 +198,10 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             ProjectTask::ExportSvgHtml(..) => {
                 cmd.push("--format=svg_html");
             }
+            ProjectTask::ExportBundle(..) => {
+                cmd.push("--format=bundle");
+                cmd.push("--features=bundle");
+            }
             ProjectTask::ExportMd(..) => {
                 cmd.push("--format=md");
             }

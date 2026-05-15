@@ -21,13 +21,16 @@ use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{
-    output_template, DocumentQuery, ExportMarkdownTask, ExportPngTask, ExportSvgTask, ExportTarget,
-    ImageOutput, PathPattern, PdfExport, PngExport, SvgExport, TextExport,
+    output_template, pdf_options, DocumentQuery, ExportBundleTask, ExportMarkdownTask,
+    ExportPngTask, ExportSvgTask, ExportTarget, ImageOutput, PathPattern, PdfExport, PngExport,
+    SvgExport, TextExport,
 };
 use tokio::sync::mpsc;
 use typlite::{Format, Typlite};
+use typst::diag::Warned;
 use typst::ecow::EcoString;
 use typst::foundations::Repr;
+use typst_bundle::{Bundle, BundleOptions, VirtualFs};
 
 use futures::Future;
 use parking_lot::Mutex;
@@ -159,7 +162,11 @@ impl ServerState {
     ) -> LspResult<CompilerQueryResponse> {
         let is_html = matches!(task, ProjectTask::ExportHtml { .. });
         // todo: we may get some file missing errors here
-        let artifact = CompiledArtifact::from_graph(snap.clone(), is_html);
+        let artifact = if matches!(task, ProjectTask::ExportBundle { .. }) {
+            CompiledArtifact::from_graph_without_doc(snap.clone())
+        } else {
+            CompiledArtifact::from_graph(snap.clone(), is_html)
+        };
         let id = artifact.world().main_id();
 
         let res = if write {
@@ -366,7 +373,7 @@ impl ExportTask {
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if write_to.is_dir() {
+        if write_to.is_dir() && !matches!(task, ProjectTask::ExportBundle { .. }) {
             bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
 
@@ -382,6 +389,9 @@ impl ExportTask {
             }) => write_to.with_file_name(page_number_template),
             _ => write_to,
         };
+        if matches!(task, ProjectTask::ExportBundle { .. }) {
+            return Ok(Some(write_to));
+        }
         if !write_to.add_extension(task.extension()) {
             write_to = write_to.with_file_name(format!("main.{}", task.extension()));
         }
@@ -438,6 +448,9 @@ impl ExportTask {
                         })
                         .collect(),
                 }
+            }
+            ExportArtifact::Bundle { .. } => {
+                bail!("cannot export bundle to memory")
             }
         };
 
@@ -546,6 +559,16 @@ impl ExportTask {
                     items: res_items,
                 }
             }
+            ExportArtifact::Bundle { items } => {
+                let root = write_to.clone();
+                let fut = tokio::task::spawn_blocking(move || write_bundle_files(&root, &items));
+                fut.await.context_ut("failed to export")??;
+
+                OnExportResponse::Single {
+                    path: Some(write_to),
+                    data: None,
+                }
+            }
         };
 
         log::debug!("ExportTask({export_id}): export complete");
@@ -564,6 +587,10 @@ impl ExportTask {
         let CompiledArtifact {
             graph, doc, diag, ..
         } = artifact;
+
+        if let ExportBundle(config) = task {
+            return FutureFolder::compute(move |_| export_bundle_artifact(&graph, &config)).await?;
+        }
 
         // Prepare the document.
         let doc = match doc {
@@ -623,6 +650,7 @@ impl ExportTask {
                     typst_html::html(html_doc()?)
                         .map_err(|e| format!("export error: {e:?}"))
                         .context_ut("failed to export to html")?.into(),
+                ExportBundle(..) => unreachable!(),
                 ExportSvgHtml(ExportHtmlTask { export: _ }) =>
                     reflexo_vec2svg::render_svg_html::<DefaultExportFeature>(paged_doc()?).into(),
                 ExportText(ExportTextTask { export: _ }) => TextExport::run_on_doc(doc)?.into(),
@@ -673,6 +701,9 @@ enum ExportArtifact {
         total_pages: usize,
         items: Vec<(usize, Bytes)>,
     },
+    Bundle {
+        items: Vec<(PathBuf, Bytes)>,
+    },
 }
 
 impl From<Bytes> for ExportArtifact {
@@ -722,6 +753,67 @@ impl WithPages for ImageOutput<String> {
             },
         }
     }
+}
+
+fn export_bundle_artifact(
+    graph: &LspComputeGraph,
+    config: &ExportBundleTask,
+) -> Result<ExportArtifact> {
+    let Warned { output, warnings } = typst::compile::<Bundle>(graph.world());
+    for warning in warnings {
+        log::warn!("bundle export warning: {}", warning.message);
+    }
+
+    let bundle = output.map_err(|errors| {
+        print_diagnostics_to_string(
+            graph.world(),
+            errors.iter(),
+            reflexo_typst::DiagnosticFormat::Human,
+        )
+        .map(|msg| anyhow::anyhow!("failed to compile bundle: {msg}"))
+        .unwrap_or_else(|err| anyhow::anyhow!("failed to compile bundle: {err}"))
+    })?;
+
+    let options = BundleOptions {
+        pixel_per_pt: config.ppi.to_f32() / 72.0,
+        pdf: pdf_options(
+            config.pages.as_deref(),
+            &config.pdf_standards,
+            config.no_pdf_tags,
+            config.creation_timestamp,
+        )?,
+    };
+    let fs = typst_bundle::export(&bundle, &options).map_err(|errors| {
+        print_diagnostics_to_string(
+            graph.world(),
+            errors.iter(),
+            reflexo_typst::DiagnosticFormat::Human,
+        )
+        .map(|msg| anyhow::anyhow!("failed to export bundle: {msg}"))
+        .unwrap_or_else(|err| anyhow::anyhow!("failed to export bundle: {err}"))
+    })?;
+
+    Ok(ExportArtifact::Bundle {
+        items: collect_bundle_files(&fs),
+    })
+}
+
+fn collect_bundle_files(fs: &VirtualFs) -> Vec<(PathBuf, Bytes)> {
+    fs.iter()
+        .map(|(path, data)| (path.realize(Path::new("")), data.clone()))
+        .collect()
+}
+
+fn write_bundle_files(root: &Path, items: &[(PathBuf, Bytes)]) -> Result<()> {
+    std::fs::create_dir_all(root).context("failed to create output directory")?;
+    for (path, data) in items {
+        let realized = root.join(path);
+        if let Some(parent) = realized.parent() {
+            std::fs::create_dir_all(parent).context("failed to create directory")?;
+        }
+        write_atomic(realized, data.clone()).context("failed to write file")?;
+    }
+    Ok(())
 }
 
 /// User configuration for export.

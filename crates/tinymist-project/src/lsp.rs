@@ -240,10 +240,10 @@ impl LspUniverseBuilder {
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
 
         // todo: typst doesn't allow to merge features
-        let features = if matches!(export_target, ExportTarget::Html) {
-            Features::from_iter([typst::Feature::Html])
-        } else {
-            features
+        let features = match export_target {
+            ExportTarget::Html => Features::from_iter([typst::Feature::Html]),
+            ExportTarget::Bundle => Features::from_iter([typst::Feature::Bundle]),
+            ExportTarget::Paged => features,
         };
 
         LspUniverse::new_raw(
