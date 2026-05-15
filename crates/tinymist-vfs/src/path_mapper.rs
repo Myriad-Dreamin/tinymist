@@ -11,7 +11,7 @@ use std::sync::LazyLock;
 use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
 use tinymist_std::path::PathClean;
-use tinymist_std::typst_shim::syntax::VirtualPathExt;
+use tinymist_std::typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::package::{PackageSpec, PackageVersion};
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
@@ -70,10 +70,9 @@ pub trait RootResolver {
         use WorkspaceResolution::*;
         let root = match WorkspaceResolver::resolve(file_id)? {
             Workspace(id) => id.path().clone(),
-            Package => self.resolve_package_root(match file_id.root() {
-                VirtualRoot::Package(package) => package,
-                _ => unreachable!("not a file in package"),
-            })?,
+            Package => {
+                self.resolve_package_root(file_id.package_compat().expect("not a file in package"))?
+            }
             UntitledRooted(..) | Rootless => {
                 return Ok(PathResolution::Rootless(Cow::Owned(
                     file_id.vpath().clone(),
@@ -91,10 +90,7 @@ pub trait RootResolver {
             Workspace(id) | UntitledRooted(id) => Ok(Some(id.path().clone())),
             Rootless => Ok(None),
             Package => self
-                .resolve_package_root(match file_id.root() {
-                    VirtualRoot::Package(package) => package,
-                    _ => unreachable!("not a file in package"),
-                })
+                .resolve_package_root(file_id.package_compat().expect("not a file in package"))
                 .map(Some),
         }
     }

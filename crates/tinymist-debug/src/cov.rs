@@ -15,6 +15,7 @@ use typst::foundations::func;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{Source, Span, SyntaxNode, ast};
 use typst::{World, WorldExt};
+use typst_shim::syntax::RootedPathExt;
 
 use crate::instrument::Instrumenter;
 
@@ -118,10 +119,7 @@ impl fmt::Display for SummarizedCoverage<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ids = self.result.regions.keys().collect::<Vec<_>>();
         ids.sort_by_key(|id| {
-            let pkg = match id.root() {
-                typst::syntax::VirtualRoot::Package(spec) => Some(crate::PackageSpecCmp::from(spec)),
-                _ => None,
-            };
+            let pkg = id.package_compat().map(crate::PackageSpecCmp::from);
             (pkg, id.vpath().get_with_slash())
         });
 

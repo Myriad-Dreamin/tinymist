@@ -9,7 +9,7 @@ use typst::diag::{bail, eco_format, FileError, FileResult, StrResult};
 use typst::syntax::package::{PackageSpec, TemplateInfo};
 use typst::syntax::{RootedPath, VirtualPath, VirtualRoot};
 use typst::World;
-use typst_shim::syntax::VirtualPathExt;
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 use crate::project::LspWorld;
 
@@ -127,10 +127,7 @@ fn scaffold_project(
         );
     }
 
-    let package = match toml_id.root() {
-        typst::syntax::VirtualRoot::Package(package) => Some(package),
-        _ => None,
-    };
+    let package = toml_id.package_compat();
     let files = scan_package_files(package.cloned(), package_root, &real_template_dir)?;
 
     // res.insert(id, world.file(id)?);
