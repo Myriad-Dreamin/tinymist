@@ -48,6 +48,7 @@ ttf-parser.workspace = true
 typst-shim.workspace = true
 typst-assets.workspace = true
 typst.workspace = true
+typst-bundle.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
 

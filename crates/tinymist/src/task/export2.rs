@@ -15,8 +15,9 @@ use crate::project::{
     TaskWhen,
 };
 use crate::world::base::{
-    ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, HtmlCompilationTask,
-    OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
+    BundleCompilationTask, ConfigTask, DiagnosticsTask, ExportComputation, FlagTask,
+    HtmlCompilationTask, OptionDocumentTask, PagedCompilationTask, WorldComputable,
+    WorldComputeGraph,
 };
 
 /// A task that checks if the project needs to be compiled.
@@ -68,6 +69,7 @@ impl ProjectCompilation {
 
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(compile_paged)));
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(compile_html)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
 
         Ok(compile_paged || compile_html)
     }

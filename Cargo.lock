@@ -7029,6 +7029,7 @@ dependencies = [
  "ttf-parser",
  "typst",
  "typst-assets",
+ "typst-bundle",
  "typst-shim",
  "wasm-bindgen",
  "web-sys",
