@@ -21,10 +21,7 @@ pub fn resolve_id_by_path(
         manifest.validate(&spec).ok()?;
 
         // Evaluates the entry point.
-        let package_root = manifest_id
-            .vpath()
-            .parent()
-            .unwrap_or_else(|| manifest_id.vpath().clone());
+        let package_root = manifest_id.vpath().parent()?;
         return Some(TypstFileId::new(RootedPath::new(
             manifest_id.root().clone(),
             package_root
@@ -34,12 +31,7 @@ pub fn resolve_id_by_path(
     }
 
     let vpath = if Path::new(import_path).is_relative() {
-        current
-            .vpath()
-            .parent()
-            .unwrap_or_else(|| current.vpath().clone())
-            .join(import_path)
-            .ok()?
+        current.vpath().parent()?.join(import_path).ok()?
     } else {
         VirtualPath::new(import_path).ok()?
     };
