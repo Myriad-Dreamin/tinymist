@@ -423,7 +423,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn run_example(&self, test: &Source) {
-        let id = test.id().vpath().as_rooted_path().with_extension("");
+        let id = std::path::Path::new(test.id().vpath().get_with_slash()).with_extension("");
         let name = id.file_name().and_then(|s| s.to_str()).unwrap_or_default();
         self.running("example", name);
 

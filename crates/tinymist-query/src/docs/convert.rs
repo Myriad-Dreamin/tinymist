@@ -36,7 +36,7 @@ pub(crate) fn convert_docs(
 
         let mut imports = Vec::new();
         if WorkspaceResolver::is_package_file(fid)
-            && let Some(pkg) = fid.package()
+            && let typst::syntax::VirtualRoot::Package(pkg) = fid.root()
         {
             let pkg_spec = pkg.to_string();
             imports.push(format!("#import {pkg_spec:?}"));

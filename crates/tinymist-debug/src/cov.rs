@@ -118,9 +118,20 @@ impl fmt::Display for SummarizedCoverage<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ids = self.result.regions.keys().collect::<Vec<_>>();
         ids.sort_by(|a, b| {
-            a.package()
-                .map(crate::PackageSpecCmp::from)
-                .cmp(&b.package().map(crate::PackageSpecCmp::from))
+            let a_pkg = match a.root() {
+                typst::syntax::VirtualRoot::Package(spec) => {
+                    Some(crate::PackageSpecCmp::from(spec))
+                }
+                _ => None,
+            };
+            let b_pkg = match b.root() {
+                typst::syntax::VirtualRoot::Package(spec) => {
+                    Some(crate::PackageSpecCmp::from(spec))
+                }
+                _ => None,
+            };
+            a_pkg
+                .cmp(&b_pkg)
                 .then_with(|| a.vpath().get_with_slash().cmp(b.vpath().get_with_slash()))
         });
 

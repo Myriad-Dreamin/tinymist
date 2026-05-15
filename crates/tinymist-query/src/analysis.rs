@@ -205,12 +205,17 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        let vpath = fid.vpath().as_rooted_path();
-                        match fid.package() {
-                            Some(package) if WorkspaceResolver::is_package_file(fid) => {
-                                format!(" in {package:?}{}", unix_slash(vpath))
+                        let vpath = fid.vpath().get_with_slash();
+                        match fid.root() {
+                            typst::syntax::VirtualRoot::Package(package)
+                                if WorkspaceResolver::is_package_file(fid) =>
+                            {
+                                format!(
+                                    " in {package:?}{}",
+                                    unix_slash(std::path::Path::new(vpath))
+                                )
                             }
-                            Some(_) | None => format!(" in {}", unix_slash(vpath)),
+                            _ => format!(" in {}", unix_slash(std::path::Path::new(vpath))),
                         }
                     } else {
                         "".to_string()
@@ -315,7 +320,7 @@ mod module_tests {
             fn ids(ids: EcoVec<FileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
-                    .map(|id| unix_slash(id.vpath().as_rooted_path()))
+                    .map(|id| unix_slash(std::path::Path::new(id.vpath().get_with_slash())))
                     .collect();
                 ids.sort();
                 ids
@@ -327,7 +332,7 @@ mod module_tests {
                 .into_iter()
                 .map(|(id, v)| {
                     (
-                        unix_slash(id.vpath().as_rooted_path()),
+                        unix_slash(std::path::Path::new(id.vpath().get_with_slash())),
                         ids(v.dependencies),
                         ids(v.dependents),
                     )

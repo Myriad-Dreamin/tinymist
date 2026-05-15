@@ -5,6 +5,7 @@ mod def;
 mod module;
 mod package;
 
+use std::path::Path;
 use tinymist_std::path::unix_slash;
 use typst::syntax::FileId;
 
@@ -15,9 +16,12 @@ pub use package::*;
 pub use tinymist_analysis::docs::*;
 
 fn file_id_repr(fid: FileId) -> String {
-    if let Some(spec) = fid.package() {
-        format!("{spec}{}", unix_slash(fid.vpath().as_rooted_path()))
+    if let typst::syntax::VirtualRoot::Package(spec) = fid.root() {
+        format!(
+            "{spec}{}",
+            unix_slash(Path::new(fid.vpath().get_with_slash()))
+        )
     } else {
-        unix_slash(fid.vpath().as_rooted_path())
+        unix_slash(Path::new(fid.vpath().get_with_slash()))
     }
 }

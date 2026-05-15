@@ -9,7 +9,7 @@ use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_world::package::PackageSpec;
 use typst::diag::{StrResult, eco_format};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, Span};
+use typst::syntax::{FileId, Span, VirtualRoot};
 
 use crate::LocalContext;
 use crate::docs::{DefDocs, PackageDefInfo, file_id_repr, module_docs};
@@ -41,7 +41,10 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let for_spec = toml_id.package().unwrap();
+    let for_spec = match toml_id.root() {
+        VirtualRoot::Package(package) => package,
+        _ => unreachable!("package manifest must be in a package"),
+    };
     let entry_point = toml_id
         .map(|path| {
             path.join(&manifest.package.entrypoint)
@@ -138,7 +141,8 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                 if child.is_external
                     && let Some(fid) = child_fid
                 {
-                    let lnk = if fid.package() == Some(for_spec) {
+                    let lnk = if matches!(fid.root(), VirtualRoot::Package(spec) if spec == for_spec)
+                    {
                         let sub_aka = akas(fid);
                         let sub_primary = sub_aka.first().cloned().unwrap_or_default();
                         child.external_link = Some(format!(
@@ -146,7 +150,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                             child.kind, child.name
                         ));
                         format!("#{}-{}-in-{sub_primary}", child.kind, child.name).replace(".", "")
-                    } else if let Some(spec) = fid.package() {
+                    } else if let VirtualRoot::Package(spec) = fid.root() {
                         let lnk = format!(
                             "https://typst.app/universe/package/{}/{}",
                             spec.name, spec.version
@@ -196,13 +200,16 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let files = file_ids
         .into_iter()
         .map(|fid| {
-            let pkg = fid
-                .package()
-                .map(|spec| packages.insert_full(spec.clone()).0);
+            let pkg = match fid.root() {
+                typst::syntax::VirtualRoot::Package(spec) => {
+                    Some(packages.insert_full(spec.clone()).0)
+                }
+                _ => None,
+            };
 
             FileMeta {
                 package: pkg,
-                path: fid.vpath().as_rootless_path().to_owned(),
+                path: fid.vpath().get_without_slash().to_owned().into(),
             }
         })
         .collect();
