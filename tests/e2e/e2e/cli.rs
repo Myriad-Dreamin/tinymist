@@ -15,11 +15,11 @@ macro_rules! apply_common_filters {
 
 #[test]
 fn test_probe() {
-    insta_cmd::assert_cmd_snapshot!(cli().arg("probe"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("probe"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    
+
     ----- stderr -----
     ");
 }
@@ -27,7 +27,7 @@ fn test_probe() {
 #[test]
 fn test_help() {
     apply_common_filters!();
-    insta_cmd::assert_cmd_snapshot!(cli().arg("--help"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("--help"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -58,7 +58,7 @@ fn test_help() {
 #[test]
 fn test_help_lsp() {
     apply_common_filters!();
-    insta_cmd::assert_cmd_snapshot!(cli().arg("lsp").arg("--help"), @r"
+    insta_cmd::assert_cmd_snapshot!(cli().arg("lsp").arg("--help"), @r#"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -70,12 +70,12 @@ fn test_help_lsp() {
           --mirror <FILE>
               Mirror the stdin to the file
               
-              [default: ]
+              [default: ""]
 
           --replay <FILE>
               Replay input from the file
               
-              [default: ]
+              [default: ""]
 
           --font-path <DIR>
               Add additional directories that are recursively searched for fonts.
@@ -92,7 +92,7 @@ fn test_help_lsp() {
               Print help (see a summary with '-h')
 
     ----- stderr -----
-    ");
+    "#);
 }
 
 #[test]
@@ -522,7 +522,7 @@ fn test_help_preview() {
               
               Note: if it equals to `data_plane_host`, same address will be used.
               
-              [default: ]
+              [default: ""]
 
           --open
               Open the preview in the browser after compilation. If `--no-open` is set, this flag will
@@ -559,7 +559,7 @@ fn test_compile() {
         assert!(rel_out.is_relative(), "rel_out should be relative {rel_out:?}");
 
         // absolute INPUT, absolute OUTPUT
-        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(cwd.join(INPUT_REL)).arg(abs_out.join("test1.pdf")), @r"
+        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(cwd.join(INPUT_REL)).arg(abs_out.join("test1.pdf")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -567,7 +567,7 @@ fn test_compile() {
         ----- stderr -----
         ");
         // absolute INPUT, relative OUTPUT
-        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(cwd.join(INPUT_REL)).arg(rel_out.join("test2.pdf")), @r"
+        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(cwd.join(INPUT_REL)).arg(rel_out.join("test2.pdf")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -575,7 +575,7 @@ fn test_compile() {
         ----- stderr -----
         ");
         // relative INPUT, absolute OUTPUT
-        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(INPUT_REL).arg(abs_out.join("test3.pdf")), @r"
+        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(INPUT_REL).arg(abs_out.join("test3.pdf")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -583,7 +583,7 @@ fn test_compile() {
         ----- stderr -----
         ");
         // relative INPUT, relative OUTPUT
-        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(INPUT_REL).arg(rel_out.join("test4.pdf")), @r"
+        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg(INPUT_REL).arg(rel_out.join("test4.pdf")), @"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -619,7 +619,7 @@ fn test_compile_alias() {
         assert!(rel_out.is_relative(), "rel_out should be relative {rel_out:?}");
 
         // Test the 'c' alias with relative INPUT and OUTPUT
-        insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg(INPUT_REL).arg(rel_out.join("test_alias.pdf")), @r"
+        insta_cmd::assert_cmd_snapshot!(cli().arg("c").arg(INPUT_REL).arg(rel_out.join("test_alias.pdf")), @"
         success: true
         exit_code: 0
         ----- stdout -----
