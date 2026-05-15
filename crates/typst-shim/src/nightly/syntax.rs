@@ -26,11 +26,18 @@ impl LinkedNodeExt for LinkedNode<'_> {
 pub trait VirtualPathExt {
     /// Get the underlying path with a leading `/` or `\`.
     fn as_rooted_path_compat(&self) -> &Path;
+
+    /// Get the underlying path without a leading `/` or `\`.
+    fn as_rootless_path_compat(&self) -> &Path;
 }
 
 impl VirtualPathExt for VirtualPath {
     fn as_rooted_path_compat(&self) -> &Path {
         Path::new(self.get_with_slash())
+    }
+
+    fn as_rootless_path_compat(&self) -> &Path {
+        Path::new(self.get_without_slash())
     }
 }
 
