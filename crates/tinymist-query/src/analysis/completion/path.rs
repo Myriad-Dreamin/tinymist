@@ -43,7 +43,7 @@ impl CompletionPair<'_, '_, '_> {
         let src_path = id.vpath();
         let base = id;
         let dst_path = src_path.join(path.to_str()?).ok()?;
-        let mut compl_path = dst_path.as_rootless_path();
+        let mut compl_path = Path::new(dst_path.get_without_slash());
         if !compl_path.is_dir() {
             compl_path = compl_path.parent().unwrap_or(Path::new(""));
         }
@@ -70,14 +70,12 @@ impl CompletionPair<'_, '_, '_> {
 
             let label: EcoString = if has_root {
                 // diff with root
-                unix_slash(path.vpath().as_rooted_path()).into()
+                unix_slash(Path::new(path.vpath().get_with_slash())).into()
             } else {
-                let base = base
-                    .vpath()
-                    .as_rooted_path()
+                let base = Path::new(base.vpath().get_with_slash())
                     .parent()
                     .unwrap_or(Path::new("/"));
-                let path = path.vpath().as_rooted_path();
+                let path = Path::new(path.vpath().get_with_slash());
                 let w = tinymist_std::path::diff(path, base)?;
                 unix_slash(&w).into()
             };

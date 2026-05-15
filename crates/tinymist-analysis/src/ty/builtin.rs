@@ -225,8 +225,9 @@ impl TryFrom<FileId> for PackageId {
     type Error = ();
 
     fn try_from(value: FileId) -> Result<Self, Self::Error> {
-        let Some(spec) = value.package() else {
-            return Err(());
+        let spec = match value.root() {
+            typst::syntax::VirtualRoot::Package(spec) => spec,
+            _ => return Err(()),
         };
         Ok(PackageId {
             namespace: spec.namespace.as_str().into(),

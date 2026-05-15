@@ -229,7 +229,6 @@ impl DocumentMetricsWorker<'_> {
     }
 
     fn compute(&mut self) -> Option<Vec<DocumentFontInfo>> {
-        use ttf_parser::name_id::*;
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
             .map(|(font, font_info_value)| {

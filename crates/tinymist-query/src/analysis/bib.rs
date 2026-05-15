@@ -49,7 +49,9 @@ struct BibWorker {
 
 impl BibWorker {
     fn analyze_path(&mut self, file_id: TypstFileId, content: Bytes) -> Option<()> {
-        let file_extension = file_id.vpath().as_rooted_path().extension()?.to_str()?;
+        let file_extension = std::path::Path::new(file_id.vpath().get_with_slash())
+            .extension()?
+            .to_str()?;
         let content = std::str::from_utf8(&content).ok()?;
 
         // Reparse the content to get all entries
@@ -209,7 +211,6 @@ impl YamlBib {
 #[cfg(test)]
 mod tests {
     use core::fmt;
-    use std::path::Path;
 
     use typst::syntax::{FileId, VirtualPath};
 

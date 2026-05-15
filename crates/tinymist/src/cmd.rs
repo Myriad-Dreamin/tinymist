@@ -340,7 +340,7 @@ impl ServerState {
                 .map_err(internal_error)?;
             let main = entry
                 .main()
-                .and_then(|e| e.vpath().resolve(&root))
+                .and_then(|e| Some(e.vpath().realize(&root)))
                 .ok_or_else(
                     || error_once!("main file must be resolved, got", entry: display_entry()),
                 )

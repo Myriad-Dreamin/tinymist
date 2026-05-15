@@ -88,7 +88,10 @@ pub struct TestCase {
 /// Extracts the test suites in the document
 pub fn test_suites(ctx: &mut LocalContext) -> Result<TestSuites> {
     let main_id = ctx.world().main();
-    let main_workspace = main_id.package();
+    let main_workspace = match main_id.root() {
+        typst::syntax::VirtualRoot::Package(package) => Some(package),
+        _ => None,
+    };
 
     crate::log_debug_ct!(
         "test workspace: {:?}, files: {:?}",
@@ -98,7 +101,7 @@ pub fn test_suites(ctx: &mut LocalContext) -> Result<TestSuites> {
     let files = ctx
         .depended_source_files()
         .par_iter()
-        .filter(|fid| fid.package() == main_workspace)
+        .filter(|fid| matches!(fid.root(), typst::syntax::VirtualRoot::Package(package) if Some(package) == main_workspace))
         .map(|fid| {
             let source = ctx
                 .source_by_id(*fid)
@@ -195,7 +198,7 @@ impl TestSuitesWorker<'_> {
     fn discover_tests(&mut self) -> Result<()> {
         for (source, module) in self.files.iter() {
             let source_id = source.id();
-            let vpath = source_id.vpath().as_rooted_path();
+            let vpath = std::path::Path::new(source_id.vpath().get_with_slash());
             let file_name = vpath.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if file_name.starts_with(self.config.example_pattern.as_str()) {
                 self.examples.push(source.clone());

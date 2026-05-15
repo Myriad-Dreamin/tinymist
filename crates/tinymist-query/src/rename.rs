@@ -3,7 +3,7 @@ use lsp_types::{
     OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
-use tinymist_std::path::{unix_slash, PathClean};
+use tinymist_std::path::{PathClean, unix_slash};
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,
@@ -11,11 +11,11 @@ use typst::{
 
 use crate::adt::interner::Interned;
 use crate::{
-    analysis::{get_link_exprs, LinkObject, LinkTarget},
+    analysis::{LinkObject, LinkTarget, get_link_exprs},
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
+    syntax::{Decl, RefExpr, SyntaxClass, first_ancestor_expr, get_index_info, node_ancestors},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -144,9 +144,8 @@ pub(crate) fn do_rename_file(
     diff: PathBuf,
     edits: &mut HashMap<Url, Vec<TextEdit>>,
 ) -> Option<()> {
-    let def_path = def_fid
-        .vpath()
-        .as_rooted_path()
+    let def_path = def_fid.vpath().get_with_slash();
+    let def_path = std::path::Path::new(def_path)
         .file_name()
         .unwrap_or_default()
         .to_str()
@@ -165,7 +164,15 @@ pub(crate) fn do_rename_file(
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
     // Compare package and vpath so we avoid allocating a joined file id while
     // still distinguishing package files that share the same internal path.
-    file_id.package() == def_fid.package()
+    let file_pkg = match file_id.root() {
+        typst::syntax::VirtualRoot::Package(pkg) => Some(pkg),
+        _ => None,
+    };
+    let def_pkg = match def_fid.root() {
+        typst::syntax::VirtualRoot::Package(pkg) => Some(pkg),
+        _ => None,
+    };
+    file_pkg == def_pkg
         && file_id
             .vpath()
             .parent()
@@ -375,7 +382,7 @@ pub(crate) fn create_change_annotation(
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, str::FromStr};
+    use std::str::FromStr;
 
     use super::*;
     use crate::tests::*;

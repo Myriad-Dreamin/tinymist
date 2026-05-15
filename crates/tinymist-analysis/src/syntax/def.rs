@@ -146,11 +146,7 @@ impl ExprInfoRepr {
     #[allow(dead_code)]
     fn show(&self) {
         use std::io::Write;
-        let vpath = self
-            .fid
-            .vpath()
-            .resolve(Path::new("target/exprs/"))
-            .unwrap();
+        let vpath = self.fid.vpath().realize(Path::new("target/exprs/"));
         let root = vpath.with_extension("root.expr");
         std::fs::create_dir_all(root.parent().unwrap()).unwrap();
         std::fs::write(root, format!("{}", self.root)).unwrap();
@@ -533,7 +529,7 @@ impl Decl {
     /// Creates a module declaration with a file ID.
     pub fn module(fid: TypstFileId) -> Self {
         let name = {
-            let stem = fid.vpath().as_rooted_path().file_stem();
+            let stem = Path::new(fid.vpath().get_with_slash()).file_stem();
             stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
                 .unwrap_or_default()
         };

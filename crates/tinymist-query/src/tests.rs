@@ -69,12 +69,12 @@ pub fn run_with_ctx_<T>(
     shadow_paths.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
     let paths = shadow_paths
         .into_iter()
-            .map(|path| {
-                WorkspaceResolver::workspace_file(
-                    Some(&root),
-                    VirtualPath::virtualize(&root, &path).unwrap(),
-                )
-            })
+        .map(|path| {
+            WorkspaceResolver::workspace_file(
+                Some(&root),
+                VirtualPath::virtualize(&root, &path).unwrap(),
+            )
+        })
         .collect::<Vec<_>>();
 
     let mut world = verse.snapshot();

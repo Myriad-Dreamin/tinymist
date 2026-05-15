@@ -126,13 +126,17 @@ fn scaffold_project(
         );
     }
 
-    let files = scan_package_files(toml_id.package().cloned(), package_root, &real_template_dir)?;
+    let package = match toml_id.root() {
+        typst::syntax::VirtualRoot::Package(package) => Some(package),
+        _ => None,
+    };
+    let files = scan_package_files(package.cloned(), package_root, &real_template_dir)?;
 
     // res.insert(id, world.file(id)?);
     for id in files {
         let f = world.file(id)?;
-        let template_dir = template_dir.vpath().as_rooted_path();
-        let file_path = id.vpath().as_rooted_path();
+        let template_dir = Path::new(template_dir.vpath().get_with_slash());
+        let file_path = Path::new(id.vpath().get_with_slash());
         let relative_path = file_path.strip_prefix(template_dir).map_err(|err| {
             eco_format!(
                 "failed to strip prefix, path: {file_path:?}, root: {template_dir:?}: {err}"

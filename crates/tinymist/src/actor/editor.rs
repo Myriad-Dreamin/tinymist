@@ -115,7 +115,7 @@ impl EditorActor {
 
                     self.status.path = compile_status
                         .compiling_id
-                        .map(|fid| unix_slash(fid.vpath().as_rooted_path()))
+                        .map(|fid| unix_slash(std::path::Path::new(fid.vpath().get_with_slash())))
                         .unwrap_or_default();
                     self.status.page_count = compile_status.page_count;
                     self.status.status = match &compile_status.status {
