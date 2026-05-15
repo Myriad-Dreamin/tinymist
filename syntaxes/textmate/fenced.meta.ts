@@ -59,5 +59,7 @@ export const languages: Lang[] = [
   { candidates: ["ts", "typescript"] },
   { candidates: ["tsx"] },
   { candidates: ["twig"] },
+  { candidates: ["verilog", "v", "vh"] },
+  { /* SystemVerilog */ as: "source.systemverilog", candidates: ["systemverilog", "sv", "svh"] },
   { /* VB */ as: "source.asp.vb.net", candidates: ["vb"] },
 ]
