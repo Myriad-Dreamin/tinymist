@@ -153,7 +153,7 @@ typst-render = "0.15.0"
 typst-pdf = "0.15.0"
 typst-syntax = "0.15.0"
 typst-eval = "0.15.0"
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "57a38ca" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "3284e80" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.4.0"
 typstyle-core = { version = "=0.13.17", default-features = false }
@@ -276,16 +276,16 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "6f1437e54a235c343604c1b17d502ccbfdb12198" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "744b3d1781e835d16012a558ea1c85b0c3cfd856" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle/", rev = "e7165060029dd6b45f1aad383d22f3af16136971" }
