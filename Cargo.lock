@@ -7329,6 +7329,7 @@ dependencies = [
  "ttf-parser",
  "typst",
  "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-bundle",
  "typst-shim",
  "wasm-bindgen",
  "web-sys",
