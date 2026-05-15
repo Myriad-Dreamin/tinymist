@@ -835,17 +835,8 @@ trait DataFlowVisitor {
     }
 
     fn math_call(&mut self, expr: ast::MathCall<'_>) -> Option<()> {
-        self.math_access(expr.callee())?;
-        let args = expr
-            .args()
-            .arg_items()
-            .flat_map(|arg| match arg.arg {
-                ast::Arg::Pos(expr) => Some(expr),
-                ast::Arg::Named(named) => Some(named.expr()),
-                ast::Arg::Spread(spread) => Some(spread.expr()),
-            })
-            .collect::<Vec<_>>();
-        self.exprs(args.into_iter())
+        self.exprs(expr.args().to_untyped().exprs())?;
+        self.math_access(expr.callee())
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
