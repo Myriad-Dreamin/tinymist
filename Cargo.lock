@@ -5123,7 +5123,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e6223c5c7f7f29baa43837c7028ca0a20727f6ba"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#f2ae759ef8ba26dc0d283057cf282d107bbee914"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5149,7 +5149,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e6223c5c7f7f29baa43837c7028ca0a20727f6ba"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#f2ae759ef8ba26dc0d283057cf282d107bbee914"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5181,7 +5181,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e6223c5c7f7f29baa43837c7028ca0a20727f6ba"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#f2ae759ef8ba26dc0d283057cf282d107bbee914"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5209,7 +5209,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e6223c5c7f7f29baa43837c7028ca0a20727f6ba"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#f2ae759ef8ba26dc0d283057cf282d107bbee914"
 dependencies = [
  "base64 0.22.1",
  "comemo",
