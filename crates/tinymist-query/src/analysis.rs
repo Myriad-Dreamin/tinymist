@@ -31,6 +31,7 @@ pub use global::*;
 pub(crate) use post_tyck::*;
 pub(crate) use tinymist_analysis::stats::{AnalysisStats, QueryStatGuard};
 pub(crate) use tyck::*;
+pub use typst_shim::syntax::VirtualPathExt;
 
 use std::sync::Arc;
 
@@ -191,6 +192,7 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
+    use typst_shim::syntax::VirtualPathExt;
 
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
@@ -205,17 +207,19 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        let vpath = fid.vpath().get_with_slash();
                         match fid.root() {
                             typst::syntax::VirtualRoot::Package(package)
                                 if WorkspaceResolver::is_package_file(fid) =>
                             {
                                 format!(
                                     " in {package:?}{}",
-                                    unix_slash(std::path::Path::new(vpath))
+                                    unix_slash(fid.vpath().as_rooted_path_compat())
                                 )
                             }
-                            _ => format!(" in {}", unix_slash(std::path::Path::new(vpath))),
+                            _ => format!(
+                                " in {}",
+                                unix_slash(fid.vpath().as_rooted_path_compat())
+                            ),
                         }
                     } else {
                         "".to_string()
@@ -320,7 +324,7 @@ mod module_tests {
             fn ids(ids: EcoVec<FileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
-                    .map(|id| unix_slash(std::path::Path::new(id.vpath().get_with_slash())))
+                    .map(|id| unix_slash(id.vpath().as_rooted_path_compat()))
                     .collect();
                 ids.sort();
                 ids
@@ -332,7 +336,7 @@ mod module_tests {
                 .into_iter()
                 .map(|(id, v)| {
                     (
-                        unix_slash(std::path::Path::new(id.vpath().get_with_slash())),
+                        unix_slash(id.vpath().as_rooted_path_compat()),
                         ids(v.dependencies),
                         ids(v.dependents),
                     )

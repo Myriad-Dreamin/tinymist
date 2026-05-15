@@ -32,7 +32,7 @@ fn collect_lint_diagnostics_with_known(
         if WorkspaceResolver::is_package_file(dep)
             || dep
                 .vpath()
-                .as_rooted_path()
+                .as_rooted_path_compat()
                 .extension()
                 .is_none_or(|e| e != "typ")
         {
@@ -89,7 +89,9 @@ impl<'w> DiagWorker<'w> {
         self.source = "tinymist-lint";
         for dep in self.ctx.world().depended_files() {
             if WorkspaceResolver::is_package_file(dep)
-                || std::path::Path::new(dep.vpath().get_with_slash())
+                || dep
+                    .vpath()
+                    .as_rooted_path_compat()
                     .extension()
                     .is_none_or(|e| e != "typ")
             {

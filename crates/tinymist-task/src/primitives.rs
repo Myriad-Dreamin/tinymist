@@ -16,6 +16,7 @@ use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
 use typst::layout::PageRanges;
 use typst::syntax::{FileId, VirtualRoot};
+use typst_shim::syntax::VirtualPathExt;
 
 /// A scalar that is not NaN.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -360,17 +361,11 @@ impl ResourcePath {
         match id.root() {
             VirtualRoot::Package(package) => ResourcePath(
                 "file_id".into(),
-                format!(
-                    "{package}{}",
-                    unix_slash(Path::new(id.vpath().get_with_slash()))
-                ),
+                format!("{package}{}", unix_slash(id.vpath().as_rooted_path_compat())),
             ),
             VirtualRoot::Project => ResourcePath(
                 "file_id".into(),
-                format!(
-                    "$root{}",
-                    unix_slash(Path::new(id.vpath().get_with_slash()))
-                ),
+                format!("$root{}", unix_slash(id.vpath().as_rooted_path_compat())),
             ),
         }
     }

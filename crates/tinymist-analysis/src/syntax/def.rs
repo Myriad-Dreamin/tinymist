@@ -529,7 +529,7 @@ impl Decl {
     /// Creates a module declaration with a file ID.
     pub fn module(fid: TypstFileId) -> Self {
         let name = {
-            let stem = Path::new(fid.vpath().get_with_slash()).file_stem();
+            let stem = fid.vpath().as_rooted_path_compat().file_stem();
             stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
                 .unwrap_or_default()
         };

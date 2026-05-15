@@ -26,7 +26,7 @@ pub use typst::syntax::ast::{self, AstNode};
 pub use typst::syntax::{
     FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
-pub use typst_shim::syntax::LinkedNodeExt;
+pub use typst_shim::syntax::{LinkedNodeExt, VirtualPathExt};
 
 pub use crate::SemanticRequest;
 pub use crate::analysis::{Definition, LocalContext};

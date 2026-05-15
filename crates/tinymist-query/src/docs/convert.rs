@@ -13,6 +13,7 @@ use typst::World;
 use typst::diag::StrResult;
 use typst::foundations::Bytes;
 use typst::syntax::FileId;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::analysis::SharedContext;
 
@@ -44,7 +45,7 @@ pub(crate) fn convert_docs(
         }
         imports.push(format!(
             "#import {:?}: *",
-            unix_slash(Path::new(fid.vpath().get_with_slash()))
+            unix_slash(fid.vpath().as_rooted_path_compat())
         ));
         imports.join("; ")
     });

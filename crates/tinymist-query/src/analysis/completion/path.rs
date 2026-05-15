@@ -70,12 +70,12 @@ impl CompletionPair<'_, '_, '_> {
 
             let label: EcoString = if has_root {
                 // diff with root
-                unix_slash(Path::new(path.vpath().get_with_slash())).into()
+                unix_slash(path.vpath().as_rooted_path_compat()).into()
             } else {
-                let base = Path::new(base.vpath().get_with_slash())
+                let base = base.vpath().as_rooted_path_compat()
                     .parent()
                     .unwrap_or(Path::new("/"));
-                let path = Path::new(path.vpath().get_with_slash());
+                let path = path.vpath().as_rooted_path_compat();
                 let w = tinymist_std::path::diff(path, base)?;
                 unix_slash(&w).into()
             };

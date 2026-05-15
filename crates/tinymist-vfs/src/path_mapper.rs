@@ -11,6 +11,7 @@ use std::sync::LazyLock;
 use parking_lot::RwLock;
 use tinymist_std::ImmutPath;
 use tinymist_std::path::PathClean;
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use typst::diag::{EcoString, FileError, FileResult, eco_format};
 use typst::syntax::package::{PackageSpec, PackageVersion};
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
@@ -37,7 +38,7 @@ impl PathResolution {
     pub fn as_path(&self) -> &Path {
         match self {
             PathResolution::Resolved(path) => path.as_path(),
-            PathResolution::Rootless(path) => Path::new(path.get_with_slash()),
+            PathResolution::Rootless(path) => path.as_ref().as_rooted_path_compat(),
         }
     }
 
@@ -339,13 +340,9 @@ impl fmt::Display for Resolving {
         } else {
             match id.root() {
                 VirtualRoot::Package(pkg) => {
-                    write!(
-                        f,
-                        "{pkg}{}",
-                        Path::new(id.vpath().get_with_slash()).display()
-                    )
+                    write!(f, "{pkg}{}", id.vpath().as_rooted_path_compat().display())
                 }
-                _ => write!(f, "{}", Path::new(id.vpath().get_with_slash()).display()),
+                _ => write!(f, "{}", id.vpath().as_rooted_path_compat().display()),
             }
         }
     }

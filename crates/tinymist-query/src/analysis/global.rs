@@ -29,6 +29,7 @@ use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
+use typst_shim::syntax::VirtualPathExt;
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
@@ -369,7 +370,7 @@ impl LocalContext {
             })
             .iter()
             .filter(move |fid| {
-                std::path::Path::new(fid.vpath().get_with_slash())
+                fid.vpath().as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -405,7 +406,9 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| preference.is_match(std::path::Path::new(id.vpath().get_with_slash())));
+        ids.retain(|id| {
+            preference.is_match(id.vpath().as_rooted_path_compat())
+        });
         ids
     }
 

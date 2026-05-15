@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use typst::{foundations::Bytes, model::CslStyle};
+use typst_shim::syntax::VirtualPathExt;
 use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 use super::prelude::*;
@@ -49,7 +50,9 @@ struct BibWorker {
 
 impl BibWorker {
     fn analyze_path(&mut self, file_id: TypstFileId, content: Bytes) -> Option<()> {
-        let file_extension = std::path::Path::new(file_id.vpath().get_with_slash())
+        let file_extension = file_id
+            .vpath()
+            .as_rooted_path_compat()
             .extension()?
             .to_str()?;
         let content = std::str::from_utf8(&content).ok()?;
