@@ -338,10 +338,6 @@ typst-utils = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightl
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", branch = "nightly" }
 
-# typst-ansi-hl = { path = "../typst-ansi-hl/lib" }
-# typstyle-core = { path = "../typstyle/crates/typstyle-core" }
-
-
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
 # typst-bundle = { path = "../typst/crates/typst-bundle" }
