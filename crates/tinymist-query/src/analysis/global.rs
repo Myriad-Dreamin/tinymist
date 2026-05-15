@@ -371,7 +371,8 @@ impl LocalContext {
             })
             .iter()
             .filter(move |fid| {
-                fid.vpath().as_rooted_path_compat()
+                fid.vpath()
+                    .as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -407,9 +408,7 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| {
-            preference.is_match(id.vpath().as_rooted_path_compat())
-        });
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path_compat()));
         ids
     }
 
@@ -608,7 +607,9 @@ impl SharedContext {
 
     /// Converts a Typst range to an LSP range.
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
-        let ext = std::path::Path::new(fid.vpath().get_without_slash())
+        let ext = fid
+            .vpath()
+            .as_rootless_path_compat()
             .extension()
             .and_then(|ext| ext.to_str());
         // yaml/yml/bib

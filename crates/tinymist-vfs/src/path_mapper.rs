@@ -306,7 +306,7 @@ impl fmt::Debug for Resolving {
 
         let path = match WorkspaceResolver::resolve(id) {
             Ok(Workspace(workspace)) => Some(id.vpath().realize(&workspace.path())),
-            Ok(UntitledRooted(..)) => Some(Path::new(id.vpath().get_without_slash()).to_owned()),
+            Ok(UntitledRooted(..)) => Some(id.vpath().as_rootless_path_compat().to_owned()),
             Ok(Rootless | Package) | Err(_) => None,
         };
 
