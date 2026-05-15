@@ -5,6 +5,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::FileId;
+use typst_shim::syntax::VirtualPathExt;
 use typst::{
     World,
     foundations::{Func, Label, Module, Selector, Value},
@@ -198,7 +199,7 @@ impl TestSuitesWorker<'_> {
     fn discover_tests(&mut self) -> Result<()> {
         for (source, module) in self.files.iter() {
             let source_id = source.id();
-            let vpath = std::path::Path::new(source_id.vpath().get_with_slash());
+            let vpath = source_id.vpath().as_rooted_path_compat();
             let file_name = vpath.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if file_name.starts_with(self.config.example_pattern.as_str()) {
                 self.examples.push(source.clone());

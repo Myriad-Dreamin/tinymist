@@ -10,3 +10,4 @@ pub use typst::syntax::{
     ast::{self, AstNode},
     package::{PackageManifest, PackageSpec},
 };
+pub use typst_shim::syntax::VirtualPathExt;

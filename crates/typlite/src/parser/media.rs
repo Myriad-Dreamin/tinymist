@@ -10,6 +10,7 @@ use comemo::Track;
 use ecow::{EcoString, eco_format};
 use tinymist_project::diag::print_diagnostics_to_string;
 use tinymist_project::{EntryReader, MEMORY_MAIN_ENTRY, TaskInputs, base::ShadowApi};
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use typst::{
     World,
     foundations::{Bytes, Dict, IntoValue},
@@ -256,11 +257,9 @@ impl HtmlToAstParser {
 
         let mut world = self.world.clone().task(TaskInputs {
             entry: Some(
-                self.world
-                    .entry_state()
-                    .select_in_workspace(std::path::Path::new(
-                        MEMORY_MAIN_ENTRY.vpath().get_with_slash(),
-                    )),
+            self.world
+                .entry_state()
+                .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path_compat()),
             ),
             inputs: match self.feat.color_theme {
                 Some(ColorTheme::Dark) => Some(DARK_THEME_INPUT.clone()),
