@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-use tinymist::ExportTask;
 use tinymist::project::*;
-use tinymist::world::WorldComputeGraph;
 use tinymist::world::system::print_diagnostics;
-use tinymist_std::{ImmutPath, error::prelude::*};
+use tinymist::world::WorldComputeGraph;
+use tinymist::ExportTask;
+use tinymist_std::{error::prelude::*, ImmutPath};
 
 /// Specify the project compilation.
 #[derive(Debug, Clone, clap::Parser)]
@@ -67,8 +67,12 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
     let graph = WorldComputeGraph::from_world(world);
 
     // Compiles the project
-    let is_html = matches!(output.task, ProjectTask::ExportHtml(..));
-    let compiled = CompiledArtifact::from_graph(graph, is_html);
+    let compiled = if matches!(output.task, ProjectTask::ExportBundle(..)) {
+        CompiledArtifact::from_graph_without_doc(graph)
+    } else {
+        let is_html = matches!(output.task, ProjectTask::ExportHtml(..));
+        CompiledArtifact::from_graph(graph, is_html)
+    };
 
     let diag = compiled.diagnostics();
     print_diagnostics(compiled.world(), diag, DiagnosticFormat::Human)

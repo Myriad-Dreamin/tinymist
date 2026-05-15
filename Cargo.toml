@@ -177,6 +177,7 @@ reflexo-typst = { version = "0.7.0", default-features = false }
 reflexo-vec2svg = { version = "0.7.0" }
 
 typst = "0.15.0"
+typst-bundle = "0.15.0"
 typst-layout = "0.15.0"
 typst-html = "0.15.0"
 typst-library = "0.15.0"

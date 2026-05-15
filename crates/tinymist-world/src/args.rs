@@ -325,6 +325,8 @@ pub enum OutputFormat {
     Svg,
     /// Export to HTML.
     Html,
+    /// Export to Bundle.
+    Bundle,
 }
 
 display_possible_values!(OutputFormat);
@@ -342,6 +344,8 @@ pub enum ExportTarget {
     Paged,
     /// The current export target is for HTML export.
     Html,
+    /// The current export target is for bundle export.
+    Bundle,
 }
 
 /// A PDF standard that Typst can enforce conformance with.
@@ -427,6 +431,8 @@ pub enum Feature {
     Html,
     /// The A11yExtras feature.
     A11yExtras,
+    /// The bundle export feature
+    Bundle,
 }
 
 display_possible_values!(Feature);
@@ -435,6 +441,7 @@ impl From<Feature> for typst::Feature {
     fn from(f: Feature) -> typst::Feature {
         match f {
             Feature::Html => typst::Feature::Html,
+            Feature::Bundle => typst::Feature::Bundle,
             Feature::A11yExtras => typst::Feature::A11yExtras,
         }
     }

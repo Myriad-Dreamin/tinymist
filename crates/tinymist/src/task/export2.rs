@@ -149,6 +149,7 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                 ExportPng(_config) => todo!(),
                 ExportSvg(_config) => todo!(),
                 ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
+                ExportBundle(..) => unreachable!(),
                 // todo: configuration
                 ExportSvgHtml(_config) => Self::export_string::<
                     _,
