@@ -7,6 +7,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 use typst::syntax::FileId;
+use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
 
 use crate::LocalContext;
@@ -39,7 +40,10 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
     let mut scan_ctx = ScanDefCtx {
         ctx,
         root: entry_point,
-        for_spec: entry_point.package(),
+        for_spec: match entry_point.root() {
+            VirtualRoot::Package(package) => Some(package),
+            _ => None,
+        },
         aliases: &mut aliases,
         extras: &mut extras,
     };
@@ -180,7 +184,7 @@ impl ScanDefCtx<'_> {
         let children = match decl.as_ref() {
             Decl::Module(..) => decl.file_id().and_then(|fid| {
                 // only generate docs for the same package
-                if fid.package() != self.for_spec {
+                if !matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec) {
                     return None;
                 }
 
@@ -240,7 +244,8 @@ impl ScanDefCtx<'_> {
         // Insert module that is not exported
         if let Some(fid) = head.decl.as_ref().and_then(|del| del.file_id()) {
             // only generate docs for the same package
-            if fid.package() == self.for_spec {
+            if matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec)
+            {
                 let av = self.aliases.entry(fid).or_default();
                 if av.is_empty() {
                     let src = self.ctx.expr_stage_by_id(fid);

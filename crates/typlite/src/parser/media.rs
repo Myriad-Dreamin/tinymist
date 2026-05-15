@@ -258,7 +258,9 @@ impl HtmlToAstParser {
             entry: Some(
                 self.world
                     .entry_state()
-                    .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path()),
+                    .select_in_workspace(std::path::Path::new(
+                        MEMORY_MAIN_ENTRY.vpath().get_with_slash(),
+                    )),
             ),
             inputs: match self.feat.color_theme {
                 Some(ColorTheme::Dark) => Some(DARK_THEME_INPUT.clone()),

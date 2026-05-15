@@ -309,7 +309,7 @@ fn make_sys(entry: &EntryState, base: Arc<LazyHash<Dict>>, inputs: Dict) -> Opti
         return None;
     }
     // Files without a path are not exported
-    let path = main.vpath().resolve(&root)?;
+    let path = main.vpath().realize(&root);
 
     // todo: handle untitled path
     if path.strip_prefix("/untitled").is_ok() {

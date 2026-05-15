@@ -27,7 +27,7 @@ use typst::introspection::EmptyIntrospector;
 pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
     // Gets the main source file and its path.
     let main_source = world.source(world.main())?;
-    let main_path = unix_slash(world.main().vpath().as_rooted_path());
+    let main_path = unix_slash(std::path::Path::new(world.main().vpath().get_with_slash()));
 
     let library = world.library();
     let traced = Traced::default();

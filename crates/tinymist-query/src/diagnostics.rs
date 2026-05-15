@@ -87,8 +87,22 @@ impl<'w> DiagWorker<'w> {
     pub fn check(mut self, known_issues: &KnownIssues) -> Self {
         let source = self.source;
         self.source = "tinymist-lint";
-        for diag in collect_lint_diagnostics_with_known(self.ctx, known_issues) {
-            self.handle(&diag);
+        for dep in self.ctx.world().depended_files() {
+            if WorkspaceResolver::is_package_file(dep)
+                || std::path::Path::new(dep.vpath().get_with_slash())
+                    .extension()
+                    .is_none_or(|e| e != "typ")
+            {
+                continue;
+            }
+
+            let Ok(source) = self.ctx.world().source(dep) else {
+                continue;
+            };
+
+            for diag in self.ctx.lint(&source, known_issues) {
+                self.handle(&diag);
+            }
         }
         self.source = source;
 

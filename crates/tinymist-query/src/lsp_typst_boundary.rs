@@ -42,7 +42,7 @@ pub fn path_to_url(path: &Path) -> anyhow::Result<Url> {
 /// Convert a path resolution to a URL.
 pub fn path_res_to_url(path: PathResolution) -> anyhow::Result<Url> {
     match path {
-        PathResolution::Rootless(path) => untitled_url(path.as_rooted_path()),
+        PathResolution::Rootless(path) => untitled_url(Path::new(path.get_with_slash())),
         PathResolution::Resolved(path) => path_to_url(&path),
     }
 }
