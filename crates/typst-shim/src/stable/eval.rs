@@ -5,9 +5,8 @@ use typst::World;
 use typst::diag::SourceResult;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Module, Value};
-use typst::introspection::EmptyIntrospector;
+use typst::introspection::Introspector;
 use typst::syntax::Source;
-use typst::utils::Protected;
 
 pub use typst_eval::*;
 
@@ -18,8 +17,8 @@ pub fn eval_compat(world: &dyn World, source: &Source) -> SourceResult<Module> {
     let mut sink = Sink::default();
 
     typst_eval::eval(
+        &typst::ROUTINES,
         world.track(),
-        world.library(),
         traced.track(),
         sink.track_mut(),
         route.track(),
@@ -30,7 +29,7 @@ pub fn eval_compat(world: &dyn World, source: &Source) -> SourceResult<Module> {
 /// The Typst Engine.
 pub struct TypstEngine<'a> {
     /// The introspector to be queried for elements and their positions.
-    pub introspector: EmptyIntrospector,
+    pub introspector: Introspector,
     /// May hold a span that is currently under inspection.
     pub traced: Traced,
     /// The route the engine took during compilation. This is used to detect
@@ -50,7 +49,7 @@ impl<'a> TypstEngine<'a> {
     /// Creates a new Typst Engine.
     pub fn new(world: &'a dyn World) -> Self {
         Self {
-            introspector: EmptyIntrospector,
+            introspector: Introspector::default(),
             traced: Traced::default(),
             route: Route::default(),
             sink: Sink::default(),
@@ -61,9 +60,9 @@ impl<'a> TypstEngine<'a> {
     /// Creates the engine.
     pub fn as_engine(&'a mut self) -> Engine<'a> {
         Engine {
-            library: self.world.library(),
+            routines: &typst::ROUTINES,
             world: self.world.track(),
-            introspector: Protected::new(self.introspector.track()),
+            introspector: self.introspector.track(),
             traced: self.traced.track(),
             sink: self.sink.track_mut(),
             route: self.route.clone(),
