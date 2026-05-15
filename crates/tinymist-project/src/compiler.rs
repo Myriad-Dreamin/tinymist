@@ -1591,7 +1591,7 @@ mod tests {
     }
 
     fn read_error_snapshot(path: PathBuf) -> FileSnapshot {
-        FileResult::Err(FileError::NotFound(path).into()).into()
+        FileResult::Err(FileError::NotFound(path)).into()
     }
 
     fn insert_source_change(workspace: &MockWorkspace, path: &str, source: &str) -> MockChange {
@@ -1692,6 +1692,10 @@ mod tests {
         );
     }
 
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "project compiler matrix rows are clearer when each dimension is asserted explicitly"
+    )]
     fn assert_row_shape(
         row: MatrixRow,
         event_variant: EventVariant,
