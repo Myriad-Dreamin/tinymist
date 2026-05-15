@@ -20,6 +20,7 @@ use tinymist_query::testing::{TestCaseKind, TestSuites};
 use tinymist_std::ImmutPath;
 use tinymist_std::typst::{TypstDocument, TypstHtmlDocument};
 use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
+use typst_shim::syntax::VirtualPathExt;
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
@@ -423,7 +424,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn run_example(&self, test: &Source) {
-        let id = std::path::Path::new(test.id().vpath().get_with_slash()).with_extension("");
+        let id = test.id().vpath().as_rooted_path_compat().with_extension("");
         let name = id.file_name().and_then(|s| s.to_str()).unwrap_or_default();
         self.running("example", name);
 

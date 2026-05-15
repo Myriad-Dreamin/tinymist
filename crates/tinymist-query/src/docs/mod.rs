@@ -5,9 +5,9 @@ mod def;
 mod module;
 mod package;
 
-use std::path::Path;
 use tinymist_std::path::unix_slash;
 use typst::syntax::FileId;
+use typst_shim::syntax::VirtualPathExt;
 
 pub(crate) use convert::convert_docs;
 pub(crate) use def::*;
@@ -19,9 +19,9 @@ fn file_id_repr(fid: FileId) -> String {
     if let typst::syntax::VirtualRoot::Package(spec) = fid.root() {
         format!(
             "{spec}{}",
-            unix_slash(Path::new(fid.vpath().get_with_slash()))
+            unix_slash(fid.vpath().as_rooted_path_compat())
         )
     } else {
-        unix_slash(Path::new(fid.vpath().get_with_slash()))
+        unix_slash(fid.vpath().as_rooted_path_compat())
     }
 }
