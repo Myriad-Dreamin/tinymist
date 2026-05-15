@@ -230,7 +230,7 @@ tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.14.6", default-fe
 tinymist-world = { path = "./crates/tinymist-world/", version = "0.14.6", default-features = false }
 tinymist-project = { path = "./crates/tinymist-project/", version = "0.14.6" }
 tinymist-task = { path = "./crates/tinymist-task/", version = "0.14.6" }
-typst-shim = { path = "./crates/typst-shim", version = "0.14.6" }
+typst-shim = { path = "./crates/typst-shim", version = "0.14.6", features = ["nightly"] }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
