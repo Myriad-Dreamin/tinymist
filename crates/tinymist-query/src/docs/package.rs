@@ -14,7 +14,7 @@ use typst_shim::syntax::RootedPathExt;
 
 use crate::LocalContext;
 use crate::docs::{DefDocs, PackageDefInfo, file_id_repr, module_docs};
-use crate::package::{PackageInfo, get_manifest_id};
+use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
 
 /// Documentation Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,12 +45,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let for_spec = toml_id
         .package_compat()
         .expect("package manifest must be in a package");
-    let entry_point = toml_id
-        .map(|path| {
-            path.join(&manifest.package.entrypoint)
-                .expect("valid package entrypoint")
-        })
-        .intern();
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
     ctx.preload_package(entry_point);
 
