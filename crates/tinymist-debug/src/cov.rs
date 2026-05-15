@@ -117,22 +117,12 @@ impl SummarizedCoverage<'_> {
 impl fmt::Display for SummarizedCoverage<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ids = self.result.regions.keys().collect::<Vec<_>>();
-        ids.sort_by(|a, b| {
-            let a_pkg = match a.root() {
-                typst::syntax::VirtualRoot::Package(spec) => {
-                    Some(crate::PackageSpecCmp::from(spec))
-                }
+        ids.sort_by_key(|id| {
+            let pkg = match id.root() {
+                typst::syntax::VirtualRoot::Package(spec) => Some(crate::PackageSpecCmp::from(spec)),
                 _ => None,
             };
-            let b_pkg = match b.root() {
-                typst::syntax::VirtualRoot::Package(spec) => {
-                    Some(crate::PackageSpecCmp::from(spec))
-                }
-                _ => None,
-            };
-            a_pkg
-                .cmp(&b_pkg)
-                .then_with(|| a.vpath().get_with_slash().cmp(b.vpath().get_with_slash()))
+            (pkg, id.vpath().get_with_slash())
         });
 
         let summary = ids
