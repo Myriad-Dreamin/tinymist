@@ -243,8 +243,8 @@ Euclid2:
             )),
         );
         assert_eq!(bib.entries.len(), 2);
-        assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63, raw_entry: None })"###);
-        assert_snapshot!(bib_snap(&bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126, raw_entry: None })"###);
+        assert_snapshot!(bib_snap(&bib.entries[0]), @r#"("Euclid", BibEntry { file_id: "/test.yml", name_range: 1..7, range: 1..63, raw_entry: None })"#);
+        assert_snapshot!(bib_snap(&bib.entries[1]), @r#"("Euclid2", BibEntry { file_id: "/test.yml", name_range: 63..70, range: 63..126, raw_entry: None })"#);
     }
 
     #[test]
