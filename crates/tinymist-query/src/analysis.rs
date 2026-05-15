@@ -138,12 +138,8 @@ impl LspQuerySnapshot {
                 .ok_or_else(|| eco_format!("cannot get package root (parent of {toml_path:?})"))?;
 
             let manifest = crate::package::get_manifest(world, toml_id)?;
-            let entry_point = toml_id
-                .map(|path| {
-                    path.join(&manifest.package.entrypoint)
-                        .expect("valid package entrypoint")
-                })
-                .intern();
+            let entry_point =
+                crate::package::package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
             Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
         });
@@ -192,6 +188,7 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
+    use typst_shim::syntax::RootedPathExt;
     use typst_shim::syntax::VirtualPathExt;
 
     use crate::syntax::{Expr, RefExpr};
@@ -207,19 +204,14 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        match fid.root() {
-                            typst::syntax::VirtualRoot::Package(package)
-                                if WorkspaceResolver::is_package_file(fid) =>
-                            {
-                                format!(
-                                    " in {package:?}{}",
-                                    unix_slash(fid.vpath().as_rooted_path_compat())
-                                )
-                            }
-                            _ => format!(
-                                " in {}",
+                        if WorkspaceResolver::is_package_file(fid) {
+                            let package = fid.package_compat().expect("package file");
+                            format!(
+                                " in {package:?}{}",
                                 unix_slash(fid.vpath().as_rooted_path_compat())
-                            ),
+                            )
+                        } else {
+                            format!(" in {}", unix_slash(fid.vpath().as_rooted_path_compat()))
                         }
                     } else {
                         "".to_string()

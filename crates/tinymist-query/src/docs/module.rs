@@ -9,11 +9,12 @@ use typst::diag::StrResult;
 use typst::syntax::FileId;
 use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
+use typst_shim::syntax::RootedPathExt;
 
 use crate::LocalContext;
 use crate::adt::interner::Interned;
 use crate::docs::file_id_repr;
-use crate::package::{PackageInfo, get_manifest_id};
+use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 
 use super::DefDocs;
@@ -23,12 +24,7 @@ pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResu
     let toml_id = get_manifest_id(pkg)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id
-        .map(|path| {
-            path.join(&manifest.package.entrypoint)
-                .expect("valid package entrypoint")
-        })
-        .intern();
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
     module_docs(ctx, entry_point)
 }
 
@@ -40,10 +36,7 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
     let mut scan_ctx = ScanDefCtx {
         ctx,
         root: entry_point,
-        for_spec: match entry_point.root() {
-            VirtualRoot::Package(package) => Some(package),
-            _ => None,
-        },
+        for_spec: entry_point.package_compat(),
         aliases: &mut aliases,
         extras: &mut extras,
     };

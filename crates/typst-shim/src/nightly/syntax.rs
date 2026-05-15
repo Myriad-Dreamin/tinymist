@@ -2,8 +2,11 @@
 use std::path::Path;
 
 use typst::syntax::LinkedNode;
+use typst::syntax::RootedPath;
 use typst::syntax::Side;
 use typst::syntax::VirtualPath;
+use typst::syntax::VirtualRoot;
+use typst::syntax::package::PackageSpec;
 
 /// The `LinkedNodeExt` trait is designed for compatibility between new and old
 /// versions of `typst`.
@@ -28,5 +31,21 @@ pub trait VirtualPathExt {
 impl VirtualPathExt for VirtualPath {
     fn as_rooted_path_compat(&self) -> &Path {
         Path::new(self.get_with_slash())
+    }
+}
+
+/// The `RootedPathExt` trait is designed for compatibility between new and old
+/// versions of `typst`.
+pub trait RootedPathExt {
+    /// The package the path resides in, if any.
+    fn package_compat(&self) -> Option<&PackageSpec>;
+}
+
+impl RootedPathExt for RootedPath {
+    fn package_compat(&self) -> Option<&PackageSpec> {
+        match self.root() {
+            VirtualRoot::Project => None,
+            VirtualRoot::Package(package) => Some(package),
+        }
     }
 }

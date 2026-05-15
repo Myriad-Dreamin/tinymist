@@ -10,10 +10,11 @@ use tinymist_world::package::PackageSpec;
 use typst::diag::{StrResult, eco_format};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, Span, VirtualRoot};
+use typst_shim::syntax::RootedPathExt;
 
 use crate::LocalContext;
 use crate::docs::{DefDocs, PackageDefInfo, file_id_repr, module_docs};
-use crate::package::{PackageInfo, get_manifest_id};
+use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
 
 /// Documentation Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,16 +42,10 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let for_spec = match toml_id.root() {
-        VirtualRoot::Package(package) => package,
-        _ => unreachable!("package manifest must be in a package"),
-    };
-    let entry_point = toml_id
-        .map(|path| {
-            path.join(&manifest.package.entrypoint)
-                .expect("valid package entrypoint")
-        })
-        .intern();
+    let for_spec = toml_id
+        .package_compat()
+        .expect("package manifest must be in a package");
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
     ctx.preload_package(entry_point);
 
@@ -200,12 +195,9 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     let files = file_ids
         .into_iter()
         .map(|fid| {
-            let pkg = match fid.root() {
-                typst::syntax::VirtualRoot::Package(spec) => {
-                    Some(packages.insert_full(spec.clone()).0)
-                }
-                _ => None,
-            };
+            let pkg = fid
+                .package_compat()
+                .map(|spec| packages.insert_full(spec.clone()).0);
 
             FileMeta {
                 package: pkg,

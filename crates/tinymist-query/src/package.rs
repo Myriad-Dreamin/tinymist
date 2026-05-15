@@ -66,17 +66,23 @@ pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageMani
         .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
+pub(crate) fn package_entrypoint_id(manifest_id: FileId, entrypoint: &str) -> FileId {
+    manifest_id
+        .map(|path| {
+            path.parent()
+                .expect("manifest path has a parent")
+                .join(entrypoint)
+                .expect("valid package entrypoint")
+        })
+        .intern()
+}
+
 /// Check Package.
 pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()> {
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id
-        .map(|path| {
-            path.join(&manifest.package.entrypoint)
-                .expect("valid package entrypoint")
-        })
-        .intern();
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
     ctx.shared_().preload_package(entry_point);
     Ok(())

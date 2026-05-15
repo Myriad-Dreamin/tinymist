@@ -5,7 +5,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::FileId;
-use typst_shim::syntax::VirtualPathExt;
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 use typst::{
     World,
     foundations::{Func, Label, Module, Selector, Value},
@@ -89,10 +89,7 @@ pub struct TestCase {
 /// Extracts the test suites in the document
 pub fn test_suites(ctx: &mut LocalContext) -> Result<TestSuites> {
     let main_id = ctx.world().main();
-    let main_workspace = match main_id.root() {
-        typst::syntax::VirtualRoot::Package(package) => Some(package),
-        _ => None,
-    };
+    let main_workspace = main_id.package_compat();
 
     crate::log_debug_ct!(
         "test workspace: {:?}, files: {:?}",

@@ -15,8 +15,8 @@ use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
 use typst::layout::PageRanges;
-use typst::syntax::{FileId, VirtualRoot};
-use typst_shim::syntax::VirtualPathExt;
+use typst::syntax::FileId;
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 /// A scalar that is not NaN.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -81,7 +81,7 @@ impl Id {
     /// Creates a new project Id from a world.
     pub fn from_world<F: CompilerFeat>(world: &CompilerWorld<F>, ctx: CtxPath) -> Option<Self> {
         let entry = world.entry_state();
-        let id = unix_slash(Path::new(entry.main()?.vpath().get_without_slash()));
+        let id = unix_slash(entry.main()?.vpath().as_rootless_path_compat());
 
         // todo: entry root may not be set, so we should use the cwd
         let path = &ResourcePath::from_user_sys(Path::new(&id), ctx);
@@ -358,15 +358,19 @@ impl ResourcePath {
 
     /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
-        match id.root() {
-            VirtualRoot::Package(package) => ResourcePath(
+        if let Some(package) = id.package_compat() {
+            ResourcePath(
                 "file_id".into(),
-                format!("{package}{}", unix_slash(id.vpath().as_rooted_path_compat())),
-            ),
-            VirtualRoot::Project => ResourcePath(
+                format!(
+                    "{package}{}",
+                    unix_slash(id.vpath().as_rooted_path_compat())
+                ),
+            )
+        } else {
+            ResourcePath(
                 "file_id".into(),
                 format!("$root{}", unix_slash(id.vpath().as_rooted_path_compat())),
-            ),
+            )
         }
     }
 
