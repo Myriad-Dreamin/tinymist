@@ -181,7 +181,7 @@ typst-render = "0.15.0"
 typst-pdf = "0.15.0"
 typst-syntax = "0.15.0"
 typst-eval = "0.15.0"
-typst-assets = "0.14.2"
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "3284e80" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.5.0"
 typstyle-core = { version = "0.14.4", default-features = false }

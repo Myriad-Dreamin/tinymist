@@ -6743,7 +6743,7 @@ dependencies = [
  "tinymist-std",
  "tokio",
  "typst",
- "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
  "typst-macros",
  "typst-timing 0.15.0",
 ]
@@ -6774,7 +6774,7 @@ dependencies = [
  "tokio",
  "toml",
  "typst",
- "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
  "wasm-bindgen",
 ]
 
@@ -6822,7 +6822,7 @@ dependencies = [
  "ttf-parser",
  "typlite",
  "typst",
- "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
  "typst-layout",
  "typst-library",
  "typst-macros",
@@ -6911,7 +6911,7 @@ dependencies = [
  "tokio",
  "toml",
  "typst",
- "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
  "typst-eval",
  "typst-html",
  "typst-layout",
@@ -7027,7 +7027,7 @@ dependencies = [
  "tinymist-vfs",
  "ttf-parser",
  "typst",
- "typst-assets 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "typst-assets",
  "typst-shim",
  "wasm-bindgen",
  "web-sys",
@@ -7538,12 +7538,6 @@ dependencies = [
 [[package]]
 name = "typst-assets"
 version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5613cb719a6222fe9b74027c3625d107767ec187bff26b8fc931cf58942c834f"
-
-[[package]]
-name = "typst-assets"
-version = "0.14.2"
 source = "git+https://github.com/typst/typst-assets?rev=3284e80#3284e80cc102b402e4e3db1aa071f1eadae5e7ca"
 dependencies = [
  "bitflags 2.11.1",
@@ -7580,7 +7574,7 @@ dependencies = [
  "palette",
  "rustc-hash 2.1.2",
  "time",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-library",
  "typst-macros",
  "typst-svg",
@@ -7614,7 +7608,7 @@ dependencies = [
  "rustybuzz",
  "smallvec",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-library",
  "typst-macros",
  "typst-syntax 0.15.0",
@@ -7678,7 +7672,7 @@ dependencies = [
  "ttf-parser",
  "two-face",
  "typed-arena",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-macros",
  "typst-syntax 0.15.0",
  "typst-timing 0.15.0",
@@ -7722,7 +7716,7 @@ dependencies = [
  "rustc-hash 2.1.2",
  "serde",
  "smallvec",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-layout",
  "typst-library",
  "typst-macros",
@@ -7763,7 +7757,7 @@ dependencies = [
  "resvg",
  "tiny-skia",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-layout",
  "typst-library",
  "typst-macros",
@@ -7798,7 +7792,7 @@ dependencies = [
  "rustc-hash 2.1.2",
  "ryu",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets",
  "typst-layout",
  "typst-library",
  "typst-macros",
