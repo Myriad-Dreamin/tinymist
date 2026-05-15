@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/set_block.typ
     "kind": 3,
     "label": "block",
     "labelDetails": {
-     "description": "(content | none, above: auto | fraction | relative, below: auto | fraction | relative, breakable: bool, clip: bool, fill: color, height: auto | fraction | relative, inset: inset, outset: outset, radius: radius, spacing: fraction | relative, sticky: bool, stroke: stroke, width: auto | relative) => block"
+     "description": "(content | none, above: auto | fraction | relative, below: auto | fraction | relative, breakable: bool, clip: bool, fill: color, height: auto | fraction | relative, inset: inset, outset: outset, radius: radius, spacing: auto | fraction | relative, sticky: bool, stroke: stroke, width: auto | relative) => block"
     },
     "sortText": "003",
     "textEdit": {

@@ -22,7 +22,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("neovim"));
-        insta::assert_snapshot!(hash, @"siphash128_13:cdbe61b5560c7e58851c9466b696531a");
+        insta::assert_snapshot!(hash, @"siphash128_13:a83028492bad0849d751802885ecf28");
     }
 
     {
@@ -33,7 +33,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode"));
-        insta::assert_snapshot!(hash, @"siphash128_13:bff2030a6c8d2038662fcbb443af583d");
+        insta::assert_snapshot!(hash, @"siphash128_13:2bbd16068fb8d0f83d285d10fd5f5eb6");
     }
 
     {
@@ -44,7 +44,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode-syntax-only"));
-        insta::assert_snapshot!(hash, @"siphash128_13:27cca1aa737281b12fcbd2ebe027828a");
+        insta::assert_snapshot!(hash, @"siphash128_13:53ca366f8e0dd052ed48868e77e8e00a");
     }
 }
 
