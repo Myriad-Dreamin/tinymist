@@ -164,16 +164,11 @@ pub(crate) fn do_rename_file(
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
     // Compare package and vpath so we avoid allocating a joined file id while
     // still distinguishing package files that share the same internal path.
-    let file_pkg = file_id.package_compat();
-    let def_pkg = def_fid.package_compat();
-    file_pkg == def_pkg
+    file_id.package_compat() == def_fid.package_compat()
         && file_id
             .vpath()
             .parent()
-            .unwrap_or_else(|| file_id.vpath().clone())
-            .join(path)
-            .ok()
-            .is_some_and(|path| path == *def_fid.vpath())
+            .is_some_and(|p| p.join(path).is_ok_and(|p| p == *def_fid.vpath()))
 }
 
 struct RenameFileWorker<'a> {
