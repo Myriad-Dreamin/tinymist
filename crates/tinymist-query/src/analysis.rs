@@ -192,6 +192,7 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
+    use typst_shim::syntax::RootedPathExt;
     use typst_shim::syntax::VirtualPathExt;
 
     use crate::syntax::{Expr, RefExpr};
@@ -207,19 +208,14 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        match fid.root() {
-                            typst::syntax::VirtualRoot::Package(package)
-                                if WorkspaceResolver::is_package_file(fid) =>
-                            {
-                                format!(
-                                    " in {package:?}{}",
-                                    unix_slash(fid.vpath().as_rooted_path_compat())
-                                )
-                            }
-                            _ => format!(
-                                " in {}",
+                        if WorkspaceResolver::is_package_file(fid) {
+                            let package = fid.package_compat().expect("package file");
+                            format!(
+                                " in {package:?}{}",
                                 unix_slash(fid.vpath().as_rooted_path_compat())
-                            ),
+                            )
+                        } else {
+                            format!(" in {}", unix_slash(fid.vpath().as_rooted_path_compat()))
                         }
                     } else {
                         "".to_string()

@@ -9,6 +9,7 @@ use typst::diag::StrResult;
 use typst::syntax::FileId;
 use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
+use typst_shim::syntax::RootedPathExt;
 
 use crate::LocalContext;
 use crate::adt::interner::Interned;
@@ -40,10 +41,7 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
     let mut scan_ctx = ScanDefCtx {
         ctx,
         root: entry_point,
-        for_spec: match entry_point.root() {
-            VirtualRoot::Package(package) => Some(package),
-            _ => None,
-        },
+        for_spec: entry_point.package_compat(),
         aliases: &mut aliases,
         extras: &mut extras,
     };

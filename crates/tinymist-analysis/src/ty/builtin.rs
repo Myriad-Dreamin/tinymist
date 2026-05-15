@@ -8,6 +8,7 @@ use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::{CastInfo, Regex};
 use typst::layout::Ratio;
 use typst::syntax::FileId;
+use typst_shim::syntax::RootedPathExt;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
@@ -228,10 +229,7 @@ impl TryFrom<FileId> for PackageId {
     type Error = ();
 
     fn try_from(value: FileId) -> Result<Self, Self::Error> {
-        let spec = match value.root() {
-            typst::syntax::VirtualRoot::Package(spec) => spec,
-            _ => return Err(()),
-        };
+        let spec = value.package_compat().ok_or(())?;
         Ok(PackageId {
             namespace: spec.namespace.as_str().into(),
             name: spec.name.as_str().into(),

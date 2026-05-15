@@ -164,14 +164,8 @@ pub(crate) fn do_rename_file(
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
     // Compare package and vpath so we avoid allocating a joined file id while
     // still distinguishing package files that share the same internal path.
-    let file_pkg = match file_id.root() {
-        typst::syntax::VirtualRoot::Package(pkg) => Some(pkg),
-        _ => None,
-    };
-    let def_pkg = match def_fid.root() {
-        typst::syntax::VirtualRoot::Package(pkg) => Some(pkg),
-        _ => None,
-    };
+    let file_pkg = file_id.package_compat();
+    let def_pkg = def_fid.package_compat();
     file_pkg == def_pkg
         && file_id
             .vpath()
