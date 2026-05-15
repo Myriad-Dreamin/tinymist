@@ -43,7 +43,7 @@ impl CompletionPair<'_, '_, '_> {
         let src_path = id.vpath();
         let base = id;
         let dst_path = src_path.join(path.to_str()?).ok()?;
-        let mut compl_path = Path::new(dst_path.get_without_slash());
+        let mut compl_path = dst_path.as_rootless_path_compat();
         if !compl_path.is_dir() {
             compl_path = compl_path.parent().unwrap_or(Path::new(""));
         }
@@ -72,7 +72,9 @@ impl CompletionPair<'_, '_, '_> {
                 // diff with root
                 unix_slash(path.vpath().as_rooted_path_compat()).into()
             } else {
-                let base = base.vpath().as_rooted_path_compat()
+                let base = base
+                    .vpath()
+                    .as_rooted_path_compat()
                     .parent()
                     .unwrap_or(Path::new("/"));
                 let path = path.vpath().as_rooted_path_compat();
