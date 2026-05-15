@@ -18,9 +18,7 @@ let lam(
 
 Lambda constructor.
 
-Typing Rule:
-
-Γ,x:A⊢M:BΓ⊢a:BΓ⊢λ(x:A)→M:π(x:A)→B
+Typing Rule:Γ,x:A⊢M:BΓ⊢a:BΓ⊢λ(x:A)→M:π(x:A)→B
 
 # Positional Parameters
 

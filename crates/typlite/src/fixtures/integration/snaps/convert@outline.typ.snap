@@ -99,7 +99,22 @@ namespace MyApplication
             return new List<int>(new int[] { 1, 2, 3 })
         }
     }
-}"><pre><code data-lang="cs"><span style="color: #d73948">using</span> System.IO.Compression;<m1linebreak></m1linebreak><m1linebreak></m1linebreak><span style="color: #d73948">#</span><span style="color: #d73948">pragma</span> <span style="color: #d73948">warning</span> <span style="color: #d73948">disable</span> 414, 3021<m1linebreak></m1linebreak><m1linebreak></m1linebreak><span style="color: #d73948">namespace</span> <span style="color: #4b69c6">MyApplication</span><m1linebreak></m1linebreak>{<m1linebreak></m1linebreak>    <span style="color: #301414">[</span><span style="color: #301414">Obsolete</span><span style="color: #301414">(</span><span style="color: #198810">"</span><span style="color: #198810">...</span><span style="color: #198810">"</span><span style="color: #301414">)</span><span style="color: #301414">]</span><m1linebreak></m1linebreak>    <span style="color: #d73948">class</span> <span style="color: #4b69c6">Program</span> : <span style="color: #8b41b1">IInterface</span><m1linebreak></m1linebreak>    {<m1linebreak></m1linebreak>        <span style="color: #d73948">public</span> <span style="color: #d73948">static</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>> <span style="color: #4b69c6">JustDoIt</span>(<span style="color: #d73948">int</span> count)<m1linebreak></m1linebreak>        {<m1linebreak></m1linebreak>            Console.<span style="color: #4b69c6">WriteLine</span>(<span style="color: #198810">$"</span><span style="color: #198810">Hello </span>{Name}<span style="color: #198810">!</span><span style="color: #198810">"</span>);<m1linebreak></m1linebreak>            <span style="color: #d73948">return</span> <span style="color: #d73948">new</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>>(<span style="color: #d73948">new</span> <span style="color: #d73948">int</span>[] { <span style="color: #b60157">1</span>, <span style="color: #b60157">2</span>, <span style="color: #b60157">3</span> })<m1linebreak></m1linebreak>        }<m1linebreak></m1linebreak>    }<m1linebreak></m1linebreak>}</code></pre></m1raw><m1parbreak></m1parbreak><p>Math inline:</p><m1eqinline>redacted-frame</m1eqinline><p>and block:</p><m1eqblock>redacted-frame</m1eqblock><m1parbreak></m1parbreak><ul><li>First item</li><li><p>Second item</p><ol><li>First sub-item</li><li><p>Second sub-item</p><ul><li>First sub-sub-item</li></ul></li></ol></li></ul><m1parbreak></m1parbreak><dl><dt>First term</dt><dd>First definition</dd></dl><m1parbreak></m1parbreak><m1table><table><tr><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td></tr></table></m1table></m1document></body>
+}"><pre><code data-lang="cs"><span style="color: #d73948">using</span> System.IO.Compression;
+
+<span style="color: #d73948">#</span><span style="color: #d73948">pragma</span> <span style="color: #d73948">warning</span> <span style="color: #d73948">disable</span> 414, 3021
+
+<span style="color: #d73948">namespace</span> <span style="color: #4b69c6">MyApplication</span>
+{
+    <span style="color: #301414">[</span><span style="color: #301414">Obsolete</span><span style="color: #301414">(</span><span style="color: #198810">"</span><span style="color: #198810">...</span><span style="color: #198810">"</span><span style="color: #301414">)</span><span style="color: #301414">]</span>
+    <span style="color: #d73948">class</span> <span style="color: #4b69c6">Program</span> : <span style="color: #8b41b1">IInterface</span>
+    {
+        <span style="color: #d73948">public</span> <span style="color: #d73948">static</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>> <span style="color: #4b69c6">JustDoIt</span>(<span style="color: #d73948">int</span> count)
+        {
+            Console.<span style="color: #4b69c6">WriteLine</span>(<span style="color: #198810">$"</span><span style="color: #198810">Hello </span>{Name}<span style="color: #198810">!</span><span style="color: #198810">"</span>);
+            <span style="color: #d73948">return</span> <span style="color: #d73948">new</span> <span style="color: #4b69c6">List</span>&lt;<span style="color: #d73948">int</span>>(<span style="color: #d73948">new</span> <span style="color: #d73948">int</span>[] { <span style="color: #b60157">1</span>, <span style="color: #b60157">2</span>, <span style="color: #b60157">3</span> })
+        }
+    }
+}</code></pre></m1raw><m1parbreak></m1parbreak><p>Math inline:</p><m1eqinline>redacted-frame</m1eqinline><p>and block:</p><m1eqblock>redacted-frame</m1eqblock><m1parbreak></m1parbreak><ul><li>First item</li><li><p>Second item</p><ol><li>First sub-item</li><li><p>Second sub-item</p><ul><li>First sub-sub-item</li></ul></li></ol></li></ul><m1parbreak></m1parbreak><dl><dt>First term</dt><dd>First definition</dd></dl><m1parbreak></m1parbreak><m1table><table><tr><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td><td>16</td><td>17</td><td>18</td><td>19</td></tr></table></m1table></m1document></body>
 </html>
 
 =====
@@ -143,7 +158,9 @@ namespace MyApplication
 }
 ```
 
-Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />and block:
+Math inline:<img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" />
+
+and block:
 
 <p align="center"><img alt="typst-block" src="data:image-hash/svg+xml;base64,redacted" /></p>
 
