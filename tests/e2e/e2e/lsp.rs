@@ -44,7 +44,7 @@ fn test_lsp() {
         });
 
         let hash = replay_log(&root.join("vscode-syntax-only"));
-        insta::assert_snapshot!(hash, @"siphash128_13:2ab2d8fe4787aee74e30efdb50ba5f7e");
+        insta::assert_snapshot!(hash, @"siphash128_13:ef3b1c98b7e86b14832253f37aef8d36");
     }
 }
 
