@@ -10,10 +10,29 @@ export interface TypstSvgDocument {
   setCursorPaths(paths: ElementPoint[][]): void;
 }
 
+const SVG_RESIZE_ANCHOR_TTL_MS = 600;
+const SVG_SCALE_EPSILON = 1e-6;
+
 interface SvgResizePageAnchor {
+  kind: "page";
   pageNumber: number;
   pageLocalY: number;
   pageHeight: number;
+}
+
+interface SvgResizeGapAnchor {
+  kind: "gap";
+  beforePageNumber?: number;
+  afterPageNumber?: number;
+  gapRatio: number;
+}
+
+type SvgResizeAnchor = SvgResizePageAnchor | SvgResizeGapAnchor;
+
+interface SvgAnchorPage {
+  pageNumber: number;
+  y: number;
+  height: number;
 }
 
 export function provideSvgDoc<
@@ -47,7 +66,7 @@ export function provideSvgDoc<
     private svgResizeAnchor?: {
       contentY: number;
       scaleRatio: number;
-      pageAnchor?: SvgResizePageAnchor;
+      viewportAnchor?: SvgResizeAnchor;
     };
     private svgResizeAnchorTimeout?: ReturnType<typeof setTimeout>;
     setCursorPaths(paths: ElementPoint[][]) {
@@ -305,65 +324,164 @@ export function provideSvgDoc<
       this.svgResizeAnchorTimeout = setTimeout(() => {
         this.svgResizeAnchor = undefined;
         this.svgResizeAnchorTimeout = undefined;
-      }, 600);
+      }, SVG_RESIZE_ANCHOR_TTL_MS);
+    }
+
+    private collectSvgAnchorPages(svg: SVGElement): SvgAnchorPage[] {
+      return Array.from(svg.children)
+        .filter((elem) => elem.classList.contains("typst-page"))
+        .map((elem) => ({
+          pageNumber: Number.parseInt(elem.getAttribute("data-page-number") || "-1"),
+          y: Number.parseFloat(elem.getAttribute("data-y") || "NaN"),
+          height: Number.parseFloat(elem.getAttribute("data-page-height") || "NaN"),
+        }))
+        .filter(
+          (page) =>
+            Number.isFinite(page.pageNumber) &&
+            Number.isFinite(page.y) &&
+            Number.isFinite(page.height) &&
+            page.height > 0,
+        )
+        .sort((a, b) => a.y - b.y);
+    }
+
+    private resolveSvgDocumentHeight(svg: SVGElement) {
+      const height = Number.parseFloat(
+        svg.getAttribute("data-height") || svg.getAttribute("height") || "NaN",
+      );
+      return Number.isFinite(height) && height > 0 ? height : undefined;
     }
 
     private resolveViewportTopY(svg: SVGElement, scrollEl: HTMLElement) {
-      const svgRect = svg.getBoundingClientRect();
-      const containerRect = scrollEl.getBoundingClientRect();
-      const dataHeight = Number.parseFloat(
-        svg.getAttribute("data-height") || svg.getAttribute("height") || "0",
-      );
-      const actualScaleY = dataHeight > 0 ? svgRect.height / dataHeight : undefined;
-      return actualScaleY && actualScaleY > 0
-        ? (containerRect.top - svgRect.top) / actualScaleY
-        : undefined;
-    }
-
-    private captureViewportTopPageAnchor(svg: SVGElement, scrollEl: HTMLElement) {
-      const syntheticTopY = this.resolveViewportTopY(svg, scrollEl);
-      if (syntheticTopY === undefined) {
+      const svgHeight = this.resolveSvgDocumentHeight(svg);
+      if (svgHeight === undefined) {
         return undefined;
       }
 
-      for (const elem of svg.children) {
-        if (!elem.classList.contains("typst-page")) {
-          continue;
-        }
-
-        const pageNumber = Number.parseInt(elem.getAttribute("data-page-number") || "-1");
-        const y = Number.parseFloat(elem.getAttribute("data-y") || "NaN");
-        const height = Number.parseFloat(elem.getAttribute("data-page-height") || "NaN");
-        if (!Number.isFinite(pageNumber) || !Number.isFinite(y) || !Number.isFinite(height)) {
-          continue;
-        }
-        if (height <= 0 || syntheticTopY < y || syntheticTopY > y + height) {
-          continue;
-        }
-
-        return {
-          pageNumber,
-          pageLocalY: syntheticTopY - y,
-          pageHeight: height,
-        };
+      const svgRect = svg.getBoundingClientRect();
+      const actualScaleY = svgRect.height / svgHeight;
+      if (!Number.isFinite(actualScaleY) || actualScaleY <= 0) {
+        return undefined;
       }
 
-      return undefined;
+      return (scrollEl.getBoundingClientRect().top - svgRect.top) / actualScaleY;
     }
 
-    private resolveSyntheticYForPageAnchor(svg: SVGElement, anchor: SvgResizePageAnchor) {
-      const page = Array.from(svg.children).find(
-        (elem) =>
-          elem.classList.contains("typst-page") &&
-          Number.parseInt(elem.getAttribute("data-page-number") || "-1") === anchor.pageNumber,
+    private captureViewportTopResizeAnchor(svg: SVGElement, scrollEl: HTMLElement) {
+      const viewportTopY = this.resolveViewportTopY(svg, scrollEl);
+      if (viewportTopY === undefined) {
+        return undefined;
+      }
+
+      const pages = this.collectSvgAnchorPages(svg);
+      const containingPage = pages.find(
+        (page) => viewportTopY >= page.y && viewportTopY <= page.y + page.height,
       );
+      if (containingPage) {
+        return {
+          kind: "page",
+          pageNumber: containingPage.pageNumber,
+          pageLocalY: viewportTopY - containingPage.y,
+          pageHeight: containingPage.height,
+        } satisfies SvgResizePageAnchor;
+      }
+
+      return this.captureSvgGapAnchor(svg, pages, viewportTopY);
+    }
+
+    private captureSvgGapAnchor(
+      svg: SVGElement,
+      pages: SvgAnchorPage[],
+      viewportTopY: number,
+    ): SvgResizeGapAnchor | undefined {
+      const svgHeight = this.resolveSvgDocumentHeight(svg);
+      if (svgHeight === undefined) {
+        return undefined;
+      }
+
+      let beforePage: SvgAnchorPage | undefined;
+      let afterPage: SvgAnchorPage | undefined;
+      for (const page of pages) {
+        if (viewportTopY < page.y) {
+          afterPage = page;
+          break;
+        }
+        if (viewportTopY > page.y + page.height) {
+          beforePage = page;
+        }
+      }
+
+      const gapStartY = beforePage ? beforePage.y + beforePage.height : 0;
+      const gapEndY = afterPage ? afterPage.y : svgHeight;
+      if (
+        !Number.isFinite(gapStartY) ||
+        !Number.isFinite(gapEndY) ||
+        gapEndY < gapStartY ||
+        viewportTopY < gapStartY ||
+        viewportTopY > gapEndY
+      ) {
+        return undefined;
+      }
+
+      // Store a relative position inside the gap instead of the raw y-coordinate.
+      const gapLength = gapEndY - gapStartY;
+      const gapAnchor: SvgResizeGapAnchor = {
+        kind: "gap",
+        gapRatio:
+          gapLength > 0 ? Math.max(0, Math.min(1, (viewportTopY - gapStartY) / gapLength)) : 0,
+      };
+      if (beforePage) {
+        gapAnchor.beforePageNumber = beforePage.pageNumber;
+      }
+      if (afterPage) {
+        gapAnchor.afterPageNumber = afterPage.pageNumber;
+      }
+      return gapAnchor;
+    }
+
+    private resolveSyntheticYForResizeAnchor(svg: SVGElement, anchor: SvgResizeAnchor) {
+      const pages = this.collectSvgAnchorPages(svg);
+
+      if (anchor.kind === "gap") {
+        const svgHeight = this.resolveSvgDocumentHeight(svg);
+        if (svgHeight === undefined) {
+          return undefined;
+        }
+
+        const beforePage =
+          anchor.beforePageNumber !== undefined
+            ? pages.find((page) => page.pageNumber === anchor.beforePageNumber)
+            : undefined;
+        const afterPage =
+          anchor.afterPageNumber !== undefined
+            ? pages.find((page) => page.pageNumber === anchor.afterPageNumber)
+            : undefined;
+
+        if (
+          (anchor.beforePageNumber !== undefined && beforePage === undefined) ||
+          (anchor.afterPageNumber !== undefined && afterPage === undefined)
+        ) {
+          return undefined;
+        }
+
+        const gapStartY = beforePage ? beforePage.y + beforePage.height : 0;
+        const gapEndY = afterPage ? afterPage.y : svgHeight;
+        if (!Number.isFinite(gapStartY) || !Number.isFinite(gapEndY) || gapEndY < gapStartY) {
+          return undefined;
+        }
+
+        const gapRatio = Math.max(0, Math.min(1, anchor.gapRatio));
+        return gapStartY + gapRatio * (gapEndY - gapStartY);
+      }
+
+      const page = pages.find((page) => page.pageNumber === anchor.pageNumber);
       if (!page) {
         return undefined;
       }
 
-      const pageY = Number.parseFloat(page.getAttribute("data-y") || "NaN");
-      const pageHeight = Number.parseFloat(page.getAttribute("data-page-height") || "NaN");
-      if (!Number.isFinite(pageY) || !Number.isFinite(pageHeight) || pageHeight <= 0) {
+      const pageY = page.y;
+      const pageHeight = page.height;
+      if (anchor.pageHeight <= 0) {
         return undefined;
       }
 
@@ -384,16 +502,18 @@ export function provideSvgDoc<
         return;
       }
 
-      // Lock the document y-coordinate at the top of the viewport while the panel is resized
-      // (i.e. the auto-fit scale changes while the user-driven scale ratio does not).
-      //
-      // We skip when the user manually zooms (currentScaleRatio changed),
-      // since installRescaleHandler already anchors at the cursor.
+      // During panel resize, only the auto-fit scale should change 
+      // while the user-driven scale ratio does not. Keep the
+      // same viewport-top anchor for the whole resize burst instead of
+      // resampling after each intermediate frame to avoid accumulating jitter.
       const scrollElement = this.hookedElem.parentElement;
       const prevScale = this.lastSvgScale;
       const prevScaleRatio = this.lastSvgScaleRatio;
+      // Manual zoom changes currentScaleRatio and is handled by
+      // installRescaleHandler's cursor-centered scroll adjustment.
       const scaleRatioChanged =
-        prevScaleRatio !== undefined && Math.abs(this.currentScaleRatio - prevScaleRatio) >= 1e-6;
+        prevScaleRatio !== undefined &&
+        Math.abs(this.currentScaleRatio - prevScaleRatio) >= SVG_SCALE_EPSILON;
       if (scaleRatioChanged) {
         this.clearSvgResizeAnchor();
       }
@@ -404,7 +524,7 @@ export function provideSvgDoc<
         prevScale > 0 &&
         prevScaleRatio !== undefined &&
         !scaleRatioChanged &&
-        (Math.abs(scale - prevScale) > 1e-6 || this.svgResizeAnchor !== undefined);
+        (Math.abs(scale - prevScale) > SVG_SCALE_EPSILON || this.svgResizeAnchor !== undefined);
 
       let restoreScroll: (() => void) | undefined;
       if (shouldAnchor) {
@@ -415,25 +535,27 @@ export function provideSvgDoc<
         const sampledContentY = (scrollEl.scrollTop - fixedTopOffset) / prevScale!;
         const reusableAnchor =
           this.svgResizeAnchor &&
-          Math.abs(this.svgResizeAnchor.scaleRatio - this.currentScaleRatio) < 1e-6
+          Math.abs(this.svgResizeAnchor.scaleRatio - this.currentScaleRatio) < SVG_SCALE_EPSILON
             ? this.svgResizeAnchor
             : undefined;
         const contentY = reusableAnchor?.contentY ?? sampledContentY;
         if (Number.isFinite(contentY)) {
-          const pageAnchor =
-            reusableAnchor?.pageAnchor ?? this.captureViewportTopPageAnchor(svg, scrollEl);
+          // A raw document y-coordinate is enough within page content. In page
+          // margins, use a gap anchor so scale-dependent margin height does not
+          // leak into the restored scroll position.
+          const viewportAnchor =
+            reusableAnchor?.viewportAnchor ?? this.captureViewportTopResizeAnchor(svg, scrollEl);
           this.svgResizeAnchor = {
             contentY,
             scaleRatio: this.currentScaleRatio,
-            pageAnchor,
+            viewportAnchor,
           };
           this.keepSvgResizeAnchorAlive();
           restoreScroll = () => {
-            const pageY = pageAnchor
-              ? this.resolveSyntheticYForPageAnchor(svg, pageAnchor)
+            const viewportAnchorY = viewportAnchor
+              ? this.resolveSyntheticYForResizeAnchor(svg, viewportAnchor)
               : undefined;
-            // Use contentY as fallback when page anchor cannot be resolved
-            const targetY = pageY ?? contentY;
+            const targetY = viewportAnchorY ?? contentY;
             const target = targetY * scale + fixedTopOffset;
             const max = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
             scrollEl.scrollTop = Math.max(0, Math.min(max, target));
