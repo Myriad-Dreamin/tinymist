@@ -36,27 +36,12 @@ else
   exit 1
 fi
 
-if [ ! -x "$tinymist_bin" ]; then
-  echo "Tinymist binary is not executable: $tinymist_bin"
-  exit 1
-fi
-
-mkdir -p "$script_dir/target/.local" "$script_dir/target/.cache"
-
-(cd "$script_dir/samples" && docker build -t "$image_name" -f lazyvim-dev/Dockerfile .)
-
-docker_run_args=(
-  --rm
-  -v "$repo_root/tests/workspaces:/home/runner/dev/workspaces"
-  -v "$script_dir:/home/runner/dev"
-  -v "$tinymist_bin:/usr/local/bin/tinymist:ro"
-  -v "$script_dir/target/.local:/home/runner/.local"
-  -v "$script_dir/target/.cache:/home/runner/.cache"
-  -w /home/runner/dev
-)
-
-if [ -t 0 ] && [ -t 1 ]; then
-  docker_run_args+=(-it)
-fi
-
-docker run "${docker_run_args[@]}" "$image_name" "${docker_args[@]}"
+(cd ../.. && docker build -t myriaddreamin/tinymist:0.14.19-rc1 .)
+(cd samples && docker build -t myriaddreamin/tinymist-nvim:0.14.19-rc1 -f lazyvim-dev/Dockerfile .)
+docker run --rm -it \
+  -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces \
+  -v $PWD:/home/runner/dev \
+  -v $PWD/target/.local:/home/runner/.local \
+  -v $PWD/target/.cache:/home/runner/.cache \
+  -w /home/runner/dev myriaddreamin/tinymist-nvim:0.14.19-rc1 \
+  $DOCKER_ARGS
