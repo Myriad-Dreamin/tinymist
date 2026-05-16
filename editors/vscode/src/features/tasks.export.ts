@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/complexity/useLiteralKeys: special keys */
 import * as vscode from "vscode";
 import type {
+  ExportBundleOpts,
   ExportHtmlOpts,
   ExportPdfOpts,
   ExportPngOpts,
@@ -13,7 +14,17 @@ import { tinymist } from "../lsp";
 import { extensionState } from "../state";
 import { VirtualConsole } from "../util";
 
-export type ExportFormat = "pdf" | "png" | "svg" | "html" | "markdown" | "text" | "query" | "pdfpc";
+export type ExportFormat =
+  | "pdf"
+  | "png"
+  | "svg"
+  | "html"
+  | "bundle"
+  | "markdown"
+  | "tex"
+  | "text"
+  | "query"
+  | "pdfpc";
 
 export interface ExportArgs {
   format: ExportFormat | ExportFormat[];
@@ -42,6 +53,14 @@ export interface ExportArgs {
   "pdf.pdfValidator"?: string;
   "pdf.pdfStandard"?: string[];
   "pdf.pdfTags"?: boolean;
+
+  "bundle.pages"?: string | string[];
+  "bundle.creationTimestamp"?: string | null;
+  "bundle.pdfVersion"?: string;
+  "bundle.pdfValidator"?: string;
+  "bundle.pdfStandard"?: string[];
+  "bundle.pdfTags"?: boolean;
+  "bundle.ppi"?: number;
 
   "png.ppi"?: number;
 
@@ -75,7 +94,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
     onDidWrite: vc.writeEmitter.event,
     onDidClose: closeEmitter.event,
     open,
-    close() {},
+    close() { },
   });
 
   async function open() {
@@ -120,7 +139,7 @@ export const exportOps = (exportArgs: ExportArgs) => ({
     const key = `${from}.${prop}` as keyof ExportArgs;
     return exportArgs[key] === undefined ? exportArgs[prop] : (exportArgs[key] as ExportArgs[P]);
   },
-  resolvePagesOpts(fmt: "pdf" | "png" | "svg") {
+  resolvePagesOpts(fmt: "pdf" | "png" | "svg" | "bundle") {
     const pages = this.inheritedProp("pages", fmt);
     return typeof pages === "string" ? pages.split(",") : pages;
   },
@@ -192,6 +211,34 @@ export const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArg
       return {};
     },
     export: tinymist.exportHtml,
+  },
+  bundle: {
+    opts(): ExportBundleOpts {
+      const rawCreationTimestamp =
+        exportArgs["bundle.creationTimestamp"] ?? exportArgs["pdf.creationTimestamp"];
+      const creationTimestamp = rawCreationTimestamp?.includes("T")
+        ? Math.floor(new Date(rawCreationTimestamp).getTime() / 1000).toString()
+        : rawCreationTimestamp;
+
+      const pdfVersion = exportArgs["bundle.pdfVersion"] ?? exportArgs["pdf.pdfVersion"];
+      const pdfValidator = exportArgs["bundle.pdfValidator"] ?? exportArgs["pdf.pdfValidator"];
+      const pdfStandard = exportArgs["bundle.pdfStandard"] ??
+        exportArgs["pdf.pdfStandard"] ?? [
+          ...(pdfVersion ? [pdfVersion] : []),
+          ...(pdfValidator ? [pdfValidator] : []),
+        ];
+
+      const pdfTags = exportArgs["bundle.pdfTags"] ?? exportArgs["pdf.pdfTags"];
+
+      return {
+        pages: ops.resolvePagesOpts("bundle"),
+        creationTimestamp,
+        pdfStandard,
+        noPdfTags: pdfTags === undefined ? undefined : !pdfTags,
+        ppi: exportArgs["bundle.ppi"] ?? exportArgs["png.ppi"],
+      };
+    },
+    export: tinymist.exportBundle,
   },
   markdown: {
     opts(): ExportTypliteOpts {
