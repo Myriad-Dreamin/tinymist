@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-use tinymist::project::*;
-use tinymist::world::system::print_diagnostics;
-use tinymist::world::WorldComputeGraph;
 use tinymist::ExportTask;
-use tinymist_std::{error::prelude::*, ImmutPath};
+use tinymist::project::*;
+use tinymist::world::WorldComputeGraph;
+use tinymist::world::system::print_diagnostics;
+use tinymist_std::{ImmutPath, error::prelude::*};
 
 /// Specify the project compilation.
 #[derive(Debug, Clone, clap::Parser)]
