@@ -48,7 +48,7 @@ const manifestPatches = trackedManifests.flatMap((manifestPath) =>
   }),
 );
 
-const releaseSensitiveFiles = buildReleaseSensitiveFiles(currentVersion, targetVersion);
+const releaseSensitiveFiles = buildReleaseSensitiveFiles(targetVersion);
 const directReleaseSensitivePatches = releaseSensitiveFiles
   .filter((item) => item.kind === "direct-update" && item.command)
   .map((item) => ({
@@ -372,38 +372,10 @@ function formatHunkRange(start, count) {
   return count === 1 ? `${start}` : `${start},${count}`;
 }
 
-function buildReleaseSensitiveFiles(currentVersionValue, targetVersionValue) {
-  const directUpdateFiles = [
-    {
-      path: "editors/neovim/bootstrap.sh",
-      reason: "Neovim bootstrap image tags should match the release version under test.",
-    },
-    {
-      path: "editors/neovim/samples/lazyvim-dev/Dockerfile",
-      reason: "Neovim sample Docker images should reference the matching tinymist release image.",
-    },
-  ];
-
-  const directUpdates = directUpdateFiles.map((item) => {
-    const patch = buildVersionPatch(item.path, currentVersionValue, targetVersionValue, {
-      kind: "simple",
-    })[0];
-
-    return {
-      path: item.path,
-      kind: "direct-update",
-      reason: item.reason,
-      needsUpdate: Boolean(patch),
-      lineUpdates: patch?.lineUpdates ?? [],
-      patch: patch?.patch ?? null,
-      command: patch?.command ?? null,
-    };
-  });
-
+function buildReleaseSensitiveFiles(targetVersionValue) {
   const typliteGeneratedVersion = readGeneratedReleaseVersion("crates/typlite/README.md");
 
   return [
-    ...directUpdates,
     {
       path: "crates/typlite/README.md",
       kind: "generated-document",

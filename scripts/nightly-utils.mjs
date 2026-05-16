@@ -298,35 +298,8 @@ class NightlyUtils {
             console.warn(`Warning: Could not update flake.nix: ${e.message}`);
         }
 
-        // Dockerfile
-        try {
-            const dockerfilePath = path.join(this.rootDir, 'editors/neovim/samples/lazyvim-dev/Dockerfile');
-            let dockerContent = await fs.readFile(dockerfilePath, 'utf-8');
-            dockerContent = dockerContent.replace(
-                /FROM myriaddreamin\/tinymist:[^ ]* as tinymist/g,
-                `FROM myriaddreamin/tinymist:${newVersion} as tinymist`
-            );
-            await fs.writeFile(dockerfilePath, dockerContent);
-        } catch (e) {
-            console.warn(`Warning: Could not update Dockerfile: ${e.message}`);
-        }
-
-        // bootstrap.sh
-        try {
-            const bootstrapPath = path.join(this.rootDir, 'editors/neovim/bootstrap.sh');
-            let bootstrapContent = await fs.readFile(bootstrapPath, 'utf-8');
-            bootstrapContent = bootstrapContent.replace(
-                /myriaddreamin\/tinymist:[^ ]*/g,
-                `myriaddreamin/tinymist:${newVersion}`
-            );
-            bootstrapContent = bootstrapContent.replace(
-                /myriaddreamin\/tinymist-nvim:[^ ]*/g,
-                `myriaddreamin/tinymist-nvim:${newVersion}`
-            );
-            await fs.writeFile(bootstrapPath, bootstrapContent);
-        } catch (e) {
-            console.warn(`Warning: Could not update bootstrap.sh: ${e.message}`);
-        }
+        // The Neovim spec image is intentionally local-only; bootstrap.sh mounts
+        // the host-built tinymist binary instead of embedding a release image tag.
     }
 
     async generateChangelog(newVersion, tinymistBaseCommit, tinymistBaseMessage, typstRev, typstBaseCommit, typstBaseMessage) {
