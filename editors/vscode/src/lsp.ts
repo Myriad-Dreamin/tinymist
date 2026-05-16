@@ -359,6 +359,7 @@ export class LanguageState {
   exportSvg = exportCommand("tinymist.exportSvg");
   exportPng = exportCommand("tinymist.exportPng");
   exportHtml = exportCommand("tinymist.exportHtml");
+  exportBundle = exportCommand("tinymist.exportBundle");
   exportMarkdown = exportCommand("tinymist.exportMarkdown");
   exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");

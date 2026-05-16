@@ -13,7 +13,16 @@ import { l10nMsg } from "../l10n";
 import { type ExportResponse, tinymist } from "../lsp";
 
 /// These are names of the export functions in the LSP client, e.g. `exportPdf`, `exportHtml`.
-export type ExportKind = "Pdf" | "Html" | "Svg" | "Png" | "Markdown" | "TeX" | "Text" | "Query";
+export type ExportKind =
+  | "Pdf"
+  | "Html"
+  | "Bundle"
+  | "Svg"
+  | "Png"
+  | "Markdown"
+  | "TeX"
+  | "Text"
+  | "Query";
 
 export function exportActivate(context: IContext) {
   context.subscriptions.push(
@@ -73,6 +82,11 @@ export const quickExports: QuickExportFormatMeta[] = [
     label: "HTML",
     description: l10nMsg("Export as HTML"),
     exportKind: "Html",
+  },
+  {
+    label: "Bundle",
+    description: l10nMsg("Export as Bundle"),
+    exportKind: "Bundle",
   },
   {
     label: "Markdown",
@@ -255,7 +269,7 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
   // See https://github.com/Myriad-Dreamin/tinymist/issues/837
   // Also see https://github.com/microsoft/vscode/issues/85930
   const openBySystemDefault = openIn === "systemDefault";
-  if (openBySystemDefault) {
+  if (openBySystemDefault && kind !== "Bundle") {
     actionOpts.open = true;
   }
 
@@ -278,6 +292,17 @@ export async function commandShow(kind: ExportKind, extraOpts?: ExportOpts): Pro
   if (!exportResponse || "message" in exportResponse) {
     // show error message
     await vscode.window.showErrorMessage(`Failed to export ${kind}: ${exportResponse?.message}`);
+    return;
+  }
+
+  if (kind === "Bundle") {
+    const exportPath =
+      "items" in exportResponse ? exportResponse.items[0]?.path : exportResponse.path;
+    if (!exportPath) {
+      await vscode.window.showErrorMessage(`Failed to export ${kind}: no path in response`);
+      return;
+    }
+    await commands.executeCommand("revealFileInOS", vscode.Uri.file(exportPath));
     return;
   }
 
