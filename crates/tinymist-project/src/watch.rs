@@ -425,14 +425,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
 
     /// Notify the event from the builtin watcher.
     fn notify_event(&mut self, event: notify::Event) {
-        if matches!(
-            event.kind,
-            notify::EventKind::Access(
-                notify::event::AccessKind::Read
-                    | notify::event::AccessKind::Open(_)
-                    | notify::event::AccessKind::Close(notify::event::AccessMode::Read)
-            )
-        ) {
+        if !is_relevant_event_kind(&event.kind) {
             return;
         }
 
@@ -626,6 +619,24 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         };
 
         Some(())
+    }
+}
+
+/// Whether a kind of watch event is relevant for compilation.
+fn is_relevant_event_kind(kind: &notify::EventKind) -> bool {
+    match kind {
+        notify::EventKind::Any => true,
+        notify::EventKind::Access(_) => false,
+        notify::EventKind::Create(_) => true,
+        notify::EventKind::Modify(kind) => match kind {
+            notify::event::ModifyKind::Any => true,
+            notify::event::ModifyKind::Data(_) => true,
+            notify::event::ModifyKind::Metadata(_) => false,
+            notify::event::ModifyKind::Name(_) => true,
+            notify::event::ModifyKind::Other => false,
+        },
+        notify::EventKind::Remove(_) => true,
+        notify::EventKind::Other => false,
     }
 }
 
@@ -1047,9 +1058,9 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn read_access_events_are_ignored_without_rereading_watched_file() {
+    async fn irrelevant_events_are_ignored_without_rereading_watched_file() {
         let mut harness = NotifyActorHarness::new();
-        let dep = test_path("access-open.typ");
+        let dep = test_path("irrelevant-events.typ");
 
         harness.access.set_content(&dep, "stable");
         harness
@@ -1058,19 +1069,33 @@ mod tests {
         harness.take_events();
         harness.take_commands();
 
-        let reads_after_sync = harness.access.read_count(&dep);
-        harness
-            .apply(MatrixInput::WatcherEvent {
-                kind: notify::EventKind::Access(notify::event::AccessKind::Open(
-                    notify::event::AccessMode::Any,
-                )),
-                paths: vec![dep.clone()],
-            })
-            .await;
+        let irrelevant_kinds = [
+            notify::EventKind::Access(notify::event::AccessKind::Open(
+                notify::event::AccessMode::Any,
+            )),
+            notify::EventKind::Access(notify::event::AccessKind::Close(
+                notify::event::AccessMode::Read,
+            )),
+            notify::EventKind::Modify(notify::event::ModifyKind::Metadata(
+                notify::event::MetadataKind::Any,
+            )),
+            notify::EventKind::Modify(notify::event::ModifyKind::Other),
+            notify::EventKind::Other,
+        ];
 
-        harness.assert_no_events();
-        assert_eq!(harness.take_commands(), Vec::new());
-        assert_eq!(harness.access.read_count(&dep), reads_after_sync);
+        for kind in irrelevant_kinds {
+            let reads_before_event = harness.access.read_count(&dep);
+            harness
+                .apply(MatrixInput::WatcherEvent {
+                    kind,
+                    paths: vec![dep.clone()],
+                })
+                .await;
+
+            harness.assert_no_events();
+            assert_eq!(harness.take_commands(), Vec::new());
+            assert_eq!(harness.access.read_count(&dep), reads_before_event);
+        }
     }
 
     #[tokio::test(flavor = "current_thread")]
