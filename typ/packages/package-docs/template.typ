@@ -14,7 +14,7 @@
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
 #let is-md-target = x-target == "md"
-#let sys-is-html-target = ("target" in dictionary(std))
+#let sys-is-html-target = ("html" in dictionary(std))
 
 #let part-counter = counter("shiroa-part-counter")
 /// Creates an embedded block typst frame.
