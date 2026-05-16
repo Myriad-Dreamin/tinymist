@@ -257,9 +257,9 @@ impl HtmlToAstParser {
 
         let mut world = self.world.clone().task(TaskInputs {
             entry: Some(
-            self.world
-                .entry_state()
-                .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path_compat()),
+                self.world
+                    .entry_state()
+                    .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path_compat()),
             ),
             inputs: match self.feat.color_theme {
                 Some(ColorTheme::Dark) => Some(DARK_THEME_INPUT.clone()),

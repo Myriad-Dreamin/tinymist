@@ -106,7 +106,9 @@ impl ReferencesWorker<'_> {
         log::debug!("references: file: {ref_fid:?}");
 
         // todo: find references in data files
-        if ref_fid.vpath().as_rooted_path_compat()
+        if ref_fid
+            .vpath()
+            .as_rooted_path_compat()
             .extension()
             .is_none_or(|e| e != "typ")
         {
@@ -193,7 +195,8 @@ impl ReferencesWorker<'_> {
                 .decl
                 .file_id()
                 .and_then(|fid| {
-                    fid.vpath().as_rooted_path_compat()
+                    fid.vpath()
+                        .as_rooted_path_compat()
                         .file_name()?
                         .to_str()
                         .map(From::from)

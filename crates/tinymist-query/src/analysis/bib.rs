@@ -50,7 +50,9 @@ struct BibWorker {
 
 impl BibWorker {
     fn analyze_path(&mut self, file_id: TypstFileId, content: Bytes) -> Option<()> {
-        let file_extension = file_id.vpath().as_rooted_path_compat()
+        let file_extension = file_id
+            .vpath()
+            .as_rooted_path_compat()
             .extension()?
             .to_str()?;
         let content = std::str::from_utf8(&content).ok()?;

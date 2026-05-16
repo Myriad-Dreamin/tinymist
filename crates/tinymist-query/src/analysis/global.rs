@@ -1459,7 +1459,7 @@ fn analyze_bib(
     let mut sink = Sink::new();
     let mut engine = Engine {
         library,
-        world: world.clone(),
+        world,
         route: Route::default(),
         introspector: typst::utils::Protected::new(introspector),
         traced: traced.track(),
