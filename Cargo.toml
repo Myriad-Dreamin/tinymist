@@ -43,7 +43,7 @@ dirs = "6"
 fontdb = { version = "0.23", default-features = false }
 half = "=2.6.0"
 libc = "0.2.155"
-notify = "6"
+notify = "8"
 open = { version = "5.3.2" }
 parking_lot = "0.12.1"
 path-clean = "1.0.1"
