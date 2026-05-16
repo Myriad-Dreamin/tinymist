@@ -168,10 +168,11 @@ fn test_help_compile_alias() {
               Specify the format of the output file, inferred from the extension by default
 
               Possible values:
-              - pdf:  Export to PDF
-              - png:  Export to PNG
-              - svg:  Export to SVG
-              - html: Export to HTML
+              - pdf:    Export to PDF
+              - png:    Export to PNG
+              - svg:    Export to SVG
+              - html:   Export to HTML
+              - bundle: Export to Bundle
 
           --pages <PAGES>
               Specify which pages to export. When unspecified, all pages are exported.
@@ -306,10 +307,11 @@ fn test_help_compile() {
               Specify the format of the output file, inferred from the extension by default
 
               Possible values:
-              - pdf:  Export to PDF
-              - png:  Export to PNG
-              - svg:  Export to SVG
-              - html: Export to HTML
+              - pdf:    Export to PDF
+              - png:    Export to PNG
+              - svg:    Export to SVG
+              - html:   Export to HTML
+              - bundle: Export to Bundle
 
           --pages <PAGES>
               Specify which pages to export. When unspecified, all pages are exported.
@@ -498,6 +500,7 @@ fn test_help_preview() {
               Possible values:
               - html:        The HTML feature
               - a11y-extras: The A11yExtras feature
+              - bundle:      The bundle export feature
               
               [env: TYPST_FEATURES=REDACTED]
 
