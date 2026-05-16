@@ -9,11 +9,11 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/editors/vscode/CHANGELOG.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
-## v0.13.45-rc1 - [2026-05-15]
+## v0.13.45 - [2026-05-16]
 
 Nightly Release at [docs: continue improve project model docs (#2012)](https://github.com/Myriad-Dreamin/tinymist/commit/12c1a0abf867943a9b472ecc5d08defaf3a5a5fa), using [ParaN3xus/typst rev d95f4b6](https://github.com/ParaN3xus/typst/commit/d95f4b695cb803885d997134dbf56f9d01b84971), a.k.a. [typst/typst Add tests for MathML](https://github.com/typst/typst/commit/de6f400976f9bf6ab8b923d13a068722959d0070).
 
-**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.43...v0.13.45-rc1
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.13.43...v0.13.45
 
 ## v0.13.43 - [2026-01-17]
 

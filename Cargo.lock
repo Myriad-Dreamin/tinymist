@@ -847,7 +847,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "anyhow",
  "base64",
@@ -4518,7 +4518,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "anyhow",
  "clap",
@@ -4646,7 +4646,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -4770,7 +4770,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4844,7 +4844,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "comemo 0.5.1",
  "dashmap",
@@ -4883,11 +4883,11 @@ checksum = "486bd04966a5672f6d3db902dd19b83c9a75093d1e2e08fe3f9d380e8c8138d1"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.13.45-rc1"
+version = "0.13.45"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "divan",
  "tinymist",
@@ -4895,7 +4895,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-core"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -4909,7 +4909,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "base64",
  "comemo 0.5.1",
@@ -4928,7 +4928,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "base64",
  "comemo 0.5.1",
@@ -4993,7 +4993,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "comemo 0.5.1",
  "insta",
@@ -5061,7 +5061,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "clap",
  "comemo 0.5.1",
@@ -5143,7 +5143,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "anyhow",
  "base64",
@@ -5197,7 +5197,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "base64",
  "log",
@@ -5354,7 +5354,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "comemo 0.5.1",
  "insta",
@@ -5782,7 +5782,7 @@ checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
 
 [[package]]
 name = "typlite"
-version = "0.13.45-rc1"
+version = "0.13.45"
 dependencies = [
  "base64",
  "clap",
@@ -7767,17 +7767,17 @@ dependencies = [
 [[patch.unused]]
 name = "reflexo"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=ffb93846492461a6c04808bf4adc97a1bdf53288#ffb93846492461a6c04808bf4adc97a1bdf53288"
+source = "git+https://github.com/ParaN3xus/typst.ts/?rev=fe7a14074849f62c2ce8597677327bebb94aafa3#fe7a14074849f62c2ce8597677327bebb94aafa3"
 
 [[patch.unused]]
 name = "reflexo-typst"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=ffb93846492461a6c04808bf4adc97a1bdf53288#ffb93846492461a6c04808bf4adc97a1bdf53288"
+source = "git+https://github.com/ParaN3xus/typst.ts/?rev=fe7a14074849f62c2ce8597677327bebb94aafa3#fe7a14074849f62c2ce8597677327bebb94aafa3"
 
 [[patch.unused]]
 name = "reflexo-vec2svg"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts/?rev=ffb93846492461a6c04808bf4adc97a1bdf53288#ffb93846492461a6c04808bf4adc97a1bdf53288"
+source = "git+https://github.com/ParaN3xus/typst.ts/?rev=fe7a14074849f62c2ce8597677327bebb94aafa3#fe7a14074849f62c2ce8597677327bebb94aafa3"
 
 [[patch.unused]]
 name = "typst-ansi-hl"
@@ -7787,4 +7787,4 @@ source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?rev=34f4af1b1da8662
 [[patch.unused]]
 name = "typstyle-core"
 version = "0.14.4"
-source = "git+https://github.com/ParaN3xus/typstyle/?rev=3af94fda7bdaa82f5ca5162cf7fc47f62df32a46#3af94fda7bdaa82f5ca5162cf7fc47f62df32a46"
+source = "git+https://github.com/ParaN3xus/typstyle/?rev=053800646d2719d9c2c2a683f9fafff851cd7c66#053800646d2719d9c2c2a683f9fafff851cd7c66"
