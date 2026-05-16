@@ -900,7 +900,7 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
                     return None;
                 }
                 let timestamp = now.unix_timestamp().checked_add(seconds.trunc() as i64)?;
-                Some(tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok()?)
+                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok()
             })
             .unwrap_or(*now);
 
