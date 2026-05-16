@@ -368,9 +368,7 @@ impl<'a> CodeActionWorker<'a> {
 
         if path.starts_with("/") {
             // Convert absolute path to relative path
-            let cur_path = id.vpath().as_rooted_path_compat()
-                .parent()
-                .unwrap();
+            let cur_path = id.vpath().as_rooted_path_compat().parent().unwrap();
             let new_path = diff(path, cur_path)?;
             let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeAction {
@@ -382,7 +380,9 @@ impl<'a> CodeActionWorker<'a> {
             self.actions.push(action);
         } else {
             // Convert relative path to absolute path
-            let mut new_path = id.vpath().as_rooted_path_compat()
+            let mut new_path = id
+                .vpath()
+                .as_rooted_path_compat()
                 .parent()
                 .unwrap()
                 .to_path_buf();

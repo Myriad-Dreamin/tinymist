@@ -17,10 +17,7 @@ pub use tinymist_analysis::docs::*;
 
 fn file_id_repr(fid: FileId) -> String {
     if let typst::syntax::VirtualRoot::Package(spec) = fid.root() {
-        format!(
-            "{spec}{}",
-            unix_slash(fid.vpath().as_rooted_path_compat())
-        )
+        format!("{spec}{}", unix_slash(fid.vpath().as_rooted_path_compat()))
     } else {
         unix_slash(fid.vpath().as_rooted_path_compat())
     }

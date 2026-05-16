@@ -5,7 +5,6 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::FileId;
-use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 use typst::{
     World,
     foundations::{Func, Label, Module, Selector, Value},
@@ -13,6 +12,7 @@ use typst::{
     syntax::Source,
     utils::PicoStr,
 };
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 use crate::LocalContext;
 
