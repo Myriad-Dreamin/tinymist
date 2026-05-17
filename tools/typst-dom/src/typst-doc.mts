@@ -419,7 +419,6 @@ export class TypstDocumentContext<O = any> {
 
     this.isRendering = true;
     const doUpdate = async () => {
-      const lastScrollPosition = this.cachedDOMState.scrollPosition;
       this.cachedDOMState = this.retrieveDOMState();
 
       if (this.patchQueue.length === 0) {
@@ -443,18 +442,11 @@ export class TypstDocumentContext<O = any> {
           this.r.rescale();
           await this.r.rerender();
           this.r.rescale();
-          /// Adjusts scroll position to keep visual position in "doc" mode.
-          /// Using `requestAnimationFrame` ensures the scroll adjustment happens after DOM updates.
-          requestAnimationFrame(() => {
-            if (lastScrollPosition && this.previewMode === PreviewMode.Doc) {
-              this.keepScrollPosition(lastScrollPosition);
-            }
-          });
         }
 
         let t2 = performance.now();
 
-        /// Perf event
+        /// perf event
         const d = (e: string, x: number, y: number) => `${e} ${(y - x).toFixed(2)} ms`;
         this.sampledRenderTime = t2 - t0;
         console.log([d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", "));
@@ -525,17 +517,6 @@ export class TypstDocumentContext<O = any> {
 
   getPartialPageNumber(): number {
     return this.partialRenderPage + 1;
-  }
-
-  /// Adjusts scroll position.
-  private keepScrollPosition(scrollPosition: DOMRect) {
-    const domState = this.retrieveDOMState();
-    const newBBox = domState.scrollPosition;
-    if (!(newBBox && scrollPosition && newBBox.width !== scrollPosition.width)) {
-      return;
-    }
-    this.hookedElem.parentElement!.scrollTop = -newBBox.height * scrollPosition.top / scrollPosition.height;
-    this.hookedElem.parentElement!.scrollLeft = -newBBox.width * scrollPosition.left / scrollPosition.width;
   }
 }
 

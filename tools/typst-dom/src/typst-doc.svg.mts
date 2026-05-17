@@ -288,8 +288,15 @@ export function provideSvgDoc<
       // apply scale
       const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
       const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
+      const appliedWidth = (dataWidth * scale).toString();
       const scaledWidth = Math.ceil(dataWidth * scale);
       const scaledHeight = Math.ceil(dataHeight * scale);
+
+      // keep scroll position if width changed
+      if (svg.getAttribute("data-applied-width") !== appliedWidth && container.scrollPosition) {
+        this.hookedElem.parentElement!.scrollTop = -scaledHeight * container.scrollPosition.top / container.scrollPosition.height;
+        this.hookedElem.parentElement!.scrollLeft = -scaledWidth * container.scrollPosition.left / container.scrollPosition.width;
+      }
 
       this.rescaleSvgOn(svg);
 
