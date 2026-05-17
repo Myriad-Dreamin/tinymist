@@ -11,6 +11,9 @@ use tinymist_std::error::{prelude::*, IgnoreLogging};
 pub mod init;
 pub(crate) mod query;
 
+#[cfg(all(test, feature = "system"))]
+mod workspace_change_tests;
+
 use crate::actor::editor::{EditorActorConfig, EditorRequest};
 use crate::task::FormatterConfig;
 use crate::*;

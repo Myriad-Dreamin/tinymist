@@ -97,6 +97,7 @@ wasm-bindgen-futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 temp-env.workspace = true
+tempfile.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

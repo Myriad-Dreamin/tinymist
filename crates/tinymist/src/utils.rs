@@ -1,18 +1,18 @@
 use core::fmt;
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use std::pin::Pin;
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use std::sync::atomic::AtomicU64;
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use std::sync::Arc;
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use std::task::{Context, Poll};
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use tokio::net::TcpStream;
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
@@ -68,11 +68,11 @@ pub fn try_or<T>(f: impl FnOnce() -> Option<T>, default: T) -> T {
     f().unwrap_or(default)
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 #[derive(Default)]
 pub(crate) struct AliveLock(Arc<AtomicU64>);
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl AliveLock {
     pub fn hold(cnt: Arc<AtomicU64>) -> Self {
         let held = cnt.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -81,7 +81,7 @@ impl AliveLock {
     }
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl Drop for AliveLock {
     fn drop(&mut self) {
         let cnt = self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
@@ -89,13 +89,13 @@ impl Drop for AliveLock {
     }
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 pub(crate) struct ConnWithCancel {
     stream: TcpStream,
     pub cancel: CancellationToken,
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl ConnWithCancel {
     pub fn new(stream: TcpStream) -> Self {
         Self {
@@ -105,14 +105,14 @@ impl ConnWithCancel {
     }
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl Drop for ConnWithCancel {
     fn drop(&mut self) {
         self.cancel.cancel()
     }
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl AsyncRead for ConnWithCancel {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -123,7 +123,7 @@ impl AsyncRead for ConnWithCancel {
     }
 }
 
-#[cfg(feature = "system")]
+#[cfg(all(feature = "system", feature = "trace"))]
 impl AsyncWrite for ConnWithCancel {
     fn poll_write(
         self: Pin<&mut Self>,
