@@ -1,8 +1,7 @@
 # vscode-config-loading Specification
 
 ## Purpose
-The vscode-config-loading specification defines how the Tinymist VS Code extension loads workspace configuration safely. It ensures malformed `tinymist.fontPaths` values do not crash extension activation or later configuration reads, preserves variable substitution for valid string arrays, and requires actionable feedback when user configuration is invalid.
-
+The vscode-config-loading specification defines how the Tinymist VS Code extension loads and refreshes workspace configuration safely. It ensures malformed `tinymist.fontPaths` values do not crash extension activation or later configuration reads, preserves variable substitution for valid string arrays, requires actionable feedback when user configuration is invalid, and keeps extension-managed internal settings present during runtime refreshes.
 ## Requirements
 ### Requirement: VS Code activation tolerates malformed `tinymist.fontPaths`
 The Tinymist VS Code extension SHALL validate `tinymist.fontPaths` before iterating or performing VS Code variable substitution. If the setting value is not an array of strings, the extension SHALL ignore that malformed value for the current configuration load and continue activation.
@@ -36,3 +35,21 @@ For valid `tinymist.fontPaths` arrays, Tinymist SHALL preserve the existing beha
 - **WHEN** `tinymist.fontPaths` is configured as an array of strings that includes VS Code variables such as `${workspaceFolder}/fonts`
 - **THEN** Tinymist substitutes variables for each entry
 - **AND** Tinymist forwards the expanded string array as the effective `fontPaths` value
+
+### Requirement: Runtime configuration refresh preserves extension-managed internal settings
+The Tinymist VS Code extension SHALL attach its extension-managed internal settings to every configuration payload delivered to the language server after startup. This SHALL preserve the same internal capability contract used during initialization, including the completion trigger flags, `supportHtmlInMarkdown`, `supportClientCodelens`, `supportExtendedCodeAction`, `customizedShowDocument`, and the current `delegateFsRequests` value.
+
+#### Scenario: Refresh payload keeps extension-managed capability flags
+- **WHEN** Tinymist synchronizes workspace configuration to the language server after a VS Code settings change during an active session
+- **THEN** the payload still includes the extension-managed internal settings that were attached during startup
+- **AND** the server does not lose those internal capability flags only because the configuration was refreshed
+
+#### Scenario: Unrelated user setting change does not clear internal settings
+- **WHEN** a user changes a normal Tinymist workspace setting such as `tinymist.preview` or `tinymist.fontPaths`
+- **THEN** Tinymist forwards the updated user setting to the language server
+- **AND** the same refresh keeps the extension-managed internal settings intact
+
+#### Scenario: Runtime refresh preserves existing user-setting normalization
+- **WHEN** a runtime configuration refresh includes a valid `tinymist.fontPaths` array with VS Code variables such as `${workspaceFolder}/fonts`
+- **THEN** Tinymist still expands the variables before forwarding the effective `fontPaths` value
+- **AND** the refresh also includes the extension-managed internal settings required by the session
