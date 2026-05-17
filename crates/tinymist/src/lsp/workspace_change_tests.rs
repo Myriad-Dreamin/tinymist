@@ -23,6 +23,11 @@ use crate::{CompileFontArgs, Config, ConstConfig, ServerState};
 const MAIN: &str = "main.typ";
 const DEP: &str = "dep.typ";
 const RENAMED_DEP: &str = "renamed.typ";
+const CASE_RENAMED_DEP: &str = "Dep.typ";
+const NEW_DEP: &str = "new.typ";
+const DIR_DEP: &str = "dir/dep.typ";
+const RENAMED_DIR_DEP: &str = "renamed-dir/dep.typ";
+const OTHER_DEP: &str = "other.typ";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ApiSensitivity {
@@ -693,239 +698,574 @@ fn lsp_workspace_change_matrix_maps_o01_through_o20() {
 }
 
 #[test]
-fn graph_dependent_lsp_responses_follow_create_edit_remove_and_rename_rows() {
-    let main = format!(
-        "#set heading(numbering: \"1.\")\n#import \"{DEP}\": alpha\n= Main <main-label>\n@main-label\n#alpha\n"
-    );
-    let mut harness = LspHarness::new(&[(MAIN, &main)]);
+fn o01_create_dependency_refreshes_missing_import_focus_apis() {
+    let main = main_source(NEW_DEP, "newer");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
     harness.compile_primary();
     harness.assert_latest_diagnostics_present();
 
-    harness.fs_insert(DEP, "#let alpha = 1\n");
+    harness.fs_insert(NEW_DEP, "#let newer = 1\n");
     harness.assert_latest_diagnostics_empty();
-
-    let alpha_pos = harness.position_of(MAIN, "#alpha", 0, 2);
-    let label_pos = harness.position_of(MAIN, "@main-label", 0, 2);
-    let dep_uri = harness.uri(DEP);
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&dep_uri));
-    assert!(harness
-        .reference_uris(MAIN, label_pos)
-        .contains(&harness.uri(MAIN)));
-    assert!(harness.hover_text(MAIN, alpha_pos).is_some());
-    assert!(harness.completion_labels(MAIN, alpha_pos).contains("alpha"));
-    assert!(harness.workspace_symbol_uris("alpha").contains(&dep_uri));
-
-    harness.fs_insert(DEP, "#let alpha = 1\n#let beta = 2\n");
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&dep_uri));
-
-    harness.fs_remove(DEP);
-    harness.assert_latest_diagnostics_present();
-    assert!(!harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&dep_uri));
-    assert!(!harness.workspace_symbol_uris("alpha").contains(&dep_uri));
-
-    harness.fs_batch(&[(DEP, "#let alpha = 3\n")], &[], false);
-    harness.assert_latest_diagnostics_empty();
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&dep_uri));
-
-    harness.fs_batch(&[(RENAMED_DEP, "#let alpha = 3\n")], &[DEP], false);
-    harness.assert_latest_diagnostics_present();
-    assert!(!harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&dep_uri));
-
-    harness.fs_insert(MAIN, &main_source(RENAMED_DEP, "alpha"));
-    harness.assert_latest_diagnostics_empty();
-    let renamed_uri = harness.uri(RENAMED_DEP);
-    let alpha_pos = harness.position_of(MAIN, "#alpha", 0, 2);
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&renamed_uri));
-    assert!(!harness.workspace_symbol_uris("alpha").contains(&dep_uri));
-    assert!(harness
-        .workspace_symbol_uris("alpha")
-        .contains(&renamed_uri));
+    assert_graph_resolves(&mut harness, MAIN, "newer", NEW_DEP);
+    assert_main_label_references_current_file(&mut harness);
 }
 
 #[test]
-fn graph_dependent_lsp_responses_follow_directory_and_mixed_batch_rows() {
-    let mut harness = LspHarness::new(&[
-        (MAIN, main_source("dir/dep.typ", "alpha").as_str()),
-        ("dir/dep.typ", "#let alpha = 1\n"),
-    ]);
+fn o02_content_update_refreshes_graph_source_and_semantic_apis() {
+    let initial = main_source_with_local(DEP, "alpha", "before_symbol");
+    let updated = main_source_with_local(DEP, "beta", "after");
+    let mut harness =
+        LspHarness::new(&[(MAIN, &initial), (DEP, "#let alpha = 1\n#let beta = 2\n")]);
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
-
-    let alpha_pos = harness.position_of(MAIN, "#alpha", 0, 2);
-    let old_uri = harness.uri("dir/dep.typ");
-    let new_uri = harness.uri("renamed-dir/dep.typ");
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&old_uri));
-
-    harness.fs_batch(
-        &[("renamed-dir/dep.typ", "#let alpha = 1\n")],
-        &["dir/dep.typ"],
-        false,
-    );
-    harness.assert_latest_diagnostics_present();
-    assert!(!harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&old_uri));
-
-    harness.fs_insert(MAIN, &main_source("renamed-dir/dep.typ", "alpha"));
-    harness.assert_latest_diagnostics_empty();
-    let alpha_pos = harness.position_of(MAIN, "#alpha", 0, 2);
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&new_uri));
-
-    harness.fs_batch(
-        &[
-            ("new-a.typ", "#let alpha = 10\n"),
-            ("new-b.typ", "#let beta = 20\n"),
-            (
-                MAIN,
-                "#import \"new-a.typ\": alpha\n#import \"new-b.typ\": beta\n#alpha\n#beta\n",
-            ),
-        ],
-        &["renamed-dir/dep.typ"],
-        false,
-    );
-    harness.assert_latest_diagnostics_empty();
-    let alpha_pos = harness.position_of(MAIN, "#alpha", 0, 2);
-    let beta_pos = harness.position_of(MAIN, "#beta", 0, 2);
-    assert!(harness
-        .goto_definition_uris(MAIN, alpha_pos)
-        .contains(&harness.uri("new-a.typ")));
-    assert!(harness
-        .goto_definition_uris(MAIN, beta_pos)
-        .contains(&harness.uri("new-b.typ")));
-    assert!(!harness.workspace_symbol_uris("alpha").contains(&new_uri));
-}
-
-#[test]
-fn source_local_and_semantic_token_responses_use_current_source() {
-    let initial = "#let alpha = 1\n#alpha\n";
-    let edited = "#let beta = 2\n#beta\n";
-    let mut harness = LspHarness::new(&[(MAIN, initial)]);
-    harness.open_source(MAIN, initial);
-
-    assert!(harness.document_symbol_names(MAIN).contains("alpha"));
-    let first_tokens = harness.semantic_full(MAIN);
-    let first_id = first_tokens
+    harness.open_source(MAIN, &initial);
+    let before_tokens = harness.semantic_full(MAIN);
+    let before_id = before_tokens
         .result_id
         .clone()
         .expect("expected semantic token result id");
-
-    harness.edit_open_source(MAIN, edited);
-    assert!(!harness.document_symbol_names(MAIN).contains("alpha"));
-    assert!(harness.document_symbol_names(MAIN).contains("beta"));
-    let edited_tokens = harness.semantic_full(MAIN);
-    assert_ne!(edited_tokens.data, first_tokens.data);
-    assert_ne!(edited_tokens.result_id, Some(first_id.clone()));
-
-    let delta_id = harness.semantic_delta_result_id(MAIN, first_id.clone());
-    assert_ne!(delta_id, Some(first_id));
-
     harness.close_source(MAIN);
-    harness.fs_batch(&[(MAIN, "#let gamma = 3\n#gamma\n")], &[MAIN], false);
-    let replaced_tokens = harness.semantic_full(MAIN);
-    assert_ne!(replaced_tokens.data, edited_tokens.data);
+
+    harness.fs_insert(MAIN, &updated);
+    harness.assert_latest_diagnostics_empty();
+    harness.open_source(MAIN, &updated);
+
+    assert_graph_resolves(&mut harness, MAIN, "beta", DEP);
+    assert_source_symbol_changed(
+        &mut harness,
+        MAIN,
+        "before_symbol",
+        "after",
+        before_tokens,
+        before_id,
+    );
 }
 
 #[test]
-fn diagnostics_publish_and_clear_for_missing_read_error_recovery_and_batches() {
-    let mut harness = LspHarness::new(&[
-        (MAIN, main_source(DEP, "alpha").as_str()),
-        (DEP, "#let alpha = 1\n"),
-    ]);
+fn o03_transient_empty_dependency_publishes_diagnostics_and_empty_semantics() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
 
-    harness.fs_remove(DEP);
+    harness.fs_insert(DEP, "");
     harness.assert_latest_diagnostics_present();
-    harness.fs_insert(DEP, "#let alpha = 2\n");
+
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DEP);
+    harness.open_source(DEP, "");
+    assert!(!harness.document_symbol_names(DEP).contains("alpha"));
+    let empty_tokens = harness.semantic_full(DEP);
+    assert!(
+        empty_tokens.data.is_empty(),
+        "expected empty dependency to produce no semantic token data, got {empty_tokens:?}"
+    );
+}
+
+#[test]
+fn o04_read_error_recovery_clears_diagnostics_and_restores_graph_apis() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
 
     harness.fs_error(DEP, "permission denied");
     harness.assert_latest_diagnostics_present();
-    harness.fs_insert(DEP, "#let alpha = 3\n");
-    harness.assert_latest_diagnostics_empty();
 
-    harness.fs_batch(&[(RENAMED_DEP, "#let alpha = 4\n")], &[DEP], false);
-    harness.assert_latest_diagnostics_present();
-    harness.fs_insert(MAIN, &main_source(RENAMED_DEP, "alpha"));
+    harness.fs_insert(DEP, "#let alpha = 4\n");
     harness.assert_latest_diagnostics_empty();
-
-    harness.fs_batch(
-        &[
-            ("other.typ", "#let beta = 5\n"),
-            (
-                MAIN,
-                "#import \"renamed.typ\": alpha\n#import \"other.typ\": beta\n#alpha\n#beta\n",
-            ),
-        ],
-        &[],
-        false,
-    );
-    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", DEP);
 }
 
 #[test]
-fn assisted_and_unassisted_rename_flows_do_not_retain_old_paths() {
-    let include_main = format!("#include \"{DEP}\"\n");
-    let mut harness = LspHarness::new(&[(MAIN, &include_main), (DEP, "[dependency]\n")]);
+fn o05_remove_dependency_retires_old_path_from_graph_apis() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
 
-    let edit = harness
-        .will_rename_edit(DEP, RENAMED_DEP)
-        .unwrap_or_else(|| {
-            let include_path_pos = harness.position_of(MAIN, DEP, 0, 1);
-            harness.rename_edit(MAIN, include_path_pos, "renamed")
-        });
-    let edit_json = serde_json::to_string(&edit).expect("failed to serialize workspace edit");
-    assert!(
-        edit_json.contains(RENAMED_DEP),
-        "workspace edit should update imports to {RENAMED_DEP}: {edit_json}"
-    );
-
-    harness.fs_batch(&[(RENAMED_DEP, "[dependency]\n")], &[DEP], false);
+    harness.fs_remove(DEP);
     harness.assert_latest_diagnostics_present();
-
-    harness.fs_insert(MAIN, &format!("#include \"{RENAMED_DEP}\"\n"));
-    harness.assert_latest_diagnostics_empty();
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DEP);
 }
 
 #[test]
-fn shadow_open_files_use_memory_until_close_then_current_filesystem() {
-    let disk = "#let disk = 1\n#disk\n";
-    let memory = "#let memory = 2\n#memory\n";
-    let filesystem = "#let filesystem = 3\n#filesystem\n";
-    let mut harness = LspHarness::new(&[(MAIN, disk)]);
+fn o06_delete_then_recreate_restores_dependency_from_fresh_harness_state() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
 
-    harness.open_source(MAIN, memory);
-    assert!(harness.document_symbol_names(MAIN).contains("memory"));
+    harness.fs_remove(DEP);
+    harness.assert_latest_diagnostics_present();
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DEP);
 
-    harness.fs_insert(MAIN, filesystem);
-    assert!(harness.document_symbol_names(MAIN).contains("memory"));
-    assert!(!harness.document_symbol_names(MAIN).contains("filesystem"));
+    harness.fs_insert(DEP, "#let alpha = 6\n");
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", DEP);
+}
+
+#[test]
+fn o07_atomic_replace_refreshes_source_local_and_semantic_apis() {
+    let initial = local_source("alpha_symbol");
+    let replaced = local_source("replacement");
+    let mut harness = LspHarness::new(&[(MAIN, &initial)]);
+    harness.open_source(MAIN, &initial);
+    let before_tokens = harness.semantic_full(MAIN);
+    let before_id = before_tokens
+        .result_id
+        .clone()
+        .expect("expected semantic token result id");
+    harness.edit_open_source(MAIN, &replaced);
+    assert_source_symbol_changed(
+        &mut harness,
+        MAIN,
+        "alpha_symbol",
+        "replacement",
+        before_tokens,
+        before_id,
+    );
+}
+
+#[test]
+fn o08_rename_with_stale_references_keeps_old_path_out_of_graph_apis() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    assert_file_rename_assistance(&mut harness, DEP, RENAMED_DEP, "renamed");
+    harness.fs_batch(&[(RENAMED_DEP, "#let alpha = 8\n")], &[DEP], false);
+    harness.assert_latest_diagnostics_present();
+
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DEP);
+}
+
+#[test]
+fn o09_rename_with_updated_references_follows_new_path_in_graph_apis() {
+    let main = main_source(DEP, "alpha");
+    let updated_main = main_source(RENAMED_DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    assert_file_rename_assistance(&mut harness, DEP, RENAMED_DEP, "renamed");
+    harness.fs_batch(
+        &[(RENAMED_DEP, "#let alpha = 9\n"), (MAIN, &updated_main)],
+        &[DEP],
+        false,
+    );
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", RENAMED_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DEP);
+}
+
+#[test]
+fn o10_case_rename_updates_references_without_retaining_old_case_path() {
+    let main = main_source(DEP, "alpha");
+    let updated_main = main_source(CASE_RENAMED_DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    assert_file_rename_assistance(&mut harness, DEP, CASE_RENAMED_DEP, "Dep");
+    harness.fs_batch(
+        &[
+            (CASE_RENAMED_DEP, "#let alpha = 10\n"),
+            (MAIN, &updated_main),
+        ],
+        &[DEP],
+        false,
+    );
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", CASE_RENAMED_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DEP);
+}
+
+#[test]
+fn o11_root_boundary_move_retires_old_nested_path_from_graph_apis() {
+    let nested_dep = "nested/dep.typ";
+    let main = main_source(nested_dep, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (nested_dep, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.fs_batch(&[(DEP, "#let alpha = 11\n")], &[nested_dep], false);
+    harness.assert_latest_diagnostics_present();
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", nested_dep);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", nested_dep);
+}
+
+#[test]
+fn o12_directory_rename_with_stale_references_retires_old_directory_path() {
+    let main = main_source(DIR_DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DIR_DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    assert_directory_rename_assistance_if_available(&mut harness, "dir", "renamed-dir");
+    harness.fs_batch(&[(RENAMED_DIR_DEP, "#let alpha = 12\n")], &[DIR_DEP], false);
+    harness.assert_latest_diagnostics_present();
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DIR_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DIR_DEP);
+}
+
+#[test]
+fn o13_directory_rename_with_updated_references_follows_new_directory_path() {
+    let main = main_source(DIR_DEP, "alpha");
+    let updated_main = main_source(RENAMED_DIR_DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DIR_DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    assert_directory_rename_assistance_if_available(&mut harness, "dir", "renamed-dir");
+    harness.fs_batch(
+        &[
+            (RENAMED_DIR_DEP, "#let alpha = 13\n"),
+            (MAIN, &updated_main),
+        ],
+        &[DIR_DEP],
+        false,
+    );
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", RENAMED_DIR_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DIR_DEP);
+}
+
+#[test]
+fn o14_directory_delete_reports_missing_dependency_and_clears_old_graph_path() {
+    let main = main_source(DIR_DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DIR_DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.fs_remove(DIR_DEP);
+    harness.assert_latest_diagnostics_present();
+    assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DIR_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DIR_DEP);
+}
+
+#[test]
+fn o15_directory_root_move_with_updated_references_follows_root_path() {
+    let main = main_source(DIR_DEP, "alpha");
+    let updated_main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DIR_DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.fs_batch(
+        &[(DEP, "#let alpha = 15\n"), (MAIN, &updated_main)],
+        &[DIR_DEP],
+        false,
+    );
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DIR_DEP);
+}
+
+#[test]
+fn o16_membership_removal_keeps_server_clean_for_remaining_source_apis() {
+    let main = main_source(DEP, "alpha");
+    let updated_main = local_source("local_only");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.fs_insert(MAIN, &updated_main);
+    harness.assert_latest_diagnostics_empty();
+    harness.open_source(MAIN, &updated_main);
+    assert_graph_resolves(&mut harness, MAIN, "local_only", MAIN);
+    assert!(harness.document_symbol_names(MAIN).contains("local_only"));
+    assert_semantic_tokens_nonempty(&mut harness, MAIN);
+}
+
+#[test]
+fn o17_membership_addition_makes_new_dependency_visible_to_graph_apis() {
+    let initial = local_source("local_only");
+    let updated_main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &initial), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.fs_insert(MAIN, &updated_main);
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "alpha", DEP);
+    assert_main_label_references_current_file(&mut harness);
+}
+
+#[test]
+fn o18_shadow_open_keeps_memory_source_until_close_then_uses_filesystem() {
+    let disk = local_source("disk_symbol");
+    let memory = local_source("memory_symbol");
+    let filesystem = local_source("filesystem_symbol");
+    let mut harness = LspHarness::new(&[(MAIN, &disk)]);
+
+    harness.open_source(MAIN, &memory);
+    assert!(harness
+        .document_symbol_names(MAIN)
+        .contains("memory_symbol"));
+    let memory_tokens = harness.semantic_full(MAIN);
+
+    harness.fs_insert(MAIN, &filesystem);
+    assert!(harness
+        .document_symbol_names(MAIN)
+        .contains("memory_symbol"));
+    assert!(!harness
+        .document_symbol_names(MAIN)
+        .contains("filesystem_symbol"));
+    assert_eq!(harness.semantic_full(MAIN).data, memory_tokens.data);
 
     harness.close_source(MAIN);
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
-    let filesystem_pos = harness.position_of(MAIN, "#filesystem", 0, 2);
-    assert!(harness
-        .goto_definition_uris(MAIN, filesystem_pos)
-        .contains(&harness.uri(MAIN)));
+    assert_definition_resolves(&mut harness, MAIN, "filesystem_symbol", MAIN);
+}
+
+#[test]
+fn o19_symlink_read_result_refreshes_graph_apis_for_link_path() {
+    let main = main_source("link.typ", "linked");
+    let mut harness = LspHarness::new(&[(MAIN, &main)]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_present();
+
+    create_symlink_fixture_if_supported(harness.root.path(), "target.typ", "link.typ");
+    harness.fs_insert("link.typ", "#let linked = 19\n");
+    harness.assert_latest_diagnostics_empty();
+    assert_graph_resolves(&mut harness, MAIN, "linked", "link.typ");
+}
+
+#[test]
+fn o20_mixed_batch_exercises_all_focus_api_groups_from_one_fresh_case() {
+    let main = main_source_with_local(DEP, "alpha", "before_symbol");
+    let updated_main = format!(
+        "#set heading(numbering: \"1.\")\n#import \"{RENAMED_DEP}\": alpha\n#import \"{OTHER_DEP}\": beta\n= Main <main-label>\n@main-label\n#let after = 20\n#alpha\n#beta\n#after\n"
+    );
+    let mut harness = LspHarness::new(&[
+        (MAIN, &main),
+        (DEP, "#let alpha = 1\n"),
+        ("stale.typ", "#let stale = 1\n"),
+    ]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+    harness.open_source(MAIN, &main);
+    let before_tokens = harness.semantic_full(MAIN);
+    let before_id = before_tokens
+        .result_id
+        .clone()
+        .expect("expected semantic token result id");
+    harness.close_source(MAIN);
+    assert_file_rename_assistance(&mut harness, DEP, RENAMED_DEP, "renamed");
+
+    harness.fs_batch(
+        &[
+            (RENAMED_DEP, "#let alpha = 20\n"),
+            (OTHER_DEP, "#let beta = 20\n"),
+            (MAIN, &updated_main),
+        ],
+        &[DEP, "stale.typ"],
+        false,
+    );
+    harness.assert_latest_diagnostics_empty();
+    harness.open_source(MAIN, &updated_main);
+
+    assert_graph_resolves(&mut harness, MAIN, "alpha", RENAMED_DEP);
+    assert_graph_resolves(&mut harness, MAIN, "beta", OTHER_DEP);
+    assert_workspace_symbol_excludes(&mut harness, "alpha", DEP);
+    assert_source_symbol_changed(
+        &mut harness,
+        MAIN,
+        "before_symbol",
+        "after",
+        before_tokens,
+        before_id,
+    );
+    assert_main_label_references_current_file(&mut harness);
+}
+
+fn assert_graph_resolves(harness: &mut LspHarness, rel: &str, symbol: &str, expected_rel: &str) {
+    let usage = format!("#{symbol}");
+    let position = harness.position_of(rel, &usage, 0, 2);
+    let expected_uri = harness.uri(expected_rel);
+    let current_uri = harness.uri(rel);
+
+    let definitions = harness.goto_definition_uris(rel, position);
+    assert!(
+        definitions.contains(&expected_uri),
+        "expected definition of {symbol} in {rel} to include {expected_uri}, got {definitions:?}"
+    );
+
+    let references = harness.reference_uris(rel, position);
+    assert!(
+        references.contains(&expected_uri) || references.contains(&current_uri),
+        "expected references for {symbol} to include {expected_uri} or {current_uri}, got {references:?}"
+    );
+
+    let hover = harness.hover_text(rel, position);
+    assert!(
+        hover.as_ref().is_some_and(|text| !text.is_empty()),
+        "expected non-empty hover for {symbol}, got {hover:?}"
+    );
+
+    let completions = harness.completion_labels(rel, position);
+    assert!(
+        completions.contains(symbol),
+        "expected completion labels at {symbol} to contain {symbol}, got {completions:?}"
+    );
+
+    let workspace_symbols = harness.workspace_symbol_uris(symbol);
+    assert!(
+        workspace_symbols.contains(&expected_uri),
+        "expected workspace symbols for {symbol} to contain {expected_uri}, got {workspace_symbols:?}"
+    );
+}
+
+fn assert_definition_resolves(
+    harness: &mut LspHarness,
+    rel: &str,
+    symbol: &str,
+    expected_rel: &str,
+) {
+    let usage = format!("#{symbol}");
+    let position = harness.position_of(rel, &usage, 0, 2);
+    let expected_uri = harness.uri(expected_rel);
+    let definitions = harness.goto_definition_uris(rel, position);
+    assert!(
+        definitions.contains(&expected_uri),
+        "expected definition of {symbol} in {rel} to include {expected_uri}, got {definitions:?}"
+    );
+}
+
+fn assert_graph_does_not_resolve_to(
+    harness: &mut LspHarness,
+    rel: &str,
+    symbol: &str,
+    retired_rel: &str,
+) {
+    let usage = format!("#{symbol}");
+    let position = harness.position_of(rel, &usage, 0, 2);
+    let retired_uri = harness.uri(retired_rel);
+
+    let definitions = harness.goto_definition_uris(rel, position);
+    assert!(
+        !definitions.contains(&retired_uri),
+        "expected definition of {symbol} not to retain {retired_uri}, got {definitions:?}"
+    );
+
+    let references = harness.reference_uris(rel, position);
+    assert!(
+        !references.contains(&retired_uri),
+        "expected references for {symbol} not to retain {retired_uri}, got {references:?}"
+    );
+
+    let hover = harness.hover_text(rel, position);
+    assert!(
+        hover
+            .as_ref()
+            .is_none_or(|text| !text.contains(retired_rel)),
+        "expected hover for {symbol} not to mention retired path {retired_rel}, got {hover:?}"
+    );
+
+    let _ = harness.completion_labels(rel, position);
+}
+
+fn assert_main_label_references_current_file(harness: &mut LspHarness) {
+    let label_pos = harness.position_of(MAIN, "@main-label", 0, 2);
+    let references = harness.reference_uris(MAIN, label_pos);
+    assert!(
+        references.contains(&harness.uri(MAIN)),
+        "expected label references to include current main file, got {references:?}"
+    );
+}
+
+fn assert_workspace_symbol_excludes(harness: &mut LspHarness, symbol: &str, rel: &str) {
+    let uri = harness.uri(rel);
+    let workspace_symbols = harness.workspace_symbol_uris(symbol);
+    assert!(
+        !workspace_symbols.contains(&uri),
+        "expected workspace symbols for {symbol} not to contain {uri}, got {workspace_symbols:?}"
+    );
+}
+
+fn assert_semantic_tokens_nonempty(harness: &mut LspHarness, rel: &str) {
+    let tokens = harness.semantic_full(rel);
+    assert!(
+        !tokens.data.is_empty(),
+        "expected non-empty semantic tokens for {rel}, got {tokens:?}"
+    );
+    assert!(
+        tokens.result_id.is_some(),
+        "expected semantic tokens for {rel} to carry a result id"
+    );
+}
+
+fn assert_source_symbol_changed(
+    harness: &mut LspHarness,
+    rel: &str,
+    old_symbol: &str,
+    new_symbol: &str,
+    before_tokens: SemanticTokens,
+    before_id: String,
+) {
+    let symbols = harness.document_symbol_names(rel);
+    assert!(
+        !symbols.contains(old_symbol),
+        "expected {rel} document symbols to drop {old_symbol}, got {symbols:?}"
+    );
+    assert!(
+        symbols.contains(new_symbol),
+        "expected {rel} document symbols to include {new_symbol}, got {symbols:?}"
+    );
+
+    let after_tokens = harness.semantic_full(rel);
+    assert_ne!(
+        after_tokens.data, before_tokens.data,
+        "expected semantic token data to change for {rel}"
+    );
+    assert_ne!(
+        after_tokens.result_id,
+        Some(before_id.clone()),
+        "expected semantic token result id to change for {rel}"
+    );
+    let delta_id = harness.semantic_delta_result_id(rel, before_id.clone());
+    assert_ne!(
+        delta_id,
+        Some(before_id),
+        "expected semantic token delta to avoid reusing the old result id for {rel}"
+    );
+}
+
+fn assert_file_rename_assistance(
+    harness: &mut LspHarness,
+    old_rel: &str,
+    new_rel: &str,
+    fallback_new_name: &str,
+) {
+    let edit = harness
+        .will_rename_edit(old_rel, new_rel)
+        .unwrap_or_else(|| {
+            let include_path_pos = harness.position_of(MAIN, old_rel, 0, 1);
+            harness.rename_edit(MAIN, include_path_pos, fallback_new_name)
+        });
+    let edit_json = serde_json::to_string(&edit).expect("failed to serialize workspace edit");
+    assert!(
+        edit_json.contains(new_rel),
+        "workspace edit should update imports to {new_rel}: {edit_json}"
+    );
+}
+
+fn assert_directory_rename_assistance_if_available(
+    harness: &mut LspHarness,
+    old_rel: &str,
+    new_rel: &str,
+) {
+    if let Some(edit) = harness.will_rename_edit(old_rel, new_rel) {
+        let edit_json = serde_json::to_string(&edit).expect("failed to serialize workspace edit");
+        assert!(
+            edit_json.contains(new_rel),
+            "workspace edit should update imports to {new_rel}: {edit_json}"
+        );
+    }
 }
 
 fn write_fixture(root: &Path, rel: &str, source: &str) {
@@ -977,5 +1317,35 @@ fn flatten_document_symbol(symbol: DocumentSymbol) -> Vec<String> {
 }
 
 fn main_source(dep: &str, symbol: &str) -> String {
-    format!("#import \"{dep}\": {symbol}\n#{symbol}\n")
+    format!(
+        "#set heading(numbering: \"1.\")\n#import \"{dep}\": {symbol}\n= Main <main-label>\n@main-label\n#{symbol}\n"
+    )
+}
+
+fn main_source_with_local(dep: &str, symbol: &str, local: &str) -> String {
+    format!(
+        "#set heading(numbering: \"1.\")\n#import \"{dep}\": {symbol}\n= Main <main-label>\n@main-label\n#let {local} = 1\n#{symbol}\n#{local}\n"
+    )
+}
+
+fn local_source(symbol: &str) -> String {
+    format!("#let {symbol} = 1\n#{symbol}\n")
+}
+
+fn create_symlink_fixture_if_supported(root: &Path, target: &str, link: &str) {
+    write_fixture(root, target, "#let linked = 0\n");
+
+    #[cfg(unix)]
+    {
+        let link_path = root.join(link);
+        if let Some(parent) = link_path.parent() {
+            fs::create_dir_all(parent).expect("failed to create symlink fixture directory");
+        }
+        std::os::unix::fs::symlink(target, link_path).expect("failed to create symlink fixture");
+    }
+
+    #[cfg(not(unix))]
+    {
+        write_fixture(root, link, "#let linked = 0\n");
+    }
 }
