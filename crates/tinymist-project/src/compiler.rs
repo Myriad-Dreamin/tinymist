@@ -1051,6 +1051,57 @@ mod tests {
     const UNRELATED: &str = "notes.typ";
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum OperationId {
+        O01,
+        O02,
+        O03,
+        O04,
+        O05,
+        O06,
+        O07,
+        O08,
+        O09,
+        O10,
+        O11,
+        O12,
+        O13,
+        O14,
+        O15,
+        O16,
+        O17,
+        O18,
+        O19,
+        O20,
+    }
+
+    impl OperationId {
+        fn label(self) -> &'static str {
+            match self {
+                OperationId::O01 => "O01",
+                OperationId::O02 => "O02",
+                OperationId::O03 => "O03",
+                OperationId::O04 => "O04",
+                OperationId::O05 => "O05",
+                OperationId::O06 => "O06",
+                OperationId::O07 => "O07",
+                OperationId::O08 => "O08",
+                OperationId::O09 => "O09",
+                OperationId::O10 => "O10",
+                OperationId::O11 => "O11",
+                OperationId::O12 => "O12",
+                OperationId::O13 => "O13",
+                OperationId::O14 => "O14",
+                OperationId::O15 => "O15",
+                OperationId::O16 => "O16",
+                OperationId::O17 => "O17",
+                OperationId::O18 => "O18",
+                OperationId::O19 => "O19",
+                OperationId::O20 => "O20",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum MatrixOperation {
         InitialSync,
         FollowUpNonSyncUpdate,
@@ -1071,6 +1122,8 @@ mod tests {
         UpstreamInvalidation,
         UnrelatedChurn,
         EmptyChangeset,
+        DependencyMembershipRemoval,
+        DependencyMembershipReaddition,
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1108,6 +1161,7 @@ mod tests {
         PreviouslyDependedPath,
         NewlyCreatedDependency,
         NewlyReferencedDependency,
+        RetainedInactiveDependency,
         UnrelatedFile,
     }
 
@@ -1157,6 +1211,8 @@ mod tests {
         AppliesDelayedMemoryBeforeFilesystem,
         KeepsUnrelatedChurnHarmless,
         ExplicitNoContentOutcome,
+        DropsInactiveDependency,
+        ReaddsChangedInactiveDependency,
     }
 
     #[derive(Debug, Clone, Copy)]
@@ -1170,6 +1226,13 @@ mod tests {
         batch_shape: BatchShape,
         sequence_shape: SequenceShape,
         expected: ExpectedOutcome,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct CompileCacheCoverageRow {
+        id: OperationId,
+        matrix_operations: &'static [MatrixOperation],
+        note: &'static str,
     }
 
     impl MatrixRow {
@@ -1427,6 +1490,156 @@ mod tests {
             batch_shape: BatchShape::EmptyChangeset,
             sequence_shape: SequenceShape::EmptyChangeset,
             expected: ExpectedOutcome::ExplicitNoContentOutcome,
+        },
+        MatrixRow {
+            operation: MatrixOperation::DependencyMembershipRemoval,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+            ],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::DropsInactiveDependency,
+        },
+        MatrixRow {
+            operation: MatrixOperation::DependencyMembershipReaddition,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+                PathRelation::ImportedDependency,
+            ],
+            batch_shape: BatchShape::MultiFileBatch,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::ReaddsChangedInactiveDependency,
+        },
+    ];
+
+    const VFS_OPERATION_COMPILE_CACHE_MATRIX: &[CompileCacheCoverageRow] = &[
+        CompileCacheCoverageRow {
+            id: OperationId::O01,
+            matrix_operations: &[MatrixOperation::CreateDependency],
+            note: "create recovers a missing dependency and refreshes compile dependencies",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O02,
+            matrix_operations: &[MatrixOperation::EditEntry, MatrixOperation::EditDependency],
+            note: "content updates are asserted for both entry and active dependency paths",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O03,
+            matrix_operations: &[
+                MatrixOperation::EmptyDependency,
+                MatrixOperation::EmptyUnrelated,
+            ],
+            note: "transient empty snapshots surface for active paths and remain harmless for unrelated paths",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O04,
+            matrix_operations: &[
+                MatrixOperation::ReadErrorDependency,
+                MatrixOperation::FailedReadThenRecovery,
+            ],
+            note: "read-error snapshots replace stale sources and later recover",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O05,
+            matrix_operations: &[MatrixOperation::RemoveDependency],
+            note: "remove retires a depended path from compile-visible state",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O06,
+            matrix_operations: &[MatrixOperation::DeleteThenRecreate],
+            note: "delete then recreate reports missing before recovering with new bytes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O07,
+            matrix_operations: &[MatrixOperation::EditDependency],
+            note: "atomic replace normalizes to a final dependency insert at the project boundary",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O08,
+            matrix_operations: &[MatrixOperation::RenameStaleReferences],
+            note: "stale-reference rename reports the old dependency unavailable",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O09,
+            matrix_operations: &[
+                MatrixOperation::RenameUpdatedReferences,
+                MatrixOperation::RenameBatch,
+            ],
+            note: "updated-reference rename follows the new path and drops the old dependency",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O10,
+            matrix_operations: &[MatrixOperation::RenameUpdatedReferences],
+            note: "case-only rename is compile-cache equivalent to an updated-reference file rename",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O11,
+            matrix_operations: &[
+                MatrixOperation::RemoveDependency,
+                MatrixOperation::CreateDependency,
+            ],
+            note: "root-boundary file moves normalize to remove-only or create-only project deltas",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O12,
+            matrix_operations: &[MatrixOperation::RenameStaleReferences],
+            note: "stale directory-prefix rename shares the old-path retirement obligation",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O13,
+            matrix_operations: &[MatrixOperation::RenameBatch],
+            note: "updated directory-prefix rename shares the batch new-path dependency obligation",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O14,
+            matrix_operations: &[MatrixOperation::RemoveDependency],
+            note: "directory delete compiles as one or more depended-path removals",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O15,
+            matrix_operations: &[
+                MatrixOperation::RemoveDependency,
+                MatrixOperation::CreateDependency,
+            ],
+            note: "root-boundary subtree moves combine moved-out removes and moved-in creates",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O16,
+            matrix_operations: &[MatrixOperation::DependencyMembershipRemoval],
+            note: "entry edits that drop imports must remove retained inactive paths from dependencies",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O17,
+            matrix_operations: &[MatrixOperation::DependencyMembershipReaddition],
+            note: "re-added dependencies must consume fresh sync snapshots after inactive changes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O18,
+            matrix_operations: &[MatrixOperation::UpstreamInvalidation],
+            note: "shadow-open filesystem races use upstream invalidation ordering",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O19,
+            matrix_operations: &[MatrixOperation::EditDependency],
+            note: "symlink-like target changes normalize to changed observable dependency bytes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O20,
+            matrix_operations: &[
+                MatrixOperation::RenameBatch,
+                MatrixOperation::MultiFileUnrelatedBatch,
+            ],
+            note: "mixed batches assert final-state dependency correctness and harmless unrelated churn",
         },
     ];
 
@@ -1692,6 +1905,23 @@ mod tests {
         );
     }
 
+    fn assert_compile_cache_matrix_contains(id: OperationId) {
+        assert!(
+            VFS_OPERATION_COMPILE_CACHE_MATRIX
+                .iter()
+                .any(|row| row.id == id),
+            "project compiler compile-cache matrix missing {}",
+            id.label()
+        );
+    }
+
+    fn project_matrix_row(operation: MatrixOperation) -> MatrixRow {
+        *PROJECT_COMPILER_FS_EVENT_MATRIX
+            .iter()
+            .find(|row| row.operation == operation)
+            .unwrap_or_else(|| panic!("missing project matrix row for {operation:?}"))
+    }
+
     #[expect(
         clippy::too_many_arguments,
         reason = "project compiler matrix rows are clearer when each dimension is asserted explicitly"
@@ -1751,6 +1981,12 @@ mod tests {
             MatrixOperation::UpstreamInvalidation => assert_upstream_invalidation(row),
             MatrixOperation::UnrelatedChurn => assert_unrelated_churn(row),
             MatrixOperation::EmptyChangeset => assert_empty_changeset(row),
+            MatrixOperation::DependencyMembershipRemoval => {
+                assert_dependency_membership_removal(row);
+            }
+            MatrixOperation::DependencyMembershipReaddition => {
+                assert_dependency_membership_readdition(row);
+            }
         }
     }
 
@@ -1780,6 +2016,8 @@ mod tests {
             MatrixOperation::UpstreamInvalidation,
             MatrixOperation::UnrelatedChurn,
             MatrixOperation::EmptyChangeset,
+            MatrixOperation::DependencyMembershipRemoval,
+            MatrixOperation::DependencyMembershipReaddition,
         ] {
             assert_matrix_contains(operation, |row| row.operation == operation);
         }
@@ -1810,6 +2048,7 @@ mod tests {
             PathRelation::PreviouslyDependedPath,
             PathRelation::NewlyCreatedDependency,
             PathRelation::NewlyReferencedDependency,
+            PathRelation::RetainedInactiveDependency,
             PathRelation::UnrelatedFile,
         ] {
             assert_matrix_contains(relation, |row| row.path_relations.contains(&relation));
@@ -1858,6 +2097,51 @@ mod tests {
     fn project_compiler_fs_event_matrix_rows_execute_expected_outcomes() {
         for row in PROJECT_COMPILER_FS_EVENT_MATRIX {
             run_matrix_row(*row);
+        }
+    }
+
+    #[test]
+    fn project_compiler_compile_cache_matrix_covers_vfs_operation_rows() {
+        for id in [
+            OperationId::O01,
+            OperationId::O02,
+            OperationId::O03,
+            OperationId::O04,
+            OperationId::O05,
+            OperationId::O06,
+            OperationId::O07,
+            OperationId::O08,
+            OperationId::O09,
+            OperationId::O10,
+            OperationId::O11,
+            OperationId::O12,
+            OperationId::O13,
+            OperationId::O14,
+            OperationId::O15,
+            OperationId::O16,
+            OperationId::O17,
+            OperationId::O18,
+            OperationId::O19,
+            OperationId::O20,
+        ] {
+            assert_compile_cache_matrix_contains(id);
+        }
+
+        for coverage in VFS_OPERATION_COMPILE_CACHE_MATRIX {
+            assert!(
+                !coverage.matrix_operations.is_empty(),
+                "{} must have an executable project compiler representative",
+                coverage.id.label()
+            );
+            assert!(
+                !coverage.note.is_empty(),
+                "{} must document its project compile-cache equivalence",
+                coverage.id.label()
+            );
+
+            for operation in coverage.matrix_operations {
+                run_matrix_row(project_matrix_row(*operation));
+            }
         }
     }
 
@@ -2461,5 +2745,87 @@ mod tests {
         assert_eq!(artifact.error_cnt(), 0);
         let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
         assert_eq!(deps_after, deps_before);
+    }
+
+    fn assert_dependency_membership_removal(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+            ],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::DropsInactiveDependency,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        assert_deps_contain(&harness.workspace, &deps_before, DEP);
+
+        let entry_without_dependency = harness
+            .workspace
+            .update_source(MAIN, "#let value = [inline]\n#value");
+        row.apply_update(&mut harness, &entry_without_dependency);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, MAIN),
+            "#let value = [inline]\n#value"
+        );
+        let deps_after = harness.dependency_paths_after_compile();
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, DEP);
+    }
+
+    fn assert_dependency_membership_readdition(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+                PathRelation::ImportedDependency,
+            ],
+            BatchShape::MultiFileBatch,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::ReaddsChangedInactiveDependency,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        assert_deps_contain(&harness.workspace, &deps_before, DEP);
+
+        let entry_without_dependency = harness
+            .workspace
+            .update_source(MAIN, "#let value = [inline]\n#value");
+        harness.apply_update(&entry_without_dependency, false);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_without_dependency = harness.dependency_paths_after_compile();
+        assert_deps_do_not_contain(&harness.workspace, &deps_without_dependency, DEP);
+
+        let changed_while_inactive = harness
+            .workspace
+            .update_source(DEP, "#let value = [changed while inactive]");
+        let entry_readd = harness
+            .workspace
+            .update_source(MAIN, "#import \"dep.typ\": value\n#value");
+        row.apply_update(&mut harness, &entry_readd);
+        harness.apply_update(&changed_while_inactive, true);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [changed while inactive]"
+        );
+        let deps_after = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps_after, DEP);
     }
 }
