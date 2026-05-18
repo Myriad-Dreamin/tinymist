@@ -1925,9 +1925,9 @@ dependencies = [
 
 [[package]]
 name = "ezsockets"
-version = "0.7.1"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f99230cd4b340f0590dab3dd65a9f3edc0da4c759922f303467eefde08a7eb7"
+checksum = "2dcb48f424f9ca146aeb1d43df970f64332a2b1e0b3719c9861729e6ec4887a4"
 dependencies = [
  "async-channel 1.9.0",
  "async-trait",
@@ -7240,9 +7240,9 @@ dependencies = [
 
 [[package]]
 name = "tower-http"
-version = "0.6.10"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68d6fdd9f81c2819c9a8b0e0cd91660e7746a8e6ea2ba7c6b2b057985f6bcb51"
+checksum = "4cfcf7e2740e6fc6d4d688b4ef00650406bb94adf4731e43c096c3a19fe40840"
 dependencies = [
  "bitflags 2.11.1",
  "bytes",
