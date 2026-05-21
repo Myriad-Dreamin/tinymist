@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6136,7 +6136,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "clap",
@@ -6268,7 +6268,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -6401,7 +6401,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6479,7 +6479,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "comemo",
  "dashmap",
@@ -6517,11 +6517,11 @@ checksum = "9169c1e5e9e524bc2f2c97da5fcef76894e1a94cf690adb21e82960eb106d829"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "divan",
  "tinymist",
@@ -6529,7 +6529,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6603,7 +6603,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6623,7 +6623,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6650,7 +6650,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-docs-tool"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6677,7 +6677,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "comemo",
  "insta",
@@ -6719,7 +6719,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "bytes",
  "clap",
@@ -6774,7 +6774,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -6828,7 +6828,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -6913,7 +6913,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "comemo",
  "insta",
@@ -6946,7 +6946,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-viewer"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -7468,7 +7468,7 @@ checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
 
 [[package]]
 name = "typlite"
-version = "0.14.19-rc5"
+version = "0.14.19-rc6"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -10293,14 +10293,14 @@ dependencies = [
 [[patch.unused]]
 name = "reflexo"
 version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=009beddfab13a6a0d63a769c65758b33b08d7f76#009beddfab13a6a0d63a769c65758b33b08d7f76"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd0edeff8836a93674f7a756b4543c0af4bcdde3#cd0edeff8836a93674f7a756b4543c0af4bcdde3"
 
 [[patch.unused]]
 name = "reflexo-typst"
 version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=009beddfab13a6a0d63a769c65758b33b08d7f76#009beddfab13a6a0d63a769c65758b33b08d7f76"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd0edeff8836a93674f7a756b4543c0af4bcdde3#cd0edeff8836a93674f7a756b4543c0af4bcdde3"
 
 [[patch.unused]]
 name = "reflexo-vec2svg"
 version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=009beddfab13a6a0d63a769c65758b33b08d7f76#009beddfab13a6a0d63a769c65758b33b08d7f76"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts/?rev=cd0edeff8836a93674f7a756b4543c0af4bcdde3#cd0edeff8836a93674f7a756b4543c0af4bcdde3"
