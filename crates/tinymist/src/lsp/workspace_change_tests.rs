@@ -1545,6 +1545,7 @@ fn local_source(symbol: &str) -> String {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LinkFixtureKind {
+    #[cfg(unix)]
     Symlink,
     #[cfg(not(unix))]
     PlainFileFallback,
