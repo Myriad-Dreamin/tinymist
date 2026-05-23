@@ -1324,9 +1324,7 @@ fn workspace_edit_carries_rename_assistance(
     let expected_uri = harness.uri(expected_rel);
     applied_workspace_edit_to_main(harness, edit)
         .is_some_and(|after| after.contains(&format!("\"{expected_rel}\"")))
-        || workspace_edit_resource_renames(edit)
-            .iter()
-            .any(|uri| *uri == expected_uri)
+        || workspace_edit_resource_renames(edit).contains(&expected_uri)
 }
 
 fn assert_workspace_edit_carries_rename_assistance(
