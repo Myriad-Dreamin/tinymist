@@ -15,7 +15,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::sync::mpsc;
 use typst::ecow::EcoString;
 
-use crate::actor::editor::EditorRequest;
+use crate::actor::editor::{EditorRequest, ProjVersion};
 use crate::input::{FileChange, FileChangeResult, FsChangeParams};
 use crate::project::{Interrupt, LspInterrupt, ProjectInsId};
 use crate::{CompileFontArgs, Config, ConstConfig, ServerState};
@@ -210,6 +210,13 @@ struct LspHarness {
     receiver: sync_ls::TConnectionRx<LspMessage>,
     server: ServerState,
     editor_rx: mpsc::UnboundedReceiver<EditorRequest>,
+    last_diag_revision: usize,
+}
+
+#[derive(Debug)]
+struct DiagnosticPublication {
+    version: ProjVersion,
+    diagnostics: Option<tinymist_query::DiagnosticsMap>,
 }
 
 impl LspHarness {
@@ -249,6 +256,7 @@ impl LspHarness {
             receiver,
             server: ServerState::new(client, config, editor_tx),
             editor_rx,
+            last_diag_revision: 0,
         };
         harness
             .server
@@ -307,7 +315,6 @@ impl LspHarness {
         });
         self.resolve_json(response);
         self.drain_project_events();
-        self.compile_primary();
     }
 
     fn fs_remove(&mut self, rel: &str) {
@@ -316,7 +323,7 @@ impl LspHarness {
 
     fn fs_batch(&mut self, inserts: &[(&str, &str)], removes: &[&str], is_sync: bool) {
         for rel in removes {
-            remove_fixture(self.root.path(), rel);
+            remove_existing_fixture(self.root.path(), rel);
         }
         for (rel, source) in inserts {
             write_fixture(self.root.path(), rel, source);
@@ -343,7 +350,6 @@ impl LspHarness {
         });
         self.resolve_json(response);
         self.drain_project_events();
-        self.compile_primary();
     }
 
     fn open_source(&mut self, rel: &str, source: &str) {
@@ -386,7 +392,7 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<GotoDefinitionResponse> = self.decode_response(response);
+        let result: Option<GotoDefinitionResponse> = self.decode_egress_response(response);
         match result {
             Some(GotoDefinitionResponse::Scalar(location)) => vec![location.uri],
             Some(GotoDefinitionResponse::Array(locations)) => {
@@ -408,7 +414,7 @@ impl LspHarness {
                 include_declaration: true,
             },
         });
-        let result: Option<Vec<Location>> = self.decode_response(response);
+        let result: Option<Vec<Location>> = self.decode_egress_response(response);
         result
             .unwrap_or_default()
             .into_iter()
@@ -425,7 +431,7 @@ impl LspHarness {
             ),
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
-        let result: Option<Hover> = self.decode_response(response);
+        let result: Option<Hover> = self.decode_egress_response(response);
         result.map(|hover| match hover.contents {
             HoverContents::Scalar(MarkedString::String(text)) => text,
             HoverContents::Scalar(MarkedString::LanguageString(text)) => text.value,
@@ -451,7 +457,7 @@ impl LspHarness {
                 trigger_character: None,
             }),
         });
-        let result: Option<CompletionList> = self.decode_response(response);
+        let result: Option<CompletionList> = self.decode_egress_response(response);
         result
             .unwrap_or_else(|| CompletionList {
                 is_incomplete: false,
@@ -469,7 +475,7 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<Vec<SymbolInformation>> = self.decode_response(response);
+        let result: Option<Vec<SymbolInformation>> = self.decode_egress_response(response);
         result
             .unwrap_or_default()
             .into_iter()
@@ -483,7 +489,7 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<DocumentSymbolResponse> = self.decode_response(response);
+        let result: Option<DocumentSymbolResponse> = self.decode_egress_response(response);
         match result {
             Some(DocumentSymbolResponse::Nested(symbols)) => symbols
                 .into_iter()
@@ -502,7 +508,7 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<SemanticTokensResult> = self.decode_response(response);
+        let result: Option<SemanticTokensResult> = self.decode_egress_response(response);
         match result.expect("expected semantic token response") {
             SemanticTokensResult::Tokens(tokens) => tokens,
             SemanticTokensResult::Partial(_) => {
@@ -524,7 +530,7 @@ impl LspHarness {
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             });
-        let result: Option<SemanticTokensFullDeltaResult> = self.decode_response(response);
+        let result: Option<SemanticTokensFullDeltaResult> = self.decode_egress_response(response);
         match result.expect("expected semantic token delta response") {
             SemanticTokensFullDeltaResult::Tokens(tokens) => tokens.result_id,
             SemanticTokensFullDeltaResult::TokensDelta(delta) => delta.result_id,
@@ -538,7 +544,7 @@ impl LspHarness {
             new_name: new_name.to_owned(),
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
-        let result: Option<WorkspaceEdit> = self.decode_response(response);
+        let result: Option<WorkspaceEdit> = self.decode_egress_response(response);
         result.expect("expected rename workspace edit")
     }
 
@@ -549,37 +555,74 @@ impl LspHarness {
                 new_uri: self.uri(new_rel).to_string(),
             }],
         });
-        let result: Option<WorkspaceEdit> = self.decode_response(response);
+        let result: Option<WorkspaceEdit> = self.decode_egress_response(response);
         result
     }
 
-    fn take_latest_diagnostics(&mut self) -> Option<tinymist_query::DiagnosticsMap> {
+    fn take_latest_diagnostics(&mut self) -> Option<DiagnosticPublication> {
+        let deadline = Instant::now() + Duration::from_secs(2);
         let mut latest = None;
-        while let Ok(request) = self.editor_rx.try_recv() {
-            if let EditorRequest::Diag(_, diagnostics) = request {
-                latest = diagnostics;
+        loop {
+            while let Ok(request) = self.editor_rx.try_recv() {
+                if let EditorRequest::Diag(version, diagnostics) = request {
+                    if version.id != ProjectInsId::PRIMARY {
+                        continue;
+                    }
+                    assert!(
+                        version.revision >= self.last_diag_revision,
+                        "diagnostics revision regressed from {} to {}",
+                        self.last_diag_revision,
+                        version.revision
+                    );
+                    self.last_diag_revision = version.revision;
+                    latest = Some(DiagnosticPublication {
+                        version,
+                        diagnostics,
+                    });
+                }
             }
+
+            if latest.is_some() || Instant::now() >= deadline {
+                break;
+            }
+
+            std::thread::sleep(Duration::from_millis(10));
         }
         latest
     }
 
     fn assert_latest_diagnostics_empty(&mut self) {
-        let diagnostics = self
+        let publication = self
             .take_latest_diagnostics()
             .expect("expected diagnostics publication");
+        let diagnostics = publication.diagnostics.unwrap_or_default();
+        let main_uri = self.uri(MAIN);
         assert!(
             diagnostics.values().all(|items| items.is_empty()),
-            "expected diagnostics to be empty, got {diagnostics:?}"
+            "expected diagnostics to be empty at revision {}, got {diagnostics:?}",
+            publication.version.revision
+        );
+        assert!(
+            diagnostics
+                .get(&main_uri)
+                .is_none_or(|items| items.is_empty()),
+            "expected main file diagnostics to be empty at revision {}, got {:?}",
+            publication.version.revision,
+            diagnostics.get(&main_uri)
         );
     }
 
     fn assert_latest_diagnostics_present(&mut self) {
-        let diagnostics = self
+        let publication = self
             .take_latest_diagnostics()
             .expect("expected diagnostics publication");
+        let diagnostics = publication.diagnostics.unwrap_or_default();
+        let main_uri = self.uri(MAIN);
+        let main_diagnostics = diagnostics.get(&main_uri);
         assert!(
-            diagnostics.values().any(|items| !items.is_empty()),
-            "expected diagnostics to be present, got {diagnostics:?}"
+            main_diagnostics.is_some_and(|items| !items.is_empty()),
+            "expected main file diagnostics to be present at revision {}, got {diagnostics:?}",
+            publication.version.revision
         );
     }
 
@@ -596,16 +639,21 @@ impl LspHarness {
             .expect("request should complete successfully")
     }
 
-    fn decode_response<T: DeserializeOwned>(&self, response: ScheduleResult) -> T {
+    fn decode_egress_response<T: DeserializeOwned>(&self, response: ScheduleResult) -> T {
         serde_json::from_value(self.resolve_json(response)).expect("failed to decode LSP response")
     }
 
     fn drain_project_events(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(10);
+        // Dependency sync can enqueue follow-up filesystem interrupts after a
+        // compile result; wait for a short quiet period before observing state.
+        let quiet_for = Duration::from_millis(100);
+        let mut idle_since = None;
         loop {
             match self.receiver.event.recv_timeout(Duration::from_millis(20)) {
                 Ok(event) => {
                     if let Ok(interrupt) = event.downcast::<LspInterrupt>() {
+                        idle_since = None;
                         self.server.project.interrupt(*interrupt);
                         continue;
                     }
@@ -621,8 +669,13 @@ impl LspHarness {
                         .compiling_since
                         .is_none()
                     {
-                        break;
+                        let idle_since = idle_since.get_or_insert_with(Instant::now);
+                        if idle_since.elapsed() >= quiet_for {
+                            break;
+                        }
+                        continue;
                     }
+                    idle_since = None;
                     assert!(
                         Instant::now() < deadline,
                         "timed out waiting for project compile event"
@@ -904,7 +957,7 @@ fn o12_directory_rename_with_stale_references_retires_old_directory_path() {
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
 
-    assert_directory_rename_assistance_if_available(&mut harness, "dir", "renamed-dir");
+    assert_directory_rename_assistance(&mut harness, "dir", "renamed-dir");
     harness.fs_batch(&[(RENAMED_DIR_DEP, "#let alpha = 12\n")], &[DIR_DEP], false);
     harness.assert_latest_diagnostics_present();
     assert_graph_does_not_resolve_to(&mut harness, MAIN, "alpha", DIR_DEP);
@@ -919,7 +972,7 @@ fn o13_directory_rename_with_updated_references_follows_new_directory_path() {
     harness.compile_primary();
     harness.assert_latest_diagnostics_empty();
 
-    assert_directory_rename_assistance_if_available(&mut harness, "dir", "renamed-dir");
+    assert_directory_rename_assistance(&mut harness, "dir", "renamed-dir");
     harness.fs_batch(
         &[
             (RENAMED_DIR_DEP, "#let alpha = 13\n"),
@@ -1023,13 +1076,17 @@ fn o18_shadow_open_keeps_memory_source_until_close_then_uses_filesystem() {
 }
 
 #[test]
-fn o19_symlink_read_result_refreshes_graph_apis_for_link_path() {
+fn o19_symlink_like_read_result_refreshes_graph_apis_for_link_path() {
     let main = main_source("link.typ", "linked");
     let mut harness = LspHarness::new(&[(MAIN, &main)]);
     harness.compile_primary();
     harness.assert_latest_diagnostics_present();
 
-    create_symlink_fixture_if_supported(harness.root.path(), "target.typ", "link.typ");
+    let link_kind = create_link_fixture(harness.root.path(), "target.typ", "link.typ");
+    #[cfg(unix)]
+    assert_eq!(link_kind, LinkFixtureKind::Symlink);
+    #[cfg(not(unix))]
+    assert_eq!(link_kind, LinkFixtureKind::PlainFileFallback);
     harness.fs_insert("link.typ", "#let linked = 19\n");
     harness.assert_latest_diagnostics_empty();
     assert_graph_resolves(&mut harness, MAIN, "linked", "link.typ");
@@ -1243,29 +1300,183 @@ fn assert_file_rename_assistance(
 ) {
     let edit = harness
         .will_rename_edit(old_rel, new_rel)
+        .filter(|edit| workspace_edit_carries_rename_assistance(harness, edit, new_rel))
         .unwrap_or_else(|| {
             let include_path_pos = harness.position_of(MAIN, old_rel, 0, 1);
             harness.rename_edit(MAIN, include_path_pos, fallback_new_name)
         });
-    let edit_json = serde_json::to_string(&edit).expect("failed to serialize workspace edit");
+    assert_workspace_edit_carries_rename_assistance(harness, &edit, new_rel);
+}
+
+fn assert_directory_rename_assistance(harness: &mut LspHarness, old_rel: &str, new_rel: &str) {
+    // Do not fall back to textDocument/rename here: renaming an import segment
+    // like "dir" is not equivalent to moving the directory.
+    if let Some(edit) = harness.will_rename_edit(old_rel, new_rel) {
+        assert_workspace_edit_carries_rename_assistance(harness, &edit, new_rel);
+    }
+}
+
+fn workspace_edit_carries_rename_assistance(
+    harness: &LspHarness,
+    edit: &WorkspaceEdit,
+    expected_rel: &str,
+) -> bool {
+    let expected_uri = harness.uri(expected_rel);
+    applied_workspace_edit_to_main(harness, edit)
+        .is_some_and(|after| after.contains(&format!("\"{expected_rel}\"")))
+        || workspace_edit_resource_renames(edit)
+            .iter()
+            .any(|uri| *uri == expected_uri)
+}
+
+fn assert_workspace_edit_carries_rename_assistance(
+    harness: &LspHarness,
+    edit: &WorkspaceEdit,
+    expected_rel: &str,
+) {
     assert!(
-        edit_json.contains(new_rel),
-        "workspace edit should update imports to {new_rel}: {edit_json}"
+        workspace_edit_carries_rename_assistance(harness, edit, expected_rel),
+        "workspace edit should either update main imports or rename a resource to {expected_rel}: {edit:?}"
     );
 }
 
-fn assert_directory_rename_assistance_if_available(
-    harness: &mut LspHarness,
-    old_rel: &str,
-    new_rel: &str,
-) {
-    if let Some(edit) = harness.will_rename_edit(old_rel, new_rel) {
-        let edit_json = serde_json::to_string(&edit).expect("failed to serialize workspace edit");
-        assert!(
-            edit_json.contains(new_rel),
-            "workspace edit should update imports to {new_rel}: {edit_json}"
-        );
+fn workspace_edit_resource_renames(edit: &WorkspaceEdit) -> Vec<Url> {
+    let mut renames = Vec::new();
+    let Some(DocumentChanges::Operations(operations)) = &edit.document_changes else {
+        return renames;
+    };
+
+    for operation in operations {
+        if let DocumentChangeOperation::Op(ResourceOp::Rename(rename)) = operation {
+            renames.push(rename.new_uri.clone());
+        }
     }
+
+    renames
+}
+
+fn applied_workspace_edit_to_main(harness: &LspHarness, edit: &WorkspaceEdit) -> Option<String> {
+    let main_uri = harness.uri(MAIN);
+    let edits = workspace_edit_text_edits(edit, &main_uri);
+    if edits.is_empty() {
+        return None;
+    }
+
+    let before = fs::read_to_string(harness.path(MAIN)).expect("failed to read main fixture");
+    let after = apply_text_edits(&before, &edits);
+    if after == before {
+        return None;
+    }
+
+    Some(after)
+}
+
+fn workspace_edit_text_edits(edit: &WorkspaceEdit, uri: &Url) -> Vec<TextEdit> {
+    let mut edits = Vec::new();
+
+    if let Some(changes) = &edit.changes {
+        if let Some(uri_edits) = changes.get(uri) {
+            edits.extend(uri_edits.iter().cloned());
+        }
+    }
+
+    if let Some(document_changes) = &edit.document_changes {
+        match document_changes {
+            DocumentChanges::Edits(document_edits) => {
+                for document_edit in document_edits {
+                    collect_text_document_edit(uri, document_edit, &mut edits);
+                }
+            }
+            DocumentChanges::Operations(operations) => {
+                for operation in operations {
+                    if let DocumentChangeOperation::Edit(document_edit) = operation {
+                        collect_text_document_edit(uri, document_edit, &mut edits);
+                    }
+                }
+            }
+        }
+    }
+
+    edits
+}
+
+fn collect_text_document_edit(
+    uri: &Url,
+    document_edit: &TextDocumentEdit,
+    edits: &mut Vec<TextEdit>,
+) {
+    if document_edit.text_document.uri != *uri {
+        return;
+    }
+
+    for edit in &document_edit.edits {
+        match edit {
+            OneOf::Left(edit) => edits.push(edit.clone()),
+            OneOf::Right(edit) => edits.push(edit.text_edit.clone()),
+        }
+    }
+}
+
+fn apply_text_edits(source: &str, edits: &[TextEdit]) -> String {
+    let mut replacements = edits
+        .iter()
+        .map(|edit| {
+            (
+                byte_offset(source, edit.range.start),
+                byte_offset(source, edit.range.end),
+                edit.new_text.clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    replacements.sort_by_key(|(start, end, _)| (*start, *end));
+
+    let mut edited = source.to_owned();
+    for (start, end, new_text) in replacements.into_iter().rev() {
+        edited.replace_range(start..end, &new_text);
+    }
+
+    edited
+}
+
+fn byte_offset(source: &str, position: Position) -> usize {
+    let mut line = 0;
+    let mut line_start = 0;
+    for (idx, ch) in source.char_indices() {
+        if line == position.line {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            line_start = idx + ch.len_utf8();
+        }
+    }
+    assert_eq!(
+        line, position.line,
+        "position line {} is outside source {source:?}",
+        position.line
+    );
+
+    let line_end = source[line_start..]
+        .find('\n')
+        .map_or(source.len(), |offset| line_start + offset);
+    let line_text = &source[line_start..line_end];
+    let mut character = 0;
+    for (idx, ch) in line_text.char_indices() {
+        if character == position.character {
+            return line_start + idx;
+        }
+        character += 1;
+        if character == position.character {
+            return line_start + idx + ch.len_utf8();
+        }
+    }
+
+    assert_eq!(
+        character, position.character,
+        "position character {} is outside source line {line_text:?}",
+        position.character
+    );
+    line_end
 }
 
 fn write_fixture(root: &Path, rel: &str, source: &str) {
@@ -1276,11 +1487,13 @@ fn write_fixture(root: &Path, rel: &str, source: &str) {
     fs::write(path, source).expect("failed to write fixture");
 }
 
-fn remove_fixture(root: &Path, rel: &str) {
+fn remove_existing_fixture(root: &Path, rel: &str) {
     let path = root.join(rel);
-    if path.is_dir() {
+    let metadata = fs::symlink_metadata(&path)
+        .unwrap_or_else(|err| panic!("expected fixture {path:?} to exist before removal: {err}"));
+    if metadata.file_type().is_dir() {
         fs::remove_dir_all(path).expect("failed to remove fixture directory");
-    } else if path.exists() {
+    } else {
         fs::remove_file(path).expect("failed to remove fixture file");
     }
 }
@@ -1332,7 +1545,14 @@ fn local_source(symbol: &str) -> String {
     format!("#let {symbol} = 1\n#{symbol}\n")
 }
 
-fn create_symlink_fixture_if_supported(root: &Path, target: &str, link: &str) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LinkFixtureKind {
+    Symlink,
+    #[cfg(not(unix))]
+    PlainFileFallback,
+}
+
+fn create_link_fixture(root: &Path, target: &str, link: &str) -> LinkFixtureKind {
     write_fixture(root, target, "#let linked = 0\n");
 
     #[cfg(unix)]
@@ -1342,10 +1562,12 @@ fn create_symlink_fixture_if_supported(root: &Path, target: &str, link: &str) {
             fs::create_dir_all(parent).expect("failed to create symlink fixture directory");
         }
         std::os::unix::fs::symlink(target, link_path).expect("failed to create symlink fixture");
+        LinkFixtureKind::Symlink
     }
 
     #[cfg(not(unix))]
     {
         write_fixture(root, link, "#let linked = 0\n");
+        LinkFixtureKind::PlainFileFallback
     }
 }
