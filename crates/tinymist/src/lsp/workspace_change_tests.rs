@@ -591,35 +591,15 @@ impl LspHarness {
         matched
     }
 
-    fn take_latest_diagnostics(&mut self) -> Option<DiagnosticPublication> {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        let mut latest = None;
-        loop {
-            self.drain_diagnostic_publications(|publication| {
-                latest = Some(publication);
-                true
-            });
-
-            if latest.is_some() || Instant::now() >= deadline {
-                break;
-            }
-
-            std::thread::sleep(Duration::from_millis(10));
-        }
-        latest
-    }
-
     fn assert_real_fs_diagnostics_empty(&mut self) {
-        let publication =
-            self.wait_for_real_fs_diagnostics("empty main diagnostics", |publication, main_uri| {
-                let diagnostics = publication.diagnostics.as_ref();
-                diagnostics.is_none_or(|diagnostics| {
-                    diagnostics.values().all(|items| items.is_empty())
-                        && diagnostics
-                            .get(main_uri)
-                            .is_none_or(|items| items.is_empty())
-                })
-            });
+        let publication = self.wait_for_diagnostics(
+            Duration::from_secs(10),
+            "empty main diagnostics",
+            true,
+            |publication, main_uri| {
+                diagnostics_are_empty(publication.diagnostics.as_ref(), main_uri)
+            },
+        );
         let diagnostics = publication.diagnostics.unwrap_or_default();
         assert!(
             diagnostics.values().all(|items| items.is_empty()),
@@ -629,14 +609,12 @@ impl LspHarness {
     }
 
     fn assert_real_fs_diagnostics_present(&mut self) {
-        let publication = self.wait_for_real_fs_diagnostics(
+        let publication = self.wait_for_diagnostics(
+            Duration::from_secs(10),
             "non-empty main diagnostics",
+            true,
             |publication, main_uri| {
-                publication
-                    .diagnostics
-                    .as_ref()
-                    .and_then(|diagnostics| diagnostics.get(main_uri))
-                    .is_some_and(|items| !items.is_empty())
+                diagnostics_are_present_on_main(publication.diagnostics.as_ref(), main_uri)
             },
         );
         let diagnostics = publication.diagnostics.unwrap_or_default();
@@ -649,12 +627,14 @@ impl LspHarness {
         );
     }
 
-    fn wait_for_real_fs_diagnostics(
+    fn wait_for_diagnostics(
         &mut self,
+        timeout: Duration,
         description: &str,
+        pump_events: bool,
         mut matches: impl FnMut(&DiagnosticPublication, &Url) -> bool,
     ) -> DiagnosticPublication {
-        let deadline = Instant::now() + Duration::from_secs(10);
+        let deadline = Instant::now() + timeout;
         let main_uri = self.uri(MAIN);
         let mut matched = None;
         let mut last_publication = None;
@@ -675,18 +655,27 @@ impl LspHarness {
 
             assert!(
                 Instant::now() < deadline,
-                "timed out waiting for real filesystem {description}; last diagnostics: {}",
+                "timed out waiting for {description}; last diagnostics: {}",
                 last_publication.unwrap_or_else(|| "<none>".to_owned())
             );
 
-            self.pump_project_event(Duration::from_millis(20));
+            if pump_events {
+                self.pump_project_event(Duration::from_millis(20));
+            } else {
+                std::thread::sleep(Duration::from_millis(10));
+            }
         }
     }
 
     fn assert_latest_diagnostics_empty(&mut self) {
-        let publication = self
-            .take_latest_diagnostics()
-            .expect("expected diagnostics publication");
+        let publication = self.wait_for_diagnostics(
+            Duration::from_secs(2),
+            "empty diagnostics",
+            false,
+            |publication, main_uri| {
+                diagnostics_are_empty(publication.diagnostics.as_ref(), main_uri)
+            },
+        );
         let diagnostics = publication.diagnostics.unwrap_or_default();
         let main_uri = self.uri(MAIN);
         assert!(
@@ -705,9 +694,14 @@ impl LspHarness {
     }
 
     fn assert_latest_diagnostics_present(&mut self) {
-        let publication = self
-            .take_latest_diagnostics()
-            .expect("expected diagnostics publication");
+        let publication = self.wait_for_diagnostics(
+            Duration::from_secs(2),
+            "main file diagnostics",
+            false,
+            |publication, main_uri| {
+                diagnostics_are_present_on_main(publication.diagnostics.as_ref(), main_uri)
+            },
+        );
         let diagnostics = publication.diagnostics.unwrap_or_default();
         let main_uri = self.uri(MAIN);
         let main_diagnostics = diagnostics.get(&main_uri);
@@ -803,6 +797,27 @@ impl LspHarness {
             }
         }
     }
+}
+
+fn diagnostics_are_empty(
+    diagnostics: Option<&tinymist_query::DiagnosticsMap>,
+    main_uri: &Url,
+) -> bool {
+    diagnostics.is_none_or(|diagnostics| {
+        diagnostics.values().all(|items| items.is_empty())
+            && diagnostics
+                .get(main_uri)
+                .is_none_or(|items| items.is_empty())
+    })
+}
+
+fn diagnostics_are_present_on_main(
+    diagnostics: Option<&tinymist_query::DiagnosticsMap>,
+    main_uri: &Url,
+) -> bool {
+    diagnostics
+        .and_then(|diagnostics| diagnostics.get(main_uri))
+        .is_some_and(|items| !items.is_empty())
 }
 
 #[test]
