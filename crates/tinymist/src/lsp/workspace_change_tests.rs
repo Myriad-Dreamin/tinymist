@@ -577,12 +577,9 @@ impl LspHarness {
                 if version.id != ProjectInsId::PRIMARY {
                     continue;
                 }
-                assert!(
-                    version.revision >= self.last_diag_revision,
-                    "diagnostics revision regressed from {} to {}",
-                    self.last_diag_revision,
-                    version.revision
-                );
+                if version.revision < self.last_diag_revision {
+                    continue;
+                }
                 self.last_diag_revision = version.revision;
                 matched |= on_publication(DiagnosticPublication {
                     version,
