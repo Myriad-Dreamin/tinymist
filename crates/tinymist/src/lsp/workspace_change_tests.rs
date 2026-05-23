@@ -321,6 +321,14 @@ impl LspHarness {
         self.fs_batch(&[], &[rel], false);
     }
 
+    fn real_fs_insert(&mut self, rel: &str, source: &str) {
+        write_fixture(self.root.path(), rel, source);
+    }
+
+    fn real_fs_remove(&mut self, rel: &str) {
+        remove_existing_fixture(self.root.path(), rel);
+    }
+
     fn fs_batch(&mut self, inserts: &[(&str, &str)], removes: &[&str], is_sync: bool) {
         for rel in removes {
             remove_existing_fixture(self.root.path(), rel);
@@ -559,28 +567,41 @@ impl LspHarness {
         result
     }
 
+    fn drain_diagnostic_publications(
+        &mut self,
+        mut on_publication: impl FnMut(DiagnosticPublication) -> bool,
+    ) -> bool {
+        let mut matched = false;
+        while let Ok(request) = self.editor_rx.try_recv() {
+            if let EditorRequest::Diag(version, diagnostics) = request {
+                if version.id != ProjectInsId::PRIMARY {
+                    continue;
+                }
+                assert!(
+                    version.revision >= self.last_diag_revision,
+                    "diagnostics revision regressed from {} to {}",
+                    self.last_diag_revision,
+                    version.revision
+                );
+                self.last_diag_revision = version.revision;
+                matched |= on_publication(DiagnosticPublication {
+                    version,
+                    diagnostics,
+                });
+            }
+        }
+
+        matched
+    }
+
     fn take_latest_diagnostics(&mut self) -> Option<DiagnosticPublication> {
         let deadline = Instant::now() + Duration::from_secs(2);
         let mut latest = None;
         loop {
-            while let Ok(request) = self.editor_rx.try_recv() {
-                if let EditorRequest::Diag(version, diagnostics) = request {
-                    if version.id != ProjectInsId::PRIMARY {
-                        continue;
-                    }
-                    assert!(
-                        version.revision >= self.last_diag_revision,
-                        "diagnostics revision regressed from {} to {}",
-                        self.last_diag_revision,
-                        version.revision
-                    );
-                    self.last_diag_revision = version.revision;
-                    latest = Some(DiagnosticPublication {
-                        version,
-                        diagnostics,
-                    });
-                }
-            }
+            self.drain_diagnostic_publications(|publication| {
+                latest = Some(publication);
+                true
+            });
 
             if latest.is_some() || Instant::now() >= deadline {
                 break;
@@ -589,6 +610,80 @@ impl LspHarness {
             std::thread::sleep(Duration::from_millis(10));
         }
         latest
+    }
+
+    fn assert_real_fs_diagnostics_empty(&mut self) {
+        let publication =
+            self.wait_for_real_fs_diagnostics("empty main diagnostics", |publication, main_uri| {
+                let diagnostics = publication.diagnostics.as_ref();
+                diagnostics.is_none_or(|diagnostics| {
+                    diagnostics.values().all(|items| items.is_empty())
+                        && diagnostics
+                            .get(main_uri)
+                            .is_none_or(|items| items.is_empty())
+                })
+            });
+        let diagnostics = publication.diagnostics.unwrap_or_default();
+        assert!(
+            diagnostics.values().all(|items| items.is_empty()),
+            "expected real filesystem diagnostics to settle empty at revision {}, got {diagnostics:?}",
+            publication.version.revision
+        );
+    }
+
+    fn assert_real_fs_diagnostics_present(&mut self) {
+        let publication = self.wait_for_real_fs_diagnostics(
+            "non-empty main diagnostics",
+            |publication, main_uri| {
+                publication
+                    .diagnostics
+                    .as_ref()
+                    .and_then(|diagnostics| diagnostics.get(main_uri))
+                    .is_some_and(|items| !items.is_empty())
+            },
+        );
+        let diagnostics = publication.diagnostics.unwrap_or_default();
+        assert!(
+            diagnostics
+                .get(&self.uri(MAIN))
+                .is_some_and(|items| !items.is_empty()),
+            "expected real filesystem diagnostics on main at revision {}, got {diagnostics:?}",
+            publication.version.revision
+        );
+    }
+
+    fn wait_for_real_fs_diagnostics(
+        &mut self,
+        description: &str,
+        mut matches: impl FnMut(&DiagnosticPublication, &Url) -> bool,
+    ) -> DiagnosticPublication {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let main_uri = self.uri(MAIN);
+        let mut matched = None;
+        let mut last_publication = None;
+
+        loop {
+            self.drain_diagnostic_publications(|publication| {
+                if matches(&publication, &main_uri) {
+                    matched = Some(publication);
+                    true
+                } else {
+                    last_publication = Some(format!("{publication:?}"));
+                    false
+                }
+            });
+            if let Some(publication) = matched.take() {
+                return publication;
+            }
+
+            assert!(
+                Instant::now() < deadline,
+                "timed out waiting for real filesystem {description}; last diagnostics: {}",
+                last_publication.unwrap_or_else(|| "<none>".to_owned())
+            );
+
+            self.pump_project_event(Duration::from_millis(20));
+        }
     }
 
     fn assert_latest_diagnostics_empty(&mut self) {
@@ -641,6 +736,26 @@ impl LspHarness {
 
     fn decode_egress_response<T: DeserializeOwned>(&self, response: ScheduleResult) -> T {
         serde_json::from_value(self.resolve_json(response)).expect("failed to decode LSP response")
+    }
+
+    fn pump_project_event(&mut self, timeout: Duration) {
+        match self.receiver.event.recv_timeout(timeout) {
+            Ok(event) => {
+                if let Ok(interrupt) = event.downcast::<LspInterrupt>() {
+                    self.server.project.interrupt(*interrupt);
+                    return;
+                }
+                panic!("unexpected server event type");
+            }
+            Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
+            Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {}
+        }
+
+        while let Ok(message) = self.receiver.lsp.try_recv() {
+            if let Message::Lsp(sync_ls::lsp::Message::Request(request)) = message {
+                panic!("unexpected client request during test: {request:?}");
+            }
+        }
     }
 
     fn drain_project_events(&mut self) {
@@ -1138,6 +1253,36 @@ fn o20_mixed_batch_exercises_all_focus_api_groups_from_one_fresh_case() {
         before_id,
     );
     assert_main_label_references_current_file(&mut harness);
+}
+
+#[test]
+#[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+fn real_fs_dependency_content_change_publishes_diagnostics_without_lsp_fs_change() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.real_fs_insert(DEP, "");
+    harness.assert_real_fs_diagnostics_present();
+
+    harness.real_fs_insert(DEP, "#let alpha = 2\n");
+    harness.assert_real_fs_diagnostics_empty();
+}
+
+#[test]
+#[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
+fn real_fs_dependency_remove_and_recreate_publishes_diagnostics_without_lsp_fs_change() {
+    let main = main_source(DEP, "alpha");
+    let mut harness = LspHarness::new(&[(MAIN, &main), (DEP, "#let alpha = 1\n")]);
+    harness.compile_primary();
+    harness.assert_latest_diagnostics_empty();
+
+    harness.real_fs_remove(DEP);
+    harness.assert_real_fs_diagnostics_present();
+
+    harness.real_fs_insert(DEP, "#let alpha = 2\n");
+    harness.assert_real_fs_diagnostics_empty();
 }
 
 fn assert_graph_resolves(harness: &mut LspHarness, rel: &str, symbol: &str, expected_rel: &str) {
