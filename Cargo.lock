@@ -6336,6 +6336,7 @@ dependencies = [
  "strum",
  "sync-ls",
  "temp-env",
+ "tempfile",
  "tinymist-assets 0.14.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",

@@ -75,9 +75,9 @@ jobs:
           name: tinymist-completion-scripts
           path: tinymist-completions.tar.gz
       - name: Test tinymist
-        run: cargo test --workspace --locked -- --skip=e2e
+        run: cargo test --workspace --features tinymist/system --locked -- --skip=e2e
       - name: Test real filesystem watcher
-        run: cargo test -p tinymist-project --features system,mock --locked real_fs_ -- --ignored
+        run: cargo test -p tinymist-project -p tinymist --features tinymist-project/system,tinymist-project/mock,tinymist/system --locked real_fs_ -- --ignored
       - name: Test Lockfile (Prepare)
         run: ./scripts/test-lock.sh
       - name: Test Lockfile (Check)
@@ -105,7 +105,7 @@ jobs:
           yarn build:l10n
       - run: cargo check --workspace --locked
       - name: Test tinymist
-        run: cargo test --workspace --locked -- --skip=e2e
+        run: cargo test --workspace --features tinymist/system --locked -- --skip=e2e
 
   prepare-build:
     runs-on: "ubuntu-latest"

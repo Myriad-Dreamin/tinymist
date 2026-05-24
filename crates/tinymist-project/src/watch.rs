@@ -274,11 +274,17 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         enum ActorEvent {
             /// Recheck the notify event.
             ReCheck(UndeterminedNotifyEvent),
+            /// Poll missing files that cannot be watched by notify-rs.
+            PollMissing,
             /// external message to change notifier's state
             Message(Option<NotifyMessage>),
             /// notify event from builtin watcher
             NotifyEvent(NotifyEvent),
         }
+
+        let mut missing_poll =
+            tokio::time::interval(tinymist_std::time::Duration::from_millis(300));
+        missing_poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
         'event_loop: loop {
             // Get the event from the inbox or the watcher.
@@ -286,6 +292,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 it = inbox.recv() => ActorEvent::Message(it),
                 Some(it) = Self::get_notify_event(&mut self.watcher) => ActorEvent::NotifyEvent(it),
                 Some(it) = self.undetermined_recv.recv() => ActorEvent::ReCheck(it),
+                _ = missing_poll.tick() => ActorEvent::PollMissing,
             };
 
             // Increase the logical tick per event.
@@ -318,6 +325,9 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 }
                 ActorEvent::ReCheck(event) => {
                     self.recheck_notify_event(event).await;
+                }
+                ActorEvent::PollMissing => {
+                    self.poll_missing_watches();
                 }
             }
         }
@@ -377,22 +387,7 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             entry.seen = true;
 
             if self.watcher.is_some() {
-                let watchable = self.inner.is_watchable_file(path.as_ref());
-
-                // Case1. meta = Err(..) We cannot get the metadata successfully, so we
-                // are okay to ignore this file for watching.
-                //
-                // Case2. meta = Ok(..) Watch the file if it's not watched.
-                if watchable && (!contained || !entry.watching) {
-                    log::debug!("watching {path:?}");
-                    if let Some(watcher) = &mut self.watcher {
-                        entry.watching = log_notify_error(
-                            watcher.watch(path.as_ref(), RecursiveMode::NonRecursive),
-                            "failed to watch",
-                        )
-                        .is_some();
-                    }
-                }
+                self.watch_file_if_needed(path, contained);
 
                 changeset.may_insert(self.notify_entry_update(path.clone()));
             } else {
@@ -421,6 +416,59 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         });
 
         (!changeset.is_empty()).then_some(changeset)
+    }
+
+    fn watch_file_if_needed(&mut self, path: &ImmutPath, contained: bool) {
+        let Some(entry) = self.watched_entries.get_mut(path) else {
+            return;
+        };
+
+        if !self.inner.is_watchable_file(path.as_ref()) {
+            return;
+        }
+
+        // Case1. meta = Err(..) We cannot get the metadata successfully, so we
+        // are okay to ignore this file for watching.
+        //
+        // Case2. meta = Ok(..) Watch the file if it's not watched.
+        if !contained || !entry.watching {
+            log::debug!("watching {path:?}");
+            if let Some(watcher) = &mut self.watcher {
+                entry.watching = log_notify_error(
+                    watcher.watch(path.as_ref(), RecursiveMode::NonRecursive),
+                    "failed to watch",
+                )
+                .is_some();
+            }
+        }
+    }
+
+    fn poll_missing_watches(&mut self) {
+        if self.watcher.is_none() {
+            return;
+        }
+
+        let paths = self
+            .watched_entries
+            .iter()
+            .filter(|(_, entry)| entry.seen && !entry.watching && entry_is_known_missing(entry))
+            .filter(|&(path, _)| self.inner.is_watchable_file(path.as_ref()))
+            .map(|(path, _)| path.clone())
+            .collect::<Vec<_>>();
+
+        if paths.is_empty() {
+            return;
+        }
+
+        let mut changeset = FileChangeSet::default();
+        for path in paths {
+            self.watch_file_if_needed(&path, true);
+            changeset.may_insert(self.notify_entry_update(path));
+        }
+
+        if !changeset.is_empty() {
+            (self.interrupted_by_events)(FilesystemEvent::Update(changeset, false));
+        }
     }
 
     /// Notify the event from the builtin watcher.
@@ -669,6 +717,12 @@ fn spawn_watch_deps(
     tokio::spawn(NotifyActor::new(interrupted_by_events).run(inbox))
 }
 
+fn entry_is_known_missing(entry: &WatchedEntry) -> bool {
+    entry.prev.as_ref().is_some_and(|snapshot| {
+        matches!(snapshot.as_ref(), Err(err) if matches!(err.as_ref(), FileError::NotFound(..)))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -790,6 +844,7 @@ mod tests {
             path: ImmutPath,
             recheck_at: usize,
         },
+        PollMissing,
     }
 
     struct NotifyActorHarness {
@@ -850,6 +905,9 @@ mod tests {
                 }
                 MatrixInput::DelayedRecheckAt { path, recheck_at } => {
                     self.force_recheck_at(path, recheck_at).await;
+                }
+                MatrixInput::PollMissing => {
+                    self.actor.poll_missing_watches();
                 }
             }
         }
@@ -1164,6 +1222,48 @@ mod tests {
         let events = harness.take_events();
         assert_eq!(events.len(), 1);
         assert_update(&events[0], false, &[(&dep, ExpectedSnapshot::NotFound)]);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn missing_poll_rewatches_recreated_dependency_without_notify_event() {
+        let mut harness = NotifyActorHarness::new();
+        let dep = test_path("missing-poll-recreate.typ");
+
+        harness.access.set_content(&dep, "alive");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![dep.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        harness.access.set_missing(&dep);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: notify::EventKind::Remove(RemoveKind::File),
+                paths: vec![dep.clone()],
+            })
+            .await;
+        assert_eq!(harness.take_commands(), vec![unwatch(&dep)]);
+
+        harness
+            .apply(MatrixInput::DelayedRecheck(dep.clone()))
+            .await;
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(&events[0], false, &[(&dep, ExpectedSnapshot::NotFound)]);
+
+        harness.access.set_content(&dep, "recreated");
+        harness.apply(MatrixInput::PollMissing).await;
+
+        assert_eq!(harness.take_commands(), vec![watch(&dep)]);
+        harness.assert_watching(&dep, true);
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&dep, ExpectedSnapshot::Content("recreated"))],
+        );
     }
 
     #[tokio::test(flavor = "current_thread")]
