@@ -9,11 +9,7 @@
 //! Hopefully, one day a reliable file watching/walking crate appears on
 //! crates.io, and we can reduce this to trivial glue code.
 
-use std::{
-    collections::HashMap,
-    fmt,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, fmt, path::Path};
 
 use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 use tinymist_std::{ImmutPath, error::IgnoreLogging};
@@ -34,7 +30,7 @@ type FileEntry = (/* key */ ImmutPath, /* value */ FileSnapshot);
 trait NotifyActorAccess: fmt::Debug + Send + Sync {
     fn content(&self, src: &Path) -> FileResult<Bytes>;
 
-    fn watch_path(&self, src: &Path) -> Option<PathBuf>;
+    fn is_watchable_file(&self, src: &Path) -> bool;
 }
 
 #[derive(Debug)]
@@ -45,14 +41,8 @@ impl NotifyActorAccess for SystemNotifyActorAccess {
         self.0.content(src)
     }
 
-    fn watch_path(&self, src: &Path) -> Option<PathBuf> {
-        if src.metadata().is_ok_and(|meta| !meta.is_dir()) {
-            return Some(src.to_path_buf());
-        }
-
-        src.parent()
-            .filter(|parent| parent.metadata().is_ok_and(|meta| meta.is_dir()))
-            .map(Path::to_path_buf)
+    fn is_watchable_file(&self, src: &Path) -> bool {
+        src.metadata().is_ok_and(|meta| !meta.is_dir())
     }
 }
 
@@ -168,8 +158,6 @@ struct WatchedEntry {
     lifetime: usize,
     /// A flag for whether it is really watching.
     watching: bool,
-    /// The concrete path registered with notify-rs.
-    watch_path: Option<PathBuf>,
     /// A flag for watch update.
     seen: bool,
     /// The state of the entry.
@@ -366,31 +354,46 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         // Also check whether the file is updated since there is a window
         // between unwatch the file and watch the file again.
         paths.dependencies(&mut |path| {
+            let mut contained = false;
             // Update or insert the entry with the new lifetime.
-            {
-                let entry = self
-                    .watched_entries
-                    .entry(path.clone())
-                    .and_modify(|watch_entry| {
-                        watch_entry.lifetime = self.lifetime;
-                    })
-                    .or_insert_with(|| WatchedEntry {
-                        lifetime: self.lifetime,
-                        watching: false,
-                        watch_path: None,
-                        seen: false,
-                        state: WatchState::Stable,
-                        prev: None,
-                    });
+            let entry = self
+                .watched_entries
+                .entry(path.clone())
+                .and_modify(|watch_entry| {
+                    contained = true;
+                    watch_entry.lifetime = self.lifetime;
+                })
+                .or_insert_with(|| WatchedEntry {
+                    lifetime: self.lifetime,
+                    watching: false,
+                    seen: false,
+                    state: WatchState::Stable,
+                    prev: None,
+                });
 
-                if entry.seen {
-                    return;
-                }
-                entry.seen = true;
+            if entry.seen {
+                return;
             }
+            entry.seen = true;
 
             if self.watcher.is_some() {
-                self.refresh_watch_for_path(path);
+                let watchable = self.inner.is_watchable_file(path.as_ref());
+
+                // Case1. meta = Err(..) We cannot get the metadata successfully, so we
+                // are okay to ignore this file for watching.
+                //
+                // Case2. meta = Ok(..) Watch the file if it's not watched.
+                if watchable && (!contained || !entry.watching) {
+                    log::debug!("watching {path:?}");
+                    if let Some(watcher) = &mut self.watcher {
+                        entry.watching = log_notify_error(
+                            watcher.watch(path.as_ref(), RecursiveMode::NonRecursive),
+                            "failed to watch",
+                        )
+                        .is_some();
+                    }
+                }
+
                 changeset.may_insert(self.notify_entry_update(path.clone()));
             } else {
                 let watched = self.inner.content(path);
@@ -405,10 +408,8 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             if !entry.seen && entry.watching {
                 log::debug!("unwatch {path:?}");
                 if let Some(watcher) = &mut self.watcher {
-                    let watch_path = entry.watch_path.as_deref().unwrap_or(path);
-                    log_notify_error(watcher.unwatch(watch_path), "failed to unwatch");
+                    log_notify_error(watcher.unwatch(path), "failed to unwatch");
                     entry.watching = false;
-                    entry.watch_path = None;
                 }
             }
 
@@ -420,39 +421,6 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
         });
 
         (!changeset.is_empty()).then_some(changeset)
-    }
-
-    fn refresh_watch_for_path(&mut self, path: &ImmutPath) {
-        let Some(desired_watch_path) = self.inner.watch_path(path.as_ref()) else {
-            return;
-        };
-        let Some(entry) = self.watched_entries.get_mut(path) else {
-            return;
-        };
-
-        if entry.watching && entry.watch_path.as_deref() == Some(desired_watch_path.as_path()) {
-            return;
-        }
-
-        if let Some(watcher) = &mut self.watcher {
-            if entry.watching {
-                if let Some(watch_path) = entry.watch_path.as_deref() {
-                    log_notify_error(watcher.unwatch(watch_path), "failed to unwatch");
-                }
-                entry.watching = false;
-                entry.watch_path = None;
-            }
-
-            log::debug!("watching {desired_watch_path:?} for {path:?}");
-            entry.watching = log_notify_error(
-                watcher.watch(&desired_watch_path, RecursiveMode::NonRecursive),
-                "failed to watch",
-            )
-            .is_some();
-            if entry.watching {
-                entry.watch_path = Some(desired_watch_path);
-            }
-        }
     }
 
     /// Notify the event from the builtin watcher.
@@ -490,11 +458,9 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
                 // Remove affected path from the watched map to restart
                 // watching on it later again.
                 if let Some(watcher) = &mut self.watcher {
-                    let watch_path = entry.watch_path.as_deref().unwrap_or(path);
-                    log_notify_error(watcher.unwatch(watch_path), "failed to unwatch");
+                    log_notify_error(watcher.unwatch(path), "failed to unwatch");
                 }
                 entry.watching = false;
-                entry.watch_path = None;
             }
         }
 
@@ -642,7 +608,6 @@ impl<F: FnMut(FilesystemEvent) + Send + Sync> NotifyActor<F> {
             } => {
                 if recheck_at == event.at_logical_tick {
                     log::debug!("notify event real happened {event:?}, state: {payload:?}");
-                    self.refresh_watch_for_path(&event.path);
 
                     // Send the underlying change to the consumer
                     let mut changeset = FileChangeSet::default();
@@ -800,12 +765,12 @@ mod tests {
                 )
         }
 
-        fn watch_path(&self, src: &Path) -> Option<PathBuf> {
+        fn is_watchable_file(&self, src: &Path) -> bool {
             self.files
                 .lock()
                 .expect("test access poisoned")
                 .get(src)
-                .and_then(|file| file.watchable.then(|| src.to_path_buf()))
+                .is_some_and(|file| file.watchable)
         }
     }
 
