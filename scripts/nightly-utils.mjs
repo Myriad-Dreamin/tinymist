@@ -167,6 +167,15 @@ class NightlyUtils {
         const { content, parsed } = await this.readToml(cargoTomlPath);
 
         let updatedContent = content;
+        const cratesIoPatches = parsed?.patch?.['crates-io'] || {};
+        const defaultPatchInfo = {
+            'typst-ansi-hl': {
+                git: 'https://github.com/ParaN3xus/typst-ansi-hl.git',
+            },
+            'typstyle-core': {
+                git: 'https://github.com/ParaN3xus/typstyle.git',
+            },
+        };
 
         const patchMappings = [
             { key: 'reflexo', patches: ['reflexo', 'reflexo-typst', 'reflexo-vec2svg'] },
@@ -225,11 +234,12 @@ class NightlyUtils {
             if (revs[mapping.key]) {
                 for (const patchName of mapping.patches) {
                     try {
-                        let patchInfo = parsed?.patch?.['crates-io'][patchName] || null
+                        let patchInfo = cratesIoPatches[patchName] || defaultPatchInfo[patchName] || null
                         if (!patchInfo) {
                             continue;
                         }
 
+                        patchInfo = { ...patchInfo };
                         delete patchInfo.branch;
                         delete patchInfo.tag;
 
