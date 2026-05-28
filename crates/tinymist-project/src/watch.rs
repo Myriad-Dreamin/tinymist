@@ -1698,7 +1698,12 @@ mod tests {
         harness.write_path(&existing, "existing-v2");
         harness.upstream(&[existing.clone(), added.clone()], 7);
         harness
-            .expect_upstream(&existing, ExpectedSnapshot::Content("existing-v2"), 7)
+            .expect_upstream_after_optional_updates(
+                &[(&added, ExpectedSnapshot::Content("added-v1"))],
+                &[(&existing, ExpectedSnapshot::Content("existing-v2"))],
+                &[existing.clone(), added.clone()],
+                7,
+            )
             .await;
         harness.write_path(&added, "added-v2");
         harness
@@ -1851,15 +1856,57 @@ mod tests {
             .await;
         }
 
-        async fn expect_upstream(
+        async fn expect_upstream_after_optional_updates(
             &mut self,
-            expected_path: &ImmutPath,
-            expected: ExpectedSnapshot<'_>,
+            required_upstream: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+            optional_prior_updates: &[(&ImmutPath, ExpectedSnapshot<'_>)],
+            expected_invalidates: &[ImmutPath],
             expected_opaque: usize,
         ) {
+            let mut seen_prior = vec![false; optional_prior_updates.len()];
+
             self.expect_event(
-                || format!("upstream path={expected_path:?}, snapshot={expected:?}"),
-                |event| upstream_contains(event, expected_path, expected, expected_opaque),
+                || {
+                    format!(
+                        "upstream required={required_upstream:?}, optional_prior={optional_prior_updates:?}"
+                    )
+                },
+                |event| {
+                    if let FilesystemEvent::Update(changeset, false) = event {
+                        for (seen, (path, snapshot)) in
+                            seen_prior.iter_mut().zip(optional_prior_updates)
+                        {
+                            if changeset_contains(changeset, path, *snapshot) {
+                                *seen = true;
+                            }
+                        }
+
+                        return false;
+                    }
+
+                    let FilesystemEvent::UpstreamUpdate {
+                        changeset,
+                        upstream_event: Some(upstream_event),
+                    } = event
+                    else {
+                        return false;
+                    };
+
+                    upstream_event
+                        .opaque
+                        .downcast_ref::<usize>()
+                        .is_some_and(|opaque| *opaque == expected_opaque)
+                        && upstream_event.invalidates.as_slice() == expected_invalidates
+                        && required_upstream
+                            .iter()
+                            .all(|(path, snapshot)| changeset_contains(changeset, path, *snapshot))
+                        && optional_prior_updates.iter().enumerate().all(
+                            |(idx, (path, snapshot))| {
+                                seen_prior[idx]
+                                    || changeset_contains(changeset, path, *snapshot)
+                            },
+                        )
+                },
             )
             .await;
         }
@@ -1953,27 +2000,6 @@ mod tests {
             && expected
                 .iter()
                 .all(|(path, snapshot)| changeset_contains(changeset, path, *snapshot))
-    }
-
-    fn upstream_contains(
-        event: &FilesystemEvent,
-        expected_path: &ImmutPath,
-        expected: ExpectedSnapshot<'_>,
-        expected_opaque: usize,
-    ) -> bool {
-        let FilesystemEvent::UpstreamUpdate {
-            changeset,
-            upstream_event: Some(upstream_event),
-        } = event
-        else {
-            return false;
-        };
-
-        upstream_event
-            .opaque
-            .downcast_ref::<usize>()
-            .is_some_and(|opaque| *opaque == expected_opaque)
-            && changeset_contains(changeset, expected_path, expected)
     }
 
     fn update_mentions_path(event: &FilesystemEvent, expected_path: &ImmutPath) -> bool {
