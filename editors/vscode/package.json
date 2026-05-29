@@ -1365,6 +1365,12 @@
         "icon": "$(open-preview)"
       },
       {
+        "command": "typst-preview.previewFile",
+        "title": "%extension.tinymist.command.typst-preview.previewFile%",
+        "description": "Preview a specific Typst file",
+        "icon": "$(open-preview)"
+      },
+      {
         "command": "typst-preview.preview",
         "title": "%extension.tinymist.command.typst-preview.preview%",
         "description": "Launch typst-preview server",
