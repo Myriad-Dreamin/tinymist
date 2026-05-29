@@ -9,7 +9,7 @@
     "editors/vscode",
     "contrib/typst-preview/editors/vscode",
     "contrib/html/editors/vscode",
-    "contrib/previewer/editors/vscode",
+    "contrib/preview-theme-provider/editors/vscode",
     "tools/editor-tools",
     "tools/typst-dom",
     "tools/typst-preview-frontend"
