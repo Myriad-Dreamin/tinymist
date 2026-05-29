@@ -1,4 +1,4 @@
-#import "@preview/shiroa:0.2.3": book-sys, templates
+#import "@preview/shiroa:0.3.1": book-sys, templates
 #import templates: *
 #import "target.typ": is-md-target, sys-is-html-target
 
@@ -9,10 +9,10 @@
 /// - read (function): A function to read theme files.
 /// - target (string): The target platform or style, such as "web-light", "web-dark", or "pdf".
 /// -> dictionary
-#let book-theme-from(preset, xml: xml, read: none, target: target) = {
+#let book-theme-from(preset, xml: xml, read: none, x-target: x-target) = {
   // todo: move theme style parser to another lib file
-  let theme-target = if target.contains("-") {
-    target.split("-").at(1)
+  let theme-target = if x-target.contains("-") {
+    x-target.split("-").at(1)
   } else {
     "light"
   }
@@ -72,7 +72,7 @@
 #let theme-box-styles-from(
   preset,
   read: read,
-  target: target,
+  x-target: x-target,
   light-theme: none,
   dark-theme: none,
 ) = {
@@ -103,9 +103,9 @@
   let book-theme-from = book-theme-from.with(xml: xml, read: read)
 
   // Theme (Colors)
-  let dark-theme = book-theme-from(preset, target: "web-" + dark-theme)
-  let light-theme = book-theme-from(preset, target: if sys-is-html-target { "web-" + light-theme } else { "pdf" })
-  let default-theme = book-theme-from(preset, target: target)
+  let dark-theme = book-theme-from(preset, x-target: "web-" + dark-theme)
+  let light-theme = book-theme-from(preset, x-target: if sys-is-html-target { "web-" + light-theme } else { "pdf" })
+  let default-theme = book-theme-from(preset, x-target: x-target)
 
   (
     dark-theme: dark-theme,
@@ -121,7 +121,7 @@
     light-theme: light-theme,
     default-theme: default-theme,
   ) = themes
-  let is-md-target = target == "md"
+  let is-md-target = x-target == "md"
   let sys-is-html-target = ("target" in dictionary(std))
 
   if is-md-target {

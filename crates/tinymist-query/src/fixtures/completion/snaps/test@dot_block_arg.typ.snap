@@ -9,6 +9,21 @@ input_file: crates/tinymist-query/src/fixtures/completion/dot_block_arg.typ
   "isIncomplete": false,
   "items": [
    {
+    "additionalTextEdits": [
+     {
+      "newText": "",
+      "range": {
+       "end": {
+        "character": 14,
+        "line": 2
+       },
+       "start": {
+        "character": 1,
+        "line": 2
+       }
+      }
+     }
+    ],
     "kind": 15,
     "label": "align",
     "labelDetails": {

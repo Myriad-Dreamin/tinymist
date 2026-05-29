@@ -55,6 +55,7 @@ web-sys = { workspace = true, optional = true, features = ["console"] }
 
 default = []
 fonts = ["typst-assets/fonts"]
+mock = ["tinymist-vfs/mock", "typst-assets/fonts"]
 http-registry = ["reqwest"]
 web = [
     "chrono",
@@ -80,6 +81,9 @@ system = [
 
 [package.metadata.docs.rs]
 features = ["browser", "system"]
+
+[dev-dependencies]
+tinymist-vfs = { workspace = true, features = ["mock"] }
 
 [lints]
 workspace = true

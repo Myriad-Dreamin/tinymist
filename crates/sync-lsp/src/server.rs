@@ -96,6 +96,26 @@ pub struct Connection<M> {
     pub receiver: TConnectionRx<M>,
 }
 
+impl<M> Connection<M> {
+    /// Creates an in-memory connection backed by channels.
+    pub fn channel() -> Self {
+        let (event_sender, event_receiver) = crossbeam_channel::unbounded::<crate::Event>();
+        let (lsp_sender, lsp_receiver) = crossbeam_channel::unbounded::<Message>();
+        Self {
+            sender: TConnectionTx {
+                event: event_sender,
+                lsp: lsp_sender,
+                marker: std::marker::PhantomData,
+            },
+            receiver: TConnectionRx {
+                event: event_receiver,
+                lsp: lsp_receiver,
+                marker: std::marker::PhantomData,
+            },
+        }
+    }
+}
+
 impl<M: TryFrom<Message, Error = anyhow::Error>> From<Connection<Message>> for Connection<M> {
     fn from(conn: Connection<Message>) -> Self {
         Self {

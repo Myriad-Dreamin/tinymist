@@ -355,8 +355,11 @@ impl ExportTask {
             return Ok(None);
         };
         let write_to = if write_to.is_relative() {
-            let cwd = std::env::current_dir().context("failed to get current directory")?;
-            cwd.join(write_to).clean()
+            let base = match entry.root() {
+                Some(root) => root.as_ref().to_path_buf(),
+                None => std::env::current_dir().context("failed to get current directory")?,
+            };
+            base.join(write_to.as_ref()).clean()
         } else {
             write_to.to_path_buf()
         };
@@ -368,7 +371,7 @@ impl ExportTask {
         }
 
         // Apply page template if any
-        let write_to = match task {
+        let mut write_to = match task {
             ProjectTask::ExportPng(ExportPngTask {
                 page_number_template: Some(page_number_template),
                 ..
@@ -379,7 +382,9 @@ impl ExportTask {
             }) => write_to.with_file_name(page_number_template),
             _ => write_to,
         };
-        let write_to = write_to.with_extension(task.extension());
+        if !write_to.add_extension(task.extension()) {
+            write_to = write_to.with_file_name(format!("main.{}", task.extension()));
+        }
 
         Ok(Some(write_to))
     }
@@ -866,11 +871,15 @@ fn open_external(path: &Path) {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use clap::Parser;
 
     use super::*;
     use crate::export::ProjectCompilation;
-    use crate::project::{CompileOnceArgs, CompileSignal};
+    use crate::project::{CompileOnceArgs, CompileSignal, WorldProvider};
     use crate::world::base::{CompileSnapshot, WorldComputeGraph};
 
     #[test]
@@ -985,5 +994,116 @@ mod tests {
         let date_time = convert_system_time(timestamp).unwrap();
         let system_pdf_ts = tinymist_std::time::to_typst_time(date_time.into());
         assert_eq!(chrono_pdf_ts, system_pdf_ts);
+    }
+
+    struct TestWorkspace {
+        root: PathBuf,
+    }
+
+    impl TestWorkspace {
+        fn new(files: &[(&str, &str)]) -> Self {
+            static NEXT_ID: AtomicUsize = AtomicUsize::new(0);
+
+            let root = std::env::temp_dir().join(format!(
+                "tinymist-export-path-test-{}-{}",
+                std::process::id(),
+                NEXT_ID.fetch_add(1, Ordering::Relaxed),
+            ));
+            fs::create_dir_all(&root).expect("failed to create test workspace");
+
+            for (path, contents) in files {
+                let path = root.join(path);
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent).expect("failed to create parent directory");
+                }
+                fs::write(path, contents).expect("failed to write test source");
+            }
+
+            Self { root }
+        }
+
+        fn graph(&self, main: &str) -> LspComputeGraph {
+            let input = self.root.join(main);
+            let args = CompileOnceArgs::parse_from([
+                "tinymist".to_owned(),
+                input.to_string_lossy().into_owned(),
+                "--root".to_owned(),
+                self.root.to_string_lossy().into_owned(),
+            ]);
+            let verse = args.resolve().expect("failed to resolve lsp universe");
+            let snap = CompileSnapshot::from_world(verse.snapshot());
+
+            WorldComputeGraph::new(snap)
+        }
+    }
+
+    impl Drop for TestWorkspace {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    fn pdf_task(output: Option<&str>) -> ProjectTask {
+        ProjectTask::ExportPdf(ExportPdfTask {
+            export: ProjectExportTask {
+                when: TaskWhen::Never,
+                output: output.map(PathPattern::new),
+                transform: vec![],
+            },
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn test_prepare_output_path_preserves_multi_dot_pdf_names() {
+        let workspace = TestWorkspace::new(&[
+            ("Chapter 1.1.typ", ""),
+            ("Chapter 1.1.1.typ", ""),
+            ("test....typ", ""),
+            ("README", ""),
+        ]);
+        let task = pdf_task(Some("$root/$dir/$name"));
+
+        for (main, expected) in [
+            ("Chapter 1.1.typ", "Chapter 1.1.pdf"),
+            ("Chapter 1.1.1.typ", "Chapter 1.1.1.pdf"),
+            ("test....typ", "test....pdf"),
+            ("README", "README.pdf"),
+        ] {
+            let graph = workspace.graph(main);
+            assert_eq!(
+                ExportTask::prepare_output_path(&task, &graph).unwrap(),
+                Some(workspace.root.join(expected))
+            );
+        }
+    }
+
+    #[test]
+    fn test_prepare_output_path_explicit_dir_name_matches_default() {
+        let workspace = TestWorkspace::new(&[
+            ("Chapter 1.1.typ", ""),
+            ("chapters/Chapter 1.1.typ", ""),
+            ("README", ""),
+            ("docs/README", ""),
+        ]);
+
+        for (main, expected) in [
+            ("Chapter 1.1.typ", "Chapter 1.1.pdf"),
+            ("chapters/Chapter 1.1.typ", "chapters/Chapter 1.1.pdf"),
+            ("README", "README.pdf"),
+            ("docs/README", "docs/README.pdf"),
+        ] {
+            let graph = workspace.graph(main);
+            let expected = Some(workspace.root.join(expected));
+
+            assert_eq!(
+                ExportTask::prepare_output_path(&pdf_task(None), &graph).unwrap(),
+                expected
+            );
+            assert_eq!(
+                ExportTask::prepare_output_path(&pdf_task(Some("$dir/$name")), &graph).unwrap(),
+                expected
+            );
+        }
     }
 }

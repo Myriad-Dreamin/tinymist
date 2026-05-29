@@ -323,22 +323,19 @@ impl<'a> CodeActionWorker<'a> {
             .unwrap_or(node);
 
         // Actually there should be only one link left
-        if let Some(link_info) = get_link_exprs_in(link_parent) {
-            let objects = link_info.objects.into_iter();
-            let object_under_node = objects.filter(|link| link.range.contains(&cursor));
+        let link_info = get_link_exprs_in(link_parent);
+        let objects = link_info.objects.into_iter();
+        let object_under_node = objects.filter(|link| link.range.contains(&cursor));
 
-            let mut resolved = false;
-            for link in object_under_node {
-                if let LinkTarget::Path(id, path) = link.target {
-                    // todo: is there a link that is not a path string?
-                    resolved = self.path_rewrite(id, &path, node).is_some() || resolved;
-                }
+        let mut resolved = false;
+        for link in object_under_node {
+            if let LinkTarget::Path(id, path) = link.target {
+                // todo: is there a link that is not a path string?
+                resolved = self.path_rewrite(id, &path, node).is_some() || resolved;
             }
-
-            return resolved.then_some(());
         }
 
-        None
+        resolved.then_some(())
     }
 
     /// Rewrites absolute paths from/to relative paths.

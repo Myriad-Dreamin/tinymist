@@ -3,6 +3,7 @@
 
 use tinymist_std::time::yyyy_mm_dd;
 use typst::foundations::Symbol;
+use typst::syntax::is_valid_label_literal_id;
 
 use super::*;
 impl CompletionPair<'_, '_, '_> {
@@ -105,6 +106,67 @@ impl CompletionPair<'_, '_, '_> {
         self.label_completions_(only_citation, false);
     }
 
+    fn label_completion_apply(
+        &mut self,
+        label: &EcoString,
+        open: bool,
+        close: bool,
+    ) -> (EcoString, Option<Vec<EcoTextEdit>>) {
+        if is_valid_label_literal_id(label.as_str()) {
+            return (
+                eco_format!(
+                    "{}{}{}",
+                    if open { "<" } else { "" },
+                    label.as_str(),
+                    if close { ">" } else { "" }
+                ),
+                None,
+            );
+        }
+        let mut edits = vec![];
+
+        let (remove_open, remove_close) = match self.cursor.selected_node() {
+            Some(SelectedNode::Label(node)) => {
+                let range = node.range();
+                let remove_open = node
+                    .text()
+                    .starts_with('<')
+                    .then_some(range.start..range.start + 1);
+                let remove_close = node
+                    .text()
+                    .ends_with('>')
+                    .then_some(range.end - 1..range.end);
+                (remove_open, remove_close)
+            }
+            _ => (
+                (self.cursor.from > 0 && self.cursor.text[..self.cursor.from].ends_with('<'))
+                    .then_some(self.cursor.from - 1..self.cursor.from),
+                self.cursor
+                    .after
+                    .starts_with('>')
+                    .then_some(self.cursor.cursor..self.cursor.cursor + 1),
+            ),
+        };
+
+        if let Some(range) = remove_open {
+            edits.push(EcoTextEdit::new(
+                self.cursor.lsp_range_of(range),
+                EcoString::new(),
+            ));
+        }
+        if let Some(range) = remove_close {
+            edits.push(EcoTextEdit::new(
+                self.cursor.lsp_range_of(range),
+                EcoString::new(),
+            ));
+        }
+
+        (
+            eco_format!("label({})", label.as_str().repr()),
+            (!edits.is_empty()).then_some(edits),
+        )
+    }
+
     /// Add completions for labels and references.
     pub fn label_completions_(&mut self, only_citation: bool, ref_label: bool) {
         let Some(document) = self.worker.document else {
@@ -137,14 +199,11 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
             let label: EcoString = label.resolve().as_str().into();
+            let (apply, additional_text_edits) = self.label_completion_apply(&label, open, close);
             let completion = Completion {
                 kind: CompletionKind::Reference,
-                apply: Some(eco_format!(
-                    "{}{}{}",
-                    if open { "<" } else { "" },
-                    label.as_str(),
-                    if close { ">" } else { "" }
-                )),
+                apply: Some(apply),
+                additional_text_edits,
                 label: label.clone(),
                 label_details: label_desc.clone(),
                 filter_text: Some(label.clone()),

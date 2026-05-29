@@ -70,6 +70,13 @@ pub struct PreviewArgs {
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
+    /// Set the preview page title.
+    ///
+    /// If not specified, the title falls back to the input filename when
+    /// available, or otherwise to `"Typst Preview"`.
+    #[clap(long = "page-title", value_name = "TITLE")]
+    pub page_title: Option<String>,
+
     /// Only render visible part of the document.
     ///
     /// This can improve performance but still being experimental.
@@ -113,6 +120,18 @@ pub struct PreviewArgs {
     /// This is hidden from the CLI.
     #[clap(long, hide(true))]
     pub refresh_style: Option<RefreshStyle>,
+}
+
+/// Resolves the browser page title for preview HTML.
+pub fn resolve_page_title(page_title: Option<&str>, input: Option<&str>) -> String {
+    if let Some(title) = page_title {
+        return title.to_owned();
+    }
+
+    input
+        .and_then(|path| Path::new(path).file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Typst Preview".to_string())
 }
 
 impl PreviewArgs {
@@ -203,6 +222,10 @@ pub struct PreviewCliArgs {
     /// set as well, this flag will win.
     #[clap(long = "no-open")]
     pub no_open: bool,
+
+    /// Emit INFO level logging. The default is WARN.
+    #[clap(long = "verbose")]
+    pub verbose: bool,
 }
 
 impl PreviewCliArgs {
@@ -489,7 +512,16 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
+            let page_title = resolve_page_title(
+                args.preview.page_title.as_deref(),
+                args.compile.input.as_deref(),
+            );
+            let frontend_html = frontend_html(
+                TYPST_PREVIEW_HTML,
+                args.preview.preview_mode,
+                "/",
+                &page_title,
+            );
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;

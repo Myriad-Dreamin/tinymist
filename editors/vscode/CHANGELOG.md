@@ -10,6 +10,55 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.18 - [2026-05-10]
+
+### Export
+
+* (Fix) Aligned output path pattern resolution with documented behavior in https://github.com/Myriad-Dreamin/tinymist/pull/2473
+
+### Editor
+
+* (Fix) Kept client flags config-wide and restart-scoped in https://github.com/Myriad-Dreamin/tinymist/pull/2499
+
+### Preview
+
+* Added CLI page-title support for preview HTML titles by @davidsanchez222 in https://github.com/Myriad-Dreamin/tinymist/pull/2445
+
+### Docs
+
+* (Docs) Added compiler settings documentation in https://github.com/Myriad-Dreamin/tinymist/pull/2477
+
+### Testing
+
+* Ensured lockfiles are updated in CI by @selfisekai in https://github.com/Myriad-Dreamin/tinymist/pull/2476
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.16...v0.14.18
+
+## v0.14.16 - [2026-04-03]
+
+### Completion
+
+* (Fix) Used `label("...")` for incompatible citation keys while keeping `<key>` for compatible keys in https://github.com/Myriad-Dreamin/tinymist/pull/2464
+* (Fix) Detected math code interpolation mode correctly for field and method completion in https://github.com/Myriad-Dreamin/tinymist/pull/2453
+
+### Editor
+
+* (Fix) Ignored malformed `tinymist.fontPaths` config values instead of crashing extension activation in https://github.com/Myriad-Dreamin/tinymist/pull/2446
+
+### Rename
+
+* (Fix) Correctly resolved `LinkTarget::Path` against the source file during rename and link updates by @BlueQuantumx and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2368
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.14...v0.14.16
+
+## v0.14.14 - [2026-03-27]
+
+### Preview
+
+* (Fix) Reverted the preview viewport-position tracking change during dock resize in https://github.com/Myriad-Dreamin/tinymist/pull/2433
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.12...v0.14.14
+
 ## v0.14.12 - [2026-03-21]
 
 ### Server

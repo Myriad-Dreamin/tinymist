@@ -162,6 +162,12 @@ pub(crate) fn do_rename_file(
     worker.work(edits)
 }
 
+fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
+    // Compare package and vpath so we avoid allocating a joined file id while
+    // still distinguishing package files that share the same internal path.
+    file_id.package() == def_fid.package() && file_id.vpath().join(path) == *def_fid.vpath()
+}
+
 struct RenameFileWorker<'a> {
     ctx: &'a mut LocalContext,
     def_fid: TypstFileId,
@@ -232,7 +238,7 @@ impl RenameFileWorker<'_> {
         let edits = edits.entry(uri).or_default();
         for obj in &link_info.objects {
             if !matches!(&obj.target,
-                LinkTarget::Path(file_id, _) if *file_id == self.def_fid
+                LinkTarget::Path(file_id, path) if link_path_matches_def(self.def_fid, *file_id, path.as_ref())
             ) {
                 continue;
             }
@@ -362,8 +368,12 @@ pub(crate) fn create_change_annotation(
 
 #[cfg(test)]
 mod tests {
+    use std::{path::Path, str::FromStr};
+
     use super::*;
     use crate::tests::*;
+    use tinymist_world::package::PackageSpec;
+    use typst::syntax::VirtualPath;
 
     #[test]
     fn test() {
@@ -391,5 +401,34 @@ mod tests {
 
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
+    }
+
+    #[test]
+    fn link_path_match_requires_same_package_spec() {
+        let package_v010 = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
+        let package_v011 = PackageSpec::from_str("@preview/example:0.1.1").unwrap();
+        let def_fid = TypstFileId::new(
+            Some(package_v010.clone()),
+            VirtualPath::new(Path::new("/assets/logo.typ")),
+        );
+        let same_package_ref = TypstFileId::new(
+            Some(package_v010),
+            VirtualPath::new(Path::new("/docs/main.typ")),
+        );
+        let other_package_ref = TypstFileId::new(
+            Some(package_v011),
+            VirtualPath::new(Path::new("/docs/main.typ")),
+        );
+
+        assert!(link_path_matches_def(
+            def_fid,
+            same_package_ref,
+            "../assets/logo.typ"
+        ));
+        assert!(!link_path_matches_def(
+            def_fid,
+            other_package_ref,
+            "../assets/logo.typ"
+        ));
     }
 }

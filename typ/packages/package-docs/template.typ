@@ -1,7 +1,7 @@
 // This is important for shiroa to produce a responsive layout
 // and multiple targets.
-#import "@preview/shiroa:0.2.2": (
-  get-page-width, is-html-target, is-pdf-target, is-web-target, plain-text, shiroa-sys-target, target, templates,
+#import "@preview/shiroa:0.3.1": (
+  get-page-width, is-html-target, is-pdf-target, is-web-target, plain-text, shiroa-sys-target, templates, x-target,
 )
 #import templates: *
 #import "@preview/numbly:0.1.0": numbly
@@ -13,7 +13,7 @@
 #let is-html-target = is-html-target()
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
-#let is-md-target = target == "md"
+#let is-md-target = x-target == "md"
 #let sys-is-html-target = ("target" in dictionary(std))
 
 #let part-counter = counter("shiroa-part-counter")

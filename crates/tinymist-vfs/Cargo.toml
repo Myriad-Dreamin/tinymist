@@ -27,6 +27,7 @@ js-sys = { workspace = true, optional = true }
 
 [features]
 
+mock = []
 web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
 browser = ["web"]
 system = ["tinymist-std/system"]

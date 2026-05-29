@@ -6,11 +6,15 @@ use ecow::{EcoVec, eco_vec};
 use tinymist_std::error::prelude::*;
 use tinymist_std::path::unix_slash;
 use tinymist_std::{ImmutPath, bail};
+#[cfg(feature = "lsp")]
 use tinymist_task::CtxPath;
+#[cfg(feature = "lsp")]
 use typst::World;
 use typst::diag::EcoString;
 
-use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute, ResourcePath};
+#[cfg(feature = "lsp")]
+use crate::model::ResourcePath;
+use crate::model::{ApplyProjectTask, Id, ProjectInput, ProjectRoute};
 use crate::{LOCK_FILENAME, LOCK_VERSION, LockFile, LockFileCompat, ProjectPathMaterial};
 
 impl LockFile {
@@ -247,6 +251,7 @@ pub fn update_lock(root: ImmutPath) -> LockFileUpdate {
 }
 
 enum LockUpdate {
+    #[cfg(feature = "lsp")]
     Input(ProjectInput),
     Task(ApplyProjectTask),
     Material(ProjectPathMaterial),
@@ -337,6 +342,7 @@ impl LockFileUpdate {
             let root_hash = tinymist_std::hash::hash128(&root);
             for update in self.updates {
                 match update {
+                    #[cfg(feature = "lsp")]
                     LockUpdate::Input(input) => {
                         l.replace_document(input);
                     }

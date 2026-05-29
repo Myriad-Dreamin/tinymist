@@ -41,8 +41,8 @@ impl TinymistLanguageServer {
         let _client = LspClientRoot::new_js(RUNTIMES.tokio_runtime.handle().clone(), sender);
         // Starts logging
         let _ = crate::init_log(crate::InitLogOpts {
-            is_transient_cmd: false,
-            is_test_no_verbose: false,
+            verbose: true,
+            filter: None,
             output: Some(_client.weak()),
         });
         let state = ServerState::install_lsp(LspBuilder::new(

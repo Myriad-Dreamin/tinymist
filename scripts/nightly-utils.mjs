@@ -9,6 +9,23 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.dirname(__dirname);
 
+const TYPST_CRATES = [
+    'typst',
+    'typst-bundle',
+    'typst-eval',
+    'typst-html',
+    'typst-layout',
+    'typst-library',
+    'typst-macros',
+    'typst-pdf',
+    'typst-realize',
+    'typst-render',
+    'typst-svg',
+    'typst-syntax',
+    'typst-timing',
+    'typst-utils',
+];
+
 class NightlyUtils {
     constructor(rootDir = ROOT_DIR) {
         this.rootDir = rootDir;
@@ -102,25 +119,7 @@ class NightlyUtils {
     async updateTypstDependencies(typstVersion, typstAssetsRev) {
         await this.ensureInit();
 
-        const typstCrates = [
-            'typst-cli',
-            'typst-eval',
-            'typst-html',
-            'typst-ide',
-            'typst-kit',
-            'typst-layout',
-            'typst-library',
-            'typst-macros',
-            'typst-pdf',
-            'typst-realize',
-            'typst-render',
-            'typst-svg',
-            'typst-syntax',
-            'typst-timing',
-            'typst-utils',
-            'typst',
-        ];
-        await this.updateDependencies(typstCrates, typstVersion)
+        await this.updateDependencies(TYPST_CRATES, typstVersion)
 
         const cargoTomlPath = path.join(this.rootDir, 'Cargo.toml');
         const { content } = await this.readToml(cargoTomlPath);
@@ -167,31 +166,21 @@ class NightlyUtils {
         const { content, parsed } = await this.readToml(cargoTomlPath);
 
         let updatedContent = content;
+        const cratesIoPatches = parsed?.patch?.['crates-io'] || {};
+        const defaultPatchInfo = {
+            'typst-ansi-hl': {
+                git: 'https://github.com/ParaN3xus/typst-ansi-hl.git',
+            },
+            'typstyle-core': {
+                git: 'https://github.com/ParaN3xus/typstyle.git',
+            },
+        };
 
         const patchMappings = [
             { key: 'reflexo', patches: ['reflexo', 'reflexo-typst', 'reflexo-vec2svg'] },
             { key: 'typst-ansi-hl', patches: ['typst-ansi-hl'] },
             { key: 'typstyle', patches: ['typstyle-core'] },
-            {
-                key: 'typst', patches: [
-                    'typst-cli',
-                    'typst-eval',
-                    'typst-html',
-                    'typst-ide',
-                    'typst-kit',
-                    'typst-layout',
-                    'typst-library',
-                    'typst-macros',
-                    'typst-pdf',
-                    'typst-realize',
-                    'typst-render',
-                    'typst-svg',
-                    'typst-syntax',
-                    'typst-timing',
-                    'typst-utils',
-                    'typst',
-                ]
-            },
+            { key: 'typst', patches: TYPST_CRATES },
             {
                 key: 'tinymist', patches: [
                     'crityp',
@@ -225,11 +214,12 @@ class NightlyUtils {
             if (revs[mapping.key]) {
                 for (const patchName of mapping.patches) {
                     try {
-                        let patchInfo = parsed?.patch?.['crates-io'][patchName] || null
+                        let patchInfo = cratesIoPatches[patchName] || defaultPatchInfo[patchName] || null
                         if (!patchInfo) {
                             continue;
                         }
 
+                        patchInfo = { ...patchInfo };
                         delete patchInfo.branch;
                         delete patchInfo.tag;
 
@@ -298,35 +288,8 @@ class NightlyUtils {
             console.warn(`Warning: Could not update flake.nix: ${e.message}`);
         }
 
-        // Dockerfile
-        try {
-            const dockerfilePath = path.join(this.rootDir, 'editors/neovim/samples/lazyvim-dev/Dockerfile');
-            let dockerContent = await fs.readFile(dockerfilePath, 'utf-8');
-            dockerContent = dockerContent.replace(
-                /FROM myriaddreamin\/tinymist:[^ ]* as tinymist/g,
-                `FROM myriaddreamin/tinymist:${newVersion} as tinymist`
-            );
-            await fs.writeFile(dockerfilePath, dockerContent);
-        } catch (e) {
-            console.warn(`Warning: Could not update Dockerfile: ${e.message}`);
-        }
-
-        // bootstrap.sh
-        try {
-            const bootstrapPath = path.join(this.rootDir, 'editors/neovim/bootstrap.sh');
-            let bootstrapContent = await fs.readFile(bootstrapPath, 'utf-8');
-            bootstrapContent = bootstrapContent.replace(
-                /myriaddreamin\/tinymist:[^ ]*/g,
-                `myriaddreamin/tinymist:${newVersion}`
-            );
-            bootstrapContent = bootstrapContent.replace(
-                /myriaddreamin\/tinymist-nvim:[^ ]*/g,
-                `myriaddreamin/tinymist-nvim:${newVersion}`
-            );
-            await fs.writeFile(bootstrapPath, bootstrapContent);
-        } catch (e) {
-            console.warn(`Warning: Could not update bootstrap.sh: ${e.message}`);
-        }
+        // The Neovim spec image is intentionally local-only; bootstrap.sh mounts
+        // the host-built tinymist binary instead of embedding a release image tag.
     }
 
     async generateChangelog(newVersion, tinymistBaseCommit, tinymistBaseMessage, typstRev, typstBaseCommit, typstBaseMessage) {
