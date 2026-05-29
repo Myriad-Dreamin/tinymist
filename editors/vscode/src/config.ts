@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 
 import { vscodeVariables } from "./vscode-variables";
@@ -129,7 +130,10 @@ export function resolvePreviewProviderValue(value: string | null | undefined): s
   }
 
   const providerPath = trimmedValue.slice(HTML_PREVIEW_PROVIDER_PREFIX.length);
-  return `${HTML_PREVIEW_PROVIDER_PREFIX}${substVscodeVars(providerPath) ?? providerPath}`;
+  const resolvedProviderPath = substVscodeVars(providerPath) ?? providerPath;
+  return `${HTML_PREVIEW_PROVIDER_PREFIX}${
+    resolvedProviderPath ? path.normalize(resolvedProviderPath) : resolvedProviderPath
+  }`;
 }
 
 function substFontPaths(value: unknown): string[] | undefined {
