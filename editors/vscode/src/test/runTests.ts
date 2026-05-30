@@ -10,7 +10,7 @@ async function main() {
   const extensionDevelopmentPath = path.resolve(__dirname, "../../");
   const previewProviderFixturePath = path.resolve(
     extensionDevelopmentPath,
-    "../../contrib/preview-theme-provider/editors/vscode",
+    "../../contrib/previewer-provider/editors/vscode",
   );
 
   const userDataDirectory = fs.mkdtempSync(path.join(tmpdir(), "vsce"));

@@ -2,14 +2,14 @@ import { readFile } from "fs/promises";
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { resolvePreviewProviderValue } from "../config";
+import { resolvePreviewerValue } from "../config";
 import { tinymist } from "../lsp";
 import { loadHTMLFile } from "../util";
 
-export type PreviewThemeSourceKind = "builtin" | "html" | "extension";
+export type PreviewerSourceKind = "builtin" | "html" | "extension";
 
-export interface PreviewThemeSourceMetadata {
-  kind: PreviewThemeSourceKind;
+export interface PreviewerSourceMetadata {
+  kind: PreviewerSourceKind;
   trusted: boolean;
   configuredProvider?: string;
   extensionId?: string;
@@ -18,46 +18,49 @@ export interface PreviewThemeSourceMetadata {
   fallbackReason?: string;
 }
 
-export interface ResolvedPreviewTheme {
+export interface ResolvedPreviewer {
   html: string;
   htmlUri: vscode.Uri;
   localResourceRoots: vscode.Uri[];
-  source: PreviewThemeSourceMetadata;
+  source: PreviewerSourceMetadata;
 }
 
-export interface TinymistPreviewTheme {
+export interface TinymistPreviewer {
   htmlPath: string;
   compatibleTinymistVersion: string;
   isCompatible?(tinymistVersion: string): Promise<boolean> | boolean;
 }
 
-export interface TinymistPreviewThemeProvider {
-  provideTheme(): Promise<TinymistPreviewTheme> | TinymistPreviewTheme;
+export interface TinymistPreviewerProvider {
+  providePreviewer(): Promise<TinymistPreviewer> | TinymistPreviewer;
 }
 
-interface PreviewThemeExtension {
+interface PreviewerExtension {
   extensionUri: vscode.Uri;
   activate(): Thenable<unknown>;
 }
 
-export interface PreviewThemeResolverEnvironment {
+export interface PreviewerResolverEnvironment {
   provider?: string;
+  builtinPreviewerId?: string;
   workspaceTrusted: boolean;
   tinymistVersion: string;
-  builtinTheme: () => Promise<ResolvedPreviewTheme>;
+  builtinPreviewer: () => Promise<ResolvedPreviewer>;
   readHtmlFile?: (uri: vscode.Uri) => Promise<string>;
-  getExtension?: (id: string) => PreviewThemeExtension | undefined;
+  getExtension?: (id: string) => PreviewerExtension | undefined;
   showWarning?: (message: string) => void;
 }
 
-const PREVIEW_THEME_CONTRACT_MARKERS = [
+const DEFAULT_PREVIEWER_EXTENSION_ID = "myriad-dreamin.tinymist";
+
+const PREVIEWER_CONTRACT_MARKERS = [
   "ws://127.0.0.1:23625",
   "preview-arg:previewMode:Doc",
   "preview-arg:state:",
 ] as const;
 
 let builtinPreviewSourceMode: "compat" | "tinymist" = "compat";
-let cachedPreviewTheme: { key: string; theme: ResolvedPreviewTheme } | undefined;
+let cachedPreviewer: { key: string; previewer: ResolvedPreviewer } | undefined;
 let lastWarningKey: string | undefined;
 
 export function setPreviewBuiltinSourceMode(mode: "compat" | "tinymist") {
@@ -65,32 +68,33 @@ export function setPreviewBuiltinSourceMode(mode: "compat" | "tinymist") {
     return;
   }
   builtinPreviewSourceMode = mode;
-  invalidatePreviewThemeCache();
+  invalidatePreviewerCache();
 }
 
-export function invalidatePreviewThemeCache() {
-  cachedPreviewTheme = undefined;
+export function invalidatePreviewerCache() {
+  cachedPreviewer = undefined;
   lastWarningKey = undefined;
 }
 
-export async function preloadPreviewTheme(context: vscode.ExtensionContext) {
-  await resolvePreviewTheme(context);
+export async function preloadPreviewer(context: vscode.ExtensionContext) {
+  await resolvePreviewer(context);
 }
 
-export function getConfiguredPreviewProvider(): string | undefined {
-  return resolvePreviewProviderValue(
-    vscode.workspace.getConfiguration("tinymist").get<string>("preview.provider"),
+export function getConfiguredPreviewer(): string | undefined {
+  return resolvePreviewerValue(
+    vscode.workspace.getConfiguration("tinymist").get<string>("previewer"),
   );
 }
 
-export function parsePreviewProvider(
+export function parsePreviewerProvider(
   value: string | undefined,
+  builtinPreviewerId = DEFAULT_PREVIEWER_EXTENSION_ID,
 ):
   | { kind: "builtin" }
   | { kind: "html"; htmlPath: string }
   | { kind: "extension"; extensionId: string } {
   const provider = value?.trim();
-  if (!provider) {
+  if (!provider || provider === builtinPreviewerId || provider === DEFAULT_PREVIEWER_EXTENSION_ID) {
     return { kind: "builtin" };
   }
 
@@ -107,11 +111,11 @@ export function parsePreviewProvider(
   };
 }
 
-export async function resolveConfiguredPreviewTheme(
-  environment: PreviewThemeResolverEnvironment,
-): Promise<ResolvedPreviewTheme> {
+export async function resolveConfiguredPreviewer(
+  environment: PreviewerResolverEnvironment,
+): Promise<ResolvedPreviewer> {
   const provider = environment.provider?.trim();
-  const parsed = parsePreviewProvider(provider);
+  const parsed = parsePreviewerProvider(provider, environment.builtinPreviewerId);
 
   if (!environment.workspaceTrusted && parsed.kind !== "builtin") {
     return fallbackToBuiltin(environment, provider, "workspace is not trusted", false);
@@ -119,33 +123,36 @@ export async function resolveConfiguredPreviewTheme(
 
   switch (parsed.kind) {
     case "builtin":
-      return environment.builtinTheme();
+      return resolveBuiltinPreviewerSelection(environment, provider);
     case "html":
-      return resolveHtmlPreviewTheme(environment, provider, parsed.htmlPath);
+      return resolveHtmlPreviewer(environment, provider, parsed.htmlPath);
     case "extension":
-      return resolveExtensionPreviewTheme(environment, provider, parsed.extensionId);
+      return resolveExtensionPreviewer(environment, provider, parsed.extensionId);
   }
 }
 
-export async function resolvePreviewTheme(
+export async function resolvePreviewer(
   context: vscode.ExtensionContext,
-): Promise<ResolvedPreviewTheme> {
-  const provider = getConfiguredPreviewProvider();
+): Promise<ResolvedPreviewer> {
+  const provider = getConfiguredPreviewer();
+  const builtinPreviewerId = String(context.extension?.id ?? DEFAULT_PREVIEWER_EXTENSION_ID);
   const cacheKey = JSON.stringify({
     builtinPreviewSourceMode,
+    builtinPreviewerId,
     provider,
     trusted: vscode.workspace.isTrusted,
     version: context.extension.packageJSON.version,
   });
-  if (cachedPreviewTheme?.key === cacheKey) {
-    return cachedPreviewTheme.theme;
+  if (cachedPreviewer?.key === cacheKey) {
+    return cachedPreviewer.previewer;
   }
 
-  const theme = await resolveConfiguredPreviewTheme({
+  const previewer = await resolveConfiguredPreviewer({
     provider,
+    builtinPreviewerId,
     workspaceTrusted: vscode.workspace.isTrusted,
     tinymistVersion: String(context.extension.packageJSON.version),
-    builtinTheme: () => resolveBuiltinPreviewTheme(context),
+    builtinPreviewer: () => resolveBuiltinPreviewer(context),
     showWarning: (message) => {
       const warningKey = `${cacheKey}:${message}`;
       if (lastWarningKey === warningKey) {
@@ -158,13 +165,13 @@ export async function resolvePreviewTheme(
     getExtension: (extensionId) => vscode.extensions.getExtension(extensionId),
   });
 
-  cachedPreviewTheme = { key: cacheKey, theme };
-  return theme;
+  cachedPreviewer = { key: cacheKey, previewer };
+  return previewer;
 }
 
-async function resolveBuiltinPreviewTheme(
+async function resolveBuiltinPreviewer(
   context: vscode.ExtensionContext,
-): Promise<ResolvedPreviewTheme> {
+): Promise<ResolvedPreviewer> {
   const htmlUri = vscode.Uri.joinPath(context.extensionUri, "out", "frontend", "index.html");
   const resourceRoot = vscode.Uri.joinPath(context.extensionUri, "out", "frontend");
   const html =
@@ -188,11 +195,30 @@ async function resolveBuiltinPreviewTheme(
   };
 }
 
-async function resolveHtmlPreviewTheme(
-  environment: PreviewThemeResolverEnvironment,
+async function resolveBuiltinPreviewerSelection(
+  environment: PreviewerResolverEnvironment,
+  provider: string | undefined,
+): Promise<ResolvedPreviewer> {
+  const previewer = await environment.builtinPreviewer();
+  if (!provider) {
+    return previewer;
+  }
+
+  return {
+    ...previewer,
+    source: {
+      ...previewer.source,
+      trusted: environment.workspaceTrusted,
+      configuredProvider: provider,
+    },
+  };
+}
+
+async function resolveHtmlPreviewer(
+  environment: PreviewerResolverEnvironment,
   provider: string | undefined,
   htmlPath: string,
-): Promise<ResolvedPreviewTheme> {
+): Promise<ResolvedPreviewer> {
   if (!htmlPath) {
     return fallbackToBuiltin(
       environment,
@@ -210,7 +236,7 @@ async function resolveHtmlPreviewTheme(
   }
 
   const htmlUri = vscode.Uri.file(htmlPath);
-  return resolveHtmlFileTheme(environment, {
+  return resolveHtmlFilePreviewer(environment, {
     provider,
     kind: "html",
     htmlUri,
@@ -223,17 +249,17 @@ async function resolveHtmlPreviewTheme(
   });
 }
 
-async function resolveExtensionPreviewTheme(
-  environment: PreviewThemeResolverEnvironment,
+async function resolveExtensionPreviewer(
+  environment: PreviewerResolverEnvironment,
   provider: string | undefined,
   extensionId: string,
-): Promise<ResolvedPreviewTheme> {
+): Promise<ResolvedPreviewer> {
   const extension = environment.getExtension?.(extensionId);
   if (!extension) {
     return fallbackToBuiltin(
       environment,
       provider,
-      `could not find preview provider extension \`${extensionId}\``,
+      `could not find previewer provider extension \`${extensionId}\``,
     );
   }
 
@@ -244,30 +270,30 @@ async function resolveExtensionPreviewTheme(
     return fallbackToBuiltin(
       environment,
       provider,
-      `failed to activate preview provider extension \`${extensionId}\`: ${errorMessage(error)}`,
+      `failed to activate previewer provider extension \`${extensionId}\`: ${errorMessage(error)}`,
     );
   }
 
-  if (!isPreviewThemeProvider(providerExports)) {
+  if (!isPreviewerProvider(providerExports)) {
     return fallbackToBuiltin(
       environment,
       provider,
-      `extension \`${extensionId}\` does not export a \`provideTheme()\` preview provider`,
+      `extension \`${extensionId}\` does not export a \`providePreviewer()\` previewer provider`,
     );
   }
 
-  let theme: TinymistPreviewTheme;
+  let previewer: TinymistPreviewer;
   try {
-    theme = await providerExports.provideTheme();
+    previewer = await providerExports.providePreviewer();
   } catch (error) {
     return fallbackToBuiltin(
       environment,
       provider,
-      `extension \`${extensionId}\` failed while providing a preview theme: ${errorMessage(error)}`,
+      `extension \`${extensionId}\` failed while providing a previewer: ${errorMessage(error)}`,
     );
   }
 
-  if (!theme || typeof theme.htmlPath !== "string" || theme.htmlPath.trim() === "") {
+  if (!previewer || typeof previewer.htmlPath !== "string" || previewer.htmlPath.trim() === "") {
     return fallbackToBuiltin(
       environment,
       provider,
@@ -276,8 +302,8 @@ async function resolveExtensionPreviewTheme(
   }
 
   if (
-    typeof theme.compatibleTinymistVersion !== "string" ||
-    theme.compatibleTinymistVersion.trim() === ""
+    typeof previewer.compatibleTinymistVersion !== "string" ||
+    previewer.compatibleTinymistVersion.trim() === ""
   ) {
     return fallbackToBuiltin(
       environment,
@@ -288,9 +314,9 @@ async function resolveExtensionPreviewTheme(
 
   let isCompatible = false;
   try {
-    isCompatible = theme.isCompatible
-      ? await theme.isCompatible(environment.tinymistVersion)
-      : theme.compatibleTinymistVersion === environment.tinymistVersion;
+    isCompatible = previewer.isCompatible
+      ? await previewer.isCompatible(environment.tinymistVersion)
+      : previewer.compatibleTinymistVersion === environment.tinymistVersion;
   } catch (error) {
     return fallbackToBuiltin(
       environment,
@@ -307,12 +333,12 @@ async function resolveExtensionPreviewTheme(
     );
   }
 
-  const resolvedHtmlPath = path.isAbsolute(theme.htmlPath)
-    ? theme.htmlPath
-    : path.resolve(extension.extensionUri.fsPath, theme.htmlPath);
+  const resolvedHtmlPath = path.isAbsolute(previewer.htmlPath)
+    ? previewer.htmlPath
+    : path.resolve(extension.extensionUri.fsPath, previewer.htmlPath);
   const htmlUri = vscode.Uri.file(resolvedHtmlPath);
 
-  return resolveHtmlFileTheme(environment, {
+  return resolveHtmlFilePreviewer(environment, {
     provider,
     kind: "extension",
     htmlUri,
@@ -322,23 +348,23 @@ async function resolveExtensionPreviewTheme(
       configuredProvider: provider,
       extensionId,
       htmlPath: resolvedHtmlPath,
-      compatibleTinymistVersion: theme.compatibleTinymistVersion,
+      compatibleTinymistVersion: previewer.compatibleTinymistVersion,
     },
   });
 }
 
-async function resolveHtmlFileTheme(
-  environment: PreviewThemeResolverEnvironment,
+async function resolveHtmlFilePreviewer(
+  environment: PreviewerResolverEnvironment,
   options: {
     provider: string | undefined;
     kind: "html" | "extension";
     htmlUri: vscode.Uri;
-    source: PreviewThemeSourceMetadata;
+    source: PreviewerSourceMetadata;
   },
-): Promise<ResolvedPreviewTheme> {
+): Promise<ResolvedPreviewer> {
   let html: string;
   try {
-    html = await (environment.readHtmlFile ?? readPreviewThemeHtml)(options.htmlUri);
+    html = await (environment.readHtmlFile ?? readPreviewerHtml)(options.htmlUri);
   } catch (error) {
     return fallbackToBuiltin(
       environment,
@@ -347,12 +373,12 @@ async function resolveHtmlFileTheme(
     );
   }
 
-  const contractIssue = validatePreviewThemeHtml(html);
+  const contractIssue = validatePreviewerHtml(html);
   if (contractIssue) {
     return fallbackToBuiltin(
       environment,
       options.provider,
-      `${options.kind === "extension" ? "extension preview theme" : "preview HTML"} ${contractIssue}`,
+      `${options.kind === "extension" ? "extension previewer" : "preview HTML"} ${contractIssue}`,
     );
   }
 
@@ -365,22 +391,22 @@ async function resolveHtmlFileTheme(
 }
 
 async function fallbackToBuiltin(
-  environment: PreviewThemeResolverEnvironment,
+  environment: PreviewerResolverEnvironment,
   provider: string | undefined,
   fallbackReason: string,
   showWarning = true,
-): Promise<ResolvedPreviewTheme> {
+): Promise<ResolvedPreviewer> {
   if (provider && showWarning) {
     environment.showWarning?.(
-      `Tinymist preview provider \`${provider}\` ${fallbackReason}. Falling back to the built-in preview.`,
+      `Tinymist previewer \`${provider}\` ${fallbackReason}. Falling back to the built-in preview.`,
     );
   }
 
-  const builtinTheme = await environment.builtinTheme();
+  const builtinPreviewer = await environment.builtinPreviewer();
   return {
-    ...builtinTheme,
+    ...builtinPreviewer,
     source: {
-      ...builtinTheme.source,
+      ...builtinPreviewer.source,
       trusted: environment.workspaceTrusted,
       configuredProvider: provider,
       fallbackReason,
@@ -388,12 +414,12 @@ async function fallbackToBuiltin(
   };
 }
 
-async function readPreviewThemeHtml(uri: vscode.Uri): Promise<string> {
+async function readPreviewerHtml(uri: vscode.Uri): Promise<string> {
   return readFile(uri.fsPath, "utf8");
 }
 
-function validatePreviewThemeHtml(html: string): string | undefined {
-  const missingMarkers = PREVIEW_THEME_CONTRACT_MARKERS.filter((marker) => !html.includes(marker));
+function validatePreviewerHtml(html: string): string | undefined {
+  const missingMarkers = PREVIEWER_CONTRACT_MARKERS.filter((marker) => !html.includes(marker));
   if (missingMarkers.length === 0) {
     return undefined;
   }
@@ -401,11 +427,11 @@ function validatePreviewThemeHtml(html: string): string | undefined {
   return `is missing required Tinymist preview markers: ${missingMarkers.join(", ")}`;
 }
 
-function isPreviewThemeProvider(value: unknown): value is TinymistPreviewThemeProvider {
+function isPreviewerProvider(value: unknown): value is TinymistPreviewerProvider {
   return (
     typeof value === "object" &&
     value !== null &&
-    typeof (value as TinymistPreviewThemeProvider).provideTheme === "function"
+    typeof (value as TinymistPreviewerProvider).providePreviewer === "function"
   );
 }
 

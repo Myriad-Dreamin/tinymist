@@ -28,12 +28,12 @@ import { l10nMsg } from "../l10n";
 import { IContext } from "../context";
 import { extensionState } from "../state";
 import {
-  invalidatePreviewThemeCache,
-  preloadPreviewTheme,
-  resolvePreviewTheme,
+  invalidatePreviewerCache,
+  preloadPreviewer,
+  resolvePreviewer,
   setPreviewBuiltinSourceMode,
-  type PreviewThemeSourceMetadata,
-  type ResolvedPreviewTheme,
+  type PreviewerSourceMetadata,
+  type ResolvedPreviewer,
 } from "./previewer";
 
 /**
@@ -54,7 +54,7 @@ export interface PreviewPanelContext {
  * @param context The extension context.
  */
 export function previewPreload(context: vscode.ExtensionContext) {
-  void preloadPreviewTheme(context);
+  void preloadPreviewer(context);
 }
 
 /**
@@ -106,11 +106,11 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       if (!event.affectsConfiguration("tinymist.previewer")) {
         return;
       }
-      invalidatePreviewThemeCache();
+      invalidatePreviewerCache();
       void provider.reloadIfVisible();
     }),
     vscode.workspace.onDidGrantWorkspaceTrust(() => {
-      invalidatePreviewThemeCache();
+      invalidatePreviewerCache();
       void provider.reloadIfVisible();
     }),
     vscode.commands.registerCommand("tinymist.browsingPreview", launchBrowsingPreview),
@@ -256,7 +256,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
 }
 
 export function previewDeactivate() {
-  invalidatePreviewThemeCache();
+  invalidatePreviewerCache();
   previewDeactivateCompat();
 }
 
@@ -306,7 +306,7 @@ interface OpenPreviewInWebViewArgs {
 
 export interface OpenedPreviewWebview {
   panel: vscode.WebviewPanel;
-  previewSource: PreviewThemeSourceMetadata;
+  previewSource: PreviewerSourceMetadata;
 }
 
 /**
@@ -324,7 +324,7 @@ export async function openPreviewInWebView({
   panelDispose,
 }: OpenPreviewInWebViewArgs): Promise<OpenedPreviewWebview> {
   const basename = path.basename(activeEditor.document.fileName);
-  const previewTheme = await resolvePreviewTheme(context);
+  const previewer = await resolvePreviewer(context);
   // Create and show a new WebView
   const panel =
     webviewPanel !== undefined
@@ -335,13 +335,13 @@ export async function openPreviewInWebView({
           getTargetViewColumn(activeEditor.viewColumn),
           {
             enableScripts: true,
-            localResourceRoots: previewTheme.localResourceRoots,
+            localResourceRoots: previewer.localResourceRoots,
             retainContextWhenHidden: true,
           },
         );
   panel.webview.options = {
     enableScripts: true,
-    localResourceRoots: previewTheme.localResourceRoots,
+    localResourceRoots: previewer.localResourceRoots,
   };
 
   const previewState: PersistPreviewState = {
@@ -379,7 +379,7 @@ export async function openPreviewInWebView({
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
 
   // Substitutes arguments in the HTML content.
-  let html = rewritePreviewAssetRoot(previewTheme, panel.webview);
+  let html = rewritePreviewAssetRoot(previewer, panel.webview);
   html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
   // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
@@ -393,7 +393,7 @@ export async function openPreviewInWebView({
   panel.webview.html = html;
   return {
     panel,
-    previewSource: previewTheme.source,
+    previewSource: previewer.source,
   };
 }
 
@@ -406,8 +406,8 @@ interface TaskControlBlock {
   panel?: vscode.WebviewPanel;
   /// random task id
   taskId: string;
-  /// preview theme metadata
-  previewSource?: PreviewThemeSourceMetadata;
+  /// previewer metadata
+  previewSource?: PreviewerSourceMetadata;
 }
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
@@ -450,7 +450,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   }
 
   let panel: vscode.WebviewPanel | undefined = undefined;
-  let previewSource: PreviewThemeSourceMetadata | undefined = undefined;
+  let previewSource: PreviewerSourceMetadata | undefined = undefined;
   switch (kind) {
     case "webview": {
       const openedPreview = await openPreviewInWebView({
@@ -719,15 +719,15 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const previewTheme = await resolvePreviewTheme(this.context);
-    const html = rewritePreviewAssetRoot(previewTheme, this._view.webview).replace(
+    const previewer = await resolvePreviewer(this.context);
+    const html = rewritePreviewAssetRoot(previewer, this._view.webview).replace(
       "ws://127.0.0.1:23625",
       ``,
     );
 
     this._view.webview.options = {
       enableScripts: true,
-      localResourceRoots: previewTheme.localResourceRoots,
+      localResourceRoots: previewer.localResourceRoots,
     };
     this._view.webview.html = html;
   }
@@ -775,14 +775,10 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
   }
 }
 
-function rewritePreviewAssetRoot(
-  previewTheme: ResolvedPreviewTheme,
-  webview: vscode.Webview,
-): string {
+function rewritePreviewAssetRoot(previewer: ResolvedPreviewer, webview: vscode.Webview): string {
   const resourceRoot =
-    previewTheme.localResourceRoots[0] ??
-    vscode.Uri.file(path.dirname(previewTheme.htmlUri.fsPath));
-  return previewTheme.html.replace(
+    previewer.localResourceRoots[0] ?? vscode.Uri.file(path.dirname(previewer.htmlUri.fsPath));
+  return previewer.html.replace(
     /\/typst-webview-assets/g,
     `${webview.asWebviewUri(resourceRoot).toString()}/typst-webview-assets`,
   );

@@ -28,7 +28,7 @@ vi.mock("./vscode-variables", () => ({
 import {
   loadTinymistConfig,
   patchInjectedClientOptionsInConfig,
-  resolvePreviewProviderValue,
+  resolvePreviewerValue,
   substVscodeVarsInConfig,
 } from "./config.js";
 
@@ -101,14 +101,24 @@ test("patchInjectedClientOptionsInConfig patches tinymist objects without overri
   ]);
 });
 
-test("resolvePreviewProviderValue substitutes and normalizes html provider paths", () => {
-  expect(
-    resolvePreviewProviderValue("html:${workspaceFolder}/preview-provider/../local-theme.html"),
-  ).toBe(`html:${path.normalize("/workspace/local-theme.html")}`);
+test("loadTinymistConfig substitutes previewer html paths", () => {
+  hoisted.getConfiguration.mockReturnValue({
+    previewer: "html:${workspaceFolder}/preview-provider/../local-previewer.html",
+  });
+
+  expect(loadTinymistConfig().previewer).toBe(
+    `html:${path.normalize("/workspace/local-previewer.html")}`,
+  );
 });
 
-test("resolvePreviewProviderValue preserves extension id providers", () => {
-  expect(resolvePreviewProviderValue(" myriad-dreamin.tinymist-previewer-fixture ")).toBe(
+test("resolvePreviewerValue substitutes and normalizes html previewer paths", () => {
+  expect(
+    resolvePreviewerValue("html:${workspaceFolder}/preview-provider/../local-previewer.html"),
+  ).toBe(`html:${path.normalize("/workspace/local-previewer.html")}`);
+});
+
+test("resolvePreviewerValue preserves extension id providers", () => {
+  expect(resolvePreviewerValue(" myriad-dreamin.tinymist-previewer-fixture ")).toBe(
     "myriad-dreamin.tinymist-previewer-fixture",
   );
 });

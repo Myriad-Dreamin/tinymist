@@ -2,16 +2,16 @@ import * as os from "node:os";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
-import { resolvePreviewProviderValue } from "../../config";
-import { resolveConfiguredPreviewTheme, type ResolvedPreviewTheme } from "../../features/previewer";
+import { resolvePreviewerValue } from "../../config";
+import { resolveConfiguredPreviewer, type ResolvedPreviewer } from "../../features/previewer";
 import type { Context } from ".";
 
 const TINYMIST_EXTENSION_ID = "myriad-dreamin.tinymist";
 const FIXTURE_EXTENSION_ID = "myriad-dreamin.tinymist-previewer-fixture";
 
-function builtinTheme(): ResolvedPreviewTheme {
+function builtinPreviewer(): ResolvedPreviewer {
   const htmlUri = vscode.Uri.file(
-    path.join(os.tmpdir(), "tinymist-preview-theme-builtin", "index.html"),
+    path.join(os.tmpdir(), "tinymist-previewer-builtin", "index.html"),
   );
   return {
     html: "<html><body>builtin</body></html>",
@@ -26,81 +26,99 @@ function builtinTheme(): ResolvedPreviewTheme {
 }
 
 export async function getTests(ctx: Context) {
-  await ctx.suite("preview provider resolver", async (suite) => {
-    suite.addTest("parses html providers with workspace substitution", async () => {
-      const workspaceUri = ctx.workspaceUri();
-      const resolvedProvider = resolvePreviewProviderValue(
-        "html:${workspaceFolder}/preview-provider/local-theme.html",
+  const workspaceCtx = ctx.workspaceCtx("book");
+
+  await workspaceCtx.suite("previewer resolver", async (suite) => {
+    suite.addTest("parses html previewers with workspace substitution", async () => {
+      const workspaceUri = workspaceCtx.workspaceUri();
+      const resolvedProvider = resolvePreviewerValue(
+        "html:${workspaceFolder}/preview-provider/local-previewer.html",
       );
-      ctx
+      workspaceCtx
         .expect(resolvedProvider)
         .to.be.equal(
-          `html:${vscode.Uri.joinPath(workspaceUri, "preview-provider", "local-theme.html").fsPath}`,
+          `html:${vscode.Uri.joinPath(workspaceUri, "preview-provider", "local-previewer.html").fsPath}`,
         );
 
-      const result = await resolveConfiguredPreviewTheme({
+      const result = await resolveConfiguredPreviewer({
         provider: resolvedProvider,
         workspaceTrusted: true,
         tinymistVersion: String(
           vscode.extensions.getExtension(TINYMIST_EXTENSION_ID)?.packageJSON.version ?? "0.0.0",
         ),
-        builtinTheme: async () => builtinTheme(),
+        builtinPreviewer: async () => builtinPreviewer(),
       });
 
-      ctx.expect(result.source.kind).to.be.equal("html");
-      ctx
+      workspaceCtx.expect(result.source.kind).to.be.equal("html");
+      workspaceCtx
         .expect(result.source.htmlPath)
         .to.be.equal(
-          vscode.Uri.joinPath(workspaceUri, "preview-provider", "local-theme.html").fsPath,
+          vscode.Uri.joinPath(workspaceUri, "preview-provider", "local-previewer.html").fsPath,
         );
-      ctx.expect(result.html).to.include("Hello from the local html preview provider");
+      workspaceCtx.expect(result.html).to.include("Hello from the local html previewer");
     });
 
-    suite.addTest("selects extension id preview providers", async () => {
+    suite.addTest("selects extension id previewers", async () => {
       const tinymistVersion = String(
         vscode.extensions.getExtension(TINYMIST_EXTENSION_ID)?.packageJSON.version ?? "0.0.0",
       );
 
-      const result = await resolveConfiguredPreviewTheme({
+      const result = await resolveConfiguredPreviewer({
         provider: FIXTURE_EXTENSION_ID,
         workspaceTrusted: true,
         tinymistVersion,
-        builtinTheme: async () => builtinTheme(),
+        builtinPreviewer: async () => builtinPreviewer(),
         getExtension: (id) => vscode.extensions.getExtension(id),
       });
 
-      ctx.expect(result.source.kind).to.be.equal("extension");
-      ctx.expect(result.source.extensionId).to.be.equal(FIXTURE_EXTENSION_ID);
-      ctx.expect(result.source.compatibleTinymistVersion).to.be.equal(tinymistVersion);
-      ctx.expect(result.html).to.include("Hello from the fixture preview provider");
+      workspaceCtx.expect(result.source.kind).to.be.equal("extension");
+      workspaceCtx.expect(result.source.extensionId).to.be.equal(FIXTURE_EXTENSION_ID);
+      workspaceCtx.expect(result.source.compatibleTinymistVersion).to.be.equal(tinymistVersion);
+      workspaceCtx.expect(result.html).to.include("Hello from the fixture previewer");
+    });
+
+    suite.addTest("uses the built-in previewer for Tinymist's own extension id", async () => {
+      const result = await resolveConfiguredPreviewer({
+        provider: TINYMIST_EXTENSION_ID,
+        workspaceTrusted: true,
+        tinymistVersion: "0.0.0",
+        builtinPreviewer: async () => builtinPreviewer(),
+        getExtension: (id) => vscode.extensions.getExtension(id),
+      });
+
+      workspaceCtx.expect(result.source.kind).to.be.equal("builtin");
+      workspaceCtx.expect(result.source.configuredProvider).to.be.equal(TINYMIST_EXTENSION_ID);
+      workspaceCtx.expect(result.source.fallbackReason).to.be.undefined;
     });
 
     suite.addTest("falls back when workspace is untrusted", async () => {
-      const result = await resolveConfiguredPreviewTheme({
+      const result = await resolveConfiguredPreviewer({
         provider: FIXTURE_EXTENSION_ID,
         workspaceTrusted: false,
         tinymistVersion: "0.0.0",
-        builtinTheme: async () => builtinTheme(),
+        builtinPreviewer: async () => builtinPreviewer(),
         getExtension: (id) => vscode.extensions.getExtension(id),
       });
 
-      ctx.expect(result.source.kind).to.be.equal("builtin");
-      ctx.expect(result.source.configuredProvider).to.be.equal(FIXTURE_EXTENSION_ID);
-      ctx.expect(result.source.fallbackReason).to.be.equal("workspace is not trusted");
+      workspaceCtx.expect(result.source.kind).to.be.equal("builtin");
+      workspaceCtx.expect(result.source.configuredProvider).to.be.equal(FIXTURE_EXTENSION_ID);
+      workspaceCtx.expect(result.source.fallbackReason).to.be.equal("workspace is not trusted");
     });
 
     suite.addTest("falls back when extension compatibility does not match", async () => {
-      const result = await resolveConfiguredPreviewTheme({
+      const result = await resolveConfiguredPreviewer({
         provider: FIXTURE_EXTENSION_ID,
         workspaceTrusted: true,
         tinymistVersion: "0.0.0-mismatch",
-        builtinTheme: async () => builtinTheme(),
+        builtinPreviewer: async () => builtinPreviewer(),
         getExtension: (id) => vscode.extensions.getExtension(id),
       });
 
-      ctx.expect(result.source.kind).to.be.equal("builtin");
-      ctx.expect(result.source.configuredProvider).to.be.equal(FIXTURE_EXTENSION_ID);
-      ctx.expect(result.source.fallbackReason).to.include("is not compatible with Tinymist");
+      workspaceCtx.expect(result.source.kind).to.be.equal("builtin");
+      workspaceCtx.expect(result.source.configuredProvider).to.be.equal(FIXTURE_EXTENSION_ID);
+      workspaceCtx
+        .expect(result.source.fallbackReason)
+        .to.include("is not compatible with Tinymist");
     });
   });
 }

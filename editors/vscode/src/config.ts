@@ -9,7 +9,7 @@ export interface TinymistConfig {
   serverPath?: string;
 }
 
-export const HTML_PREVIEW_PROVIDER_PREFIX = "html:";
+export const HTML_PREVIEWER_PREFIX = "html:";
 
 const INJECTED_CLIENT_OPTION_CONFIG_KEYS = [
   "triggerSuggest",
@@ -35,11 +35,14 @@ export function loadTinymistConfig(): TinymistConfig {
   for (let i = 0; i < keys.length; i++) {
     config[keys[i]] = values[i];
   }
+  if (typeof config.previewer === "string") {
+    config.previewer = resolvePreviewerValue(config.previewer);
+  }
   if (typeof config.preview?.provider === "string") {
-    config.preview.provider = resolvePreviewProviderValue(config.preview.provider);
+    config.preview.provider = resolvePreviewerValue(config.preview.provider);
   }
   if (typeof config["preview.provider"] === "string") {
-    config["preview.provider"] = resolvePreviewProviderValue(config["preview.provider"]);
+    config["preview.provider"] = resolvePreviewerValue(config["preview.provider"]);
   }
   return config;
 }
@@ -115,7 +118,7 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
   }
 }
 
-export function resolvePreviewProviderValue(value: string | null | undefined): string | undefined {
+export function resolvePreviewerValue(value: string | null | undefined): string | undefined {
   if (value === undefined || value === null) {
     return undefined;
   }
@@ -125,13 +128,13 @@ export function resolvePreviewProviderValue(value: string | null | undefined): s
     return undefined;
   }
 
-  if (!trimmedValue.startsWith(HTML_PREVIEW_PROVIDER_PREFIX)) {
+  if (!trimmedValue.startsWith(HTML_PREVIEWER_PREFIX)) {
     return trimmedValue;
   }
 
-  const providerPath = trimmedValue.slice(HTML_PREVIEW_PROVIDER_PREFIX.length);
+  const providerPath = trimmedValue.slice(HTML_PREVIEWER_PREFIX.length);
   const resolvedProviderPath = substVscodeVars(providerPath) ?? providerPath;
-  return `${HTML_PREVIEW_PROVIDER_PREFIX}${
+  return `${HTML_PREVIEWER_PREFIX}${
     resolvedProviderPath ? path.normalize(resolvedProviderPath) : resolvedProviderPath
   }`;
 }

@@ -4,12 +4,12 @@ const TINYMIST_EXTENSION_ID = "myriad-dreamin.tinymist";
 
 export async function activate(_context: vscode.ExtensionContext) {
   return {
-    provideTheme() {
+    providePreviewer() {
       const tinymistVersion = String(
         vscode.extensions.getExtension(TINYMIST_EXTENSION_ID)?.packageJSON.version ?? "0.0.0",
       );
       return {
-        htmlPath: "theme/index.html",
+        htmlPath: "previewer/index.html",
         compatibleTinymistVersion: tinymistVersion,
       };
     },

@@ -2,13 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Tinymist Local Preview Theme</title>
+    <title>Tinymist Previewer Fixture</title>
   </head>
   <body>
-    <main id="local-preview-theme">Hello from the local html preview provider</main>
-    <script src="/typst-webview-assets/local.js"></script>
+    <main id="fixture-previewer">Hello from the fixture previewer</main>
+    <script src="/typst-webview-assets/provider.js"></script>
     <script>
-      window.__TINYMIST_LOCAL_PROVIDER__ = {
+      window.__TINYMIST_PROVIDER_FIXTURE__ = {
         ws: "ws://127.0.0.1:23625",
         mode: "preview-arg:previewMode:Doc",
         state: "preview-arg:state:",
