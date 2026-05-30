@@ -43,7 +43,7 @@ pub struct WebviewActor<'a, C> {
 
     broadcast_sender: broadcast::Sender<WebviewActorRequest>,
     editor_sender: mpsc::UnboundedSender<EditorActorRequest>,
-    render_sender: broadcast::Sender<RenderActorRequest>,
+    render_sender: mpsc::UnboundedSender<RenderActorRequest>,
 }
 
 pub struct Channels {
@@ -69,7 +69,7 @@ where
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
         editor_sender: mpsc::UnboundedSender<EditorActorRequest>,
-        render_sender: broadcast::Sender<RenderActorRequest>,
+        render_sender: mpsc::UnboundedSender<RenderActorRequest>,
     ) -> Self {
         Self {
             webview_websocket_conn: websocket_conn,

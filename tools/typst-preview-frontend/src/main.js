@@ -43,7 +43,12 @@ function retrieveWsArgs() {
   /// the websocket connection requires an absolute url.
   ///
   /// See [WebSocket and relative URLs](https://github.com/whatwg/websockets/issues/20)
-  let urlObject = new URL("ws://127.0.0.1:23625", window.location.href);
+  let url = "ws://127.0.0.1:23625";
+  if (!url) {
+    return { url: "", previewMode, isContentPreview: false };
+  }
+
+  let urlObject = new URL(url, window.location.href);
   /// Rewrite the protocol to websocket.
   urlObject.protocol = urlObject.protocol.replace("https:", "wss:").replace("http:", "ws:");
   if (location.href.startsWith("https://")) {

@@ -176,16 +176,18 @@ impl Previewer {
                 }
                 let actor::webview::Channels { svg } =
                     actor::webview::WebviewActor::<'_, C>::set_up_channels();
+                let (direct_render_tx, direct_render_rx) = mpsc::unbounded_channel();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
                     svg.1,
                     h.webview_tx.clone(),
                     h.webview_tx.subscribe(),
                     h.editor_tx.clone(),
-                    h.renderer_tx.clone(),
+                    direct_render_tx,
                 );
                 let render_actor = actor::render::RenderActor::new(
                     h.renderer_tx.subscribe(),
+                    direct_render_rx,
                     h.doc_sender.clone(),
                     h.editor_tx.clone(),
                     svg.0,
