@@ -38,12 +38,6 @@ export function loadTinymistConfig(): TinymistConfig {
   if (typeof config.previewer === "string") {
     config.previewer = resolvePreviewerValue(config.previewer);
   }
-  if (typeof config.preview?.provider === "string") {
-    config.preview.provider = resolvePreviewerValue(config.preview.provider);
-  }
-  if (typeof config["preview.provider"] === "string") {
-    config["preview.provider"] = resolvePreviewerValue(config["preview.provider"]);
-  }
   return config;
 }
 
