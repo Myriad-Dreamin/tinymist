@@ -25,6 +25,22 @@ function builtinPreviewer(): ResolvedPreviewer {
   };
 }
 
+async function expectPreviewerError(
+  ctx: Context,
+  action: Promise<ResolvedPreviewer>,
+  expectedMessage: string,
+) {
+  let caught: unknown;
+  try {
+    await action;
+  } catch (error) {
+    caught = error;
+  }
+
+  ctx.expect(caught).to.be.instanceOf(Error);
+  ctx.expect((caught as Error).message).to.include(expectedMessage);
+}
+
 export async function getTests(ctx: Context) {
   const workspaceCtx = ctx.workspaceCtx("book");
 
@@ -91,6 +107,24 @@ export async function getTests(ctx: Context) {
       workspaceCtx.expect(result.source.fallbackReason).to.be.undefined;
     });
 
+    suite.addTest("throws when extension id previewer cannot be found", async () => {
+      const missingProvider = "myriad-dreamin.tinymist-missing-previewer";
+
+      await expectPreviewerError(
+        workspaceCtx,
+        resolveConfiguredPreviewer({
+          provider: missingProvider,
+          workspaceTrusted: true,
+          tinymistVersion: "0.0.0",
+          builtinPreviewer: async () => {
+            throw new Error("unexpected built-in previewer fallback");
+          },
+          getExtension: (id) => vscode.extensions.getExtension(id),
+        }),
+        `could not find previewer provider extension \`${missingProvider}\``,
+      );
+    });
+
     suite.addTest("falls back when workspace is untrusted", async () => {
       const result = await resolveConfiguredPreviewer({
         provider: FIXTURE_EXTENSION_ID,
@@ -105,20 +139,20 @@ export async function getTests(ctx: Context) {
       workspaceCtx.expect(result.source.fallbackReason).to.be.equal("workspace is not trusted");
     });
 
-    suite.addTest("falls back when extension compatibility does not match", async () => {
-      const result = await resolveConfiguredPreviewer({
-        provider: FIXTURE_EXTENSION_ID,
-        workspaceTrusted: true,
-        tinymistVersion: "0.0.0-mismatch",
-        builtinPreviewer: async () => builtinPreviewer(),
-        getExtension: (id) => vscode.extensions.getExtension(id),
-      });
-
-      workspaceCtx.expect(result.source.kind).to.be.equal("builtin");
-      workspaceCtx.expect(result.source.configuredProvider).to.be.equal(FIXTURE_EXTENSION_ID);
-      workspaceCtx
-        .expect(result.source.fallbackReason)
-        .to.include("is not compatible with Tinymist");
+    suite.addTest("throws when extension compatibility does not match", async () => {
+      await expectPreviewerError(
+        workspaceCtx,
+        resolveConfiguredPreviewer({
+          provider: FIXTURE_EXTENSION_ID,
+          workspaceTrusted: true,
+          tinymistVersion: "0.0.0-mismatch",
+          builtinPreviewer: async () => {
+            throw new Error("unexpected built-in previewer fallback");
+          },
+          getExtension: (id) => vscode.extensions.getExtension(id),
+        }),
+        "is not compatible with Tinymist 0.0.0-mismatch",
+      );
     });
   });
 }

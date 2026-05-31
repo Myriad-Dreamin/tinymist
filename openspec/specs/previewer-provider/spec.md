@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The previewer-provider specification defines how the VS Code Tinymist extension resolves alternate preview HTML through `tinymist.previewer`. It covers built-in previewer selection, local HTML previewers, extension-provided previewers, compatibility checks, fallback behavior, and workspace trust boundaries.
+The previewer-provider specification defines how the VS Code Tinymist extension resolves alternate preview HTML through `tinymist.previewer`. It covers built-in previewer selection, local HTML previewers, extension-provided previewers, compatibility checks, failure behavior, and workspace trust boundaries.
 
 ## Requirements
 
 ### Requirement: Trusted workspaces can override preview HTML through a single previewer setting
 
-The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview HTML by setting `tinymist.previewer`. If the configured previewer value cannot be resolved, Tinymist SHALL fall back to its built-in preview HTML.
+The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview HTML by setting `tinymist.previewer`. Tinymist SHALL use the built-in previewer when the setting is empty, selects Tinymist's own extension id, or is ignored for an untrusted workspace.
 
 #### Scenario: HTML previewer path is used
 
@@ -20,10 +20,10 @@ The VS Code Tinymist extension SHALL allow trusted workspaces to override the de
 - **WHEN** a workspace sets `tinymist.previewer` to `myriad-dreamin.tinymist`
 - **THEN** Tinymist uses its built-in preview HTML without resolving the value as an external extension provider
 
-#### Scenario: Invalid previewer falls back to built-in HTML
+#### Scenario: Invalid extension previewer fails resolution
 
-- **WHEN** the configured `tinymist.previewer` value cannot be resolved to a readable HTML file or a usable extension provider
-- **THEN** Tinymist reports the loading problem and uses its built-in preview HTML
+- **WHEN** a trusted workspace sets `tinymist.previewer` to an extension id that cannot be resolved to a usable extension provider
+- **THEN** Tinymist reports the loading problem and fails previewer resolution without using its built-in preview HTML
 
 ### Requirement: Provider values without the html prefix are interpreted as extension ids
 
@@ -34,10 +34,10 @@ The VS Code Tinymist extension SHALL interpret non-empty `tinymist.previewer` va
 - **WHEN** a trusted workspace configures `tinymist.previewer` with an installed and compatible extension id
 - **THEN** Tinymist activates that extension and uses the provider-supplied HTML path for preview
 
-#### Scenario: Missing extension id falls back to built-in HTML
+#### Scenario: Missing extension id reports an error
 
 - **WHEN** `tinymist.previewer` is set to an extension id that is not installed or does not expose the required provider contract
-- **THEN** Tinymist reports the problem and uses its built-in preview HTML
+- **THEN** Tinymist reports the problem and fails previewer resolution without using its built-in preview HTML
 
 ### Requirement: HTML previewers use the typst preview frontend contract
 
@@ -65,12 +65,12 @@ Tinymist SHALL verify that a configured extension-based previewer provider is co
 #### Scenario: Default compatibility rejects mismatched version
 
 - **WHEN** a configured extension-based provider declares a Tinymist version different from the running Tinymist version and does not define a custom compatibility predicate
-- **THEN** Tinymist rejects the provider previewer and uses its built-in preview HTML
+- **THEN** Tinymist reports the compatibility problem and fails previewer resolution without using its built-in preview HTML
 
 #### Scenario: Custom compatibility check rejects provider
 
 - **WHEN** a configured extension-based provider defines a custom compatibility predicate and that predicate returns false for the running Tinymist version
-- **THEN** Tinymist rejects the provider previewer and uses its built-in preview HTML
+- **THEN** Tinymist reports the compatibility problem and fails previewer resolution without using its built-in preview HTML
 
 ### Requirement: Untrusted workspaces ignore previewer overrides
 

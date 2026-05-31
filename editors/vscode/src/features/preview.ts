@@ -54,7 +54,11 @@ export interface PreviewPanelContext {
  * @param context The extension context.
  */
 export function previewPreload(context: vscode.ExtensionContext) {
-  void preloadPreviewer(context);
+  void preloadPreviewer(context).catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(message);
+    void vscode.window.showErrorMessage(message);
+  });
 }
 
 /**

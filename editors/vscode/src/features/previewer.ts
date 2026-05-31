@@ -51,6 +51,8 @@ export interface PreviewerResolverEnvironment {
   showWarning?: (message: string) => void;
 }
 
+type ResolutionFailureMode = "fallback" | "error";
+
 const DEFAULT_PREVIEWER_EXTENSION_ID = "myriad-dreamin.tinymist";
 
 const PREVIEWER_CONTRACT_MARKERS = [
@@ -256,8 +258,7 @@ async function resolveExtensionPreviewer(
 ): Promise<ResolvedPreviewer> {
   const extension = environment.getExtension?.(extensionId);
   if (!extension) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `could not find previewer provider extension \`${extensionId}\``,
     );
@@ -267,16 +268,14 @@ async function resolveExtensionPreviewer(
   try {
     providerExports = await extension.activate();
   } catch (error) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `failed to activate previewer provider extension \`${extensionId}\`: ${errorMessage(error)}`,
     );
   }
 
   if (!isPreviewerProvider(providerExports)) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` does not export a \`providePreviewer()\` previewer provider`,
     );
@@ -286,16 +285,14 @@ async function resolveExtensionPreviewer(
   try {
     previewer = await providerExports.providePreviewer();
   } catch (error) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` failed while providing a previewer: ${errorMessage(error)}`,
     );
   }
 
   if (!previewer || typeof previewer.htmlPath !== "string" || previewer.htmlPath.trim() === "") {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` returned an empty preview HTML path`,
     );
@@ -305,8 +302,7 @@ async function resolveExtensionPreviewer(
     typeof previewer.compatibleTinymistVersion !== "string" ||
     previewer.compatibleTinymistVersion.trim() === ""
   ) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` did not declare \`compatibleTinymistVersion\``,
     );
@@ -318,16 +314,14 @@ async function resolveExtensionPreviewer(
       ? await previewer.isCompatible(environment.tinymistVersion)
       : previewer.compatibleTinymistVersion === environment.tinymistVersion;
   } catch (error) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` failed while checking compatibility: ${errorMessage(error)}`,
     );
   }
 
   if (!isCompatible) {
-    return fallbackToBuiltin(
-      environment,
+    throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` is not compatible with Tinymist ${environment.tinymistVersion}`,
     );
@@ -341,6 +335,7 @@ async function resolveExtensionPreviewer(
   return resolveHtmlFilePreviewer(environment, {
     provider,
     kind: "extension",
+    failureMode: "error",
     htmlUri,
     source: {
       kind: "extension",
@@ -358,27 +353,31 @@ async function resolveHtmlFilePreviewer(
   options: {
     provider: string | undefined;
     kind: "html" | "extension";
+    failureMode?: ResolutionFailureMode;
     htmlUri: vscode.Uri;
     source: PreviewerSourceMetadata;
   },
 ): Promise<ResolvedPreviewer> {
+  const failureMode = options.failureMode ?? "fallback";
   let html: string;
   try {
     html = await (environment.readHtmlFile ?? readPreviewerHtml)(options.htmlUri);
   } catch (error) {
-    return fallbackToBuiltin(
+    return handlePreviewerResolutionFailure(
       environment,
       options.provider,
       `could not read preview HTML from \`${options.htmlUri.fsPath}\`: ${errorMessage(error)}`,
+      failureMode,
     );
   }
 
   const contractIssue = validatePreviewerHtml(html);
   if (contractIssue) {
-    return fallbackToBuiltin(
+    return handlePreviewerResolutionFailure(
       environment,
       options.provider,
       `${options.kind === "extension" ? "extension previewer" : "preview HTML"} ${contractIssue}`,
+      failureMode,
     );
   }
 
@@ -388,6 +387,19 @@ async function resolveHtmlFilePreviewer(
     localResourceRoots: [vscode.Uri.file(path.dirname(options.htmlUri.fsPath))],
     source: options.source,
   };
+}
+
+async function handlePreviewerResolutionFailure(
+  environment: PreviewerResolverEnvironment,
+  provider: string | undefined,
+  reason: string,
+  failureMode: ResolutionFailureMode,
+): Promise<ResolvedPreviewer> {
+  if (failureMode === "error") {
+    throw previewerResolutionError(provider, reason);
+  }
+
+  return fallbackToBuiltin(environment, provider, reason);
 }
 
 async function fallbackToBuiltin(
@@ -412,6 +424,14 @@ async function fallbackToBuiltin(
       fallbackReason,
     },
   };
+}
+
+function previewerResolutionError(provider: string | undefined, reason: string): Error {
+  if (provider) {
+    return new Error(`Tinymist previewer \`${provider}\` ${reason}.`);
+  }
+
+  return new Error(`Tinymist previewer ${reason}.`);
 }
 
 async function readPreviewerHtml(uri: vscode.Uri): Promise<string> {
