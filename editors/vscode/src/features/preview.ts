@@ -40,6 +40,31 @@ import {
  * The launch preview implementation which depends on `isCompat` of previewActivate.
  */
 let launchImpl: typeof launchPreviewLsp;
+const previewerErrorReported = Symbol("tinymistPreviewerErrorReported");
+
+type ReportedPreviewerError = Error & {
+  [previewerErrorReported]?: true;
+};
+
+function hasReportedPreviewerError(error: unknown): boolean {
+  return (
+    error instanceof Error && (error as ReportedPreviewerError)[previewerErrorReported] === true
+  );
+}
+
+function reportPreviewerError(error: unknown, action: "load" | "open"): Error {
+  const cause = error instanceof Error ? error.message : String(error);
+  const message =
+    action === "open"
+      ? `Could not open Typst preview because the configured previewer could not be loaded: ${cause}`
+      : `Could not load the configured Typst previewer: ${cause}`;
+  console.error(message);
+  void vscode.window.showErrorMessage(message);
+
+  const reported = error instanceof Error ? error : new Error(message);
+  (reported as ReportedPreviewerError)[previewerErrorReported] = true;
+  return reported;
+}
 
 /**
  * The state corresponding to the focusing preview panel.
@@ -55,9 +80,9 @@ export interface PreviewPanelContext {
  */
 export function previewPreload(context: vscode.ExtensionContext) {
   void preloadPreviewer(context).catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
-    void vscode.window.showErrorMessage(message);
+    if (!hasReportedPreviewerError(error)) {
+      reportPreviewerError(error, "load");
+    }
   });
 }
 
@@ -203,6 +228,9 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         isDev: opts?.isDev || false,
         isNotPrimary: opts?.isNotPrimary || false,
       }).catch((e) => {
+        if (hasReportedPreviewerError(e)) {
+          return;
+        }
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
     };
@@ -328,7 +356,12 @@ export async function openPreviewInWebView({
   panelDispose,
 }: OpenPreviewInWebViewArgs): Promise<OpenedPreviewWebview> {
   const basename = path.basename(activeEditor.document.fileName);
-  const previewer = await resolvePreviewer(context);
+  let previewer: ResolvedPreviewer;
+  try {
+    previewer = await resolvePreviewer(context);
+  } catch (error) {
+    throw reportPreviewerError(error, "open");
+  }
   // Create and show a new WebView
   const panel =
     webviewPanel !== undefined
