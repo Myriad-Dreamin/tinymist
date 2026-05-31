@@ -1,8 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Trusted workspaces can override preview HTML through a single previewer setting
-The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview HTML by setting `tinymist.previewer`. If the configured previewer value cannot be resolved, Tinymist SHALL fall back to its built-in preview HTML.
-
+The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview HTML by setting `tinymist.previewer`.
 #### Scenario: HTML previewer path is used
 - **WHEN** a trusted workspace sets `tinymist.previewer` to `html:<path>` where `<path>` resolves to a readable HTML file
 - **THEN** Tinymist uses that HTML file as the preview webview content instead of the built-in preview HTML
