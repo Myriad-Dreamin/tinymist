@@ -126,7 +126,7 @@ export function resolvePreviewerValue(value: string | null | undefined): string 
     return trimmedValue;
   }
 
-  const providerPath = trimmedValue.slice(HTML_PREVIEWER_PREFIX.length);
+  const providerPath = trimmedValue.slice(HTML_PREVIEWER_PREFIX.length).trim();
   const resolvedProviderPath = substVscodeVars(providerPath) ?? providerPath;
   return `${HTML_PREVIEWER_PREFIX}${
     resolvedProviderPath ? path.normalize(resolvedProviderPath) : resolvedProviderPath
