@@ -44,9 +44,9 @@ Tinymist SHALL verify that a configured extension-based previewer provider is co
 - **THEN** Tinymist accepts the provider previewer
 
 #### Scenario: Default compatibility rejects mismatched version
-- **WHEN** a configured extension-based provider declares a Tinymist version different from the running Tinymist version and does not define a custom compatibility predicate
-- **THEN** Tinymist rejects the provider previewer and uses its built-in preview HTML
 
+- **WHEN** a configured extension-based provider declares a Tinymist version different from the running Tinymist version and does not define a custom compatibility predicate
+- **THEN** Tinymist reports the compatibility problem and fails previewer resolution without using its built-in preview HTML
 #### Scenario: Custom compatibility check rejects provider
 - **WHEN** a configured extension-based provider defines a custom compatibility predicate and that predicate returns false for the running Tinymist version
 - **THEN** Tinymist rejects the provider previewer and uses its built-in preview HTML
