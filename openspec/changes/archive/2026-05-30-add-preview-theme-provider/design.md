@@ -41,7 +41,7 @@ Resolution order:
 2. If `tinymist.previewer` is unset, empty, or `myriad-dreamin.tinymist`, use the built-in Tinymist HTML.
 3. If `tinymist.previewer` starts with `html:`, treat the suffix as a path to an HTML file and try to load it.
 4. Otherwise, treat `tinymist.previewer` as an extension id and try to resolve an extension-based previewer provider.
-5. If any configured provider cannot be read or fails compatibility checks, report the problem and fall back to the built-in Tinymist HTML.
+5. If a configured provider cannot be read or fails compatibility checks, report the problem; `html:` previewers fall back to the built-in Tinymist HTML, while extension-id previewers fail previewer resolution.
 
 Alternative considered:
 - Keep separate settings for extension ids and HTML paths.
