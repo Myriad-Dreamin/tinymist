@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.14.19-rc9"
+version = "0.14.21-rc1"
 edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
@@ -233,16 +233,16 @@ typst-shim = { path = "./crates/typst-shim", version = "0.14.6" }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.14.19-rc9" }
-tinymist = { path = "./crates/tinymist/", version = "0.14.19-rc9", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.19-rc9" }
-tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.19-rc9" }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.19-rc9" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.19-rc9" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.19-rc9" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.19-rc9" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.14.19-rc9" }
-typlite = { path = "./crates/typlite", version = "0.14.19-rc9", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.14.21-rc1" }
+tinymist = { path = "./crates/tinymist/", version = "0.14.21-rc1", default-features = false }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.21-rc1" }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.21-rc1" }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.21-rc1" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.21-rc1" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.21-rc1" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.21-rc1" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.14.21-rc1" }
+typlite = { path = "./crates/typlite", version = "0.14.21-rc1", default-features = false }
 
 cmark-writer = { path = "crates/cmark-writer", version = "0.9.0", features = [
     "gfm",
@@ -342,9 +342,9 @@ typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "d95f4
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "91edfc0fd121ec0a3acb5d61abfd878f84ae49a0" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "91edfc0fd121ec0a3acb5d61abfd878f84ae49a0" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "91edfc0fd121ec0a3acb5d61abfd878f84ae49a0" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "16d37e212015978ba94eea6dc9ce2f9b3be6fb42" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "16d37e212015978ba94eea6dc9ce2f9b3be6fb42" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts/", rev = "16d37e212015978ba94eea6dc9ce2f9b3be6fb42" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
