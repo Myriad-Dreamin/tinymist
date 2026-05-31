@@ -21,9 +21,9 @@ The VS Code Tinymist extension SHALL interpret non-empty `tinymist.previewer` va
 - **WHEN** a trusted workspace configures `tinymist.previewer` with an installed and compatible extension id
 - **THEN** Tinymist activates that extension and uses the provider-supplied HTML path for preview
 
-#### Scenario: Missing extension id falls back to built-in HTML
+#### Scenario: Missing extension id reports an error
 - **WHEN** `tinymist.previewer` is set to an extension id that is not installed or does not expose the required provider contract
-- **THEN** Tinymist reports the problem and uses its built-in preview HTML
+- **THEN** Tinymist reports the problem and fails previewer resolution without using its built-in preview HTML
 
 ### Requirement: HTML previewers use the typst preview frontend contract
 The VS Code Tinymist extension SHALL require `html:` previewer targets to resolve to an HTML entry file compatible with `tools/typst-preview-frontend`.
