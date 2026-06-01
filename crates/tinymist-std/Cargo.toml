@@ -44,6 +44,7 @@ rkyv = { workspace = true, optional = true }
 
 # feature = "typst"
 typst = { workspace = true, optional = true }
+typst-layout = { workspace = true, optional = true }
 typst-html = { workspace = true, optional = true }
 typst-shim = { workspace = true, optional = true }
 
@@ -72,7 +73,7 @@ hex.workspace = true
 default = ["full"]
 full = ["web", "rkyv", "typst"]
 
-typst = ["dep:typst", "dep:typst-shim", "dep:typst-html"]
+typst = ["dep:typst", "dep:typst-shim", "dep:typst-html", "dep:typst-layout"]
 
 rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]

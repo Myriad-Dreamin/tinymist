@@ -9,6 +9,7 @@ use tinymist_world::vfs::PathResolution;
 use tinymist_world::{CompilerFeat, CompilerWorld, vfs::FileId};
 use typst::Library;
 use typst::diag::FileResult;
+use typst::foundations::Duration;
 use typst::foundations::{Bytes, Datetime};
 use typst::syntax::Source;
 use typst::text::{Font, FontBook};
@@ -60,7 +61,7 @@ where
         self.base.font(index)
     }
 
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
         self.base.today(offset)
     }
 }

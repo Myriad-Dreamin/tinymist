@@ -23,6 +23,7 @@ tinymist-analysis.workspace = true
 tinymist-debug.workspace = true
 tinymist-world = { workspace = true, features = ["system"] }
 typst-library.workspace = true
+typst-layout.workspace = true
 typst-shim.workspace = true
 typst.workspace = true
 

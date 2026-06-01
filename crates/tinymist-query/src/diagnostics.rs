@@ -87,8 +87,24 @@ impl<'w> DiagWorker<'w> {
     pub fn check(mut self, known_issues: &KnownIssues) -> Self {
         let source = self.source;
         self.source = "tinymist-lint";
-        for diag in collect_lint_diagnostics_with_known(self.ctx, known_issues) {
-            self.handle(&diag);
+        for dep in self.ctx.world().depended_files() {
+            if WorkspaceResolver::is_package_file(dep)
+                || dep
+                    .vpath()
+                    .as_rooted_path_compat()
+                    .extension()
+                    .is_none_or(|e| e != "typ")
+            {
+                continue;
+            }
+
+            let Ok(source) = self.ctx.world().source(dep) else {
+                continue;
+            };
+
+            for diag in self.ctx.lint(&source, known_issues) {
+                self.handle(&diag);
+            }
         }
         self.source = source;
 
@@ -218,7 +234,7 @@ fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
     let mut message = typst_diagnostic.message.to_string();
     for hint in &typst_diagnostic.hints {
         message.push_str("\nHint: ");
-        message.push_str(hint);
+        message.push_str(&hint.v);
     }
     message
 }
@@ -263,7 +279,7 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
             && raw
                 .hints
                 .iter()
-                .any(|hint| hint.contains("cannot read file outside of project root"))
+                .any(|hint| hint.v.contains("cannot read file outside of project root"))
     }
 
     fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {

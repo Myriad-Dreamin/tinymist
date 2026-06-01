@@ -12,6 +12,10 @@ en = "A page number template must be present if the source document renders to m
 en = "A typst file help export to TeX, e.g. `/ieee-tex.typ` or `@local/ieee-tex:0.1.0`"
 zh = "提供一个帮助导出为 TeX 的 typst 文件，例如 `/ieee-tex.typ` 或 `@local/ieee-tex:0.1.0`"
 
+["Export as Bundle"]
+en = "Export as Bundle"
+zh = "导出为 Bundle"
+
 ["Export as HTML"]
 en = "Export as HTML"
 zh = "导出为 HTML"

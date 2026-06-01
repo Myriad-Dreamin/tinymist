@@ -16,7 +16,7 @@
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
 #let is-md-target = x-target == "md"
-#let sys-is-html-target = ("target" in dictionary(std))
+#let sys-is-html-target = ("html" in dictionary(std))
 
 // Theme (Colors)
 #let themes = theme-box-styles-from(toml("theme-style.toml"), read: it => read(it))

@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-assertion_line: 292
 expression: "snap.join(\"\\n\")"
 input_file: crates/tinymist-query/src/fixtures/expr_of/import_by_ident.typ
 ---

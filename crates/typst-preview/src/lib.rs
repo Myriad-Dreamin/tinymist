@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
-use typst::{layout::Position, syntax::Span};
+use typst::{introspection::PagedPosition, syntax::Span};
 
 use crate::actor::editor::{EditorActor, EditorActorRequest};
 use crate::actor::render::RenderActorRequest;
@@ -496,7 +496,7 @@ pub trait CompileView: Send + Sync {
     }
 
     /// Resolve the document position.
-    fn resolve_document_position(&self, _by: Location) -> Vec<Position> {
+    fn resolve_document_position(&self, _by: Location) -> Vec<PagedPosition> {
         vec![]
     }
 

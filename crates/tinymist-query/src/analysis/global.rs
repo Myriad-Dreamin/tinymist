@@ -22,13 +22,15 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
+use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
 use typst::introspection::Introspector;
-use typst::layout::Position;
+use typst::introspection::PagedPosition as Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
+use typst_shim::syntax::VirtualPathExt;
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
@@ -356,8 +358,13 @@ impl LocalContext {
             .get_or_init(|| {
                 if let Some(root) = self.world().entry_state().workspace_root() {
                     scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
-                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
+                        VirtualPath::virtualize(&root, &root.join(path))
+                            .ok()
+                            .map(|path| WorkspaceResolver::workspace_file(Some(&root), path))
                     })
+                    .into_iter()
+                    .flatten()
+                    .collect()
                 } else {
                     vec![]
                 }
@@ -365,7 +372,7 @@ impl LocalContext {
             .iter()
             .filter(move |fid| {
                 fid.vpath()
-                    .as_rooted_path()
+                    .as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -401,7 +408,7 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path_compat()));
         ids
     }
 
@@ -602,7 +609,7 @@ impl SharedContext {
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
-            .as_rootless_path()
+            .as_rootless_path_compat()
             .extension()
             .and_then(|ext| ext.to_str());
         // yaml/yml/bib
@@ -1031,7 +1038,7 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+    pub fn analyze_bib(&self, introspector: &dyn Introspector) -> Option<Arc<BibInfo>> {
         let world = self.world();
         let world = (world as &dyn World).track();
 
@@ -1445,9 +1452,20 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    introspector: Tracked<Introspector>,
+    introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
-    let bib_elem = BibliographyElem::find(introspector).ok()?;
+    let library = world.library();
+    let traced = Traced::default();
+    let mut sink = Sink::new();
+    let mut engine = Engine {
+        library,
+        world,
+        route: Route::default(),
+        introspector: typst::utils::Protected::new(introspector),
+        traced: traced.track(),
+        sink: sink.track_mut(),
+    };
+    let bib_elem = BibliographyElem::find(&mut engine, Span::detached()).ok()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`

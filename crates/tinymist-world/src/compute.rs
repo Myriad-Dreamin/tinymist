@@ -7,7 +7,9 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use typst::diag::{At, SourceResult, Warned};
 use typst::ecow::EcoVec;
+use typst::foundations::Output;
 use typst::syntax::Span;
+use typst_bundle::Bundle;
 
 use crate::snapshot::CompileSnapshot;
 use crate::{CompilerFeat, CompilerWorld, EntryReader, TaskInputs};
@@ -269,10 +271,13 @@ pub type PagedCompilationTask = CompilationTask<TypstPagedDocument>;
 /// A task that compiles an HTML document.
 pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 
+/// A task that compiles a bundle.
+pub type BundleCompilationTask = CompilationTask<Bundle>;
+
 /// A task that compiles a document.
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
-impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
+impl<D: Output + Send + Sync + 'static> CompilationTask<D> {
     /// Ensures the main document.
     pub fn ensure_main<F: CompilerFeat>(world: &CompilerWorld<F>) -> SourceResult<()> {
         let main_id = world.main_id();
@@ -327,7 +332,7 @@ impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
 
 impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
 where
-    D: typst::Document + Send + Sync + 'static,
+    D: Output + Send + Sync + 'static,
 {
     type Output = Option<Warned<SourceResult<Arc<D>>>>;
 
@@ -343,7 +348,7 @@ pub struct OptionDocumentTask<D>(std::marker::PhantomData<D>);
 
 impl<F: CompilerFeat, D> WorldComputable<F> for OptionDocumentTask<D>
 where
-    D: typst::Document + Send + Sync + 'static,
+    D: Output + Send + Sync + 'static,
 {
     type Output = Option<Arc<D>>;
 
@@ -358,7 +363,7 @@ where
     }
 }
 
-impl<D> OptionDocumentTask<D> where D: typst::Document + Send + Sync + 'static {}
+impl<D> OptionDocumentTask<D> where D: Output + Send + Sync + 'static {}
 
 /// A task that computes the diagnostics of a document.
 struct CompilationDiagnostics {
@@ -382,6 +387,7 @@ impl CompilationDiagnostics {
 pub struct DiagnosticsTask {
     paged: CompilationDiagnostics,
     html: CompilationDiagnostics,
+    bundle: CompilationDiagnostics,
 }
 
 impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
@@ -390,10 +396,12 @@ impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
         let paged = graph.compute::<PagedCompilationTask>()?.clone();
         let html = graph.compute::<HtmlCompilationTask>()?.clone();
+        let bundle = graph.compute::<BundleCompilationTask>()?.clone();
 
         Ok(Self {
             paged: CompilationDiagnostics::from_result(&paged),
             html: CompilationDiagnostics::from_result(&html),
+            bundle: CompilationDiagnostics::from_result(&bundle),
         })
     }
 }
@@ -410,6 +418,10 @@ impl DiagnosticsTask {
                 errors: None,
                 warnings: None,
             },
+            bundle: CompilationDiagnostics {
+                errors: None,
+                warnings: None,
+            },
         }
     }
 
@@ -417,12 +429,14 @@ impl DiagnosticsTask {
     pub fn error_cnt(&self) -> usize {
         self.paged.errors.as_ref().map_or(0, |e| e.len())
             + self.html.errors.as_ref().map_or(0, |e| e.len())
+            + self.bundle.errors.as_ref().map_or(0, |e| e.len())
     }
 
     /// Gets the number of warnings.
     pub fn warning_cnt(&self) -> usize {
         self.paged.warnings.as_ref().map_or(0, |e| e.len())
             + self.html.warnings.as_ref().map_or(0, |e| e.len())
+            + self.bundle.warnings.as_ref().map_or(0, |e| e.len())
     }
 
     /// Gets the diagnostics.
@@ -433,6 +447,8 @@ impl DiagnosticsTask {
             .chain(self.paged.warnings.iter())
             .chain(self.html.errors.iter())
             .chain(self.html.warnings.iter())
+            .chain(self.bundle.errors.iter())
+            .chain(self.bundle.warnings.iter())
             .flatten()
     }
 }
@@ -444,7 +460,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 
     /// Compiles once from scratch.
-    pub fn pure_compile<D: ::typst::Document + Send + Sync + 'static>(
+    pub fn pure_compile<D: ::typst::foundations::Output + Send + Sync + 'static>(
         &self,
     ) -> Warned<SourceResult<Arc<D>>> {
         CompilationTask::<D>::execute(&self.snap.world)
