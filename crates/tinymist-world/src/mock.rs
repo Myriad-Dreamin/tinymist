@@ -55,13 +55,13 @@ pub trait MockWorkspaceWorldExt {
 
 impl MockWorkspaceWorldExt for MockWorkspace {
     fn entry_state(&self, entry: impl AsRef<Path>) -> FileResult<EntryState> {
+        let path = self.path(entry);
         Ok(EntryState::new_rooted(
             self.root_path(),
-            Some(VirtualPath::new(
-                self.path(entry)
-                    .strip_prefix(self.root())
+            Some(
+                VirtualPath::virtualize(self.root(), &path)
                     .map_err(|_| typst::diag::FileError::AccessDenied)?,
-            )),
+            ),
         ))
     }
 

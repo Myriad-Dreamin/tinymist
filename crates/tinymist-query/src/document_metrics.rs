@@ -140,7 +140,7 @@ impl DocumentMetricsWorker<'_> {
     fn work(&mut self, doc: &TypstDocument) -> Option<()> {
         match doc {
             TypstDocument::Paged(paged_doc) => {
-                for page in &paged_doc.pages {
+                for page in paged_doc.pages() {
                     self.work_frame(&page.frame)?;
                 }
 
@@ -229,7 +229,6 @@ impl DocumentMetricsWorker<'_> {
     }
 
     fn compute(&mut self) -> Option<Vec<DocumentFontInfo>> {
-        use ttf_parser::name_id::*;
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
             .map(|(font, font_info_value)| {
@@ -240,9 +239,9 @@ impl DocumentMetricsWorker<'_> {
                     style: info.variant.style,
                     weight: info.variant.weight,
                     stretch: info.variant.stretch,
-                    postscript_name: font.find_name(POST_SCRIPT_NAME),
-                    full_name: font.find_name(FULL_NAME),
-                    family: font.find_name(FAMILY),
+                    postscript_name: font.post_script_name(),
+                    full_name: Some(info.family.clone()),
+                    family: Some(info.family.clone()),
                     fixed_family: Some(info.family.clone()),
                     source: extra.map(|source| self.internal_source(source)),
                     index: Some(font.index()),

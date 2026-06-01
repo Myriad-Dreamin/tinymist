@@ -11,24 +11,35 @@ pub fn resolve_id_by_path(
     if import_path.starts_with('@') {
         let spec = import_path.parse::<PackageSpec>().ok()?;
         // Evaluates the manifest.
-        let manifest_id = TypstFileId::new(Some(spec.clone()), VirtualPath::new("typst.toml"));
+        let manifest_id = TypstFileId::new(RootedPath::new(
+            VirtualRoot::Package(spec.clone()),
+            VirtualPath::new("typst.toml").ok()?,
+        ));
         let bytes = world.file(manifest_id).ok()?;
         let string = std::str::from_utf8(&bytes).map_err(FileError::from).ok()?;
         let manifest: PackageManifest = toml::from_str(string).ok()?;
         manifest.validate(&spec).ok()?;
 
         // Evaluates the entry point.
-        return Some(manifest_id.join(&manifest.package.entrypoint));
+        let package_root = manifest_id.vpath().parent()?;
+        return Some(TypstFileId::new(RootedPath::new(
+            manifest_id.root().clone(),
+            package_root
+                .join(manifest.package.entrypoint.as_str())
+                .ok()?,
+        )));
     }
 
-    let path = Path::new(import_path);
-    let vpath = if path.is_relative() {
-        current.vpath().join(path)
+    let vpath = if Path::new(import_path).is_relative() {
+        current.vpath().parent()?.join(import_path).ok()?
     } else {
-        VirtualPath::new(path)
+        VirtualPath::new(import_path).ok()?
     };
 
-    Some(TypstFileId::new(current.package().cloned(), vpath))
+    Some(TypstFileId::new(RootedPath::new(
+        current.root().clone(),
+        vpath,
+    )))
 }
 
 /// Finds a source instance by its import node.

@@ -14,7 +14,7 @@ let f(
   w02: str = "test",
   w03: any = 1 + 2,
   w04: any = Label(test),
-  w05: (content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box = (content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box,
+  w05: (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box = (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box,
   w06: (content) => item | any = (body-indent: length, indent: length, marker: array | content | function, spacing: auto | length, tight: bool, ..: content) => list.item,
   w07: text = Expr(..),
   w08: any = Expr(..),
@@ -26,7 +26,7 @@ let f(
   w11: array = (),
   w12: dictionary = (:),
   w13: dictionary = (a: 1),
-  w14: dictionary = (a: (content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box),
+  w14: dictionary = (a: (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box),
   w15: dictionary = (a: (body-indent: length, indent: length, marker: array | content | function, spacing: auto | length, tight: bool, ..: content) => list.item),
 ) = int;
 ```
@@ -100,7 +100,7 @@ type:
 ## w05 (named)
 
 ```typc
-type: (content | none, baseline: relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box
+type: (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box
 ```
 
 

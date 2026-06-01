@@ -15,6 +15,7 @@ use typst::foundations::func;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{Source, Span, SyntaxNode, ast};
 use typst::{World, WorldExt};
+use typst_shim::syntax::RootedPathExt;
 
 use crate::instrument::Instrumenter;
 
@@ -118,10 +119,11 @@ impl fmt::Display for SummarizedCoverage<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ids = self.result.regions.keys().collect::<Vec<_>>();
         ids.sort_by(|a, b| {
-            a.package()
+            a.get()
+                .package_compat()
                 .map(crate::PackageSpecCmp::from)
-                .cmp(&b.package().map(crate::PackageSpecCmp::from))
-                .then_with(|| a.vpath().cmp(b.vpath()))
+                .cmp(&b.get().package_compat().map(crate::PackageSpecCmp::from))
+                .then_with(|| a.vpath().get_with_slash().cmp(b.vpath().get_with_slash()))
         });
 
         let summary = ids
@@ -290,7 +292,10 @@ impl InstrumentWorker {
                     self.instrument_block_child(
                         node,
                         cond_expr.if_body().span(),
-                        cond_expr.else_body().unwrap_or_default().span(),
+                        cond_expr
+                            .else_body()
+                            .map(|expr| expr.span())
+                            .unwrap_or(Span::detached()),
                     );
                     return;
                 }
@@ -349,6 +354,8 @@ impl InstrumentWorker {
                 | ast::Expr::MathPrimes(..)
                 | ast::Expr::MathFrac(..)
                 | ast::Expr::MathRoot(..)
+                | ast::Expr::MathFieldAccess(..)
+                | ast::Expr::MathCall(..)
                 | ast::Expr::Ident(..)
                 | ast::Expr::None(..)
                 | ast::Expr::Auto(..)
@@ -451,7 +458,8 @@ mod tests {
     #[test]
     fn test_physica_vector() {
         let instrumented = instr(include_str!("fixtures/instr_coverage/physica_vector.typ"));
-        insta::assert_snapshot!(instrumented, @r###"
+        insta::assert_snapshot!(instrumented, @r#"
+
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -491,7 +499,7 @@ mod tests {
         }
         __cov_pc(8);
         }
-        "###);
+        "#);
     }
 
     #[test]
@@ -511,7 +519,7 @@ mod tests {
     fn test_instrument_coverage_show_content() {
         let source = Source::detached("#show math.equation: context it => it");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show math.equation: {
         let __cov_show_body = context (it => {
         __cov_pc(0);
@@ -520,14 +528,14 @@ mod tests {
         })
         __it => {__cov_pc(2);
         if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_inline_block() {
         let source = Source::detached("#let main-size = {1} + 2 + {3}");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let main-size = {
         __cov_pc(0);
         {1}
@@ -537,7 +545,7 @@ mod tests {
         {3}
         __cov_pc(3);
         }
-        "###);
+        ");
     }
 
     #[test]
@@ -550,7 +558,7 @@ mod tests {
 }",
         );
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let main-size = if is-web-target {
         __cov_pc(0);
         {
@@ -564,42 +572,42 @@ mod tests {
         }
         __cov_pc(3);
         }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let a = {
         __cov_pc(0);
         {1}
         __cov_pc(1);
         };
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show: {
         let __cov_show_body = main
         __it => {__cov_pc(0);
         if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_set() {
         let source = Source::detached("#show raw: set text(12pt)");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show raw: __it => {__cov_pc(0);
         set text(12pt)
         __it; }
-        "###);
+        ");
     }
 }

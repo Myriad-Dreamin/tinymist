@@ -115,6 +115,7 @@
                       "png",
                       "svg",
                       "html",
+                      "bundle",
                       "markdown",
                       "tex",
                       "text",
@@ -126,6 +127,7 @@
                       "PNG",
                       "SVG",
                       "HTML",
+                      "Bundle",
                       "Markdown",
                       "TeX",
                       "Plain Text",
@@ -145,6 +147,7 @@
                         "png",
                         "svg",
                         "html",
+                        "bundle",
                         "markdown",
                         "tex",
                         "text",
@@ -156,6 +159,7 @@
                         "PNG",
                         "SVG",
                         "HTML",
+                        "Bundle",
                         "Markdown",
                         "TeX",
                         "Plain Text",
@@ -182,6 +186,40 @@
                   "string"
                 ],
                 "description": "The unix timestamp of the PDF creation. If not specified, the current time is used."
+              },
+              "bundle.pages": {
+                "type": [
+                  "string",
+                  "array"
+                ],
+                "description": "The page range(s) to export into the bundle. Uses the same syntax as `pages`.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bundle.creationTimestamp": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The unix timestamp of the PDF creation inside the bundle. If not specified, the current time is used."
+              },
+              "bundle.pdfStandard": {
+                "type": "array",
+                "description": "Optional PDF standards for PDF documents inside the bundle.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "bundle.pdfTags": {
+                "type": "boolean",
+                "description": "Whether to include tagged structure in PDF documents inside the bundle for better accessibility.",
+                "default": true
+              },
+              "bundle.ppi": {
+                "type": "number",
+                "description": "The PPI (pixels per inch) to use for raster exports inside the bundle.",
+                "default": 144
               },
               "png.ppi": {
                 "type": "number",
@@ -372,11 +410,13 @@
           "default": "paged",
           "enum": [
             "paged",
-            "html"
+            "html",
+            "bundle"
           ],
           "enumDescriptions": [
             "%extension.tinymist.config.tinymist.exportTarget.string.enum.paged%",
-            "%extension.tinymist.config.tinymist.exportTarget.string.enum.html%"
+            "%extension.tinymist.config.tinymist.exportTarget.string.enum.html%",
+            "%extension.tinymist.config.tinymist.exportTarget.string.enum.bundle%"
           ]
         },
         "tinymist.exportPdf": {

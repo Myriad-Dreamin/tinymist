@@ -248,7 +248,7 @@ See show-module() for outputting the results of this function.
         in all function and parameter descriptions.<!-- typlite:end:list-item 0 --> 
 - <!-- typlite:begin:list-item 0 -->preamble (string): Code to prepend to all code snippets shown with `#example()`. 
         This can for instance be used to import something from the scope.<!-- typlite:end:list-item 0 --> 
--> string"###), @r"
+-> string"###), @"
         >> docs:
         These again are dictionaries with the keys
         - `description` (optional): The description for the argument.
@@ -297,7 +297,7 @@ See show-module() for outputting the results of this function.
         references. If `auto`, the label-prefix name will be the module name. 
   - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
   - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 --><!-- typlite:end:list-item 0 -->
--> string"###), @r"
+-> string"###), @"
         >> docs:
         These again are dictionaries with the keys
         - `description` (optional): The description for the argument.
@@ -322,7 +322,7 @@ See show-module() for outputting the results of this function.
     #[test]
     fn test_identify_tidy_docs3() {
         insta::assert_snapshot!(var(r###"See show-module() for outputting the results of this function.
--> string"###), @r"
+-> string"###), @"
         >> docs:
         See show-module() for outputting the results of this function.
         << docs
@@ -335,7 +335,7 @@ See show-module() for outputting the results of this function.
     #[test]
     fn test_identify_tidy_docs4() {
         insta::assert_snapshot!(func(r###"
-- <!-- typlite:begin:list-item 0 -->fn (function, fn): The `fn`.<!-- typlite:end:list-item 0 -->"###), @r"
+- <!-- typlite:begin:list-item 0 -->fn (function, fn): The `fn`.<!-- typlite:end:list-item 0 -->"###), @"
         >> docs:
 
         << docs

@@ -6,7 +6,7 @@ use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
-use typst::introspection::Introspector;
+use typst::introspection::EmptyIntrospector;
 use typst::model::BibliographyElem;
 use typst::syntax::{LinkedNode, Span, SyntaxKind, SyntaxNode, ast};
 use typst_shim::eval::Vm;
@@ -75,14 +75,15 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
 
     let _guard = GLOBAL_STATS.stat(source_span.id(), "analyze_import");
 
-    let introspector = Introspector::default();
+    let library = world.library();
+    let introspector = EmptyIntrospector;
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
-        routines: &typst::ROUTINES,
+        library,
         world: world.track(),
         route: Route::default(),
-        introspector: introspector.track(),
+        introspector: typst::utils::Protected::new(introspector.track()),
         traced: traced.track(),
         sink: sink.track_mut(),
     };
@@ -91,7 +92,7 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
     let mut vm = Vm::new(
         engine,
         context.track(),
-        Scopes::new(Some(world.library())),
+        Scopes::new(Some(library)),
         Span::detached(),
     );
     let module = match source.clone() {
@@ -131,7 +132,7 @@ pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let _guard = GLOBAL_STATS.stat(None, "analyze_labels");
 
     // Labels in the document.
-    for elem in document.introspector().all() {
+    for elem in document.introspector().query_labelled() {
         let Some(label) = elem.label() else { continue };
         let (is_derived, details) = {
             let derived = elem

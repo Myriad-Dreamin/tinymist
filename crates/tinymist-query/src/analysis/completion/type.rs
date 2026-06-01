@@ -312,10 +312,8 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                     );
                 } else if ty.scope().iter().any(|(_, b)| {
                     if let Value::Func(f) = b.read() {
-                        let pos = f
-                            .params()
-                            .and_then(|params| params.iter().find(|s| s.required));
-                        pos.is_none_or(|pos| pos.name != "self")
+                        let pos = f.params().find(|s| s.required());
+                        pos.is_none_or(|pos| pos.name() != Some("self"))
                     } else {
                         true
                     }

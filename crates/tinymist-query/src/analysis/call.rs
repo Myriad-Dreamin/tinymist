@@ -36,6 +36,29 @@ pub struct CallInfo {
     pub arg_mapping: HashMap<SyntaxNode, CallParamInfo>,
 }
 
+/// Gets the callee and argument nodes for a normal or math call.
+pub fn call_parts<'a>(node: &LinkedNode<'a>) -> Option<(LinkedNode<'a>, LinkedNode<'a>)> {
+    match node.cast::<ast::Expr>()? {
+        ast::Expr::FuncCall(call) => {
+            let callee = call.callee();
+            // todo: reduce many such patterns
+            if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
+                return None;
+            }
+
+            let callee_node = node.find(callee.span())?;
+            let args_node = node.find(call.args().span())?;
+            Some((callee_node, args_node))
+        }
+        ast::Expr::MathCall(call) => {
+            let callee_node = node.find(call.callee().to_untyped().span())?;
+            let args_node = node.find(call.args().span())?;
+            Some((callee_node, args_node))
+        }
+        _ => None,
+    }
+}
+
 // todo: cache call
 /// Analyzes a function call.
 #[typst_macros::time(span = node.span())]
@@ -45,20 +68,12 @@ pub fn analyze_call(
     node: LinkedNode,
 ) -> Option<Arc<CallInfo>> {
     log::trace!("func call found: {node:?}");
-    let call = node.cast::<ast::FuncCall>()?;
-
-    let callee = call.callee();
-    // todo: reduce many such patterns
-    if !callee.hash() && !matches!(callee, ast::Expr::MathIdent(_)) {
-        return None;
-    }
-
-    let callee_node = node.find(callee.span())?;
+    let (callee_node, args_node) = call_parts(&node)?;
     Some(Arc::new(analyze_call_no_cache(
         ctx,
         source,
         callee_node,
-        call.args(),
+        args_node,
     )?))
 }
 
@@ -68,7 +83,7 @@ pub fn analyze_call_no_cache(
     ctx: &mut LocalContext,
     source: Source,
     callee_node: LinkedNode,
-    args: ast::Args<'_>,
+    args_node: LinkedNode,
 ) -> Option<CallInfo> {
     let signature = analyze_signature(
         ctx.shared(),
@@ -188,7 +203,7 @@ pub fn analyze_call_no_cache(
         }
     }
 
-    for node in args.to_untyped().children() {
+    for node in args_node.children() {
         match node.kind() {
             SyntaxKind::LeftParen => {
                 pos_builder.set_out_of_arg_list(false);
@@ -200,7 +215,7 @@ pub fn analyze_call_no_cache(
             }
             _ => {}
         }
-        let arg_tag = node.clone();
+        let arg_tag = node.get().clone();
         let Some(arg) = node.cast::<ast::Arg>() else {
             continue;
         };

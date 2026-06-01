@@ -18,6 +18,14 @@ export interface ExportPngOpts {
   ppi?: number;
 }
 
+export interface ExportBundleOpts {
+  pages?: string[];
+  creationTimestamp?: string | null;
+  pdfStandard?: string[];
+  noPdfTags?: boolean;
+  ppi?: number;
+}
+
 export interface ExportSvgOpts {
   pages?: string[];
   pageNumberTemplate?: string;
@@ -48,6 +56,7 @@ export interface ExportTextOpts {}
 export type ExportOpts =
   | ExportPdfOpts
   | ExportPngOpts
+  | ExportBundleOpts
   | ExportSvgOpts
   | ExportTypliteOpts
   | ExportQueryOpts

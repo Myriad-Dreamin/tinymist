@@ -13,6 +13,7 @@ use typst::World;
 use typst::diag::StrResult;
 use typst::foundations::Bytes;
 use typst::syntax::FileId;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::analysis::SharedContext;
 
@@ -26,16 +27,17 @@ pub(crate) fn convert_docs(
         let root = ctx
             .world()
             .vfs()
-            .file_path(fid.join("/"))
+            .file_path(fid)
             .ok()
-            .and_then(|e| e.to_err().ok());
+            .and_then(|e| e.to_err().ok())
+            .and_then(|path| path.parent().map(|root| root.to_path_buf()));
         if let Some(root) = root {
             entry = EntryState::new_workspace(root.into());
         }
 
         let mut imports = Vec::new();
         if WorkspaceResolver::is_package_file(fid)
-            && let Some(pkg) = fid.package()
+            && let typst::syntax::VirtualRoot::Package(pkg) = fid.root()
         {
             let pkg_spec = pkg.to_string();
             imports.push(format!("#import {pkg_spec:?}"));
@@ -43,7 +45,7 @@ pub(crate) fn convert_docs(
         }
         imports.push(format!(
             "#import {:?}: *",
-            unix_slash(fid.vpath().as_rooted_path())
+            unix_slash(fid.vpath().as_rooted_path_compat())
         ));
         imports.join("; ")
     });
