@@ -356,11 +356,12 @@ Nightly Release at [${tinymistBaseMessage}](https://github.com/Myriad-Dreamin/ti
                 }
             }
 
-            // find insert point
+            // Use the latest stable release as the compare baseline. RC entries are
+            // intermediate nightly artifacts and break the release draft parser.
             let previousVersion = '';
             for (const line of filteredLines) {
                 if (line.startsWith('## v')) {
-                    const match = line.match(/## (v[0-9][^\s]*)/);
+                    const match = line.match(/^## (v[0-9]+\.[0-9]+\.[0-9]+)(?:\s|$)/);
                     if (match) {
                         previousVersion = match[1];
                         break;
