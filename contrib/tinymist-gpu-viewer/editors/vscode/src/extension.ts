@@ -95,18 +95,24 @@ function launchViewer(context: vscode.ExtensionContext, task: TinymistPreviewTas
     });
   });
   viewer.on("exit", (code, signal) => {
-    activeViewers.delete(task.taskId);
+    deleteActiveViewer(task.taskId, viewer);
     appendLog(`Tinymist GPU Viewer exited with code ${code ?? "null"} signal ${signal ?? "null"}`);
   });
 
   return {
     dispose() {
-      activeViewers.delete(task.taskId);
+      deleteActiveViewer(task.taskId, viewer);
       if (!viewer.killed) {
         viewer.kill();
       }
     },
   };
+}
+
+function deleteActiveViewer(taskId: string, viewer: ChildProcessWithoutNullStreams) {
+  if (activeViewers.get(taskId) === viewer) {
+    activeViewers.delete(taskId);
+  }
 }
 
 function resolveViewerExecutable(context: vscode.ExtensionContext): string {
