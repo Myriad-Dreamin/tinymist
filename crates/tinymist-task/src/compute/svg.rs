@@ -39,7 +39,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
                 .as_ref()
                 .and_then(|gap| parse_length(gap).ok())
                 .unwrap_or_default();
-            let svg = typst_svg::svg_merged(&dummy_doc, gap);
+            let svg = typst_svg::svg_merged(&dummy_doc, &svg_options, gap);
             Ok(ImageOutput::Merged(svg))
         } else {
             let exported = exported_pages
