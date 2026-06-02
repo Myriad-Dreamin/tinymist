@@ -175,7 +175,12 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("tinymist.doDisposePreview", ({ taskId }) => {
       for (const t of activeTask.values()) {
         if (t.taskId === taskId) {
-          t.panel?.dispose();
+          if (t.panel) {
+            t.panel.dispose();
+          } else {
+            t.dispose?.();
+            void tinymist.killPreview(t.taskId);
+          }
           return;
         }
       }
@@ -334,6 +339,10 @@ interface OpenPreviewInWebViewArgs {
    * Additional cleanup routine when the webview panel is disposed.
    */
   panelDispose: () => Promise<void>;
+  /**
+   * Resolved previewer, if the caller already needed it to decide how to launch.
+   */
+  previewer?: ResolvedPreviewer;
 }
 
 export interface OpenedPreviewWebview {
@@ -354,13 +363,20 @@ export async function openPreviewInWebView({
   dataPlanePort,
   webviewPanel,
   panelDispose,
+  previewer: resolvedPreviewer,
 }: OpenPreviewInWebViewArgs): Promise<OpenedPreviewWebview> {
   const basename = path.basename(activeEditor.document.fileName);
-  let previewer: ResolvedPreviewer;
+  let previewer = resolvedPreviewer;
   try {
-    previewer = await resolvePreviewer(context);
+    previewer ??= await resolvePreviewer(context);
   } catch (error) {
     throw reportPreviewerError(error, "open");
+  }
+  if (previewer.handlePreview) {
+    throw reportPreviewerError(
+      new Error("the configured previewer handles document preview without a webview"),
+      "open",
+    );
   }
   // Create and show a new WebView
   const panel =
@@ -445,6 +461,8 @@ interface TaskControlBlock {
   taskId: string;
   /// previewer metadata
   previewSource?: PreviewerSourceMetadata;
+  /// cleanup routine for previews that do not own a webview panel
+  dispose?: () => void;
 }
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
@@ -455,12 +473,16 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   /**
    * Can only open one preview for one document.
    */
-  if (activeTask.has(bindDocument)) {
-    const { panel } = activeTask.get(bindDocument)!;
+  const existingTask = activeTask.get(bindDocument);
+  if (existingTask) {
+    const { panel } = existingTask;
     if (panel) {
       panel.reveal();
+      return { message: "existed" };
     }
-    return { message: "existed" };
+
+    existingTask.dispose?.();
+    await tinymist.killPreview(existingTask.taskId);
   }
 
   const taskId = Math.random().toString(36).substring(7);
@@ -478,7 +500,18 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   // update real primary state
   task.isNotPrimary = !isPrimary;
 
-  if (isPrimary) {
+  let resolvedPreviewer: ResolvedPreviewer | undefined = undefined;
+  if (kind === "webview") {
+    try {
+      resolvedPreviewer = await resolvePreviewer(context);
+    } catch (error) {
+      disposes.dispose();
+      throw reportPreviewerError(error, "open");
+    }
+  }
+  const isHandledByPreviewer = kind === "webview" && !!resolvedPreviewer?.handlePreview;
+
+  if (isPrimary && !isHandledByPreviewer) {
     const connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
     contentPreviewProvider.then((p) => p.postActivate(connectUrl));
     disposes.add(() => {
@@ -490,12 +523,36 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   let previewSource: PreviewerSourceMetadata | undefined = undefined;
   switch (kind) {
     case "webview": {
+      if (resolvedPreviewer?.handlePreview) {
+        try {
+          const previewHandle = await resolvedPreviewer.handlePreview({
+            taskId,
+            documentUri: bindDocument.uri.toString(),
+            documentPath: filePath,
+            mode: task.mode,
+            dataPlaneHost: `ws://127.0.0.1:${dataPlanePort}`,
+            dataPlanePort,
+            staticServerPort,
+            isBrowsing: !!isBrowsing,
+            isPrimary: !!isPrimary,
+          });
+          addPreviewHandleDispose(disposes, previewHandle);
+        } catch (error) {
+          disposes.dispose();
+          await tinymist.killPreview(taskId);
+          throw error;
+        }
+        previewSource = resolvedPreviewer.source;
+        break;
+      }
+
       const openedPreview = await openPreviewInWebView({
         context,
         task,
         activeEditor: editor,
         dataPlanePort,
         webviewPanel,
+        previewer: resolvedPreviewer,
         async panelDispose() {
           disposes.dispose();
           await tinymist.killPreview(taskId);
@@ -517,6 +574,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     panel,
     taskId,
     previewSource,
+    dispose: () => disposes.dispose(),
   });
   disposes.add(() => {
     if (activeTask.get(bindDocument)?.taskId === taskId) {
@@ -640,6 +698,22 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       character: editorToReport.selection.active.character,
     };
     scrollPreviewPanel(taskId, scrollRequest);
+  }
+}
+
+function addPreviewHandleDispose(disposes: DisposeList, previewHandle: unknown) {
+  if (!previewHandle) {
+    return;
+  }
+
+  if (typeof previewHandle === "function") {
+    disposes.add(() => previewHandle());
+    return;
+  }
+
+  const disposable = previewHandle as vscode.Disposable;
+  if (typeof disposable.dispose === "function") {
+    disposes.add(disposable);
   }
 }
 

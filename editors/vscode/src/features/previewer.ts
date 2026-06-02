@@ -14,21 +14,40 @@ export interface PreviewerSourceMetadata {
   configuredProvider?: string;
   extensionId?: string;
   htmlPath?: string;
+  handler?: "documentPreview";
   compatibleTinymistVersion?: string;
   fallbackReason?: string;
+}
+
+export type TinymistPreviewHandle = vscode.Disposable | (() => void) | void;
+
+export interface TinymistPreviewTask {
+  taskId: string;
+  documentUri: string;
+  documentPath: string;
+  mode: "doc" | "slide";
+  dataPlaneHost: string;
+  dataPlanePort: string | number;
+  staticServerPort: string | number;
+  isBrowsing: boolean;
+  isPrimary: boolean;
 }
 
 export interface ResolvedPreviewer {
   html: string;
   htmlUri: vscode.Uri;
   localResourceRoots: vscode.Uri[];
+  handlePreview?: (
+    task: TinymistPreviewTask,
+  ) => Promise<TinymistPreviewHandle> | TinymistPreviewHandle;
   source: PreviewerSourceMetadata;
 }
 
 export interface TinymistPreviewer {
-  htmlPath: string;
+  htmlPath?: string;
   compatibleTinymistVersion: string;
   isCompatible?(tinymistVersion: string): Promise<boolean> | boolean;
+  handlePreview?(task: TinymistPreviewTask): Promise<TinymistPreviewHandle> | TinymistPreviewHandle;
 }
 
 export interface TinymistPreviewerProvider {
@@ -291,14 +310,8 @@ async function resolveExtensionPreviewer(
     );
   }
 
-  if (!previewer || typeof previewer.htmlPath !== "string" || previewer.htmlPath.trim() === "") {
-    throw previewerResolutionError(
-      provider,
-      `extension \`${extensionId}\` returned an empty preview HTML path`,
-    );
-  }
-
   if (
+    !previewer ||
     typeof previewer.compatibleTinymistVersion !== "string" ||
     previewer.compatibleTinymistVersion.trim() === ""
   ) {
@@ -324,6 +337,30 @@ async function resolveExtensionPreviewer(
     throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` is not compatible with Tinymist ${environment.tinymistVersion}`,
+    );
+  }
+
+  if (typeof previewer.handlePreview === "function") {
+    return {
+      html: "",
+      htmlUri: extension.extensionUri,
+      localResourceRoots: [],
+      handlePreview: previewer.handlePreview.bind(previewer),
+      source: {
+        kind: "extension",
+        trusted: environment.workspaceTrusted,
+        configuredProvider: provider,
+        extensionId,
+        handler: "documentPreview",
+        compatibleTinymistVersion: previewer.compatibleTinymistVersion,
+      },
+    };
+  }
+
+  if (typeof previewer.htmlPath !== "string" || previewer.htmlPath.trim() === "") {
+    throw previewerResolutionError(
+      provider,
+      `extension \`${extensionId}\` did not export a \`handlePreview()\` handler or return an HTML path`,
     );
   }
 
