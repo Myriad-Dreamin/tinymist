@@ -119,11 +119,21 @@ function resolveViewerExecutable(context: vscode.ExtensionContext): string {
   const configured = vscode.workspace
     .getConfiguration("tinymist.gpuViewer")
     .get<string | null>("executable");
+  const configuredPath = configured?.trim();
+  if (configuredPath) {
+    if (configuredPath === VIEWER_BINARY_NAME || fs.existsSync(configuredPath)) {
+      return configuredPath;
+    }
+
+    throw new Error(
+      `Configured tinymist.gpuViewer.executable does not exist: ${configuredPath}. Unset the setting to use the bundled viewer or ${VIEWER_BINARY_NAME} from PATH.`,
+    );
+  }
+
   const candidates = [
-    configured,
     path.join(context.extensionUri.fsPath, "bin", VIEWER_BINARY_NAME),
     VIEWER_BINARY_NAME,
-  ].filter((candidate): candidate is string => !!candidate && candidate.trim() !== "");
+  ];
 
   for (const candidate of candidates) {
     if (candidate === VIEWER_BINARY_NAME || fs.existsSync(candidate)) {
