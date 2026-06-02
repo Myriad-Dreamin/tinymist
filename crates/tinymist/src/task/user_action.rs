@@ -20,7 +20,7 @@ use tinymist_project::LspComputeGraph;
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
-use typst::{syntax::Span, World};
+use typst::{syntax::Span, World, WorldExt};
 
 use crate::project::LspWorld;
 use crate::{internal_error, AliveLock, ConnWithCancel, ServerState};
@@ -477,7 +477,7 @@ async fn make_http_server(
 fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
     let id = span.id()?;
     let source = world.source(id).ok()?;
-    let range = source.range(span)?;
+    let range = world.range(span)?;
     let line = source.lines().byte_to_line(range.start)?;
     Some((format!("{id:?}"), line as u32 + 1))
 }
