@@ -12,11 +12,17 @@ use masonry::layout::{LenReq, Length};
 use tracing::{Span, trace_span};
 use vello::Scene;
 use vello::kurbo::{Affine, Axis, Point, Rect, Size};
+use vello::peniko::{Color, Fill};
 use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewMarker};
 use xilem::{Pod, ViewCtx};
 
 /// Accesses a raw vello [`Scene`] within a canvas that fills its parent
-pub fn doc<State, F>(scene: Arc<Scene>, scene_scale: f64, on_click: F) -> TypstDocPage<State, F>
+pub fn doc<State, F>(
+    scene: Arc<Scene>,
+    scene_scale: f64,
+    background_color: Option<Color>,
+    on_click: F,
+) -> TypstDocPage<State, F>
 where
     State: ViewArgument,
     F: Fn(Point, Rect) + 'static,
@@ -24,6 +30,7 @@ where
     TypstDocPage {
         scene,
         scene_scale,
+        background_color,
         on_click,
         alt_text: Option::default(),
         phantom: PhantomData,
@@ -35,6 +42,7 @@ where
 pub struct TypstDocPage<State, F> {
     scene: Arc<Scene>,
     scene_scale: f64,
+    background_color: Option<Color>,
     alt_text: Option<ArcStr>,
     on_click: F,
     phantom: PhantomData<fn() -> State>,
@@ -68,6 +76,7 @@ where
                     alt_text: self.alt_text.clone(),
                     size: Size::default(),
                     scene_scale: self.scene_scale,
+                    background_color: self.background_color,
                     scene: self.scene.clone(),
                 })
             }),
@@ -83,7 +92,12 @@ where
         mut element: Mut<'_, Self::Element>,
         _state: Arg<'_, State>,
     ) {
-        PageCanvas::request_render(&mut element, self.scene.clone(), self.scene_scale);
+        PageCanvas::request_render(
+            &mut element,
+            self.scene.clone(),
+            self.scene_scale,
+            self.background_color,
+        );
         if self.alt_text != prev.alt_text {
             PageCanvas::set_alt_text(&mut element, self.alt_text.clone());
         }
@@ -135,6 +149,7 @@ pub struct PageCanvas {
     /// The drawable area size, which matches the widget's content-box.
     size: Size,
     scene_scale: f64,
+    background_color: Option<Color>,
     scene: Arc<Scene>,
 }
 
@@ -168,9 +183,15 @@ impl PageCanvas {
 // --- MARK: WIDGETMUT
 impl PageCanvas {
     /// Requests a render of the canvas.
-    pub fn request_render(this: &mut WidgetMut<'_, Self>, scene: Arc<Scene>, scene_scale: f64) {
+    pub fn request_render(
+        this: &mut WidgetMut<'_, Self>,
+        scene: Arc<Scene>,
+        scene_scale: f64,
+        background_color: Option<Color>,
+    ) {
         this.widget.scene = scene;
         this.widget.scene_scale = scene_scale;
+        this.widget.background_color = background_color;
         this.ctx.request_render();
     }
 
@@ -269,6 +290,15 @@ impl Widget for PageCanvas {
     }
 
     fn paint(&mut self, _: &mut PaintCtx<'_>, _props: &PropertiesRef<'_>, scene: &mut Scene) {
+        if let Some(background_color) = self.background_color {
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                background_color,
+                None,
+                &self.size.to_rect(),
+            );
+        }
         scene.append(&self.scene, Some(Affine::scale(self.scene_scale)));
     }
 
@@ -297,5 +327,45 @@ impl Widget for PageCanvas {
 
     fn get_debug_text(&self) -> Option<String> {
         self.alt_text.as_ref().map(ToString::to_string)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use masonry::core::Widget;
+    use masonry::peniko::Color;
+    use masonry::theme::default_property_set;
+    use masonry::vello::Scene;
+    use masonry::vello::kurbo::Size;
+    use masonry_testing::{TestHarness, TestHarnessParams};
+
+    use super::PageCanvas;
+
+    #[test]
+    fn page_canvas_paints_supplied_white_background() {
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color: Some(Color::WHITE),
+            scene: Arc::new(Scene::new()),
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(64.0, 64.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+
+        let rendered = harness.render();
+        let center = rendered.get_pixel(32, 32).0;
+
+        assert_eq!(
+            center,
+            [255, 255, 255, 255],
+            "a Typst page with a supplied white background should not reveal the viewer background"
+        );
     }
 }

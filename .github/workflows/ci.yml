@@ -47,6 +47,17 @@ jobs:
         with:
           node-version: 24
           cache: 'yarn'
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libvulkan1 mesa-vulkan-drivers vulkan-tools
+      - name: Check Vulkan software renderer
+        run: |
+          ls -l /usr/share/vulkan/icd.d
+          vulkaninfo --summary || true
+        env:
+          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
       - name: Install deps
         run: yarn install
       - name: Check and build assets
@@ -76,6 +87,10 @@ jobs:
           path: tinymist-completions.tar.gz
       - name: Test tinymist
         run: cargo test --workspace --features tinymist/system --locked -- --skip=e2e
+        env:
+          WGPU_BACKEND: vulkan
+          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
       - name: Test real filesystem watcher
         run: cargo test -p tinymist-project -p tinymist --features tinymist-project/system,tinymist-project/mock,tinymist/system --locked real_fs_ -- --ignored
       - name: Test Lockfile (Prepare)

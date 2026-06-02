@@ -13,6 +13,7 @@ use reflexo::{
 use vello::{
     Scene,
     kurbo::{Size, Vec2},
+    peniko::{Color, color::parse_color},
 };
 
 use crate::VecPage;
@@ -96,6 +97,22 @@ impl IncrVelloDocClient {
     /// Sets canvas's background color
     pub fn set_fill(&mut self, fill: ImmutStr) {
         self.vec2vello.fill = fill;
+    }
+
+    /// Returns the configured default page background color.
+    pub fn background_color(&self) -> Option<Color> {
+        let fill = self.vec2vello.fill.as_ref();
+        if fill.is_empty() {
+            return None;
+        }
+
+        match parse_color(fill) {
+            Ok(color) => Some(color.to_alpha_color()),
+            Err(err) => {
+                log::warn!("Invalid page background color {fill:?}: {err}");
+                None
+            }
+        }
     }
 
     /// Patches the delta of the incremental rendering.
