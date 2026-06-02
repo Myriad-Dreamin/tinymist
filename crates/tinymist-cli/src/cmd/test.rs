@@ -485,7 +485,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let output = match typst_html::html(doc) {
+        let output = match typst_html::html(doc, &typst_html::HtmlOptions::default()) {
             Ok(output) => self.update_example(example, output.as_bytes(), "html"),
             Err(err) => {
                 self.diagnostics.lock().push(err);
