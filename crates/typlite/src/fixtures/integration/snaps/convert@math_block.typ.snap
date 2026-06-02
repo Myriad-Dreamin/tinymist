@@ -14,14 +14,16 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
       mtable mtd.right-align,
       mtable.left-align mtd.right-align,
       mtable.aligned mtd:nth-child(odd) {
-        text-align: -webkit-right;
+        justify-items: end;
+        text-align: right;
       }
       mtable.cases mtd,
       mtable.left-align mtd,
       mtable mtd.left-align,
       mtable.aligned mtd:nth-child(even),
       math:is(:not([display])) > mtable.multiline-equation mtd {
-        text-align: -webkit-left;
+        justify-items: start;
+        text-align: left;
       }
       mtable.cases mtd,
       mtable.aligned mtd,
