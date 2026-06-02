@@ -1407,7 +1407,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5367,7 +5367,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=57417b4d4fc9957174047a8ee9aff2e9b75ec86c#57417b4d4fc9957174047a8ee9aff2e9b75ec86c"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=5eb50ca24099571daa66c40de6cab25f06c1c120#5eb50ca24099571daa66c40de6cab25f06c1c120"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5393,7 +5393,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=57417b4d4fc9957174047a8ee9aff2e9b75ec86c#57417b4d4fc9957174047a8ee9aff2e9b75ec86c"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=5eb50ca24099571daa66c40de6cab25f06c1c120#5eb50ca24099571daa66c40de6cab25f06c1c120"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5425,7 +5425,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=57417b4d4fc9957174047a8ee9aff2e9b75ec86c#57417b4d4fc9957174047a8ee9aff2e9b75ec86c"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=5eb50ca24099571daa66c40de6cab25f06c1c120#5eb50ca24099571daa66c40de6cab25f06c1c120"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5453,7 +5453,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=57417b4d4fc9957174047a8ee9aff2e9b75ec86c#57417b4d4fc9957174047a8ee9aff2e9b75ec86c"
+source = "git+https://github.com/ParaN3xus/typst.ts.git?rev=5eb50ca24099571daa66c40de6cab25f06c1c120#5eb50ca24099571daa66c40de6cab25f06c1c120"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6405,7 +6405,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "clap",
@@ -6537,7 +6537,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -6670,7 +6670,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6750,7 +6750,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "comemo",
  "dashmap",
@@ -6788,11 +6788,11 @@ checksum = "9169c1e5e9e524bc2f2c97da5fcef76894e1a94cf690adb21e82960eb106d829"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.14.21-rc2"
+version = "0.14.21"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "divan",
  "tinymist",
@@ -6800,7 +6800,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6874,7 +6874,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6895,7 +6895,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6923,7 +6923,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-docs-tool"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6950,7 +6950,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "comemo",
  "insta",
@@ -6992,7 +6992,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "bytes",
  "clap",
@@ -7049,7 +7049,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7105,7 +7105,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -7192,7 +7192,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "comemo",
  "insta",
@@ -7225,7 +7225,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-viewer"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "accesskit_consumer",
  "anyhow",
@@ -7761,7 +7761,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "typlite"
-version = "0.14.21-rc2"
+version = "0.14.21"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -8217,7 +8217,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.14.4"
-source = "git+https://github.com/ParaN3xus/typstyle.git?rev=005baa0ea29720f86c3c3702261aaddec8dff1ac#005baa0ea29720f86c3c3702261aaddec8dff1ac"
+source = "git+https://github.com/ParaN3xus/typstyle.git?rev=b57c0adf20880d9260e324193007318bdf077511#b57c0adf20880d9260e324193007318bdf077511"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
