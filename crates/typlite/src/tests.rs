@@ -102,7 +102,11 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         Err(err) => return format!("failed to convert to markdown: {err}"),
     };
 
-    let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
+    let repr = typst_html::html(
+        &redact(doc.base.clone()),
+        &typst_html::HtmlOptions { pretty: true },
+    )
+    .unwrap();
     let res = match kind {
         ConvKind::Md { .. } => doc.to_md_string().unwrap(),
         ConvKind::LaTeX => doc.to_tex_string().unwrap(),
