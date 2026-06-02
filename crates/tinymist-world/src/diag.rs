@@ -9,8 +9,9 @@ use codespan_reporting::term;
 use codespan_reporting::term::termcolor::{NoColor, WriteColor};
 use tinymist_std::Result;
 use tinymist_vfs::FileId;
+use typst::WorldExt;
 use typst::diag::{Severity, SourceDiagnostic, StrResult, eco_format};
-use typst::syntax::Span;
+use typst::syntax::DiagSpan;
 
 use crate::{CodeSpanReportWorld, DiagnosticFormat, SourceWorld};
 
@@ -81,6 +82,7 @@ pub fn print_diagnostics_to<'d, 'files>(
 }
 
 /// Creates a label for a span.
-fn label(world: &dyn SourceWorld, span: Span) -> Option<Label<FileId>> {
-    Some(Label::primary(span.id()?, world.source_range(span)?))
+fn label(world: &dyn SourceWorld, span: impl Into<DiagSpan>) -> Option<Label<FileId>> {
+    let span = span.into();
+    Some(Label::primary(span.id()?, world.range(span)?))
 }
