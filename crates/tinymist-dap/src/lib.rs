@@ -165,7 +165,7 @@ impl BreakpointContext<'_, '_, '_> {
         root.synthesize(self.span);
 
         // Check for well-formedness.
-        let errors = root.errors();
+        let errors = root.errors_and_warnings().0;
         if !errors.is_empty() {
             return Err(errors.into_iter().map(Into::into).collect());
         }
