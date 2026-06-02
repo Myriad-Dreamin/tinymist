@@ -331,8 +331,8 @@ impl HtmlToAstParser {
         self.warnings.extend(std::iter::once(diag));
     }
 
-    fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<Span> {
-        info.remap_span(self.world.as_ref(), span)
+    fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<DiagSpan> {
+        info.remap_diag_span(self.world.as_ref(), span.into())
     }
 }
 
