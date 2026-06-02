@@ -21,6 +21,7 @@ use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
 use tinymist_viewer::doc::doc;
 use tinymist_viewer::incr::IncrVelloDocClient;
+use tinymist_viewer::protocol::preview_update_from_bytes;
 
 #[derive(Debug, Clone, Parser)]
 struct Args {
@@ -222,13 +223,13 @@ impl ezsockets::ClientExt for Client {
     }
 
     async fn on_binary(&mut self, bytes: ezsockets::Bytes) -> Result<(), ezsockets::Error> {
-        const DIFF_V1_PREFIX: &[u8] = b"diff-v1,";
-
-        if bytes.starts_with(DIFF_V1_PREFIX) {
-            let diff = bytes.slice(DIFF_V1_PREFIX.len()..);
-
+        if let Some(update) = preview_update_from_bytes(bytes.as_ref()) {
+            if update.reset_before_merge {
+                self.doc = IncrDocClient::default();
+                self.vello.reset();
+            }
             // todo: cloned on unaligned data.
-            let delta = BytesModuleStream::from_slice(&diff).checkout_owned();
+            let delta = BytesModuleStream::from_slice(update.payload).checkout_owned();
 
             self.doc.merge_delta(delta);
 
