@@ -43,7 +43,7 @@ pub fn pdf_options(
     pdf_standards: &[PdfStandard],
     no_pdf_tags: bool,
     creation_timestamp: Option<i64>,
-) -> Result<PdfOptions<'static>> {
+) -> Result<PdfOptions> {
     let creation_timestamp = creation_timestamp
         .map(|ts| ts.to_utc_datetime().context("timestamp is out of range"))
         .transpose()?
