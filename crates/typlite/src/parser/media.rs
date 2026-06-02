@@ -87,6 +87,7 @@ impl HtmlToAstParser {
         let svg = typst_svg::svg_in_html(
             &frame.inner,
             frame.text_size,
+            false,
             frame.id.as_deref(),
             &eco_format!("{}", frame.css.to_inline()),
             &frame.anchors,
@@ -142,8 +143,15 @@ impl HtmlToAstParser {
 
         let introspector = EmptyIntrospector;
         let link_resolver = LateLinkResolver::new(None, &introspector);
-        let svg =
-            typst_svg::svg_in_html(frame, Abs::pt(12.0), None, "", &[], link_resolver.track());
+        let svg = typst_svg::svg_in_html(
+            frame,
+            Abs::pt(12.0),
+            false,
+            None,
+            "",
+            &[],
+            link_resolver.track(),
+        );
         self.convert_svg(svg)
     }
 
