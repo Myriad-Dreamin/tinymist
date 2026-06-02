@@ -15,6 +15,7 @@ use winit::dpi::LogicalSize;
 use xilem::core::{Edit, MessageProxy, fork};
 use xilem::vello::Scene;
 use xilem::vello::kurbo::Size;
+use xilem::vello::peniko::Color;
 use xilem::view::{flex_col, portal, resize_observer, sized_box, task};
 use xilem::{EventLoop, WidgetView, WindowOptions, Xilem};
 
@@ -47,6 +48,7 @@ fn main() -> Result<()> {
         PreviewState {
             data_plane_host: args.data_plane_host,
             pages: vec![],
+            background_color: None,
             window_size: default_size,
             tx,
             rx: Some(rx),
@@ -62,6 +64,7 @@ fn main() -> Result<()> {
 struct PreviewState {
     data_plane_host: String,
     pages: Vec<(Arc<Scene>, Size)>,
+    background_color: Option<Color>,
     window_size: Size,
     tx: mpsc::UnboundedSender<PreviewEvent>,
     rx: Option<mpsc::UnboundedReceiver<PreviewEvent>>,
@@ -128,8 +131,12 @@ impl PreviewState {
             |arg: &mut PreviewState, req: RenderRequest| {
                 // s.tick();
                 match req {
-                    RenderRequest::New(pages) => {
+                    RenderRequest::New {
+                        pages,
+                        background_color,
+                    } => {
                         arg.pages = pages;
+                        arg.background_color = background_color;
                     }
                 }
             },
@@ -148,6 +155,7 @@ impl PreviewState {
             .map(|(idx, (page_scene, scene_size))| {
                 let tx = self.tx.clone();
                 let page_scene = page_scene.clone();
+                let background_color = self.background_color;
                 let width = scene_size.width;
                 let height = scene_size.height;
 
@@ -158,20 +166,25 @@ impl PreviewState {
                 let elem_scale = if width > 0. { elem_width / width } else { 1.0 };
                 let elem_height = elem_scale * height;
                 // The sized box is necessary to avoid collapsing the canvas.
-                sized_box(doc(page_scene, elem_scale, move |pos, bbox| {
-                    if bbox.width() == 0. || bbox.height() == 0. {
-                        return;
-                    }
+                sized_box(doc(
+                    page_scene,
+                    elem_scale,
+                    background_color,
+                    move |pos, bbox| {
+                        if bbox.width() == 0. || bbox.height() == 0. {
+                            return;
+                        }
 
-                    let x = pos.x / bbox.width() * width;
-                    let y = pos.y / bbox.height() * height;
+                        let x = pos.x / bbox.width() * width;
+                        let y = pos.y / bbox.height() * height;
 
-                    let _ = tx.send(PreviewEvent::Click {
-                        page_idx: idx + 1,
-                        x: x as f32,
-                        y: y as f32,
-                    });
-                }))
+                        let _ = tx.send(PreviewEvent::Click {
+                            page_idx: idx + 1,
+                            x: x as f32,
+                            y: y as f32,
+                        });
+                    },
+                ))
                 .fixed_width(Length::const_px(elem_width))
                 .fixed_height(Length::const_px(elem_height))
             })
@@ -226,8 +239,12 @@ impl ezsockets::ClientExt for Client {
                     return Ok(());
                 }
             };
+            let background_color = self.vello.background_color();
 
-            let _ = self.proxy.message(RenderRequest::New(pages));
+            let _ = self.proxy.message(RenderRequest::New {
+                pages,
+                background_color,
+            });
         } else {
             log::info!("received bytes: {bytes:?}");
         }
@@ -252,13 +269,16 @@ impl ezsockets::ClientExt for Client {
 }
 
 enum RenderRequest {
-    New(Vec<(Arc<Scene>, Size)>),
+    New {
+        pages: Vec<(Arc<Scene>, Size)>,
+        background_color: Option<Color>,
+    },
 }
 
 impl fmt::Debug for RenderRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::New(scenes) => write!(f, "New(pages = {:?})", scenes.len()),
+            Self::New { pages, .. } => write!(f, "New(pages = {:?})", pages.len()),
         }
     }
 }

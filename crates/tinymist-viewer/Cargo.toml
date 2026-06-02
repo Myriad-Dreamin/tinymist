@@ -57,5 +57,9 @@ cli = []
 # This requires modifying typst.
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
+[dev-dependencies]
+masonry_testing.workspace = true
+masonry_winit.workspace = true
+
 [lints]
 workspace = true
