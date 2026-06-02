@@ -326,7 +326,7 @@ impl HtmlToAstParser {
             }
         };
 
-        let svg = typst_svg::svg_merged(&doc, Abs::zero());
+        let svg = typst_svg::svg_merged(&doc, &typst_svg::SvgOptions::default(), Abs::zero());
         self.convert_svg(svg)
     }
 }
