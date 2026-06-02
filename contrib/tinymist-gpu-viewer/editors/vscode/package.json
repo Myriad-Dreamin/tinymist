@@ -26,10 +26,9 @@
   "extensionDependencies": [
     "myriad-dreamin.tinymist"
   ],
-  "extensionKind": [
-    "workspace",
-    "ui"
-  ],
+    "extensionKind": [
+      "ui"
+    ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
