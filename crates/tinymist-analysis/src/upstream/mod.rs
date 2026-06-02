@@ -679,6 +679,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/selector/#definitions-and
         https://typst.app/docs/reference/foundations/selector/#definitions-before
         https://typst.app/docs/reference/foundations/selector/#definitions-or
+        https://typst.app/docs/reference/foundations/selector/#definitions-within
         https://typst.app/docs/reference/foundations/str/
         https://typst.app/docs/reference/foundations/str/#definitions-at
         https://typst.app/docs/reference/foundations/str/#definitions-clusters
@@ -1011,6 +1012,7 @@ mod tests {
         https://typst.app/docs/reference/visualize/color/#definitions-rotate
         https://typst.app/docs/reference/visualize/color/#definitions-saturate
         https://typst.app/docs/reference/visualize/color/#definitions-space
+        https://typst.app/docs/reference/visualize/color/#definitions-spot
         https://typst.app/docs/reference/visualize/color/#definitions-to-hex
         https://typst.app/docs/reference/visualize/color/#definitions-transparentize
         https://typst.app/docs/reference/visualize/curve/
@@ -1042,6 +1044,7 @@ mod tests {
         https://typst.app/docs/reference/visualize/polygon/
         https://typst.app/docs/reference/visualize/polygon/#definitions-regular
         https://typst.app/docs/reference/visualize/rect/
+        https://typst.app/docs/reference/visualize/spot/#definitions-tint
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
         https://typst.app/docs/reference/visualize/tiling/
