@@ -23,6 +23,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
         doc: &Arc<TypstPagedDocument>,
         config: &ExportSvgTask,
     ) -> Result<Self::Output> {
+        let svg_options = typst_svg::SvgOptions::default();
         let exported_pages = select_pages(doc, &config.pages);
         if let Some(PageMerge { ref gap }) = config.merge {
             // Typst does not expose svg-merging API.
@@ -44,7 +45,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
             let exported = exported_pages
                 .into_iter()
                 .map(|(i, page)| {
-                    let svg = typst_svg::svg(page);
+                    let svg = typst_svg::svg(page, &svg_options);
                     Ok(PagedOutput {
                         page: i,
                         value: svg,
