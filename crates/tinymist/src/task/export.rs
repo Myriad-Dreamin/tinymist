@@ -647,7 +647,7 @@ impl ExportTask {
                 ExportPng(config) => PngExport::run(&graph, paged_doc()?,& config)?.with_pages(total_pages()),
                 Query(config) => DocumentQuery::run(&graph, paged_doc()?, &config)??.into(),
                 ExportHtml(ExportHtmlTask { export: _ }) =>
-                    typst_html::html(html_doc()?)
+                    typst_html::html(html_doc()?, &typst_html::HtmlOptions::default())
                         .map_err(|e| format!("export error: {e:?}"))
                         .context_ut("failed to export to html")?.into(),
                 ExportBundle(..) => unreachable!(),
