@@ -506,7 +506,7 @@ impl<'a> CompletionWorker<'a> {
         if matches!(
             cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) && cursor.leaf.erroneous()
+        ) && cursor.leaf.diagnosis().errors
         {
             let mut chars = cursor.leaf.text().chars();
             match chars.next() {
