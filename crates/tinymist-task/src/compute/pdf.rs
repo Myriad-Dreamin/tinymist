@@ -76,7 +76,8 @@ pub fn pdf_options(
             })
             .collect::<Vec<_>>(),
     )
-    .context_ut("prepare pdf standards")?;
+    .map_err(|err| err.message().clone())
+    .context("prepare pdf standards")?;
 
     let tagged = !no_pdf_tags && pages.is_none();
     // todo: emit warning diag
