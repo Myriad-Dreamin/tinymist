@@ -2,13 +2,13 @@
 
 ## Purpose
 
-The previewer-provider specification defines how the VS Code Tinymist extension resolves alternate preview HTML through `tinymist.previewer`. It covers built-in previewer selection, local HTML previewers, extension-provided previewers, compatibility checks, failure behavior, and workspace trust boundaries.
+The previewer-provider specification defines how the VS Code Tinymist extension resolves alternate preview implementations through `tinymist.previewer`. It covers built-in previewer selection, local HTML previewers, extension-provided previewers, compatibility checks, failure behavior, and workspace trust boundaries.
 
 ## Requirements
 
-### Requirement: Trusted workspaces can override preview HTML through a single previewer setting
+### Requirement: Trusted workspaces can override preview behavior through a single previewer setting
 
-The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview HTML by setting `tinymist.previewer`. Tinymist SHALL use the built-in previewer when the setting is empty, selects Tinymist's own extension id, or is ignored for an untrusted workspace.
+The VS Code Tinymist extension SHALL allow trusted workspaces to override the default preview behavior by setting `tinymist.previewer`. Tinymist SHALL use the built-in previewer when the setting is empty, selects Tinymist's own extension id, or is ignored for an untrusted workspace.
 
 #### Scenario: HTML previewer path is used
 
@@ -32,7 +32,7 @@ The VS Code Tinymist extension SHALL interpret non-empty `tinymist.previewer` va
 #### Scenario: Extension id provider is used
 
 - **WHEN** a trusted workspace configures `tinymist.previewer` with an installed and compatible extension id
-- **THEN** Tinymist activates that extension and uses the provider-supplied HTML path for preview
+- **THEN** Tinymist activates that extension and uses either the provider-supplied HTML path or document preview handler for preview
 
 #### Scenario: Missing extension id reports an error
 
@@ -53,9 +53,24 @@ The VS Code Tinymist extension SHALL require `html:` previewer targets to resolv
 - **WHEN** `tinymist.previewer` resolves through `html:<path>` to an HTML file that does not satisfy Tinymist's preview frontend expectations at runtime
 - **THEN** Tinymist reports the problem and uses its built-in preview HTML
 
+### Requirement: Extension previewers can handle document preview without a webview
+
+Extension-based previewer providers MAY return a document preview handler instead of an HTML path. Tinymist SHALL start the normal preview server, pass the preview task and data-plane websocket address to the handler, and skip creating a VS Code webview panel for that preview.
+
+#### Scenario: Native document preview handler is used
+
+- **WHEN** `tinymist.previewer` resolves to a compatible extension provider that exposes `handlePreview`
+- **THEN** Tinymist calls the handler with the document preview task after starting the preview server
+- **AND** Tinymist does not create a VS Code webview panel for that preview
+
+#### Scenario: Document preview handler cleanup is used
+
+- **WHEN** a document preview handler returns a disposable preview handle
+- **THEN** Tinymist disposes that handle when the preview task is closed or restarted
+
 ### Requirement: Provider compatibility is enforced before use
 
-Tinymist SHALL verify that a configured extension-based previewer provider is compatible with the running Tinymist extension before using provider-supplied HTML. If the provider does not supply a custom compatibility predicate, Tinymist SHALL require the provider's declared Tinymist version to exactly match the running Tinymist version.
+Tinymist SHALL verify that a configured extension-based previewer provider is compatible with the running Tinymist extension before using provider-supplied HTML or document preview handlers. If the provider does not supply a custom compatibility predicate, Tinymist SHALL require the provider's declared Tinymist version to exactly match the running Tinymist version.
 
 #### Scenario: Default compatibility accepts exact version match
 
