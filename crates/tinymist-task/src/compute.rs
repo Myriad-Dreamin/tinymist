@@ -89,8 +89,11 @@ fn select_pages<'a>(
 
 fn parse_length(gap: &str) -> Result<Abs> {
     let length = typst::syntax::parse_code(gap);
-    if length.erroneous() {
-        bail!("invalid length: {gap}, errors: {:?}", length.errors());
+    if length.diagnosis().errors {
+        bail!(
+            "invalid length: {gap}, errors: {:?}",
+            length.errors_and_warnings().0
+        );
     }
 
     let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);

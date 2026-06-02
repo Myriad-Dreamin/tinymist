@@ -898,7 +898,7 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                 let main = graph.snap.world.main();
                 let source_res = graph.world().source(main).at(Span::from_range(main, 0..0));
                 let syntax_res = source_res.and_then(|source| {
-                    let errors = source.root().errors();
+                    let errors = source.root().errors_and_warnings().0;
                     if errors.is_empty() {
                         Ok(())
                     } else {
