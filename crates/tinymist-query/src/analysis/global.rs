@@ -1454,10 +1454,7 @@ fn analyze_bib(
     introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
     let bib_elems = introspector.query(&BibliographyElem::ELEM.select());
-    let bib_elem = bib_elems
-        .iter()
-        .next()?
-        .to_packed::<BibliographyElem>()?;
+    let bib_elem = bib_elems.iter().next()?.to_packed::<BibliographyElem>()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`
