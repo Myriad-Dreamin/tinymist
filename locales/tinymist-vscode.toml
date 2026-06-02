@@ -1451,6 +1451,14 @@ zh = "启用预览功能。"
 en = "Disable preview features."
 zh = "禁用预览功能。"
 
+[extension.tinymist.config.tinymist.previewer.title]
+en = "Previewer"
+zh = "预览器"
+
+[extension.tinymist.config.tinymist.previewer.desc]
+en = "Select the previewer for Typst. `myriad-dreamin.tinymist` uses Tinymist's built-in previewer. Values starting with `html:` are treated as absolute HTML file paths after VS Code variable substitution, and other non-empty values are treated as extension ids. Overrides are ignored in untrusted workspaces."
+zh = "为 Typst 选择预览器。`myriad-dreamin.tinymist` 使用 Tinymist 内置预览器。以 `html:` 开头的值会在 VS Code 变量替换后被视为绝对 HTML 文件路径，其他非空值会被视为扩展 id。在不受信任的工作区中会忽略此覆盖。"
+
 [extension.tinymist.config.tinymist.preview.sysInputs.title]
 en = "Preview Sys Inputs"
 zh = "预览系统输入"

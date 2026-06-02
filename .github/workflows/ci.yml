@@ -81,7 +81,7 @@ jobs:
       - name: Test Lockfile (Prepare)
         run: ./scripts/test-lock.sh
       - name: Test Lockfile (Check)
-        run: cargo test --package tinymist --lib --locked -- route::tests --show-output --ignored 
+        run: cargo test --package tinymist --lib --locked -- route::tests --show-output --ignored
 
   checks-windows:
     name: Check Minimum Rust version and Tests (Windows)

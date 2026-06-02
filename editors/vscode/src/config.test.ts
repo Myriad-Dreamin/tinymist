@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import * as path from "node:path";
 
 const hoisted = vi.hoisted(() => ({
   getConfiguration: vi.fn(),
@@ -27,6 +28,7 @@ vi.mock("./vscode-variables", () => ({
 import {
   loadTinymistConfig,
   patchInjectedClientOptionsInConfig,
+  resolvePreviewerValue,
   substVscodeVarsInConfig,
 } from "./config.js";
 
@@ -97,4 +99,26 @@ test("patchInjectedClientOptionsInConfig patches tinymist objects without overri
       delegateFsRequests: false,
     },
   ]);
+});
+
+test("loadTinymistConfig substitutes previewer html paths", () => {
+  hoisted.getConfiguration.mockReturnValue({
+    previewer: "html:${workspaceFolder}/preview-provider/../local-previewer.html",
+  });
+
+  expect(loadTinymistConfig().previewer).toBe(
+    `html:${path.normalize("/workspace/local-previewer.html")}`,
+  );
+});
+
+test("resolvePreviewerValue substitutes and normalizes html previewer paths", () => {
+  expect(
+    resolvePreviewerValue("html:${workspaceFolder}/preview-provider/../local-previewer.html"),
+  ).toBe(`html:${path.normalize("/workspace/local-previewer.html")}`);
+});
+
+test("resolvePreviewerValue preserves extension id providers", () => {
+  expect(resolvePreviewerValue(" myriad-dreamin.tinymist-previewer-fixture ")).toBe(
+    "myriad-dreamin.tinymist-previewer-fixture",
+  );
 });

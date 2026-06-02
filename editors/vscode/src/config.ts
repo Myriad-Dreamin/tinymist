@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 
 import { vscodeVariables } from "./vscode-variables";
@@ -7,6 +8,8 @@ export interface TinymistConfig {
   typingContinueCommentsOnNewline?: boolean;
   serverPath?: string;
 }
+
+export const HTML_PREVIEWER_PREFIX = "html:";
 
 const INJECTED_CLIENT_OPTION_CONFIG_KEYS = [
   "triggerSuggest",
@@ -31,6 +34,9 @@ export function loadTinymistConfig(): TinymistConfig {
   config = {};
   for (let i = 0; i < keys.length; i++) {
     config[keys[i]] = values[i];
+  }
+  if (typeof config.previewer === "string") {
+    config.previewer = resolvePreviewerValue(config.previewer);
   }
   return config;
 }
@@ -104,6 +110,27 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
     console.error("failed to substitute vscode variables", e);
     return str;
   }
+}
+
+export function resolvePreviewerValue(value: string | null | undefined): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (!trimmedValue.startsWith(HTML_PREVIEWER_PREFIX)) {
+    return trimmedValue;
+  }
+
+  const providerPath = trimmedValue.slice(HTML_PREVIEWER_PREFIX.length).trim();
+  const resolvedProviderPath = substVscodeVars(providerPath) ?? providerPath;
+  return `${HTML_PREVIEWER_PREFIX}${
+    resolvedProviderPath ? path.normalize(resolvedProviderPath) : resolvedProviderPath
+  }`;
 }
 
 function substFontPaths(value: unknown): string[] | undefined {
