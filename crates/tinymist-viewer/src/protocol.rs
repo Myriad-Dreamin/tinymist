@@ -18,7 +18,10 @@ pub fn preview_update_from_bytes(bytes: &[u8]) -> Option<PreviewUpdate<'_>> {
             reset_before_merge: false,
             payload,
         }),
-        PreviewDataFrame::FullCurrent(_) => None,
+        PreviewDataFrame::FullCurrent(payload) => Some(PreviewUpdate {
+            reset_before_merge: true,
+            payload,
+        }),
     }
 }
 

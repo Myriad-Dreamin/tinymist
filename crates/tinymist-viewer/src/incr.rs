@@ -92,7 +92,14 @@ pub struct IncrVelloDocClient {
 
 impl IncrVelloDocClient {
     /// Resets the state of the incremental rendering.
-    pub fn reset(&mut self) {}
+    pub fn reset(&mut self) {
+        let fill = self.vec2vello.fill.clone();
+        self.vec2vello = IncrVelloPass {
+            fill,
+            pages: vec![],
+        };
+        self.doc_view = None;
+    }
 
     /// Sets canvas's background color
     pub fn set_fill(&mut self, fill: ImmutStr) {
@@ -149,5 +156,23 @@ impl IncrVelloDocClient {
             })
             .collect();
         Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IncrVelloDocClient;
+
+    #[test]
+    fn reset_clears_cached_view_state_without_losing_fill() {
+        let mut client = IncrVelloDocClient::default();
+        client.set_fill("#101010".into());
+        client.doc_view = Some(vec![]);
+
+        client.reset();
+
+        assert_eq!(client.vec2vello.fill.as_ref(), "#101010");
+        assert!(client.vec2vello.pages.is_empty());
+        assert!(client.doc_view.is_none());
     }
 }
