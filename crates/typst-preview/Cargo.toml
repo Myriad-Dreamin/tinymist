@@ -32,6 +32,8 @@ typst-macros.workspace = true
 typst-timing.workspace = true
 typst-assets.workspace = true
 
+[dev-dependencies]
+tinymist-tests.workspace = true
 
 [features]
 

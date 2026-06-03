@@ -14,6 +14,7 @@ use vello::peniko;
 
 pub mod doc;
 pub mod incr;
+pub mod protocol;
 mod render;
 
 /// A vello scene corresponding to a typst page.
