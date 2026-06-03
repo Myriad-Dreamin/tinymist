@@ -340,6 +340,14 @@ mod tests {
     use masonry::vello::Scene;
     use masonry::vello::kurbo::Size;
     use masonry_testing::{TestHarness, TestHarnessParams};
+    use reflexo::vector::incr::IncrDocClient;
+    use reflexo::vector::stream::BytesModuleStream;
+    use reflexo_vec2svg::IncrSvgDocServer;
+    use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
+    use tinymist_std::typst::TypstDocument;
+
+    use crate::incr::IncrVelloDocClient;
+    use crate::protocol::preview_update_from_bytes;
 
     use super::PageCanvas;
 
@@ -366,6 +374,114 @@ mod tests {
             center,
             [255, 255, 255, 255],
             "a Typst page with a supplied white background should not reveal the viewer background"
+        );
+    }
+
+    #[test]
+    fn diff_v1_preview_frame_paints_generated_page() {
+        let (frame, _) = generated_preview_frames();
+        assert!(
+            frame.starts_with(DIFF_V1_PREFIX),
+            "the initial backend preview frame should be diff-v1"
+        );
+
+        let center = render_preview_frame_center(&frame);
+
+        assert_black_pixel(
+            center,
+            "a rendered diff-v1 frame should paint the generated black page",
+        );
+    }
+
+    #[test]
+    fn full_current_preview_frame_paints_generated_page_after_reset() {
+        let (_, frame) = generated_preview_frames();
+        assert!(
+            frame.starts_with(NEW_PREFIX),
+            "the backend full-current preview frame should be new"
+        );
+
+        let center = render_preview_frame_center(&frame);
+
+        assert_black_pixel(
+            center,
+            "a rendered new frame should reset, merge, and paint the generated black page",
+        );
+    }
+
+    fn generated_preview_frames() -> (Vec<u8>, Vec<u8>) {
+        const SOURCE: &str = r#"
+#set page(width: 16pt, height: 16pt, margin: 0pt, fill: white)
+#rect(width: 16pt, height: 16pt, fill: black)
+"#;
+
+        tinymist_tests::run_with_sources(SOURCE, |verse, _| {
+            let world = verse.snapshot();
+            let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+                .output
+                .expect("short viewer preview fixture should compile");
+            let document = TypstDocument::Paged(Arc::new(doc));
+            let mut renderer = IncrSvgDocServer::default();
+
+            let diff = renderer.pack_delta(&document);
+            let current = tinymist_preview::protocol::full_current_frame_from_delta(&diff)
+                .expect("full current can be built from an initial incremental frame");
+
+            (diff, current)
+        })
+    }
+
+    fn render_preview_frame_center(frame: &[u8]) -> [u8; 4] {
+        let mut doc = IncrDocClient::default();
+        let mut vello = IncrVelloDocClient::default();
+
+        let update = preview_update_from_bytes(frame).expect("preview frame should be accepted");
+        if update.reset_before_merge {
+            doc = IncrDocClient::default();
+            vello.reset();
+        }
+
+        let delta = BytesModuleStream::from_slice(update.payload).checkout_owned();
+        doc.merge_delta(delta);
+
+        let mut pages = vello
+            .render_pages(&mut doc)
+            .expect("preview frame should render through the viewer");
+        assert_eq!(pages.len(), 1, "preview fixture should render one page");
+
+        let (scene, size) = pages.pop().expect("one rendered page should exist");
+        assert_eq!(size, Size::new(16.0, 16.0));
+
+        render_page_canvas_center(scene, vello.background_color())
+    }
+
+    fn render_page_canvas_center(scene: Arc<Scene>, background_color: Option<Color>) -> [u8; 4] {
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color,
+            scene,
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(32.0, 32.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+        let rendered = harness.render();
+
+        rendered.get_pixel(8, 8).0
+    }
+
+    fn assert_black_pixel(pixel: [u8; 4], message: &str) {
+        assert!(
+            pixel[0] <= 4 && pixel[1] <= 4 && pixel[2] <= 4 && pixel[3] == 255,
+            "{message}; got rgba({},{},{},{})",
+            pixel[0],
+            pixel[1],
+            pixel[2],
+            pixel[3]
         );
     }
 }

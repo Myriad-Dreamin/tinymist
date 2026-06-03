@@ -60,6 +60,7 @@ no-content-hint = ["reflexo-typst/no-content-hint"]
 [dev-dependencies]
 masonry_testing.workspace = true
 masonry_winit.workspace = true
+tinymist-tests.workspace = true
 
 [lints]
 workspace = true

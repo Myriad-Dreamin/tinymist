@@ -392,9 +392,8 @@ mod tests {
                     "initial preview update should be diff-v1"
                 );
 
-                let current = renderer
-                    .pack_current()
-                    .expect("full current is available after the renderer has state");
+                let current = protocol::full_current_frame_from_delta(&first)
+                    .expect("full current can be built from an initial incremental frame");
                 assert!(
                     current.starts_with(protocol::NEW_PREFIX),
                     "full current preview update should use the new, prefix"

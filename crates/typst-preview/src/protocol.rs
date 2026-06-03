@@ -26,3 +26,13 @@ pub fn split_preview_data_frame(bytes: &[u8]) -> Option<PreviewDataFrame<'_>> {
             .map(PreviewDataFrame::FullCurrent)
     }
 }
+
+/// Converts a complete initial incremental update into a full-current update.
+///
+/// A fresh incremental renderer emits a self-contained `diff-v1,` payload. The
+/// full-current data-plane event uses the same payload format with a `new,`
+/// prefix so clients reset their local state before merging it.
+pub fn full_current_frame_from_delta(delta_frame: &[u8]) -> Option<Vec<u8>> {
+    let payload = delta_frame.strip_prefix(DIFF_V1_PREFIX)?;
+    Some([NEW_PREFIX, payload].concat())
+}
