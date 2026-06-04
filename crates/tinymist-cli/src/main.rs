@@ -10,6 +10,7 @@ mod cmd {
     #[cfg(feature = "dap")]
     pub mod dap;
     pub mod generate_script;
+    pub mod lint;
     pub mod lsp;
     #[cfg(feature = "preview")]
     pub mod preview;
@@ -34,6 +35,7 @@ use crate::cmd::*;
 #[cfg(feature = "export")]
 use crate::compile::CompileArgs;
 use crate::conn::client_root;
+use crate::lint::LintArgs;
 use crate::utils::*;
 
 #[cfg(feature = "dhat-heap")]
@@ -97,6 +99,8 @@ enum Commands {
     #[cfg(feature = "export")]
     #[clap(alias = "c")]
     Compile(CompileArgs),
+    /// Run Tinymist lint checks
+    Lint(LintArgs),
 
     /// Generate completion script to stdout
     Completion(crate::completion::ShellCompletionArgs),
@@ -148,6 +152,7 @@ fn main() -> Result<()> {
         Commands::Completion(..) | Commands::Probe => false,
         #[cfg(feature = "export")]
         Commands::Compile(..) => false,
+        Commands::Lint(..) => false,
 
         // Long-running commands, usually run from the CLI.
         Commands::Test(test) => test.verbose,
@@ -183,6 +188,7 @@ fn main() -> Result<()> {
         Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
+        Commands::Lint(args) => crate::lint::lint_main(args),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),

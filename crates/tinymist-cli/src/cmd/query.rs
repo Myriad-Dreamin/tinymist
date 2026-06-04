@@ -62,12 +62,11 @@ pub struct PackageDocsArgs {
     // pub format: Option<QueryDocsFormat>,
 }
 
-/// The main entry point for language server queries.
-pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
-    use tinymist_project::package::PackageRegistry;
+/// Creates the default analysis context for CLI query-style commands.
+pub fn default_analysis() -> Arc<Analysis> {
     let (config, _) = Config::extract_lsp_params(Default::default(), Default::default());
     let const_config = &config.const_config;
-    let analysis = Arc::new(Analysis {
+    Arc::new(Analysis {
         position_encoding: const_config.position_encoding,
         allow_overlapping_token: const_config.tokens_overlapping_token_support,
         allow_multiline_token: const_config.tokens_multiline_token_support,
@@ -87,7 +86,13 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
         caches: Default::default(),
         analysis_rev_cache: Arc::default(),
         stats: Arc::default(),
-    });
+    })
+}
+
+/// The main entry point for language server queries.
+pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
+    use tinymist_project::package::PackageRegistry;
+    let analysis = default_analysis();
 
     let compile = match &mut cmds {
         QueryCommands::Lsif(args) => &mut args.compile,
