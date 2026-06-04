@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Cursor;
@@ -59,51 +59,39 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         .and_then(Path::parent)
         .context("viewer crate should live under <workspace>/crates/tinymist-viewer")?;
     let output_root = workspace_root.join(OUTPUT_ROOT);
-    let cases = selected_cases(&manifest_dir)?;
+    let hash_cases = selected_cases(&manifest_dir)?;
+    let hash_case_set = hash_cases.iter().cloned().collect::<BTreeSet<_>>();
     let collected = collect_tests(&tests_root)?;
     let make_pdf = env_flag("TINYMIST_VELLO_PDF");
+    let render_cases = if make_pdf {
+        all_ref_cases(&tests_root)?
+    } else {
+        hash_cases.clone()
+    };
 
     fs::create_dir_all(&output_root)?;
 
     let mut rasterizer = SceneRasterizer::new();
     let mut failures = String::new();
-    let mut hash_refs = String::new();
+    let mut hash_results = BTreeMap::new();
+    let mut pdf_failures = String::new();
     let mut rendered_cases = vec![];
 
-    for name in cases {
-        let Some(test) = collected.get(&name) else {
-            writeln!(failures, "{name}: no such Typst suite section")?;
-            continue;
-        };
-
-        if !test.attrs.render {
-            writeln!(failures, "{name}: suite section is not a render target")?;
-            continue;
-        }
-
+    for name in render_cases {
+        let is_hash_case = hash_case_set.contains(&name);
         let ref_png = tests_root.join("ref").join(format!("{name}.png"));
         if !ref_png.exists() {
-            writeln!(
-                failures,
-                "{name}: missing upstream PNG ref at {}",
-                ref_png.display()
-            )?;
+            let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
+            if is_hash_case {
+                writeln!(failures, "{failure}")?;
+            } else if make_pdf {
+                let vello_png = output_png_path(&output_root, "vello", &name);
+                write_placeholder_png(&vello_png, None)?;
+                writeln!(pdf_failures, "{failure}")?;
+                rendered_cases.push(name);
+            }
             continue;
         }
-
-        let png = match render_suite_case(test, &tests_root, &mut rasterizer) {
-            Ok(png) => png,
-            Err(err) => {
-                writeln!(failures, "{name}: {err:#}")?;
-                continue;
-            }
-        };
-
-        let vello_png = output_png_path(&output_root, "vello", &name);
-        write_png(&vello_png, &png)?;
-
-        let hash = format!("ihash16:{}", block_hash(&png, 16));
-        writeln!(hash_refs, "{name} {hash}")?;
 
         let ref_output = output_png_path(&output_root, "ref", &name);
         if let Some(parent) = ref_output.parent() {
@@ -112,11 +100,56 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         fs::copy(&ref_png, &ref_output)
             .with_context(|| format!("failed to copy upstream ref {}", ref_png.display()))?;
 
+        let render_result = render_suite_case_by_name(
+            &name,
+            is_hash_case,
+            &collected,
+            &tests_root,
+            &mut rasterizer,
+        );
+        let png = match render_result {
+            Ok(png) => png,
+            Err(err) => {
+                if is_hash_case {
+                    writeln!(failures, "{name}: {err:#}")?;
+                } else if make_pdf {
+                    let vello_png = output_png_path(&output_root, "vello", &name);
+                    write_placeholder_png(&vello_png, Some(&ref_png))?;
+                    writeln!(pdf_failures, "{name}: {err:#}")?;
+                    rendered_cases.push(name);
+                }
+                continue;
+            }
+        };
+
+        let vello_png = output_png_path(&output_root, "vello", &name);
+        write_png(&vello_png, &png)?;
+
+        if is_hash_case {
+            let hash = format!("ihash16:{}", block_hash(&png, 16));
+            hash_results.insert(name.clone(), hash);
+        }
+
         rendered_cases.push(name);
     }
 
     if make_pdf && !rendered_cases.is_empty() {
+        if !pdf_failures.is_empty() {
+            fs::write(
+                output_root.join("vello-renderer-failures.txt"),
+                &pdf_failures,
+            )?;
+        }
         write_comparison_pdf(&output_root, &rendered_cases)?;
+    }
+
+    let mut hash_refs = String::new();
+    for name in &hash_cases {
+        let Some(hash) = hash_results.get(name) else {
+            writeln!(failures, "{name}: did not render a hash reference")?;
+            continue;
+        };
+        writeln!(hash_refs, "{name} {hash}")?;
     }
 
     if !failures.is_empty() {
@@ -170,6 +203,32 @@ fn selected_cases(manifest_dir: &Path) -> Result<Vec<String>> {
     Ok(cases)
 }
 
+fn all_ref_cases(tests_root: &Path) -> Result<Vec<String>> {
+    let ref_root = tests_root.join("ref");
+    let mut cases = vec![];
+    for entry in fs::read_dir(&ref_root)
+        .with_context(|| format!("failed to read Typst ref root {}", ref_root.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().is_none_or(|ext| ext != "png") {
+            continue;
+        }
+
+        let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        cases.push(stem.to_owned());
+    }
+
+    cases.sort();
+    if cases.is_empty() {
+        bail!("Typst ref root {} contains no PNG refs", ref_root.display());
+    }
+
+    Ok(cases)
+}
+
 fn collect_tests(tests_root: &Path) -> Result<BTreeMap<String, SuiteTest>> {
     let typst_root = tests_root
         .parent()
@@ -194,6 +253,24 @@ fn collect_tests(tests_root: &Path) -> Result<BTreeMap<String, SuiteTest>> {
     }
 
     Ok(tests)
+}
+
+fn render_suite_case_by_name(
+    name: &str,
+    require_render_attr: bool,
+    collected: &BTreeMap<String, SuiteTest>,
+    tests_root: &Path,
+    rasterizer: &mut SceneRasterizer,
+) -> Result<RgbaImage> {
+    let test = collected
+        .get(name)
+        .ok_or_else(|| anyhow!("{name}: no such Typst suite section"))?;
+
+    if require_render_attr && !test.attrs.render {
+        bail!("{name}: suite section is not a render target");
+    }
+
+    render_suite_case(test, tests_root, rasterizer)
 }
 
 fn parse_suite_file(
@@ -526,6 +603,34 @@ fn write_png(path: &Path, image: &RgbaImage) -> Result<()> {
 
 fn output_png_path(root: &Path, kind: &str, name: &str) -> PathBuf {
     root.join(kind).join(format!("{name}.png"))
+}
+
+fn write_placeholder_png(path: &Path, ref_png: Option<&Path>) -> Result<()> {
+    let (width, height) = ref_png
+        .and_then(|path| image::image_dimensions(path).ok())
+        .unwrap_or((256, 144));
+    let width = width.max(64);
+    let height = height.max(64);
+    let mut image = RgbaImage::from_pixel(width, height, Rgba([255, 245, 245, 255]));
+
+    for y in 0..height {
+        for x in 0..width {
+            if ((x + y) / 18).is_multiple_of(2) {
+                image.put_pixel(x, y, Rgba([255, 225, 225, 255]));
+            }
+        }
+    }
+
+    for x in 0..width {
+        image.put_pixel(x, 0, Rgba([190, 0, 0, 255]));
+        image.put_pixel(x, height - 1, Rgba([190, 0, 0, 255]));
+    }
+    for y in 0..height {
+        image.put_pixel(0, y, Rgba([190, 0, 0, 255]));
+        image.put_pixel(width - 1, y, Rgba([190, 0, 0, 255]));
+    }
+
+    write_png(path, &image)
 }
 
 fn block_hash(image: &RgbaImage, bits: usize) -> String {
