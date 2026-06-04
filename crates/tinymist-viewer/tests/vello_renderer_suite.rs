@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{Cursor, Write as _};
@@ -43,7 +43,6 @@ use vello::wgpu::{
     TextureUsages, TextureViewDescriptor,
 };
 
-const CASES_PATH: &str = "tests/vello-renderer/cases.txt";
 const OUTPUT_ROOT: &str = "target/tinymist-viewer/vello-renderer";
 
 #[test]
@@ -61,32 +60,24 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         .and_then(Path::parent)
         .context("viewer crate should live under <workspace>/crates/tinymist-viewer")?;
     let output_root = workspace_root.join(OUTPUT_ROOT);
-    let hash_cases = selected_cases(&manifest_dir)?;
-    let hash_case_set = hash_cases.iter().cloned().collect::<BTreeSet<_>>();
+    let cases = all_ref_cases(&tests_root)?;
     let collected = Box::new(collect_tests(&tests_root)?);
     let make_pdf = env_flag("TINYMIST_VELLO_PDF");
-    let render_cases = if make_pdf {
-        all_ref_cases(&tests_root)?
-    } else {
-        hash_cases.clone()
-    };
 
     fs::create_dir_all(&output_root)?;
 
     let mut rasterizer = Box::new(SceneRasterizer::new());
     let mut failures = String::new();
-    let mut hash_results = BTreeMap::new();
+    let mut hash_refs = String::new();
     let mut pdf_failures = String::new();
     let mut rendered_cases = vec![];
 
-    for name in render_cases {
-        let is_hash_case = hash_case_set.contains(&name);
+    for name in cases {
         let ref_png = tests_root.join("ref").join(format!("{name}.png"));
         if !ref_png.exists() {
             let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
-            if is_hash_case {
-                writeln!(failures, "{failure}")?;
-            } else if make_pdf {
+            writeln!(failures, "{failure}")?;
+            if make_pdf {
                 let vello_png = output_png_path(&output_root, "vello", &name);
                 write_placeholder_png(&vello_png, None)?;
                 writeln!(pdf_failures, "{failure}")?;
@@ -102,19 +93,13 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         fs::copy(&ref_png, &ref_output)
             .with_context(|| format!("failed to copy upstream ref {}", ref_png.display()))?;
 
-        let render_result = render_suite_case_by_name(
-            &name,
-            is_hash_case,
-            &collected,
-            &tests_root,
-            &mut rasterizer,
-        );
+        let render_result =
+            render_suite_case_by_name(&name, &collected, &tests_root, &mut rasterizer);
         let png = match render_result {
             Ok(png) => png,
             Err(err) => {
-                if is_hash_case {
-                    writeln!(failures, "{name}: {err:#}")?;
-                } else if make_pdf {
+                writeln!(failures, "{name}: {err:#}")?;
+                if make_pdf {
                     let vello_png = output_png_path(&output_root, "vello", &name);
                     write_placeholder_png(&vello_png, Some(&ref_png))?;
                     writeln!(pdf_failures, "{name}: {err:#}")?;
@@ -127,10 +112,8 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         let vello_png = output_png_path(&output_root, "vello", &name);
         write_png(&vello_png, &png)?;
 
-        if is_hash_case {
-            let hash = format!("ihash16:{}", block_hash(&png, 16));
-            hash_results.insert(name.clone(), hash);
-        }
+        let hash = format!("ihash16:{}", block_hash(&png, 16));
+        writeln!(hash_refs, "{name} {hash}")?;
 
         rendered_cases.push(name);
     }
@@ -143,15 +126,6 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
             )?;
         }
         write_comparison_pdf(&output_root, &rendered_cases)?;
-    }
-
-    let mut hash_refs = String::new();
-    for name in &hash_cases {
-        let Some(hash) = hash_results.get(name) else {
-            writeln!(failures, "{name}: did not render a hash reference")?;
-            continue;
-        };
-        writeln!(hash_refs, "{name} {hash}")?;
     }
 
     if !failures.is_empty() {
@@ -174,35 +148,6 @@ fn typst_tests_root() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     let path = PathBuf::from(home).join("work/rust/typst/tests");
     (path.join("suite").is_dir() && path.join("ref").is_dir()).then_some(path)
-}
-
-fn selected_cases(manifest_dir: &Path) -> Result<Vec<String>> {
-    if let Ok(raw) = std::env::var("TINYMIST_VELLO_CASES")
-        && !raw.trim().is_empty()
-    {
-        return Ok(raw
-            .split(',')
-            .map(str::trim)
-            .filter(|name| !name.is_empty())
-            .map(ToOwned::to_owned)
-            .collect());
-    }
-
-    let path = manifest_dir.join(CASES_PATH);
-    let text = fs::read_to_string(&path)
-        .with_context(|| format!("failed to read case list {}", path.display()))?;
-    let cases = text
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-
-    if cases.is_empty() {
-        bail!("case list {} is empty", path.display());
-    }
-
-    Ok(cases)
 }
 
 fn all_ref_cases(tests_root: &Path) -> Result<Vec<String>> {
@@ -259,7 +204,6 @@ fn collect_tests(tests_root: &Path) -> Result<BTreeMap<String, SuiteTest>> {
 
 fn render_suite_case_by_name(
     name: &str,
-    require_render_attr: bool,
     collected: &BTreeMap<String, SuiteTest>,
     tests_root: &Path,
     rasterizer: &mut SceneRasterizer,
@@ -267,10 +211,6 @@ fn render_suite_case_by_name(
     let test = collected
         .get(name)
         .ok_or_else(|| anyhow!("{name}: no such Typst suite section"))?;
-
-    if require_render_attr && !test.attrs.render {
-        bail!("{name}: suite section is not a render target");
-    }
 
     render_suite_case(test, tests_root, rasterizer)
 }
@@ -311,7 +251,6 @@ fn parse_suite_file(
             header.name.clone(),
             SuiteTest {
                 name: header.name.clone(),
-                attrs: header.attrs,
                 source,
             },
         );
@@ -333,8 +272,7 @@ fn parse_header(line: &str) -> Option<Header> {
 
     let mut parts = inner.split_whitespace();
     let name = parts.next()?.to_owned();
-    let attrs = Attrs::from_flags(parts);
-    Some(Header { name, attrs })
+    Some(Header { name })
 }
 
 fn indexed_lines(text: &str) -> Vec<IndexedLine<'_>> {
@@ -982,33 +920,8 @@ struct PdfImageRect {
     height: f32,
 }
 
-#[derive(Clone, Copy)]
-struct Attrs {
-    render: bool,
-}
-
-impl Attrs {
-    fn from_flags<'a>(flags: impl Iterator<Item = &'a str>) -> Self {
-        let mut has_render = false;
-        let mut has_non_render = false;
-        for flag in flags {
-            match flag {
-                "render" => has_render = true,
-                "html" | "pdftags" => has_non_render = true,
-                "large" | "nopdfua" => {}
-                _ => {}
-            }
-        }
-
-        Self {
-            render: has_render || !has_non_render,
-        }
-    }
-}
-
 struct Header {
     name: String,
-    attrs: Attrs,
 }
 
 struct IndexedLine<'a> {
@@ -1019,7 +932,6 @@ struct IndexedLine<'a> {
 
 struct SuiteTest {
     name: String,
-    attrs: Attrs,
     source: Source,
 }
 
