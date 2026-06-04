@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::fs;
-use std::io::Cursor;
+use std::io::{Cursor, Write as _};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -12,8 +12,10 @@ use std::sync::{Arc, OnceLock};
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use comemo::Tracked;
+use flate2::{Compression, write::ZlibEncoder};
 use image::{GenericImage, ImageFormat, Rgba, RgbaImage};
 use parking_lot::Mutex;
+use pdf_writer::{Content as PdfContent, Filter, Name, Pdf, Rect as PdfRect, Ref, Str};
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
@@ -61,7 +63,7 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
     let output_root = workspace_root.join(OUTPUT_ROOT);
     let hash_cases = selected_cases(&manifest_dir)?;
     let hash_case_set = hash_cases.iter().cloned().collect::<BTreeSet<_>>();
-    let collected = collect_tests(&tests_root)?;
+    let collected = Box::new(collect_tests(&tests_root)?);
     let make_pdf = env_flag("TINYMIST_VELLO_PDF");
     let render_cases = if make_pdf {
         all_ref_cases(&tests_root)?
@@ -71,7 +73,7 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
 
     fs::create_dir_all(&output_root)?;
 
-    let mut rasterizer = SceneRasterizer::new();
+    let mut rasterizer = Box::new(SceneRasterizer::new());
     let mut failures = String::new();
     let mut hash_results = BTreeMap::new();
     let mut pdf_failures = String::new();
@@ -366,12 +368,12 @@ fn render_suite_case(
     let typst_root = tests_root
         .parent()
         .context("Typst tests path should be <typst>/tests")?;
-    let world = RenderWorld::new(
+    let world = Box::new(RenderWorld::new(
         test.source.clone(),
         typst_root.to_path_buf(),
         Some(tests_root.join("packages")),
-    );
-    let compiled = compile_paged(&world)
+    ));
+    let compiled = compile_paged(world.as_ref())
         .with_context(|| format!("failed to compile Typst suite case {}", test.name))?;
     let document = TypstDocument::Paged(Arc::new(compiled));
 
@@ -474,7 +476,7 @@ impl SceneRasterizer {
             .map_err(|err| anyhow!("failed to create Vello renderer: {err}"))?,
         };
 
-        let mut scene = vello::Scene::new();
+        let mut scene = Box::new(vello::Scene::new());
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
@@ -774,43 +776,210 @@ fn write_comparison_pdf(output_root: &Path, names: &[String]) -> Result<()> {
     let points = serde_json::to_string_pretty(names)?;
     fs::write(output_root.join("test-points.json"), points)?;
 
-    let source = r#"
-#set page(height: auto)
-
-#let points = json("test-points.json");
-
-#set heading(numbering: "1.")
-
-#outline()
-
-#for v in points [
-  #page[
-    = #v
-    #table(
-      columns: (1fr, 1fr),
-      table.header("Typst Ref", "Vello"),
-      image("ref/" + v + ".png"), image("vello/" + v + ".png"),
-    )
-  ]
-]
-"#;
-    fs::write(output_root.join("index.typ"), source)?;
-
-    let file_id = FileId::new(None, VirtualPath::new("index.typ"));
-    let world = RenderWorld::new(
-        Source::new(file_id, source.to_owned()),
-        output_root.to_path_buf(),
-        None,
-    );
-    let doc = compile_paged(&world).context("failed to compile vello renderer comparison PDF")?;
-    let pdf = typst_pdf::pdf(&doc, &typst_pdf::PdfOptions::default())
-        .map_err(|errors| anyhow!("{}", format_diagnostics(&errors)))?;
+    let pdf = write_comparison_pdf_bytes(output_root, names)?;
     fs::write(output_root.join("vello-renderer-comparison.pdf"), pdf)?;
     Ok(())
 }
 
+fn write_comparison_pdf_bytes(output_root: &Path, names: &[String]) -> Result<Vec<u8>> {
+    const PAGE_WIDTH: f32 = 842.0;
+    const PAGE_HEIGHT: f32 = 595.0;
+    const MARGIN: f32 = 24.0;
+    const COLUMN_GAP: f32 = 18.0;
+    const TITLE_SIZE: f32 = 11.0;
+    const LABEL_SIZE: f32 = 9.0;
+    const IMAGE_TOP: f32 = PAGE_HEIGHT - 64.0;
+    const IMAGE_BOTTOM: f32 = 24.0;
+
+    let catalog_id = Ref::new(1);
+    let pages_id = Ref::new(2);
+    let font_id = Ref::new(3);
+    let mut refs = PdfRefs::new(4);
+    let mut page_refs = Vec::with_capacity(names.len());
+    let mut pdf = Box::new(Pdf::new());
+
+    pdf.catalog(catalog_id).pages(pages_id);
+    pdf.type1_font(font_id)
+        .base_font(Name(b"Helvetica"))
+        .encoding_predefined(Name(b"WinAnsiEncoding"));
+
+    for name in names {
+        let page_id = refs.alloc();
+        let content_id = refs.alloc();
+        let ref_image_id = refs.alloc();
+        let vello_image_id = refs.alloc();
+        page_refs.push(page_id);
+
+        let ref_image = Box::new(load_pdf_image(&output_png_path(output_root, "ref", name))?);
+        let vello_image = Box::new(load_pdf_image(&output_png_path(
+            output_root,
+            "vello",
+            name,
+        ))?);
+
+        write_pdf_image(&mut pdf, ref_image_id, &ref_image)?;
+        write_pdf_image(&mut pdf, vello_image_id, &vello_image)?;
+
+        let column_width = (PAGE_WIDTH - MARGIN * 2.0 - COLUMN_GAP) / 2.0;
+        let image_height = IMAGE_TOP - IMAGE_BOTTOM;
+        let ref_rect = fit_pdf_image(
+            ref_image.width,
+            ref_image.height,
+            MARGIN,
+            IMAGE_BOTTOM,
+            column_width,
+            image_height,
+        );
+        let vello_rect = fit_pdf_image(
+            vello_image.width,
+            vello_image.height,
+            MARGIN + column_width + COLUMN_GAP,
+            IMAGE_BOTTOM,
+            column_width,
+            image_height,
+        );
+
+        let mut content = Box::new(PdfContent::new());
+        content
+            .begin_text()
+            .set_font(Name(b"F1"), TITLE_SIZE)
+            .next_line(MARGIN, PAGE_HEIGHT - 30.0)
+            .show(Str(name.as_bytes()))
+            .end_text();
+        content
+            .begin_text()
+            .set_font(Name(b"F1"), LABEL_SIZE)
+            .next_line(MARGIN, PAGE_HEIGHT - 48.0)
+            .show(Str(b"Typst Ref"))
+            .next_line(column_width + COLUMN_GAP, 0.0)
+            .show(Str(b"Vello"))
+            .end_text();
+        draw_pdf_image(&mut content, Name(b"R"), ref_rect);
+        draw_pdf_image(&mut content, Name(b"V"), vello_rect);
+
+        let content = content.finish();
+        {
+            let mut page = pdf.page(page_id);
+            page.parent(pages_id)
+                .media_box(PdfRect::new(0.0, 0.0, PAGE_WIDTH, PAGE_HEIGHT))
+                .contents(content_id);
+            let mut resources = page.resources();
+            resources.fonts().pair(Name(b"F1"), font_id);
+            resources
+                .x_objects()
+                .pair(Name(b"R"), ref_image_id)
+                .pair(Name(b"V"), vello_image_id);
+        }
+        pdf.stream(content_id, content.as_slice());
+    }
+
+    pdf.pages(pages_id)
+        .kids(page_refs.iter().copied())
+        .count(page_refs.len() as i32);
+
+    Ok(pdf.finish())
+}
+
+fn load_pdf_image(path: &Path) -> Result<PdfImage> {
+    let image = image::open(path)
+        .with_context(|| format!("failed to open comparison image {}", path.display()))?
+        .to_rgba8();
+    let (width, height) = image.dimensions();
+    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
+    for pixel in image.pixels() {
+        let alpha = u16::from(pixel[3]);
+        for channel in &pixel.0[..3] {
+            let value = (u16::from(*channel) * alpha + 255 * (255 - alpha)) / 255;
+            rgb.push(value as u8);
+        }
+    }
+
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::fast());
+    encoder.write_all(&rgb)?;
+    let samples = encoder.finish()?;
+
+    Ok(PdfImage {
+        width,
+        height,
+        samples,
+    })
+}
+
+fn write_pdf_image(pdf: &mut Pdf, image_id: Ref, image: &PdfImage) -> Result<()> {
+    let width = i32::try_from(image.width).context("PDF image width exceeds i32")?;
+    let height = i32::try_from(image.height).context("PDF image height exceeds i32")?;
+    let mut xobject = pdf.image_xobject(image_id, &image.samples);
+    xobject
+        .width(width)
+        .height(height)
+        .bits_per_component(8)
+        .filter(Filter::FlateDecode);
+    xobject.color_space().device_rgb();
+    Ok(())
+}
+
+fn draw_pdf_image(content: &mut PdfContent, name: Name, rect: PdfImageRect) {
+    content
+        .save_state()
+        .transform([rect.width, 0.0, 0.0, rect.height, rect.x, rect.y])
+        .x_object(name)
+        .restore_state();
+}
+
+fn fit_pdf_image(
+    image_width: u32,
+    image_height: u32,
+    x: f32,
+    y: f32,
+    max_width: f32,
+    max_height: f32,
+) -> PdfImageRect {
+    let scale = (max_width / image_width as f32)
+        .min(max_height / image_height as f32)
+        .min(1.0);
+    let width = image_width as f32 * scale;
+    let height = image_height as f32 * scale;
+
+    PdfImageRect {
+        x: x + (max_width - width) / 2.0,
+        y: y + (max_height - height) / 2.0,
+        width,
+        height,
+    }
+}
+
 fn env_flag(name: &str) -> bool {
     std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "0")
+}
+
+struct PdfRefs {
+    next: i32,
+}
+
+impl PdfRefs {
+    fn new(next: i32) -> Self {
+        Self { next }
+    }
+
+    fn alloc(&mut self) -> Ref {
+        let id = Ref::new(self.next);
+        self.next += 1;
+        id
+    }
+}
+
+struct PdfImage {
+    width: u32,
+    height: u32,
+    samples: Vec<u8>,
+}
+
+#[derive(Clone, Copy)]
+struct PdfImageRect {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
 }
 
 #[derive(Clone, Copy)]
