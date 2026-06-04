@@ -7010,11 +7010,13 @@ dependencies = [
  "hayro",
  "image",
  "indexmap 2.12.1",
+ "insta",
  "log",
  "masonry",
  "masonry_testing",
  "masonry_winit",
  "parking_lot",
+ "pollster",
  "reflexo",
  "reflexo-typst",
  "reflexo-vec2svg",
@@ -7030,9 +7032,14 @@ dependencies = [
  "tracing",
  "ttf-parser",
  "typst",
+ "typst-assets",
+ "typst-dev-assets",
  "typst-library",
+ "typst-pdf",
+ "typst-syntax 0.14.2",
  "vello",
  "vello_svg",
+ "walkdir",
  "winit",
  "xilem",
 ]
@@ -7583,6 +7590,11 @@ name = "typst-assets"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5613cb719a6222fe9b74027c3625d107767ec187bff26b8fc931cf58942c834f"
+
+[[package]]
+name = "typst-dev-assets"
+version = "0.14.2"
+source = "git+https://github.com/typst/typst-dev-assets?tag=v0.14.2#fe6cad916d8b20c20742512b2a3f3b247a2bc4f8"
 
 [[package]]
 name = "typst-eval"

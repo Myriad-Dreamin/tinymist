@@ -58,9 +58,16 @@ cli = []
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
 [dev-dependencies]
+insta.workspace = true
 masonry_testing.workspace = true
 masonry_winit.workspace = true
+pollster = "0.4"
 tinymist-tests.workspace = true
+typst-assets = { workspace = true, features = ["fonts"] }
+typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.14.2" }
+typst-pdf.workspace = true
+typst-syntax.workspace = true
+walkdir.workspace = true
 
 [lints]
 workspace = true
