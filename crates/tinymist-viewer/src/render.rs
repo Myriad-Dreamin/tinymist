@@ -180,16 +180,18 @@ impl<C> TransformContext<C> for RenderStack {
 impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext<C>
     for RenderStack
 {
-    fn render_path(&mut self, _ctx: &mut C, path: &ir::PathItem, _abs_ref: &Fingerprint) {
+    fn render_path(&mut self, ctx: &mut C, path: &ir::PathItem, _abs_ref: &Fingerprint) {
         let mut scene = Scene::new();
         let Some(path_data) = svg_path(&path.d) else {
             return;
         };
 
-        let mut fill_color = peniko::Color::BLACK;
+        let mut fill_brush = peniko::Brush::Solid(peniko::Color::BLACK);
+        let mut fill_brush_transform = None;
         let mut fill = false;
         let mut fill_rule = peniko::Fill::NonZero;
-        let mut stroke_color = peniko::Color::BLACK;
+        let mut stroke_brush = peniko::Brush::Solid(peniko::Color::BLACK);
+        let mut stroke_brush_transform = None;
         let mut stroke = false;
         let mut stroke_width = 0f64;
         let mut stroke_join = kurbo::Join::Miter;
@@ -201,25 +203,11 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         for style in &path.styles {
             match style {
                 PathStyle::Fill(color) => {
-                    // todo: canvas gradient and pattern
-                    if color.starts_with('@') {
-                        fill_color = peniko::Color::BLACK;
-                    } else {
-                        fill_color = peniko::color::parse_color(color.as_ref())
-                            .map(|it| it.to_alpha_color())
-                            .unwrap_or(peniko::Color::BLACK);
-                    }
+                    (fill_brush, fill_brush_transform) = resolve_paint(ctx, color);
                     fill = true;
                 }
                 PathStyle::Stroke(color) => {
-                    // todo: canvas gradient and pattern
-                    if color.starts_with('@') {
-                        stroke_color = peniko::Color::BLACK;
-                    } else {
-                        stroke_color = peniko::color::parse_color(color.as_ref())
-                            .map(|it| it.to_alpha_color())
-                            .unwrap_or(peniko::Color::BLACK);
-                    }
+                    (stroke_brush, stroke_brush_transform) = resolve_paint(ctx, color);
                     stroke = true;
                 }
                 PathStyle::StrokeWidth(width) => {
@@ -261,27 +249,16 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         }
 
         if fill {
-            //  Affine::IDENTITY
-            let brush_transform = None;
-            // let brush_transform =
-            //     (!transform.is_identity()).then_some(convert_transform(transform));
-            // todo: paint transform?
-            // shape_paint_transform(state, paint, shape);
-            // let size = shape_fill_size(state, paint, shape);
-            // let brush = convert_paint_to_brush(paint, size);
-
             scene.fill(
                 fill_rule,
                 Affine::IDENTITY,
-                &peniko::Brush::Solid(fill_color),
-                brush_transform,
+                &fill_brush,
+                fill_brush_transform,
                 &path_data,
             );
         }
 
         if stroke {
-            let brush_transform = None;
-
             let mut kurbo_stroke = kurbo::Stroke {
                 width: stroke_width,
                 join: stroke_join,
@@ -298,8 +275,8 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             scene.stroke(
                 &kurbo_stroke,
                 Affine::IDENTITY,
-                &peniko::Brush::Solid(stroke_color),
-                brush_transform,
+                &stroke_brush,
+                stroke_brush_transform,
                 &path_data,
             );
         }
@@ -377,6 +354,135 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
                 .push((Vec2::new(pos.x.0 as f64, pos.y.0 as f64), glyph));
         }
     }
+}
+
+fn resolve_paint<'m, C: RenderVm<'m>>(
+    ctx: &C,
+    color: &ImmutStr,
+) -> (peniko::Brush, Option<Affine>) {
+    let fallback = || {
+        (
+            peniko::Brush::Solid(
+                peniko::color::parse_color(color.as_ref())
+                    .map(|it| it.to_alpha_color())
+                    .unwrap_or(peniko::Color::BLACK),
+            ),
+            None,
+        )
+    };
+
+    let Some(id) = color.as_ref().strip_prefix("@g") else {
+        return fallback();
+    };
+
+    let Ok(mut id) = Fingerprint::try_from_str(id) else {
+        return fallback();
+    };
+
+    let mut brush_transform = None;
+    if let Some(ir::VecItem::ColorTransform(transform)) = ctx.get_item(&id) {
+        id = transform.item;
+        brush_transform = Some(convert_transform(&transform.transform));
+    }
+
+    match ctx.get_item(&id) {
+        Some(ir::VecItem::Gradient(gradient)) => (
+            peniko::Brush::Gradient(convert_gradient(gradient)),
+            brush_transform,
+        ),
+        _ => fallback(),
+    }
+}
+
+fn convert_gradient(gradient: &ir::GradientItem) -> peniko::Gradient {
+    let interpolation_space = convert_color_space(gradient.space);
+    let stops = gradient
+        .stops
+        .iter()
+        .map(|(color, offset)| (offset.0, rgba8_to_color(*color)))
+        .collect::<Vec<_>>();
+
+    let converted = match &gradient.kind {
+        ir::GradientKind::Linear(angle) => {
+            let sin = angle.0.sin();
+            let cos = angle.0.cos();
+            let length = sin.abs() + cos.abs();
+            let dx = cos * length * 0.5;
+            let dy = sin * length * 0.5;
+            peniko::Gradient::new_linear((0.5 - dx, 0.5 - dy), (0.5 + dx, 0.5 + dy))
+        }
+        ir::GradientKind::Radial(radius) => {
+            let mut center = Axes::new(Scalar(0.5), Scalar(0.5));
+            let mut focal_center = None;
+            let mut focal_radius = Scalar(0.);
+
+            for style in &gradient.styles {
+                match style {
+                    ir::GradientStyle::Center(value) => center = *value,
+                    ir::GradientStyle::FocalCenter(value) => focal_center = Some(*value),
+                    ir::GradientStyle::FocalRadius(value) => focal_radius = *value,
+                }
+            }
+
+            if let Some(focal_center) = focal_center {
+                peniko::Gradient::new_two_point_radial(
+                    (focal_center.x.0, focal_center.y.0),
+                    focal_radius.0,
+                    (center.x.0, center.y.0),
+                    radius.0,
+                )
+            } else {
+                peniko::Gradient::new_radial((center.x.0, center.y.0), radius.0)
+            }
+        }
+        ir::GradientKind::Conic(angle) => {
+            let mut center = Axes::new(Scalar(0.5), Scalar(0.5));
+            for style in &gradient.styles {
+                if let ir::GradientStyle::Center(value) = style {
+                    center = *value;
+                }
+            }
+
+            peniko::Gradient::new_sweep(
+                (center.x.0, center.y.0),
+                angle.0,
+                angle.0 + std::f32::consts::TAU,
+            )
+        }
+    };
+
+    converted
+        .with_interpolation_cs(interpolation_space)
+        .with_stops(stops.as_slice())
+}
+
+fn rgba8_to_color(color: ir::Rgba8Item) -> peniko::Color {
+    peniko::Color::from_rgba8(color.r, color.g, color.b, color.a)
+}
+
+fn convert_color_space(space: ir::ColorSpace) -> peniko::color::ColorSpaceTag {
+    match space {
+        ir::ColorSpace::Oklab => peniko::color::ColorSpaceTag::Oklab,
+        ir::ColorSpace::Srgb => peniko::color::ColorSpaceTag::Srgb,
+        ir::ColorSpace::LinearRgb => peniko::color::ColorSpaceTag::LinearSrgb,
+        ir::ColorSpace::Hsl => peniko::color::ColorSpaceTag::Hsl,
+        ir::ColorSpace::Oklch => peniko::color::ColorSpaceTag::Oklch,
+        ir::ColorSpace::Luma
+        | ir::ColorSpace::D65Gray
+        | ir::ColorSpace::Hsv
+        | ir::ColorSpace::Cmyk => peniko::color::ColorSpaceTag::Srgb,
+    }
+}
+
+fn convert_transform(m: &ir::Transform) -> Affine {
+    Affine::new([
+        m.sx.0 as f64,
+        m.ky.0 as f64,
+        m.kx.0 as f64,
+        m.sy.0 as f64,
+        m.tx.0 as f64,
+        m.ty.0 as f64,
+    ])
 }
 
 trait GlyphFactory {

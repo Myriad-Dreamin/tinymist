@@ -163,12 +163,24 @@ impl IncrVelloDocClient {
 mod tests {
     use std::sync::Arc;
 
-    use reflexo::vector::incr::IncrDocClient;
-    use reflexo::vector::stream::BytesModuleStream;
+    use reflexo::{
+        hash::Fingerprint,
+        vector::{
+            incr::IncrDocClient,
+            ir::{
+                self, Axes, ColorSpace, GradientItem, GradientKind, Module, Page, PathItem,
+                PathStyle, Rgba8Item, Scalar, VecItem,
+            },
+            stream::BytesModuleStream,
+        },
+    };
     use reflexo_vec2svg::IncrSvgDocServer;
     use tinymist_preview::protocol::DIFF_V1_PREFIX;
     use tinymist_std::typst::TypstDocument;
-    use vello::Scene;
+    use vello::{
+        Scene,
+        kurbo::{Size, Vec2},
+    };
 
     use super::{IncrVelloDocClient, IncrVelloPass};
 
@@ -288,7 +300,80 @@ mod tests {
         );
     }
 
-    fn render_first_page(name: &str, source: &str) -> (Arc<Scene>, vello::kurbo::Size) {
+    #[test]
+    fn path_gradient_fill_reaches_vello_encoding() {
+        let gradient_id = Fingerprint::from_pair(1, 0);
+        let paint_id = Fingerprint::from_pair(2, 0);
+        let path_id = Fingerprint::from_pair(3, 0);
+
+        let mut module = Module::default();
+        module.items.insert(gradient_id, gradient_item());
+        module.items.insert(
+            paint_id,
+            VecItem::ColorTransform(Arc::new(ir::ColorTransform {
+                transform: ir::Transform::from_scale(Scalar(100.), Scalar(50.)),
+                item: gradient_id,
+            })),
+        );
+        module.items.insert(
+            path_id,
+            VecItem::Path(PathItem {
+                d: "M 0 0 L 100 0 L 100 50 L 0 50 Z".into(),
+                size: Some(Axes::new(Scalar(100.), Scalar(50.))),
+                styles: vec![PathStyle::Fill(
+                    format!("@{}", paint_id.as_svg_id("g")).into(),
+                )],
+            }),
+        );
+
+        let mut pass = IncrVelloPass::default();
+        pass.interpret_changes(
+            &module,
+            &[Page {
+                content: path_id,
+                size: Axes::new(Scalar(100.), Scalar(50.)),
+            }],
+        );
+
+        let (scene, size) = pass.flush_page(0);
+
+        assert_eq!(size, Vec2::new(100., 50.));
+        assert!(
+            scene.encoding().resources.color_stops.len() >= 2,
+            "gradient fill should encode color stops instead of falling back to a solid color"
+        );
+    }
+
+    fn gradient_item() -> VecItem {
+        VecItem::Gradient(Arc::new(GradientItem {
+            stops: vec![
+                (
+                    Rgba8Item {
+                        r: 255,
+                        g: 0,
+                        b: 0,
+                        a: 255,
+                    },
+                    Scalar(0.),
+                ),
+                (
+                    Rgba8Item {
+                        r: 0,
+                        g: 0,
+                        b: 255,
+                        a: 255,
+                    },
+                    Scalar(1.),
+                ),
+            ],
+            anti_alias: true,
+            space: ColorSpace::Srgb,
+            kind: GradientKind::Linear(Scalar(0.)),
+            styles: vec![],
+        }))
+    }
+
+    fn render_first_page(name: &str, source: &str) -> (Arc<Scene>, Size) {
         let mut doc = compile_incremental_doc(source);
         let mut vello = IncrVelloDocClient::default();
 
