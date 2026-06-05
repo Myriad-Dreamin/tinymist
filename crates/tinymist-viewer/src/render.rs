@@ -395,6 +395,7 @@ fn decode_svg_image(data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
 
 fn svg_options() -> resvg::usvg::Options<'static> {
     let resolve_string = resvg::usvg::ImageHrefResolver::default_string_resolver();
+    // todo: improve svg_options with user font settings.
     resvg::usvg::Options {
         font_family: "Libertinus Serif".to_owned(),
         fontdb: svg_fontdb(),
