@@ -442,8 +442,16 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
         _ => return None,
     };
 
+    let converted = convert_gradient(gradient)?;
+    if let Some(gradient_transform) = converted.transform {
+        transform = Some(match transform {
+            Some(transform) => transform * gradient_transform,
+            None => gradient_transform,
+        });
+    }
+
     Some(PaintBrush {
-        brush: peniko::Brush::Gradient(convert_gradient(gradient)?),
+        brush: peniko::Brush::Gradient(converted.gradient),
         transform,
     })
 }
@@ -467,11 +475,17 @@ fn convert_transform(m: &ir::Transform) -> Affine {
     ])
 }
 
-fn convert_gradient(gradient: &GradientItem) -> Option<peniko::Gradient> {
+struct ConvertedGradient {
+    gradient: peniko::Gradient,
+    transform: Option<Affine>,
+}
+
+fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
     if gradient.stops.is_empty() {
         return None;
     }
 
+    let mut transform = None;
     let mut stops = peniko::ColorStops::new();
     for (color, offset) in &gradient.stops {
         stops.push(peniko::ColorStop {
@@ -515,11 +529,11 @@ fn convert_gradient(gradient: &GradientItem) -> Option<peniko::Gradient> {
                 }
             }
 
-            let start_angle = -angle.0;
+            transform = Some(conic_gradient_transform(center, *angle));
             peniko::Gradient::new_sweep(
                 (center.x.0 as f64, center.y.0 as f64),
-                start_angle,
-                start_angle + std::f32::consts::TAU,
+                0.,
+                std::f32::consts::TAU,
             )
         }
     };
@@ -527,7 +541,22 @@ fn convert_gradient(gradient: &GradientItem) -> Option<peniko::Gradient> {
     peniko_gradient.interpolation_cs = color_space_tag(gradient.space);
     peniko_gradient.stops = stops;
 
-    Some(peniko_gradient)
+    Some(ConvertedGradient {
+        gradient: peniko_gradient,
+        transform,
+    })
+}
+
+fn conic_gradient_transform(center: Axes<Scalar>, angle: Scalar) -> Affine {
+    let center = Vec2::new(center.x.0 as f64, center.y.0 as f64);
+    scale_non_uniform_about(-1., 1., center)
+        * Affine::rotate_about(-(angle.0 as f64), (center.x, center.y))
+}
+
+fn scale_non_uniform_about(scale_x: f64, scale_y: f64, center: Vec2) -> Affine {
+    Affine::translate(-center)
+        .then_scale_non_uniform(scale_x, scale_y)
+        .then_translate(center)
 }
 
 fn linear_gradient_points(angle: f32) -> ((f64, f64), (f64, f64)) {
@@ -739,6 +768,28 @@ mod tests {
 
         assert_eq!(paint.transform, Some(convert_transform(&transform)));
         assert!(matches!(paint.brush, peniko::Brush::Gradient(_)));
+    }
+
+    #[test]
+    fn resolves_conic_gradient_with_typst_orientation() {
+        let gradient = sample_gradient(GradientKind::Conic(Scalar(0.)));
+        let ir::VecItem::Gradient(gradient) = gradient else {
+            panic!("expected gradient item");
+        };
+
+        let converted = convert_gradient(&gradient).expect("gradient should convert");
+        assert_eq!(
+            converted.transform,
+            Some(Affine::new([-1., 0., 0., 1., 1., 0.]))
+        );
+
+        let peniko_gradient = converted.gradient;
+        let peniko::GradientKind::Sweep(sweep) = peniko_gradient.kind else {
+            panic!("expected sweep gradient");
+        };
+
+        assert_eq!(sweep.start_angle, 0.);
+        assert_eq!(sweep.end_angle, std::f32::consts::TAU);
     }
 
     #[test]
