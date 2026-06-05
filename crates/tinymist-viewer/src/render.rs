@@ -396,6 +396,7 @@ fn decode_svg_image(data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
 fn svg_options() -> resvg::usvg::Options<'static> {
     let resolve_string = resvg::usvg::ImageHrefResolver::default_string_resolver();
     resvg::usvg::Options {
+        font_family: "Libertinus Serif".to_owned(),
         fontdb: svg_fontdb(),
         image_href_resolver: resvg::usvg::ImageHrefResolver {
             resolve_data: resvg::usvg::ImageHrefResolver::default_data_resolver(),
@@ -412,7 +413,12 @@ fn svg_fontdb() -> Arc<resvg::usvg::fontdb::Database> {
     static FONT_DB: OnceLock<Arc<resvg::usvg::fontdb::Database>> = OnceLock::new();
     Arc::clone(FONT_DB.get_or_init(|| {
         let mut database = resvg::usvg::fontdb::Database::new();
-        database.load_system_fonts();
+        for data in typst_assets::fonts() {
+            database.load_font_data(data.to_vec());
+        }
+        database.set_serif_family("Libertinus Serif");
+        database.set_sans_serif_family("New Computer Modern");
+        database.set_monospace_family("DejaVu Sans Mono");
         Arc::new(database)
     }))
 }
