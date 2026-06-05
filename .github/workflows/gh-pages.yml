@@ -67,6 +67,12 @@ jobs:
         run: |
           cargo doc --workspace --no-deps
           cp -r target/doc dist/tinymist/rs
+      - name: Build Renderer Diff
+        run: yarn build:renderer-diff
+      - name: Attach Renderer Diff
+        run: |
+          mkdir -p dist/tinymist/renderer-diff
+          cp -R contrib/renderer-diff/dist/. dist/tinymist/renderer-diff/
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
