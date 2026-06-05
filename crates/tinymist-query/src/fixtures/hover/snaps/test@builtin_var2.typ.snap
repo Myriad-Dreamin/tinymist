@@ -17,3 +17,9 @@ let sys;
 ```typc
 <module sys>
 ```
+
+
+======
+
+
+[Inspect Values](command:tinymist.inspectValue)
