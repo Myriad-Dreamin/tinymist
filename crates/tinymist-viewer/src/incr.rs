@@ -16,7 +16,7 @@ use vello::{
     peniko::{Color, color::parse_color},
 };
 
-use crate::VecPage;
+use crate::{SvgResourceResolver, VecPage};
 
 /// Incremental pass from vector to vello scene.
 pub struct IncrVelloPass {
@@ -27,6 +27,8 @@ pub struct IncrVelloPass {
     pub fill: ImmutStr,
     /// Holds a sequence of vello pages that are rendered
     pub pages: Vec<VecPage>,
+    /// Resolves image resources linked from inside SVG images.
+    pub svg_resource_resolver: Option<Arc<dyn SvgResourceResolver>>,
 }
 
 impl Default for IncrVelloPass {
@@ -34,6 +36,7 @@ impl Default for IncrVelloPass {
         Self {
             fill: "#ffffff".into(),
             pages: vec![],
+            svg_resource_resolver: None,
         }
     }
 }
@@ -41,7 +44,8 @@ impl Default for IncrVelloPass {
 impl IncrVelloPass {
     /// Interprets the changes in the given module and pages.
     pub fn interpret_changes(&mut self, module: &Module, pages: &[Page]) {
-        let mut ct = crate::render::Renderer::new(module);
+        let mut ct = crate::render::Renderer::new(module)
+            .with_svg_resource_resolver(self.svg_resource_resolver.clone());
 
         let pages: Vec<VecPage> = pages
             .iter()
@@ -97,8 +101,14 @@ impl IncrVelloDocClient {
         self.vec2vello = IncrVelloPass {
             fill,
             pages: vec![],
+            svg_resource_resolver: self.vec2vello.svg_resource_resolver.clone(),
         };
         self.doc_view = None;
+    }
+
+    /// Sets the resolver for image resources linked from SVG images.
+    pub fn set_svg_resource_resolver(&mut self, resolver: Option<Arc<dyn SvgResourceResolver>>) {
+        self.vec2vello.svg_resource_resolver = resolver;
     }
 
     /// Sets canvas's background color

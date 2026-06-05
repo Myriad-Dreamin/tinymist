@@ -17,6 +17,51 @@ pub mod incr;
 pub mod protocol;
 mod render;
 
+/// A raster image format resolved for an SVG-linked image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SvgResourceFormat {
+    /// JPEG image data.
+    Jpeg,
+    /// PNG image data.
+    Png,
+    /// GIF image data.
+    Gif,
+    /// WebP image data.
+    Webp,
+}
+
+/// A raster image resolved from an SVG `<image href=...>` reference.
+#[derive(Debug, Clone)]
+pub struct SvgResource {
+    /// The format of the encoded image data.
+    pub format: SvgResourceFormat,
+    /// The encoded image data.
+    pub data: Arc<Vec<u8>>,
+}
+
+impl SvgResource {
+    /// Creates a new resolved SVG image resource.
+    pub fn new(format: SvgResourceFormat, data: impl Into<Vec<u8>>) -> Self {
+        Self {
+            format,
+            data: Arc::new(data.into()),
+        }
+    }
+}
+
+/// Resolves image resources linked from inside SVG image data.
+///
+/// Vector documents only carry the encoded image bytes, so callers that still
+/// know the original document or asset context can provide this hook to resolve
+/// relative SVG image links.
+pub trait SvgResourceResolver: Send + Sync {
+    /// Resolves `href` from an SVG image.
+    ///
+    /// `svg_data` is the encoded SVG being parsed. Implementations can use it
+    /// to recover a virtual base path for images that came from an asset store.
+    fn resolve_svg_resource(&self, svg_data: &[u8], href: &str) -> Option<SvgResource>;
+}
+
 /// A vello scene corresponding to a typst page.
 #[derive(Debug, Clone)]
 pub struct VecPage {
