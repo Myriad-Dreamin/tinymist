@@ -25,6 +25,7 @@ use reflexo::{
     },
 };
 use smallvec::SmallVec;
+use typst::visualize::{Color as TypstColor, ColorSpace as TypstColorSpace, WeightedColor};
 use vello::peniko;
 use vello::{
     Scene,
@@ -480,21 +481,15 @@ struct ConvertedGradient {
     transform: Option<Affine>,
 }
 
+const VELLO_GRADIENT_SAMPLES: usize = 512;
+
 fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
     if gradient.stops.is_empty() {
         return None;
     }
 
     let mut transform = None;
-    let mut stops = peniko::ColorStops::new();
-    for (color, offset) in &gradient.stops {
-        stops.push(peniko::ColorStop {
-            offset: offset.0,
-            color: peniko::color::DynamicColor::from_alpha_color(peniko::Color::from_rgba8(
-                color.r, color.g, color.b, color.a,
-            )),
-        });
-    }
+    let (stops, interpolation_cs) = convert_gradient_stops(gradient);
 
     let mut peniko_gradient = match &gradient.kind {
         GradientKind::Linear(angle) => {
@@ -538,13 +533,134 @@ fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
         }
     };
 
-    peniko_gradient.interpolation_cs = color_space_tag(gradient.space);
+    peniko_gradient.interpolation_cs = interpolation_cs;
     peniko_gradient.stops = stops;
 
     Some(ConvertedGradient {
         gradient: peniko_gradient,
         transform,
     })
+}
+
+fn convert_gradient_stops(
+    gradient: &GradientItem,
+) -> (peniko::ColorStops, peniko::color::ColorSpaceTag) {
+    // Vello 0.7 resolves gradient ramps in sRGB regardless of
+    // `Gradient::interpolation_cs`, so pre-sample non-sRGB spaces with Typst's
+    // color mixer before handing the stops to Vello.
+    if let Some(stops) = sampled_gradient_stops(gradient) {
+        return (stops, peniko::color::ColorSpaceTag::Srgb);
+    }
+
+    (
+        raw_gradient_stops(gradient),
+        color_space_tag(gradient.space),
+    )
+}
+
+fn sampled_gradient_stops(gradient: &GradientItem) -> Option<peniko::ColorStops> {
+    let mixing_space = typst_color_space(gradient.space)?;
+    if gradient.stops.len() < 2 {
+        return None;
+    }
+
+    let mut stops = peniko::ColorStops::new();
+    for index in 0..VELLO_GRADIENT_SAMPLES {
+        let offset = index as f32 / (VELLO_GRADIENT_SAMPLES - 1) as f32;
+        stops.push(peniko::ColorStop {
+            offset,
+            color: dynamic_color_from_typst(sample_gradient_color(
+                gradient,
+                mixing_space,
+                offset as f64,
+            )?),
+        });
+    }
+
+    Some(stops)
+}
+
+fn raw_gradient_stops(gradient: &GradientItem) -> peniko::ColorStops {
+    let mut stops = peniko::ColorStops::new();
+    for (color, offset) in &gradient.stops {
+        stops.push(peniko::ColorStop {
+            offset: offset.0,
+            color: dynamic_color_from_rgba8(*color),
+        });
+    }
+
+    stops
+}
+
+fn sample_gradient_color(
+    gradient: &GradientItem,
+    mixing_space: TypstColorSpace,
+    t: f64,
+) -> Option<TypstColor> {
+    let t = t.clamp(0.0, 1.0);
+    let stops = &gradient.stops;
+    let mut index = stops.partition_point(|(_, ratio)| f64::from(ratio.0) < t);
+
+    if index == 0 {
+        while stops
+            .get(index + 1)
+            .is_some_and(|(_, ratio)| ratio.0 == 0.0)
+        {
+            index += 1;
+        }
+
+        return Some(typst_color_from_rgba8(stops[index].0));
+    }
+
+    if index >= stops.len() {
+        return Some(typst_color_from_rgba8(stops.last()?.0));
+    }
+
+    let (col_0, pos_0) = stops[index - 1];
+    let (col_1, pos_1) = stops[index];
+    let span = pos_1.0 - pos_0.0;
+    let t = if span.abs() <= f32::EPSILON {
+        0.0
+    } else {
+        (t - f64::from(pos_0.0)) / f64::from(span)
+    };
+
+    TypstColor::mix_iter(
+        [
+            WeightedColor::new(typst_color_from_rgba8(col_0), 1.0 - t),
+            WeightedColor::new(typst_color_from_rgba8(col_1), t),
+        ],
+        mixing_space,
+    )
+    .ok()
+}
+
+fn typst_color_space(space: ColorSpace) -> Option<TypstColorSpace> {
+    Some(match space {
+        ColorSpace::Luma | ColorSpace::Srgb => return None,
+        ColorSpace::Oklab => TypstColorSpace::Oklab,
+        ColorSpace::Oklch => TypstColorSpace::Oklch,
+        ColorSpace::D65Gray => TypstColorSpace::D65Gray,
+        ColorSpace::LinearRgb => TypstColorSpace::LinearRgb,
+        ColorSpace::Hsl => TypstColorSpace::Hsl,
+        ColorSpace::Hsv => TypstColorSpace::Hsv,
+        ColorSpace::Cmyk => TypstColorSpace::Cmyk,
+    })
+}
+
+fn typst_color_from_rgba8(color: ir::Rgba8Item) -> TypstColor {
+    TypstColor::from_u8(color.r, color.g, color.b, color.a)
+}
+
+fn dynamic_color_from_rgba8(color: ir::Rgba8Item) -> peniko::color::DynamicColor {
+    peniko::color::DynamicColor::from_alpha_color(peniko::Color::from_rgba8(
+        color.r, color.g, color.b, color.a,
+    ))
+}
+
+fn dynamic_color_from_typst(color: TypstColor) -> peniko::color::DynamicColor {
+    let (r, g, b, a) = color.to_rgb().into_format::<u8, u8>().into_components();
+    dynamic_color_from_rgba8(ir::Rgba8Item { r, g, b, a })
 }
 
 fn conic_gradient_transform(center: Axes<Scalar>, angle: Scalar) -> Affine {
@@ -730,11 +846,11 @@ mod tests {
 
         assert_eq!(
             gradient.interpolation_cs,
-            peniko::color::ColorSpaceTag::Oklab
+            peniko::color::ColorSpaceTag::Srgb
         );
-        assert_eq!(gradient.stops.len(), 2);
+        assert_eq!(gradient.stops.len(), VELLO_GRADIENT_SAMPLES);
         assert_eq!(gradient.stops[0].offset, 0.);
-        assert_eq!(gradient.stops[1].offset, 1.);
+        assert_eq!(gradient.stops[VELLO_GRADIENT_SAMPLES - 1].offset, 1.);
         assert!(matches!(gradient.kind, peniko::GradientKind::Linear(_)));
     }
 
