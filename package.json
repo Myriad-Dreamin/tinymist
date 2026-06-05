@@ -11,6 +11,7 @@
     "contrib/html/editors/vscode",
     "contrib/tinymist-gpu-viewer/editors/vscode",
     "contrib/previewer-provider/editors/vscode",
+    "contrib/renderer-diff",
     "tools/editor-tools",
     "tools/typst-dom",
     "tools/typst-preview-frontend"
@@ -24,6 +25,7 @@
     "build:lsp:debug": "node scripts/build.mjs build:lsp:debug",
     "build:editor-tools": "node scripts/build.mjs build:editor-tools",
     "build:preview": "node scripts/build.mjs build:preview",
+    "build:renderer-diff": "yarn workspace @tinymist/renderer-diff build",
     "build:syntax": "node scripts/build.mjs build:syntax",
     "build:l10n": "node scripts/build.mjs build:l10n",
     "build:docker": "docker build -t myriaddreamin/tinymist:0.14.10 .",

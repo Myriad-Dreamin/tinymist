@@ -4,22 +4,21 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{Cursor, Write as _};
+use std::io::Cursor;
 use std::num::NonZeroUsize;
-use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use anyhow::{Context as _, Result, anyhow, bail};
 use comemo::Tracked;
-use flate2::{Compression, write::ZlibEncoder};
 use image::{GenericImage, ImageFormat, Rgba, RgbaImage};
 use parking_lot::Mutex;
-use pdf_writer::{Content as PdfContent, Filter, Name, Pdf, Rect as PdfRect, Ref, Str};
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
+use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
 use tinymist_std::typst::TypstDocument;
 use tinymist_viewer::incr::IncrVelloDocClient;
@@ -45,6 +44,11 @@ use vello::wgpu::{
 };
 
 const OUTPUT_ROOT: &str = "target/tinymist-viewer/vello-renderer";
+const RENDERER_DIFF_ARTIFACT: &str = "renderer-diff-vello";
+const RENDERER_DIFF_MANIFEST: &str = "renderer-diff-manifest.json";
+const HASH_BITS: usize = 16;
+const OFFICIAL_GROUP: &str = "official";
+const VELLO_GROUP: &str = "vello";
 
 #[test]
 fn typst_suite_vello_renderer_hashes() -> Result<()> {
@@ -61,124 +65,119 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         .and_then(Path::parent)
         .context("viewer crate should live under <workspace>/crates/tinymist-viewer")?;
     let output_root = workspace_root.join(OUTPUT_ROOT);
+    let artifact_root = output_root.join(RENDERER_DIFF_ARTIFACT);
     let cases = all_ref_cases(&tests_root)?;
     let collected = Box::new(collect_tests(&tests_root)?);
-    let make_pdf = env_flag("TINYMIST_VELLO_PDF");
+    let make_bundle = env_flag("TINYMIST_RENDERER_DIFF");
 
     fs::create_dir_all(&output_root)?;
+    if make_bundle {
+        if artifact_root.exists() {
+            fs::remove_dir_all(&artifact_root).with_context(|| {
+                format!(
+                    "failed to remove previous renderer diff bundle {}",
+                    artifact_root.display()
+                )
+            })?;
+        }
+        fs::create_dir_all(&artifact_root)?;
+    }
 
     let mut rasterizer = Box::new(SceneRasterizer::new());
     let mut failures = String::new();
     let mut hash_refs = String::new();
-    let mut pdf_failures = String::new();
-    let mut rendered_cases = vec![];
+    let mut bundle_failures = String::new();
+    let mut manifest_cases = vec![];
 
     for name in cases {
         let ref_png = tests_root.join("ref").join(format!("{name}.png"));
         if !ref_png.exists() {
             let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
             writeln!(failures, "{failure}")?;
-            let vello_png = output_png_path(&output_root, "vello", &name);
-            write_placeholder_png(&vello_png, None)?;
-            writeln!(pdf_failures, "{failure}")?;
-            rendered_cases.push(name);
+            if make_bundle {
+                let png = placeholder_png(None);
+                write_group_png(&artifact_root, VELLO_GROUP, &name, &png)?;
+                writeln!(bundle_failures, "{failure}")?;
+            }
             continue;
         }
 
-        let ref_output = output_png_path(&output_root, "ref", &name);
-        if let Some(parent) = ref_output.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::copy(&ref_png, &ref_output)
-            .with_context(|| format!("failed to copy upstream ref {}", ref_png.display()))?;
+        let official_asset = if make_bundle {
+            Some(copy_group_png(
+                &artifact_root,
+                OFFICIAL_GROUP,
+                &name,
+                &ref_png,
+            )?)
+        } else {
+            let ref_output = output_png_path(&output_root, "ref", &name);
+            if let Some(parent) = ref_output.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&ref_png, &ref_output)
+                .with_context(|| format!("failed to copy upstream ref {}", ref_png.display()))?;
+            None
+        };
 
         let render_result =
             render_suite_case_by_name(&name, &collected, &tests_root, &mut rasterizer);
-        let png = match render_result {
-            Ok(png) => png,
+        let (png, render_error) = match render_result {
+            Ok(png) => (png, None),
             Err(err) => {
                 writeln!(failures, "{name}: {err:#}")?;
-                let vello_png = output_png_path(&output_root, "vello", &name);
-                write_placeholder_png(&vello_png, Some(&ref_png))?;
-                writeln!(pdf_failures, "{name}: {err:#}")?;
-                rendered_cases.push(name);
+                if make_bundle {
+                    let png = placeholder_png(Some(&ref_png));
+                    let vello_asset = write_group_png(&artifact_root, VELLO_GROUP, &name, &png)?;
+                    let message = format!("{err:#}");
+                    writeln!(bundle_failures, "{name}: {message}")?;
+                    let official_asset = official_asset.expect("official PNG should be loaded");
+                    let case = renderer_diff_case(
+                        &name,
+                        "render-error",
+                        official_asset,
+                        vello_asset,
+                        Some(message),
+                    );
+                    manifest_cases.push(case);
+                }
                 continue;
             }
         };
 
-        let vello_png = output_png_path(&output_root, "vello", &name);
-        write_png(&vello_png, &png)?;
+        let vello_asset = if make_bundle {
+            Some(write_group_png(&artifact_root, VELLO_GROUP, &name, &png)?)
+        } else {
+            let vello_png = output_png_path(&output_root, VELLO_GROUP, &name);
+            write_png(&vello_png, &png)?;
+            None
+        };
 
-        let hash = format!("ihash16:{}", block_hash(&png, 16));
+        let hash = format!("ihash16:{}", block_hash(&png, HASH_BITS));
         writeln!(hash_refs, "{name} {hash}")?;
 
-        rendered_cases.push(name);
+        if make_bundle {
+            let official_asset = official_asset.expect("official PNG should be loaded");
+            let vello_asset = vello_asset.expect("Vello PNG should be written");
+            let case =
+                renderer_diff_case(&name, "pending", official_asset, vello_asset, render_error);
+            manifest_cases.push(case);
+        }
     }
 
-    let mut comparison_pdf_written = false;
-    if make_pdf && !rendered_cases.is_empty() {
-        let pdf_path = write_comparison_artifacts(&output_root, &rendered_cases, &pdf_failures)?;
-        eprintln!(
-            "wrote Vello renderer comparison PDF to {}",
-            pdf_path.display()
-        );
-        comparison_pdf_written = true;
+    if make_bundle && !manifest_cases.is_empty() {
+        if !bundle_failures.is_empty() {
+            fs::write(artifact_root.join("failures.txt"), &bundle_failures)?;
+        }
+        write_renderer_diff_manifest(&artifact_root, &tests_root, manifest_cases)?;
     }
 
     if !failures.is_empty() {
-        if !comparison_pdf_written && !rendered_cases.is_empty() {
-            let pdf_path =
-                write_comparison_artifacts(&output_root, &rendered_cases, &pdf_failures)?;
-            eprintln!(
-                "wrote Vello renderer comparison PDF to {}",
-                pdf_path.display()
-            );
-        }
         bail!("vello renderer suite failed:\n{failures}");
     }
 
-    assert_hash_snapshot_with_comparison_pdf(
-        &output_root,
-        &rendered_cases,
-        hash_refs,
-        comparison_pdf_written,
-    );
+    insta::assert_snapshot!("vello_renderer_hashes", hash_refs);
 
     Ok(())
-}
-
-fn assert_hash_snapshot_with_comparison_pdf(
-    output_root: &Path,
-    rendered_cases: &[String],
-    hash_refs: String,
-    comparison_pdf_written: bool,
-) {
-    let result = catch_unwind(AssertUnwindSafe(|| {
-        insta::assert_snapshot!("vello_renderer_hashes", hash_refs);
-    }));
-
-    if let Err(payload) = result {
-        if comparison_pdf_written {
-            eprintln!(
-                "Vello renderer comparison PDF: {}",
-                comparison_pdf_path(output_root).display()
-            );
-        } else if !rendered_cases.is_empty() {
-            match write_comparison_artifacts(output_root, rendered_cases, "") {
-                Ok(pdf_path) => {
-                    eprintln!(
-                        "wrote Vello renderer comparison PDF to {}",
-                        pdf_path.display()
-                    );
-                }
-                Err(err) => {
-                    eprintln!("failed to write Vello renderer comparison PDF: {err:#}");
-                }
-            }
-        }
-
-        resume_unwind(payload);
-    }
 }
 
 fn typst_tests_root() -> Option<PathBuf> {
@@ -579,9 +578,7 @@ fn write_png(path: &Path, image: &RgbaImage) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let mut cursor = Cursor::new(Vec::new());
-    image.write_to(&mut cursor, ImageFormat::Png)?;
-    fs::write(path, cursor.into_inner())
+    fs::write(path, encode_png(image)?)
         .with_context(|| format!("failed to write PNG {}", path.display()))
 }
 
@@ -589,7 +586,7 @@ fn output_png_path(root: &Path, kind: &str, name: &str) -> PathBuf {
     root.join(kind).join(format!("{name}.png"))
 }
 
-fn write_placeholder_png(path: &Path, ref_png: Option<&Path>) -> Result<()> {
+fn placeholder_png(ref_png: Option<&Path>) -> RgbaImage {
     let (width, height) = ref_png
         .and_then(|path| image::image_dimensions(path).ok())
         .unwrap_or((256, 144));
@@ -614,7 +611,238 @@ fn write_placeholder_png(path: &Path, ref_png: Option<&Path>) -> Result<()> {
         image.put_pixel(width - 1, y, Rgba([190, 0, 0, 255]));
     }
 
-    write_png(path, &image)
+    image
+}
+
+fn encode_png(image: &RgbaImage) -> Result<Vec<u8>> {
+    let mut cursor = Cursor::new(Vec::new());
+    image.write_to(&mut cursor, ImageFormat::Png)?;
+    Ok(cursor.into_inner())
+}
+
+fn copy_group_png(
+    root: &Path,
+    group: &str,
+    name: &str,
+    source: &Path,
+) -> Result<RendererDiffAsset> {
+    let bytes =
+        fs::read(source).with_context(|| format!("failed to read PNG {}", source.display()))?;
+    let image = image::load_from_memory(&bytes)
+        .with_context(|| format!("failed to decode PNG {}", source.display()))?
+        .to_rgba8();
+    let png_path = output_png_path(root, group, name);
+    write_group_png_bytes(root, group, name, image, bytes, &png_path)
+}
+
+fn write_group_png(
+    root: &Path,
+    group: &str,
+    name: &str,
+    image: &RgbaImage,
+) -> Result<RendererDiffAsset> {
+    let png_path = output_png_path(root, group, name);
+    write_group_png_bytes(
+        root,
+        group,
+        name,
+        image.clone(),
+        encode_png(image)?,
+        &png_path,
+    )
+}
+
+fn write_group_png_bytes(
+    root: &Path,
+    group: &str,
+    name: &str,
+    image: RgbaImage,
+    bytes: Vec<u8>,
+    png_path: &Path,
+) -> Result<RendererDiffAsset> {
+    if let Some(parent) = png_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(png_path, &bytes)
+        .with_context(|| format!("failed to write PNG {}", png_path.display()))?;
+
+    let perceptual_hash = format!("ihash16:{}", block_hash(&image, HASH_BITS));
+    let sha256 = format!("sha256:{:x}", Sha256::digest(&bytes));
+    let hash_path = group_asset_path(root, group, name, "hash");
+    let sha256_path = group_asset_path(root, group, name, "sha256");
+    fs::write(&hash_path, format!("{perceptual_hash}\n"))
+        .with_context(|| format!("failed to write hash {}", hash_path.display()))?;
+    fs::write(&sha256_path, format!("{sha256}\n"))
+        .with_context(|| format!("failed to write sha256 {}", sha256_path.display()))?;
+
+    Ok(RendererDiffAsset {
+        png: output_group_rel_path(group, name, "png"),
+        hash: output_group_rel_path(group, name, "hash"),
+        sha256: output_group_rel_path(group, name, "sha256"),
+        width: image.width(),
+        height: image.height(),
+        perceptual_hash,
+        sha256_digest: sha256,
+        image: Box::new(image),
+    })
+}
+
+fn group_asset_path(root: &Path, group: &str, name: &str, extension: &str) -> PathBuf {
+    root.join(group).join(format!("{name}.{extension}"))
+}
+
+fn output_group_rel_path(group: &str, name: &str, extension: &str) -> String {
+    format!("{group}/{name}.{extension}")
+}
+
+fn renderer_diff_case(
+    name: &str,
+    status: &str,
+    official: RendererDiffAsset,
+    vello: RendererDiffAsset,
+    error: Option<String>,
+) -> RendererDiffCase {
+    let comparison = compare_images(
+        &official.image,
+        &vello.image,
+        &official.perceptual_hash,
+        &vello.perceptual_hash,
+    );
+
+    let status = match status {
+        "render-error" => "render-error",
+        _ if comparison.pixel_mismatch_count == 0 => "matched",
+        _ => "different",
+    };
+
+    let mut assets = BTreeMap::new();
+    assets.insert(OFFICIAL_GROUP.to_owned(), official);
+    assets.insert(VELLO_GROUP.to_owned(), vello);
+
+    RendererDiffCase {
+        name: name.to_owned(),
+        status: status.to_owned(),
+        assets,
+        comparisons: vec![RendererDiffComparison {
+            lhs: OFFICIAL_GROUP.to_owned(),
+            rhs: VELLO_GROUP.to_owned(),
+            status: status.to_owned(),
+            metrics: comparison,
+        }],
+        error,
+    }
+}
+
+fn compare_images(
+    official: &RgbaImage,
+    actual: &RgbaImage,
+    official_hash: &str,
+    actual_hash: &str,
+) -> RendererDiffMetrics {
+    let width = official.width().max(actual.width()).max(1);
+    let height = official.height().max(actual.height()).max(1);
+    let total_pixels = u64::from(width) * u64::from(height);
+
+    let mut pixel_mismatch_count = 0u64;
+    let mut max_channel_delta = 0u8;
+    let mut total_abs_delta = 0u64;
+
+    for y in 0..height {
+        for x in 0..width {
+            let lhs = sample_pixel(official, x, y);
+            let rhs = sample_pixel(actual, x, y);
+            let mut pixel_delta = 0u8;
+
+            for channel in 0..3 {
+                let delta = lhs[channel].abs_diff(rhs[channel]);
+                pixel_delta = pixel_delta.max(delta);
+                max_channel_delta = max_channel_delta.max(delta);
+                total_abs_delta += u64::from(delta);
+            }
+
+            if pixel_delta > 0 || lhs[3] != rhs[3] {
+                pixel_mismatch_count += 1;
+            }
+        }
+    }
+
+    let pixel_mismatch_ratio = pixel_mismatch_count as f64 / total_pixels as f64;
+    let mean_absolute_error = total_abs_delta as f64 / (total_pixels as f64 * 3.0 * 255.0);
+
+    RendererDiffMetrics {
+        perceptual_hash_distance: perceptual_hash_distance(official_hash, actual_hash),
+        pixel_mismatch_count,
+        pixel_mismatch_ratio,
+        mean_absolute_error,
+        max_channel_delta,
+    }
+}
+
+fn sample_pixel(image: &RgbaImage, x: u32, y: u32) -> Rgba<u8> {
+    if x < image.width() && y < image.height() {
+        *image.get_pixel(x, y)
+    } else {
+        Rgba([0, 0, 0, 0])
+    }
+}
+
+fn perceptual_hash_distance(lhs: &str, rhs: &str) -> u32 {
+    let lhs = lhs.strip_prefix("ihash16:").unwrap_or(lhs);
+    let rhs = rhs.strip_prefix("ihash16:").unwrap_or(rhs);
+    let mut distance = 0;
+
+    for (lhs, rhs) in lhs.chars().zip(rhs.chars()) {
+        let lhs = lhs.to_digit(16).unwrap_or(0);
+        let rhs = rhs.to_digit(16).unwrap_or(0);
+        distance += (lhs ^ rhs).count_ones();
+    }
+
+    let extra = lhs.len().abs_diff(rhs.len()) as u32;
+    distance + extra * 4
+}
+
+fn write_renderer_diff_manifest(
+    output_root: &Path,
+    tests_root: &Path,
+    cases: Vec<RendererDiffCase>,
+) -> Result<()> {
+    let summary = RendererDiffSummary::from_cases(&cases);
+    let manifest = RendererDiffManifest {
+        schema_version: 1,
+        artifact_name: RENDERER_DIFF_ARTIFACT.to_owned(),
+        groups: vec![
+            RendererDiffGroup {
+                id: OFFICIAL_GROUP.to_owned(),
+                label: "Typst official renderer".to_owned(),
+                kind: "baseline".to_owned(),
+                source: Some("typst/typst tests/ref".to_owned()),
+            },
+            RendererDiffGroup {
+                id: VELLO_GROUP.to_owned(),
+                label: "Vello".to_owned(),
+                kind: "renderer".to_owned(),
+                source: None,
+            },
+        ],
+        source: RendererDiffSource {
+            suite: "typst renderer suite".to_owned(),
+            typst_tests: tests_root.display().to_string(),
+            typst_ref: std::env::var("TINYMIST_TYPST_REF").ok(),
+            github_run_id: std::env::var("GITHUB_RUN_ID").ok(),
+            github_sha: std::env::var("GITHUB_SHA").ok(),
+        },
+        hash: RendererDiffHashInfo {
+            algorithm: "blockhash".to_owned(),
+            bits: HASH_BITS,
+            format: "ihash16:<hex>".to_owned(),
+            distance: "hamming".to_owned(),
+        },
+        summary,
+        cases,
+    };
+    let manifest = serde_json::to_string_pretty(&manifest)?;
+    fs::write(output_root.join(RENDERER_DIFF_MANIFEST), manifest)
+        .with_context(|| format!("failed to write {RENDERER_DIFF_MANIFEST}"))
 }
 
 fn block_hash(image: &RgbaImage, bits: usize) -> String {
@@ -754,231 +982,126 @@ fn pixel_value(pixel: &Rgba<u8>) -> f64 {
     }
 }
 
-fn write_comparison_artifacts(
-    output_root: &Path,
-    names: &[String],
-    failures: &str,
-) -> Result<PathBuf> {
-    if !failures.is_empty() {
-        fs::write(output_root.join("vello-renderer-failures.txt"), failures)?;
-    }
-
-    write_comparison_pdf(output_root, names)
-}
-
-fn write_comparison_pdf(output_root: &Path, names: &[String]) -> Result<PathBuf> {
-    let points = serde_json::to_string_pretty(names)?;
-    fs::write(output_root.join("test-points.json"), points)?;
-
-    let pdf = write_comparison_pdf_bytes(output_root, names)?;
-    let pdf_path = comparison_pdf_path(output_root);
-    fs::write(&pdf_path, pdf)?;
-    Ok(pdf_path)
-}
-
-fn comparison_pdf_path(output_root: &Path) -> PathBuf {
-    output_root.join("vello-renderer-comparison.pdf")
-}
-
-fn write_comparison_pdf_bytes(output_root: &Path, names: &[String]) -> Result<Vec<u8>> {
-    const PAGE_WIDTH: f32 = 842.0;
-    const PAGE_HEIGHT: f32 = 595.0;
-    const MARGIN: f32 = 24.0;
-    const COLUMN_GAP: f32 = 18.0;
-    const TITLE_SIZE: f32 = 11.0;
-    const LABEL_SIZE: f32 = 9.0;
-    const IMAGE_TOP: f32 = PAGE_HEIGHT - 64.0;
-    const IMAGE_BOTTOM: f32 = 24.0;
-
-    let catalog_id = Ref::new(1);
-    let pages_id = Ref::new(2);
-    let font_id = Ref::new(3);
-    let mut refs = PdfRefs::new(4);
-    let mut page_refs = Vec::with_capacity(names.len());
-    let mut pdf = Box::new(Pdf::new());
-
-    pdf.catalog(catalog_id).pages(pages_id);
-    pdf.type1_font(font_id)
-        .base_font(Name(b"Helvetica"))
-        .encoding_predefined(Name(b"WinAnsiEncoding"));
-
-    for name in names {
-        let page_id = refs.alloc();
-        let content_id = refs.alloc();
-        let ref_image_id = refs.alloc();
-        let vello_image_id = refs.alloc();
-        page_refs.push(page_id);
-
-        let ref_image = Box::new(load_pdf_image(&output_png_path(output_root, "ref", name))?);
-        let vello_image = Box::new(load_pdf_image(&output_png_path(
-            output_root,
-            "vello",
-            name,
-        ))?);
-
-        write_pdf_image(&mut pdf, ref_image_id, &ref_image)?;
-        write_pdf_image(&mut pdf, vello_image_id, &vello_image)?;
-
-        let column_width = (PAGE_WIDTH - MARGIN * 2.0 - COLUMN_GAP) / 2.0;
-        let image_height = IMAGE_TOP - IMAGE_BOTTOM;
-        let ref_rect = fit_pdf_image(
-            ref_image.width,
-            ref_image.height,
-            MARGIN,
-            IMAGE_BOTTOM,
-            column_width,
-            image_height,
-        );
-        let vello_rect = fit_pdf_image(
-            vello_image.width,
-            vello_image.height,
-            MARGIN + column_width + COLUMN_GAP,
-            IMAGE_BOTTOM,
-            column_width,
-            image_height,
-        );
-
-        let mut content = Box::new(PdfContent::new());
-        content
-            .begin_text()
-            .set_font(Name(b"F1"), TITLE_SIZE)
-            .next_line(MARGIN, PAGE_HEIGHT - 30.0)
-            .show(Str(name.as_bytes()))
-            .end_text();
-        content
-            .begin_text()
-            .set_font(Name(b"F1"), LABEL_SIZE)
-            .next_line(MARGIN, PAGE_HEIGHT - 48.0)
-            .show(Str(b"Typst Ref"))
-            .next_line(column_width + COLUMN_GAP, 0.0)
-            .show(Str(b"Vello"))
-            .end_text();
-        draw_pdf_image(&mut content, Name(b"R"), ref_rect);
-        draw_pdf_image(&mut content, Name(b"V"), vello_rect);
-
-        let content = content.finish();
-        {
-            let mut page = pdf.page(page_id);
-            page.parent(pages_id)
-                .media_box(PdfRect::new(0.0, 0.0, PAGE_WIDTH, PAGE_HEIGHT))
-                .contents(content_id);
-            let mut resources = page.resources();
-            resources.fonts().pair(Name(b"F1"), font_id);
-            resources
-                .x_objects()
-                .pair(Name(b"R"), ref_image_id)
-                .pair(Name(b"V"), vello_image_id);
-        }
-        pdf.stream(content_id, content.as_slice());
-    }
-
-    pdf.pages(pages_id)
-        .kids(page_refs.iter().copied())
-        .count(page_refs.len() as i32);
-
-    Ok(pdf.finish())
-}
-
-fn load_pdf_image(path: &Path) -> Result<PdfImage> {
-    let image = image::open(path)
-        .with_context(|| format!("failed to open comparison image {}", path.display()))?
-        .to_rgba8();
-    let (width, height) = image.dimensions();
-    let mut rgb = Vec::with_capacity(width as usize * height as usize * 3);
-    for pixel in image.pixels() {
-        let alpha = u16::from(pixel[3]);
-        for channel in &pixel.0[..3] {
-            let value = (u16::from(*channel) * alpha + 255 * (255 - alpha)) / 255;
-            rgb.push(value as u8);
-        }
-    }
-
-    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::fast());
-    encoder.write_all(&rgb)?;
-    let samples = encoder.finish()?;
-
-    Ok(PdfImage {
-        width,
-        height,
-        samples,
-    })
-}
-
-fn write_pdf_image(pdf: &mut Pdf, image_id: Ref, image: &PdfImage) -> Result<()> {
-    let width = i32::try_from(image.width).context("PDF image width exceeds i32")?;
-    let height = i32::try_from(image.height).context("PDF image height exceeds i32")?;
-    let mut xobject = pdf.image_xobject(image_id, &image.samples);
-    xobject
-        .width(width)
-        .height(height)
-        .bits_per_component(8)
-        .filter(Filter::FlateDecode);
-    xobject.color_space().device_rgb();
-    Ok(())
-}
-
-fn draw_pdf_image(content: &mut PdfContent, name: Name, rect: PdfImageRect) {
-    content
-        .save_state()
-        .transform([rect.width, 0.0, 0.0, rect.height, rect.x, rect.y])
-        .x_object(name)
-        .restore_state();
-}
-
-fn fit_pdf_image(
-    image_width: u32,
-    image_height: u32,
-    x: f32,
-    y: f32,
-    max_width: f32,
-    max_height: f32,
-) -> PdfImageRect {
-    let scale = (max_width / image_width as f32)
-        .min(max_height / image_height as f32)
-        .min(1.0);
-    let width = image_width as f32 * scale;
-    let height = image_height as f32 * scale;
-
-    PdfImageRect {
-        x: x + (max_width - width) / 2.0,
-        y: y + (max_height - height) / 2.0,
-        width,
-        height,
-    }
-}
-
 fn env_flag(name: &str) -> bool {
     std::env::var_os(name).is_some_and(|value| !value.is_empty() && value != "0")
 }
 
-struct PdfRefs {
-    next: i32,
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffManifest {
+    schema_version: u32,
+    artifact_name: String,
+    groups: Vec<RendererDiffGroup>,
+    source: RendererDiffSource,
+    hash: RendererDiffHashInfo,
+    summary: RendererDiffSummary,
+    cases: Vec<RendererDiffCase>,
 }
 
-impl PdfRefs {
-    fn new(next: i32) -> Self {
-        Self { next }
-    }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffGroup {
+    id: String,
+    label: String,
+    kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<String>,
+}
 
-    fn alloc(&mut self) -> Ref {
-        let id = Ref::new(self.next);
-        self.next += 1;
-        id
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffSource {
+    suite: String,
+    typst_tests: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    typst_ref: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    github_run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    github_sha: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffHashInfo {
+    algorithm: String,
+    bits: usize,
+    format: String,
+    distance: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffSummary {
+    total: usize,
+    matched: usize,
+    different: usize,
+    render_errors: usize,
+}
+
+impl RendererDiffSummary {
+    fn from_cases(cases: &[RendererDiffCase]) -> Self {
+        let mut summary = Self {
+            total: cases.len(),
+            matched: 0,
+            different: 0,
+            render_errors: 0,
+        };
+
+        for case in cases {
+            match case.status.as_str() {
+                "matched" => summary.matched += 1,
+                "render-error" => summary.render_errors += 1,
+                _ => summary.different += 1,
+            }
+        }
+
+        summary
     }
 }
 
-struct PdfImage {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffCase {
+    name: String,
+    status: String,
+    assets: BTreeMap<String, RendererDiffAsset>,
+    comparisons: Vec<RendererDiffComparison>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffAsset {
+    png: String,
+    hash: String,
+    sha256: String,
     width: u32,
     height: u32,
-    samples: Vec<u8>,
+    perceptual_hash: String,
+    sha256_digest: String,
+    #[serde(skip_serializing)]
+    image: Box<RgbaImage>,
 }
 
-#[derive(Clone, Copy)]
-struct PdfImageRect {
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffComparison {
+    lhs: String,
+    rhs: String,
+    status: String,
+    metrics: RendererDiffMetrics,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RendererDiffMetrics {
+    perceptual_hash_distance: u32,
+    pixel_mismatch_count: u64,
+    pixel_mismatch_ratio: f64,
+    mean_absolute_error: f64,
+    max_channel_delta: u8,
 }
 
 struct Header {
