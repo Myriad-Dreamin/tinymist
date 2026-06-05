@@ -35,8 +35,10 @@ serde.workspace = true
 smallvec.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
+typst-assets = { workspace = true, features = ["fonts"] }
 typst-library.workspace = true
 reflexo.workspace = true
+resvg.workspace = true
 svgtypes.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
@@ -44,7 +46,6 @@ tinymist-preview.workspace = true
 tracing.workspace = true
 ttf-parser.workspace = true
 vello.workspace = true
-vello_svg.workspace = true
 winit.workspace = true
 xilem.workspace = true
 
@@ -65,7 +66,6 @@ masonry_winit.workspace = true
 pdf-writer = "0.14.0"
 pollster = "0.4"
 tinymist-tests.workspace = true
-typst-assets = { workspace = true, features = ["fonts"] }
 typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.14.2" }
 typst-syntax.workspace = true
 walkdir.workspace = true

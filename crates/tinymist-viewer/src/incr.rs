@@ -251,6 +251,14 @@ mod tests {
 "#,
                 check: assert_image_encoding,
             },
+            Case {
+                name: "decoded svg image",
+                source: r##"
+#set page(width: 32pt, height: 32pt, margin: 0pt)
+#image(bytes(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#00ff00"/></svg>`.text), format: "svg", width: 6pt, height: 6pt)
+"##,
+                check: assert_image_encoding,
+            },
         ];
 
         for case in cases {
