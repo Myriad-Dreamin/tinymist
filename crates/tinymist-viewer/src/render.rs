@@ -2,7 +2,6 @@
 //! todo: develop xilem to support damage tracking.
 //! todo: convert a page into a tree of xilem components instead of a single
 //! todo: test about text color
-//! todo: svg decoder
 //! todo: test about images' iccprofile.
 //! scene. todo: clean up code.
 
@@ -311,40 +310,19 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
     }
 
     fn render_image(&mut self, _ctx: &mut C, image_item: &ir::ImageItem) {
-        let mut scene = vello::Scene::new();
-
-        let width = image_item.image.width();
-        let height = image_item.image.height();
-
-        if width == 0 || height == 0 || image_item.size.x.0 < 1e-11 || image_item.size.y.0 < 1e-11 {
+        if image_item.image.width() == 0
+            || image_item.image.height() == 0
+            || image_item.size.x.0 < 1e-11
+            || image_item.size.y.0 < 1e-11
+        {
             return;
         }
 
-        let data = std::io::Cursor::new(&image_item.image.data);
-
-        let image_data = match image_item.image.format.as_ref() {
-            "jpeg" => decode(JpegDecoder::new(data)),
-            "png" => decode(PngDecoder::new(data)),
-            "webp" => decode(WebPDecoder::new(data)),
-            "gif" => decode(GifDecoder::new(data)),
-            // todo: svg
-            // "svg+xml" => decode(SvgDecoder::new(data)),
-            _ => return,
-        };
-        let Ok(image_data) = image_data else {
+        let Some((scene, width, height)) =
+            decode_image_scene(image_item.image.format.as_ref(), &image_item.image.data)
+        else {
             return;
         };
-
-        let image_data = peniko::ImageData {
-            data: peniko::Blob::new(Arc::new(image_data.to_rgba8().into_vec())),
-            format: peniko::ImageFormat::Rgba8,
-            alpha_type: peniko::ImageAlphaType::Alpha,
-            width,
-            height,
-        };
-
-        let brush = peniko::ImageBrush::new(image_data);
-        scene.draw_image(&brush, kurbo::Affine::IDENTITY);
 
         let transform = Affine::IDENTITY.pre_scale_non_uniform(
             image_item.size.x.0 as f64 / width as f64,
@@ -355,13 +333,6 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             Vec2::new(0., 0.),
             Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
         ));
-
-        fn decode<T: ImageDecoder>(decoder: ImageResult<T>) -> ImageResult<image::DynamicImage> {
-            let mut decoder = decoder?;
-            decoder.set_limits(Limits::default())?;
-            let dynamic = image::DynamicImage::from_decoder(decoder)?;
-            Ok(dynamic)
-        }
     }
 
     fn render_item_at(&mut self, ctx: &mut C, pos: ir::Point, item: &Fingerprint) {
@@ -377,6 +348,70 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
                 .push((Vec2::new(pos.x.0 as f64, pos.y.0 as f64), glyph));
         }
     }
+}
+
+fn decode_image_scene(format: &str, data: &[u8]) -> Option<(vello::Scene, u32, u32)> {
+    match format {
+        "svg" | "svg+xml" => decode_svg_image(data),
+        _ => decode_raster_image(format, data).map(|(image_data, width, height)| {
+            let mut scene = vello::Scene::new();
+            let brush = peniko::ImageBrush::new(image_data);
+            scene.draw_image(&brush, kurbo::Affine::IDENTITY);
+            (scene, width, height)
+        }),
+    }
+}
+
+fn decode_svg_image(data: &[u8]) -> Option<(vello::Scene, u32, u32)> {
+    let svg = std::str::from_utf8(data).ok()?;
+    let tree = vello_svg::usvg::Tree::from_str(svg, &vello_svg::usvg::Options::default()).ok()?;
+    let scene = vello_svg::render_tree(&tree);
+    let size = tree.size();
+    let width = size.width().ceil() as u32;
+    let height = size.height().ceil() as u32;
+    (width > 0 && height > 0).then_some((scene, width, height))
+}
+
+fn decode_raster_image(format: &str, data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
+    let data = std::io::Cursor::new(data);
+
+    let decoded = match format {
+        "jpeg" => decode(JpegDecoder::new(data)),
+        "png" => decode(PngDecoder::new(data)),
+        "webp" => decode(WebPDecoder::new(data)),
+        "gif" => decode(GifDecoder::new(data)),
+        _ => return None,
+    };
+    let Ok(image_data) = decoded else {
+        return None;
+    };
+
+    let width = image_data.width();
+    let height = image_data.height();
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    Some((
+        peniko::ImageData {
+            data: peniko::Blob::new(Arc::new(image_data.to_rgba8().into_vec())),
+            format: peniko::ImageFormat::Rgba8,
+            alpha_type: peniko::ImageAlphaType::Alpha,
+            width,
+            height,
+        },
+        width,
+        height,
+    ))
+}
+
+fn decode<T: ImageDecoder>(decoder: ImageResult<T>) -> ImageResult<image::DynamicImage> {
+    let mut decoder = decoder?;
+    decoder.set_limits(Limits::default())?;
+    let orientation = decoder.orientation()?;
+    let mut dynamic = image::DynamicImage::from_decoder(decoder)?;
+    dynamic.apply_orientation(orientation);
+    Ok(dynamic)
 }
 
 trait GlyphFactory {
