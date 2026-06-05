@@ -37,6 +37,7 @@ tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
 typst-library.workspace = true
 reflexo.workspace = true
+resvg.workspace = true
 svgtypes.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
@@ -44,7 +45,6 @@ tinymist-preview.workspace = true
 tracing.workspace = true
 ttf-parser.workspace = true
 vello.workspace = true
-vello_svg.workspace = true
 winit.workspace = true
 xilem.workspace = true
 

@@ -5,7 +5,7 @@
 //! todo: test about images' iccprofile.
 //! scene. todo: clean up code.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use ecow::EcoVec;
 use image::codecs::gif::GifDecoder;
@@ -351,25 +351,70 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
 }
 
 fn decode_image_scene(format: &str, data: &[u8]) -> Option<(vello::Scene, u32, u32)> {
-    match format {
+    let (image_data, width, height) = match format {
         "svg" | "svg+xml" => decode_svg_image(data),
-        _ => decode_raster_image(format, data).map(|(image_data, width, height)| {
-            let mut scene = vello::Scene::new();
-            let brush = peniko::ImageBrush::new(image_data);
-            scene.draw_image(&brush, kurbo::Affine::IDENTITY);
-            (scene, width, height)
-        }),
+        _ => decode_raster_image(format, data),
+    }?;
+
+    let mut scene = vello::Scene::new();
+    let brush = peniko::ImageBrush::new(image_data);
+    scene.draw_image(&brush, kurbo::Affine::IDENTITY);
+    Some((scene, width, height))
+}
+
+fn decode_svg_image(data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
+    let svg = std::str::from_utf8(data).ok()?;
+    let options = svg_options();
+    let tree = resvg::usvg::Tree::from_str(svg, &options).ok()?;
+    let size = tree.size().to_int_size();
+    let width = size.width();
+    let height = size.height();
+    if width == 0 || height == 0 {
+        return None;
+    }
+
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height)?;
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::identity(),
+        &mut pixmap.as_mut(),
+    );
+
+    Some((
+        peniko::ImageData {
+            data: peniko::Blob::new(Arc::new(pixmap.data().to_vec())),
+            format: peniko::ImageFormat::Rgba8,
+            alpha_type: peniko::ImageAlphaType::AlphaPremultiplied,
+            width,
+            height,
+        },
+        width,
+        height,
+    ))
+}
+
+fn svg_options() -> resvg::usvg::Options<'static> {
+    let resolve_string = resvg::usvg::ImageHrefResolver::default_string_resolver();
+    resvg::usvg::Options {
+        fontdb: svg_fontdb(),
+        image_href_resolver: resvg::usvg::ImageHrefResolver {
+            resolve_data: resvg::usvg::ImageHrefResolver::default_data_resolver(),
+            resolve_string: Box::new(move |href, options| {
+                let href = href.strip_prefix("file://").unwrap_or(href);
+                resolve_string(href, options)
+            }),
+        },
+        ..Default::default()
     }
 }
 
-fn decode_svg_image(data: &[u8]) -> Option<(vello::Scene, u32, u32)> {
-    let svg = std::str::from_utf8(data).ok()?;
-    let tree = vello_svg::usvg::Tree::from_str(svg, &vello_svg::usvg::Options::default()).ok()?;
-    let scene = vello_svg::render_tree(&tree);
-    let size = tree.size();
-    let width = size.width().ceil() as u32;
-    let height = size.height().ceil() as u32;
-    (width > 0 && height > 0).then_some((scene, width, height))
+fn svg_fontdb() -> Arc<resvg::usvg::fontdb::Database> {
+    static FONT_DB: OnceLock<Arc<resvg::usvg::fontdb::Database>> = OnceLock::new();
+    Arc::clone(FONT_DB.get_or_init(|| {
+        let mut database = resvg::usvg::fontdb::Database::new();
+        database.load_system_fonts();
+        Arc::new(database)
+    }))
 }
 
 fn decode_raster_image(format: &str, data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {

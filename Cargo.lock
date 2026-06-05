@@ -3461,7 +3461,7 @@ dependencies = [
  "png 0.17.16",
  "resvg",
  "tiny-skia",
- "usvg 0.45.1",
+ "usvg",
 ]
 
 [[package]]
@@ -5250,7 +5250,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
- "svgtypes 0.15.3",
+ "svgtypes",
  "tiny-skia",
  "tiny-skia-path",
  "ttf-parser",
@@ -5375,9 +5375,9 @@ dependencies = [
  "log",
  "pico-args",
  "rgb",
- "svgtypes 0.15.3",
+ "svgtypes",
  "tiny-skia",
- "usvg 0.45.1",
+ "usvg",
  "zune-jpeg 0.4.21",
 ]
 
@@ -6135,16 +6135,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68c7541fff44b35860c1a7a47a7cadf3e4a304c457b58f9870d9706ece028afc"
 dependencies = [
  "kurbo 0.11.3",
- "siphasher",
-]
-
-[[package]]
-name = "svgtypes"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "695b5790b3131dafa99b3bbfd25a216edb3d216dad9ca208d4657bfb8f2abc3d"
-dependencies = [
- "kurbo 0.13.0",
  "siphasher",
 ]
 
@@ -7022,10 +7012,11 @@ dependencies = [
  "reflexo",
  "reflexo-typst",
  "reflexo-vec2svg",
+ "resvg",
  "serde",
  "serde_json",
  "smallvec",
- "svgtypes 0.15.3",
+ "svgtypes",
  "tinymist-assets 0.14.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-preview",
  "tinymist-std",
@@ -7039,7 +7030,6 @@ dependencies = [
  "typst-library",
  "typst-syntax 0.14.2",
  "vello",
- "vello_svg",
  "walkdir",
  "winit",
  "xilem",
@@ -7730,7 +7720,7 @@ dependencies = [
  "unicode-normalization",
  "unicode-segmentation",
  "unscanny",
- "usvg 0.45.1",
+ "usvg",
  "utf8_iter",
  "wasmi",
  "xmlwriter",
@@ -8175,34 +8165,7 @@ dependencies = [
  "simplecss",
  "siphasher",
  "strict-num",
- "svgtypes 0.15.3",
- "tiny-skia-path",
- "unicode-bidi",
- "unicode-script",
- "unicode-vo",
- "xmlwriter",
-]
-
-[[package]]
-name = "usvg"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e419dff010bb12512b0ae9e3d2f318dfbdf0167fde7eb05465134d4e8756076f"
-dependencies = [
- "base64 0.22.1",
- "data-url",
- "flate2",
- "fontdb",
- "imagesize 0.14.0",
- "kurbo 0.13.0",
- "log",
- "pico-args",
- "roxmltree 0.21.1",
- "rustybuzz",
- "simplecss",
- "siphasher",
- "strict-num",
- "svgtypes 0.16.1",
+ "svgtypes",
  "tiny-skia-path",
  "unicode-bidi",
  "unicode-script",
@@ -8294,18 +8257,6 @@ dependencies = [
  "naga",
  "thiserror 2.0.18",
  "vello_encoding",
-]
-
-[[package]]
-name = "vello_svg"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79dfa03829a8fb45ad458a05bd533d399d2259d042cdd78f391b290dbbdf1bd3"
-dependencies = [
- "image",
- "thiserror 2.0.18",
- "usvg 0.46.0",
- "vello",
 ]
 
 [[package]]

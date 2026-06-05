@@ -245,7 +245,7 @@ mod tests {
 #set page(width: 32pt, height: 32pt, margin: 0pt)
 #image(bytes(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#00ff00"/></svg>`.text), format: "svg", width: 6pt, height: 6pt)
 "##,
-                check: assert_vector_image_encoding,
+                check: assert_image_encoding,
             },
         ];
 
@@ -402,19 +402,6 @@ mod tests {
         assert!(
             !encoding.resources.patches.is_empty(),
             "raster image should attach an image resource patch"
-        );
-    }
-
-    fn assert_vector_image_encoding(scene: &Scene) {
-        let encoding = scene.encoding();
-        assert!(
-            encoding.n_paths >= 1,
-            "SVG image should encode vector paths, got {}",
-            encoding.n_paths
-        );
-        assert!(
-            !encoding.draw_tags.is_empty(),
-            "SVG image should emit draw operations"
         );
     }
 }
