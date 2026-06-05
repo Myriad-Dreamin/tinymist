@@ -1,4 +1,3 @@
-//! todo: tiling support.
 //! todo: develop xilem to support damage tracking.
 //! todo: convert a page into a tree of xilem components instead of a single
 //! todo: test about text color
@@ -18,7 +17,7 @@ use reflexo::{
     vector::{
         ir::{
             self, Abs, Axes, ColorSpace, FontIndice, FontItem, FontRef, GradientItem, GradientKind,
-            GradientStyle, ImmutStr, Module, PathStyle, Ratio, Scalar,
+            GradientStyle, ImmutStr, Module, PathStyle, PatternItem, Ratio, Scalar,
         },
         vm::{GroupContext, RenderVm, TransformContext},
     },
@@ -28,7 +27,7 @@ use typst::visualize::{Color as TypstColor, ColorSpace as TypstColorSpace, Weigh
 use vello::peniko;
 use vello::{
     Scene,
-    kurbo::{self, Affine, Vec2},
+    kurbo::{self, Affine, Rect, Shape, Vec2},
 };
 
 use crate::{GroupScene, VecScene};
@@ -97,13 +96,7 @@ impl<'m> GlyphFactory for Renderer<'m> {
 
         let paint = self.resolve_paint(fill).translated_for_glyph(pos);
         let mut scene = Scene::new();
-        scene.fill(
-            peniko::Fill::NonZero,
-            Affine::IDENTITY,
-            &paint.brush,
-            paint.transform,
-            &path,
-        );
+        fill_path_with_paint(self, &mut scene, peniko::Fill::NonZero, &path, &paint);
 
         Some(Arc::new(VecScene::Scene(Box::new(scene), None)))
     }
@@ -262,13 +255,7 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         }
 
         if fill {
-            scene.fill(
-                fill_rule,
-                Affine::IDENTITY,
-                &fill_brush.brush,
-                fill_brush.transform,
-                &path_data,
-            );
+            fill_path_with_paint(ctx, &mut scene, fill_rule, &path_data, &fill_brush);
         }
 
         if stroke {
@@ -285,13 +272,7 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
                 kurbo_stroke.dash_offset = dash_offset;
             }
 
-            scene.stroke(
-                &kurbo_stroke,
-                Affine::IDENTITY,
-                &stroke_brush.brush,
-                stroke_brush.transform,
-                &path_data,
-            );
+            stroke_path_with_paint(ctx, &mut scene, &kurbo_stroke, &path_data, &stroke_brush);
         }
 
         self.inner.push((
@@ -472,9 +453,18 @@ trait GlyphFactory {
 }
 
 #[derive(Clone, Debug)]
-struct PaintBrush {
-    brush: peniko::Brush,
-    transform: Option<Affine>,
+enum PaintBrush {
+    Brush {
+        brush: peniko::Brush,
+        transform: Option<Affine>,
+    },
+    Pattern(PatternPaint),
+}
+
+#[derive(Clone, Debug)]
+struct PatternPaint {
+    pattern: Arc<PatternItem>,
+    transform: Affine,
 }
 
 impl PaintBrush {
@@ -483,28 +473,39 @@ impl PaintBrush {
     }
 
     fn solid(color: peniko::Color) -> Self {
-        Self {
+        Self::Brush {
             brush: peniko::Brush::Solid(color),
             transform: None,
         }
     }
 
-    fn translated_for_glyph(mut self, pos: Vec2) -> Self {
-        if let peniko::Brush::Gradient(_) = self.brush {
-            let transform = self.transform.unwrap_or(Affine::IDENTITY);
-            self.transform = Some(transform.then_translate(-pos));
-        }
+    fn translated_for_glyph(self, pos: Vec2) -> Self {
+        match self {
+            Self::Brush {
+                brush,
+                mut transform,
+            } => {
+                if let peniko::Brush::Gradient(_) = brush {
+                    let matrix = transform.unwrap_or(Affine::IDENTITY);
+                    transform = Some(matrix.then_translate(-pos));
+                }
 
-        self
+                Self::Brush { brush, transform }
+            }
+            Self::Pattern(mut pattern) => {
+                pattern.transform = pattern.transform.then_translate(-pos);
+                Self::Pattern(pattern)
+            }
+        }
     }
 }
 
 fn resolve_paint(module: &Module, paint: &ImmutStr) -> PaintBrush {
     if paint.starts_with("@g") {
         resolve_gradient(module, paint.as_ref()).unwrap_or_else(PaintBrush::black)
+    } else if paint.starts_with("@p") {
+        resolve_pattern(module, paint.as_ref()).unwrap_or_else(PaintBrush::black)
     } else if paint.starts_with('@') {
-        // Pattern/tiling paints use @p... and are intentionally left as the
-        // existing black fallback until the viewer grows pattern support.
         PaintBrush::black()
     } else {
         PaintBrush::solid(
@@ -513,6 +514,119 @@ fn resolve_paint(module: &Module, paint: &ImmutStr) -> PaintBrush {
                 .unwrap_or(peniko::Color::BLACK),
         )
     }
+}
+
+fn fill_path_with_paint<'m, C>(
+    ctx: &mut C,
+    scene: &mut Scene,
+    fill_rule: peniko::Fill,
+    path: &kurbo::BezPath,
+    paint: &PaintBrush,
+) where
+    C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory,
+{
+    match paint {
+        PaintBrush::Brush { brush, transform } => {
+            scene.fill(fill_rule, Affine::IDENTITY, brush, *transform, path);
+        }
+        PaintBrush::Pattern(pattern) => {
+            scene.push_clip_layer(fill_rule, Affine::IDENTITY, path);
+            render_pattern_tiles(ctx, scene, pattern, path.bounding_box());
+            scene.pop_layer();
+        }
+    }
+}
+
+fn stroke_path_with_paint<'m, C>(
+    ctx: &mut C,
+    scene: &mut Scene,
+    stroke: &kurbo::Stroke,
+    path: &kurbo::BezPath,
+    paint: &PaintBrush,
+) where
+    C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory,
+{
+    match paint {
+        PaintBrush::Brush { brush, transform } => {
+            scene.stroke(stroke, Affine::IDENTITY, brush, *transform, path);
+        }
+        PaintBrush::Pattern(pattern) => {
+            if stroke.width == 0. {
+                return;
+            }
+
+            scene.push_clip_layer(stroke, Affine::IDENTITY, path);
+            render_pattern_tiles(ctx, scene, pattern, stroke_pattern_bounds(path, stroke));
+            scene.pop_layer();
+        }
+    }
+}
+
+fn stroke_pattern_bounds(path: &kurbo::BezPath, stroke: &kurbo::Stroke) -> Rect {
+    let padding = stroke.width * stroke.miter_limit.max(1.);
+    path.bounding_box().inset(padding)
+}
+
+fn render_pattern_tiles<'m, C>(ctx: &mut C, scene: &mut Scene, pattern: &PatternPaint, bounds: Rect)
+where
+    C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory,
+{
+    if !is_valid_rect(bounds) {
+        return;
+    }
+
+    let tile_width = f64::from(pattern.pattern.size.x.0 + pattern.pattern.spacing.x.0);
+    let tile_height = f64::from(pattern.pattern.size.y.0 + pattern.pattern.spacing.y.0);
+    if tile_width <= f64::EPSILON || tile_height <= f64::EPSILON {
+        return;
+    }
+
+    let pattern_bounds = pattern.transform.inverse().transform_rect_bbox(bounds);
+    if !is_valid_rect(pattern_bounds) {
+        return;
+    }
+
+    let tile = ctx.render_item(&pattern.pattern.frame);
+    let mut tile_scene = Scene::new();
+    let tile_clip = Rect::new(0., 0., tile_width, tile_height);
+    tile_scene.push_clip_layer(peniko::Fill::NonZero, Affine::IDENTITY, &tile_clip);
+    tile.render(&mut tile_scene);
+    tile_scene.pop_layer();
+
+    let start_x = tile_start(pattern_bounds.min_x(), tile_width);
+    let end_x = tile_end(pattern_bounds.max_x(), tile_width);
+    let start_y = tile_start(pattern_bounds.min_y(), tile_height);
+    let end_y = tile_end(pattern_bounds.max_y(), tile_height);
+
+    for y in start_y..=end_y {
+        for x in start_x..=end_x {
+            let tile_origin = Vec2::new(f64::from(x) * tile_width, f64::from(y) * tile_height);
+            scene.append(
+                &tile_scene,
+                Some(pattern.transform.pre_translate(tile_origin)),
+            );
+        }
+    }
+}
+
+fn is_valid_rect(rect: Rect) -> bool {
+    rect.x0.is_finite()
+        && rect.y0.is_finite()
+        && rect.x1.is_finite()
+        && rect.y1.is_finite()
+        && !rect.is_zero_area()
+}
+
+fn tile_start(value: f64, step: f64) -> i32 {
+    tile_index((value / step).floor() - 1.)
+}
+
+fn tile_end(value: f64, step: f64) -> i32 {
+    tile_index((value / step).ceil() + 1.)
+}
+
+fn tile_index(value: f64) -> i32 {
+    value.clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32
 }
 
 fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
@@ -538,10 +652,28 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
         });
     }
 
-    Some(PaintBrush {
+    Some(PaintBrush::Brush {
         brush: peniko::Brush::Gradient(converted.gradient),
         transform,
     })
+}
+
+fn resolve_pattern(module: &Module, paint: &str) -> Option<PaintBrush> {
+    let id = paint.strip_prefix("@p")?;
+    let mut fingerprint = parse_fingerprint(id)?;
+    let mut transform = Affine::IDENTITY;
+
+    if let Some(ir::VecItem::ColorTransform(color_transform)) = module.get_item(&fingerprint) {
+        fingerprint = color_transform.item;
+        transform = convert_transform(&color_transform.transform);
+    }
+
+    let pattern = match module.get_item(&fingerprint) {
+        Some(ir::VecItem::Pattern(pattern)) => pattern.clone(),
+        _ => return None,
+    };
+
+    Some(PaintBrush::Pattern(PatternPaint { pattern, transform }))
 }
 
 fn parse_fingerprint(id: &str) -> Option<Fingerprint> {
@@ -902,15 +1034,27 @@ mod tests {
         }))
     }
 
+    fn sample_pattern(frame: Fingerprint) -> ir::VecItem {
+        ir::VecItem::Pattern(Arc::new(PatternItem {
+            frame,
+            size: Axes::new(Scalar(4.), Scalar(5.)),
+            spacing: Axes::new(Scalar(1.), Scalar(2.)),
+        }))
+    }
+
     #[test]
     fn resolves_solid_paint() {
         let module = Module::default();
 
         let paint = resolve_paint(&module, &"#f00".into());
 
-        assert!(paint.transform.is_none());
+        let PaintBrush::Brush { brush, transform } = paint else {
+            panic!("expected brush paint");
+        };
+
+        assert!(transform.is_none());
         assert_eq!(
-            paint.brush,
+            brush,
             peniko::Brush::Solid(peniko::Color::from_rgb8(255, 0, 0))
         );
     }
@@ -926,8 +1070,12 @@ mod tests {
 
         let paint = resolve_paint(&module, &format!("@{}", gradient_id.as_svg_id("g")).into());
 
-        assert!(paint.transform.is_none());
-        let peniko::Brush::Gradient(gradient) = paint.brush else {
+        let PaintBrush::Brush { brush, transform } = paint else {
+            panic!("expected brush paint");
+        };
+
+        assert!(transform.is_none());
+        let peniko::Brush::Gradient(gradient) = brush else {
             panic!("expected gradient brush");
         };
 
@@ -969,8 +1117,16 @@ mod tests {
 
         let paint = resolve_paint(&module, &format!("@{}", transform_id.as_svg_id("g")).into());
 
-        assert_eq!(paint.transform, Some(convert_transform(&transform)));
-        assert!(matches!(paint.brush, peniko::Brush::Gradient(_)));
+        let PaintBrush::Brush {
+            brush,
+            transform: paint_transform,
+        } = paint
+        else {
+            panic!("expected brush paint");
+        };
+
+        assert_eq!(paint_transform, Some(convert_transform(&transform)));
+        assert!(matches!(brush, peniko::Brush::Gradient(_)));
     }
 
     #[test]
@@ -996,11 +1152,69 @@ mod tests {
     }
 
     #[test]
-    fn keeps_pattern_as_black_fallback() {
+    fn resolves_direct_pattern_paint() {
+        let mut module = Module::default();
+        let frame_id = Fingerprint::from_pair(1, 0);
+        let pattern_id = Fingerprint::from_pair(2, 0);
+        module.items.insert(pattern_id, sample_pattern(frame_id));
+
+        let paint = resolve_paint(&module, &format!("@{}", pattern_id.as_svg_id("p")).into());
+
+        let PaintBrush::Pattern(pattern) = paint else {
+            panic!("expected pattern paint");
+        };
+
+        assert_eq!(pattern.pattern.frame, frame_id);
+        assert_eq!(pattern.pattern.size, Axes::new(Scalar(4.), Scalar(5.)));
+        assert_eq!(pattern.pattern.spacing, Axes::new(Scalar(1.), Scalar(2.)));
+        assert_eq!(pattern.transform, Affine::IDENTITY);
+    }
+
+    #[test]
+    fn resolves_pattern_paint_with_color_transform() {
+        let mut module = Module::default();
+        let frame_id = Fingerprint::from_pair(1, 0);
+        let pattern_id = Fingerprint::from_pair(2, 0);
+        let transform_id = Fingerprint::from_pair(3, 0);
+        let transform = ir::Transform {
+            sx: Scalar(2.),
+            ky: Scalar(0.),
+            kx: Scalar(0.),
+            sy: Scalar(3.),
+            tx: Scalar(4.),
+            ty: Scalar(5.),
+        };
+
+        module.items.insert(pattern_id, sample_pattern(frame_id));
+        module.items.insert(
+            transform_id,
+            ir::VecItem::ColorTransform(Arc::new(ir::ColorTransform {
+                transform,
+                item: pattern_id,
+            })),
+        );
+
+        let paint = resolve_paint(&module, &format!("@{}", transform_id.as_svg_id("p")).into());
+
+        let PaintBrush::Pattern(pattern) = paint else {
+            panic!("expected pattern paint");
+        };
+
+        assert_eq!(pattern.pattern.frame, frame_id);
+        assert_eq!(pattern.transform, convert_transform(&transform));
+    }
+
+    #[test]
+    fn keeps_unknown_reference_as_black_fallback() {
         let module = Module::default();
 
         let paint = resolve_paint(&module, &"@pAQAAAAAAAAA".into());
 
-        assert_eq!(paint.brush, peniko::Brush::Solid(peniko::Color::BLACK));
+        let PaintBrush::Brush { brush, transform } = paint else {
+            panic!("expected brush paint");
+        };
+
+        assert!(transform.is_none());
+        assert_eq!(brush, peniko::Brush::Solid(peniko::Color::BLACK));
     }
 }
