@@ -6,6 +6,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{Cursor, Write as _};
 use std::num::NonZeroUsize;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
@@ -77,12 +78,10 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         if !ref_png.exists() {
             let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
             writeln!(failures, "{failure}")?;
-            if make_pdf {
-                let vello_png = output_png_path(&output_root, "vello", &name);
-                write_placeholder_png(&vello_png, None)?;
-                writeln!(pdf_failures, "{failure}")?;
-                rendered_cases.push(name);
-            }
+            let vello_png = output_png_path(&output_root, "vello", &name);
+            write_placeholder_png(&vello_png, None)?;
+            writeln!(pdf_failures, "{failure}")?;
+            rendered_cases.push(name);
             continue;
         }
 
@@ -99,12 +98,10 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
             Ok(png) => png,
             Err(err) => {
                 writeln!(failures, "{name}: {err:#}")?;
-                if make_pdf {
-                    let vello_png = output_png_path(&output_root, "vello", &name);
-                    write_placeholder_png(&vello_png, Some(&ref_png))?;
-                    writeln!(pdf_failures, "{name}: {err:#}")?;
-                    rendered_cases.push(name);
-                }
+                let vello_png = output_png_path(&output_root, "vello", &name);
+                write_placeholder_png(&vello_png, Some(&ref_png))?;
+                writeln!(pdf_failures, "{name}: {err:#}")?;
+                rendered_cases.push(name);
                 continue;
             }
         };
@@ -118,23 +115,70 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         rendered_cases.push(name);
     }
 
+    let mut comparison_pdf_written = false;
     if make_pdf && !rendered_cases.is_empty() {
-        if !pdf_failures.is_empty() {
-            fs::write(
-                output_root.join("vello-renderer-failures.txt"),
-                &pdf_failures,
-            )?;
-        }
-        write_comparison_pdf(&output_root, &rendered_cases)?;
+        let pdf_path = write_comparison_artifacts(&output_root, &rendered_cases, &pdf_failures)?;
+        eprintln!(
+            "wrote Vello renderer comparison PDF to {}",
+            pdf_path.display()
+        );
+        comparison_pdf_written = true;
     }
 
     if !failures.is_empty() {
+        if !comparison_pdf_written && !rendered_cases.is_empty() {
+            let pdf_path =
+                write_comparison_artifacts(&output_root, &rendered_cases, &pdf_failures)?;
+            eprintln!(
+                "wrote Vello renderer comparison PDF to {}",
+                pdf_path.display()
+            );
+        }
         bail!("vello renderer suite failed:\n{failures}");
     }
 
-    insta::assert_snapshot!("vello_renderer_hashes", hash_refs);
+    assert_hash_snapshot_with_comparison_pdf(
+        &output_root,
+        &rendered_cases,
+        hash_refs,
+        comparison_pdf_written,
+    );
 
     Ok(())
+}
+
+fn assert_hash_snapshot_with_comparison_pdf(
+    output_root: &Path,
+    rendered_cases: &[String],
+    hash_refs: String,
+    comparison_pdf_written: bool,
+) {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        insta::assert_snapshot!("vello_renderer_hashes", hash_refs);
+    }));
+
+    if let Err(payload) = result {
+        if comparison_pdf_written {
+            eprintln!(
+                "Vello renderer comparison PDF: {}",
+                comparison_pdf_path(output_root).display()
+            );
+        } else if !rendered_cases.is_empty() {
+            match write_comparison_artifacts(output_root, rendered_cases, "") {
+                Ok(pdf_path) => {
+                    eprintln!(
+                        "wrote Vello renderer comparison PDF to {}",
+                        pdf_path.display()
+                    );
+                }
+                Err(err) => {
+                    eprintln!("failed to write Vello renderer comparison PDF: {err:#}");
+                }
+            }
+        }
+
+        resume_unwind(payload);
+    }
 }
 
 fn typst_tests_root() -> Option<PathBuf> {
@@ -710,13 +754,30 @@ fn pixel_value(pixel: &Rgba<u8>) -> f64 {
     }
 }
 
-fn write_comparison_pdf(output_root: &Path, names: &[String]) -> Result<()> {
+fn write_comparison_artifacts(
+    output_root: &Path,
+    names: &[String],
+    failures: &str,
+) -> Result<PathBuf> {
+    if !failures.is_empty() {
+        fs::write(output_root.join("vello-renderer-failures.txt"), failures)?;
+    }
+
+    write_comparison_pdf(output_root, names)
+}
+
+fn write_comparison_pdf(output_root: &Path, names: &[String]) -> Result<PathBuf> {
     let points = serde_json::to_string_pretty(names)?;
     fs::write(output_root.join("test-points.json"), points)?;
 
     let pdf = write_comparison_pdf_bytes(output_root, names)?;
-    fs::write(output_root.join("vello-renderer-comparison.pdf"), pdf)?;
-    Ok(())
+    let pdf_path = comparison_pdf_path(output_root);
+    fs::write(&pdf_path, pdf)?;
+    Ok(pdf_path)
+}
+
+fn comparison_pdf_path(output_root: &Path) -> PathBuf {
+    output_root.join("vello-renderer-comparison.pdf")
 }
 
 fn write_comparison_pdf_bytes(output_root: &Path, names: &[String]) -> Result<Vec<u8>> {
