@@ -28,14 +28,16 @@ use typst::engine::Engine;
 use typst::foundations::{
     Array, Bytes, Context, Datetime, IntoValue, NoneValue, Repr, Smart, Value, func,
 };
-use typst::layout::{Abs, Margin, PageElem, PagedDocument};
+use typst::layout::{
+    Abs, Frame, FrameItem, Margin, PageElem, PagedDocument, Size as TypstSize, Transform,
+};
 use typst::model::{Numbering, NumberingPattern};
 use typst::syntax::{FileId, Source, Span, VirtualPath};
 use typst::text::{Font, FontBook, TextElem, TextSize};
 use typst::utils::LazyHash;
 use typst::visualize::Color as TypstColor;
 use typst::{Feature, Library, LibraryExt, World};
-use vello::kurbo::{Affine, Rect, Size};
+use vello::kurbo::{Affine, Point as KurboPoint, Rect, Size, Vec2};
 use vello::peniko::{Color, Fill};
 use vello::util::RenderContext;
 use vello::wgpu::{
@@ -357,7 +359,8 @@ fn render_suite_case(
     ));
     let compiled = compile_paged(world.as_ref())
         .with_context(|| format!("failed to compile Typst suite case {}", test.name))?;
-    let document = TypstDocument::Paged(Arc::new(compiled));
+    let compiled = Arc::new(compiled);
+    let document = TypstDocument::Paged(compiled.clone());
 
     let mut renderer = IncrSvgDocServer::default();
     let frame = renderer.pack_delta(&document);
@@ -380,10 +383,14 @@ fn render_suite_case(
     }
 
     let mut rendered = vec![];
-    for (scene, size) in pages {
+    for (page_idx, (scene, size)) in pages.into_iter().enumerate() {
         let width = size.width.ceil().max(1.0) as u32;
         let height = size.height.ceil().max(1.0) as u32;
-        rendered.push(rasterizer.render_page(&scene, size, width, height, background)?);
+        let mut page = rasterizer.render_page(&scene, size, width, height, background)?;
+        if let Some(source_page) = compiled.pages.get(page_idx) {
+            render_link_overlays(&mut page, &source_page.frame);
+        }
+        rendered.push(page);
     }
 
     Ok(merge_pages(&rendered))
@@ -546,6 +553,89 @@ impl SceneRasterizer {
 
         RgbaImage::from_vec(width, height, result).context("failed to create Vello PNG image")
     }
+}
+
+fn render_link_overlays(image: &mut RgbaImage, frame: &Frame) {
+    // Match Typst's official PNG refs, which paint link boxes after rendering.
+    render_link_overlays_in_frame(image, Affine::IDENTITY, frame);
+}
+
+fn render_link_overlays_in_frame(image: &mut RgbaImage, transform: Affine, frame: &Frame) {
+    for (pos, item) in frame.items() {
+        let transform = transform.pre_translate(Vec2::new(pos.x.to_pt(), pos.y.to_pt()));
+        match item {
+            FrameItem::Group(group) => {
+                render_link_overlays_in_frame(
+                    image,
+                    transform * typst_transform_to_affine(&group.transform),
+                    &group.frame,
+                );
+            }
+            FrameItem::Link(_, size) => {
+                fill_transformed_link_overlay(image, transform, *size);
+            }
+            FrameItem::Text(..)
+            | FrameItem::Shape(..)
+            | FrameItem::Image(..)
+            | FrameItem::Tag(..) => {}
+        }
+    }
+}
+
+fn fill_transformed_link_overlay(image: &mut RgbaImage, transform: Affine, size: TypstSize) {
+    const LINK_OVERLAY: Rgba<u8> = Rgba([40, 54, 99, 40]);
+
+    let width = size.x.to_pt();
+    let height = size.y.to_pt();
+    if width <= 0.0 || height <= 0.0 {
+        return;
+    }
+
+    let rect = Rect::new(0.0, 0.0, width, height);
+    let bbox = transform.transform_rect_bbox(rect);
+    if !bbox.x0.is_finite() || !bbox.x1.is_finite() || !bbox.y0.is_finite() || !bbox.y1.is_finite()
+    {
+        return;
+    }
+
+    let x0 = bbox.x0.floor().max(0.0) as u32;
+    let y0 = bbox.y0.floor().max(0.0) as u32;
+    let x1 = bbox.x1.ceil().min(f64::from(image.width())) as u32;
+    let y1 = bbox.y1.ceil().min(f64::from(image.height())) as u32;
+    if x0 >= x1 || y0 >= y1 || !transform.determinant().is_normal() {
+        return;
+    }
+
+    let inverse = transform.inverse();
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let point = inverse * KurboPoint::new(f64::from(x) + 0.5, f64::from(y) + 0.5);
+            if point.x >= 0.0 && point.x < width && point.y >= 0.0 && point.y < height {
+                alpha_blend_pixel(image.get_pixel_mut(x, y), LINK_OVERLAY);
+            }
+        }
+    }
+}
+
+fn alpha_blend_pixel(dst: &mut Rgba<u8>, src: Rgba<u8>) {
+    let alpha = u32::from(src[3]);
+    let inv_alpha = 255 - alpha;
+    for channel in 0..3 {
+        dst[channel] =
+            ((u32::from(src[channel]) * alpha + u32::from(dst[channel]) * inv_alpha + 127) / 255)
+                as u8;
+    }
+}
+
+fn typst_transform_to_affine(transform: &Transform) -> Affine {
+    Affine::new([
+        transform.sx.get(),
+        transform.ky.get(),
+        transform.kx.get(),
+        transform.sy.get(),
+        transform.tx.to_pt(),
+        transform.ty.to_pt(),
+    ])
 }
 
 fn merge_pages(pages: &[RgbaImage]) -> RgbaImage {
