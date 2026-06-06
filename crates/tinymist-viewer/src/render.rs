@@ -68,7 +68,7 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             kind: GroupKind::General,
             ts: Affine::IDENTITY,
             clipper: None,
-            fill: None,
+            glyph_style: None,
             inner: EcoVec::new(),
         }
     }
@@ -76,11 +76,12 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
     fn start_text(&mut self, value: &Fingerprint, text: &ir::TextItem) -> Self::Group {
         let mut g = self.start_group(value);
         g.kind = GroupKind::Text;
-        for style in &text.shape.styles {
-            if let ir::PathStyle::Fill(fill) = style {
-                g.fill = Some(fill.clone());
-            }
-        }
+        let stroke_scale = self
+            .get_font(&text.shape.font)
+            .map(|font| f64::from(font.units_per_em.0) / f64::from(text.shape.size.0))
+            .filter(|scale| scale.is_finite())
+            .unwrap_or(1.0);
+        g.glyph_style = Some(resolve_draw_style(self, &text.shape.styles, stroke_scale));
         g
     }
 }
@@ -96,7 +97,7 @@ impl<'m> GlyphFactory for Renderer<'m> {
         &mut self,
         font: &FontItem,
         glyph: u32,
-        fill: &ImmutStr,
+        style: &DrawStyle,
         pos: Vec2,
     ) -> Option<Arc<VecScene>> {
         let glyph_data = font.get_glyph(glyph)?;
@@ -104,9 +105,13 @@ impl<'m> GlyphFactory for Renderer<'m> {
         match glyph_data.as_ref() {
             ir::FlatGlyphItem::Outline(path) => {
                 let path = svg_path(&path.d)?;
-                let paint = self.resolve_paint(fill).translated_for_glyph(pos);
+                let style = style.translated_for_glyph(pos);
+                if !style.has_draw() {
+                    return None;
+                }
+
                 let mut scene = Scene::new();
-                fill_path_with_paint(self, &mut scene, peniko::Fill::NonZero, &path, &paint);
+                render_path_with_style(self, &mut scene, &path, &style);
                 Some(Arc::new(VecScene::Scene(Box::new(scene), None)))
             }
             ir::FlatGlyphItem::Image(glyph) => {
@@ -140,8 +145,8 @@ pub struct RenderStack {
     pub ts: Affine,
     /// A unique clip path on stack
     pub clipper: Option<ir::PathItem>,
-    /// The fill color.
-    pub fill: Option<ImmutStr>,
+    /// The draw style for glyph outlines in text groups.
+    glyph_style: Option<DrawStyle>,
     /// The inner elements.
     pub inner: EcoVec<(Vec2, Arc<VecScene>)>,
     // /// The bounding box of the group.
@@ -210,87 +215,8 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         let Some(path_data) = svg_path(&path.d) else {
             return;
         };
-
-        let mut fill_brush = PaintBrush::black();
-        let mut fill = false;
-        let mut fill_rule = peniko::Fill::NonZero;
-        let mut stroke_brush = PaintBrush::black();
-        let mut stroke = false;
-        let mut stroke_width = 0f64;
-        let mut stroke_join = kurbo::Join::Miter;
-        let mut stroke_cap = kurbo::Cap::Butt;
-        let mut stroke_miter_limit = 4f64;
-        let mut dash_pattern = SmallVec::new();
-        let mut dash_offset = 0f64;
-
-        for style in &path.styles {
-            match style {
-                PathStyle::Fill(color) => {
-                    fill_brush = ctx.resolve_paint(color);
-                    fill = true;
-                }
-                PathStyle::Stroke(color) => {
-                    stroke_brush = ctx.resolve_paint(color);
-                    stroke = true;
-                }
-                PathStyle::StrokeWidth(width) => {
-                    stroke_width = width.0 as f64;
-                }
-                PathStyle::StrokeLineCap(cap) => {
-                    stroke_cap = match cap.as_ref() {
-                        "butt" => kurbo::Cap::Butt,
-                        "round" => kurbo::Cap::Round,
-                        "square" => kurbo::Cap::Square,
-                        _ => kurbo::Cap::Butt,
-                    };
-                }
-                PathStyle::StrokeLineJoin(join) => {
-                    stroke_join = match join.as_ref() {
-                        "miter" => kurbo::Join::Miter,
-                        "round" => kurbo::Join::Round,
-                        "bevel" => kurbo::Join::Bevel,
-                        _ => kurbo::Join::Miter,
-                    };
-                }
-                PathStyle::StrokeMitterLimit(limit) => {
-                    stroke_miter_limit = limit.0 as f64;
-                }
-                PathStyle::StrokeDashArray(array) => {
-                    dash_pattern = array.iter().map(|d| d.0 as f64).collect();
-                }
-                PathStyle::StrokeDashOffset(offset) => {
-                    dash_offset = offset.0 as f64;
-                }
-                PathStyle::FillRule(rule) => {
-                    fill_rule = match rule.as_ref() {
-                        "nonzero" => peniko::Fill::NonZero,
-                        "evenodd" => peniko::Fill::EvenOdd,
-                        _ => peniko::Fill::NonZero,
-                    };
-                }
-            }
-        }
-
-        if fill {
-            fill_path_with_paint(ctx, &mut scene, fill_rule, &path_data, &fill_brush);
-        }
-
-        if stroke {
-            let mut kurbo_stroke = kurbo::Stroke {
-                width: stroke_width,
-                join: stroke_join,
-                miter_limit: stroke_miter_limit,
-                start_cap: stroke_cap,
-                end_cap: stroke_cap,
-                ..Default::default()
-            };
-            if !dash_pattern.is_empty() {
-                kurbo_stroke.dash_pattern = dash_pattern;
-                kurbo_stroke.dash_offset = dash_offset;
-            }
-
-            stroke_path_with_paint(ctx, &mut scene, &kurbo_stroke, &path_data, &stroke_brush);
-        }
+        let style = resolve_draw_style(ctx, &path.styles, 1.0);
+        render_path_with_style(ctx, &mut scene, &path_data, &style);
 
         self.inner.push((
             Vec2::new(0., 0.),
@@ -327,8 +253,8 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
 
     fn render_glyph(&mut self, ctx: &mut C, pos: Axes<Scalar>, font: &FontItem, glyph: u32) {
         let pos = Vec2::new(pos.x.0 as f64, pos.y.0 as f64);
-        if let Some(fill) = self.fill.clone()
-            && let Some(glyph) = ctx.get_glyph(font, glyph, &fill, pos)
+        if let Some(style) = &self.glyph_style
+            && let Some(glyph) = ctx.get_glyph(font, glyph, style, pos)
         {
             self.inner.push((pos, glyph));
         }
@@ -570,13 +496,160 @@ trait GlyphFactory {
         &mut self,
         font: &FontItem,
         glyph: u32,
-        fill: &ImmutStr,
+        style: &DrawStyle,
         pos: Vec2,
     ) -> Option<Arc<VecScene>>;
 
     fn resolve_paint(&self, paint: &ImmutStr) -> PaintBrush;
 
     fn svg_resource_resolver(&self) -> Option<&dyn SvgResourceResolver>;
+}
+
+#[derive(Clone, Debug)]
+struct DrawStyle {
+    fill: Option<PaintBrush>,
+    fill_rule: peniko::Fill,
+    stroke: Option<StrokeStyle>,
+}
+
+impl Default for DrawStyle {
+    fn default() -> Self {
+        Self {
+            fill: None,
+            fill_rule: peniko::Fill::NonZero,
+            stroke: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct StrokeStyle {
+    brush: PaintBrush,
+    stroke: kurbo::Stroke,
+}
+
+impl DrawStyle {
+    fn has_draw(&self) -> bool {
+        self.fill.is_some() || self.stroke.is_some()
+    }
+
+    fn translated_for_glyph(&self, pos: Vec2) -> Self {
+        Self {
+            fill: self
+                .fill
+                .clone()
+                .map(|paint| paint.translated_for_glyph(pos)),
+            fill_rule: self.fill_rule,
+            stroke: self.stroke.as_ref().map(|stroke| StrokeStyle {
+                brush: stroke.brush.clone().translated_for_glyph(pos),
+                stroke: stroke.stroke.clone(),
+            }),
+        }
+    }
+}
+
+fn resolve_draw_style<'m, C>(ctx: &C, styles: &[PathStyle], stroke_scale: f64) -> DrawStyle
+where
+    C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory,
+{
+    let mut draw = DrawStyle::default();
+    let mut stroke_brush = PaintBrush::black();
+    let mut stroke = false;
+    let mut stroke_width = 0f64;
+    let mut stroke_join = kurbo::Join::Miter;
+    let mut stroke_cap = kurbo::Cap::Butt;
+    let mut stroke_miter_limit = 4f64;
+    let mut dash_pattern = SmallVec::new();
+    let mut dash_offset = 0f64;
+
+    for style in styles {
+        match style {
+            PathStyle::Fill(color) => {
+                draw.fill = Some(ctx.resolve_paint(color));
+            }
+            PathStyle::Stroke(color) => {
+                stroke_brush = ctx.resolve_paint(color);
+                stroke = true;
+            }
+            PathStyle::StrokeWidth(width) => {
+                stroke_width = f64::from(width.0) * stroke_scale;
+            }
+            PathStyle::StrokeLineCap(cap) => {
+                stroke_cap = match cap.as_ref() {
+                    "butt" => kurbo::Cap::Butt,
+                    "round" => kurbo::Cap::Round,
+                    "square" => kurbo::Cap::Square,
+                    _ => kurbo::Cap::Butt,
+                };
+            }
+            PathStyle::StrokeLineJoin(join) => {
+                stroke_join = match join.as_ref() {
+                    "miter" => kurbo::Join::Miter,
+                    "round" => kurbo::Join::Round,
+                    "bevel" => kurbo::Join::Bevel,
+                    _ => kurbo::Join::Miter,
+                };
+            }
+            PathStyle::StrokeMitterLimit(limit) => {
+                stroke_miter_limit = f64::from(limit.0);
+            }
+            PathStyle::StrokeDashArray(array) => {
+                dash_pattern = array
+                    .iter()
+                    .map(|dash| f64::from(dash.0) * stroke_scale)
+                    .collect();
+            }
+            PathStyle::StrokeDashOffset(offset) => {
+                dash_offset = f64::from(offset.0) * stroke_scale;
+            }
+            PathStyle::FillRule(rule) => {
+                draw.fill_rule = match rule.as_ref() {
+                    "nonzero" => peniko::Fill::NonZero,
+                    "evenodd" => peniko::Fill::EvenOdd,
+                    _ => peniko::Fill::NonZero,
+                };
+            }
+        }
+    }
+
+    if stroke {
+        let mut kurbo_stroke = kurbo::Stroke {
+            width: stroke_width,
+            join: stroke_join,
+            miter_limit: stroke_miter_limit,
+            start_cap: stroke_cap,
+            end_cap: stroke_cap,
+            ..Default::default()
+        };
+        if !dash_pattern.is_empty() {
+            kurbo_stroke.dash_pattern = dash_pattern;
+            kurbo_stroke.dash_offset = dash_offset;
+        }
+
+        draw.stroke = Some(StrokeStyle {
+            brush: stroke_brush,
+            stroke: kurbo_stroke,
+        });
+    }
+
+    draw
+}
+
+fn render_path_with_style<'m, C>(
+    ctx: &mut C,
+    scene: &mut Scene,
+    path: &kurbo::BezPath,
+    style: &DrawStyle,
+) where
+    C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory,
+{
+    if let Some(fill) = &style.fill {
+        fill_path_with_paint(ctx, scene, style.fill_rule, path, fill);
+    }
+
+    if let Some(stroke) = &style.stroke {
+        stroke_path_with_paint(ctx, scene, &stroke.stroke, path, &stroke.brush);
+    }
 }
 
 #[derive(Clone, Debug)]
