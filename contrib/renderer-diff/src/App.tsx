@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   artifactProxyDownloadUrl,
   downloadArtifactZip,
+  githubArtifactFromId,
   listRendererDiffArtifacts,
+  normalizeActionArtifactId,
+  normalizeActionRunId,
   parseActionRunUrl,
   type ActionRunRef,
   type GithubArtifact,
@@ -25,7 +28,7 @@ interface LoadMessage {
 interface ArtifactDownload {
   name: string;
   href: string;
-  sizeInBytes: number;
+  sizeInBytes?: number;
 }
 
 interface LoadProgress {
@@ -141,14 +144,49 @@ export function App() {
     setIsLoading(true);
     setLoadProgress(null);
     setArtifactDownloads([]);
-    setMessage({ kind: "info", text: "Loading GitHub Actions artifacts..." });
+    setMessage({
+      kind: "info",
+      text: ref.artifactId
+        ? "Loading GitHub Actions artifact..."
+        : "Loading GitHub Actions artifacts...",
+    });
 
     try {
+      if (ref.artifactId) {
+        const artifact = githubArtifactFromId(ref.artifactId);
+        setArtifactDownloads([
+          {
+            name: artifact.name,
+            href: artifactProxyDownloadUrl(ref, artifact),
+          },
+        ]);
+        setLoadProgress({
+          current: 0,
+          total: 1,
+          label: "Loading renderer diff bundle",
+          detail: artifact.name,
+        });
+        const zip = await downloadArtifactZip(ref, artifact);
+        const bundle = await loadRendererDiffZip("", zip);
+        setLoadProgress({
+          current: 1,
+          total: 1,
+          label: "Loading renderer diff bundle",
+          detail: artifact.name,
+        });
+        await replaceBundles([bundle]);
+        setMessage({ kind: "info", text: "Loaded 1 renderer diff bundle." });
+        return;
+      }
+
       const artifacts = await listRendererDiffArtifacts(ref);
       const available = artifacts.filter((artifact) => !artifact.expired);
 
       if (!available.length) {
-        setMessage({ kind: "error", text: "No active renderer-diff-* artifacts were found." });
+        setMessage({
+          kind: "error",
+          text: "No active renderer-diff-* artifacts were found for this run. Open a run that uploads renderer-diff-* bundles, open a direct artifact link, or use ZIP upload.",
+        });
         setArtifactDownloads([]);
         await replaceBundles([]);
         return;
@@ -279,7 +317,9 @@ export function App() {
           {artifactDownloads.map((artifact) => (
             <a key={artifact.href} href={artifact.href} target="_blank" rel="noreferrer">
               <span>{artifact.name}</span>
-              <strong>{formatBytes(artifact.sizeInBytes)}</strong>
+              {artifact.sizeInBytes !== undefined && (
+                <strong>{formatBytes(artifact.sizeInBytes)}</strong>
+              )}
             </a>
           ))}
         </section>
@@ -459,15 +499,21 @@ function initialActionRunUrl(): string {
 
   const owner = params.get("owner");
   const repo = params.get("repo");
-  if (!owner || !repo || !/^\d+$/.test(run)) {
+  const runId = normalizeActionRunId(run);
+  const artifactId =
+    normalizeActionArtifactId(params.get("artifact") ?? params.get("artifactId") ?? "") ??
+    undefined;
+  if (!owner || !repo || !runId) {
     return "";
   }
 
-  return `https://github.com/${owner}/${repo}/actions/runs/${run}`;
+  const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${runId}`;
+  return artifactId ? `${runUrl}/artifacts/${artifactId}` : runUrl;
 }
 
 function actionRunUrl(ref: ActionRunRef): string {
-  return `https://github.com/${ref.owner}/${ref.repo}/actions/runs/${ref.runId}`;
+  const runUrl = `https://github.com/${ref.owner}/${ref.repo}/actions/runs/${ref.runId}`;
+  return ref.artifactId ? `${runUrl}/artifacts/${ref.artifactId}` : runUrl;
 }
 
 function writeActionRunParams(ref: ActionRunRef): void {
@@ -475,6 +521,12 @@ function writeActionRunParams(ref: ActionRunRef): void {
   params.set("owner", ref.owner);
   params.set("repo", ref.repo);
   params.set("run", ref.runId);
+  if (ref.artifactId) {
+    params.set("artifact", ref.artifactId);
+  } else {
+    params.delete("artifact");
+    params.delete("artifactId");
+  }
   params.delete("url");
   params.delete("actionUrl");
   params.delete("action");

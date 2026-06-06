@@ -101,6 +101,7 @@ jobs:
           VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
           VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
       - name: Upload Vello renderer diff bundle
+        id: upload_renderer_diff
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -111,7 +112,11 @@ jobs:
       - name: Show renderer diff viewer link
         if: always()
         run: |
+          artifact_id="${{ steps.upload_renderer_diff.outputs.artifact-id }}"
           page_url="https://myriad-dreamin.github.io/tinymist/renderer-diff/?owner=${{ github.repository_owner }}&repo=${{ github.event.repository.name }}&run=${{ github.run_id }}"
+          if [ -n "${artifact_id}" ]; then
+            page_url="${page_url}&artifact=${artifact_id}"
+          fi
           echo "Renderer diff viewer: ${page_url}"
           {
             echo "### Renderer diff viewer"
