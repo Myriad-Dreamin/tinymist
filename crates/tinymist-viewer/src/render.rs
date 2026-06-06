@@ -11,6 +11,7 @@ use image::codecs::gif::GifDecoder;
 use image::codecs::jpeg::JpegDecoder;
 use image::codecs::png::PngDecoder;
 use image::codecs::webp::WebPDecoder;
+use image::imageops::FilterType;
 use image::{ImageDecoder, ImageResult, Limits};
 use reflexo::{
     hash::Fingerprint,
@@ -30,15 +31,27 @@ use vello::{
     kurbo::{self, Affine, Rect, Shape, Vec2},
 };
 
-use crate::{GroupScene, VecScene};
+use crate::{GroupScene, SvgResource, SvgResourceFormat, SvgResourceResolver, VecScene};
 
 pub struct Renderer<'a> {
     module: &'a Module,
+    svg_resource_resolver: Option<Arc<dyn SvgResourceResolver>>,
 }
 
 impl<'a> Renderer<'a> {
     pub fn new(module: &'a Module) -> Self {
-        Self { module }
+        Self {
+            module,
+            svg_resource_resolver: None,
+        }
+    }
+
+    pub fn with_svg_resource_resolver(
+        mut self,
+        resolver: Option<Arc<dyn SvgResourceResolver>>,
+    ) -> Self {
+        self.svg_resource_resolver = resolver;
+        self
     }
 }
 
@@ -88,21 +101,32 @@ impl<'m> GlyphFactory for Renderer<'m> {
     ) -> Option<Arc<VecScene>> {
         let glyph_data = font.get_glyph(glyph)?;
 
-        let path = match glyph_data.as_ref() {
-            ir::FlatGlyphItem::Outline(path) => svg_path(&path.d)?,
-            ir::FlatGlyphItem::Image(..) => return None,
-            ir::FlatGlyphItem::None => return None,
-        };
-
-        let paint = self.resolve_paint(fill).translated_for_glyph(pos);
-        let mut scene = Scene::new();
-        fill_path_with_paint(self, &mut scene, peniko::Fill::NonZero, &path, &paint);
-
-        Some(Arc::new(VecScene::Scene(Box::new(scene), None)))
+        match glyph_data.as_ref() {
+            ir::FlatGlyphItem::Outline(path) => {
+                let path = svg_path(&path.d)?;
+                let paint = self.resolve_paint(fill).translated_for_glyph(pos);
+                let mut scene = Scene::new();
+                fill_path_with_paint(self, &mut scene, peniko::Fill::NonZero, &path, &paint);
+                Some(Arc::new(VecScene::Scene(Box::new(scene), None)))
+            }
+            ir::FlatGlyphItem::Image(glyph) => {
+                let (scene, image_transform) =
+                    image_item_scene(&glyph.image, self.svg_resource_resolver())?;
+                Some(Arc::new(VecScene::Scene(
+                    Box::new(scene),
+                    Some(transform_to_affine(&glyph.ts) * image_transform),
+                )))
+            }
+            ir::FlatGlyphItem::None => None,
+        }
     }
 
     fn resolve_paint(&self, paint: &ImmutStr) -> PaintBrush {
         resolve_paint(self.module, paint)
+    }
+
+    fn svg_resource_resolver(&self) -> Option<&dyn SvgResourceResolver> {
+        self.svg_resource_resolver.as_deref()
     }
 }
 
@@ -144,14 +168,7 @@ impl From<RenderStack> for Arc<VecScene> {
 /// See [`TransformContext`].
 impl<C> TransformContext<C> for RenderStack {
     fn transform_matrix(mut self, _ctx: &mut C, m: &ir::Transform) -> Self {
-        let sub_ts = Affine::new([
-            m.sx.0 as f64,
-            m.ky.0 as f64,
-            m.kx.0 as f64,
-            m.sy.0 as f64,
-            m.tx.0 as f64,
-            m.ty.0 as f64,
-        ]);
+        let sub_ts = transform_to_affine(m);
         self.ts *= sub_ts;
         self
     }
@@ -281,7 +298,7 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         ));
     }
 
-    fn render_image(&mut self, _ctx: &mut C, image_item: &ir::ImageItem) {
+    fn render_image(&mut self, ctx: &mut C, image_item: &ir::ImageItem) {
         if image_item.image.width() == 0
             || image_item.image.height() == 0
             || image_item.size.x.0 < 1e-11
@@ -290,16 +307,10 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         }
 
-        let Some((scene, width, height)) =
-            decode_image_scene(image_item.image.format.as_ref(), &image_item.image.data)
+        let Some((scene, transform)) = image_item_scene(image_item, ctx.svg_resource_resolver())
         else {
             return;
         };
-
-        let transform = Affine::IDENTITY.pre_scale_non_uniform(
-            image_item.size.x.0 as f64 / width as f64,
-            image_item.size.y.0 as f64 / height as f64,
-        );
 
         self.inner.push((
             Vec2::new(0., 0.),
@@ -324,35 +335,79 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
     }
 }
 
-fn decode_image_scene(format: &str, data: &[u8]) -> Option<(vello::Scene, u32, u32)> {
-    let (image_data, width, height) = match format {
-        "svg" | "svg+xml" => decode_svg_image(data),
-        _ => decode_raster_image(format, data),
-    }?;
+fn image_item_scene(
+    image_item: &ir::ImageItem,
+    svg_resource_resolver: Option<&dyn SvgResourceResolver>,
+) -> Option<(vello::Scene, Affine)> {
+    let (image_data, width, height, quality) = decode_image_data_for_item(
+        image_item.image.format.as_ref(),
+        &image_item.image.data,
+        image_item.size,
+        &image_item.image.attrs,
+        svg_resource_resolver,
+    )?;
 
     let mut scene = vello::Scene::new();
-    let brush = peniko::ImageBrush::new(image_data);
+    let brush = peniko::ImageBrush::new(image_data).with_quality(quality);
     scene.draw_image(&brush, kurbo::Affine::IDENTITY);
-    Some((scene, width, height))
+
+    let transform = Affine::IDENTITY.pre_scale_non_uniform(
+        image_item.size.x.0 as f64 / width as f64,
+        image_item.size.y.0 as f64 / height as f64,
+    );
+
+    Some((scene, transform))
 }
 
-fn decode_svg_image(data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
+fn decode_image_data_for_item(
+    format: &str,
+    data: &[u8],
+    target_size: Axes<Abs>,
+    attrs: &[ir::ImageAttr],
+    svg_resource_resolver: Option<&dyn SvgResourceResolver>,
+) -> Option<(peniko::ImageData, u32, u32, peniko::ImageQuality)> {
+    match format {
+        "svg" | "svg+xml" => {
+            let (image_data, width, height) =
+                decode_svg_image(data, target_size, svg_resource_resolver)?;
+            Some((image_data, width, height, peniko::ImageQuality::Low))
+        }
+        _ => {
+            let (image_data, width, height) =
+                decode_raster_image(format, data, target_size, is_pixelated(attrs))?;
+            Some((image_data, width, height, peniko::ImageQuality::Low))
+        }
+    }
+}
+
+fn is_pixelated(attrs: &[ir::ImageAttr]) -> bool {
+    attrs.iter().any(|attr| {
+        matches!(attr, ir::ImageAttr::ImageRendering(rendering) if rendering.as_ref() == "pixelated")
+    })
+}
+
+fn decode_svg_image(
+    data: &[u8],
+    target_size: Axes<Abs>,
+    svg_resource_resolver: Option<&dyn SvgResourceResolver>,
+) -> Option<(peniko::ImageData, u32, u32)> {
     let svg = std::str::from_utf8(data).ok()?;
-    let options = svg_options();
+    let options = svg_options(data, svg_resource_resolver);
     let tree = resvg::usvg::Tree::from_str(svg, &options).ok()?;
-    let size = tree.size().to_int_size();
-    let width = size.width();
-    let height = size.height();
-    if width == 0 || height == 0 {
+    let tree_size = tree.size();
+    let width = tree_size.width();
+    let height = tree_size.height();
+    if width == 0.0 || height == 0.0 {
         return None;
     }
 
+    let (width, height) = target_texture_size(target_size, width as f64 / height as f64);
     let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height)?;
-    resvg::render(
-        &tree,
-        resvg::tiny_skia::Transform::identity(),
-        &mut pixmap.as_mut(),
+    let transform = resvg::tiny_skia::Transform::from_scale(
+        width as f32 / tree_size.width(),
+        height as f32 / tree_size.height(),
     );
+    resvg::render(&tree, transform, &mut pixmap.as_mut());
 
     Some((
         peniko::ImageData {
@@ -367,7 +422,19 @@ fn decode_svg_image(data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
     ))
 }
 
-fn svg_options() -> resvg::usvg::Options<'static> {
+fn target_texture_size(target_size: Axes<Abs>, aspect: f64) -> (u32, u32) {
+    let width = (target_size.x.0 as f64)
+        .max(aspect * target_size.y.0 as f64)
+        .ceil()
+        .max(1.0) as u32;
+    let height = (width as f64 / aspect).ceil().max(1.0) as u32;
+    (width, height)
+}
+
+fn svg_options<'a>(
+    svg_data: &'a [u8],
+    svg_resource_resolver: Option<&'a dyn SvgResourceResolver>,
+) -> resvg::usvg::Options<'a> {
     let resolve_string = resvg::usvg::ImageHrefResolver::default_string_resolver();
     // todo: improve svg_options with user font settings.
     resvg::usvg::Options {
@@ -377,11 +444,36 @@ fn svg_options() -> resvg::usvg::Options<'static> {
             resolve_data: resvg::usvg::ImageHrefResolver::default_data_resolver(),
             resolve_string: Box::new(move |href, options| {
                 let href = href.strip_prefix("file://").unwrap_or(href);
+                if let Some(resource) = svg_resource_resolver
+                    .and_then(|resolver| resolver.resolve_svg_resource(svg_data, href))
+                {
+                    return Some(svg_resource_to_usvg_image_kind(resource));
+                }
                 resolve_string(href, options)
             }),
         },
         ..Default::default()
     }
+}
+
+fn svg_resource_to_usvg_image_kind(resource: SvgResource) -> resvg::usvg::ImageKind {
+    match resource.format {
+        SvgResourceFormat::Jpeg => resvg::usvg::ImageKind::JPEG(resource.data),
+        SvgResourceFormat::Png => resvg::usvg::ImageKind::PNG(resource.data),
+        SvgResourceFormat::Gif => resvg::usvg::ImageKind::GIF(resource.data),
+        SvgResourceFormat::Webp => resvg::usvg::ImageKind::WEBP(resource.data),
+    }
+}
+
+fn transform_to_affine(m: &ir::Transform) -> Affine {
+    Affine::new([
+        m.sx.0 as f64,
+        m.ky.0 as f64,
+        m.kx.0 as f64,
+        m.sy.0 as f64,
+        m.tx.0 as f64,
+        m.ty.0 as f64,
+    ])
 }
 
 fn svg_fontdb() -> Arc<resvg::usvg::fontdb::Database> {
@@ -398,11 +490,16 @@ fn svg_fontdb() -> Arc<resvg::usvg::fontdb::Database> {
     }))
 }
 
-fn decode_raster_image(format: &str, data: &[u8]) -> Option<(peniko::ImageData, u32, u32)> {
+fn decode_raster_image(
+    format: &str,
+    data: &[u8],
+    target_size: Axes<Abs>,
+    pixelated: bool,
+) -> Option<(peniko::ImageData, u32, u32)> {
     let data = std::io::Cursor::new(data);
 
     let decoded = match format {
-        "jpeg" => decode(JpegDecoder::new(data)),
+        "jpeg" | "jpg" => decode(JpegDecoder::new(data)),
         "png" => decode(PngDecoder::new(data)),
         "webp" => decode(WebPDecoder::new(data)),
         "gif" => decode(GifDecoder::new(data)),
@@ -418,6 +515,10 @@ fn decode_raster_image(format: &str, data: &[u8]) -> Option<(peniko::ImageData, 
         return None;
     }
 
+    let image_data = resize_raster_image(image_data, target_size, pixelated);
+    let width = image_data.width();
+    let height = image_data.height();
+
     Some((
         peniko::ImageData {
             data: peniko::Blob::new(Arc::new(image_data.to_rgba8().into_vec())),
@@ -429,6 +530,30 @@ fn decode_raster_image(format: &str, data: &[u8]) -> Option<(peniko::ImageData, 
         width,
         height,
     ))
+}
+
+fn resize_raster_image(
+    image_data: image::DynamicImage,
+    target_size: Axes<Abs>,
+    pixelated: bool,
+) -> image::DynamicImage {
+    let (width, height) = target_texture_size(
+        target_size,
+        image_data.width() as f64 / image_data.height() as f64,
+    );
+
+    if (width, height) == (image_data.width(), image_data.height()) {
+        return image_data;
+    }
+
+    let upscale = width > image_data.width();
+    let filter = match (pixelated, upscale) {
+        (true, _) => FilterType::Nearest,
+        (false, true) => FilterType::CatmullRom,
+        (false, false) => FilterType::Lanczos3,
+    };
+
+    image_data.resize_exact(width, height, filter)
 }
 
 fn decode<T: ImageDecoder>(decoder: ImageResult<T>) -> ImageResult<image::DynamicImage> {
@@ -450,6 +575,8 @@ trait GlyphFactory {
     ) -> Option<Arc<VecScene>>;
 
     fn resolve_paint(&self, paint: &ImmutStr) -> PaintBrush;
+
+    fn svg_resource_resolver(&self) -> Option<&dyn SvgResourceResolver>;
 }
 
 #[derive(Clone, Debug)]

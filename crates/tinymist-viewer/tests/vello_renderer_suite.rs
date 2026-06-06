@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::Cursor;
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
@@ -22,6 +22,7 @@ use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
 use tinymist_std::typst::TypstDocument;
 use tinymist_viewer::incr::IncrVelloDocClient;
+use tinymist_viewer::{SvgResource, SvgResourceFormat, SvgResourceResolver};
 use typst::diag::{At, FileError, FileResult, SourceResult, StrResult, Warned, bail as typst_bail};
 use typst::engine::Engine;
 use typst::foundations::{
@@ -369,6 +370,7 @@ fn render_suite_case(
     doc.merge_delta(delta);
 
     let mut client = IncrVelloDocClient::default();
+    client.set_svg_resource_resolver(Some(suite_svg_resource_resolver()));
     let background = client.background_color().unwrap_or(Color::WHITE);
     let pages = client
         .render_pages(&mut doc)
@@ -1228,6 +1230,121 @@ impl World for RenderWorld {
 enum SystemPath {
     Asset(PathBuf),
     File(PathBuf),
+}
+
+fn suite_svg_resource_resolver() -> Arc<dyn SvgResourceResolver> {
+    static RESOLVER: OnceLock<Arc<SuiteSvgResourceResolver>> = OnceLock::new();
+    let resolver: Arc<dyn SvgResourceResolver> = RESOLVER
+        .get_or_init(|| {
+            let mut resolver = SuiteSvgResourceResolver::default();
+            resolver.add_dev_asset_svg_base("images/linked.svg");
+            Arc::new(resolver)
+        })
+        .clone();
+    resolver
+}
+
+#[derive(Default)]
+struct SuiteSvgResourceResolver {
+    svg_bases: BTreeMap<Vec<u8>, PathBuf>,
+}
+
+impl SuiteSvgResourceResolver {
+    fn add_dev_asset_svg_base(&mut self, asset: &str) {
+        let Some(data) = typst_dev_assets::get(asset) else {
+            return;
+        };
+        let Some(base) = Path::new(asset).parent() else {
+            return;
+        };
+
+        self.svg_bases
+            .insert(Sha256::digest(data).to_vec(), base.to_path_buf());
+    }
+
+    fn resolve_dev_asset(&self, path: &Path) -> Option<SvgResource> {
+        let asset = normalized_relative_path(path)?;
+        let format = svg_resource_format(Path::new(&asset))?;
+        let data = typst_dev_assets::get(&asset)?;
+        Some(SvgResource::new(format, data.to_vec()))
+    }
+}
+
+impl SvgResourceResolver for SuiteSvgResourceResolver {
+    fn resolve_svg_resource(&self, svg_data: &[u8], href: &str) -> Option<SvgResource> {
+        if href.starts_with('/') || has_url_scheme(href) {
+            return None;
+        }
+
+        if let Some(asset) = href_assets_suffix(href)
+            && let Some(resource) = self.resolve_dev_asset(&asset)
+        {
+            return Some(resource);
+        }
+
+        let hash = Sha256::digest(svg_data).to_vec();
+        let base = self.svg_bases.get(&hash)?;
+        self.resolve_dev_asset(&base.join(href))
+    }
+}
+
+fn href_assets_suffix(href: &str) -> Option<PathBuf> {
+    let mut in_assets = false;
+    let mut asset = PathBuf::new();
+
+    for component in Path::new(href).components() {
+        match component {
+            Component::Normal(part) if !in_assets && part.to_str() == Some("assets") => {
+                in_assets = true;
+            }
+            Component::Normal(part) if in_assets => asset.push(part),
+            Component::CurDir if in_assets => {}
+            Component::ParentDir if in_assets => {
+                asset.pop();
+            }
+            Component::Prefix(_) | Component::RootDir => return None,
+            _ => {}
+        }
+    }
+
+    (in_assets && !asset.as_os_str().is_empty()).then_some(asset)
+}
+
+fn normalized_relative_path(path: &Path) -> Option<String> {
+    let mut parts = vec![];
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_str()?.to_owned()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                parts.pop()?;
+            }
+            Component::Prefix(_) | Component::RootDir => return None,
+        }
+    }
+
+    (!parts.is_empty()).then(|| parts.join("/"))
+}
+
+fn svg_resource_format(path: &Path) -> Option<SvgResourceFormat> {
+    match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "jpg" | "jpeg" => Some(SvgResourceFormat::Jpeg),
+        "png" => Some(SvgResourceFormat::Png),
+        "gif" => Some(SvgResourceFormat::Gif),
+        "webp" => Some(SvgResourceFormat::Webp),
+        _ => None,
+    }
+}
+
+fn has_url_scheme(href: &str) -> bool {
+    let Some((scheme, _)) = href.split_once("://") else {
+        return false;
+    };
+
+    !scheme.is_empty()
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
 }
 
 struct FileSlot {
