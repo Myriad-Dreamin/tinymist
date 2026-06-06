@@ -1,6 +1,6 @@
 //! Incremental data transfer from backend.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use reflexo::{
     error::prelude::*,
@@ -111,15 +111,15 @@ impl IncrVelloPass {
     fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
         let mut pages = Vec::with_capacity(self.pages.len());
         let mut flushed_pages = Vec::with_capacity(self.pages.len());
+        let mut reusable_flushed_pages =
+            Self::collect_reusable_flushed_pages(&mut self.flushed_pages);
 
-        for (idx, page) in self.pages.iter().enumerate() {
-            if let Some(flushed) = self
-                .flushed_pages
-                .get(idx)
-                .filter(|flushed| flushed.matches(page))
+        for page in &self.pages {
+            if let Some(flushed) =
+                Self::take_matching_flushed_page(&mut reusable_flushed_pages, page)
             {
                 pages.push((flushed.scene.clone(), flushed.size));
-                flushed_pages.push(flushed.clone());
+                flushed_pages.push(flushed);
                 continue;
             }
 
@@ -134,6 +134,43 @@ impl IncrVelloPass {
 
         self.flushed_pages = flushed_pages;
         pages
+    }
+
+    fn collect_reusable_flushed_pages(
+        flushed_pages: &mut Vec<FlushedPage>,
+    ) -> HashMap<Fingerprint, Vec<FlushedPage>> {
+        let mut reusable: HashMap<Fingerprint, Vec<FlushedPage>> =
+            HashMap::with_capacity(flushed_pages.len());
+
+        for flushed in flushed_pages.drain(..) {
+            reusable
+                .entry(flushed.content_hash)
+                .or_default()
+                .push(flushed);
+        }
+
+        reusable
+    }
+
+    fn take_matching_flushed_page(
+        reusable: &mut HashMap<Fingerprint, Vec<FlushedPage>>,
+        page: &VecPage,
+    ) -> Option<FlushedPage> {
+        let content_hash = page.content_hash;
+        let (flushed, remove_entry) = {
+            let candidates = reusable.get_mut(&content_hash)?;
+            let position = candidates
+                .iter()
+                .position(|flushed| flushed.matches(page))?;
+            let flushed = candidates.swap_remove(position);
+            (flushed, candidates.is_empty())
+        };
+
+        if remove_entry {
+            reusable.remove(&content_hash);
+        }
+
+        Some(flushed)
     }
 
     fn flush_page_uncached(page: &VecPage) -> (Arc<Scene>, Vec2) {
@@ -448,6 +485,32 @@ mod tests {
     }
 
     #[test]
+    fn renderer_reuses_shifted_flushed_scenes_after_page_deletion() {
+        let first_id = Fingerprint::from_pair(30, 0);
+        let second_id = Fingerprint::from_pair(31, 0);
+        let third_id = Fingerprint::from_pair(32, 0);
+        let (module, pages) = three_page_module(first_id, second_id, third_id);
+
+        let mut pass = IncrVelloPass::default();
+        pass.interpret_changes(&module, &pages);
+        let first_flush = pass.flush_pages();
+
+        pass.interpret_changes(&module, &pages[1..]);
+        let second_flush = pass.flush_pages();
+
+        assert_eq!(first_flush.len(), 3);
+        assert_eq!(second_flush.len(), 2);
+        assert!(
+            Arc::ptr_eq(&first_flush[1].0, &second_flush[0].0),
+            "first page after deletion should reuse the shifted flushed vello scene"
+        );
+        assert!(
+            Arc::ptr_eq(&first_flush[2].0, &second_flush[1].0),
+            "second page after deletion should reuse the shifted flushed vello scene"
+        );
+    }
+
+    #[test]
     fn path_gradient_fill_reaches_vello_encoding() {
         let gradient_id = Fingerprint::from_pair(1, 0);
         let paint_id = Fingerprint::from_pair(2, 0);
@@ -533,6 +596,35 @@ mod tests {
             },
             Page {
                 content: second_id,
+                size: page_size,
+            },
+        ];
+
+        (module, pages)
+    }
+
+    fn three_page_module(
+        first_id: Fingerprint,
+        second_id: Fingerprint,
+        third_id: Fingerprint,
+    ) -> (Module, Vec<Page>) {
+        let mut module = Module::default();
+        module.items.insert(first_id, rectangle_item("black"));
+        module.items.insert(second_id, rectangle_item("red"));
+        module.items.insert(third_id, rectangle_item("blue"));
+
+        let page_size = Axes::new(Scalar(16.), Scalar(16.));
+        let pages = vec![
+            Page {
+                content: first_id,
+                size: page_size,
+            },
+            Page {
+                content: second_id,
+                size: page_size,
+            },
+            Page {
+                content: third_id,
                 size: page_size,
             },
         ];
