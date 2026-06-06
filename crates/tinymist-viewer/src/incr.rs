@@ -7,7 +7,7 @@ use reflexo::{
     hash::Fingerprint,
     vector::{
         incr::IncrDocClient,
-        ir::{ImmutStr, Module, Page},
+        ir::{ImmutStr, LayoutRegion, LayoutRegionNode, Module, Page},
         vm::RenderVm,
     },
 };
@@ -245,15 +245,86 @@ impl IncrVelloDocClient {
         }
     }
 
+    fn select_page_layout(kern: &IncrDocClient) -> Option<LayoutRegionNode> {
+        for (idx, region) in kern.doc.layouts.iter().enumerate() {
+            let mut visited = vec![idx];
+            if let Some(layout) = Self::select_page_layout_from_region(
+                region,
+                &kern.doc.layouts,
+                &kern.doc.module,
+                &mut visited,
+            ) {
+                return Some(layout);
+            }
+        }
+
+        None
+    }
+
+    fn select_page_layout_from_region(
+        region: &LayoutRegion,
+        all_layouts: &[LayoutRegion],
+        module: &Module,
+        visited: &mut Vec<usize>,
+    ) -> Option<LayoutRegionNode> {
+        match region {
+            LayoutRegion::ByScalar(region) => {
+                for (_, layout) in &region.layouts {
+                    if let Some(layout) =
+                        Self::select_page_layout_from_node(layout, all_layouts, module, visited)
+                    {
+                        return Some(layout);
+                    }
+                }
+            }
+            LayoutRegion::ByStr(region) => {
+                for (_, layout) in &region.layouts {
+                    if let Some(layout) =
+                        Self::select_page_layout_from_node(layout, all_layouts, module, visited)
+                    {
+                        return Some(layout);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn select_page_layout_from_node(
+        layout: &LayoutRegionNode,
+        all_layouts: &[LayoutRegion],
+        module: &Module,
+        visited: &mut Vec<usize>,
+    ) -> Option<LayoutRegionNode> {
+        if layout.pages(module).is_some() {
+            return Some(layout.clone());
+        }
+
+        let LayoutRegionNode::Indirect(idx) = layout else {
+            return None;
+        };
+
+        if visited.contains(idx) {
+            log::warn!("Ignoring cyclic indirect layout reference: {idx}");
+            return None;
+        }
+
+        let region = all_layouts.get(*idx)?;
+        visited.push(*idx);
+        let selected = Self::select_page_layout_from_region(region, all_layouts, module, visited);
+        visited.pop();
+        selected
+    }
+
     /// Renders a specific page of the document in the given window.
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
-        {
-            let layouts = kern.doc.layouts[0].by_scalar();
-            let Some(layout) = layouts.and_then(|layout| layout.first().cloned()) else {
-                return Ok(vec![]);
-            };
-            kern.set_layout(layout.1.clone());
-        }
+        let Some(layout) = Self::select_page_layout(kern) else {
+            kern.layout = None;
+            self.reset();
+            return Ok(vec![]);
+        };
+        kern.set_layout(layout);
 
         self.patch_delta(kern);
 
@@ -280,8 +351,8 @@ mod tests {
         vector::{
             incr::IncrDocClient,
             ir::{
-                self, Axes, ColorSpace, GradientItem, GradientKind, Module, Page, PathItem,
-                PathStyle, Rgba8Item, Scalar, VecItem,
+                self, Axes, ColorSpace, GradientItem, GradientKind, LayoutRegion, LayoutRegionNode,
+                LayoutRegionRepr, Module, Page, PathItem, PathStyle, Rgba8Item, Scalar, VecItem,
             },
             stream::BytesModuleStream,
         },
@@ -319,6 +390,71 @@ mod tests {
         assert!(client.vec2vello.pages.is_empty());
         assert!(client.vec2vello.flushed_pages.is_empty());
         assert!(client.doc_view.is_none());
+    }
+
+    #[test]
+    fn render_pages_clears_cached_pages_when_no_renderable_layout_exists() {
+        let mut client = IncrVelloDocClient::default();
+        let mut doc = compile_incremental_doc(
+            r#"
+#set page(width: 16pt, height: 16pt, margin: 0pt)
+#rect(width: 8pt, height: 8pt, fill: black)
+"#,
+        );
+
+        let pages = client
+            .render_pages(&mut doc)
+            .expect("renderer fixture should render before layouts are removed");
+        assert_eq!(pages.len(), 1);
+        assert_eq!(client.vec2vello.pages.len(), 1);
+        assert_eq!(client.vec2vello.flushed_pages.len(), 1);
+
+        doc.doc.layouts.clear();
+
+        let pages = client
+            .render_pages(&mut doc)
+            .expect("missing layouts should not panic");
+        assert!(pages.is_empty());
+        assert!(doc.layout.is_none());
+        assert!(client.vec2vello.pages.is_empty());
+        assert!(client.vec2vello.flushed_pages.is_empty());
+    }
+
+    #[test]
+    fn render_pages_selects_indirect_page_layout_after_non_page_region() {
+        let page_id = Fingerprint::from_pair(40, 0);
+        let mut module = Module::default();
+        module.items.insert(page_id, rectangle_item("black"));
+        let pages = vec![Page {
+            content: page_id,
+            size: Axes::new(Scalar(16.), Scalar(16.)),
+        }];
+
+        let mut doc = IncrDocClient::default();
+        doc.doc.module = module;
+        doc.doc.layouts = vec![
+            LayoutRegion::new_single(LayoutRegionNode::new_source_mapping(vec![])),
+            LayoutRegion::ByStr(LayoutRegionRepr {
+                kind: "mode".into(),
+                layouts: vec![("slide".into(), LayoutRegionNode::Indirect(2))],
+            }),
+            LayoutRegion::new_single(LayoutRegionNode::new_pages(pages)),
+        ];
+
+        let mut client = IncrVelloDocClient::default();
+        let rendered = client
+            .render_pages(&mut doc)
+            .expect("indirect string layout should render");
+
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].1, Size::new(16., 16.));
+        assert!(
+            doc.layout
+                .as_ref()
+                .and_then(|layout| layout.pages(&doc.doc.module))
+                .is_some(),
+            "selected layout should resolve to page metadata"
+        );
     }
 
     #[test]
