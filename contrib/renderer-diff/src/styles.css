@@ -331,6 +331,32 @@ select {
 .case-list {
   overflow: auto;
   padding: 6px;
+  scrollbar-color: #8fb0c1 #eef3f6;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+
+.case-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.case-list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #eef3f6;
+}
+
+.case-list::-webkit-scrollbar-thumb {
+  border: 2px solid #eef3f6;
+  border-radius: 999px;
+  background: #8fb0c1;
+}
+
+.case-list::-webkit-scrollbar-thumb:hover {
+  background: #5f8fa6;
+}
+
+.case-list::-webkit-scrollbar-thumb:active {
+  background: #2b6b8f;
 }
 
 .case-row {
