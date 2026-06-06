@@ -58,7 +58,12 @@ cli = []
 # This requires modifying typst.
 no-content-hint = ["reflexo-typst/no-content-hint"]
 
+[[bench]]
+name = "page_incremental_rendering"
+harness = false
+
 [dev-dependencies]
+criterion.workspace = true
 insta.workspace = true
 masonry_testing.workspace = true
 masonry_winit.workspace = true

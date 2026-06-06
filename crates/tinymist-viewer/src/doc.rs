@@ -155,6 +155,17 @@ pub struct PageCanvas {
 
 // --- MARK: BUILDERS
 impl PageCanvas {
+    /// Creates a page canvas from an already-flushed Vello scene.
+    pub fn new(scene: Arc<Scene>, scene_scale: f64, background_color: Option<Color>) -> Self {
+        Self {
+            alt_text: None,
+            size: Size::default(),
+            scene_scale,
+            background_color,
+            scene,
+        }
+    }
+
     /// Sets the text that will describe the canvas to screen readers.
     ///
     /// Users are encouraged to set alt text for the canvas.
@@ -189,10 +200,16 @@ impl PageCanvas {
         scene_scale: f64,
         background_color: Option<Color>,
     ) {
+        let should_render = !Arc::ptr_eq(&this.widget.scene, &scene)
+            || this.widget.scene_scale != scene_scale
+            || this.widget.background_color != background_color;
+
         this.widget.scene = scene;
         this.widget.scene_scale = scene_scale;
         this.widget.background_color = background_color;
-        this.ctx.request_render();
+        if should_render {
+            this.ctx.request_render();
+        }
     }
 
     /// Sets the text that will describe the canvas to screen readers.
