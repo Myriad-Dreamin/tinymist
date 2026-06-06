@@ -6993,6 +6993,7 @@ dependencies = [
  "bytes",
  "clap",
  "comemo",
+ "criterion",
  "ecow",
  "env_logger",
  "ezsockets",

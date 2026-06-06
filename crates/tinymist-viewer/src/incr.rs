@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use reflexo::{
     error::prelude::*,
+    hash::Fingerprint,
     vector::{
         incr::IncrDocClient,
         ir::{ImmutStr, Module, Page},
@@ -27,6 +28,8 @@ pub struct IncrVelloPass {
     pub fill: ImmutStr,
     /// Holds a sequence of vello pages that are rendered
     pub pages: Vec<VecPage>,
+    /// Holds flushed vello scenes for pages that are rendered.
+    flushed_pages: Vec<FlushedPage>,
 }
 
 impl Default for IncrVelloPass {
@@ -34,7 +37,21 @@ impl Default for IncrVelloPass {
         Self {
             fill: "#ffffff".into(),
             pages: vec![],
+            flushed_pages: vec![],
         }
+    }
+}
+
+#[derive(Clone)]
+struct FlushedPage {
+    content_hash: Fingerprint,
+    size: Vec2,
+    scene: Arc<Scene>,
+}
+
+impl FlushedPage {
+    fn matches(&self, page: &VecPage) -> bool {
+        self.content_hash == page.content_hash && self.size == page.size
     }
 }
 
@@ -70,8 +87,53 @@ impl IncrVelloPass {
             return (Arc::new(vello::Scene::new()), Vec2::ZERO);
         }
 
-        let VecPage { size, elem, .. } = &self.pages[idx];
+        let page = &self.pages[idx];
+        let (scene, size) = Self::flush_page_uncached(page);
 
+        let flushed = FlushedPage {
+            content_hash: page.content_hash,
+            size,
+            scene: scene.clone(),
+        };
+        if idx < self.flushed_pages.len() {
+            self.flushed_pages[idx] = flushed;
+        } else if idx == self.flushed_pages.len() {
+            self.flushed_pages.push(flushed);
+        }
+
+        (scene, size)
+    }
+
+    fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
+        let mut pages = Vec::with_capacity(self.pages.len());
+        let mut flushed_pages = Vec::with_capacity(self.pages.len());
+
+        for (idx, page) in self.pages.iter().enumerate() {
+            if let Some(flushed) = self
+                .flushed_pages
+                .get(idx)
+                .filter(|flushed| flushed.matches(page))
+            {
+                pages.push((flushed.scene.clone(), flushed.size));
+                flushed_pages.push(flushed.clone());
+                continue;
+            }
+
+            let (scene, size) = Self::flush_page_uncached(page);
+            flushed_pages.push(FlushedPage {
+                content_hash: page.content_hash,
+                size,
+                scene: scene.clone(),
+            });
+            pages.push((scene, size));
+        }
+
+        self.flushed_pages = flushed_pages;
+        pages
+    }
+
+    fn flush_page_uncached(page: &VecPage) -> (Arc<Scene>, Vec2) {
+        let VecPage { size, elem, .. } = page;
         let mut elem_scene = vello::Scene::new();
         elem.render(&mut elem_scene);
 
@@ -97,6 +159,7 @@ impl IncrVelloDocClient {
         self.vec2vello = IncrVelloPass {
             fill,
             pages: vec![],
+            flushed_pages: vec![],
         };
         self.doc_view = None;
     }
@@ -149,11 +212,11 @@ impl IncrVelloDocClient {
         // let ts = sk::Transform::from_scale(s, s);
         // let ts = Affine::scale(s as f64);
 
-        let res = (0..self.vec2vello.pages.len())
-            .map(|idx| {
-                let (scene, size) = self.vec2vello.flush_page(idx);
-                (scene, Size::new(size.x, size.y))
-            })
+        let res = self
+            .vec2vello
+            .flush_pages()
+            .into_iter()
+            .map(|(scene, size)| (scene, Size::new(size.x, size.y)))
             .collect();
         Ok(res)
     }
@@ -189,11 +252,23 @@ mod tests {
         let mut client = IncrVelloDocClient::default();
         client.set_fill("#101010".into());
         client.doc_view = Some(vec![]);
+        let mut doc = compile_incremental_doc(
+            r#"
+#set page(width: 16pt, height: 16pt, margin: 0pt)
+#rect(width: 8pt, height: 8pt, fill: black)
+"#,
+        );
+        let pages = client
+            .render_pages(&mut doc)
+            .expect("renderer fixture should render before reset");
+        assert_eq!(pages.len(), 1);
+        assert_eq!(client.vec2vello.flushed_pages.len(), 1);
 
         client.reset();
 
         assert_eq!(client.vec2vello.fill.as_ref(), "#101010");
         assert!(client.vec2vello.pages.is_empty());
+        assert!(client.vec2vello.flushed_pages.is_empty());
         assert!(client.doc_view.is_none());
     }
 
@@ -309,6 +384,58 @@ mod tests {
     }
 
     #[test]
+    fn renderer_reuses_flushed_scene_when_content_hash_is_unchanged() {
+        let first_id = Fingerprint::from_pair(10, 0);
+        let second_id = Fingerprint::from_pair(11, 0);
+        let (module, pages) = two_page_module(first_id, second_id);
+
+        let mut pass = IncrVelloPass::default();
+        pass.interpret_changes(&module, &pages);
+        let first_flush = pass.flush_pages();
+
+        pass.interpret_changes(&module, &pages);
+        let second_flush = pass.flush_pages();
+
+        assert_eq!(first_flush.len(), 2);
+        assert_eq!(second_flush.len(), 2);
+        assert!(
+            Arc::ptr_eq(&first_flush[0].0, &second_flush[0].0),
+            "first unchanged page should reuse the flushed vello scene"
+        );
+        assert!(
+            Arc::ptr_eq(&first_flush[1].0, &second_flush[1].0),
+            "second unchanged page should reuse the flushed vello scene"
+        );
+    }
+
+    #[test]
+    fn renderer_refreshes_flushed_scene_when_content_hash_changes() {
+        let first_id = Fingerprint::from_pair(20, 0);
+        let changed_first_id = Fingerprint::from_pair(21, 0);
+        let second_id = Fingerprint::from_pair(22, 0);
+        let (module, first_pages) = two_page_module(first_id, second_id);
+        let (changed_module, changed_pages) = two_page_module(changed_first_id, second_id);
+
+        let mut pass = IncrVelloPass::default();
+        pass.interpret_changes(&module, &first_pages);
+        let first_flush = pass.flush_pages();
+
+        pass.interpret_changes(&changed_module, &changed_pages);
+        let second_flush = pass.flush_pages();
+
+        assert_eq!(first_flush.len(), 2);
+        assert_eq!(second_flush.len(), 2);
+        assert!(
+            !Arc::ptr_eq(&first_flush[0].0, &second_flush[0].0),
+            "changed page should be flushed into a new vello scene"
+        );
+        assert!(
+            Arc::ptr_eq(&first_flush[1].0, &second_flush[1].0),
+            "unchanged neighboring page should keep its flushed vello scene"
+        );
+    }
+
+    #[test]
     fn path_gradient_fill_reaches_vello_encoding() {
         let gradient_id = Fingerprint::from_pair(1, 0);
         let paint_id = Fingerprint::from_pair(2, 0);
@@ -379,6 +506,34 @@ mod tests {
             kind: GradientKind::Linear(Scalar(0.)),
             styles: vec![],
         }))
+    }
+
+    fn two_page_module(first_id: Fingerprint, second_id: Fingerprint) -> (Module, Vec<Page>) {
+        let mut module = Module::default();
+        module.items.insert(first_id, rectangle_item("black"));
+        module.items.insert(second_id, rectangle_item("red"));
+
+        let page_size = Axes::new(Scalar(16.), Scalar(16.));
+        let pages = vec![
+            Page {
+                content: first_id,
+                size: page_size,
+            },
+            Page {
+                content: second_id,
+                size: page_size,
+            },
+        ];
+
+        (module, pages)
+    }
+
+    fn rectangle_item(fill: &'static str) -> VecItem {
+        VecItem::Path(PathItem {
+            d: "M 0 0 L 16 0 L 16 16 L 0 16 Z".into(),
+            size: Some(Axes::new(Scalar(16.), Scalar(16.))),
+            styles: vec![PathStyle::Fill(fill.into())],
+        })
     }
 
     fn render_first_page(name: &str, source: &str) -> (Arc<Scene>, Size) {
