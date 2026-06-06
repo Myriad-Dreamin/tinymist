@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::Cursor;
 use std::num::NonZeroUsize;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
@@ -22,19 +22,22 @@ use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
 use tinymist_std::typst::TypstDocument;
 use tinymist_viewer::incr::IncrVelloDocClient;
+use tinymist_viewer::{SvgResource, SvgResourceFormat, SvgResourceResolver};
 use typst::diag::{At, FileError, FileResult, SourceResult, StrResult, Warned, bail as typst_bail};
 use typst::engine::Engine;
 use typst::foundations::{
     Array, Bytes, Context, Datetime, IntoValue, NoneValue, Repr, Smart, Value, func,
 };
-use typst::layout::{Abs, Margin, PageElem, PagedDocument};
+use typst::layout::{
+    Abs, Frame, FrameItem, Margin, PageElem, PagedDocument, Size as TypstSize, Transform,
+};
 use typst::model::{Numbering, NumberingPattern};
 use typst::syntax::{FileId, Source, Span, VirtualPath};
 use typst::text::{Font, FontBook, TextElem, TextSize};
 use typst::utils::LazyHash;
 use typst::visualize::Color as TypstColor;
 use typst::{Feature, Library, LibraryExt, World};
-use vello::kurbo::{Affine, Rect, Size};
+use vello::kurbo::{Affine, Point as KurboPoint, Rect, Size, Vec2};
 use vello::peniko::{Color, Fill};
 use vello::util::RenderContext;
 use vello::wgpu::{
@@ -356,7 +359,8 @@ fn render_suite_case(
     ));
     let compiled = compile_paged(world.as_ref())
         .with_context(|| format!("failed to compile Typst suite case {}", test.name))?;
-    let document = TypstDocument::Paged(Arc::new(compiled));
+    let compiled = Arc::new(compiled);
+    let document = TypstDocument::Paged(compiled.clone());
 
     let mut renderer = IncrSvgDocServer::default();
     let frame = renderer.pack_delta(&document);
@@ -369,6 +373,7 @@ fn render_suite_case(
     doc.merge_delta(delta);
 
     let mut client = IncrVelloDocClient::default();
+    client.set_svg_resource_resolver(Some(suite_svg_resource_resolver()));
     let background = client.background_color().unwrap_or(Color::WHITE);
     let pages = client
         .render_pages(&mut doc)
@@ -378,10 +383,14 @@ fn render_suite_case(
     }
 
     let mut rendered = vec![];
-    for (scene, size) in pages {
+    for (page_idx, (scene, size)) in pages.into_iter().enumerate() {
         let width = size.width.ceil().max(1.0) as u32;
         let height = size.height.ceil().max(1.0) as u32;
-        rendered.push(rasterizer.render_page(&scene, size, width, height, background)?);
+        let mut page = rasterizer.render_page(&scene, size, width, height, background)?;
+        if let Some(source_page) = compiled.pages.get(page_idx) {
+            render_link_overlays(&mut page, &source_page.frame);
+        }
+        rendered.push(page);
     }
 
     Ok(merge_pages(&rendered))
@@ -544,6 +553,89 @@ impl SceneRasterizer {
 
         RgbaImage::from_vec(width, height, result).context("failed to create Vello PNG image")
     }
+}
+
+fn render_link_overlays(image: &mut RgbaImage, frame: &Frame) {
+    // Match Typst's official PNG refs, which paint link boxes after rendering.
+    render_link_overlays_in_frame(image, Affine::IDENTITY, frame);
+}
+
+fn render_link_overlays_in_frame(image: &mut RgbaImage, transform: Affine, frame: &Frame) {
+    for (pos, item) in frame.items() {
+        let transform = transform.pre_translate(Vec2::new(pos.x.to_pt(), pos.y.to_pt()));
+        match item {
+            FrameItem::Group(group) => {
+                render_link_overlays_in_frame(
+                    image,
+                    transform * typst_transform_to_affine(&group.transform),
+                    &group.frame,
+                );
+            }
+            FrameItem::Link(_, size) => {
+                fill_transformed_link_overlay(image, transform, *size);
+            }
+            FrameItem::Text(..)
+            | FrameItem::Shape(..)
+            | FrameItem::Image(..)
+            | FrameItem::Tag(..) => {}
+        }
+    }
+}
+
+fn fill_transformed_link_overlay(image: &mut RgbaImage, transform: Affine, size: TypstSize) {
+    const LINK_OVERLAY: Rgba<u8> = Rgba([40, 54, 99, 40]);
+
+    let width = size.x.to_pt();
+    let height = size.y.to_pt();
+    if width <= 0.0 || height <= 0.0 {
+        return;
+    }
+
+    let rect = Rect::new(0.0, 0.0, width, height);
+    let bbox = transform.transform_rect_bbox(rect);
+    if !bbox.x0.is_finite() || !bbox.x1.is_finite() || !bbox.y0.is_finite() || !bbox.y1.is_finite()
+    {
+        return;
+    }
+
+    let x0 = bbox.x0.floor().max(0.0) as u32;
+    let y0 = bbox.y0.floor().max(0.0) as u32;
+    let x1 = bbox.x1.ceil().min(f64::from(image.width())) as u32;
+    let y1 = bbox.y1.ceil().min(f64::from(image.height())) as u32;
+    if x0 >= x1 || y0 >= y1 || !transform.determinant().is_normal() {
+        return;
+    }
+
+    let inverse = transform.inverse();
+    for y in y0..y1 {
+        for x in x0..x1 {
+            let point = inverse * KurboPoint::new(f64::from(x) + 0.5, f64::from(y) + 0.5);
+            if point.x >= 0.0 && point.x < width && point.y >= 0.0 && point.y < height {
+                alpha_blend_pixel(image.get_pixel_mut(x, y), LINK_OVERLAY);
+            }
+        }
+    }
+}
+
+fn alpha_blend_pixel(dst: &mut Rgba<u8>, src: Rgba<u8>) {
+    let alpha = u32::from(src[3]);
+    let inv_alpha = 255 - alpha;
+    for channel in 0..3 {
+        dst[channel] =
+            ((u32::from(src[channel]) * alpha + u32::from(dst[channel]) * inv_alpha + 127) / 255)
+                as u8;
+    }
+}
+
+fn typst_transform_to_affine(transform: &Transform) -> Affine {
+    Affine::new([
+        transform.sx.get(),
+        transform.ky.get(),
+        transform.kx.get(),
+        transform.sy.get(),
+        transform.tx.to_pt(),
+        transform.ty.to_pt(),
+    ])
 }
 
 fn merge_pages(pages: &[RgbaImage]) -> RgbaImage {
@@ -1228,6 +1320,121 @@ impl World for RenderWorld {
 enum SystemPath {
     Asset(PathBuf),
     File(PathBuf),
+}
+
+fn suite_svg_resource_resolver() -> Arc<dyn SvgResourceResolver> {
+    static RESOLVER: OnceLock<Arc<SuiteSvgResourceResolver>> = OnceLock::new();
+    let resolver: Arc<dyn SvgResourceResolver> = RESOLVER
+        .get_or_init(|| {
+            let mut resolver = SuiteSvgResourceResolver::default();
+            resolver.add_dev_asset_svg_base("images/linked.svg");
+            Arc::new(resolver)
+        })
+        .clone();
+    resolver
+}
+
+#[derive(Default)]
+struct SuiteSvgResourceResolver {
+    svg_bases: BTreeMap<Vec<u8>, PathBuf>,
+}
+
+impl SuiteSvgResourceResolver {
+    fn add_dev_asset_svg_base(&mut self, asset: &str) {
+        let Some(data) = typst_dev_assets::get(asset) else {
+            return;
+        };
+        let Some(base) = Path::new(asset).parent() else {
+            return;
+        };
+
+        self.svg_bases
+            .insert(Sha256::digest(data).to_vec(), base.to_path_buf());
+    }
+
+    fn resolve_dev_asset(&self, path: &Path) -> Option<SvgResource> {
+        let asset = normalized_relative_path(path)?;
+        let format = svg_resource_format(Path::new(&asset))?;
+        let data = typst_dev_assets::get(&asset)?;
+        Some(SvgResource::new(format, data.to_vec()))
+    }
+}
+
+impl SvgResourceResolver for SuiteSvgResourceResolver {
+    fn resolve_svg_resource(&self, svg_data: &[u8], href: &str) -> Option<SvgResource> {
+        if href.starts_with('/') || has_url_scheme(href) {
+            return None;
+        }
+
+        if let Some(asset) = href_assets_suffix(href)
+            && let Some(resource) = self.resolve_dev_asset(&asset)
+        {
+            return Some(resource);
+        }
+
+        let hash = Sha256::digest(svg_data).to_vec();
+        let base = self.svg_bases.get(&hash)?;
+        self.resolve_dev_asset(&base.join(href))
+    }
+}
+
+fn href_assets_suffix(href: &str) -> Option<PathBuf> {
+    let mut in_assets = false;
+    let mut asset = PathBuf::new();
+
+    for component in Path::new(href).components() {
+        match component {
+            Component::Normal(part) if !in_assets && part.to_str() == Some("assets") => {
+                in_assets = true;
+            }
+            Component::Normal(part) if in_assets => asset.push(part),
+            Component::CurDir if in_assets => {}
+            Component::ParentDir if in_assets => {
+                asset.pop();
+            }
+            Component::Prefix(_) | Component::RootDir => return None,
+            _ => {}
+        }
+    }
+
+    (in_assets && !asset.as_os_str().is_empty()).then_some(asset)
+}
+
+fn normalized_relative_path(path: &Path) -> Option<String> {
+    let mut parts = vec![];
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_str()?.to_owned()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                parts.pop()?;
+            }
+            Component::Prefix(_) | Component::RootDir => return None,
+        }
+    }
+
+    (!parts.is_empty()).then(|| parts.join("/"))
+}
+
+fn svg_resource_format(path: &Path) -> Option<SvgResourceFormat> {
+    match path.extension()?.to_str()?.to_ascii_lowercase().as_str() {
+        "jpg" | "jpeg" => Some(SvgResourceFormat::Jpeg),
+        "png" => Some(SvgResourceFormat::Png),
+        "gif" => Some(SvgResourceFormat::Gif),
+        "webp" => Some(SvgResourceFormat::Webp),
+        _ => None,
+    }
+}
+
+fn has_url_scheme(href: &str) -> bool {
+    let Some((scheme, _)) = href.split_once("://") else {
+        return false;
+    };
+
+    !scheme.is_empty()
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.')
 }
 
 struct FileSlot {
