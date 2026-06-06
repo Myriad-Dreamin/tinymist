@@ -244,6 +244,14 @@ mod tests {
                 check: assert_text_glyph_encoding,
             },
             Case {
+                name: "stroked text glyph",
+                source: r#"
+#set page(width: 64pt, height: 32pt, margin: 0pt)
+#text(size: 18pt, fill: black, stroke: 1pt + red)[T]
+"#,
+                check: assert_stroked_text_glyph_encoding,
+            },
+            Case {
                 name: "decoded png image",
                 source: r#"
 #set page(width: 32pt, height: 32pt, margin: 0pt)
@@ -485,6 +493,25 @@ mod tests {
             encoding.draw_tags.len() >= 2,
             "outline text should emit draw operations for glyph outlines, got {}",
             encoding.draw_tags.len()
+        );
+    }
+
+    fn assert_stroked_text_glyph_encoding(scene: &Scene) {
+        let encoding = scene.encoding();
+        assert!(
+            encoding.n_paths >= 2,
+            "stroked outline text should encode fill and stroke paths, got {}",
+            encoding.n_paths
+        );
+        assert!(
+            encoding.draw_tags.len() >= 2,
+            "stroked outline text should emit fill and stroke draw operations, got {}",
+            encoding.draw_tags.len()
+        );
+        assert!(
+            encoding.styles.len() >= 2,
+            "stroked outline text should encode separate fill and stroke styles, got {}",
+            encoding.styles.len()
         );
     }
 
