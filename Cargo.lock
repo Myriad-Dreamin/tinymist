@@ -6988,6 +6988,7 @@ dependencies = [
 name = "tinymist-viewer"
 version = "0.14.18"
 dependencies = [
+ "accesskit_consumer",
  "anyhow",
  "async-trait",
  "bytes",

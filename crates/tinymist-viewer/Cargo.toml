@@ -63,7 +63,12 @@ no-content-hint = ["reflexo-typst/no-content-hint"]
 name = "page_incremental_rendering"
 harness = false
 
+[[bench]]
+name = "a11y_synthetic_tree"
+harness = false
+
 [dev-dependencies]
+accesskit_consumer = "0.31.0"
 criterion.workspace = true
 insta.workspace = true
 masonry_testing.workspace = true
