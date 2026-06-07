@@ -132,7 +132,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (!event.affectsConfiguration("tinymist.previewer")) {
+      if (
+        !event.affectsConfiguration("tinymist.previewer") &&
+        !event.affectsConfiguration("tinymist.exportTarget")
+      ) {
         return;
       }
       invalidatePreviewerCache();
@@ -530,6 +533,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             documentUri: bindDocument.uri.toString(),
             documentPath: filePath,
             mode: task.mode,
+            target: resolvedPreviewer.source.target ?? "paged",
             dataPlaneHost: `ws://127.0.0.1:${dataPlanePort}`,
             dataPlanePort,
             staticServerPort,

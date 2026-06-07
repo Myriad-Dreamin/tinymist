@@ -31,7 +31,9 @@ use vello::{
     kurbo::{self, Affine, Rect, Shape, Vec2},
 };
 
-use crate::{GroupScene, SvgResource, SvgResourceFormat, SvgResourceResolver, VecScene};
+use crate::{
+    GroupScene, SemanticLink, SvgResource, SvgResourceFormat, SvgResourceResolver, VecScene,
+};
 
 pub struct Renderer<'a> {
     module: &'a Module,
@@ -70,6 +72,7 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             clipper: None,
             glyph_style: None,
             inner: EcoVec::new(),
+            semantic_links: EcoVec::new(),
         }
     }
 
@@ -149,6 +152,8 @@ pub struct RenderStack {
     glyph_style: Option<DrawStyle>,
     /// The inner elements.
     pub inner: EcoVec<(Vec2, Arc<VecScene>)>,
+    /// Semantic links in this group.
+    pub semantic_links: EcoVec<SemanticLink>,
     // /// The bounding box of the group.
     // pub rect: CanvasBBox,
 }
@@ -166,6 +171,7 @@ impl From<RenderStack> for Arc<VecScene> {
             clip: s.clipper.and_then(|it| svg_path(&it.d)),
             ts: s.ts,
             scenes: s.inner,
+            semantic_links: s.semantic_links,
         }))
     }
 }
@@ -221,6 +227,17 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         self.inner.push((
             Vec2::new(0., 0.),
             Arc::new(VecScene::Scene(Box::new(scene), None)),
+        ));
+    }
+
+    fn render_link(&mut self, _ctx: &mut C, link: &ir::LinkItem) {
+        if link.size.x.0 <= 0.0 || link.size.y.0 <= 0.0 {
+            return;
+        }
+
+        self.semantic_links.push(SemanticLink::new(
+            link.href.as_ref(),
+            Rect::from_origin_size((0.0, 0.0), (link.size.x.0 as f64, link.size.y.0 as f64)),
         ));
     }
 

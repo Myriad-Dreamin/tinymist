@@ -3,7 +3,11 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 
 import { resolvePreviewerValue } from "../../config";
-import { resolveConfiguredPreviewer, type ResolvedPreviewer } from "../../features/previewer";
+import {
+  resolveConfiguredPreviewer,
+  type ResolvedPreviewer,
+  type TinymistPreviewer,
+} from "../../features/previewer";
 import type { Context } from ".";
 
 const TINYMIST_EXTENSION_ID = "myriad-dreamin.tinymist";
@@ -22,6 +26,15 @@ function builtinPreviewer(): ResolvedPreviewer {
       trusted: true,
       htmlPath: htmlUri.fsPath,
     },
+  };
+}
+
+function extensionWithPreviewer(previewer: TinymistPreviewer) {
+  return {
+    extensionUri: vscode.Uri.file(path.join(os.tmpdir(), "tinymist-previewer-extension")),
+    activate: async () => ({
+      providePreviewer: () => previewer,
+    }),
   };
 }
 
@@ -92,6 +105,71 @@ export async function getTests(ctx: Context) {
       workspaceCtx.expect(result.source.compatibleTinymistVersion).to.be.equal(tinymistVersion);
       workspaceCtx.expect(result.html).to.include("Hello from the fixture previewer");
     });
+
+    suite.addTest(
+      "treats previewers without target declarations as supporting every target",
+      async () => {
+        const provider = "myriad-dreamin.tinymist-default-target-previewer";
+
+        const result = await resolveConfiguredPreviewer({
+          provider,
+          previewTarget: "html",
+          workspaceTrusted: true,
+          tinymistVersion: "1.2.3",
+          builtinPreviewer: async () => builtinPreviewer(),
+          getExtension: (id) =>
+            id === provider
+              ? extensionWithPreviewer({
+                  compatibleTinymistVersion: "1.2.3",
+                  handlePreview() {
+                    return undefined;
+                  },
+                })
+              : undefined,
+        });
+
+        workspaceCtx.expect(result.source.kind).to.be.equal("extension");
+        workspaceCtx.expect(result.source.target).to.be.equal("html");
+        workspaceCtx.expect(result.source.supportedTargets).to.be.undefined;
+        workspaceCtx.expect(result.handlePreview).to.be.a("function");
+      },
+    );
+
+    suite.addTest(
+      "falls back when extension previewer does not support current target",
+      async () => {
+        const provider = "myriad-dreamin.tinymist-paged-only-previewer";
+        const warnings: string[] = [];
+
+        const result = await resolveConfiguredPreviewer({
+          provider,
+          previewTarget: "html",
+          workspaceTrusted: true,
+          tinymistVersion: "1.2.3",
+          builtinPreviewer: async () => builtinPreviewer(),
+          getExtension: (id) =>
+            id === provider
+              ? extensionWithPreviewer({
+                  compatibleTinymistVersion: "1.2.3",
+                  supportedTargets: ["paged"],
+                  handlePreview() {
+                    throw new Error("unexpected preview handler call");
+                  },
+                })
+              : undefined,
+          showWarning: (message) => warnings.push(message),
+        });
+
+        workspaceCtx.expect(result.source.kind).to.be.equal("builtin");
+        workspaceCtx.expect(result.source.target).to.be.equal("html");
+        workspaceCtx.expect(result.source.configuredProvider).to.be.equal(provider);
+        workspaceCtx
+          .expect(result.source.fallbackReason)
+          .to.be.equal("does not support the `html` preview target");
+        workspaceCtx.expect(warnings).to.have.lengthOf(1);
+        workspaceCtx.expect(warnings[0]).to.include("Falling back to the built-in preview");
+      },
+    );
 
     suite.addTest("uses the built-in previewer for Tinymist's own extension id", async () => {
       const result = await resolveConfiguredPreviewer({

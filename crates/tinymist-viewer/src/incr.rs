@@ -17,7 +17,18 @@ use vello::{
     peniko::{Color, color::parse_color},
 };
 
-use crate::{SvgResourceResolver, VecPage};
+use crate::{PageSemantics, SvgResourceResolver, VecPage};
+
+/// A rendered page with its semantic metadata.
+#[derive(Clone)]
+pub struct RenderedPage {
+    /// The flushed Vello scene.
+    pub scene: Arc<Scene>,
+    /// The page size in Typst page coordinates.
+    pub size: Size,
+    /// The page semantic layer.
+    pub semantics: PageSemantics,
+}
 
 /// Incremental pass from vector to vello scene.
 pub struct IncrVelloPass {
@@ -48,13 +59,12 @@ impl Default for IncrVelloPass {
 #[derive(Clone)]
 struct FlushedPage {
     content_hash: Fingerprint,
-    size: Vec2,
-    scene: Arc<Scene>,
+    page: RenderedPage,
 }
 
 impl FlushedPage {
     fn matches(&self, page: &VecPage) -> bool {
-        self.content_hash == page.content_hash && self.size == page.size
+        self.content_hash == page.content_hash && self.page.size == vec2_to_size(page.size)
     }
 }
 
@@ -73,9 +83,12 @@ impl IncrVelloPass {
                 }
 
                 let size = Vec2::new(size.x.0 as f64, size.y.0 as f64);
+                let elem = ct.render_item(content);
+                let semantics = elem.page_semantics();
                 VecPage {
                     size,
-                    elem: ct.render_item(content),
+                    elem,
+                    semantics,
                     content_hash: *content,
                 }
             })
@@ -86,18 +99,26 @@ impl IncrVelloPass {
 
     /// Flushes a page to the canvas with the given transform.
     pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
+        let page = self.flush_page_with_semantics(idx);
+        (page.scene, size_to_vec2(page.size))
+    }
+
+    fn flush_page_with_semantics(&mut self, idx: usize) -> RenderedPage {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {idx}");
-            return (Arc::new(vello::Scene::new()), Vec2::ZERO);
+            return RenderedPage {
+                scene: Arc::new(vello::Scene::new()),
+                size: Size::ZERO,
+                semantics: PageSemantics::default(),
+            };
         }
 
         let page = &self.pages[idx];
-        let (scene, size) = Self::flush_page_uncached(page);
+        let rendered_page = Self::flush_page_uncached(page);
 
         let flushed = FlushedPage {
             content_hash: page.content_hash,
-            size,
-            scene: scene.clone(),
+            page: rendered_page.clone(),
         };
         if idx < self.flushed_pages.len() {
             self.flushed_pages[idx] = flushed;
@@ -105,10 +126,18 @@ impl IncrVelloPass {
             self.flushed_pages.push(flushed);
         }
 
-        (scene, size)
+        rendered_page
     }
 
+    #[cfg(test)]
     fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
+        self.flush_pages_with_semantics()
+            .into_iter()
+            .map(|page| (page.scene, size_to_vec2(page.size)))
+            .collect()
+    }
+
+    fn flush_pages_with_semantics(&mut self) -> Vec<RenderedPage> {
         let mut pages = Vec::with_capacity(self.pages.len());
         let mut flushed_pages = Vec::with_capacity(self.pages.len());
         let mut reusable_flushed_pages =
@@ -118,18 +147,17 @@ impl IncrVelloPass {
             if let Some(flushed) =
                 Self::take_matching_flushed_page(&mut reusable_flushed_pages, page)
             {
-                pages.push((flushed.scene.clone(), flushed.size));
+                pages.push(flushed.page.clone());
                 flushed_pages.push(flushed);
                 continue;
             }
 
-            let (scene, size) = Self::flush_page_uncached(page);
+            let rendered_page = Self::flush_page_uncached(page);
             flushed_pages.push(FlushedPage {
                 content_hash: page.content_hash,
-                size,
-                scene: scene.clone(),
+                page: rendered_page.clone(),
             });
-            pages.push((scene, size));
+            pages.push(rendered_page);
         }
 
         self.flushed_pages = flushed_pages;
@@ -173,13 +201,25 @@ impl IncrVelloPass {
         Some(flushed)
     }
 
-    fn flush_page_uncached(page: &VecPage) -> (Arc<Scene>, Vec2) {
+    fn flush_page_uncached(page: &VecPage) -> RenderedPage {
         let VecPage { size, elem, .. } = page;
         let mut elem_scene = vello::Scene::new();
         elem.render(&mut elem_scene);
 
-        (Arc::new(elem_scene), *size)
+        RenderedPage {
+            scene: Arc::new(elem_scene),
+            size: vec2_to_size(*size),
+            semantics: page.semantics.clone(),
+        }
     }
+}
+
+fn vec2_to_size(size: Vec2) -> Size {
+    Size::new(size.x, size.y)
+}
+
+fn size_to_vec2(size: Size) -> Vec2 {
+    Vec2::new(size.width, size.height)
 }
 
 /// Maintains the state of the incremental rendering a canvas at client side
@@ -319,6 +359,18 @@ impl IncrVelloDocClient {
 
     /// Renders a specific page of the document in the given window.
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
+        Ok(self
+            .render_pages_with_semantics(kern)?
+            .into_iter()
+            .map(|page| (page.scene, page.size))
+            .collect())
+    }
+
+    /// Renders pages with their semantic metadata.
+    pub fn render_pages_with_semantics(
+        &mut self,
+        kern: &mut IncrDocClient,
+    ) -> Result<Vec<RenderedPage>> {
         let Some(layout) = Self::select_page_layout(kern) else {
             kern.layout = None;
             self.reset();
@@ -332,12 +384,7 @@ impl IncrVelloDocClient {
         // let ts = sk::Transform::from_scale(s, s);
         // let ts = Affine::scale(s as f64);
 
-        let res = self
-            .vec2vello
-            .flush_pages()
-            .into_iter()
-            .map(|(scene, size)| (scene, Size::new(size.x, size.y)))
-            .collect();
+        let res = self.vec2vello.flush_pages_with_semantics();
         Ok(res)
     }
 }
@@ -362,7 +409,7 @@ mod tests {
     use tinymist_std::typst::TypstDocument;
     use vello::{
         Scene,
-        kurbo::{Size, Vec2},
+        kurbo::{Point, Size, Vec2},
     };
 
     use super::{IncrVelloDocClient, IncrVelloPass};
@@ -454,6 +501,52 @@ mod tests {
                 .and_then(|layout| layout.pages(&doc.doc.module))
                 .is_some(),
             "selected layout should resolve to page metadata"
+        );
+    }
+
+    #[test]
+    fn render_pages_preserves_link_semantics() {
+        let link_id = Fingerprint::from_pair(41, 0);
+        let mut module = Module::default();
+        module.items.insert(
+            link_id,
+            VecItem::Link(ir::LinkItem {
+                href: "https://example.com".into(),
+                size: Axes::new(Scalar(6.), Scalar(8.)),
+            }),
+        );
+
+        let pages = vec![Page {
+            content: link_id,
+            size: Axes::new(Scalar(16.), Scalar(16.)),
+        }];
+        let mut doc = IncrDocClient::default();
+        doc.doc.module = module;
+        doc.doc.layouts = vec![LayoutRegion::new_single(LayoutRegionNode::new_pages(pages))];
+
+        let mut client = IncrVelloDocClient::default();
+        let rendered = client
+            .render_pages_with_semantics(&mut doc)
+            .expect("link semantics fixture should render");
+
+        assert_eq!(rendered.len(), 1);
+        let links = rendered[0].semantics.links();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].href, "https://example.com");
+        assert_eq!(links[0].rect.width(), 6.0);
+        assert_eq!(links[0].rect.height(), 8.0);
+        assert_eq!(
+            rendered[0]
+                .semantics
+                .hit_test_link(Point::new(3.0, 4.0))
+                .map(|link| link.href.as_str()),
+            Some("https://example.com")
+        );
+        assert!(
+            rendered[0]
+                .semantics
+                .hit_test_link(Point::new(12.0, 12.0))
+                .is_none()
         );
     }
 

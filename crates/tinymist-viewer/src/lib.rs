@@ -9,7 +9,7 @@ use std::fmt;
 use ecow::EcoVec;
 use reflexo::hash::Fingerprint;
 use std::sync::Arc;
-use vello::kurbo::{self, Affine};
+use vello::kurbo::{self, Affine, Point, Rect};
 use vello::peniko;
 
 pub mod doc;
@@ -67,7 +67,59 @@ pub trait SvgResourceResolver: Send + Sync {
 pub struct VecPage {
     size: kurbo::Vec2,
     elem: Arc<VecScene>,
+    semantics: PageSemantics,
     content_hash: Fingerprint,
+}
+
+/// Semantic metadata for a rendered page.
+#[derive(Debug, Clone, Default)]
+pub struct PageSemantics {
+    links: EcoVec<SemanticLink>,
+}
+
+impl PageSemantics {
+    /// Returns all semantic links in paint order.
+    pub fn links(&self) -> &[SemanticLink] {
+        &self.links
+    }
+
+    /// Returns the topmost link at the provided page-coordinate point.
+    pub fn hit_test_link(&self, point: Point) -> Option<&SemanticLink> {
+        self.links
+            .iter()
+            .rev()
+            .find(|link| link.rect.contains(point))
+    }
+
+    fn push_link(&mut self, link: SemanticLink) {
+        self.links.push(link);
+    }
+}
+
+/// A semantic link hit area in page coordinates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SemanticLink {
+    /// The link destination.
+    pub href: String,
+    /// The clickable page-coordinate rectangle.
+    pub rect: Rect,
+}
+
+impl SemanticLink {
+    /// Creates a semantic link.
+    pub fn new(href: impl Into<String>, rect: Rect) -> Self {
+        Self {
+            href: href.into(),
+            rect,
+        }
+    }
+
+    fn transformed(&self, transform: Affine) -> Self {
+        Self {
+            href: self.href.clone(),
+            rect: transform_rect_bbox(transform, self.rect),
+        }
+    }
 }
 
 /// A scene that can be rendered to a [`vello::Scene`].
@@ -108,6 +160,20 @@ impl VecScene {
             VecScene::Scene(sub, transform) => scene.append(sub, *transform),
         }
     }
+
+    /// Collects semantic metadata in page coordinates.
+    pub fn page_semantics(&self) -> PageSemantics {
+        let mut semantics = PageSemantics::default();
+        self.collect_semantics(Affine::IDENTITY, &mut semantics);
+        semantics
+    }
+
+    fn collect_semantics(&self, transform: Affine, semantics: &mut PageSemantics) {
+        match self {
+            VecScene::Group(group) => group.collect_semantics(transform, semantics),
+            VecScene::Path(..) | VecScene::Scene(..) => {}
+        }
+    }
 }
 
 /// A group of scenes that are rendered together.
@@ -116,6 +182,7 @@ pub struct GroupScene {
     clip: Option<kurbo::BezPath>,
     ts: Affine,
     scenes: EcoVec<(kurbo::Vec2, Arc<VecScene>)>,
+    semantic_links: EcoVec<SemanticLink>,
 }
 
 impl GroupScene {
@@ -134,5 +201,103 @@ impl GroupScene {
         if self.clip.is_some() {
             scene.pop_layer();
         }
+    }
+
+    fn collect_semantics(&self, transform: Affine, semantics: &mut PageSemantics) {
+        let transform = transform * self.ts;
+        for link in self.semantic_links.iter() {
+            semantics.push_link(link.transformed(transform));
+        }
+
+        for (pos, elem) in self.scenes.iter() {
+            elem.collect_semantics(transform.pre_translate(*pos), semantics);
+        }
+    }
+}
+
+fn transform_rect_bbox(transform: Affine, rect: Rect) -> Rect {
+    let points = [
+        Point::new(rect.x0, rect.y0),
+        Point::new(rect.x1, rect.y0),
+        Point::new(rect.x1, rect.y1),
+        Point::new(rect.x0, rect.y1),
+    ]
+    .map(|point| transform * point);
+
+    let mut x0 = f64::INFINITY;
+    let mut y0 = f64::INFINITY;
+    let mut x1 = f64::NEG_INFINITY;
+    let mut y1 = f64::NEG_INFINITY;
+    for point in points {
+        x0 = x0.min(point.x);
+        y0 = y0.min(point.y);
+        x1 = x1.max(point.x);
+        y1 = y1.max(point.y);
+    }
+
+    Rect::new(x0, y0, x1, y1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn page_semantics_hit_tests_topmost_link() {
+        let mut semantics = PageSemantics::default();
+        semantics.push_link(SemanticLink::new(
+            "https://bottom.example",
+            Rect::new(0.0, 0.0, 20.0, 20.0),
+        ));
+        semantics.push_link(SemanticLink::new(
+            "https://top.example",
+            Rect::new(10.0, 10.0, 30.0, 30.0),
+        ));
+
+        assert_eq!(
+            semantics
+                .hit_test_link(Point::new(12.0, 12.0))
+                .map(|link| link.href.as_str()),
+            Some("https://top.example")
+        );
+        assert_eq!(
+            semantics
+                .hit_test_link(Point::new(5.0, 5.0))
+                .map(|link| link.href.as_str()),
+            Some("https://bottom.example")
+        );
+        assert!(semantics.hit_test_link(Point::new(40.0, 40.0)).is_none());
+    }
+
+    #[test]
+    fn page_semantics_collects_transformed_nested_links() {
+        let mut links = EcoVec::new();
+        links.push(SemanticLink::new(
+            "https://example.com",
+            Rect::new(0.0, 0.0, 5.0, 10.0),
+        ));
+        let child = Arc::new(VecScene::Group(GroupScene {
+            clip: None,
+            ts: Affine::scale(2.0),
+            scenes: EcoVec::new(),
+            semantic_links: links,
+        }));
+
+        let mut scenes = EcoVec::new();
+        scenes.push((kurbo::Vec2::new(10.0, 20.0), child));
+        let scene = VecScene::Group(GroupScene {
+            clip: None,
+            ts: Affine::IDENTITY,
+            scenes,
+            semantic_links: EcoVec::new(),
+        });
+
+        let semantics = scene.page_semantics();
+        assert_eq!(semantics.links().len(), 1);
+        let link = &semantics.links()[0];
+        assert_eq!(link.href, "https://example.com");
+        assert_eq!(link.rect, Rect::new(10.0, 20.0, 20.0, 40.0));
+        assert!(semantics.hit_test_link(Point::new(15.0, 30.0)).is_some());
+        assert!(semantics.hit_test_link(Point::new(25.0, 30.0)).is_none());
     }
 }

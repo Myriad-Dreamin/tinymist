@@ -27,6 +27,7 @@ image.workspace = true
 indexmap.workspace = true
 log.workspace = true
 masonry.workspace = true
+open.workspace = true
 parking_lot.workspace = true
 reflexo-vec2svg.workspace = true
 reflexo-typst.workspace = true
