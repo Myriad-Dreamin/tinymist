@@ -59,14 +59,12 @@ impl Default for IncrVelloPass {
 #[derive(Clone)]
 struct FlushedPage {
     content_hash: Fingerprint,
-    size: Vec2,
-    scene: Arc<Scene>,
-    semantics: PageSemantics,
+    page: RenderedPage,
 }
 
 impl FlushedPage {
     fn matches(&self, page: &VecPage) -> bool {
-        self.content_hash == page.content_hash && self.size == page.size
+        self.content_hash == page.content_hash && self.page.size == vec2_to_size(page.size)
     }
 }
 
@@ -101,29 +99,26 @@ impl IncrVelloPass {
 
     /// Flushes a page to the canvas with the given transform.
     pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
-        let (scene, size, _) = self.flush_page_with_semantics(idx);
-        (scene, size)
+        let page = self.flush_page_with_semantics(idx);
+        (page.scene, size_to_vec2(page.size))
     }
 
-    fn flush_page_with_semantics(&mut self, idx: usize) -> (Arc<Scene>, Vec2, PageSemantics) {
+    fn flush_page_with_semantics(&mut self, idx: usize) -> RenderedPage {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {idx}");
-            return (
-                Arc::new(vello::Scene::new()),
-                Vec2::ZERO,
-                PageSemantics::default(),
-            );
+            return RenderedPage {
+                scene: Arc::new(vello::Scene::new()),
+                size: Size::ZERO,
+                semantics: PageSemantics::default(),
+            };
         }
 
         let page = &self.pages[idx];
-        let (scene, size) = Self::flush_page_uncached(page);
-        let semantics = page.semantics.clone();
+        let rendered_page = Self::flush_page_uncached(page);
 
         let flushed = FlushedPage {
             content_hash: page.content_hash,
-            size,
-            scene: scene.clone(),
-            semantics: semantics.clone(),
+            page: rendered_page.clone(),
         };
         if idx < self.flushed_pages.len() {
             self.flushed_pages[idx] = flushed;
@@ -131,18 +126,18 @@ impl IncrVelloPass {
             self.flushed_pages.push(flushed);
         }
 
-        (scene, size, semantics)
+        rendered_page
     }
 
     #[cfg(test)]
     fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
         self.flush_pages_with_semantics()
             .into_iter()
-            .map(|(scene, size, _)| (scene, size))
+            .map(|page| (page.scene, size_to_vec2(page.size)))
             .collect()
     }
 
-    fn flush_pages_with_semantics(&mut self) -> Vec<(Arc<Scene>, Vec2, PageSemantics)> {
+    fn flush_pages_with_semantics(&mut self) -> Vec<RenderedPage> {
         let mut pages = Vec::with_capacity(self.pages.len());
         let mut flushed_pages = Vec::with_capacity(self.pages.len());
         let mut reusable_flushed_pages =
@@ -152,24 +147,17 @@ impl IncrVelloPass {
             if let Some(flushed) =
                 Self::take_matching_flushed_page(&mut reusable_flushed_pages, page)
             {
-                pages.push((
-                    flushed.scene.clone(),
-                    flushed.size,
-                    flushed.semantics.clone(),
-                ));
+                pages.push(flushed.page.clone());
                 flushed_pages.push(flushed);
                 continue;
             }
 
-            let (scene, size) = Self::flush_page_uncached(page);
-            let semantics = page.semantics.clone();
+            let rendered_page = Self::flush_page_uncached(page);
             flushed_pages.push(FlushedPage {
                 content_hash: page.content_hash,
-                size,
-                scene: scene.clone(),
-                semantics: semantics.clone(),
+                page: rendered_page.clone(),
             });
-            pages.push((scene, size, semantics));
+            pages.push(rendered_page);
         }
 
         self.flushed_pages = flushed_pages;
@@ -213,13 +201,25 @@ impl IncrVelloPass {
         Some(flushed)
     }
 
-    fn flush_page_uncached(page: &VecPage) -> (Arc<Scene>, Vec2) {
+    fn flush_page_uncached(page: &VecPage) -> RenderedPage {
         let VecPage { size, elem, .. } = page;
         let mut elem_scene = vello::Scene::new();
         elem.render(&mut elem_scene);
 
-        (Arc::new(elem_scene), *size)
+        RenderedPage {
+            scene: Arc::new(elem_scene),
+            size: vec2_to_size(*size),
+            semantics: page.semantics.clone(),
+        }
     }
+}
+
+fn vec2_to_size(size: Vec2) -> Size {
+    Size::new(size.x, size.y)
+}
+
+fn size_to_vec2(size: Size) -> Vec2 {
+    Vec2::new(size.width, size.height)
 }
 
 /// Maintains the state of the incremental rendering a canvas at client side
@@ -384,16 +384,7 @@ impl IncrVelloDocClient {
         // let ts = sk::Transform::from_scale(s, s);
         // let ts = Affine::scale(s as f64);
 
-        let res = self
-            .vec2vello
-            .flush_pages_with_semantics()
-            .into_iter()
-            .map(|(scene, size, semantics)| RenderedPage {
-                scene,
-                size: Size::new(size.x, size.y),
-                semantics,
-            })
-            .collect();
+        let res = self.vec2vello.flush_pages_with_semantics();
         Ok(res)
     }
 }
