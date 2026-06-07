@@ -17,7 +17,18 @@ use vello::{
     peniko::{Color, color::parse_color},
 };
 
-use crate::{SvgResourceResolver, VecPage};
+use crate::{PageSemantics, SvgResourceResolver, VecPage};
+
+/// A rendered page with its semantic metadata.
+#[derive(Clone)]
+pub struct RenderedPage {
+    /// The flushed Vello scene.
+    pub scene: Arc<Scene>,
+    /// The page size in Typst page coordinates.
+    pub size: Size,
+    /// The page semantic layer.
+    pub semantics: PageSemantics,
+}
 
 /// Incremental pass from vector to vello scene.
 pub struct IncrVelloPass {
@@ -50,6 +61,7 @@ struct FlushedPage {
     content_hash: Fingerprint,
     size: Vec2,
     scene: Arc<Scene>,
+    semantics: PageSemantics,
 }
 
 impl FlushedPage {
@@ -73,9 +85,12 @@ impl IncrVelloPass {
                 }
 
                 let size = Vec2::new(size.x.0 as f64, size.y.0 as f64);
+                let elem = ct.render_item(content);
+                let semantics = elem.page_semantics();
                 VecPage {
                     size,
-                    elem: ct.render_item(content),
+                    elem,
+                    semantics,
                     content_hash: *content,
                 }
             })
@@ -86,18 +101,29 @@ impl IncrVelloPass {
 
     /// Flushes a page to the canvas with the given transform.
     pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
+        let (scene, size, _) = self.flush_page_with_semantics(idx);
+        (scene, size)
+    }
+
+    fn flush_page_with_semantics(&mut self, idx: usize) -> (Arc<Scene>, Vec2, PageSemantics) {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {idx}");
-            return (Arc::new(vello::Scene::new()), Vec2::ZERO);
+            return (
+                Arc::new(vello::Scene::new()),
+                Vec2::ZERO,
+                PageSemantics::default(),
+            );
         }
 
         let page = &self.pages[idx];
         let (scene, size) = Self::flush_page_uncached(page);
+        let semantics = page.semantics.clone();
 
         let flushed = FlushedPage {
             content_hash: page.content_hash,
             size,
             scene: scene.clone(),
+            semantics: semantics.clone(),
         };
         if idx < self.flushed_pages.len() {
             self.flushed_pages[idx] = flushed;
@@ -105,10 +131,18 @@ impl IncrVelloPass {
             self.flushed_pages.push(flushed);
         }
 
-        (scene, size)
+        (scene, size, semantics)
     }
 
+    #[cfg(test)]
     fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
+        self.flush_pages_with_semantics()
+            .into_iter()
+            .map(|(scene, size, _)| (scene, size))
+            .collect()
+    }
+
+    fn flush_pages_with_semantics(&mut self) -> Vec<(Arc<Scene>, Vec2, PageSemantics)> {
         let mut pages = Vec::with_capacity(self.pages.len());
         let mut flushed_pages = Vec::with_capacity(self.pages.len());
         let mut reusable_flushed_pages =
@@ -118,18 +152,24 @@ impl IncrVelloPass {
             if let Some(flushed) =
                 Self::take_matching_flushed_page(&mut reusable_flushed_pages, page)
             {
-                pages.push((flushed.scene.clone(), flushed.size));
+                pages.push((
+                    flushed.scene.clone(),
+                    flushed.size,
+                    flushed.semantics.clone(),
+                ));
                 flushed_pages.push(flushed);
                 continue;
             }
 
             let (scene, size) = Self::flush_page_uncached(page);
+            let semantics = page.semantics.clone();
             flushed_pages.push(FlushedPage {
                 content_hash: page.content_hash,
                 size,
                 scene: scene.clone(),
+                semantics: semantics.clone(),
             });
-            pages.push((scene, size));
+            pages.push((scene, size, semantics));
         }
 
         self.flushed_pages = flushed_pages;
@@ -319,6 +359,18 @@ impl IncrVelloDocClient {
 
     /// Renders a specific page of the document in the given window.
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
+        Ok(self
+            .render_pages_with_semantics(kern)?
+            .into_iter()
+            .map(|page| (page.scene, page.size))
+            .collect())
+    }
+
+    /// Renders pages with their semantic metadata.
+    pub fn render_pages_with_semantics(
+        &mut self,
+        kern: &mut IncrDocClient,
+    ) -> Result<Vec<RenderedPage>> {
         let Some(layout) = Self::select_page_layout(kern) else {
             kern.layout = None;
             self.reset();
@@ -334,9 +386,13 @@ impl IncrVelloDocClient {
 
         let res = self
             .vec2vello
-            .flush_pages()
+            .flush_pages_with_semantics()
             .into_iter()
-            .map(|(scene, size)| (scene, Size::new(size.x, size.y)))
+            .map(|(scene, size, semantics)| RenderedPage {
+                scene,
+                size: Size::new(size.x, size.y),
+                semantics,
+            })
             .collect();
         Ok(res)
     }
@@ -362,7 +418,7 @@ mod tests {
     use tinymist_std::typst::TypstDocument;
     use vello::{
         Scene,
-        kurbo::{Size, Vec2},
+        kurbo::{Point, Size, Vec2},
     };
 
     use super::{IncrVelloDocClient, IncrVelloPass};
@@ -454,6 +510,52 @@ mod tests {
                 .and_then(|layout| layout.pages(&doc.doc.module))
                 .is_some(),
             "selected layout should resolve to page metadata"
+        );
+    }
+
+    #[test]
+    fn render_pages_preserves_link_semantics() {
+        let link_id = Fingerprint::from_pair(41, 0);
+        let mut module = Module::default();
+        module.items.insert(
+            link_id,
+            VecItem::Link(ir::LinkItem {
+                href: "https://example.com".into(),
+                size: Axes::new(Scalar(6.), Scalar(8.)),
+            }),
+        );
+
+        let pages = vec![Page {
+            content: link_id,
+            size: Axes::new(Scalar(16.), Scalar(16.)),
+        }];
+        let mut doc = IncrDocClient::default();
+        doc.doc.module = module;
+        doc.doc.layouts = vec![LayoutRegion::new_single(LayoutRegionNode::new_pages(pages))];
+
+        let mut client = IncrVelloDocClient::default();
+        let rendered = client
+            .render_pages_with_semantics(&mut doc)
+            .expect("link semantics fixture should render");
+
+        assert_eq!(rendered.len(), 1);
+        let links = rendered[0].semantics.links();
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].href, "https://example.com");
+        assert_eq!(links[0].rect.width(), 6.0);
+        assert_eq!(links[0].rect.height(), 8.0);
+        assert_eq!(
+            rendered[0]
+                .semantics
+                .hit_test_link(Point::new(3.0, 4.0))
+                .map(|link| link.href.as_str()),
+            Some("https://example.com")
+        );
+        assert!(
+            rendered[0]
+                .semantics
+                .hit_test_link(Point::new(12.0, 12.0))
+                .is_none()
         );
     }
 

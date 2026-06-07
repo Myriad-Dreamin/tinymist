@@ -15,9 +15,11 @@ const WINDOW_LAYOUT_TIMEOUT_MS = 10_000;
 const WINDOW_LAYOUT_POLL_MS = 250;
 
 type WindowLayoutMode = "disabled" | "sideBySide";
+type PreviewTarget = "paged" | "html";
 
 interface TinymistPreviewer {
   compatibleTinymistVersion: string;
+  supportedTargets?: PreviewTarget[];
   isCompatible?(tinymistVersion: string): Promise<boolean> | boolean;
   handlePreview(task: TinymistPreviewTask): Promise<vscode.Disposable> | vscode.Disposable;
 }
@@ -25,6 +27,7 @@ interface TinymistPreviewer {
 interface TinymistPreviewTask {
   taskId: string;
   documentPath: string;
+  target: PreviewTarget;
   dataPlaneHost: string;
 }
 
@@ -51,6 +54,7 @@ export function activate(context: vscode.ExtensionContext): TinymistPreviewerPro
     providePreviewer() {
       return {
         compatibleTinymistVersion,
+        supportedTargets: ["paged"],
         isCompatible(tinymistVersion: string) {
           return tinymistVersion === compatibleTinymistVersion;
         },
@@ -64,7 +68,10 @@ export function activate(context: vscode.ExtensionContext): TinymistPreviewerPro
 
 export function deactivate() {}
 
-function launchViewer(context: vscode.ExtensionContext, task: TinymistPreviewTask): vscode.Disposable {
+function launchViewer(
+  context: vscode.ExtensionContext,
+  task: TinymistPreviewTask,
+): vscode.Disposable {
   activeViewers.get(task.taskId)?.kill();
 
   const executable = resolveViewerExecutable(context);

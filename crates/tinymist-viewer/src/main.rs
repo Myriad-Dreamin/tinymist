@@ -26,13 +26,13 @@ use typst::{Library, LibraryExt, World};
 use winit::dpi::LogicalSize;
 use xilem::core::{Edit, MessageProxy, fork};
 use xilem::vello::Scene;
-use xilem::vello::kurbo::Size;
+use xilem::vello::kurbo::{Point, Size};
 use xilem::vello::peniko::Color;
 use xilem::view::{ZStackExt as _, flex_col, portal, resize_observer, sized_box, task, zstack};
 use xilem::{AppState, EventLoop, WidgetView, WindowId, Xilem, window};
 
 use tinymist_viewer::doc::doc;
-use tinymist_viewer::incr::IncrVelloDocClient;
+use tinymist_viewer::incr::{IncrVelloDocClient, RenderedPage};
 use tinymist_viewer::protocol::preview_update_from_bytes;
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
@@ -86,7 +86,7 @@ struct PreviewState {
     data_plane_host: String,
     window_id: WindowId,
     running: bool,
-    pages: Vec<(Arc<Scene>, Size)>,
+    pages: Vec<RenderedPage>,
     background_color: Option<Color>,
     window_size: Size,
     connection: ConnectionStatus,
@@ -262,12 +262,13 @@ impl PreviewState {
             .pages
             .iter()
             .enumerate()
-            .map(|(idx, (page_scene, scene_size))| {
+            .map(|(idx, page)| {
                 let tx = self.tx.clone();
-                let page_scene = page_scene.clone();
+                let page_scene = page.scene.clone();
+                let page_semantics = page.semantics.clone();
                 let background_color = self.background_color;
-                let width = scene_size.width;
-                let height = scene_size.height;
+                let width = page.size.width;
+                let height = page.size.height;
 
                 // Adjusts size
                 // This is a hack to hide the vertical scrollbar.
@@ -287,6 +288,12 @@ impl PreviewState {
 
                         let x = pos.x / bbox.width() * width;
                         let y = pos.y / bbox.height() * height;
+
+                        if let Some(link) = page_semantics.hit_test_link(Point::new(x, y))
+                            && open_supported_external_link(&link.href)
+                        {
+                            return;
+                        }
 
                         let _ = tx.send(PreviewEvent::Click {
                             page_idx: idx + 1,
@@ -587,7 +594,7 @@ impl ezsockets::ClientExt for Client {
 
             self.doc.merge_delta(delta);
 
-            let pages = match self.vello.render_pages(&mut self.doc) {
+            let pages = match self.vello.render_pages_with_semantics(&mut self.doc) {
                 Ok(scene) => scene,
                 Err(err) => {
                     log::error!("Error rendering pages: {err}");
@@ -675,7 +682,7 @@ impl ezsockets::ClientExt for Client {
 
 enum RenderRequest {
     New {
-        pages: Vec<(Arc<Scene>, Size)>,
+        pages: Vec<RenderedPage>,
         background_color: Option<Color>,
     },
     Connection(ConnectionStatus),
@@ -690,9 +697,55 @@ impl fmt::Debug for RenderRequest {
     }
 }
 
+fn open_supported_external_link(href: &str) -> bool {
+    let href = href.trim();
+    if !is_supported_external_link(href) {
+        return false;
+    }
+
+    log::debug!("opening external link: {href}");
+    if let Err(err) = open::that_detached(href) {
+        log::warn!("failed to open external link {href:?}: {err}");
+    }
+    true
+}
+
+fn is_supported_external_link(href: &str) -> bool {
+    let Some((scheme, rest)) = href.trim().split_once(':') else {
+        return false;
+    };
+
+    if scheme.eq_ignore_ascii_case("mailto") {
+        return !rest.is_empty();
+    }
+
+    (scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https"))
+        && rest.starts_with("//")
+        && rest.len() > 2
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn supported_external_links_are_limited_to_web_and_mail() {
+        assert!(is_supported_external_link("http://example.com"));
+        assert!(is_supported_external_link("https://example.com/path"));
+        assert!(is_supported_external_link("mailto:hello@example.com"));
+        assert!(is_supported_external_link("HTTPS://example.com"));
+    }
+
+    #[test]
+    fn unsupported_external_links_are_not_opened_by_viewer() {
+        assert!(!is_supported_external_link("file:///tmp/example.typ"));
+        assert!(!is_supported_external_link("/tmp/example.typ"));
+        assert!(!is_supported_external_link("example.typ"));
+        assert!(!is_supported_external_link("#target"));
+        assert!(!is_supported_external_link("ftp://example.com"));
+        assert!(!is_supported_external_link("http:example.com"));
+        assert!(!is_supported_external_link("mailto:"));
+    }
 
     #[test]
     fn typst_status_scene_renders() {

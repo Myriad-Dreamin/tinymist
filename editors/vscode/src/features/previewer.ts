@@ -7,14 +7,17 @@ import { tinymist } from "../lsp";
 import { loadHTMLFile } from "../util";
 
 export type PreviewerSourceKind = "builtin" | "html" | "extension";
+export type PreviewTarget = "paged" | "html";
 
 export interface PreviewerSourceMetadata {
   kind: PreviewerSourceKind;
   trusted: boolean;
+  target?: PreviewTarget;
   configuredProvider?: string;
   extensionId?: string;
   htmlPath?: string;
   handler?: "documentPreview";
+  supportedTargets?: PreviewTarget[];
   compatibleTinymistVersion?: string;
   fallbackReason?: string;
 }
@@ -26,6 +29,7 @@ export interface TinymistPreviewTask {
   documentUri: string;
   documentPath: string;
   mode: "doc" | "slide";
+  target: PreviewTarget;
   dataPlaneHost: string;
   dataPlanePort: string | number;
   staticServerPort: string | number;
@@ -45,6 +49,7 @@ export interface ResolvedPreviewer {
 
 export interface TinymistPreviewer {
   htmlPath?: string;
+  supportedTargets?: PreviewTarget[];
   compatibleTinymistVersion: string;
   isCompatible?(tinymistVersion: string): Promise<boolean> | boolean;
   handlePreview?(task: TinymistPreviewTask): Promise<TinymistPreviewHandle> | TinymistPreviewHandle;
@@ -62,6 +67,7 @@ interface PreviewerExtension {
 export interface PreviewerResolverEnvironment {
   provider?: string;
   builtinPreviewerId?: string;
+  previewTarget?: PreviewTarget;
   workspaceTrusted: boolean;
   tinymistVersion: string;
   builtinPreviewer: () => Promise<ResolvedPreviewer>;
@@ -104,6 +110,12 @@ export async function preloadPreviewer(context: vscode.ExtensionContext) {
 export function getConfiguredPreviewer(): string | undefined {
   return resolvePreviewerValue(
     vscode.workspace.getConfiguration("tinymist").get<string>("previewer"),
+  );
+}
+
+export function getConfiguredPreviewTarget(): PreviewTarget {
+  return normalizePreviewTarget(
+    vscode.workspace.getConfiguration("tinymist").get<string>("exportTarget"),
   );
 }
 
@@ -156,11 +168,13 @@ export async function resolvePreviewer(
   context: vscode.ExtensionContext,
 ): Promise<ResolvedPreviewer> {
   const provider = getConfiguredPreviewer();
+  const previewTarget = getConfiguredPreviewTarget();
   const builtinPreviewerId = String(context.extension?.id ?? DEFAULT_PREVIEWER_EXTENSION_ID);
   const cacheKey = JSON.stringify({
     builtinPreviewSourceMode,
     builtinPreviewerId,
     provider,
+    previewTarget,
     trusted: vscode.workspace.isTrusted,
     version: context.extension.packageJSON.version,
   });
@@ -171,6 +185,7 @@ export async function resolvePreviewer(
   const previewer = await resolveConfiguredPreviewer({
     provider,
     builtinPreviewerId,
+    previewTarget,
     workspaceTrusted: vscode.workspace.isTrusted,
     tinymistVersion: String(context.extension.packageJSON.version),
     builtinPreviewer: () => resolveBuiltinPreviewer(context),
@@ -221,16 +236,13 @@ async function resolveBuiltinPreviewerSelection(
   provider: string | undefined,
 ): Promise<ResolvedPreviewer> {
   const previewer = await environment.builtinPreviewer();
-  if (!provider) {
-    return previewer;
-  }
-
   return {
     ...previewer,
     source: {
       ...previewer.source,
       trusted: environment.workspaceTrusted,
-      configuredProvider: provider,
+      target: getPreviewTarget(environment),
+      ...(provider ? { configuredProvider: provider } : {}),
     },
   };
 }
@@ -264,6 +276,7 @@ async function resolveHtmlPreviewer(
     source: {
       kind: "html",
       trusted: environment.workspaceTrusted,
+      target: getPreviewTarget(environment),
       configuredProvider: provider,
       htmlPath,
     },
@@ -340,6 +353,16 @@ async function resolveExtensionPreviewer(
     );
   }
 
+  const previewTarget = getPreviewTarget(environment);
+  const supportedTargets = normalizeSupportedTargets(previewer.supportedTargets);
+  if (!supportsPreviewTarget(supportedTargets, previewTarget)) {
+    return fallbackToBuiltin(
+      environment,
+      provider,
+      `does not support the \`${previewTarget}\` preview target`,
+    );
+  }
+
   if (typeof previewer.handlePreview === "function") {
     return {
       html: "",
@@ -349,9 +372,11 @@ async function resolveExtensionPreviewer(
       source: {
         kind: "extension",
         trusted: environment.workspaceTrusted,
+        target: previewTarget,
         configuredProvider: provider,
         extensionId,
         handler: "documentPreview",
+        supportedTargets,
         compatibleTinymistVersion: previewer.compatibleTinymistVersion,
       },
     };
@@ -377,9 +402,11 @@ async function resolveExtensionPreviewer(
     source: {
       kind: "extension",
       trusted: environment.workspaceTrusted,
+      target: previewTarget,
       configuredProvider: provider,
       extensionId,
       htmlPath: resolvedHtmlPath,
+      supportedTargets,
       compatibleTinymistVersion: previewer.compatibleTinymistVersion,
     },
   });
@@ -457,6 +484,7 @@ async function fallbackToBuiltin(
     source: {
       ...builtinPreviewer.source,
       trusted: environment.workspaceTrusted,
+      target: getPreviewTarget(environment),
       configuredProvider: provider,
       fallbackReason,
     },
@@ -490,6 +518,37 @@ function isPreviewerProvider(value: unknown): value is TinymistPreviewerProvider
     value !== null &&
     typeof (value as TinymistPreviewerProvider).providePreviewer === "function"
   );
+}
+
+function getPreviewTarget(environment: PreviewerResolverEnvironment): PreviewTarget {
+  return environment.previewTarget ?? "paged";
+}
+
+function normalizePreviewTarget(value: unknown): PreviewTarget {
+  return typeof value === "string" && value.trim() === "html" ? "html" : "paged";
+}
+
+function normalizeSupportedTargets(supportedTargets: unknown): PreviewTarget[] | undefined {
+  if (supportedTargets === undefined || supportedTargets === null) {
+    return undefined;
+  }
+
+  if (!Array.isArray(supportedTargets)) {
+    return [];
+  }
+
+  return [...new Set(supportedTargets.filter(isPreviewTarget))];
+}
+
+function supportsPreviewTarget(
+  supportedTargets: PreviewTarget[] | undefined,
+  previewTarget: PreviewTarget,
+): boolean {
+  return supportedTargets === undefined || supportedTargets.includes(previewTarget);
+}
+
+function isPreviewTarget(value: unknown): value is PreviewTarget {
+  return value === "paged" || value === "html";
 }
 
 function errorMessage(error: unknown): string {
