@@ -7,7 +7,7 @@ use comemo::Track;
 use tinymist_world::args;
 use typst::{
     engine::Engine,
-    foundations::{func::Repr, Args, Closure, Context, Func, Str, Value},
+    foundations::{func::Repr, Args, Closure, ClosureNode, Context, Func, Str, Value},
     syntax::{ast, Source, Span},
 };
 
@@ -129,8 +129,7 @@ impl TySchemeWorker<'_> {
                 ))
             }
             "rec" => {
-                // let ty = self.define(k, &args.eat::<Value>().ok()??);
-                todo!()
+                Ty::Any
             }
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
@@ -263,7 +262,10 @@ impl TySchemeWorker<'_> {
             TyMark::Sig(ty) => return Some(ty),
         };
 
-        let syntax = closure.node.cast::<ast::Closure>()?;
+        let syntax = match &closure.node {
+            ClosureNode::Closure(node) => node.cast::<ast::Closure>()?,
+            ClosureNode::Context(_) => return None,
+        };
         let name = syntax.name().unwrap_or_default().get();
         let mut defaults = closure.defaults.iter();
 
