@@ -569,8 +569,7 @@ impl LspClient {
                 self.respond_result(req_id, result.await);
             }
             Ok(MaybeDone::Gone) => {
-                log::warn!("response for request({req_id:?}) already taken");
-                self.respond_result(req_id, Err(internal_error("response already taken")));
+                log::debug!("response for request({req_id:?}) was already sent");
             }
             Err(err) => {
                 self.respond_result(req_id, Err(err));
@@ -632,7 +631,7 @@ impl LsHook for () {
 type AsyncHandler<S, T, R> = fn(srv: &mut S, args: T) -> SchedulableResponse<R>;
 type RawHandler<S, T> = fn(srv: &mut S, args: T) -> ScheduleResult;
 type BoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
-type BoxHandler<S, T> = Box<dyn Fn(&mut S, T) -> SchedulableResponse<JsonValue>>;
+type BoxHandler<S, T> = Box<dyn Fn(&mut S, RequestId, T) -> SchedulableResponse<JsonValue>>;
 type ExecuteCmdMap<S> = HashMap<&'static str, BoxHandler<S, Vec<JsonValue>>>;
 type RegularCmdMap<S> = HashMap<&'static str, BoxHandler<S, JsonValue>>;
 type NotifyCmdMap<S> = HashMap<&'static str, BoxPureHandler<S, JsonValue>>;
@@ -717,8 +716,10 @@ where
         path: &'static str,
         handler: fn(&mut Args::S, Vec<JsonValue>) -> AnySchedulableResponse,
     ) -> Self {
-        self.resource_handlers
-            .insert(Path::new(path).into(), Box::new(handler));
+        self.resource_handlers.insert(
+            Path::new(path).into(),
+            Box::new(move |s, _req_id, args| handler(s, args)),
+        );
         self
     }
 
@@ -830,7 +831,7 @@ impl<M, Args: Initializer> LsDriver<M, Args> {
 
     /// Get static resources with help of tinymist service, for example, a
     /// static help pages for some typst function.
-    pub fn get_resources(&mut self, args: Vec<JsonValue>) -> ScheduleResult {
+    pub fn get_resources(&mut self, req_id: RequestId, args: Vec<JsonValue>) -> ScheduleResult {
         let s = self.state.opt_mut().ok_or_else(not_initialized)?;
 
         let path =
@@ -842,7 +843,7 @@ impl<M, Args: Initializer> LsDriver<M, Args> {
         };
 
         // Note our redirection will keep the first path argument in the args vec.
-        handler(s, args)
+        handler(s, req_id, args)
     }
 }
 
@@ -910,6 +911,14 @@ pub fn erased_response<T: Serialize + 'static>(resp: SchedulableResponse<T>) -> 
             MaybeDone::Done(Err(internal_error("response already taken")))
         }
     })
+}
+
+/// Adapts a handler that may respond to the request itself.
+pub fn scheduled_response(resp: ScheduledResult) -> ScheduleResult {
+    match resp? {
+        Some(()) => Ok(MaybeDone::Gone),
+        None => just_ok(JsonValue::Null),
+    }
 }
 
 fn resp_err(code: ErrorCode, msg: impl fmt::Display) -> ResponseError {

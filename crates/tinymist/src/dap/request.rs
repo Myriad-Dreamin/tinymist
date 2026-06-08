@@ -1,7 +1,4 @@
-use std::{
-    path::Path,
-    sync::Arc,
-};
+use std::{path::Path, sync::Arc};
 
 use dapts::{ProcessEventStartMethod, ThreadEventReason};
 use reflexo::ImmutPath;
@@ -194,11 +191,14 @@ impl ServerState {
     ) -> ScheduledResult {
         let session = self.debug.session()?;
 
-        session.adaptor.tx.send(DebugRequest::Evaluate(
-            RequestId::dap(req_id),
-            args.expression,
-        ))
-        .map_err(|_| internal_error("debug session is closed"))?;
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Evaluate(
+                RequestId::dap(req_id),
+                args.expression,
+            ))
+            .map_err(|_| internal_error("debug session is closed"))?;
         Ok(Some(()))
     }
 
