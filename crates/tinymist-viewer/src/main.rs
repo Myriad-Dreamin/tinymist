@@ -28,12 +28,22 @@ use xilem::core::{Edit, MessageProxy, fork};
 use xilem::vello::Scene;
 use xilem::vello::kurbo::{Point, Size};
 use xilem::vello::peniko::Color;
-use xilem::view::{ZStackExt as _, flex_col, portal, resize_observer, sized_box, task, zstack};
+use xilem::view::{ZStackExt as _, flex_col, resize_observer, sized_box, task, zstack};
 use xilem::{AppState, EventLoop, WidgetView, WindowId, Xilem, window};
 
-use tinymist_viewer::doc::doc;
+use tinymist_viewer::doc::{ZoomAction, doc};
 use tinymist_viewer::incr::{IncrVelloDocClient, RenderedPage};
 use tinymist_viewer::protocol::preview_update_from_bytes;
+use tinymist_viewer::zoom_portal::zoom_portal;
+
+const DEFAULT_ZOOM_SCALE: f64 = 1.0;
+const MIN_ZOOM_SCALE: f64 = 0.1;
+const MAX_ZOOM_SCALE: f64 = 10.0;
+const ZOOM_FACTOR_EPSILON: f64 = 1e-9;
+const ZOOM_FACTORS: [f64; 31] = [
+    0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1, 2.4, 2.7, 3.0,
+    3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7.0, 7.7, 8.5, 9.4, 10.0,
+];
 
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const STATUS_BANNER_HEIGHT: f64 = 28.0;
@@ -72,6 +82,7 @@ fn main() -> Result<()> {
             window_size: default_size,
             connection: ConnectionStatus::Connecting,
             status_scene: None,
+            zoom_scale: DEFAULT_ZOOM_SCALE,
             tx,
             rx: Some(rx),
         },
@@ -91,6 +102,7 @@ struct PreviewState {
     window_size: Size,
     connection: ConnectionStatus,
     status_scene: Option<StatusScene>,
+    zoom_scale: f64,
     tx: mpsc::UnboundedSender<PreviewEvent>,
     rx: Option<mpsc::UnboundedReceiver<PreviewEvent>>,
 }
@@ -146,6 +158,10 @@ impl PreviewState {
 
         let scene = self.status_scene.as_ref().expect("status scene just set");
         (scene.scene.clone(), scene.size)
+    }
+
+    fn apply_zoom(&mut self, action: ZoomAction) {
+        self.zoom_scale = zoom_scale_after_action(self.zoom_scale, action);
     }
 
     fn view(&mut self) -> impl WidgetView<Edit<Self>> + use<> {
@@ -273,8 +289,13 @@ impl PreviewState {
                 // Adjusts size
                 // This is a hack to hide the vertical scrollbar.
                 // todo: hide vertical scrollbar
-                let elem_width = self.window_size.width - 0.5;
-                let elem_scale = if width > 0. { elem_width / width } else { 1.0 };
+                let fitted_width = fitted_page_width(self.window_size.width);
+                let elem_scale = page_scale(fitted_width, width, self.zoom_scale);
+                let elem_width = if width > 0.0 {
+                    width * elem_scale
+                } else {
+                    fitted_width
+                };
                 let elem_height = elem_scale * height;
                 // The sized box is necessary to avoid collapsing the canvas.
                 sized_box(doc(
@@ -301,6 +322,7 @@ impl PreviewState {
                             y: y as f32,
                         });
                     },
+                    |state: &mut PreviewState, action| state.apply_zoom(action),
                 ))
                 .fixed_width(Length::const_px(elem_width))
                 .fixed_height(Length::const_px(elem_height))
@@ -324,14 +346,23 @@ impl PreviewState {
             };
 
             Some(
-                sized_box(doc(scene, scene_scale, Some(color), |_pos, _bbox| {}).alt_text(message))
-                    .fixed_width(Length::const_px(overlay_width))
-                    .fixed_height(Length::const_px(overlay_height))
-                    .alignment(if self.pages.is_empty() {
-                        UnitPoint::CENTER
-                    } else {
-                        UnitPoint::TOP
-                    }),
+                sized_box(
+                    doc(
+                        scene,
+                        scene_scale,
+                        Some(color),
+                        |_pos, _bbox| {},
+                        |state: &mut PreviewState, action| state.apply_zoom(action),
+                    )
+                    .alt_text(message),
+                )
+                .fixed_width(Length::const_px(overlay_width))
+                .fixed_height(Length::const_px(overlay_height))
+                .alignment(if self.pages.is_empty() {
+                    UnitPoint::CENTER
+                } else {
+                    UnitPoint::TOP
+                }),
             )
         } else {
             None
@@ -342,9 +373,16 @@ impl PreviewState {
             |state: &mut PreviewState, size: Size| {
                 state.window_size = size;
             },
-            // Adds a scroll bar
+            // Adds a scrollable viewport.
             fork(
-                zstack((portal(flex_col(page_list)), status_overlay)),
+                zstack((
+                    zoom_portal(
+                        flex_col(page_list),
+                        self.zoom_scale,
+                        |state: &mut PreviewState, action| state.apply_zoom(action),
+                    ),
+                    status_overlay,
+                )),
                 effect,
             ),
         )
@@ -562,6 +600,60 @@ fn truncate_message(message: String, max_chars: usize) -> String {
     }
 }
 
+fn fitted_page_width(window_width: f64) -> f64 {
+    if window_width.is_finite() {
+        (window_width - 0.5).max(1.0)
+    } else {
+        1.0
+    }
+}
+
+fn page_scale(fitted_width: f64, page_width: f64, zoom_scale: f64) -> f64 {
+    let fit_scale = if page_width > 0.0 && fitted_width.is_finite() {
+        fitted_width / page_width
+    } else {
+        1.0
+    };
+
+    fit_scale * clamp_zoom_scale(zoom_scale)
+}
+
+fn clamp_zoom_scale(scale: f64) -> f64 {
+    if scale.is_finite() {
+        scale.clamp(MIN_ZOOM_SCALE, MAX_ZOOM_SCALE)
+    } else {
+        DEFAULT_ZOOM_SCALE
+    }
+}
+
+fn zoom_scale_after_action(current: f64, action: ZoomAction) -> f64 {
+    let current = clamp_zoom_scale(current);
+    match action {
+        ZoomAction::In => next_zoom_factor(current),
+        ZoomAction::Out => previous_zoom_factor(current),
+        ZoomAction::Reset => DEFAULT_ZOOM_SCALE,
+    }
+}
+
+fn next_zoom_factor(current: f64) -> f64 {
+    let current = clamp_zoom_scale(current);
+    ZOOM_FACTORS
+        .iter()
+        .copied()
+        .find(|factor| *factor > current + ZOOM_FACTOR_EPSILON)
+        .unwrap_or(MAX_ZOOM_SCALE)
+}
+
+fn previous_zoom_factor(current: f64) -> f64 {
+    let current = clamp_zoom_scale(current);
+    ZOOM_FACTORS
+        .iter()
+        .rev()
+        .copied()
+        .find(|factor| *factor < current - ZOOM_FACTOR_EPSILON)
+        .unwrap_or(MIN_ZOOM_SCALE)
+}
+
 enum PreviewEvent {
     Click { page_idx: usize, x: f32, y: f32 },
 }
@@ -727,6 +819,46 @@ fn is_supported_external_link(href: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn page_scale_composes_fit_width_and_zoom() {
+        assert_eq!(page_scale(400.0, 200.0, 1.5), 3.0);
+    }
+
+    #[test]
+    fn page_scale_uses_default_zoom_for_invalid_values() {
+        assert_eq!(page_scale(400.0, 200.0, f64::NAN), 2.0);
+    }
+
+    #[test]
+    fn zoom_actions_update_and_reset_scale() {
+        assert_eq!(zoom_scale_after_action(1.0, ZoomAction::In), 1.1);
+        assert_eq!(zoom_scale_after_action(1.1, ZoomAction::In), 1.3);
+        assert_eq!(zoom_scale_after_action(1.0, ZoomAction::Out), 0.9);
+        assert_eq!(zoom_scale_after_action(1.1, ZoomAction::Out), 1.0);
+        assert_eq!(
+            zoom_scale_after_action(2.0, ZoomAction::Reset),
+            DEFAULT_ZOOM_SCALE
+        );
+    }
+
+    #[test]
+    fn zoom_actions_snap_from_in_between_values_to_next_ladder_factor() {
+        assert_eq!(zoom_scale_after_action(1.2, ZoomAction::In), 1.3);
+        assert_eq!(zoom_scale_after_action(1.2, ZoomAction::Out), 1.1);
+    }
+
+    #[test]
+    fn zoom_scale_is_clamped_to_supported_range() {
+        assert_eq!(
+            zoom_scale_after_action(MAX_ZOOM_SCALE, ZoomAction::In),
+            MAX_ZOOM_SCALE
+        );
+        assert_eq!(
+            zoom_scale_after_action(MIN_ZOOM_SCALE, ZoomAction::Out),
+            MIN_ZOOM_SCALE
+        );
+    }
 
     #[test]
     fn supported_external_links_are_limited_to_web_and_mail() {
