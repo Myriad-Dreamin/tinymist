@@ -555,6 +555,52 @@ mod tests {
     }
 
     #[test]
+    fn render_pages_preserves_text_accessibility_run() {
+        let mut doc = compile_incremental_doc(
+            r#"
+#set page(width: 96pt, height: 48pt, margin: 0pt)
+hello
+"#,
+        );
+
+        let mut client = IncrVelloDocClient::default();
+        let rendered = client
+            .render_pages_with_accessibility(&mut doc)
+            .expect("text accessibility fixture should render");
+
+        assert_eq!(rendered.len(), 1);
+        let text_runs = rendered[0].accessibility.text_runs();
+        assert!(
+            text_runs.iter().any(|run| run.text() == "hello"),
+            "expected rendered text runs to include the source text, got {text_runs:?}"
+        );
+        let run = text_runs
+            .iter()
+            .find(|run| run.text() == "hello")
+            .expect("text run should exist");
+        assert_eq!(run.character_bounds().len(), 5);
+
+        let first = run.character_bounds()[0];
+        let last = run.character_bounds()[4];
+        let first_x = first.x0 + (first.x1 - first.x0) * 0.1;
+        let last_x = last.x1 - (last.x1 - last.x0) * 0.1;
+        let anchor = rendered[0]
+            .accessibility
+            .hit_test_text(Point::new(first_x, (first.y0 + first.y1) / 2.0))
+            .expect("first character should be selectable");
+        let focus = rendered[0]
+            .accessibility
+            .hit_test_text(Point::new(last_x, (last.y0 + last.y1) / 2.0))
+            .expect("last character should be selectable");
+        assert_eq!(
+            rendered[0]
+                .accessibility
+                .selected_text(crate::PageTextSelection { anchor, focus }),
+            "hello"
+        );
+    }
+
+    #[test]
     fn renderer_emits_expected_scene_encoding_for_typst_primitives() {
         struct Case {
             name: &'static str,

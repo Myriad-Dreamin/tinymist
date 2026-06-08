@@ -6,8 +6,9 @@ use std::sync::Arc;
 use masonry::accesskit::{Node, Role};
 use masonry::core::keyboard::Key;
 use masonry::core::{
-    AccessCtx, ArcStr, ChildrenIds, KeyboardEvent, LayoutCtx, MeasureCtx, Modifiers, PaintCtx,
-    PropertiesRef, RegisterCtx, TextEvent, Widget, WidgetId, WidgetMut,
+    AccessCtx, ArcStr, ChildrenIds, CursorIcon, KeyboardEvent, LayoutCtx, MeasureCtx, Modifiers,
+    PaintCtx, PointerButton, PointerButtonEvent, PointerEvent, PointerUpdate, PropertiesMut,
+    PropertiesRef, QueryCtx, RegisterCtx, TextEvent, Widget, WidgetId, WidgetMut,
 };
 use masonry::layout::{LenReq, Length};
 use tracing::{Span, trace_span};
@@ -17,7 +18,7 @@ use vello::peniko::{Color, Fill};
 use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewMarker};
 use xilem::{Pod, ViewCtx};
 
-use crate::PageAccessibility;
+use crate::{PageAccessibility, PageTextPosition, PageTextSelection};
 
 /// Accesses a raw vello [`Scene`] within a canvas that fills its parent
 pub fn doc<State, Action, F, G>(
@@ -107,6 +108,9 @@ where
                     background_color: self.background_color,
                     scene: self.scene.clone(),
                     accessibility: self.accessibility.clone(),
+                    selection: None,
+                    selection_drag_anchor: None,
+                    selection_dragged: false,
                 })
             }),
             (),
@@ -187,6 +191,9 @@ pub struct PageCanvas {
     background_color: Option<Color>,
     scene: Arc<Scene>,
     accessibility: Arc<PageAccessibility>,
+    selection: Option<PageTextSelection>,
+    selection_drag_anchor: Option<PageTextPosition>,
+    selection_dragged: bool,
 }
 
 // --- MARK: BUILDERS
@@ -200,6 +207,9 @@ impl PageCanvas {
             background_color,
             scene,
             accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
         }
     }
 
@@ -231,6 +241,24 @@ impl PageCanvas {
     /// size.
     pub fn size(&self) -> Size {
         self.size
+    }
+
+    fn page_point_from_local(&self, pos: Point) -> Option<Point> {
+        if self.scene_scale <= 0.0 || !self.scene_scale.is_finite() {
+            return None;
+        }
+        Some(Point::new(
+            pos.x / self.scene_scale,
+            pos.y / self.scene_scale,
+        ))
+    }
+
+    fn selection_is_valid(&self) -> bool {
+        let Some(selection) = self.selection else {
+            return true;
+        };
+        selection.anchor.run_index < self.accessibility.text_runs().len()
+            && selection.focus.run_index < self.accessibility.text_runs().len()
     }
 }
 
@@ -269,6 +297,11 @@ impl PageCanvas {
         accessibility: Arc<PageAccessibility>,
     ) {
         this.widget.accessibility = accessibility;
+        if !this.widget.selection_is_valid() {
+            this.widget.selection = None;
+            this.widget.selection_drag_anchor = None;
+            this.widget.selection_dragged = false;
+        }
         this.ctx.request_accessibility_update();
     }
 }
@@ -309,6 +342,30 @@ fn zoom_action_from_keyboard(event: &KeyboardEvent) -> Option<ZoomAction> {
     }
 }
 
+fn is_copy_shortcut(event: &KeyboardEvent) -> bool {
+    if !event.state.is_down() {
+        return false;
+    }
+    let action_modifier = if cfg!(target_os = "macos") {
+        event.modifiers.meta()
+    } else {
+        event.modifiers.ctrl()
+    };
+    action_modifier
+        && matches!(&event.key, Key::Character(key) if key.as_str().eq_ignore_ascii_case("c"))
+}
+
+const TEXT_SELECTION_COLOR: Color = Color::from_rgba8(70, 130, 255, 96);
+
+fn scale_access_rect(rect: masonry::accesskit::Rect, scale: f64) -> Rect {
+    Rect::new(
+        rect.x0 * scale,
+        rect.y0 * scale,
+        rect.x1 * scale,
+        rect.y1 * scale,
+    )
+}
+
 // --- MARK: IMPL WIDGET
 impl Widget for PageCanvas {
     type Action = PageAction;
@@ -316,18 +373,57 @@ impl Widget for PageCanvas {
     fn on_pointer_event(
         &mut self,
         ctx: &mut masonry::core::EventCtx<'_>,
-        _props: &mut masonry::core::PropertiesMut<'_>,
-        event: &masonry::core::PointerEvent,
+        _props: &mut PropertiesMut<'_>,
+        event: &PointerEvent,
     ) {
         match event {
-            masonry::core::PointerEvent::Down(..) => {
+            PointerEvent::Down(PointerButtonEvent {
+                button: None | Some(PointerButton::Primary),
+                state,
+                ..
+            }) => {
+                let cursor_pos = ctx.local_position(state.position);
+                let new_selection = self
+                    .page_point_from_local(cursor_pos)
+                    .and_then(|point| self.accessibility.hit_test_text(point))
+                    .map(PageTextSelection::collapsed);
+                let selection_changed = self.selection != new_selection;
+                self.selection = new_selection;
+                self.selection_drag_anchor = new_selection.map(|selection| selection.anchor);
+                self.selection_dragged = false;
+
                 ctx.request_focus();
                 ctx.capture_pointer();
-                // Changes in pointer capture impact appearance, but not accessibility node
                 ctx.request_paint_only();
+                if selection_changed {
+                    ctx.request_accessibility_update();
+                }
             }
-            masonry::core::PointerEvent::Up(event) => {
-                if ctx.is_active() && ctx.is_hovered() {
+            PointerEvent::Move(PointerUpdate { current, .. }) => {
+                if ctx.is_active()
+                    && let Some(anchor) = self.selection_drag_anchor
+                    && let Some(focus) = self
+                        .page_point_from_local(ctx.local_position(current.position))
+                        .and_then(|point| self.accessibility.hit_test_text(point))
+                {
+                    let new_selection = PageTextSelection { anchor, focus };
+                    if self.selection != Some(new_selection) {
+                        self.selection_dragged = true;
+                        self.selection = Some(new_selection);
+                        ctx.request_paint_only();
+                        ctx.request_accessibility_update();
+                    }
+                }
+            }
+            PointerEvent::Up(event) => {
+                let suppress_click = self.selection_dragged
+                    && self
+                        .selection
+                        .is_some_and(|selection| !selection.is_collapsed());
+                self.selection_drag_anchor = None;
+                self.selection_dragged = false;
+
+                if ctx.is_active() && ctx.is_hovered() && !suppress_click {
                     let content_box = ctx.content_box();
                     let cursor_pos = ctx.local_position(event.state.position);
                     ctx.submit_action::<Self::Action>(PageAction::Click {
@@ -335,7 +431,11 @@ impl Widget for PageCanvas {
                         cursor_pos,
                     });
                 }
-                // Changes in pointer capture impact appearance, but not accessibility node
+                ctx.request_paint_only();
+            }
+            PointerEvent::Cancel(_) => {
+                self.selection_drag_anchor = None;
+                self.selection_dragged = false;
                 ctx.request_paint_only();
             }
             _ => (),
@@ -353,12 +453,36 @@ impl Widget for PageCanvas {
         {
             ctx.submit_action::<Self::Action>(PageAction::Zoom(action));
             ctx.set_handled();
+        } else if let TextEvent::Keyboard(event) = event
+            && is_copy_shortcut(event)
+        {
+            if let Some(selection) = self.selection {
+                let selected_text = self.accessibility.selected_text(selection);
+                if !selected_text.is_empty() {
+                    ctx.set_clipboard(selected_text);
+                }
+            }
+            ctx.set_handled();
         }
     }
 
     // TODO - Do we want the Canvas to be transparent to pointer events?
     fn accepts_pointer_interaction(&self) -> bool {
         true
+    }
+
+    fn get_cursor(&self, ctx: &QueryCtx<'_>, pos: Point) -> CursorIcon {
+        let local_pos = ctx.to_local(pos);
+        let Some(page_pos) = self.page_point_from_local(local_pos) else {
+            return CursorIcon::Default;
+        };
+        if self.accessibility.hit_test_link(page_pos).is_some() {
+            CursorIcon::Pointer
+        } else if self.accessibility.hit_test_text(page_pos).is_some() {
+            CursorIcon::Text
+        } else {
+            CursorIcon::Default
+        }
     }
 
     fn register_children(&mut self, _ctx: &mut RegisterCtx<'_>) {}
@@ -400,6 +524,17 @@ impl Widget for PageCanvas {
                 None,
                 &self.size.to_rect(),
             );
+        }
+        if let Some(selection) = self.selection {
+            for rect in self.accessibility.selection_rects(selection) {
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    TEXT_SELECTION_COLOR,
+                    None,
+                    &scale_access_rect(rect, self.scene_scale),
+                );
+            }
         }
         scene.append(&self.scene, Some(Affine::scale(self.scene_scale)));
     }
@@ -448,11 +583,14 @@ mod tests {
 
     use masonry::accesskit::{Action, Rect as AccessRect, Role};
     use masonry::core::keyboard::{Code, Key, KeyState};
-    use masonry::core::{KeyboardEvent, Modifiers, NewWidget, Widget, WidgetTag};
+    use masonry::core::{
+        CursorIcon, KeyboardEvent, Modifiers, NewWidget, PointerButton, TextEvent, Widget,
+        WidgetTag,
+    };
     use masonry::peniko::Color;
     use masonry::theme::default_property_set;
     use masonry::vello::Scene;
-    use masonry::vello::kurbo::Size;
+    use masonry::vello::kurbo::{Point, Size};
     use masonry_testing::{TestHarness, TestHarnessParams};
     use reflexo::vector::incr::IncrDocClient;
     use reflexo::vector::stream::BytesModuleStream;
@@ -460,9 +598,9 @@ mod tests {
     use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
     use tinymist_std::typst::TypstDocument;
 
-    use crate::PageAccessibility;
     use crate::incr::IncrVelloDocClient;
     use crate::protocol::preview_update_from_bytes;
+    use crate::{PageAccessibility, PageTextRun};
 
     use super::{PageCanvas, ZoomAction, zoom_action_from_keyboard};
 
@@ -475,6 +613,9 @@ mod tests {
             background_color: Some(Color::WHITE),
             scene: Arc::new(Scene::new()),
             accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
         };
         let mut params = TestHarnessParams::default();
         params.window_size = Size::new(64.0, 64.0);
@@ -617,6 +758,9 @@ mod tests {
             background_color,
             scene,
             accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
         };
         let mut params = TestHarnessParams::default();
         params.window_size = Size::new(32.0, 32.0);
@@ -661,6 +805,92 @@ mod tests {
             link_node.raw_bounds(),
             Some(AccessRect::new(2.0, 4.0, 14.0, 20.0))
         );
+    }
+
+    #[test]
+    fn page_canvas_uses_pointer_cursor_over_links() {
+        let page_accessibility = Arc::new(PageAccessibility::new([PageAccessibility::link_node(
+            "https://example.com",
+            AccessRect::new(0.0, 0.0, 20.0, 20.0),
+        )]));
+        let page = PageCanvas::new(Arc::new(Scene::new()), 1.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        harness.mouse_move(Point::new(10.0, 10.0));
+        assert_eq!(harness.cursor_icon(), CursorIcon::Pointer);
+    }
+
+    #[test]
+    fn page_canvas_exposes_synthetic_accesskit_text_runs() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let page = PageCanvas::new(Arc::new(Scene::new()), 2.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        let page_id = harness.get_widget(tag).id();
+        let page_node = harness
+            .access_node(page_id)
+            .expect("page canvas should have an AccessKit node");
+        assert_eq!(page_node.role(), Role::Document);
+
+        let text_node = page_node
+            .children()
+            .next()
+            .expect("page canvas should contain synthetic text node");
+        assert_eq!(text_node.role(), Role::TextRun);
+        assert_eq!(text_node.value().as_deref(), Some("hello"));
+        assert_eq!(text_node.data().character_lengths(), &[1, 1, 1, 1, 1]);
+        assert_eq!(
+            text_node.raw_bounds(),
+            Some(AccessRect::new(0.0, 0.0, 100.0, 20.0))
+        );
+    }
+
+    #[test]
+    fn page_canvas_selects_and_copies_text() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let page = PageCanvas::new(Arc::new(Scene::new()), 1.0, None)
+            .with_accessibility(page_accessibility);
+        let widget = NewWidget::new(page);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        harness.mouse_move(Point::new(1.0, 5.0));
+        assert_eq!(harness.cursor_icon(), CursorIcon::Text);
+        harness.mouse_button_press(PointerButton::Primary);
+        harness.mouse_move(Point::new(49.0, 5.0));
+        harness.mouse_button_release(PointerButton::Primary);
+        harness.process_text_event(TextEvent::Keyboard(keyboard_event("c", copy_modifiers())));
+
+        assert_eq!(harness.clipboard_contents(), "hello");
+    }
+
+    fn text_accessibility() -> PageAccessibility {
+        let mut accessibility = PageAccessibility::default();
+        accessibility.push_text_run(PageTextRun::new(
+            "hello",
+            AccessRect::new(0.0, 0.0, 50.0, 10.0),
+            (0..5).map(|index| {
+                let x0 = index as f64 * 10.0;
+                AccessRect::new(x0, 0.0, x0 + 10.0, 10.0)
+            }),
+        ));
+        accessibility
+    }
+
+    fn copy_modifiers() -> Modifiers {
+        if cfg!(target_os = "macos") {
+            Modifiers::META
+        } else {
+            Modifiers::CONTROL
+        }
     }
 
     fn assert_black_pixel(pixel: [u8; 4], message: &str) {
