@@ -455,19 +455,66 @@ impl TypeChecker<'_> {
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
+            let call_callee = if let Expr::Select(select) = &apply.callee {
+                Self::prefer_primitive_array_method_call(callee.clone(), select.key.name().as_ref())
+            } else {
+                callee.clone()
+            };
             let mut worker = ApplyTypeChecker {
                 base: self,
                 call_site: apply.callee.span(),
                 call_raw_for_with: Some(callee.clone()),
                 resultant: vec![],
             };
-            callee.call(&args, true, &mut worker);
+            call_callee.call(&args, true, &mut worker);
             let res = Ty::from_types(worker.resultant.into_iter());
             self.info.witness_at_least(apply.span, res.clone());
             return res;
         }
 
         Ty::Any
+    }
+
+    fn prefer_primitive_array_method_call(callee: Ty, key: &str) -> Ty {
+        if !matches!(key, "map" | "at") {
+            return callee;
+        }
+
+        let Ty::Union(types) = callee else {
+            return callee;
+        };
+
+        let has_primitive_method = types
+            .iter()
+            .any(|ty| matches!(ty, Ty::Select(sel) if sel.select.as_ref() == key));
+        if !has_primitive_method {
+            return Ty::Union(types);
+        }
+
+        let filtered = types
+            .iter()
+            .filter(|ty| !Self::is_array_scope_method(ty, key))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if filtered.len() == types.len() {
+            Ty::Union(types)
+        } else {
+            Ty::from_types(filtered.into_iter())
+        }
+    }
+
+    fn is_array_scope_method(ty: &Ty, key: &str) -> bool {
+        let Ty::Value(value) = ty else {
+            return false;
+        };
+
+        let scope = Type::of::<typst::foundations::Array>().scope();
+        let Some(method) = scope.get(key) else {
+            return false;
+        };
+
+        value.val == method.read().clone()
     }
 
     fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {

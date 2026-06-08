@@ -1,0 +1,43 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/array_map_generic.typ
+---
+"f" = (Array<Type(int)>) => Array<Type(str)>
+"s" = Any
+"a" = (1, 2, )
+"b" = Array<Type(str)>
+"c" = (1, "s", )
+"d" = Array<Type(str)>
+"id" = (Any) => Any
+"x" = ( ⪰ Type(int) | Type(str))
+"e" = (1, "s", )
+=====
+38..39 -> @f
+40..41 -> @s
+45..46 -> @s
+45..50 -> (Func(map) | @v"s".map)
+45..55 -> Array<Type(str)>
+51..54 -> Type(string)
+62..63 -> @a
+66..72 -> (1, 2, )
+78..79 -> @b
+82..83 -> @a
+82..87 -> (Func(map) | @v"a".map)
+82..92 -> Array<Type(str)>
+88..91 -> Type(string)
+99..100 -> @c
+103..111 -> (1, "s", )
+117..118 -> @d
+121..122 -> @c
+121..126 -> (Func(map) | @v"c".map)
+121..131 -> Array<Type(str)>
+127..130 -> Type(string)
+138..140 -> @id
+141..142 -> @x
+146..147 -> @x
+153..154 -> @e
+157..158 -> @c
+157..162 -> (Func(map) | @v"c".map)
+157..166 -> (1, "s", )
+163..165 -> @id

@@ -61,7 +61,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                         Ty::from_types(mapper.resultant.into_iter())
                                     })
                                     .collect::<Vec<_>>();
-                                self.resultant.push(Ty::Tuple(res.into()));
+                                self.resultant.push(tuple_map_result(res));
                             }
                             Sig::ArrayCons(elem) => {
                                 crate::log_debug_ct!("array map check on array: {elem:?} {p0:?}");
@@ -157,6 +157,17 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                 )));
             }
         }
+    }
+}
+
+fn tuple_map_result(mapped: Vec<Ty>) -> Ty {
+    let mut unique = mapped.clone();
+    unique.sort();
+    unique.dedup();
+
+    match unique.as_slice() {
+        [elem] => Ty::Array(elem.clone().into()),
+        _ => Ty::Tuple(mapped.into()),
     }
 }
 

@@ -154,13 +154,22 @@ impl DocsChecker<'_> {
     fn check_type_strings(&mut self, m: &Module, inputs: &str) -> Option<Ty> {
         let mut terms = vec![];
         for name in inputs.split(",").map(|ty| ty.trim()) {
-            let Some(ty) = self.check_type_ident(m, name) else {
+            let Some(ty) = self
+                .check_type_ident(m, name)
+                .or_else(|| self.check_type_code(m, name))
+            else {
                 continue;
             };
             terms.push(ty);
         }
 
         Some(Ty::from_types(terms.into_iter()))
+    }
+
+    fn check_type_code(&mut self, module: &Module, code: &str) -> Option<Ty> {
+        let parsed = typst::syntax::parse_code(&code.replace('\'', "θ"));
+        let mut exprs = parsed.cast::<ast::Code>()?.exprs();
+        self.check_type_expr(module, exprs.next()?)
     }
 
     fn check_type_ident(&mut self, m: &Module, name: &str) -> Option<Ty> {
@@ -235,9 +244,7 @@ impl DocsChecker<'_> {
         if let Value::Content(raw) = val.read() {
             let annotated = raw.clone().unpack::<typst::text::RawElem>().ok()?;
             let annotated = annotated.text.clone().into_value().cast::<Str>().ok()?;
-            let code = typst::syntax::parse_code(&annotated.as_str().replace('\'', "θ"));
-            let mut exprs = code.cast::<ast::Code>()?.exprs();
-            let term = self.check_type_expr(module, exprs.next()?);
+            let term = self.check_type_code(module, annotated.as_str());
             self.globals.insert(name.into(), term.clone());
             term
         } else {
