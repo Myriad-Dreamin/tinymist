@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use dapts::StoppedEventReason;
 pub use init::*;
+use parking_lot::Mutex;
 
 use reflexo_typst::vfs::PathResolution;
 use reflexo_typst::TypstPagedDocument;
@@ -18,7 +19,7 @@ use tinymist_query::PositionEncoding;
 use typst::diag::{SourceResult, Warned};
 use typst::foundations::{Repr, Value};
 // use sync_lsp::RequestId;
-use typst::syntax::{FileId, Source};
+use typst::syntax::{FileId, Source, Span};
 
 use crate::project::LspCompileSnapshot;
 use crate::{ConstDapConfig, ServerState};
@@ -102,6 +103,7 @@ pub struct DapPosition {
 
 struct Debuggee {
     tx: std::sync::mpsc::Sender<DebugRequest>,
+    current_span: Mutex<Option<Span>>,
     /// Whether the debugger should stop on entry.
     stop_on_entry: bool,
     /// A faked thread id. We don't support multiple threads, so we can use a
@@ -113,6 +115,8 @@ struct Debuggee {
 
 impl DebugAdaptor for Debuggee {
     fn before_compile(&self) {
+        *self.current_span.lock() = None;
+
         if self.stop_on_entry {
             self.client
                 .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
@@ -128,6 +132,8 @@ impl DebugAdaptor for Debuggee {
     }
 
     fn after_compile(&self, result: Warned<SourceResult<TypstPagedDocument>>) {
+        *self.current_span.lock() = None;
+
         // if args.compile_error {
         // simulate a compile/build error in "launch" request:
         // the error should not result in a modal dialog since 'showUser' is
@@ -161,33 +167,29 @@ impl DebugAdaptor for Debuggee {
     fn terminate(&self) {}
 
     fn stopped(&self, ctx: &BreakpointContext) {
+        let source_span = ctx.source_span();
+        if source_span.id().is_none() {
+            *self.current_span.lock() = None;
+            return;
+        }
 
-        // Creates a fake breakpoint at the end of document.
-        // const MAIN_EOF: u64 = 1;
-        // let source = self.debug.session()?.to_dap_source(main);
-        // let pos = self
-        //     .debug
-        //     .session()?
-        //     .to_dap_position(main_eof, &main_source);
-        // let _ = self.debug.session()?.source;
-        // let _ = self.debug.session()?.position;
-        // self.client
-        //     .send_dap_event::<dapts::event::Breakpoint>(dapts::BreakpointEvent {
-        //         breakpoint: Breakpoint {
-        //             message: Some("The end of the document".into()),
-        //             source: Some(source),
-        //             line: Some(pos.line),
-        //             column: None,
-        //             verified: false,
-        //             end_column: None,
-        //             end_line: None,
-        //             offset: None,
-        //             id: Some(MAIN_EOF),
-        //             instruction_reference: None,
-        //             reason: None,
-        //         },
-        //         reason: BreakpointEventReason::New,
-        //     });
+        *self.current_span.lock() = Some(source_span);
+
+        let reason = match ctx.kind {
+            tinymist_dap::BreakpointKind::Function => StoppedEventReason::FunctionBreakpoint,
+            _ => StoppedEventReason::Breakpoint,
+        };
+
+        self.client
+            .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
+                all_threads_stopped: Some(true),
+                reason,
+                description: Some(format!("Paused at {} breakpoint", ctx.kind.to_str())),
+                thread_id: Some(self.thread_id),
+                hit_breakpoint_ids: None,
+                preserve_focus_hint: Some(false),
+                text: None,
+            });
     }
 
     fn respond(&self, id: i64, result: SourceResult<Value>) {

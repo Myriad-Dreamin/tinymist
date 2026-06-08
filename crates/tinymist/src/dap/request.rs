@@ -141,6 +141,7 @@ impl ServerState {
         let (adaptor_tx, adaptor_rx) = std::sync::mpsc::channel();
         let adaptor = Arc::new(Debuggee {
             tx: adaptor_tx,
+            current_span: Default::default(),
             stop_on_entry: args.stop_on_entry.unwrap_or_default(),
             thread_id: 1,
             client: self.client.clone().to_untyped(),
@@ -218,9 +219,25 @@ impl ServerState {
             )));
         }
 
-        let source = session.to_dap_source(session.source.id());
-        let position = session.to_dap_position(session.position, &session.source);
-        let line_count = session.source.text().lines().count().max(1) as u64;
+        let current_span = *session.adaptor.current_span.lock();
+        let current_source = current_span
+            .and_then(|span| Some((span, session.snapshot.world.source(span.id()?).ok()?)));
+        let current_location = current_source.and_then(|(span, source)| {
+            Some((source.range(span).or_else(|| span.range())?, source))
+        });
+        let (source, position, line_count) = if let Some((range, source)) = current_location {
+            (
+                session.to_dap_source(source.id()),
+                session.to_dap_position(range.start, &source),
+                source.text().lines().count().max(1) as u64,
+            )
+        } else {
+            (
+                session.to_dap_source(session.source.id()),
+                session.to_dap_position(session.position, &session.source),
+                session.source.text().lines().count().max(1) as u64,
+            )
+        };
         let line = if session.config.lines_start_at1 {
             position.line.clamp(1, line_count)
         } else {

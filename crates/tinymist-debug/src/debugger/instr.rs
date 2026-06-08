@@ -73,7 +73,7 @@ impl InstrumentWorker {
                     return;
                 }
                 ast::Expr::Closure(closure) => {
-                    self.instrument_block_child(node, closure.body().span(), Span::detached());
+                    self.instrument_closure(node, closure);
                     return;
                 }
                 ast::Expr::ShowRule(show_rule) => {
@@ -159,6 +159,10 @@ impl InstrumentWorker {
     }
 
     fn make_cov(&mut self, span: Span, kind: BreakpointKind) {
+        self.make_cov_with_scope(span, kind, "(:)");
+    }
+
+    fn make_cov_with_scope(&mut self, span: Span, kind: BreakpointKind, scope: &str) {
         let it = self.meta.meta.len();
         self.meta.meta.push(BreakpointItem { origin_span: span });
         self.instrumented.push_str("if __breakpoint_");
@@ -170,7 +174,9 @@ impl InstrumentWorker {
         self.instrumented.push_str(kind.to_str());
         self.instrumented.push_str("_handle(");
         self.instrumented.push_str(&it.to_string());
-        self.instrumented.push_str(", (:)); ");
+        self.instrumented.push_str(", ");
+        self.instrumented.push_str(scope);
+        self.instrumented.push_str("); ");
         self.instrumented.push_str("};\n");
     }
 
@@ -199,10 +205,73 @@ impl InstrumentWorker {
     fn instrument_functor(&mut self, child: &SyntaxNode) {
         self.instrumented.push_str("{\nlet __bp_functor = ");
         let s = child.span();
-        self.visit_node_fallback(child);
+        self.visit_node(child);
         self.instrumented.push_str("\n__it => {");
         self.make_cov(s, BreakpointKind::ShowStart);
         self.instrumented.push_str("__bp_functor(__it); } }\n");
+    }
+
+    fn instrument_closure(&mut self, node: &SyntaxNode, closure: ast::Closure) {
+        let body = closure.body().span();
+        let origin = closure
+            .name()
+            .map_or_else(|| node.span(), |name| name.span());
+        let scope = Self::closure_scope(closure);
+
+        for child in node.children() {
+            if body == child.span() {
+                self.instrumented.push_str("{\n");
+                self.make_cov_with_scope(origin, BreakpointKind::Function, &scope);
+                self.visit_node(child);
+                self.instrumented.push_str("\n}\n");
+            } else {
+                self.visit_node(child);
+            }
+        }
+    }
+
+    fn closure_scope(closure: ast::Closure) -> String {
+        let mut bindings = Vec::new();
+        for param in closure.params().children() {
+            match param {
+                ast::Param::Pos(pattern) => {
+                    for binding in pattern.bindings() {
+                        Self::push_scope_binding(&mut bindings, binding);
+                    }
+                }
+                ast::Param::Named(named) => {
+                    Self::push_scope_binding(&mut bindings, named.name());
+                }
+                ast::Param::Spread(spread) => {
+                    if let Some(binding) = spread.sink_ident() {
+                        Self::push_scope_binding(&mut bindings, binding);
+                    }
+                }
+            }
+        }
+
+        if bindings.is_empty() {
+            return "(:)".to_owned();
+        }
+
+        let mut scope = String::from("(");
+        for (idx, binding) in bindings.iter().enumerate() {
+            if idx > 0 {
+                scope.push_str(", ");
+            }
+            scope.push_str(binding);
+            scope.push_str(": ");
+            scope.push_str(binding);
+        }
+        scope.push(')');
+        scope
+    }
+
+    fn push_scope_binding(bindings: &mut Vec<String>, binding: ast::Ident) {
+        let binding = binding.as_str();
+        if !bindings.iter().any(|it| it == binding) {
+            bindings.push(binding.to_owned());
+        }
     }
 }
 
@@ -221,7 +290,7 @@ mod tests {
         let instrumented = instr(include_str!(
             "../fixtures/instr_coverage/physica_vector.typ"
         ));
-        insta::assert_snapshot!(instrumented, @r###"
+        insta::assert_snapshot!(instrumented, @r#"
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -231,40 +300,48 @@ mod tests {
         //     U^+U = U U^+ = I
         //   ]
         #let super-plus-as-dagger(document) = {
-        if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
+        if __breakpoint_function(0) {__breakpoint_function_handle(0, (document: document)); };
+        {
+        if __breakpoint_block_start(1) {__breakpoint_block_start_handle(1, (:)); };
         {
           show math.attach: {
         let __bp_functor = elem => {
-        if __breakpoint_block_start(1) {__breakpoint_block_start_handle(1, (:)); };
+        if __breakpoint_function(2) {__breakpoint_function_handle(2, (elem: elem)); };
+        {
+        if __breakpoint_block_start(3) {__breakpoint_block_start_handle(3, (:)); };
         {
             if __eligible(elem.base) and elem.at("t", default: none) == [+] {
-        if __breakpoint_block_start(2) {__breakpoint_block_start_handle(2, (:)); };
+        if __breakpoint_block_start(4) {__breakpoint_block_start_handle(4, (:)); };
         {
               $attach(elem.base, t: dagger, b: elem.at("b", default: #none))$
             }
-        if __breakpoint_block_end(3) {__breakpoint_block_end_handle(3, (:)); };
+        if __breakpoint_block_end(5) {__breakpoint_block_end_handle(5, (:)); };
         }
          else {
-        if __breakpoint_block_start(4) {__breakpoint_block_start_handle(4, (:)); };
+        if __breakpoint_block_start(6) {__breakpoint_block_start_handle(6, (:)); };
         {
               elem
             }
-        if __breakpoint_block_end(5) {__breakpoint_block_end_handle(5, (:)); };
+        if __breakpoint_block_end(7) {__breakpoint_block_end_handle(7, (:)); };
         }
 
           }
-        if __breakpoint_block_end(6) {__breakpoint_block_end_handle(6, (:)); };
+        if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
         }
 
-        __it => {if __breakpoint_show_start(7) {__breakpoint_show_start_handle(7, (:)); };
+        }
+
+        __it => {if __breakpoint_show_start(9) {__breakpoint_show_start_handle(9, (:)); };
         __bp_functor(__it); } }
 
 
           document
         }
-        if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
+        if __breakpoint_block_end(10) {__breakpoint_block_end_handle(10, (:)); };
         }
-        "###);
+
+        }
+        "#);
     }
 
     #[test]
@@ -291,6 +368,27 @@ mod tests {
         if __breakpoint_block_end(1) {__breakpoint_block_end_handle(1, (:)); };
         }
         ;
+        "###);
+    }
+
+    #[test]
+    fn test_instrument_breakpoint_function() {
+        let source = Source::detached(
+            r#"#let add(x, y: 1, ..rest) = x + y
+#let inc = value => value + 1"#,
+        );
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        assert!(new.root().errors().is_empty());
+        insta::assert_snapshot!(new.text(), @r###"
+        #let add(x, y: 1, ..rest) = {
+        if __breakpoint_function(0) {__breakpoint_function_handle(0, (x: x, y: y, rest: rest)); };
+        x + y
+        }
+
+        #let inc = value => {
+        if __breakpoint_function(1) {__breakpoint_function_handle(1, (value: value)); };
+        value + 1
+        }
         "###);
     }
 

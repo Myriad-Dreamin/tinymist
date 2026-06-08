@@ -171,6 +171,11 @@ pub struct BreakpointContext<'a, 'b, 'c> {
 }
 
 impl BreakpointContext<'_, '_, '_> {
+    /// The original source span that caused the breakpoint stop.
+    pub fn source_span(&self) -> Span {
+        self.span
+    }
+
     fn evaluate(&self, expr: &str) -> SourceResult<Value> {
         let mut root = parse_code(expr);
         root.synthesize(self.span);
