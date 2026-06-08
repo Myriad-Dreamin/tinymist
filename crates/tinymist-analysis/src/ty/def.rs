@@ -846,6 +846,8 @@ pub struct ParamTy {
     pub docs: Option<DocText>,
     /// The default value of the variable.
     pub default: Option<EcoString>,
+    /// Whether the parameter is required.
+    pub required: bool,
     /// The type of the parameter.
     pub ty: Ty,
     /// The attributes of the parameter.
@@ -865,6 +867,7 @@ impl ParamTy {
             ty,
             docs: None,
             default: None,
+            required: true,
             attrs,
         })
     }

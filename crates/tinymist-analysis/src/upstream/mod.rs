@@ -530,11 +530,10 @@ mod tests {
                             (false, false, false) => "arg",
                         };
                         let required = if param.required { "!" } else { "" };
-                        let default = if param.default.is_some() {
-                            " = ..."
-                        } else {
-                            ""
-                        };
+                        let default = param
+                            .default
+                            .map(|default| format!(" = {}", super::truncated_repr(&default())))
+                            .unwrap_or_default();
                         format!(
                             "{}{}: {}{default} [{mode}]",
                             param.name,
