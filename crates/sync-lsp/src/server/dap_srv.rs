@@ -152,7 +152,13 @@ where
                 Msg(DapMessage::Event(not)) => {
                     self.on_event(loop_start, not)?;
                 }
-                Msg(DapMessage::Response(resp)) => {
+                Msg(
+                    DapMessage::Response(resp)
+                    | DapMessage::ResponseWithCommand(dap::ResponseWithCommand {
+                        response: resp,
+                        ..
+                    }),
+                ) => {
                     let s = match &mut self.state {
                         State::Ready(s) => s,
                         _ => {

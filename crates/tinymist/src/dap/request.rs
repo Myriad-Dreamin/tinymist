@@ -24,6 +24,30 @@ impl ServerState {
         just_ok(())
     }
 
+    /// Resumes the debuggee after a stopped event.
+    pub(crate) fn continue_debug(
+        &mut self,
+        args: dapts::ContinueArguments,
+    ) -> SchedulableResponse<dapts::ContinueResponse> {
+        let session = self.debug.session()?;
+        if args.thread_id != session.adaptor.thread_id {
+            return Err(invalid_request(format!(
+                "unknown debug thread: {}",
+                args.thread_id
+            )));
+        }
+
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Continue)
+            .map_err(|_| internal_error("debug session is closed"))?;
+
+        just_ok(dapts::ContinueResponse {
+            all_threads_continued: Some(true),
+        })
+    }
+
     /// Should stop the debug session.
     pub(crate) fn disconnect(
         &mut self,
@@ -179,6 +203,45 @@ impl ServerState {
                 id: 1,
                 name: "thread 1".into(),
             }],
+        })
+    }
+
+    pub(crate) fn debug_stack_trace(
+        &mut self,
+        args: dapts::StackTraceArguments,
+    ) -> SchedulableResponse<dapts::StackTraceResponse> {
+        let session = self.debug.session()?;
+        if args.thread_id != session.adaptor.thread_id {
+            return Err(invalid_request(format!(
+                "unknown debug thread: {}",
+                args.thread_id
+            )));
+        }
+
+        let source = session.to_dap_source(session.source.id());
+        let position = session.to_dap_position(session.position, &session.source);
+        let line_count = session.source.text().lines().count().max(1) as u64;
+        let line = if session.config.lines_start_at1 {
+            position.line.clamp(1, line_count)
+        } else {
+            position.line.min(line_count.saturating_sub(1))
+        };
+
+        just_ok(dapts::StackTraceResponse {
+            stack_frames: vec![dapts::StackFrame {
+                can_restart: None,
+                column: position.character.min(u32::MAX as u64) as u32,
+                end_column: None,
+                end_line: None,
+                id: 1,
+                instruction_pointer_reference: None,
+                line: line.min(u32::MAX as u64) as u32,
+                module_id: None,
+                name: "main".into(),
+                presentation_hint: None,
+                source: Some(source),
+            }],
+            total_frames: Some(1),
         })
     }
 }

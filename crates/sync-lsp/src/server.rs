@@ -410,6 +410,10 @@ impl TransportHost {
                 Message::Dap(dap::Message::Response(req)) => {
                     panic!("unexpected response to js world: {req:?}");
                 }
+                #[cfg(feature = "dap")]
+                Message::Dap(dap::Message::ResponseWithCommand(req)) => {
+                    panic!("unexpected response to js world: {req:?}");
+                }
             },
         }
     }
@@ -552,6 +556,14 @@ impl LspClient {
                 log::error!("failed to get delay for request {id:?}: {err:?}");
             }
         }
+
+        #[cfg(feature = "dap")]
+        let response = match response {
+            Message::Dap(dap::Message::Response(resp)) => Message::Dap(
+                dap::Message::ResponseWithCommand(dap::ResponseWithCommand::new(method, resp)),
+            ),
+            response => response,
+        };
 
         self.sender.send_message(response);
     }
