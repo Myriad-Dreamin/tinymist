@@ -182,7 +182,7 @@ pub(crate) fn sig_of_type(
                     name: doc.name.clone(),
                     docs: Some(DocText::plain(doc.docs.clone())),
                     default,
-                    required: doc.default.is_none(),
+                    required: false,
                     ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
                     attrs: ParamAttrs::variadic(),
                 }));

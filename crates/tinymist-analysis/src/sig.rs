@@ -233,7 +233,7 @@ pub fn func_signature(func: Func) -> Signature {
                         .to_native()
                         .map(|native| DocText::official(native.docs.into())),
                     default: param.default().map(|default| truncated_repr(&default)),
-                    required: param.required(),
+                    required: param.required() && !param.variadic(),
                     ty: Ty::from_param_site(&func, &param),
                     attrs: (&param).into(),
                 }));
@@ -319,7 +319,7 @@ fn analyze_closure_signature(
                     name: sink.unwrap_or_default().into(),
                     docs: None,
                     default: None,
-                    required: true,
+                    required: false,
                     ty: Ty::Any,
                     attrs: ParamAttrs::variadic(),
                 }));

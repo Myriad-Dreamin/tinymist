@@ -70,7 +70,7 @@ array
     - sum(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-sum
     - to-dict(self!: array [pos]) -> dictionary @reference/foundations/array/#definitions-to-dict
     - windows(self!: array [pos], window-size!: int [pos]) -> array @reference/foundations/array/#definitions-windows
-    - zip(self!: array [pos], exact: bool = false [named], others!: array [rest]) -> array @reference/foundations/array/#definitions-zip
+    - zip(self!: array [pos], exact: bool = false [named], others: array [rest]) -> array @reference/foundations/array/#definitions-zip
 
 boolean
   short: bool
@@ -104,7 +104,7 @@ color
     - lighten(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-lighten
     - linear-rgb(red!: int | ratio [pos], green!: int | ratio [pos], blue!: int | ratio [pos], alpha!: int | ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-linear-rgb
     - luma(lightness!: int | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-luma
-    - mix(colors!: color | array [rest], space: any = oklab [named]) -> color @reference/visualize/color/#definitions-mix
+    - mix(colors: color | array [rest], space: any = oklab [named]) -> color @reference/visualize/color/#definitions-mix
     - negate(self!: color [pos], space: any = oklab [named]) -> color @reference/visualize/color/#definitions-negate
     - oklab(lightness!: ratio [pos], a!: float | ratio [pos], b!: float | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklab
     - oklch(lightness!: ratio [pos], chroma!: float | ratio [pos], hue!: angle [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklch
@@ -230,8 +230,8 @@ function
   routes: reference/foundations/function/
   fields: where, with
   methods:
-    - where(self!: function [pos], fields!: any [rest]) -> selector @reference/foundations/function/#definitions-where
-    - with(self!: function [pos], arguments!: any [rest]) -> function @reference/foundations/function/#definitions-with
+    - where(self!: function [pos], fields: any [rest]) -> selector @reference/foundations/function/#definitions-where
+    - with(self!: function [pos], arguments: any [rest]) -> function @reference/foundations/function/#definitions-with
 
 gradient
   short: gradient
@@ -241,17 +241,17 @@ gradient
   methods:
     - angle(self!: gradient [pos]) -> angle | none @reference/visualize/gradient/#definitions-angle
     - center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-center
-    - conic(stops!: color | array [rest], angle: angle = 0deg [named], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named]) -> gradient @reference/visualize/gradient/#definitions-conic
+    - conic(stops: color | array [rest], angle: angle = 0deg [named], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named]) -> gradient @reference/visualize/gradient/#definitions-conic
     - focal-center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-focal-center
     - focal-radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-focal-radius
     - kind(self!: gradient [pos]) -> function @reference/visualize/gradient/#definitions-kind
-    - linear(stops!: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], dir: direction = ltr [pos], angle!: angle [pos]) -> gradient @reference/visualize/gradient/#definitions-linear
-    - radial(stops!: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named], radius: ratio = 50% [named], focal-center: array | auto = auto [named], focal-radius: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-radial
+    - linear(stops: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], dir: direction = ltr [pos], angle!: angle [pos]) -> gradient @reference/visualize/gradient/#definitions-linear
+    - radial(stops: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named], radius: ratio = 50% [named], focal-center: array | auto = auto [named], focal-radius: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-radial
     - radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-radius
     - relative(self!: gradient [pos]) -> "self" | "parent" | auto @reference/visualize/gradient/#definitions-relative
     - repeat(self!: gradient [pos], repetitions!: int [pos], mirror: bool = false [named]) -> gradient @reference/visualize/gradient/#definitions-repeat
     - sample(self!: gradient [pos], t!: ratio | angle [pos]) -> color @reference/visualize/gradient/#definitions-sample
-    - samples(self!: gradient [pos], ts!: ratio | angle [rest]) -> array @reference/visualize/gradient/#definitions-samples
+    - samples(self!: gradient [pos], ts: ratio | angle [rest]) -> array @reference/visualize/gradient/#definitions-samples
     - sharp(self!: gradient [pos], steps!: int [pos], smoothness: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-sharp
     - space(self!: gradient [pos]) -> any @reference/visualize/gradient/#definitions-space
     - stops(self!: gradient [pos]) -> array @reference/visualize/gradient/#definitions-stops
@@ -336,9 +336,9 @@ selector
   fields: after, and, before, or
   methods:
     - after(self!: str | function | label | regex | location | selector [pos], start!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-after
-    - and(self!: str | function | label | regex | location | selector [pos], others!: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-and
+    - and(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-and
     - before(self!: str | function | label | regex | location | selector [pos], end!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-before
-    - or(self!: str | function | label | regex | location | selector [pos], others!: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-or
+    - or(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-or
 
 state
   short: state
