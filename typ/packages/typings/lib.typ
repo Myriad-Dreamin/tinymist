@@ -20,8 +20,6 @@
 #let named-required = named.with(required: true);
 /// A spread left or right parameter.
 #let rest(..args) = typing-item.with(kind: "rest", ..args);
-/// A source-code representation for a default value.
-#let code(source) = typing-item.with(kind: "code", source: source);
 
 /// A polymorphic signature.
 #let sig(..args) = typing-item.with(kind: "sig", ..args);

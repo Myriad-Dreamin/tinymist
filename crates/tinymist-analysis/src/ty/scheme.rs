@@ -4,7 +4,6 @@ use core::fmt;
 use std::{collections::VecDeque, path::Path, sync::OnceLock};
 
 use comemo::Track;
-use ecow::EcoString;
 use tinymist_world::args;
 use typst::{
     engine::Engine,
@@ -283,12 +282,12 @@ impl TySchemeWorker<'_> {
     fn term_param(&mut self, k: &str, mut args: Args, attrs: ParamAttrs) -> Option<Ty> {
         let ty = self.define(k, &args.eat::<Value>().ok()??);
         let default = if let Some(default) = args.named::<Value>("default").ok().flatten() {
-            Some(self.default_repr(&default))
+            Some(default.repr())
         } else {
             args.eat::<Value>()
                 .ok()
                 .flatten()
-                .map(|default| self.default_repr(&default))
+                .map(|default| default.repr())
         };
         let required = args
             .named::<bool>("required")
@@ -304,35 +303,6 @@ impl TySchemeWorker<'_> {
             ty,
             attrs,
         })))
-    }
-
-    fn default_repr(&self, value: &Value) -> EcoString {
-        self.code_default_repr(value)
-            .unwrap_or_else(|| value.repr())
-    }
-
-    fn code_default_repr(&self, value: &Value) -> Option<EcoString> {
-        if !self.is_typing_item(value) {
-            return None;
-        }
-
-        let Value::Func(func) = value else {
-            return None;
-        };
-        let Repr::With(with) = func.inner() else {
-            return None;
-        };
-
-        let mut args = with.1.clone();
-        let kind = args.named::<Str>("kind").ok().flatten()?;
-        if kind.as_str() != "code" {
-            return None;
-        }
-
-        args.named::<Str>("source")
-            .ok()
-            .flatten()
-            .map(|source| source.as_str().into())
     }
 
     fn define_value(&mut self, v: &Value) -> TyMark {
