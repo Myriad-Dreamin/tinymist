@@ -355,7 +355,7 @@ fn is_copy_shortcut(event: &KeyboardEvent) -> bool {
         && matches!(&event.key, Key::Character(key) if key.as_str().eq_ignore_ascii_case("c"))
 }
 
-const TEXT_SELECTION_COLOR: Color = Color::from_rgba8(70, 130, 255, 96);
+const TEXT_SELECTION_COLOR: Color = Color::from_rgba8(0x7d, 0xb9, 0xde, 0xa0);
 
 fn scale_access_rect(rect: masonry::accesskit::Rect, scale: f64) -> Rect {
     Rect::new(
@@ -525,6 +525,7 @@ impl Widget for PageCanvas {
                 &self.size.to_rect(),
             );
         }
+        scene.append(&self.scene, Some(Affine::scale(self.scene_scale)));
         if let Some(selection) = self.selection {
             for rect in self.accessibility.selection_rects(selection) {
                 scene.fill(
@@ -536,7 +537,6 @@ impl Widget for PageCanvas {
                 );
             }
         }
-        scene.append(&self.scene, Some(Affine::scale(self.scene_scale)));
     }
 
     fn accessibility_role(&self) -> Role {
@@ -587,10 +587,10 @@ mod tests {
         CursorIcon, KeyboardEvent, Modifiers, NewWidget, PointerButton, TextEvent, Widget,
         WidgetTag,
     };
-    use masonry::peniko::Color;
+    use masonry::peniko::{Color, Fill};
     use masonry::theme::default_property_set;
     use masonry::vello::Scene;
-    use masonry::vello::kurbo::{Point, Size};
+    use masonry::vello::kurbo::{Affine, Point, Size};
     use masonry_testing::{TestHarness, TestHarnessParams};
     use reflexo::vector::incr::IncrDocClient;
     use reflexo::vector::stream::BytesModuleStream;
@@ -600,7 +600,7 @@ mod tests {
 
     use crate::incr::IncrVelloDocClient;
     use crate::protocol::preview_update_from_bytes;
-    use crate::{PageAccessibility, PageTextRun};
+    use crate::{PageAccessibility, PageTextPosition, PageTextRun, PageTextSelection};
 
     use super::{PageCanvas, ZoomAction, zoom_action_from_keyboard};
 
@@ -870,6 +870,56 @@ mod tests {
         harness.process_text_event(TextEvent::Keyboard(keyboard_event("c", copy_modifiers())));
 
         assert_eq!(harness.clipboard_contents(), "hello");
+    }
+
+    #[test]
+    fn page_canvas_paints_selection_overlay_above_scene() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let mut scene = Scene::new();
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            Color::WHITE,
+            None,
+            &Size::new(50.0, 10.0).to_rect(),
+        );
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color: None,
+            scene: Arc::new(scene),
+            accessibility: page_accessibility,
+            selection: Some(PageTextSelection {
+                anchor: PageTextPosition {
+                    run_index: 0,
+                    character_index: 0,
+                },
+                focus: PageTextPosition {
+                    run_index: 0,
+                    character_index: 5,
+                },
+            }),
+            selection_drag_anchor: None,
+            selection_dragged: false,
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(64.0, 32.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+        let rendered = harness.render();
+        let selected_pixel = rendered.get_pixel(5, 5).0;
+
+        assert!(
+            selected_pixel[2] > selected_pixel[0],
+            "selection overlay should tint an opaque page scene blue; got rgba({},{},{},{})",
+            selected_pixel[0],
+            selected_pixel[1],
+            selected_pixel[2],
+            selected_pixel[3],
+        );
     }
 
     fn text_accessibility() -> PageAccessibility {
