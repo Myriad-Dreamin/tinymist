@@ -4,4 +4,4 @@ expression: result
 input_file: crates/tinymist-analysis/src/fixtures/type_schema/rec.typ
 ---
 "V" = @V
-"dict-type" = ("V": @V) => Any
+"dict-type" = ("V": @V) => {"len": ("self": Any) => Type(int)}

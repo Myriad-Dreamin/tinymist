@@ -1,396 +1,377 @@
-
 #import "/typ/packages/typings/lib.typ": *
 
-#let U = tv("U");
-#let V = tv("V");
-#let W = tv("W");
+// Generated from Typst standard library type scopes.
+// Keep method parameter shapes aligned with `upstream::tests::std_types_snapshot`.
+// The types are intentionally loose; this file preserves method names and
+// parameter pos/named/rest shape for the typing parser.
 
-// array generic
-// :: arguments.at(default)
-// -> arguments.at
-
-#let array-type(V: V) = {
-  let Arr = Self
-  let Self = Self.with(V)
-  rec(
-    name: "array",
-    scope: (
-      range: (end: pos(int), start: named(int, 0), step: named(int, 1)) => arr(int),
-      len: (self: Self) => int,
-      first: (self: Self) => V,
-      last: (self: Self) => V,
-      at: (self: Self, index: pos(int), default: pos(V)) => V,
-      push: (self: Self, value: pos(V)) => none,
-      insert: (self: Self, index: pos(int), value: pos(V)) => none,
-      remove: (self: Self, index: pos(str), default: pos(V)) => none,
-      slice: (self: Self, start: pos(int), end: pos(int), count: pos(int)) => arr(V),
-      contains: (self: Self, value: pos(V)) => bool,
-      find: (self: Self, searcher: (elem: pos(V)) => bool) => V,
-      position: (self: Self, searcher: (elem: pos(V)) => bool) => int,
-      filter: (self: Self, test: (elem: pos(V)) => bool) => arr(V),
-      map: (self: Self, mapper: pos((elem: pos(V)) => U)) => arr(U),
-      enumerate: (self: Self, start: named(int, 0)) => arr(tuple(int, V)),
-      zip: (self: Self, others: pos(arr(U)), exact: named(bool, false)) => arr(tuple(V, U)),
-      fold: (
-        self: Self,
-        init: pos(U),
-        folder: pos((acc: pos(U), elem: pos(V)) => U),
-      ) => U,
-      sum: (self: Self, default: pos(V)) => V,
-      product: (self: Self, default: pos(V)) => V,
-      any: (self: Self, test: (elem: pos(V)) => bool) => bool,
-      all: (self: Self, test: (elem: pos(V)) => bool) => bool,
-      flatten: (self: Arr.with(arr(V))) => arr(V),
-      rev: (self: Self) => arr(V),
-      split: (self: Self, at: pos(V)) => arr(arr(V)),
-      join: sig(
-        (self: Self, last: named(W)) => add(V, W),
-        (self: Self, separator: pos(U), last: named(W)) => add(V, add(U, W)),
-      ),
-      intersperse: (self: Self, separator: pos(U)) => arr(union(V, U)),
-      chunks: (self: Self, size: pos(int), exact: named(bool, false)) => arr(arr(V)),
-      windows: (self: Self, window-size: pos(int)) => arr(arr(V)),
-      sorted: (
-        self: Self,
-        key: named((elem: pos(V)) => any),
-      ) => arr(V),
-      dedup: (
-        self: Self,
-        key: named((elem: pos(V)) => any),
-      ) => arr(V),
-      to-dict: (
-        self: Arr.with(tuple(str, V)),
-      ) => dict(str, V),
-      reduce: (
-        self: Self,
-        reducer: pos((acc: pos(V), elem: pos(V)) => V),
-      ) => opt(V),
-    ),
-  )
-};
-
-// bytes
-// calc
-
-// datetime
-// decimal
-
-#let dict-type(V: V) = {
-  let Self = Self.with(V)
-  rec(
-    name: "dictionary",
-    scope: (
-      len: (self: Self) => int,
-      at: (self: Self, key: pos(str), default: pos(V)) => V,
-      insert: (self: Self, key: pos(str), value: pos(V)) => none,
-      remove: (self: Self, key: pos(str), default: pos(V)) => none,
-      keys: (self: Self) => arr(str),
-      values: (self: Self) => arr(V),
-      pairs: (self: Self) => arr(tuple(str, V)),
-    ),
-  )
-};
-
-// duration
-// eval
-// float
-// function
-// int
-// label
-// dictionary
-// none
-// panic
-// plugin
-// regex
-// repr
-// selector
-// string
-// symbol
-// system
-// target
-// type
-// version
-
-#let str-type = rec(
-  name: "str",
+#let alignment = rec(
+  name: "alignment",
   scope: (
-    clusters: (self: Self) => arr(str),
-    codepoints: (self: Self) => arr(int),
-    // todo: match object
-    match: (self: Self, pattern: pos(union(str, regex))) => dictionary,
-    matches: (self: Self, pattern: pos(union(str, regex))) => arr(dictionary),
-    split: (self: Self, separator: pos(union(str, regex))) => arr(str),
-    replace: sig(
-      (self: Self, pattern: pos(union(str, regex)), replacement: pos(str)) => str,
-      // todo: match object
-      (self: Self, pattern: pos(union(str, regex)), replacement: pos((match: pos(dictionary)) => str)) => str,
-    ),
+    axis: (self: pos(any)) => any,
+    inv: (self: pos(any)) => any,
   ),
-)
-
-
-// === function ===
-// :: state.at(selector)
-// :: state.update(update)
-// === any ===
-// -> state.get
-// -> state.at
-// -> state.final
-// :: state.update(update)
-// === any ===
-// -> state.get
-// -> state.at
-// -> state.final
-// :: state.update(update)
-
-// === element function ===
-
-// :: selector.or(others)
-// :: selector.and(others)
-// :: selector.before(end)
-// :: selector.after(start)
-// :: figure(kind)
-// :: query(target)
-
-// === supplement function ===
-
-// :: figure(supplement)
-// :: heading(supplement)
-// :: ref(supplement)
-// :: equation(supplement)
-
-// === numbering function ===
-
-// :: figure(numbering)
-// :: footnote(numbering)
-// :: heading(numbering)
-// :: enum(numbering)
-// :: numbering(numbering)
-// :: par.line(numbering)
-// :: equation(numbering)
-// :: page(numbering)
-// :: counter.display(numbering)
-// -> location.page-numbering
-
-// === table cell customization ===
-
-// :: table(fill)
-// :: table(align)
-// :: table(stroke)
-// :: table(inset)
-// :: cancel(angle)
-// :: grid(fill)
-// :: grid(align)
-// :: grid(stroke)
-// :: grid(inset)
-
-// === table array
-
-// :: table(columns)
-// :: table(rows)
-// :: table(gutter)
-// :: table(column-gutter)
-// :: table(row-gutter)
-// :: table(fill)
-// :: table(align)
-// :: table(stroke)
-// :: table(inset)
-
-// === function ===
-
-// -> content.func
-// -> function.with
-// :: plugin.transition(func)
-// :: list(marker)
-// :: outline(target)
-// :: outline(indent)
-// :: layout(func)
-// -> gradient.kind
-// :: counter.at(selector)
-// :: counter.update(update)
-// :: locate(selector)
-
-// === array
-
-// :: bibliography(sources)
-// :: list(marker)
-// :: document(author)
-// :: document(keywords)
-// :: enum(children)
-// :: terms(children)
-// :: raw(syntaxes)
-// :: smartquote(quotes)
-// :: text(font)
-// :: text(stylistic-set)
-// :: text(features)
-// :: cases(delim)
-// :: mat(delim)
-// :: mat(rows)
-// :: vec(delim)
-// :: grid(columns)
-// :: grid(rows)
-// :: grid(gutter)
-// :: grid(column-gutter)
-// :: grid(row-gutter)
-// :: grid(fill)
-// :: grid(align)
-// :: grid(stroke)
-// :: grid(inset)
-// -> color.components
-// :: color.mix(colors)
-// :: curve.move(start)
-// :: curve.line(end)
-// :: curve.quad(control)
-// :: curve.quad(end)
-// :: curve.cubic(control-start)
-// :: curve.cubic(control-end)
-// :: curve.cubic(end)
-// :: gradient.linear(stops)
-// :: gradient.radial(stops)
-// :: gradient.radial(center)
-// :: gradient.radial(focal-center)
-// :: gradient.conic(stops)
-// :: gradient.conic(center)
-// -> gradient.stops
-// -> gradient.center
-// -> gradient.focal-center
-// -> gradient.samples
-// :: line(start)
-// :: line(end)
-// :: path(vertices)
-// :: polygon(vertices)
-// -> counter.get
-// -> counter.at
-// -> counter.final
-// :: counter.update(update)
-// -> query
-// -> csv
-// -> csv.decode
-
-// === Dictionary
-
-// :: link(dest)
-// :: par(first-line-indent)
-// :: smartquote(quotes)
-// :: text(font)
-// :: text(costs)
-// :: text(features)
-// :: mat(augment)
-// -> measure
-// :: page(margin)
-// :: image(format)
-// :: image.decode(format)
-// -> location.position
-// :: elem(attrs)
-
-// === Radius
-
-// :: highlight(radius)
-// :: block(radius)
-// :: box(radius)
-// :: rect(radius)
-// :: square(radius)
-
-// === Outset
-
-// :: block(outset)
-// :: box(outset)
-// :: circle(outset)
-// :: ellipse(outset)
-// :: rect(outset)
-// :: square(outset)
-
-// === Inset
-
-// :: rect(inset)
-// :: square(inset)
-// :: ellipse(inset)
-// :: table(inset)
-// :: table.cell(inset)
-// :: block(inset)
-// :: box(inset)
-// :: grid(inset)
-// :: grid.cell(inset)
-// :: circle(inset)
-
-#let bytes-type = rec(
-  name: "bytes",
-  scope: (
-    len: (self: Self) => int,
-  ),
-)
-
-// === Stroke
-
-// :: grid(stroke)
-// :: grid.cell(stroke)
-// :: grid.hline(stroke)
-// :: grid.vline(stroke)
-// :: circle(stroke)
-// :: curve(stroke)
-// :: ellipse(stroke)
-// :: line(stroke)
-// :: path(stroke)
-// :: polygon(stroke)
-// :: polygon.regular(stroke)
-// :: rect(stroke)
-// :: square(stroke)
-// :: table(stroke)
-// :: table.cell(stroke)
-// :: table.hline(stroke)
-// :: table.vline(stroke)
-// :: highlight(stroke)
-// :: overline(stroke)
-// :: strike(stroke)
-// :: text(stroke)
-// :: underline(stroke)
-// :: cancel(stroke)
-// :: block(stroke)
-// :: box(stroke)
-// :: table(stroke)
-// :: table.cell(stroke)
-// :: table.hline(stroke)
-// :: table.vline(stroke)
-// :: highlight(stroke)
-// :: overline(stroke)
-// :: strike(stroke)
-// :: text(stroke)
-// :: underline(stroke)
-// :: cancel(stroke)
-// :: block(stroke)
-// :: box(stroke)
-// :: grid(stroke)
-// :: grid.cell(stroke)
-// :: grid.hline(stroke)
-// :: grid.vline(stroke)
-// :: circle(stroke)
-// :: curve(stroke)
-// :: ellipse(stroke)
-// :: line(stroke)
-// :: path(stroke)
-// :: polygon(stroke)
-// :: polygon.regular(stroke)
-// :: rect(stroke)
-// :: square(stroke)
-
-// === content
-
-// -> eval
-// -> color.space
-// :: color.negate(space)
-// :: color.rotate(space)
-// :: color.mix(space)
-// :: gradient.linear(space)
-// :: gradient.radial(space)
-// :: gradient.conic(space)
-// -> gradient.space
-// -> counter.display
-// -> xml
-// -> xml.decode
-
-#let assert = union(
-  (condition: pos(bool), message: named(str)) => invariant(condition),
-  eq: (left: pos(any), right: pos(any), message: named(str)) => invariant(eq(left, right)),
-  ne: (left: pos(any), right: pos(any), message: named(str)) => invariant(neq(left, right)),
 );
 
+#let angle = rec(
+  name: "angle",
+  scope: (
+    deg: (self: pos(any)) => any,
+    rad: (self: pos(any)) => any,
+  ),
+);
+
+#let arguments = rec(
+  name: "arguments",
+  scope: (
+    at: (self: pos(any), key: pos(any), default: named(any)) => any,
+    named: (self: pos(any)) => any,
+    pos: (self: pos(any)) => any,
+  ),
+);
+
+#let array = rec(
+  name: "array",
+  scope: (
+    all: (self: pos(any), test: pos(any)) => any,
+    any: (self: pos(any), test: pos(any)) => any,
+    at: (self: pos(any), index: pos(any), default: named(any)) => any,
+    chunks: (self: pos(any), chunk-size: pos(any), exact: named(any)) => any,
+    contains: (self: pos(any), value: pos(any)) => any,
+    dedup: (self: pos(any), key: named(any)) => any,
+    enumerate: (self: pos(any), start: named(any)) => any,
+    filter: (self: pos(any), test: pos(any)) => any,
+    find: (self: pos(any), searcher: pos(any)) => any,
+    first: (self: pos(any), default: named(any)) => any,
+    flatten: (self: pos(any)) => any,
+    fold: (self: pos(any), init: pos(any), folder: pos(any)) => any,
+    insert: (self: pos(any), index: pos(any), value: pos(any)) => any,
+    intersperse: (self: pos(any), separator: pos(any)) => any,
+    join: (self: pos(any), separator: pos(any), last: named(any), default: named(any)) => any,
+    last: (self: pos(any), default: named(any)) => any,
+    len: (self: pos(any)) => any,
+    map: (self: pos(any), mapper: pos(any)) => any,
+    pop: (self: pos(any)) => any,
+    position: (self: pos(any), searcher: pos(any)) => any,
+    product: (self: pos(any), default: named(any)) => any,
+    push: (self: pos(any), value: pos(any)) => any,
+    range: (start: pos(any), end: pos(any), step: named(any)) => any,
+    reduce: (self: pos(any), reducer: pos(any)) => any,
+    remove: (self: pos(any), index: pos(any), default: named(any)) => any,
+    rev: (self: pos(any)) => any,
+    slice: (self: pos(any), start: pos(any), end: pos(any), count: named(any)) => any,
+    sorted: (self: pos(any), key: named(any), by: named(any)) => any,
+    split: (self: pos(any), at: pos(any)) => any,
+    sum: (self: pos(any), default: named(any)) => any,
+    to-dict: (self: pos(any)) => any,
+    windows: (self: pos(any), window-size: pos(any)) => any,
+    zip: (self: pos(any), exact: named(any), others: rest(any)) => any,
+  ),
+);
+
+#let bool = rec(
+  name: "boolean",
+  scope: (:),
+);
+
+#let bytes = rec(
+  name: "bytes",
+  scope: (
+    at: (self: pos(any), index: pos(any), default: named(any)) => any,
+    len: (self: pos(any)) => any,
+    slice: (self: pos(any), start: pos(any), end: pos(any), count: named(any)) => any,
+  ),
+);
+
+#let color = rec(
+  name: "color",
+  scope: (
+    cmyk: (cyan: pos(any), magenta: pos(any), yellow: pos(any), key: pos(any), color: pos(any)) => any,
+    components: (self: pos(any), alpha: named(any)) => any,
+    darken: (self: pos(any), factor: pos(any)) => any,
+    desaturate: (self: pos(any), factor: pos(any)) => any,
+    hsl: (hue: pos(any), saturation: pos(any), lightness: pos(any), alpha: pos(any), color: pos(any)) => any,
+    hsv: (hue: pos(any), saturation: pos(any), value: pos(any), alpha: pos(any), color: pos(any)) => any,
+    lighten: (self: pos(any), factor: pos(any)) => any,
+    linear-rgb: (red: pos(any), green: pos(any), blue: pos(any), alpha: pos(any), color: pos(any)) => any,
+    luma: (lightness: pos(any), alpha: pos(any), color: pos(any)) => any,
+    mix: (colors: rest(any), space: named(any)) => any,
+    negate: (self: pos(any), space: named(any)) => any,
+    oklab: (lightness: pos(any), a: pos(any), b: pos(any), alpha: pos(any), color: pos(any)) => any,
+    oklch: (lightness: pos(any), chroma: pos(any), hue: pos(any), alpha: pos(any), color: pos(any)) => any,
+    opacify: (self: pos(any), scale: pos(any)) => any,
+    rgb: (red: pos(any), green: pos(any), blue: pos(any), alpha: pos(any), hex: pos(any), color: pos(any)) => any,
+    rotate: (self: pos(any), angle: pos(any), space: named(any)) => any,
+    saturate: (self: pos(any), factor: pos(any)) => any,
+    space: (self: pos(any)) => any,
+    to-hex: (self: pos(any)) => any,
+    transparentize: (self: pos(any), scale: pos(any)) => any,
+  ),
+);
+
+#let content = rec(
+  name: "content",
+  scope: (
+    at: (self: pos(any), field: pos(any), default: named(any)) => any,
+    fields: (self: pos(any)) => any,
+    func: (self: pos(any)) => any,
+    has: (self: pos(any), field: pos(any)) => any,
+    location: (self: pos(any)) => any,
+  ),
+);
+
+#let counter = rec(
+  name: "counter",
+  scope: (
+    at: (self: pos(any), selector: pos(any)) => any,
+    display: (self: pos(any), numbering: pos(any), both: named(any)) => any,
+    final: (self: pos(any)) => any,
+    get: (self: pos(any)) => any,
+    step: (self: pos(any), level: named(any)) => any,
+    update: (self: pos(any), update: pos(any)) => any,
+  ),
+);
+
+#let datetime = rec(
+  name: "datetime",
+  scope: (
+    day: (self: pos(any)) => any,
+    display: (self: pos(any), pattern: pos(any)) => any,
+    hour: (self: pos(any)) => any,
+    minute: (self: pos(any)) => any,
+    month: (self: pos(any)) => any,
+    ordinal: (self: pos(any)) => any,
+    second: (self: pos(any)) => any,
+    today: (offset: named(any)) => any,
+    weekday: (self: pos(any)) => any,
+    year: (self: pos(any)) => any,
+  ),
+);
+
+#let decimal = rec(
+  name: "decimal",
+  scope: (:),
+);
+
+#let dictionary = rec(
+  name: "dictionary",
+  scope: (
+    at: (self: pos(any), key: pos(any), default: named(any)) => any,
+    insert: (self: pos(any), key: pos(any), value: pos(any)) => any,
+    keys: (self: pos(any)) => any,
+    len: (self: pos(any)) => any,
+    pairs: (self: pos(any)) => any,
+    remove: (self: pos(any), key: pos(any), default: named(any)) => any,
+    values: (self: pos(any)) => any,
+  ),
+);
+
+#let direction = rec(
+  name: "direction",
+  scope: (
+    axis: (self: pos(any)) => any,
+    end: (self: pos(any)) => any,
+    from: (side: pos(any)) => any,
+    inv: (self: pos(any)) => any,
+    sign: (self: pos(any)) => any,
+    start: (self: pos(any)) => any,
+    to: (side: pos(any)) => any,
+  ),
+);
+
+#let duration = rec(
+  name: "duration",
+  scope: (
+    days: (self: pos(any)) => any,
+    hours: (self: pos(any)) => any,
+    minutes: (self: pos(any)) => any,
+    seconds: (self: pos(any)) => any,
+    weeks: (self: pos(any)) => any,
+  ),
+);
+
+#let float = rec(
+  name: "float",
+  scope: (
+    from-bytes: (bytes: pos(any), endian: named(any)) => any,
+    is-infinite: (self: pos(any)) => any,
+    is-nan: (self: pos(any)) => any,
+    signum: (self: pos(any)) => any,
+    to-bytes: (self: pos(any), endian: named(any), size: named(any)) => any,
+  ),
+);
+
+#let fraction = rec(
+  name: "fraction",
+  scope: (:),
+);
+
+#let function = rec(
+  name: "function",
+  scope: (
+    where: (self: pos(any), fields: rest(any)) => any,
+    with: (self: pos(any), arguments: rest(any)) => any,
+  ),
+);
+
+#let gradient = rec(
+  name: "gradient",
+  scope: (
+    angle: (self: pos(any)) => any,
+    center: (self: pos(any)) => any,
+    conic: (stops: rest(any), angle: named(any), space: named(any), relative: named(any), center: named(any)) => any,
+    focal-center: (self: pos(any)) => any,
+    focal-radius: (self: pos(any)) => any,
+    kind: (self: pos(any)) => any,
+    linear: (stops: rest(any), space: named(any), relative: named(any), dir: pos(any), angle: pos(any)) => any,
+    radial: (stops: rest(any), space: named(any), relative: named(any), center: named(any), radius: named(any), focal-center: named(any), focal-radius: named(any)) => any,
+    radius: (self: pos(any)) => any,
+    relative: (self: pos(any)) => any,
+    repeat: (self: pos(any), repetitions: pos(any), mirror: named(any)) => any,
+    sample: (self: pos(any), t: pos(any)) => any,
+    samples: (self: pos(any), ts: rest(any)) => any,
+    sharp: (self: pos(any), steps: pos(any), smoothness: named(any)) => any,
+    space: (self: pos(any)) => any,
+    stops: (self: pos(any)) => any,
+  ),
+);
+
+#let int = rec(
+  name: "integer",
+  scope: (
+    bit-and: (self: pos(any), rhs: pos(any)) => any,
+    bit-lshift: (self: pos(any), shift: pos(any)) => any,
+    bit-not: (self: pos(any)) => any,
+    bit-or: (self: pos(any), rhs: pos(any)) => any,
+    bit-rshift: (self: pos(any), shift: pos(any), logical: named(any)) => any,
+    bit-xor: (self: pos(any), rhs: pos(any)) => any,
+    from-bytes: (bytes: pos(any), endian: named(any), signed: named(any)) => any,
+    signum: (self: pos(any)) => any,
+    to-bytes: (self: pos(any), endian: named(any), size: named(any)) => any,
+  ),
+);
+
+#let label = rec(
+  name: "label",
+  scope: (:),
+);
+
+#let length = rec(
+  name: "length",
+  scope: (
+    cm: (self: pos(any)) => any,
+    inches: (self: pos(any)) => any,
+    mm: (self: pos(any)) => any,
+    pt: (self: pos(any)) => any,
+    to-absolute: (self: pos(any)) => any,
+  ),
+);
+
+#let location = rec(
+  name: "location",
+  scope: (
+    page: (self: pos(any)) => any,
+    page-numbering: (self: pos(any)) => any,
+    position: (self: pos(any)) => any,
+  ),
+);
+
+#let module = rec(
+  name: "module",
+  scope: (:),
+);
+
+#let ratio = rec(
+  name: "ratio",
+  scope: (:),
+);
+
+#let regex = rec(
+  name: "regex",
+  scope: (:),
+);
+
+#let relative = rec(
+  name: "relative length",
+  scope: (:),
+);
+
+#let selector = rec(
+  name: "selector",
+  scope: (
+    after: (self: pos(any), start: pos(any), inclusive: named(any)) => any,
+    "and": (self: pos(any), others: rest(any)) => any,
+    before: (self: pos(any), end: pos(any), inclusive: named(any)) => any,
+    "or": (self: pos(any), others: rest(any)) => any,
+  ),
+);
+
+#let state = rec(
+  name: "state",
+  scope: (
+    at: (self: pos(any), selector: pos(any)) => any,
+    final: (self: pos(any)) => any,
+    get: (self: pos(any)) => any,
+    update: (self: pos(any), update: pos(any)) => any,
+  ),
+);
+
+#let str = rec(
+  name: "string",
+  scope: (
+    at: (self: pos(any), index: pos(any), default: named(any)) => any,
+    clusters: (self: pos(any)) => any,
+    codepoints: (self: pos(any)) => any,
+    contains: (self: pos(any), pattern: pos(any)) => any,
+    ends-with: (self: pos(any), pattern: pos(any)) => any,
+    find: (self: pos(any), pattern: pos(any)) => any,
+    first: (self: pos(any), default: named(any)) => any,
+    from-unicode: (value: pos(any)) => any,
+    last: (self: pos(any), default: named(any)) => any,
+    len: (self: pos(any)) => any,
+    match: (self: pos(any), pattern: pos(any)) => any,
+    matches: (self: pos(any), pattern: pos(any)) => any,
+    normalize: (self: pos(any), form: named(any)) => any,
+    position: (self: pos(any), pattern: pos(any)) => any,
+    replace: (self: pos(any), pattern: pos(any), replacement: pos(any), count: named(any)) => any,
+    rev: (self: pos(any)) => any,
+    slice: (self: pos(any), start: pos(any), end: pos(any), count: named(any)) => any,
+    split: (self: pos(any), pattern: pos(any)) => any,
+    starts-with: (self: pos(any), pattern: pos(any)) => any,
+    to-unicode: (character: pos(any)) => any,
+    trim: (self: pos(any), pattern: pos(any), at: named(any), repeat: named(any)) => any,
+  ),
+);
+
+#let stroke = rec(
+  name: "stroke",
+  scope: (:),
+);
+
+#let symbol = rec(
+  name: "symbol",
+  scope: (:),
+);
+
+#let pattern = rec(
+  name: "tiling",
+  scope: (:),
+);
+#let tiling = pattern;
+
+#let type = rec(
+  name: "type",
+  scope: (:),
+);
+
+#let version = rec(
+  name: "version",
+  scope: (
+    at: (self: pos(any), index: pos(any)) => any,
+  ),
+);
+
+// Backwards-compatible generic helpers used by existing fixtures.
+#let array-type(V: any) = array;
+#let dict-type(V: any) = dictionary;
+#let str-type = str;

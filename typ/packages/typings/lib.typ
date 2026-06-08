@@ -14,6 +14,8 @@
 #let pos(..args) = typing-item.with(kind: "pos", ..args);
 /// A named parameter.
 #let named(..args) = typing-item.with(kind: "named", ..args);
+/// A parameter that may be passed positionally or by name.
+#let pos-named(..args) = typing-item.with(kind: "pos-named", ..args);
 /// A named parameter.
 #let named-required = named.with(required: true);
 /// A spread left or right parameter.

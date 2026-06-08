@@ -3,6 +3,6 @@ source: crates/tinymist-analysis/src/ty/scheme.rs
 expression: result
 input_file: crates/tinymist-analysis/src/fixtures/type_schema/builtin.typ
 ---
-"array-type" = ("V": @V) => Any
-"assert" = (Type(bool), "message": Type(str)) => Any
-"dict-type" = ("V": @V) => Any
+"array-type" = ("V": Any) => {"all": (Any, Any) => any, "any": (Any, Any) => any, "at": (Any, Any, "default": Any) => any, "chunks": (Any, Any, "exact": Any) => any, "contains": (Any, Any) => any, "dedup": (Any, "key": Any) => any, "enumerate": (Any, "start": Any) => any, "filter": (Any, Any) => any, "find": (Any, Any) => any, "first": (Any, "default": Any) => any, "flatten": (Any) => any, "fold": (Any, Any, Any) => any, "insert": (Any, Any, Any) => any, "intersperse": (Any, Any) => any, "join": (Any, Any, "default": Any, "last": Any) => any, "last": (Any, "default": Any) => any, "len": (Any) => any, "map": (Any, Any) => any, "pop": (Any) => any, "position": (Any, Any) => any, "product": (Any, "default": Any) => any, "push": (Any, Any) => any, "range": (Any, Any, "step": Any) => any, "reduce": (Any, Any) => any, "remove": (Any, Any, "default": Any) => any, "rev": (Any) => any, "slice": (Any, Any, Any, "count": Any) => any, "sorted": (Any, "by": Any, "key": Any) => any, "split": (Any, Any) => any, "sum": (Any, "default": Any) => any, "to-dict": (Any) => any, "windows": (Any, Any) => any, "zip": (Any, Any, "exact": Any) => any}
+"assert" = (Type(bool), "message": Type(str)) => Type(none)
+"dict-type" = ("V": Any) => {"at": (Any, Any, "default": Any) => any, "insert": (Any, Any, Any) => any, "keys": (Any) => any, "len": (Any) => any, "pairs": (Any) => any, "remove": (Any, Any, "default": Any) => any, "values": (Any) => any}

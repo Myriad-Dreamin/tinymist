@@ -7,8 +7,8 @@ use comemo::Track;
 use tinymist_world::args;
 use typst::{
     engine::Engine,
-    foundations::{func::Repr, Args, Closure, ClosureNode, Context, Func, Str, Value},
-    syntax::{ast, Source, Span},
+    foundations::{Args, Closure, ClosureNode, Context, Func, Str, Value, func::Repr},
+    syntax::{Source, Span, ast},
 };
 
 use super::Ty;
@@ -16,8 +16,8 @@ use crate::{
     func_signature,
     syntax::Decl,
     ty::{
-        is_plain_value, BuiltinTy, InsTy, Interned, ParamAttrs, ParamTy, RecordTy, SigTy, TypeInfo,
-        TypeVar,
+        BuiltinTy, InsTy, Interned, ParamAttrs, ParamTy, RecordTy, SigTy, TypeInfo, TypeVar,
+        is_plain_value,
     },
 };
 
@@ -129,11 +129,32 @@ impl TySchemeWorker<'_> {
                 ))
             }
             "rec" => {
-                Ty::Any
+                let scope = args.named::<Value>("scope").ok()??;
+                let Value::Dict(scope) = scope else {
+                    return Some(TyMark::Any);
+                };
+                let fields = scope
+                    .iter()
+                    .map(|(name, value)| (name.as_str().into(), self.define(name.as_str(), value)))
+                    .collect();
+                Ty::Dict(RecordTy::new(fields))
             }
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
                 Ty::Array(Interned::new(ty))
+            }
+            "dict" => {
+                let values = args.all::<Value>().ok()?;
+                let val_ty = values.get(1).map(|v| self.define(k, v)).unwrap_or(Ty::Any);
+                Ty::Dict(RecordTy::new(vec![("..".into(), val_ty)]))
+            }
+            "record" => {
+                let fields = args
+                    .to_named()
+                    .into_iter()
+                    .map(|(name, value)| (name.as_str().into(), self.define(name.as_str(), &value)))
+                    .collect();
+                Ty::Dict(RecordTy::new(fields))
             }
             "tuple" => {
                 let values = args.all::<Value>().ok()?;
@@ -150,6 +171,10 @@ impl TySchemeWorker<'_> {
             "named" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
                 Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::named()))
+            }
+            "pos-named" => {
+                let ty = self.define(k, &args.eat::<Value>().ok()??);
+                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::pos_named()))
             }
             "rest" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
@@ -325,19 +350,22 @@ impl TySchemeWorker<'_> {
 
 #[cfg(test)]
 pub mod tests {
-    use std::path::Path;
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        path::Path,
+    };
 
     use super::*;
 
-    use tinymist_world::{args::CompileOnceArgs, ShadowApi};
+    use tinymist_world::{ShadowApi, args::CompileOnceArgs};
     use typst::{
+        Feature, Features, Library, LibraryExt, World,
         engine::{Route, Sink, Traced},
-        foundations::Bytes,
+        foundations::{Bytes, Scope, Type},
         introspection::Introspector,
-        World,
     };
 
-    use crate::{tests::*, ty::TypeInfo};
+    use crate::{tests::*, ty::TypeInfo, ty::def::TypeInterface};
 
     macro_rules! typ_path {
         ($path:expr) => {
@@ -345,62 +373,351 @@ pub mod tests {
         };
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum ParamShapeKind {
+        Pos,
+        Named,
+        PosNamed,
+        Rest,
+        Other,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    struct ParamShape {
+        name: String,
+        kind: ParamShapeKind,
+    }
+
+    type MethodShapes = BTreeMap<String, Vec<ParamShape>>;
+    type TypeShapes = BTreeMap<String, MethodShapes>;
+
+    fn param_shape_kind(attrs: ParamAttrs) -> ParamShapeKind {
+        match (attrs.positional, attrs.named, attrs.variadic) {
+            (_, _, true) => ParamShapeKind::Rest,
+            (true, true, false) => ParamShapeKind::PosNamed,
+            (true, false, false) => ParamShapeKind::Pos,
+            (false, true, false) => ParamShapeKind::Named,
+            (false, false, false) => ParamShapeKind::Other,
+        }
+    }
+
+    fn with_test_worker<T>(
+        world: &dyn World,
+        scheme: &mut TypeInfo,
+        f: impl FnOnce(&mut TySchemeWorker<'_>) -> T,
+    ) -> T {
+        let route = Route::default();
+        let mut sink = Sink::default();
+        let introspector = Introspector::default();
+        let traced = Traced::default();
+        let engine = Engine {
+            routines: &typst::ROUTINES,
+            world: world.track(),
+            introspector: introspector.track(),
+            traced: traced.track(),
+            sink: sink.track_mut(),
+            route,
+        };
+
+        let mut worker = TySchemeWorker { engine, scheme };
+        f(&mut worker)
+    }
+
+    fn map_typings_std(world: &mut tinymist_project::LspWorld) {
+        let main_id = world.main();
+        world
+            .map_shadow_by_id(
+                main_id.join("/typings.typ"),
+                Bytes::from_string(include_str!(typ_path!("packages/typings/lib.typ"))),
+            )
+            .unwrap();
+        world
+            .map_shadow_by_id(
+                main_id.join("/std.typ"),
+                Bytes::from_string(
+                    include_str!(typ_path!("typings/std.typ"))
+                        .replace("/typ/packages/typings/lib.typ", "typings.typ"),
+                ),
+            )
+            .unwrap();
+    }
+
+    fn parse_typings_std(
+        world: &tinymist_project::LspWorld,
+    ) -> (typst::foundations::Module, typst::syntax::Source) {
+        let std_id = world.main().join("/std.typ");
+        let source = world.source(std_id).unwrap();
+        let module = typst_shim::eval::eval_compat(world, &source).unwrap_or_else(|err| {
+            panic!("Failed to evaluate typings std module: {err:?}");
+        });
+
+        (module, source)
+    }
+
+    fn collect_upstream_type_shapes() -> TypeShapes {
+        let library = Library::builder()
+            .with_features(Features::from_iter([Feature::Html]))
+            .build();
+        let mut result = TypeShapes::new();
+        let mut seen_scopes = BTreeSet::new();
+        let mut scopes = vec![
+            ("std".to_string(), library.global.scope()),
+            ("math".to_string(), library.math.scope()),
+        ];
+
+        while let Some((path, scope)) = scopes.pop() {
+            let scope_id = scope as *const Scope as usize;
+            if !seen_scopes.insert(scope_id) {
+                continue;
+            }
+
+            for (name, binding) in scope.iter() {
+                let path = format!("{path}.{name}");
+                match binding.read() {
+                    Value::Func(func) => {
+                        if let Some(scope) = func.scope() {
+                            scopes.push((path, scope));
+                        }
+                    }
+                    Value::Module(module) => {
+                        scopes.push((path, module.scope()));
+                    }
+                    Value::Type(ty) => {
+                        let export = path.rsplit('.').next().unwrap().to_string();
+                        let methods = upstream_type_method_shapes(*ty);
+                        if let Some(prev) = result.insert(export.clone(), methods.clone()) {
+                            assert_eq!(prev, methods, "duplicate std type export {export}");
+                        }
+                        scopes.push((path, ty.scope()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        result
+    }
+
+    fn upstream_type_method_shapes(ty: Type) -> MethodShapes {
+        let mut methods = MethodShapes::new();
+        for (name, binding) in ty.scope().iter() {
+            if let Value::Func(func) = binding.read() {
+                let params = func
+                    .params()
+                    .map(|params| {
+                        params
+                            .iter()
+                            .map(|param| ParamShape {
+                                name: param.name.to_string(),
+                                kind: param_shape_kind(ParamAttrs::from(param)),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                methods.insert(name.to_string(), params);
+            }
+        }
+
+        methods
+    }
+
+    fn typing_value_args(value: &Value) -> Option<Args> {
+        let Value::Func(func) = value else {
+            return None;
+        };
+        let Repr::With(with) = func.inner() else {
+            return None;
+        };
+
+        Some(with.1.clone())
+    }
+
+    fn generated_type_method_shapes(
+        worker: &mut TySchemeWorker,
+        export: &str,
+        value: &Value,
+    ) -> MethodShapes {
+        let mut args = typing_value_args(value)
+            .unwrap_or_else(|| panic!("{export} is not a typing item with arguments"));
+        let kind = args
+            .named::<Str>("kind")
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| panic!("{export} has no typing kind"));
+        assert_eq!(kind.as_str(), "rec", "{export} must be generated with rec");
+
+        let scope = args
+            .named::<Value>("scope")
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| panic!("{export} has no generated scope"));
+        let Value::Dict(scope) = scope else {
+            panic!("{export} generated scope is not a dictionary");
+        };
+
+        scope
+            .iter()
+            .filter_map(|(method, value)| {
+                let Value::Func(func) = value else {
+                    return None;
+                };
+                Some((
+                    method.to_string(),
+                    generated_method_param_shapes(worker, export, method, func),
+                ))
+            })
+            .collect()
+    }
+
+    fn generated_method_param_shapes(
+        worker: &mut TySchemeWorker,
+        export: &str,
+        method: &str,
+        func: &Func,
+    ) -> Vec<ParamShape> {
+        let Repr::Closure(closure) = func.inner() else {
+            panic!("{export}.{method} is not generated as a closure");
+        };
+        let syntax = match &closure.node {
+            ClosureNode::Closure(node) => node.cast::<ast::Closure>().unwrap(),
+            ClosureNode::Context(_) => panic!("{export}.{method} is a context closure"),
+        };
+        let mut defaults = closure.defaults.iter();
+        let mut params = vec![];
+
+        for param in syntax.params().children() {
+            match param {
+                ast::Param::Pos(pos) => {
+                    let name = pos
+                        .bindings()
+                        .into_iter()
+                        .next()
+                        .map(|ident| ident.get().to_string())
+                        .unwrap_or_default();
+                    params.push(ParamShape {
+                        name,
+                        kind: ParamShapeKind::Pos,
+                    });
+                }
+                ast::Param::Spread(spread) => {
+                    params.push(ParamShape {
+                        name: spread
+                            .sink_ident()
+                            .map(|sink| sink.get().to_string())
+                            .unwrap_or_default(),
+                        kind: ParamShapeKind::Rest,
+                    });
+                }
+                ast::Param::Named(named) => {
+                    let name = named.name().get();
+                    let default = defaults.next();
+                    let ty = if let Some(default) = default {
+                        worker.define(name, default)
+                    } else {
+                        Ty::Any
+                    };
+
+                    match ty {
+                        Ty::Param(param) => {
+                            params.push(ParamShape {
+                                name: param.name.to_string(),
+                                kind: param_shape_kind(param.attrs),
+                            });
+                        }
+                        _ => {
+                            params.push(ParamShape {
+                                name: name.to_string(),
+                                kind: ParamShapeKind::Named,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        params
+    }
+
+    fn assert_parser_keeps_method_names(export: &str, ty: Ty, expected: &MethodShapes) {
+        let Ty::Dict(record) = ty else {
+            panic!("{export} did not parse to a record type: {ty:?}");
+        };
+
+        let actual = record
+            .interface()
+            .filter_map(|(name, ty)| matches!(ty, Ty::Func(_)).then(|| name.to_string()))
+            .collect::<BTreeSet<_>>();
+        let expected = expected.keys().cloned().collect::<BTreeSet<_>>();
+
+        assert_eq!(
+            actual, expected,
+            "{export} method names differ after parsing"
+        );
+    }
+
     #[test]
     fn test_check() {
         snapshot_testing("type_schema", &|mut world, path| {
+            map_typings_std(&mut world);
             let main_id = world.main();
-            world
-                .map_shadow_by_id(
-                    main_id.join("/typings.typ"),
-                    Bytes::from_string(include_str!(typ_path!("packages/typings/lib.typ"))),
-                )
-                .unwrap();
-            world
-                .map_shadow_by_id(
-                    main_id.join("/std.typ"),
-                    Bytes::from_string(
-                        include_str!(typ_path!("typings/std.typ"))
-                            .replace("/typ/packages/typings/lib.typ", "typings.typ"),
-                    ),
-                )
-                .unwrap();
             let source = world.source(main_id).unwrap();
 
             let module = typst_shim::eval::eval_compat(&world, &source).unwrap_or_else(|err| {
                 panic!("Failed to evaluate module ({path:?}): {err:?}");
             });
 
-            let route = Route::default();
-            let mut sink = Sink::default();
-            let introspector = Introspector::default();
-            let traced = Traced::default();
-            let engine = Engine {
-                routines: &typst::ROUTINES,
-                world: ((&world) as &dyn World).track(),
-                introspector: introspector.track(),
-                traced: traced.track(),
-                sink: sink.track_mut(),
-                route,
-            };
-
             let mut scheme = TypeInfo::default();
-            let mut w = TySchemeWorker {
-                engine,
-                scheme: &mut scheme,
-            };
-            for (k, v) in module.scope().iter() {
-                let fid = v.span().id().unwrap();
-                if fid != source.id() {
-                    continue;
-                }
+            with_test_worker(&world, &mut scheme, |w| {
+                for (k, v) in module.scope().iter() {
+                    let fid = v.span().id().unwrap();
+                    if fid != source.id() {
+                        continue;
+                    }
 
-                let ty = w.define(k, v.read());
-                w.scheme.exports.insert(k.into(), ty);
-            }
+                    let ty = w.define(k, v.read());
+                    w.scheme.exports.insert(k.into(), ty);
+                }
+            });
 
             let result = format!("{:#?}", TypeCheckSnapshot(&scheme));
 
             insta::assert_snapshot!(result);
+        });
+    }
+
+    #[test]
+    fn std_typings_match_upstream_shapes() {
+        let expected = collect_upstream_type_shapes();
+
+        tinymist_tests::run_with_sources("#import \"std.typ\": *", |verse, _| {
+            let mut world = verse.snapshot();
+            map_typings_std(&mut world);
+            let (module, source) = parse_typings_std(&world);
+
+            let mut actual = TypeShapes::new();
+            let mut scheme = TypeInfo::default();
+            with_test_worker(&world, &mut scheme, |worker| {
+                for (export, expected_methods) in &expected {
+                    let binding = module
+                        .scope()
+                        .get(export)
+                        .unwrap_or_else(|| panic!("missing generated std type {export}"));
+                    assert_eq!(
+                        binding.span().id(),
+                        Some(source.id()),
+                        "{export} must be defined by typ/typings/std.typ"
+                    );
+
+                    let parsed = worker.define(export, binding.read());
+                    assert_parser_keeps_method_names(export, parsed, expected_methods);
+                    actual.insert(
+                        export.clone(),
+                        generated_type_method_shapes(worker, export, binding.read()),
+                    );
+                }
+            });
+
+            assert_eq!(actual, expected);
         });
     }
 }
