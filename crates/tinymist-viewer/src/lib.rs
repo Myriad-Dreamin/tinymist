@@ -16,6 +16,7 @@ pub mod doc;
 pub mod incr;
 pub mod protocol;
 mod render;
+pub mod zoom_portal;
 
 /// A raster image format resolved for an SVG-linked image.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

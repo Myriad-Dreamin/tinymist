@@ -4,9 +4,10 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use masonry::accesskit::{Node, Role};
+use masonry::core::keyboard::Key;
 use masonry::core::{
-    AccessCtx, ArcStr, ChildrenIds, LayoutCtx, MeasureCtx, PaintCtx, PropertiesRef, RegisterCtx,
-    Widget, WidgetId, WidgetMut,
+    AccessCtx, ArcStr, ChildrenIds, KeyboardEvent, LayoutCtx, MeasureCtx, Modifiers, PaintCtx,
+    PropertiesRef, RegisterCtx, TextEvent, Widget, WidgetId, WidgetMut,
 };
 use masonry::layout::{LenReq, Length};
 use tracing::{Span, trace_span};
@@ -17,38 +18,53 @@ use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewM
 use xilem::{Pod, ViewCtx};
 
 /// Accesses a raw vello [`Scene`] within a canvas that fills its parent
-pub fn doc<State, F>(
+pub fn doc<State, Action, F, G>(
     scene: Arc<Scene>,
     scene_scale: f64,
     background_color: Option<Color>,
     on_click: F,
-) -> TypstDocPage<State, F>
+    on_zoom: G,
+) -> TypstDocPage<State, Action, F, G>
 where
     State: ViewArgument,
     F: Fn(Point, Rect) + 'static,
+    G: Fn(Arg<'_, State>, ZoomAction) -> Action + 'static,
 {
     TypstDocPage {
         scene,
         scene_scale,
         background_color,
         on_click,
+        on_zoom,
         alt_text: Option::default(),
         phantom: PhantomData,
     }
 }
 
+/// A viewer zoom command emitted by page input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZoomAction {
+    /// Increase viewer zoom.
+    In,
+    /// Decrease viewer zoom.
+    Out,
+    /// Reset viewer zoom to the default fitted scale.
+    Reset,
+}
+
 /// The [`View`] created by [`canvas`].
 #[must_use = "View values do nothing unless provided to Xilem."]
-pub struct TypstDocPage<State, F> {
+pub struct TypstDocPage<State, Action, F, G> {
     scene: Arc<Scene>,
     scene_scale: f64,
     background_color: Option<Color>,
     alt_text: Option<ArcStr>,
     on_click: F,
-    phantom: PhantomData<fn() -> State>,
+    on_zoom: G,
+    phantom: PhantomData<fn() -> (State, Action)>,
 }
 
-impl<State, F> TypstDocPage<State, F> {
+impl<State, Action, F, G> TypstDocPage<State, Action, F, G> {
     /// Sets alt text for the contents of the canvas.
     ///
     /// Users are strongly encouraged to provide alt text for accessibility
@@ -59,12 +75,14 @@ impl<State, F> TypstDocPage<State, F> {
     }
 }
 
-impl<State, F> ViewMarker for TypstDocPage<State, F> {}
+impl<State, Action, F, G> ViewMarker for TypstDocPage<State, Action, F, G> {}
 
-impl<State, Action, F> View<State, Action, ViewCtx> for TypstDocPage<State, F>
+impl<State, Action, F, G> View<State, Action, ViewCtx> for TypstDocPage<State, Action, F, G>
 where
     State: ViewArgument,
+    Action: 'static,
     F: Fn(Point, Rect) + 'static,
+    G: Fn(Arg<'_, State>, ZoomAction) -> Action + 'static,
 {
     type Element = Pod<PageCanvas>;
     type ViewState = ();
@@ -110,7 +128,7 @@ where
         (): &mut Self::ViewState,
         message: &mut MessageCtx,
         _element: Mut<'_, Self::Element>,
-        _app_state: Arg<'_, State>,
+        app_state: Arg<'_, State>,
     ) -> MessageResult<Action> {
         debug_assert!(
             message.remaining_path().is_empty(),
@@ -125,6 +143,9 @@ where
                 } => {
                     (self.on_click)(*cursor_pos, *content_box);
                     MessageResult::Nop
+                }
+                PageAction::Zoom(action) => {
+                    MessageResult::Action((self.on_zoom)(app_state, *action))
                 }
             },
             None => {
@@ -236,6 +257,25 @@ pub enum PageAction {
         /// The position of the cursor
         cursor_pos: Point,
     },
+    /// The user has requested a zoom change.
+    Zoom(ZoomAction),
+}
+
+fn is_zoom_modifier(modifiers: Modifiers) -> bool {
+    modifiers.ctrl() || modifiers.meta()
+}
+
+fn zoom_action_from_keyboard(event: &KeyboardEvent) -> Option<ZoomAction> {
+    if !event.state.is_down() || !is_zoom_modifier(event.modifiers) {
+        return None;
+    }
+
+    match &event.key {
+        Key::Character(key) if key == "+" || key == "=" => Some(ZoomAction::In),
+        Key::Character(key) if key == "-" => Some(ZoomAction::Out),
+        Key::Character(key) if key == "0" => Some(ZoomAction::Reset),
+        _ => None,
+    }
 }
 
 // --- MARK: IMPL WIDGET
@@ -268,6 +308,20 @@ impl Widget for PageCanvas {
                 ctx.request_paint_only();
             }
             _ => (),
+        }
+    }
+
+    fn on_text_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        _props: &mut masonry::core::PropertiesMut<'_>,
+        event: &TextEvent,
+    ) {
+        if let TextEvent::Keyboard(event) = event
+            && let Some(action) = zoom_action_from_keyboard(event)
+        {
+            ctx.submit_action::<Self::Action>(PageAction::Zoom(action));
+            ctx.set_handled();
         }
     }
 
@@ -351,7 +405,8 @@ impl Widget for PageCanvas {
 mod tests {
     use std::sync::Arc;
 
-    use masonry::core::Widget;
+    use masonry::core::keyboard::{Code, Key, KeyState};
+    use masonry::core::{KeyboardEvent, Modifiers, Widget};
     use masonry::peniko::Color;
     use masonry::theme::default_property_set;
     use masonry::vello::Scene;
@@ -366,7 +421,7 @@ mod tests {
     use crate::incr::IncrVelloDocClient;
     use crate::protocol::preview_update_from_bytes;
 
-    use super::PageCanvas;
+    use super::{PageCanvas, ZoomAction, zoom_action_from_keyboard};
 
     #[test]
     fn page_canvas_paints_supplied_white_background() {
@@ -426,6 +481,34 @@ mod tests {
         );
     }
 
+    #[test]
+    fn modified_keyboard_shortcuts_map_to_zoom_actions() {
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("+", Modifiers::CONTROL)),
+            Some(ZoomAction::In)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("=", Modifiers::META)),
+            Some(ZoomAction::In)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("-", Modifiers::CONTROL)),
+            Some(ZoomAction::Out)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("0", Modifiers::META)),
+            Some(ZoomAction::Reset)
+        );
+    }
+
+    #[test]
+    fn unmodified_keyboard_zoom_shortcut_is_ignored() {
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("+", Modifiers::empty())),
+            None
+        );
+    }
+
     fn generated_preview_frames() -> (Vec<u8>, Vec<u8>) {
         const SOURCE: &str = r#"
 #set page(width: 16pt, height: 16pt, margin: 0pt, fill: white)
@@ -446,6 +529,16 @@ mod tests {
 
             (diff, current)
         })
+    }
+
+    fn keyboard_event(key: &str, modifiers: Modifiers) -> KeyboardEvent {
+        KeyboardEvent {
+            state: KeyState::Down,
+            key: Key::Character(key.to_owned()),
+            code: Code::Unidentified,
+            modifiers,
+            ..Default::default()
+        }
     }
 
     fn render_preview_frame_center(frame: &[u8]) -> [u8; 4] {
