@@ -528,7 +528,11 @@ mod tests {
                             (false, true, false) => "named",
                             (false, false, false) => "arg",
                         };
-                        let required = if param.required { "!" } else { "" };
+                        let required = if param.required && !param.variadic {
+                            "!"
+                        } else {
+                            ""
+                        };
                         let default = param
                             .default
                             .map(|default| format!(" = {}", super::truncated_repr(&default())))

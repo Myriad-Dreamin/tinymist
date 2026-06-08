@@ -192,7 +192,7 @@ impl TySchemeWorker<'_> {
             .named::<bool>("required")
             .ok()
             .flatten()
-            .unwrap_or(attrs.positional || attrs.variadic);
+            .unwrap_or(attrs.positional && !attrs.variadic);
 
         Some(Ty::Param(Interned::new(ParamTy {
             name: k.into(),
@@ -531,7 +531,7 @@ pub mod tests {
                             .map(|param| ParamShape {
                                 name: param.name.to_string(),
                                 kind: param_shape_kind(ParamAttrs::from(param)),
-                                required: param.required,
+                                required: param.required && !param.variadic,
                                 default: param.default.map(|default| {
                                     crate::upstream::truncated_repr(&default()).to_string()
                                 }),
@@ -633,7 +633,7 @@ pub mod tests {
                             .map(|sink| sink.get().to_string())
                             .unwrap_or_default(),
                         kind: ParamShapeKind::Rest,
-                        required: true,
+                        required: false,
                         default: None,
                     });
                 }
@@ -648,6 +648,14 @@ pub mod tests {
 
                     match ty {
                         Ty::Param(param) => {
+                            if param.attrs.variadic {
+                                assert!(
+                                    matches!(param.ty, Ty::Array(_) | Ty::Tuple(_)),
+                                    "{export}.{method}.{} rest type must be an array or tuple: {:?}",
+                                    param.name,
+                                    param.ty
+                                );
+                            }
                             params.push(ParamShape {
                                 name: param.name.to_string(),
                                 kind: param_shape_kind(param.attrs),
