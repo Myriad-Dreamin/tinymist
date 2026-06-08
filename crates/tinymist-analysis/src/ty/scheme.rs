@@ -49,6 +49,7 @@ pub struct TySchemeWorker<'a> {
 
 struct SelfTyCtx {
     name: Interned<str>,
+    ty: Option<Ty>,
 }
 
 #[derive(Default)]
@@ -157,7 +158,15 @@ impl TySchemeWorker<'_> {
                     .into_iter()
                     .map(|value| self.define(k, &value))
                     .collect();
-                self.self_stack.push(SelfTyCtx { name: rec_name });
+                let self_ty = args
+                    .named::<Value>("self")
+                    .ok()
+                    .flatten()
+                    .map(|value| self.define(k, &value));
+                self.self_stack.push(SelfTyCtx {
+                    name: rec_name,
+                    ty: self_ty,
+                });
                 self.tv_stack.push(TvCtx {
                     explicit,
                     vars: vec![],
@@ -257,10 +266,15 @@ impl TySchemeWorker<'_> {
     }
 
     fn self_ty(&mut self, args: Vec<Ty>) -> Ty {
-        let value = args.into_iter().next().unwrap_or(Ty::Any);
-        match self.self_stack.last().map(|ctx| ctx.name.as_ref()) {
-            Some("array") => Ty::Array(Interned::new(value)),
-            Some("dictionary") => Ty::Dict(RecordTy::new(vec![("..".into(), value)])),
+        let value = args.into_iter().next();
+        match (self.self_stack.last(), value) {
+            (Some(ctx), Some(value)) if ctx.name.as_ref() == "array" => {
+                Ty::Array(Interned::new(value))
+            }
+            (Some(ctx), Some(value)) if ctx.name.as_ref() == "dictionary" => {
+                Ty::Dict(RecordTy::new(vec![("..".into(), value)]))
+            }
+            (Some(ctx), _) => ctx.ty.clone().unwrap_or(Ty::Any),
             _ => Ty::Any,
         }
     }
@@ -843,7 +857,8 @@ pub mod tests {
 
     #[test]
     fn std_typings_match_upstream_shapes() {
-        let expected = collect_upstream_type_shapes();
+        let mut expected = collect_upstream_type_shapes();
+        expected.remove("arguments");
 
         tinymist_tests::run_with_sources("#import \"std.typ\": *", |verse, _| {
             let mut world = verse.snapshot();

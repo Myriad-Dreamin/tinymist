@@ -50,26 +50,19 @@
 
 #let alignment = rec(
   name: "alignment",
+  self: alignment,
   scope: (
-    axis: (self: pos(alignment)) => union("horizontal", "vertical", none),
-    inv: (self: pos(alignment)) => alignment,
+    axis: (self: Self) => union("horizontal", "vertical", none),
+    inv: (self: Self) => alignment,
   ),
 );
 
 #let angle = rec(
   name: "angle",
+  self: angle,
   scope: (
-    deg: (self: pos(angle)) => float,
-    rad: (self: pos(angle)) => float,
-  ),
-);
-
-#let arguments = rec(
-  name: "arguments",
-  scope: (
-    at: (self: pos(arguments), key: pos(union(int, str)), default: named(any, required: false)) => any,
-    named: (self: pos(arguments)) => dictionary,
-    pos: (self: pos(arguments)) => array,
+    deg: (self: Self) => float,
+    rad: (self: Self) => float,
   ),
 );
 
@@ -80,75 +73,80 @@
 
 #let bytes = rec(
   name: "bytes",
+  self: bytes,
   scope: (
-    at: (self: pos(bytes), index: pos(int), default: named(any, required: false)) => any,
-    len: (self: pos(bytes)) => int,
-    slice: (self: pos(bytes), start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => bytes,
+    at: (self: Self, index: pos(int), default: named(any, required: false)) => any,
+    len: (self: Self) => int,
+    slice: (self: Self, start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => bytes,
   ),
 );
 
 #let color = rec(
   name: "color",
+  self: color,
   scope: (
     cmyk: (cyan: pos(ratio), magenta: pos(ratio), yellow: pos(ratio), key: pos(ratio), color: pos(color)) => color,
-    components: (self: pos(color), alpha: named(bool, required: false, default: "true")) => array,
-    darken: (self: pos(color), factor: pos(ratio)) => color,
-    desaturate: (self: pos(color), factor: pos(ratio)) => color,
+    components: (self: Self, alpha: named(bool, required: false, default: "true")) => array,
+    darken: (self: Self, factor: pos(ratio)) => color,
+    desaturate: (self: Self, factor: pos(ratio)) => color,
     hsl: (hue: pos(angle), saturation: pos(union(int, ratio)), lightness: pos(union(int, ratio)), alpha: pos(union(int, ratio)), color: pos(color)) => color,
     hsv: (hue: pos(angle), saturation: pos(union(int, ratio)), value: pos(union(int, ratio)), alpha: pos(union(int, ratio)), color: pos(color)) => color,
-    lighten: (self: pos(color), factor: pos(ratio)) => color,
+    lighten: (self: Self, factor: pos(ratio)) => color,
     linear-rgb: (red: pos(union(int, ratio)), green: pos(union(int, ratio)), blue: pos(union(int, ratio)), alpha: pos(union(int, ratio)), color: pos(color)) => color,
     luma: (lightness: pos(union(int, ratio)), alpha: pos(ratio), color: pos(color)) => color,
     mix: (colors: rest(arr(union(color, array))), space: named(any, required: false, default: "oklab")) => color,
-    negate: (self: pos(color), space: named(any, required: false, default: "oklab")) => color,
+    negate: (self: Self, space: named(any, required: false, default: "oklab")) => color,
     oklab: (lightness: pos(ratio), a: pos(union(float, ratio)), b: pos(union(float, ratio)), alpha: pos(ratio), color: pos(color)) => color,
     oklch: (lightness: pos(ratio), chroma: pos(union(float, ratio)), hue: pos(angle), alpha: pos(ratio), color: pos(color)) => color,
-    opacify: (self: pos(color), scale: pos(ratio)) => color,
+    opacify: (self: Self, scale: pos(ratio)) => color,
     rgb: (red: pos(union(int, ratio)), green: pos(union(int, ratio)), blue: pos(union(int, ratio)), alpha: pos(union(int, ratio)), hex: pos(str), color: pos(color)) => color,
-    rotate: (self: pos(color), angle: pos(angle), space: named(any, required: false, default: "oklch")) => color,
-    saturate: (self: pos(color), factor: pos(ratio)) => color,
-    space: (self: pos(color)) => any,
-    to-hex: (self: pos(color)) => str,
-    transparentize: (self: pos(color), scale: pos(ratio)) => color,
+    rotate: (self: Self, angle: pos(angle), space: named(any, required: false, default: "oklch")) => color,
+    saturate: (self: Self, factor: pos(ratio)) => color,
+    space: (self: Self) => any,
+    to-hex: (self: Self) => str,
+    transparentize: (self: Self, scale: pos(ratio)) => color,
   ),
 );
 
 #let content = rec(
   name: "content",
+  self: content,
   scope: (
-    at: (self: pos(content), field: pos(str), default: named(any, required: false)) => any,
-    fields: (self: pos(content)) => dictionary,
-    func: (self: pos(content)) => function,
-    has: (self: pos(content), field: pos(str)) => bool,
-    location: (self: pos(content)) => union(location, none),
+    at: (self: Self, field: pos(str), default: named(any, required: false)) => any,
+    fields: (self: Self) => dictionary,
+    func: (self: Self) => function,
+    has: (self: Self, field: pos(str)) => bool,
+    location: (self: Self) => union(location, none),
   ),
 );
 
 #let counter = rec(
   name: "counter",
+  self: counter,
   scope: (
-    at: (self: pos(counter), selector: pos(union(label, function, location, selector))) => union(int, array),
-    display: (self: pos(counter), numbering: pos(union(str, function, auto), required: false, default: "auto"), both: named(bool, required: false, default: "false")) => any,
-    final: (self: pos(counter)) => union(int, array),
-    get: (self: pos(counter)) => union(int, array),
-    step: (self: pos(counter), level: named(int, required: false, default: "1")) => content,
-    update: (self: pos(counter), update: pos(union(int, array, function))) => content,
+    at: (self: Self, selector: pos(union(label, function, location, selector))) => union(int, array),
+    display: (self: Self, numbering: pos(union(str, function, auto), required: false, default: "auto"), both: named(bool, required: false, default: "false")) => any,
+    final: (self: Self) => union(int, array),
+    get: (self: Self) => union(int, array),
+    step: (self: Self, level: named(int, required: false, default: "1")) => content,
+    update: (self: Self, update: pos(union(int, array, function))) => content,
   ),
 );
 
 #let datetime = rec(
   name: "datetime",
+  self: datetime,
   scope: (
-    day: (self: pos(datetime)) => union(int, none),
-    display: (self: pos(datetime), pattern: pos(union(str, auto), required: false, default: "auto")) => str,
-    hour: (self: pos(datetime)) => union(int, none),
-    minute: (self: pos(datetime)) => union(int, none),
-    month: (self: pos(datetime)) => union(int, none),
-    ordinal: (self: pos(datetime)) => union(int, none),
-    second: (self: pos(datetime)) => union(int, none),
+    day: (self: Self) => union(int, none),
+    display: (self: Self, pattern: pos(union(str, auto), required: false, default: "auto")) => str,
+    hour: (self: Self) => union(int, none),
+    minute: (self: Self) => union(int, none),
+    month: (self: Self) => union(int, none),
+    ordinal: (self: Self) => union(int, none),
+    second: (self: Self) => union(int, none),
     today: (offset: named(union(int, auto), required: false, default: "auto")) => datetime,
-    weekday: (self: pos(datetime)) => union(int, none),
-    year: (self: pos(datetime)) => union(int, none),
+    weekday: (self: Self) => union(int, none),
+    year: (self: Self) => union(int, none),
   ),
 );
 
@@ -159,49 +157,53 @@
 
 #let dictionary = rec(
   name: "dictionary",
+  self: dictionary,
   scope: (
-    at: (self: pos(dictionary), key: pos(str), default: named(any, required: false)) => any,
-    insert: (self: pos(dictionary), key: pos(str), value: pos(any)) => none,
-    keys: (self: pos(dictionary)) => array,
-    len: (self: pos(dictionary)) => int,
-    pairs: (self: pos(dictionary)) => array,
-    remove: (self: pos(dictionary), key: pos(str), default: named(any, required: false)) => any,
-    values: (self: pos(dictionary)) => array,
+    at: (self: Self, key: pos(str), default: named(any, required: false)) => any,
+    insert: (self: Self, key: pos(str), value: pos(any)) => none,
+    keys: (self: Self) => array,
+    len: (self: Self) => int,
+    pairs: (self: Self) => array,
+    remove: (self: Self, key: pos(str), default: named(any, required: false)) => any,
+    values: (self: Self) => array,
   ),
 );
 
 #let direction = rec(
   name: "direction",
+  self: direction,
   scope: (
-    axis: (self: pos(direction)) => union("horizontal", "vertical"),
-    end: (self: pos(direction)) => alignment,
+    axis: (self: Self) => union("horizontal", "vertical"),
+    end: (self: Self) => alignment,
     from: (side: pos(alignment)) => direction,
-    inv: (self: pos(direction)) => direction,
-    sign: (self: pos(direction)) => int,
-    start: (self: pos(direction)) => alignment,
+    inv: (self: Self) => direction,
+    sign: (self: Self) => int,
+    start: (self: Self) => alignment,
     to: (side: pos(alignment)) => direction,
   ),
 );
 
 #let duration = rec(
   name: "duration",
+  self: duration,
   scope: (
-    days: (self: pos(duration)) => float,
-    hours: (self: pos(duration)) => float,
-    minutes: (self: pos(duration)) => float,
-    seconds: (self: pos(duration)) => float,
-    weeks: (self: pos(duration)) => float,
+    days: (self: Self) => float,
+    hours: (self: Self) => float,
+    minutes: (self: Self) => float,
+    seconds: (self: Self) => float,
+    weeks: (self: Self) => float,
   ),
 );
 
 #let float = rec(
   name: "float",
+  self: float,
   scope: (
     from-bytes: (bytes: pos(bytes), endian: named(union("big", "little"), required: false, default: "\"little\"")) => float,
-    is-infinite: (self: pos(float)) => bool,
-    is-nan: (self: pos(float)) => bool,
-    signum: (self: pos(float)) => float,
-    to-bytes: (self: pos(float), endian: named(union("big", "little"), required: false, default: "\"little\""), size: named(int, required: false, default: "8")) => bytes,
+    is-infinite: (self: Self) => bool,
+    is-nan: (self: Self) => bool,
+    signum: (self: Self) => float,
+    to-bytes: (self: Self, endian: named(union("big", "little"), required: false, default: "\"little\""), size: named(int, required: false, default: "8")) => bytes,
   ),
 );
 
@@ -212,46 +214,49 @@
 
 #let function = rec(
   name: "function",
+  self: function,
   scope: (
-    where: (self: pos(function), fields: rest(arr(any))) => selector,
-    with: (self: pos(function), arguments: rest(arr(any))) => function,
+    where: (self: Self, fields: rest(arr(any))) => selector,
+    with: (self: Self, arguments: rest(arr(any))) => function,
   ),
 );
 
 #let gradient = rec(
   name: "gradient",
+  self: gradient,
   scope: (
-    angle: (self: pos(gradient)) => union(angle, none),
-    center: (self: pos(gradient)) => union(array, none),
+    angle: (self: Self) => union(angle, none),
+    center: (self: Self) => union(array, none),
     conic: (stops: rest(arr(union(color, array))), angle: named(angle, required: false, default: "0deg"), space: named(any, required: false, default: "oklab"), relative: named(union("self", "parent", auto), required: false, default: "auto"), center: named(array, required: false, default: "(50%, 50%)")) => gradient,
-    focal-center: (self: pos(gradient)) => union(array, none),
-    focal-radius: (self: pos(gradient)) => union(ratio, none),
-    kind: (self: pos(gradient)) => function,
+    focal-center: (self: Self) => union(array, none),
+    focal-radius: (self: Self) => union(ratio, none),
+    kind: (self: Self) => function,
     linear: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: "oklab"), relative: named(union("self", "parent", auto), required: false, default: "auto"), dir: pos(direction, required: false, default: "ltr"), angle: pos(angle)) => gradient,
     radial: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: "oklab"), relative: named(union("self", "parent", auto), required: false, default: "auto"), center: named(array, required: false, default: "(50%, 50%)"), radius: named(ratio, required: false, default: "50%"), focal-center: named(union(array, auto), required: false, default: "auto"), focal-radius: named(ratio, required: false, default: "0%")) => gradient,
-    radius: (self: pos(gradient)) => union(ratio, none),
-    relative: (self: pos(gradient)) => union("self", "parent", auto),
-    repeat: (self: pos(gradient), repetitions: pos(int), mirror: named(bool, required: false, default: "false")) => gradient,
-    sample: (self: pos(gradient), t: pos(union(ratio, angle))) => color,
-    samples: (self: pos(gradient), ts: rest(arr(union(ratio, angle)))) => array,
-    sharp: (self: pos(gradient), steps: pos(int), smoothness: named(ratio, required: false, default: "0%")) => gradient,
-    space: (self: pos(gradient)) => any,
-    stops: (self: pos(gradient)) => array,
+    radius: (self: Self) => union(ratio, none),
+    relative: (self: Self) => union("self", "parent", auto),
+    repeat: (self: Self, repetitions: pos(int), mirror: named(bool, required: false, default: "false")) => gradient,
+    sample: (self: Self, t: pos(union(ratio, angle))) => color,
+    samples: (self: Self, ts: rest(arr(union(ratio, angle)))) => array,
+    sharp: (self: Self, steps: pos(int), smoothness: named(ratio, required: false, default: "0%")) => gradient,
+    space: (self: Self) => any,
+    stops: (self: Self) => array,
   ),
 );
 
 #let int = rec(
   name: "integer",
+  self: int,
   scope: (
-    bit-and: (self: pos(int), rhs: pos(int)) => int,
-    bit-lshift: (self: pos(int), shift: pos(int)) => int,
-    bit-not: (self: pos(int)) => int,
-    bit-or: (self: pos(int), rhs: pos(int)) => int,
-    bit-rshift: (self: pos(int), shift: pos(int), logical: named(bool, required: false, default: "false")) => int,
-    bit-xor: (self: pos(int), rhs: pos(int)) => int,
+    bit-and: (self: Self, rhs: pos(int)) => int,
+    bit-lshift: (self: Self, shift: pos(int)) => int,
+    bit-not: (self: Self) => int,
+    bit-or: (self: Self, rhs: pos(int)) => int,
+    bit-rshift: (self: Self, shift: pos(int), logical: named(bool, required: false, default: "false")) => int,
+    bit-xor: (self: Self, rhs: pos(int)) => int,
     from-bytes: (bytes: pos(bytes), endian: named(union("big", "little"), required: false, default: "\"little\""), signed: named(bool, required: false, default: "true")) => int,
-    signum: (self: pos(int)) => int,
-    to-bytes: (self: pos(int), endian: named(union("big", "little"), required: false, default: "\"little\""), size: named(int, required: false, default: "8")) => bytes,
+    signum: (self: Self) => int,
+    to-bytes: (self: Self, endian: named(union("big", "little"), required: false, default: "\"little\""), size: named(int, required: false, default: "8")) => bytes,
   ),
 );
 
@@ -262,21 +267,23 @@
 
 #let length = rec(
   name: "length",
+  self: length,
   scope: (
-    cm: (self: pos(length)) => float,
-    inches: (self: pos(length)) => float,
-    mm: (self: pos(length)) => float,
-    pt: (self: pos(length)) => float,
-    to-absolute: (self: pos(length)) => length,
+    cm: (self: Self) => float,
+    inches: (self: Self) => float,
+    mm: (self: Self) => float,
+    pt: (self: Self) => float,
+    to-absolute: (self: Self) => length,
   ),
 );
 
 #let location = rec(
   name: "location",
+  self: location,
   scope: (
-    page: (self: pos(location)) => int,
-    page-numbering: (self: pos(location)) => union(str, function, none),
-    position: (self: pos(location)) => dictionary,
+    page: (self: Self) => int,
+    page-numbering: (self: Self) => union(str, function, none),
+    position: (self: Self) => dictionary,
   ),
 );
 
@@ -302,48 +309,51 @@
 
 #let selector = rec(
   name: "selector",
+  self: selector,
   scope: (
-    after: (self: pos(union(str, function, label, regex, location, selector)), start: pos(union(label, function, location, selector)), inclusive: named(bool, required: false, default: "true")) => selector,
-    "and": (self: pos(union(str, function, label, regex, location, selector)), others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
-    before: (self: pos(union(str, function, label, regex, location, selector)), end: pos(union(label, function, location, selector)), inclusive: named(bool, required: false, default: "true")) => selector,
-    "or": (self: pos(union(str, function, label, regex, location, selector)), others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
+    after: (self: Self, start: pos(union(label, function, location, selector)), inclusive: named(bool, required: false, default: "true")) => selector,
+    "and": (self: Self, others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
+    before: (self: Self, end: pos(union(label, function, location, selector)), inclusive: named(bool, required: false, default: "true")) => selector,
+    "or": (self: Self, others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
   ),
 );
 
 #let state = rec(
   name: "state",
+  self: state,
   scope: (
-    at: (self: pos(state), selector: pos(union(label, function, location, selector))) => any,
-    final: (self: pos(state)) => any,
-    get: (self: pos(state)) => any,
-    update: (self: pos(state), update: pos(union(function, any))) => content,
+    at: (self: Self, selector: pos(union(label, function, location, selector))) => any,
+    final: (self: Self) => any,
+    get: (self: Self) => any,
+    update: (self: Self, update: pos(union(function, any))) => content,
   ),
 );
 
 #let str = rec(
   name: "string",
+  self: str,
   scope: (
-    at: (self: pos(str), index: pos(int), default: named(any, required: false)) => any,
-    clusters: (self: pos(str)) => array,
-    codepoints: (self: pos(str)) => array,
-    contains: (self: pos(str), pattern: pos(union(str, regex))) => bool,
-    ends-with: (self: pos(str), pattern: pos(union(str, regex))) => bool,
-    find: (self: pos(str), pattern: pos(union(str, regex))) => union(str, none),
-    first: (self: pos(str), default: named(str, required: false)) => str,
+    at: (self: Self, index: pos(int), default: named(any, required: false)) => any,
+    clusters: (self: Self) => array,
+    codepoints: (self: Self) => array,
+    contains: (self: Self, pattern: pos(union(str, regex))) => bool,
+    ends-with: (self: Self, pattern: pos(union(str, regex))) => bool,
+    find: (self: Self, pattern: pos(union(str, regex))) => union(str, none),
+    first: (self: Self, default: named(str, required: false)) => str,
     from-unicode: (value: pos(int)) => str,
-    last: (self: pos(str), default: named(str, required: false)) => str,
-    len: (self: pos(str)) => int,
-    match: (self: pos(str), pattern: pos(union(str, regex))) => union(dictionary, none),
-    matches: (self: pos(str), pattern: pos(union(str, regex))) => array,
-    normalize: (self: pos(str), form: named(union("nfc", "nfd", "nfkc", "nfkd"), required: false, default: "\"nfc\"")) => str,
-    position: (self: pos(str), pattern: pos(union(str, regex))) => union(int, none),
-    replace: (self: pos(str), pattern: pos(union(str, regex)), replacement: pos(union(str, function)), count: named(int, required: false)) => str,
-    rev: (self: pos(str)) => str,
-    slice: (self: pos(str), start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => str,
-    split: (self: pos(str), pattern: pos(union(str, regex, none), required: false, default: "none")) => array,
-    starts-with: (self: pos(str), pattern: pos(union(str, regex))) => bool,
+    last: (self: Self, default: named(str, required: false)) => str,
+    len: (self: Self) => int,
+    match: (self: Self, pattern: pos(union(str, regex))) => union(dictionary, none),
+    matches: (self: Self, pattern: pos(union(str, regex))) => array,
+    normalize: (self: Self, form: named(union("nfc", "nfd", "nfkc", "nfkd"), required: false, default: "\"nfc\"")) => str,
+    position: (self: Self, pattern: pos(union(str, regex))) => union(int, none),
+    replace: (self: Self, pattern: pos(union(str, regex)), replacement: pos(union(str, function)), count: named(int, required: false)) => str,
+    rev: (self: Self) => str,
+    slice: (self: Self, start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => str,
+    split: (self: Self, pattern: pos(union(str, regex, none), required: false, default: "none")) => array,
+    starts-with: (self: Self, pattern: pos(union(str, regex))) => bool,
     to-unicode: (character: pos(str)) => int,
-    trim: (self: pos(str), pattern: pos(union(str, regex, none), required: false, default: "none"), at: named(alignment, required: false), repeat: named(bool, required: false, default: "true")) => str,
+    trim: (self: Self, pattern: pos(union(str, regex, none), required: false, default: "none"), at: named(alignment, required: false), repeat: named(bool, required: false, default: "true")) => str,
   ),
 );
 
@@ -370,8 +380,9 @@
 
 #let version = rec(
   name: "version",
+  self: version,
   scope: (
-    at: (self: pos(version), index: pos(int)) => int,
+    at: (self: Self, index: pos(int)) => int,
   ),
 );
 
