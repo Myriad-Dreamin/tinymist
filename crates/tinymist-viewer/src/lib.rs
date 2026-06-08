@@ -7,9 +7,10 @@
 use std::fmt;
 
 use ecow::EcoVec;
+use masonry::accesskit::{Action, Node, NodeId, Rect as AccessRect, Role, TreeUpdate};
 use reflexo::hash::Fingerprint;
 use std::sync::Arc;
-use vello::kurbo::{self, Affine, Point, Rect};
+use vello::kurbo::{self, Affine, Point};
 use vello::peniko;
 
 pub mod doc;
@@ -68,59 +69,96 @@ pub trait SvgResourceResolver: Send + Sync {
 pub struct VecPage {
     size: kurbo::Vec2,
     elem: Arc<VecScene>,
-    semantics: PageSemantics,
+    accessibility: PageAccessibility,
     content_hash: Fingerprint,
 }
 
-/// Semantic metadata for a rendered page.
+/// AccessKit nodes for a rendered page.
 #[derive(Debug, Clone, Default)]
-pub struct PageSemantics {
-    links: EcoVec<SemanticLink>,
+pub struct PageAccessibility {
+    nodes: EcoVec<Node>,
 }
 
-impl PageSemantics {
-    /// Returns all semantic links in paint order.
-    pub fn links(&self) -> &[SemanticLink] {
-        &self.links
+impl PageAccessibility {
+    /// Creates a page accessibility tree from AccessKit nodes in paint order.
+    pub fn new(nodes: impl IntoIterator<Item = Node>) -> Self {
+        Self {
+            nodes: nodes.into_iter().collect(),
+        }
     }
 
-    /// Returns the topmost link at the provided page-coordinate point.
-    pub fn hit_test_link(&self, point: Point) -> Option<&SemanticLink> {
-        self.links
+    /// Returns the page AccessKit nodes in paint order.
+    pub fn nodes(&self) -> &[Node] {
+        &self.nodes
+    }
+
+    /// Returns whether this page has no synthetic AccessKit nodes.
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+
+    /// Returns the topmost link href at the provided page-coordinate point.
+    pub fn hit_test_link(&self, point: Point) -> Option<&str> {
+        self.nodes
             .iter()
             .rev()
-            .find(|link| link.rect.contains(point))
+            .find(|node| {
+                node.role() == Role::Link
+                    && node.supports_action(Action::Click)
+                    && node
+                        .bounds()
+                        .is_some_and(|bounds| access_rect_contains(bounds, point))
+            })
+            .and_then(Node::value)
     }
 
-    fn push_link(&mut self, link: SemanticLink) {
-        self.links.push(link);
+    /// Adds synthetic nodes to the active AccessKit update and attaches them to
+    /// the owner widget node.
+    pub fn push_accesskit_nodes(
+        &self,
+        tree_update: &mut TreeUpdate,
+        owner: &mut Node,
+        mut next_node_id: impl FnMut() -> NodeId,
+        scale: f64,
+    ) {
+        let mut child_ids = Vec::with_capacity(self.nodes.len());
+        for page_node in self.nodes.iter() {
+            let node_id = next_node_id();
+            child_ids.push(node_id);
+            tree_update
+                .nodes
+                .push((node_id, scaled_access_node(page_node, scale)));
+        }
+        owner.set_children(child_ids);
+    }
+
+    pub(crate) fn push_node(&mut self, node: Node) {
+        self.nodes.push(node);
+    }
+
+    pub(crate) fn link_node(href: impl Into<String>, bounds: AccessRect) -> Node {
+        let href = href.into();
+        let mut node = Node::new(Role::Link);
+        node.set_bounds(bounds);
+        node.set_label(href.clone());
+        node.set_value(href);
+        node.add_action(Action::Click);
+        node
     }
 }
 
-/// A semantic link hit area in page coordinates.
-#[derive(Debug, Clone, PartialEq)]
-pub struct SemanticLink {
-    /// The link destination.
-    pub href: String,
-    /// The clickable page-coordinate rectangle.
-    pub rect: Rect,
+fn scaled_access_node(node: &Node, scale: f64) -> Node {
+    let mut node = node.clone();
+    if scale != 1.0
+        && let Some(bounds) = node.bounds()
+    {
+        node.set_bounds(transform_access_rect_bbox(Affine::scale(scale), bounds));
+    }
+    node
 }
 
-impl SemanticLink {
-    /// Creates a semantic link.
-    pub fn new(href: impl Into<String>, rect: Rect) -> Self {
-        Self {
-            href: href.into(),
-            rect,
-        }
-    }
-
-    fn transformed(&self, transform: Affine) -> Self {
-        Self {
-            href: self.href.clone(),
-            rect: transform_rect_bbox(transform, self.rect),
-        }
-    }
+fn access_rect_contains(rect: AccessRect, point: Point) -> bool {
+    point.x >= rect.x0 && point.x < rect.x1 && point.y >= rect.y0 && point.y < rect.y1
 }
 
 /// A scene that can be rendered to a [`vello::Scene`].
@@ -162,16 +200,16 @@ impl VecScene {
         }
     }
 
-    /// Collects semantic metadata in page coordinates.
-    pub fn page_semantics(&self) -> PageSemantics {
-        let mut semantics = PageSemantics::default();
-        self.collect_semantics(Affine::IDENTITY, &mut semantics);
-        semantics
+    /// Collects AccessKit nodes in page coordinates.
+    pub fn page_accessibility(&self) -> PageAccessibility {
+        let mut accessibility = PageAccessibility::default();
+        self.collect_accessibility(Affine::IDENTITY, &mut accessibility);
+        accessibility
     }
 
-    fn collect_semantics(&self, transform: Affine, semantics: &mut PageSemantics) {
+    fn collect_accessibility(&self, transform: Affine, accessibility: &mut PageAccessibility) {
         match self {
-            VecScene::Group(group) => group.collect_semantics(transform, semantics),
+            VecScene::Group(group) => group.collect_accessibility(transform, accessibility),
             VecScene::Path(..) | VecScene::Scene(..) => {}
         }
     }
@@ -182,8 +220,21 @@ impl VecScene {
 pub struct GroupScene {
     clip: Option<kurbo::BezPath>,
     ts: Affine,
-    scenes: EcoVec<(kurbo::Vec2, Arc<VecScene>)>,
-    semantic_links: EcoVec<SemanticLink>,
+    items: EcoVec<GroupSceneItem>,
+}
+
+/// An item inside a [`GroupScene`], ordered as emitted by the renderer.
+#[derive(Debug, Clone)]
+pub enum GroupSceneItem {
+    /// A visual scene drawn at the given group-local position.
+    Scene {
+        /// The group-local position of the scene.
+        pos: kurbo::Vec2,
+        /// The scene to render.
+        scene: Arc<VecScene>,
+    },
+    /// An AccessKit node associated with the group.
+    Accessibility(Node),
 }
 
 impl GroupScene {
@@ -193,30 +244,46 @@ impl GroupScene {
             scene.push_clip_layer(peniko::Fill::NonZero, self.ts, clip);
         }
         let ts = self.ts;
-        for (pos, elem) in self.scenes.iter() {
-            let ts = ts.pre_translate(*pos);
-            let mut sub_scene = vello::Scene::new();
-            elem.render(&mut sub_scene);
-            scene.append(&sub_scene, Some(ts));
+        for item in self.items.iter() {
+            if let GroupSceneItem::Scene {
+                pos,
+                scene: child_scene,
+            } = item
+            {
+                let ts = ts.pre_translate(*pos);
+                let mut sub_scene = vello::Scene::new();
+                child_scene.render(&mut sub_scene);
+                scene.append(&sub_scene, Some(ts));
+            }
         }
         if self.clip.is_some() {
             scene.pop_layer();
         }
     }
 
-    fn collect_semantics(&self, transform: Affine, semantics: &mut PageSemantics) {
+    fn collect_accessibility(&self, transform: Affine, accessibility: &mut PageAccessibility) {
         let transform = transform * self.ts;
-        for link in self.semantic_links.iter() {
-            semantics.push_link(link.transformed(transform));
-        }
-
-        for (pos, elem) in self.scenes.iter() {
-            elem.collect_semantics(transform.pre_translate(*pos), semantics);
+        for item in self.items.iter() {
+            match item {
+                GroupSceneItem::Scene {
+                    pos,
+                    scene: child_scene,
+                } => {
+                    child_scene.collect_accessibility(transform.pre_translate(*pos), accessibility);
+                }
+                GroupSceneItem::Accessibility(node) => {
+                    let mut node = node.clone();
+                    if let Some(bounds) = node.bounds() {
+                        node.set_bounds(transform_access_rect_bbox(transform, bounds));
+                    }
+                    accessibility.push_node(node);
+                }
+            }
         }
     }
 }
 
-fn transform_rect_bbox(transform: Affine, rect: Rect) -> Rect {
+fn transform_access_rect_bbox(transform: Affine, rect: AccessRect) -> AccessRect {
     let points = [
         Point::new(rect.x0, rect.y0),
         Point::new(rect.x1, rect.y0),
@@ -236,69 +303,121 @@ fn transform_rect_bbox(transform: Affine, rect: Rect) -> Rect {
         y1 = y1.max(point.y);
     }
 
-    Rect::new(x0, y0, x1, y1)
+    AccessRect::new(x0, y0, x1, y1)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn page_semantics_hit_tests_topmost_link() {
-        let mut semantics = PageSemantics::default();
-        semantics.push_link(SemanticLink::new(
-            "https://bottom.example",
-            Rect::new(0.0, 0.0, 20.0, 20.0),
-        ));
-        semantics.push_link(SemanticLink::new(
-            "https://top.example",
-            Rect::new(10.0, 10.0, 30.0, 30.0),
-        ));
-
-        assert_eq!(
-            semantics
-                .hit_test_link(Point::new(12.0, 12.0))
-                .map(|link| link.href.as_str()),
-            Some("https://top.example")
-        );
-        assert_eq!(
-            semantics
-                .hit_test_link(Point::new(5.0, 5.0))
-                .map(|link| link.href.as_str()),
-            Some("https://bottom.example")
-        );
-        assert!(semantics.hit_test_link(Point::new(40.0, 40.0)).is_none());
+    fn access_rect(x0: f64, y0: f64, x1: f64, y1: f64) -> AccessRect {
+        AccessRect::new(x0, y0, x1, y1)
     }
 
     #[test]
-    fn page_semantics_collects_transformed_nested_links() {
-        let mut links = EcoVec::new();
-        links.push(SemanticLink::new(
-            "https://example.com",
-            Rect::new(0.0, 0.0, 5.0, 10.0),
+    fn page_accessibility_hit_tests_topmost_link_node() {
+        let mut accessibility = PageAccessibility::default();
+        accessibility.push_node(PageAccessibility::link_node(
+            "https://bottom.example",
+            access_rect(0.0, 0.0, 20.0, 20.0),
         ));
+        accessibility.push_node(PageAccessibility::link_node(
+            "https://top.example",
+            access_rect(10.0, 10.0, 30.0, 30.0),
+        ));
+
+        assert_eq!(
+            accessibility.hit_test_link(Point::new(12.0, 12.0)),
+            Some("https://top.example")
+        );
+        assert_eq!(
+            accessibility.hit_test_link(Point::new(5.0, 5.0)),
+            Some("https://bottom.example")
+        );
+        assert!(
+            accessibility
+                .hit_test_link(Point::new(40.0, 40.0))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn page_accessibility_collects_transformed_nested_link_nodes() {
+        let mut child_items = EcoVec::new();
+        child_items.push(GroupSceneItem::Accessibility(PageAccessibility::link_node(
+            "https://example.com",
+            access_rect(0.0, 0.0, 5.0, 10.0),
+        )));
         let child = Arc::new(VecScene::Group(GroupScene {
             clip: None,
             ts: Affine::scale(2.0),
-            scenes: EcoVec::new(),
-            semantic_links: links,
+            items: child_items,
         }));
 
-        let mut scenes = EcoVec::new();
-        scenes.push((kurbo::Vec2::new(10.0, 20.0), child));
+        let mut items = EcoVec::new();
+        items.push(GroupSceneItem::Scene {
+            pos: kurbo::Vec2::new(10.0, 20.0),
+            scene: child,
+        });
         let scene = VecScene::Group(GroupScene {
             clip: None,
             ts: Affine::IDENTITY,
-            scenes,
-            semantic_links: EcoVec::new(),
+            items,
         });
 
-        let semantics = scene.page_semantics();
-        assert_eq!(semantics.links().len(), 1);
-        let link = &semantics.links()[0];
-        assert_eq!(link.href, "https://example.com");
-        assert_eq!(link.rect, Rect::new(10.0, 20.0, 20.0, 40.0));
-        assert!(semantics.hit_test_link(Point::new(15.0, 30.0)).is_some());
-        assert!(semantics.hit_test_link(Point::new(25.0, 30.0)).is_none());
+        let accessibility = scene.page_accessibility();
+        let [link] = accessibility.nodes() else {
+            panic!("expected one AccessKit link node");
+        };
+        assert_eq!(link.role(), Role::Link);
+        assert_eq!(link.value(), Some("https://example.com"));
+        assert_eq!(link.bounds(), Some(access_rect(10.0, 20.0, 20.0, 40.0)));
+        assert!(link.supports_action(Action::Click));
+        assert!(
+            accessibility
+                .hit_test_link(Point::new(15.0, 30.0))
+                .is_some()
+        );
+        assert!(
+            accessibility
+                .hit_test_link(Point::new(25.0, 30.0))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn page_accessibility_hit_tests_links_in_group_item_order() {
+        let mut child_items = EcoVec::new();
+        child_items.push(GroupSceneItem::Accessibility(PageAccessibility::link_node(
+            "https://bottom.example",
+            access_rect(0.0, 0.0, 20.0, 20.0),
+        )));
+        let child = Arc::new(VecScene::Group(GroupScene {
+            clip: None,
+            ts: Affine::IDENTITY,
+            items: child_items,
+        }));
+
+        let mut items = EcoVec::new();
+        items.push(GroupSceneItem::Scene {
+            pos: kurbo::Vec2::ZERO,
+            scene: child,
+        });
+        items.push(GroupSceneItem::Accessibility(PageAccessibility::link_node(
+            "https://top.example",
+            access_rect(0.0, 0.0, 20.0, 20.0),
+        )));
+        let scene = VecScene::Group(GroupScene {
+            clip: None,
+            ts: Affine::IDENTITY,
+            items,
+        });
+
+        assert_eq!(
+            scene
+                .page_accessibility()
+                .hit_test_link(Point::new(10.0, 10.0)),
+            Some("https://top.example")
+        );
     }
 }

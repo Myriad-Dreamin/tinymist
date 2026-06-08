@@ -17,6 +17,8 @@ use vello::peniko::{Color, Fill};
 use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewMarker};
 use xilem::{Pod, ViewCtx};
 
+use crate::PageAccessibility;
+
 /// Accesses a raw vello [`Scene`] within a canvas that fills its parent
 pub fn doc<State, Action, F, G>(
     scene: Arc<Scene>,
@@ -37,6 +39,7 @@ where
         on_click,
         on_zoom,
         alt_text: Option::default(),
+        accessibility: Arc::new(PageAccessibility::default()),
         phantom: PhantomData,
     }
 }
@@ -59,6 +62,7 @@ pub struct TypstDocPage<State, Action, F, G> {
     scene_scale: f64,
     background_color: Option<Color>,
     alt_text: Option<ArcStr>,
+    accessibility: Arc<PageAccessibility>,
     on_click: F,
     on_zoom: G,
     phantom: PhantomData<fn() -> (State, Action)>,
@@ -71,6 +75,12 @@ impl<State, Action, F, G> TypstDocPage<State, Action, F, G> {
     /// tools to use.
     pub fn alt_text(mut self, alt_text: impl Into<ArcStr>) -> Self {
         self.alt_text = Some(alt_text.into());
+        self
+    }
+
+    /// Sets synthetic AccessKit nodes for the page contents.
+    pub fn accessibility(mut self, accessibility: Arc<PageAccessibility>) -> Self {
+        self.accessibility = accessibility;
         self
     }
 }
@@ -96,6 +106,7 @@ where
                     scene_scale: self.scene_scale,
                     background_color: self.background_color,
                     scene: self.scene.clone(),
+                    accessibility: self.accessibility.clone(),
                 })
             }),
             (),
@@ -118,6 +129,9 @@ where
         );
         if self.alt_text != prev.alt_text {
             PageCanvas::set_alt_text(&mut element, self.alt_text.clone());
+        }
+        if !Arc::ptr_eq(&self.accessibility, &prev.accessibility) {
+            PageCanvas::set_accessibility(&mut element, self.accessibility.clone());
         }
     }
 
@@ -172,6 +186,7 @@ pub struct PageCanvas {
     scene_scale: f64,
     background_color: Option<Color>,
     scene: Arc<Scene>,
+    accessibility: Arc<PageAccessibility>,
 }
 
 // --- MARK: BUILDERS
@@ -184,6 +199,7 @@ impl PageCanvas {
             scene_scale,
             background_color,
             scene,
+            accessibility: Arc::new(PageAccessibility::default()),
         }
     }
 
@@ -199,6 +215,12 @@ impl PageCanvas {
     /// accessible description of the canvas content.
     pub fn with_alt_text(mut self, alt_text: impl Into<ArcStr>) -> Self {
         self.alt_text = Some(alt_text.into());
+        self
+    }
+
+    /// Sets synthetic AccessKit nodes for this page canvas.
+    pub fn with_accessibility(mut self, accessibility: Arc<PageAccessibility>) -> Self {
+        self.accessibility = accessibility;
         self
     }
 }
@@ -238,6 +260,15 @@ impl PageCanvas {
     /// See [`Canvas::with_alt_text`] for details.
     pub fn set_alt_text(this: &mut WidgetMut<'_, Self>, alt_text: Option<impl Into<ArcStr>>) {
         this.widget.alt_text = alt_text.map(Into::into);
+        this.ctx.request_accessibility_update();
+    }
+
+    /// Sets synthetic AccessKit nodes for this page canvas.
+    pub fn set_accessibility(
+        this: &mut WidgetMut<'_, Self>,
+        accessibility: Arc<PageAccessibility>,
+    ) {
+        this.widget.accessibility = accessibility;
         this.ctx.request_accessibility_update();
     }
 }
@@ -374,18 +405,28 @@ impl Widget for PageCanvas {
     }
 
     fn accessibility_role(&self) -> Role {
-        Role::Canvas
+        if self.accessibility.is_empty() {
+            Role::Canvas
+        } else {
+            Role::Document
+        }
     }
 
     fn accessibility(
         &mut self,
-        _ctx: &mut AccessCtx<'_>,
+        ctx: &mut AccessCtx<'_>,
         _props: &PropertiesRef<'_>,
         node: &mut Node,
     ) {
         if let Some(alt_text) = &self.alt_text {
             node.set_description(&**alt_text);
         }
+        self.accessibility.push_accesskit_nodes(
+            ctx.tree_update(),
+            node,
+            AccessCtx::next_node_id,
+            self.scene_scale,
+        );
     }
 
     fn children_ids(&self) -> ChildrenIds {
@@ -405,8 +446,9 @@ impl Widget for PageCanvas {
 mod tests {
     use std::sync::Arc;
 
+    use masonry::accesskit::{Action, Rect as AccessRect, Role};
     use masonry::core::keyboard::{Code, Key, KeyState};
-    use masonry::core::{KeyboardEvent, Modifiers, Widget};
+    use masonry::core::{KeyboardEvent, Modifiers, NewWidget, Widget, WidgetTag};
     use masonry::peniko::Color;
     use masonry::theme::default_property_set;
     use masonry::vello::Scene;
@@ -418,6 +460,7 @@ mod tests {
     use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
     use tinymist_std::typst::TypstDocument;
 
+    use crate::PageAccessibility;
     use crate::incr::IncrVelloDocClient;
     use crate::protocol::preview_update_from_bytes;
 
@@ -431,6 +474,7 @@ mod tests {
             scene_scale: 1.0,
             background_color: Some(Color::WHITE),
             scene: Arc::new(Scene::new()),
+            accessibility: Arc::new(PageAccessibility::default()),
         };
         let mut params = TestHarnessParams::default();
         params.window_size = Size::new(64.0, 64.0);
@@ -572,6 +616,7 @@ mod tests {
             scene_scale: 1.0,
             background_color,
             scene,
+            accessibility: Arc::new(PageAccessibility::default()),
         };
         let mut params = TestHarnessParams::default();
         params.window_size = Size::new(32.0, 32.0);
@@ -582,6 +627,40 @@ mod tests {
         let rendered = harness.render();
 
         rendered.get_pixel(8, 8).0
+    }
+
+    #[test]
+    fn page_canvas_exposes_synthetic_accesskit_link_nodes() {
+        let page_accessibility = Arc::new(PageAccessibility::new([PageAccessibility::link_node(
+            "https://example.com",
+            AccessRect::new(1.0, 2.0, 7.0, 10.0),
+        )]));
+        let page = PageCanvas::new(Arc::new(Scene::new()), 2.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        let page_id = harness.get_widget(tag).id();
+        let page_node = harness
+            .access_node(page_id)
+            .expect("page canvas should have an AccessKit node");
+        assert_eq!(page_node.role(), Role::Document);
+
+        let link_node = page_node
+            .children()
+            .next()
+            .expect("page canvas should contain synthetic link node");
+        assert_eq!(link_node.role(), Role::Link);
+        assert_eq!(link_node.value().as_deref(), Some("https://example.com"));
+        assert!(link_node.supports_action(Action::Click, &|_| {
+            accesskit_consumer::FilterResult::Include
+        }));
+        assert_eq!(
+            link_node.raw_bounds(),
+            Some(AccessRect::new(2.0, 4.0, 14.0, 20.0))
+        );
     }
 
     fn assert_black_pixel(pixel: [u8; 4], message: &str) {

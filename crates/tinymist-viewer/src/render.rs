@@ -32,7 +32,8 @@ use vello::{
 };
 
 use crate::{
-    GroupScene, SemanticLink, SvgResource, SvgResourceFormat, SvgResourceResolver, VecScene,
+    GroupScene, GroupSceneItem, PageAccessibility, SvgResource, SvgResourceFormat,
+    SvgResourceResolver, VecScene,
 };
 
 pub struct Renderer<'a> {
@@ -71,8 +72,7 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             ts: Affine::IDENTITY,
             clipper: None,
             glyph_style: None,
-            inner: EcoVec::new(),
-            semantic_links: EcoVec::new(),
+            items: EcoVec::new(),
         }
     }
 
@@ -150,10 +150,8 @@ pub struct RenderStack {
     pub clipper: Option<ir::PathItem>,
     /// The draw style for glyph outlines in text groups.
     glyph_style: Option<DrawStyle>,
-    /// The inner elements.
-    pub inner: EcoVec<(Vec2, Arc<VecScene>)>,
-    /// Semantic links in this group.
-    pub semantic_links: EcoVec<SemanticLink>,
+    /// The ordered visual and semantic items.
+    pub items: EcoVec<GroupSceneItem>,
     // /// The bounding box of the group.
     // pub rect: CanvasBBox,
 }
@@ -170,8 +168,7 @@ impl From<RenderStack> for Arc<VecScene> {
             // todo: detect whether there is a failure converting paths.
             clip: s.clipper.and_then(|it| svg_path(&it.d)),
             ts: s.ts,
-            scenes: s.inner,
-            semantic_links: s.semantic_links,
+            items: s.items,
         }))
     }
 }
@@ -224,10 +221,10 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         let style = resolve_draw_style(ctx, &path.styles, 1.0);
         render_path_with_style(ctx, &mut scene, &path_data, &style);
 
-        self.inner.push((
-            Vec2::new(0., 0.),
-            Arc::new(VecScene::Scene(Box::new(scene), None)),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(0., 0.),
+            scene: Arc::new(VecScene::Scene(Box::new(scene), None)),
+        });
     }
 
     fn render_link(&mut self, _ctx: &mut C, link: &ir::LinkItem) {
@@ -235,10 +232,16 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         }
 
-        self.semantic_links.push(SemanticLink::new(
-            link.href.as_ref(),
-            Rect::from_origin_size((0.0, 0.0), (link.size.x.0 as f64, link.size.y.0 as f64)),
-        ));
+        self.items
+            .push(GroupSceneItem::Accessibility(PageAccessibility::link_node(
+                link.href.as_ref(),
+                masonry::accesskit::Rect {
+                    x0: 0.0,
+                    y0: 0.0,
+                    x1: link.size.x.0 as f64,
+                    y1: link.size.y.0 as f64,
+                },
+            )));
     }
 
     fn render_image(&mut self, ctx: &mut C, image_item: &ir::ImageItem) {
@@ -255,17 +258,17 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         };
 
-        self.inner.push((
-            Vec2::new(0., 0.),
-            Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(0., 0.),
+            scene: Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
+        });
     }
 
     fn render_item_at(&mut self, ctx: &mut C, pos: ir::Point, item: &Fingerprint) {
-        self.inner.push((
-            Vec2::new(pos.x.0 as f64, pos.y.0 as f64),
-            ctx.render_item(item),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(pos.x.0 as f64, pos.y.0 as f64),
+            scene: ctx.render_item(item),
+        });
     }
 
     fn render_glyph(&mut self, ctx: &mut C, pos: Axes<Scalar>, font: &FontItem, glyph: u32) {
@@ -273,7 +276,7 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         if let Some(style) = &self.glyph_style
             && let Some(glyph) = ctx.get_glyph(font, glyph, style, pos)
         {
-            self.inner.push((pos, glyph));
+            self.items.push(GroupSceneItem::Scene { pos, scene: glyph });
         }
     }
 }
