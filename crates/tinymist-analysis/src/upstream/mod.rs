@@ -478,7 +478,165 @@ pub fn with_vm<T>(
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        fmt::Write,
+    };
+
     use crate::upstream::ROUTE_MAPS;
+    use typst::{
+        Category,
+        foundations::{CastInfo, Func, Repr, Scope, Type, Value},
+    };
+
+    #[derive(Default)]
+    struct StdTypeEntry {
+        short_name: String,
+        long_name: String,
+        paths: BTreeSet<String>,
+        routes: BTreeSet<String>,
+        fields: BTreeSet<String>,
+        methods: BTreeSet<String>,
+    }
+
+    fn record_std_type(entries: &mut BTreeMap<String, StdTypeEntry>, ty: Type, path: &str) {
+        let entry = entries.entry(ty.long_name().into()).or_default();
+        entry.short_name = ty.short_name().into();
+        entry.long_name = ty.long_name().into();
+        entry.paths.insert(path.into());
+        for (name, binding) in ty.scope().iter() {
+            entry.fields.insert(name.to_string());
+            if let Value::Func(func) = binding.read() {
+                entry.methods.insert(format_std_method(name, func));
+            }
+        }
+        if let Some(route) = super::route_of_value(&Value::Type(ty)) {
+            entry.routes.insert(route.clone());
+        }
+    }
+
+    fn format_std_method(name: &str, func: &Func) -> String {
+        let params = func
+            .params()
+            .map(|params| {
+                params
+                    .iter()
+                    .map(|param| {
+                        let mode = match (param.positional, param.named, param.variadic) {
+                            (_, _, true) => "rest",
+                            (true, true, false) => "pos+named",
+                            (true, false, false) => "pos",
+                            (false, true, false) => "named",
+                            (false, false, false) => "arg",
+                        };
+                        let required = if param.required { "!" } else { "" };
+                        let default = if param.default.is_some() {
+                            " = ..."
+                        } else {
+                            ""
+                        };
+                        format!(
+                            "{}{}: {}{default} [{mode}]",
+                            param.name,
+                            required,
+                            format_cast_info(&param.input)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_else(|| "?".into());
+        let returns = func
+            .returns()
+            .map(format_cast_info)
+            .unwrap_or_else(|| "?".into());
+        let route = super::route_of_value(&Value::Func(func.clone()))
+            .map(|route| format!(" @{route}"))
+            .unwrap_or_default();
+
+        format!("{name}({params}) -> {returns}{route}")
+    }
+
+    fn format_cast_info(info: &CastInfo) -> String {
+        match info {
+            CastInfo::Any => "any".into(),
+            CastInfo::Value(value, _) => value.repr().into(),
+            CastInfo::Type(ty) => ty.short_name().into(),
+            CastInfo::Union(infos) => infos
+                .iter()
+                .map(format_cast_info)
+                .collect::<Vec<_>>()
+                .join(" | "),
+        }
+    }
+
+    fn collect_std_type_snapshot() -> String {
+        let mut entries = BTreeMap::<String, StdTypeEntry>::new();
+        let mut seen_scopes = BTreeSet::new();
+        let mut scopes = vec![
+            ("std".to_string(), super::LIBRARY.global.scope(), None),
+            ("math".to_string(), super::LIBRARY.math.scope(), None),
+        ];
+
+        while let Some((path, scope, cat)) = scopes.pop() {
+            let scope_id = scope as *const Scope as usize;
+            if !seen_scopes.insert(scope_id) {
+                continue;
+            }
+
+            for (name, binding) in scope.iter() {
+                let cat: Option<Category> = cat.or_else(|| binding.category());
+                let path = format!("{path}.{name}");
+                match binding.read() {
+                    Value::Func(func) => {
+                        if let Some(scope) = func.scope() {
+                            scopes.push((path, scope, cat));
+                        }
+                    }
+                    Value::Module(module) => {
+                        scopes.push((path, module.scope(), cat));
+                    }
+                    Value::Type(ty) => {
+                        record_std_type(&mut entries, *ty, &path);
+                        scopes.push((path, ty.scope(), cat));
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let mut snapshot = String::new();
+        writeln!(snapshot, "count: {}", entries.len()).unwrap();
+        for entry in entries.values() {
+            writeln!(snapshot).unwrap();
+            writeln!(snapshot, "{}", entry.long_name).unwrap();
+            writeln!(snapshot, "  short: {}", entry.short_name).unwrap();
+            writeln!(
+                snapshot,
+                "  paths: {}",
+                entry.paths.iter().cloned().collect::<Vec<_>>().join(", ")
+            )
+            .unwrap();
+            writeln!(
+                snapshot,
+                "  routes: {}",
+                entry.routes.iter().cloned().collect::<Vec<_>>().join(", ")
+            )
+            .unwrap();
+            writeln!(
+                snapshot,
+                "  fields: {}",
+                entry.fields.iter().cloned().collect::<Vec<_>>().join(", ")
+            )
+            .unwrap();
+            writeln!(snapshot, "  methods:").unwrap();
+            for method in &entry.methods {
+                writeln!(snapshot, "    - {method}").unwrap();
+            }
+        }
+
+        snapshot
+    }
 
     #[test]
     fn docs_test() {
@@ -502,6 +660,13 @@ mod tests {
             "[citation][cite](test)[cite2]",
             super::plain_docs_sentence("[citation][cite](test)[cite2]")
         );
+    }
+
+    #[test]
+    fn std_types_snapshot() {
+        let snapshot = collect_std_type_snapshot();
+        println!("{snapshot}");
+        insta::assert_snapshot!("std_types", snapshot);
     }
 
     #[test]

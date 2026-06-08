@@ -805,6 +805,16 @@ impl ParamAttrs {
         }
     }
 
+    /// Creates an attribute for a parameter that can be passed positionally or by name.
+    pub fn pos_named() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: true,
+            variadic: false,
+            settable: false,
+        }
+    }
+
     /// Creates a variadic parameter attribute.
     pub fn variadic() -> ParamAttrs {
         ParamAttrs {
