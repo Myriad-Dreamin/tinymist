@@ -7,7 +7,9 @@ use comemo::Track;
 use tinymist_world::args;
 use typst::{
     engine::Engine,
-    foundations::{Args, Closure, ClosureNode, Context, Func, Str, Value, func::Repr},
+    foundations::{
+        Args, Closure, ClosureNode, Context, Func, Repr as ValueRepr, Str, Value, func::Repr,
+    },
     syntax::{Source, Span, ast},
 };
 
@@ -164,25 +166,42 @@ impl TySchemeWorker<'_> {
                     .collect::<Vec<_>>();
                 Ty::Tuple(Interned::new(values))
             }
-            "pos" => {
-                let ty = self.define(k, &args.eat::<Value>().ok()??);
-                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::positional()))
-            }
-            "named" => {
-                let ty = self.define(k, &args.eat::<Value>().ok()??);
-                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::named()))
-            }
-            "pos-named" => {
-                let ty = self.define(k, &args.eat::<Value>().ok()??);
-                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::pos_named()))
-            }
-            "rest" => {
-                let ty = self.define(k, &args.eat::<Value>().ok()??);
-                Ty::Param(ParamTy::new(ty, k.into(), ParamAttrs::variadic()))
-            }
+            "pos" => self.term_param(k, args, ParamAttrs::positional())?,
+            "named" => self.term_param(k, args, ParamAttrs::named())?,
+            "pos-named" => self.term_param(k, args, ParamAttrs::pos_named())?,
+            "rest" => self.term_param(k, args, ParamAttrs::variadic())?,
             _ => Ty::Any,
         };
         Some(TyMark::Norm(ty))
+    }
+
+    fn term_param(&mut self, k: &str, mut args: Args, attrs: ParamAttrs) -> Option<Ty> {
+        let ty = self.define(k, &args.eat::<Value>().ok()??);
+        let default = args
+            .named::<Str>("default")
+            .ok()
+            .flatten()
+            .map(|default| default.as_str().into())
+            .or_else(|| {
+                args.eat::<Value>()
+                    .ok()
+                    .flatten()
+                    .map(|default| default.repr().into())
+            });
+        let required = args
+            .named::<bool>("required")
+            .ok()
+            .flatten()
+            .unwrap_or(attrs.positional || attrs.variadic);
+
+        Some(Ty::Param(Interned::new(ParamTy {
+            name: k.into(),
+            docs: None,
+            default,
+            required,
+            ty,
+            attrs,
+        })))
     }
 
     fn define_value(&mut self, v: &Value) -> TyMark {
@@ -386,6 +405,8 @@ pub mod tests {
     struct ParamShape {
         name: String,
         kind: ParamShapeKind,
+        required: bool,
+        default: Option<String>,
     }
 
     type MethodShapes = BTreeMap<String, Vec<ParamShape>>;
@@ -510,6 +531,10 @@ pub mod tests {
                             .map(|param| ParamShape {
                                 name: param.name.to_string(),
                                 kind: param_shape_kind(ParamAttrs::from(param)),
+                                required: param.required,
+                                default: param.default.map(|default| {
+                                    crate::upstream::truncated_repr(&default()).to_string()
+                                }),
                             })
                             .collect()
                     })
@@ -597,6 +622,8 @@ pub mod tests {
                     params.push(ParamShape {
                         name,
                         kind: ParamShapeKind::Pos,
+                        required: true,
+                        default: None,
                     });
                 }
                 ast::Param::Spread(spread) => {
@@ -606,6 +633,8 @@ pub mod tests {
                             .map(|sink| sink.get().to_string())
                             .unwrap_or_default(),
                         kind: ParamShapeKind::Rest,
+                        required: true,
+                        default: None,
                     });
                 }
                 ast::Param::Named(named) => {
@@ -622,14 +651,13 @@ pub mod tests {
                             params.push(ParamShape {
                                 name: param.name.to_string(),
                                 kind: param_shape_kind(param.attrs),
+                                required: param.required,
+                                default: param.default.as_ref().map(|default| default.to_string()),
                             });
                         }
-                        _ => {
-                            params.push(ParamShape {
-                                name: name.to_string(),
-                                kind: ParamShapeKind::Named,
-                            });
-                        }
+                        _ => panic!(
+                            "{export}.{method}.{name} must use pos/named/pos-named/rest typing metadata"
+                        ),
                     }
                 }
             }

@@ -229,6 +229,7 @@ pub fn func_signature(func: Func) -> Signature {
                     name: param.name.into(),
                     docs: Some(param.docs.into()),
                     default: param.default.map(|default| truncated_repr(&default())),
+                    required: param.required,
                     ty: Ty::from_param_site(&func, param),
                     attrs: param.into(),
                 }));
@@ -288,6 +289,7 @@ fn analyze_closure_signature(
                     name: name.as_str().into(),
                     docs: None,
                     default: None,
+                    required: true,
                     ty: Ty::Any,
                     attrs: ParamAttrs::positional(),
                 }));
@@ -299,6 +301,7 @@ fn analyze_closure_signature(
                     name: named.name().get().into(),
                     docs: Some(eco_format!("Default value: {default}")),
                     default: Some(default),
+                    required: false,
                     ty: Ty::Any,
                     attrs: ParamAttrs::named(),
                 }));
@@ -309,6 +312,7 @@ fn analyze_closure_signature(
                     name: sink.unwrap_or_default().into(),
                     docs: None,
                     default: None,
+                    required: true,
                     ty: Ty::Any,
                     attrs: ParamAttrs::variadic(),
                 }));
