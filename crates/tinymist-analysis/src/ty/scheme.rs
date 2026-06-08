@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 use core::fmt;
-use std::{path::Path, sync::OnceLock};
+use std::{collections::VecDeque, path::Path, sync::OnceLock};
 
 use comemo::Track;
 use tinymist_world::args;
@@ -42,6 +42,19 @@ impl TyMark {
 pub struct TySchemeWorker<'a> {
     engine: Engine<'a>,
     scheme: &'a mut TypeInfo,
+    self_stack: Vec<SelfTyCtx>,
+    tv_stack: Vec<TvCtx>,
+    fresh_vars: u64,
+}
+
+struct SelfTyCtx {
+    name: Interned<str>,
+}
+
+#[derive(Default)]
+struct TvCtx {
+    explicit: VecDeque<Ty>,
+    vars: Vec<((Interned<str>, Span), Ty)>,
 }
 
 impl TySchemeWorker<'_> {
@@ -125,21 +138,58 @@ impl TySchemeWorker<'_> {
             }
             "tv" => {
                 let name = args.eat::<Str>().ok()??;
-                Ty::Var(TypeVar::new(
-                    name.as_str().into(),
-                    Interned::new(Decl::lit_at(name.as_str(), args.span)),
-                ))
+                self.type_var(name.as_str(), args.span)
             }
             "rec" => {
+                let rec_name = args
+                    .named::<Str>("name")
+                    .ok()
+                    .flatten()
+                    .map(|name| Interned::new_str(name.as_str()))
+                    .unwrap_or_else(|| Interned::new_str(k));
                 let scope = args.named::<Value>("scope").ok()??;
                 let Value::Dict(scope) = scope else {
                     return Some(TyMark::Any);
                 };
+                let explicit = args
+                    .all::<Value>()
+                    .ok()?
+                    .into_iter()
+                    .map(|value| self.define(k, &value))
+                    .collect();
+                self.self_stack.push(SelfTyCtx { name: rec_name });
+                self.tv_stack.push(TvCtx {
+                    explicit,
+                    vars: vec![],
+                });
                 let fields = scope
                     .iter()
                     .map(|(name, value)| (name.as_str().into(), self.define(name.as_str(), value)))
                     .collect();
+                self.tv_stack.pop();
+                self.self_stack.pop();
                 Ty::Dict(RecordTy::new(fields))
+            }
+            "self" => {
+                let args = args
+                    .all::<Value>()
+                    .ok()?
+                    .into_iter()
+                    .map(|value| self.define(k, &value))
+                    .collect::<Vec<_>>();
+                let ty = self.self_ty(args);
+                if k == "self" {
+                    Ty::Param(Interned::new(ParamTy {
+                        name: k.into(),
+                        docs: None,
+                        default: None,
+                        required: true,
+                        ty,
+                        attrs: ParamAttrs::positional(),
+                    }))
+                } else {
+                    ty
+                }
             }
             "arr" => {
                 let ty = self.define(k, &args.eat::<Value>().ok()??);
@@ -173,6 +223,46 @@ impl TySchemeWorker<'_> {
             _ => Ty::Any,
         };
         Some(TyMark::Norm(ty))
+    }
+
+    fn type_var(&mut self, name: &str, span: Span) -> Ty {
+        let key = (Interned::new_str(name), span);
+        let Some(idx) = self.tv_stack.len().checked_sub(1) else {
+            return Ty::Var(TypeVar::new(key.0, Interned::new(Decl::lit_at(name, span))));
+        };
+
+        if let Some((_, ty)) = self.tv_stack[idx]
+            .vars
+            .iter()
+            .find(|(existing, _)| *existing == key)
+        {
+            return ty.clone();
+        }
+
+        let ty = if let Some(explicit) = self.tv_stack[idx].explicit.pop_front() {
+            explicit
+        } else {
+            self.fresh_type_var(name)
+        };
+        self.tv_stack[idx].vars.push((key, ty.clone()));
+        ty
+    }
+
+    fn fresh_type_var(&mut self, name: &str) -> Ty {
+        self.fresh_vars += 1;
+        Ty::Var(TypeVar::new(
+            name.into(),
+            Interned::new(Decl::generated(tinymist_std::DefId(self.fresh_vars))),
+        ))
+    }
+
+    fn self_ty(&mut self, args: Vec<Ty>) -> Ty {
+        let value = args.into_iter().next().unwrap_or(Ty::Any);
+        match self.self_stack.last().map(|ctx| ctx.name.as_ref()) {
+            Some("array") => Ty::Array(Interned::new(value)),
+            Some("dictionary") => Ty::Dict(RecordTy::new(vec![("..".into(), value)])),
+            _ => Ty::Any,
+        }
     }
 
     fn term_param(&mut self, k: &str, mut args: Args, attrs: ParamAttrs) -> Option<Ty> {
@@ -298,13 +388,6 @@ impl TySchemeWorker<'_> {
         let mut named = vec![];
         let mut rest_left = None;
         let mut rest_right = None;
-        let ret = self.define_with_mark("ret", &ret_value);
-
-        let ret = match ret {
-            TyMark::Any => None,
-            TyMark::Norm(ty) => Some(ty),
-            TyMark::Sig(ty) => return Some(ty),
-        };
 
         let syntax = match &closure.node {
             ClosureNode::Closure(node) => node.cast::<ast::Closure>()?,
@@ -360,6 +443,14 @@ impl TySchemeWorker<'_> {
             // rest right.
             rest_right = rest_left.take();
         }
+
+        let ret = self.define_with_mark("ret", &ret_value);
+
+        let ret = match ret {
+            TyMark::Any => None,
+            TyMark::Norm(ty) => Some(ty),
+            TyMark::Sig(ty) => return Some(ty),
+        };
 
         Some(Ty::Func(
             SigTy::new(pos.into_iter(), named, rest_left, rest_right, ret).into(),
@@ -440,7 +531,13 @@ pub mod tests {
             route,
         };
 
-        let mut worker = TySchemeWorker { engine, scheme };
+        let mut worker = TySchemeWorker {
+            engine,
+            scheme,
+            self_stack: vec![],
+            tv_stack: vec![],
+            fresh_vars: 0,
+        };
         f(&mut worker)
     }
 
@@ -691,6 +788,29 @@ pub mod tests {
         );
     }
 
+    fn array_map_self_var(ty: &Ty) -> Interned<TypeVar> {
+        let Ty::Dict(record) = ty else {
+            panic!("array did not parse to a record type: {ty:?}");
+        };
+        let map = record
+            .field_by_name(&Interned::new_str("map"))
+            .unwrap_or_else(|| panic!("array has no map method"));
+        let Ty::Func(sig) = map else {
+            panic!("array.map did not parse to a function: {map:?}");
+        };
+        let Ty::Array(elem) = sig
+            .pos(0)
+            .unwrap_or_else(|| panic!("array.map has no self"))
+        else {
+            panic!("array.map self is not an array: {sig:?}");
+        };
+        let Ty::Var(var) = elem.as_ref() else {
+            panic!("array.map self element is not a type variable: {elem:?}");
+        };
+
+        var.clone()
+    }
+
     #[test]
     fn test_check() {
         snapshot_testing("type_schema", &|mut world, path| {
@@ -754,6 +874,27 @@ pub mod tests {
             });
 
             assert_eq!(actual, expected);
+        });
+    }
+
+    #[test]
+    fn std_array_type_vars_are_fresh_per_expansion() {
+        tinymist_tests::run_with_sources("#import \"std.typ\": *", |verse, _| {
+            let mut world = verse.snapshot();
+            map_typings_std(&mut world);
+            let (module, _) = parse_typings_std(&world);
+
+            let mut scheme = TypeInfo::default();
+            with_test_worker(&world, &mut scheme, |worker| {
+                let binding = module
+                    .scope()
+                    .get("array")
+                    .unwrap_or_else(|| panic!("missing generated std type array"));
+                let first = worker.define("array", binding.read());
+                let second = worker.define("array", binding.read());
+
+                assert_ne!(array_map_self_var(&first), array_map_self_var(&second));
+            });
         });
     }
 }

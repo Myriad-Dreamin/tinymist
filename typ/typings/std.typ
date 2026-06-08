@@ -5,6 +5,49 @@
 // are aligned with `upstream::tests::std_types_snapshot`.
 // Documentation is intentionally not embedded here.
 
+#let _array-v = tv("V");
+#let _array-u = tv("U");
+#let _array-a = tv("A");
+
+#let array = rec(
+  name: "array",
+  scope: (
+    all: (self: Self.with(_array-v), test: pos((value: pos(_array-v)) => bool)) => bool,
+    any: (self: Self.with(_array-v), test: pos((value: pos(_array-v)) => bool)) => bool,
+    at: (self: Self.with(_array-v), index: pos(int), default: named(any, required: false)) => _array-v,
+    chunks: (self: Self.with(_array-v), chunk-size: pos(int), exact: named(bool, required: false, default: "false")) => Self.with(Self.with(_array-v)),
+    contains: (self: Self.with(_array-v), value: pos(_array-v)) => bool,
+    dedup: (self: Self.with(_array-v), key: named((value: pos(_array-v)) => any, required: false)) => Self.with(_array-v),
+    enumerate: (self: Self.with(_array-v), start: named(int, required: false, default: "0")) => Self.with(tuple(int, _array-v)),
+    filter: (self: Self.with(_array-v), test: pos((value: pos(_array-v)) => bool)) => Self.with(_array-v),
+    find: (self: Self.with(_array-v), searcher: pos((value: pos(_array-v)) => bool)) => union(_array-v, none),
+    first: (self: Self.with(_array-v), default: named(any, required: false)) => _array-v,
+    flatten: (self: Self.with(_array-v)) => Self.with(any),
+    fold: (self: Self.with(_array-v), init: pos(_array-a), folder: pos((acc: pos(_array-a), value: pos(_array-v)) => _array-a)) => _array-a,
+    insert: (self: Self.with(_array-v), index: pos(int), value: pos(_array-v)) => none,
+    intersperse: (self: Self.with(_array-v), separator: pos(_array-v)) => Self.with(_array-v),
+    join: (self: Self.with(_array-v), separator: pos(union(any, none), required: false, default: "none"), last: named(any, required: false), default: named(union(any, none), required: false, default: "none")) => any,
+    last: (self: Self.with(_array-v), default: named(any, required: false)) => _array-v,
+    len: (self: Self.with(_array-v)) => int,
+    map: (self: Self.with(_array-v), mapper: pos((value: pos(_array-v)) => _array-u)) => Self.with(_array-u),
+    pop: (self: Self.with(_array-v)) => _array-v,
+    position: (self: Self.with(_array-v), searcher: pos((value: pos(_array-v)) => bool)) => union(int, none),
+    product: (self: Self.with(_array-v), default: named(any, required: false)) => any,
+    push: (self: Self.with(_array-v), value: pos(_array-v)) => none,
+    range: (start: pos(int, required: false, default: "0"), end: pos(int), step: named(int, required: false, default: "1")) => Self.with(int),
+    reduce: (self: Self.with(_array-v), reducer: pos((acc: pos(_array-v), value: pos(_array-v)) => _array-v)) => _array-v,
+    remove: (self: Self.with(_array-v), index: pos(int), default: named(any, required: false)) => _array-v,
+    rev: (self: Self.with(_array-v)) => Self.with(_array-v),
+    slice: (self: Self.with(_array-v), start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => Self.with(_array-v),
+    sorted: (self: Self.with(_array-v), key: named((value: pos(_array-v)) => any, required: false), by: named((left: pos(_array-v), right: pos(_array-v)) => bool, required: false)) => Self.with(_array-v),
+    split: (self: Self.with(_array-v), at: pos(_array-v)) => Self.with(Self.with(_array-v)),
+    sum: (self: Self.with(_array-v), default: named(any, required: false)) => any,
+    to-dict: (self: Self.with(_array-v)) => dictionary,
+    windows: (self: Self.with(_array-v), window-size: pos(int)) => Self.with(Self.with(_array-v)),
+    zip: (self: Self.with(_array-v), exact: named(bool, required: false, default: "false"), others: rest(arr(array))) => array,
+  ),
+);
+
 #let alignment = rec(
   name: "alignment",
   scope: (
@@ -27,45 +70,6 @@
     at: (self: pos(arguments), key: pos(union(int, str)), default: named(any, required: false)) => any,
     named: (self: pos(arguments)) => dictionary,
     pos: (self: pos(arguments)) => array,
-  ),
-);
-
-#let array = rec(
-  name: "array",
-  scope: (
-    all: (self: pos(array), test: pos(function)) => bool,
-    any: (self: pos(array), test: pos(function)) => bool,
-    at: (self: pos(array), index: pos(int), default: named(any, required: false)) => any,
-    chunks: (self: pos(array), chunk-size: pos(int), exact: named(bool, required: false, default: "false")) => array,
-    contains: (self: pos(array), value: pos(any)) => bool,
-    dedup: (self: pos(array), key: named(function, required: false)) => array,
-    enumerate: (self: pos(array), start: named(int, required: false, default: "0")) => array,
-    filter: (self: pos(array), test: pos(function)) => array,
-    find: (self: pos(array), searcher: pos(function)) => union(any, none),
-    first: (self: pos(array), default: named(any, required: false)) => any,
-    flatten: (self: pos(array)) => array,
-    fold: (self: pos(array), init: pos(any), folder: pos(function)) => any,
-    insert: (self: pos(array), index: pos(int), value: pos(any)) => none,
-    intersperse: (self: pos(array), separator: pos(any)) => array,
-    join: (self: pos(array), separator: pos(union(any, none), required: false, default: "none"), last: named(any, required: false), default: named(union(any, none), required: false, default: "none")) => any,
-    last: (self: pos(array), default: named(any, required: false)) => any,
-    len: (self: pos(array)) => int,
-    map: (self: pos(array), mapper: pos(function)) => array,
-    pop: (self: pos(array)) => any,
-    position: (self: pos(array), searcher: pos(function)) => union(int, none),
-    product: (self: pos(array), default: named(any, required: false)) => any,
-    push: (self: pos(array), value: pos(any)) => none,
-    range: (start: pos(int, required: false, default: "0"), end: pos(int), step: named(int, required: false, default: "1")) => array,
-    reduce: (self: pos(array), reducer: pos(function)) => any,
-    remove: (self: pos(array), index: pos(int), default: named(any, required: false)) => any,
-    rev: (self: pos(array)) => array,
-    slice: (self: pos(array), start: pos(int), end: pos(union(int, none), required: false, default: "none"), count: named(int, required: false)) => array,
-    sorted: (self: pos(array), key: named(function, required: false), by: named(function, required: false)) => array,
-    split: (self: pos(array), at: pos(any)) => array,
-    sum: (self: pos(array), default: named(any, required: false)) => any,
-    to-dict: (self: pos(array)) => dictionary,
-    windows: (self: pos(array), window-size: pos(int)) => array,
-    zip: (self: pos(array), exact: named(bool, required: false, default: "false"), others: rest(arr(array))) => array,
   ),
 );
 
@@ -372,6 +376,6 @@
 );
 
 // Backwards-compatible generic helpers used by existing fixtures.
-#let array-type(V: any) = array;
+#let array-type(V: _array-v) = array.with(V);
 #let dict-type(V: any) = dictionary;
 #let str-type = str;
