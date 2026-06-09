@@ -293,7 +293,7 @@ impl InlayHintWorker<'_> {
             // Version not found - invalid
             let version_str = package_spec.version.to_string();
             (
-                tinymist_l10n::t!("inlay-hint.package.version-not-found", "❗ not found"),
+                tinymist_l10n::t!("inlay-hint.package.version-not-found", "version not found"),
                 Some(tinymist_l10n::t!(
                     "inlay-hint.package.version-not-found-tooltip",
                     "Version {version} not found",
@@ -309,7 +309,7 @@ impl InlayHintWorker<'_> {
             (
                 tinymist_l10n::t!(
                     "inlay-hint.package.upgradable",
-                    "⬆️ {version}",
+                    "→ {version} available",
                     version = latest_str.as_str().into()
                 ),
                 Some(tinymist_l10n::t!(
@@ -321,7 +321,7 @@ impl InlayHintWorker<'_> {
         } else {
             // Up to date - latest version
             (
-                tinymist_l10n::t!("inlay-hint.package.up-to-date", "✅"),
+                tinymist_l10n::t!("inlay-hint.package.up-to-date", "√ latest"),
                 Some(tinymist_l10n::t!(
                     "inlay-hint.package.up-to-date-tooltip",
                     "Up to date (latest version)"

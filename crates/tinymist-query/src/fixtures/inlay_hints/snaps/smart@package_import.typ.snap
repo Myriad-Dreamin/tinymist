@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
 [
  {
   "kind": 1,
-  "label": "⬆️ 0.1.1",
+  "label": "→ 0.1.1 available",
   "paddingLeft": true,
   "position": {
    "character": 32,
@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
  },
  {
   "kind": 1,
-  "label": "✅",
+  "label": "√ latest",
   "paddingLeft": true,
   "position": {
    "character": 32,
@@ -26,7 +26,7 @@ input_file: crates/tinymist-query/src/fixtures/inlay_hints/package_import.typ
  },
  {
   "kind": 1,
-  "label": "❗ not found",
+  "label": "version not found",
   "paddingLeft": true,
   "position": {
    "character": 32,
