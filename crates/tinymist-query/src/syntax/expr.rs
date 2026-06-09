@@ -893,10 +893,10 @@ impl ExprWorker<'_> {
         if self.init_stage || span.is_detached() || span.id() != Some(self.fid) {
             return;
         }
-        let Some(item_range) = self.source.range(span) else {
+        let Some(item_range) = source_range(&self.source, span) else {
             return;
         };
-        let Some(binding_range) = self.source.range(child.span()) else {
+        let Some(binding_range) = source_range(&self.source, child.span()) else {
             return;
         };
         self.module_items.insert(

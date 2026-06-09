@@ -10,7 +10,7 @@ use tinymist_world::package::PackageSpec;
 use typst::diag::{StrResult, eco_format};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, Span, VirtualRoot};
-use typst_shim::syntax::RootedPathExt;
+use typst_shim::syntax::{RootedPathExt, source_range};
 
 use crate::LocalContext;
 use crate::docs::{DefDocs, PackageDefInfo, file_id_repr, module_docs};
@@ -111,7 +111,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                     v.id().and_then(|fid| {
                         let allocated = file_ids.insert_full(fid).0;
                         let src = ctx.source_by_id(fid).ok()?;
-                        let rng = src.range(v)?;
+                        let rng = source_range(&src, v)?;
                         Some((allocated, rng.start, rng.end))
                     })
                 });
