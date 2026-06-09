@@ -1191,6 +1191,14 @@ zh = "使用语义标记进行语法高亮"
 en = "Do not use semantic tokens for syntax highlighting"
 zh = "不使用语义标记进行语法高亮"
 
+[extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.title]
+en = "Show Package Version Status"
+zh = "显示包版本状态"
+
+[extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.desc]
+en = "Show inline decorations indicating package version status (latest, upgradable, or invalid)"
+zh = "显示包版本状态的内联装饰（最新、可升级或无效）"
+
 [extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title]
 en = "Continue Comments on Newline"
 zh = "在新行上继续注释"

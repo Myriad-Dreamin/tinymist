@@ -107,6 +107,13 @@ impl PackageIndexEntry {
         }
     }
 
+    /// Check if this entry matches a full package specification.
+    pub fn matches(&self, spec: &PackageSpec) -> bool {
+        self.namespace == spec.namespace
+            && self.package.name == spec.name
+            && self.package.version == spec.version
+    }
+
     /// Check if this entry matches a versionless package specification.
     pub fn matches_versionless(&self, spec: &VersionlessPackageSpec) -> bool {
         self.namespace == spec.namespace && self.package.name == spec.name
