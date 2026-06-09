@@ -296,7 +296,7 @@ impl DataFlowVisitor for Linter<'_> {
         }
         self.exprs(expr.args().to_untyped().exprs());
 
-        if expr.target().to_untyped().text() == "text" {
+        if expr.target().to_untyped().leaf_text() == "text" {
             self.check_bad_font(expr.args().items());
         }
 
@@ -405,7 +405,7 @@ impl DataFlowVisitor for Linter<'_> {
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
         // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
         // "VF"
-        if expr.callee().to_untyped().text() == "text" {
+        if expr.callee().to_untyped().leaf_text() == "text" {
             self.check_bad_font(expr.args().items());
         }
         self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
@@ -637,7 +637,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 ast::Expr::ShowRule(..) | ast::Expr::SetRule(..) => diag,
                 expr if expr.hash() => diag.with_hint(eco_format!(
                     "consider ignoring the value explicitly using underscore: `let _ = {}`",
-                    expr.to_untyped().clone().into_text()
+                    expr.to_untyped().clone().full_text()
                 )),
                 _ => diag,
             };
@@ -1010,19 +1010,19 @@ impl BuggyBlockLoc<'_> {
                     eco_format!(
                         "consider changing parent to `show {}: it => {{ {}; it }}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show.to_untyped().clone().into_text()
+                        show.to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `show {}: {}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show_set.to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text()
                     )
                 }
             }
@@ -1036,32 +1036,32 @@ impl BuggyBlockLoc<'_> {
                     eco_format!(
                         "consider changing parent to `show {}: if {neg}({}) {{ .. }}`",
                         match show.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        conditional.condition().to_untyped().clone().into_text()
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `{} if {neg}({})`",
-                        show_set.to_untyped().clone().into_text(),
-                        conditional.condition().to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text(),
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 }
             }
             BuggyBlockLoc::While(w) => {
                 eco_format!(
                     "consider changing parent to `show: it => if {} {{ {}; it }}`",
-                    w.condition().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    w.condition().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
             BuggyBlockLoc::For(f) => {
                 eco_format!(
                     "consider changing parent to `show: {}.fold(it => it, (style-it, {}) => it => {{ {}; style-it(it) }})`",
-                    f.iterable().to_untyped().clone().into_text(),
-                    f.pattern().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    f.iterable().to_untyped().clone().full_text(),
+                    f.pattern().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
         }
