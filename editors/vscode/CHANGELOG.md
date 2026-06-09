@@ -10,6 +10,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.25-rc1 - [2026-06-09]
+
+Nightly Release at [dev: add crate-local mock harnesses for vfs, world, and project tests (#2503)](https://github.com/Myriad-Dreamin/tinymist/commit/4e93d9f341af0314851a6be0124e2afece356556), using [ParaN3xus/typst rev 6743cf2](https://github.com/ParaN3xus/typst/commit/6743cf2415fb3c11c292d371d16746cbee44c114), a.k.a. [typst/typst Fix raster glyph positioning and sizing in PNG and SVG export (#8440)](https://github.com/typst/typst/commit/d6548454b243521271715aff0e72153696d9df7d).
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.23...v0.14.25-rc1
+
 ## v0.14.23 - [2026-06-05]
 
 Nightly Release at [dev: add crate-local mock harnesses for vfs, world, and project tests (#2503)](https://github.com/Myriad-Dreamin/tinymist/commit/4e93d9f341af0314851a6be0124e2afece356556), using [ParaN3xus/typst rev d95f4b6](https://github.com/ParaN3xus/typst/commit/d95f4b695cb803885d997134dbf56f9d01b84971), a.k.a. [typst/typst Add tests for MathML](https://github.com/typst/typst/commit/de6f400976f9bf6ab8b923d13a068722959d0070).
