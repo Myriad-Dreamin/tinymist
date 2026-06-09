@@ -182,7 +182,7 @@ typst-render = "0.15.0"
 typst-pdf = "0.15.0"
 typst-syntax = "0.15.0"
 typst-eval = "0.15.0"
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "3284e80" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "955ae8d" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.5.0"
 typstyle-core = { version = "0.14.4", default-features = false }
@@ -310,20 +310,20 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-bundle = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-layout = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-realize = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
-typst-utils = { git = "https://github.com/ParaN3xus/typst.git", rev = "d95f4b695cb803885d997134dbf56f9d01b84971" }
+typst = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-bundle = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-eval = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-html = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-layout = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-library = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-macros = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-realize = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-render = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-svg = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-timing = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
+typst-utils = { git = "https://github.com/ParaN3xus/typst.git", rev = "6743cf2415fb3c11c292d371d16746cbee44c114" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "8065e4fea1a4dec14583f3fb88ca618185b04dd3" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", rev = "65301b2cfd9793b392df8e100bd95dfad7933d1a" }
