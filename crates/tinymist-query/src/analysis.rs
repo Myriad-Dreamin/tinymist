@@ -438,7 +438,7 @@ mod post_type_check_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let result = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &result, node);
@@ -473,7 +473,7 @@ mod type_describe_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let ti = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &ti, node);
@@ -623,7 +623,7 @@ mod call_info_tests {
             w.sort_by(|x, y| x.0.span().into_raw().cmp(&y.0.span().into_raw()));
 
             for (arg, arg_call_info) in w {
-                writeln!(f, "{} -> {:?}", arg.clone().into_text(), arg_call_info)?;
+                writeln!(f, "{} -> {:?}", arg.clone().full_text(), arg_call_info)?;
             }
 
             Ok(())
