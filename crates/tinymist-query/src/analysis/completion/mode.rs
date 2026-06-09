@@ -4,7 +4,7 @@ use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Complete in comments. Or rather, don't!
     pub fn complete_comments(&mut self) -> bool {
-        let text = self.cursor.leaf.get().text();
+        let text = self.cursor.leaf.get().leaf_text();
         // check if next line defines a function
         if (text == "///" || text == "/// ")
             // hash node
