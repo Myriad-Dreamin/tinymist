@@ -121,11 +121,21 @@ where
                         log::info!("WebviewActor: no more messages from websocket: {}", msg.unwrap_err());
                       break;
                     };
-                    let WsMessage::Text(msg) = msg else {
-                        log::info!("WebviewActor: received non-text message from websocket: {msg:?}");
-                        let _ = self.webview_websocket_conn.send(WsMessage::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
-                        .await;
-                        break;
+                    let msg = match msg {
+                        WsMessage::Text(msg) => msg,
+                        WsMessage::Ping(msg) => {
+                            let _ = self.webview_websocket_conn.send(WsMessage::Pong(msg)).await;
+                            continue;
+                        },
+                        WsMessage::Pong(..) => {
+                            continue;
+                        },
+                        _ =>  {
+                            log::info!("WebviewActor: received non-text message from websocket: {msg:?}");
+                            let _ = self.webview_websocket_conn.send(WsMessage::Text(format!("Webview Actor: error, received non-text message: {msg:?}")))
+                            .await;
+                            break;
+                        }
                     };
                     if msg == "current" {
                         self.render_sender.send(RenderActorRequest::RenderFullLatest).log_error("WebViewActor");

@@ -1,7 +1,7 @@
 // This is important for shiroa to produce a responsive layout
 // and multiple targets.
-#import "@preview/shiroa:0.2.3": (
-  get-page-width, is-html-target, is-pdf-target, is-web-target, plain-text, shiroa-sys-target, target, templates,
+#import "@preview/shiroa:0.3.1": (
+  get-page-width, is-html-target, is-pdf-target, is-web-target, plain-text, shiroa-sys-target, templates, x-target,
 )
 #import templates: *
 #import "@preview/numbly:0.1.0": numbly
@@ -15,7 +15,7 @@
 #let is-html-target = is-html-target()
 #let is-pdf-target = is-pdf-target()
 #let is-web-target = is-web-target()
-#let is-md-target = target == "md"
+#let is-md-target = x-target == "md"
 #let sys-is-html-target = ("target" in dictionary(std))
 
 // Theme (Colors)
@@ -84,7 +84,7 @@
   main-size: main-size,
   heading-sizes: heading-sizes,
   list-indent: list-indent,
-  starlight: "@preview/shiroa-starlight:0.2.3",
+  starlight: "@preview/shiroa-starlight:0.3.1",
 ) = {
   assert(dash-color != none, message: "dash-color must be set")
 
@@ -366,7 +366,7 @@
   ) if is-web-target and not is-html-target
 
   show: if is-html-target {
-    import "@preview/shiroa-starlight:0.2.3": starlight
+    import "@preview/shiroa-starlight:0.3.1": starlight
 
     let description = if description != none { description } else {
       let desc = plain-text(body, limit: 512).trim()
@@ -379,9 +379,9 @@
     starlight.with(
       include "/docs/tinymist/book.typ",
       title: title,
-      site-title: "Tinymist Docs",
       description: description,
-      github-link: "https://github.com/Myriad-Dreamin/tinymist",
+      // site-title: "Tinymist Docs",
+      // github-link: "https://github.com/Myriad-Dreamin/tinymist",
     )
   } else {
     it => it

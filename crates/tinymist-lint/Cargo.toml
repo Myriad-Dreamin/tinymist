@@ -12,14 +12,14 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-typst-library.workspace = true
-typst.workspace = true
-tinymist-analysis.workspace = true
-tinymist-project = { workspace = true, features = ["lsp"] }
-tinymist-std.workspace = true
 comemo.workspace = true
 rayon.workspace = true
 strsim.workspace = true
+tinymist-analysis.workspace = true
+tinymist-project = { workspace = true, features = ["lsp"] }
+tinymist-std.workspace = true
+typst.workspace = true
+typst-library.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

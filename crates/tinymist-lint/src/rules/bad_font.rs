@@ -65,25 +65,53 @@ impl<'w> Linter<'w> {
         // Get available fonts from the font book
         let available_fonts = self.available_fonts.get_or_init(|| {
             let book = self.world.font_resolver.font_book();
-            book.families().map(|(name, _)| name).collect()
+            let mut fonts = book.families().map(|(name, _)| name).collect::<Vec<_>>();
+            fonts.sort_unstable();
+            fonts
         });
 
-        // Find the best matching fonts using string similarity
+        let mut diag = SourceDiagnostic::warning(
+            expr.span(),
+            eco_format!("unknown font family: {unknown_font}"),
+        );
+
+        // 1. Check for common character errors
+        if unknown_font.contains(',') {
+            diag.hint("multiple fonts should be specified as an array, e.g., (\"Times New Roman\", \"Arial\") instead of a comma-separated string.");
+        }
+
+        // 2. Check for non-ASCII characters
+        if !unknown_font.is_ascii() {
+            diag.hint("font family names in Typst should usually be English (PostScript) names. Try using the English name of the font.");
+        }
+
+        // 3. Check for localized mapping
+        let mapped_suggestions: Vec<_> = LOCALIZED_FONT_MAPPING
+            .iter()
+            .find(|(localized, _)| *localized == unknown_font)
+            .map(|(_, en)| {
+                en.iter()
+                    .filter(|&name| available_fonts.binary_search(name).is_ok())
+                    .copied()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+
+        if !mapped_suggestions.is_empty() {
+            add_suggestion_hints(&mut diag, &mapped_suggestions);
+            self.diag.push(diag);
+            return Some(());
+        }
+
+        // 4. Find the best matching fonts using string similarity
         let suggestions = find_similar_fonts(unknown_font.as_str(), available_fonts, 3);
 
         if !suggestions.is_empty() {
-            let mut diag = SourceDiagnostic::warning(
-                expr.span(),
-                eco_format!("unknown font family: {}", unknown_font),
-            );
+            add_suggestion_hints(&mut diag, &suggestions);
+        }
 
-            if suggestions.len() == 1 {
-                diag = diag.with_hint(eco_format!("did you mean '{}'?", suggestions[0]));
-            } else {
-                let suggestion_list = suggestions.join("', '");
-                diag = diag.with_hint(eco_format!("did you mean one of: '{}'?", suggestion_list));
-            }
-
+        // Only push if we added some hint, otherwise it's just a duplicate of compiler warning
+        if !diag.hints.is_empty() {
             self.diag.push(diag);
         }
 
@@ -91,15 +119,21 @@ impl<'w> Linter<'w> {
     }
 }
 
+fn add_suggestion_hints(diag: &mut SourceDiagnostic, suggestions: &[&str]) {
+    if suggestions.len() == 1 {
+        diag.hint(eco_format!("did you mean '{}'?", suggestions[0]));
+    } else {
+        let suggestion_list = suggestions.join("', '");
+        diag.hint(eco_format!("did you mean one of: '{}'?", suggestion_list));
+    }
+}
+
 /// Extracts the font name from an "unknown font" diagnostic message.
 /// Expected format: "unknown font family: {font_name}"
 pub(crate) fn extract_unknown_font(message: &str) -> Option<EcoString> {
     // Try to match patterns like "unknown font family: FontName"
-    if message.starts_with("unknown font family:") {
-        let font_name = message.strip_prefix("unknown font family:")?.trim();
-        return Some(EcoString::from(font_name));
-    }
-    None
+    let font_name = message.strip_prefix("unknown font family:")?.trim();
+    Some(font_name.into())
 }
 
 /// Finds fonts similar to the given font name from a list of available fonts.
@@ -107,7 +141,7 @@ pub(crate) fn extract_unknown_font(message: &str) -> Option<EcoString> {
 /// Returns up to `max_suggestions` fonts sorted by similarity score (highest first).
 fn find_similar_fonts<'a>(
     target: &str,
-    available: &[&'a str],
+    available: impl IntoIterator<Item = &'a &'a str>,
     max_suggestions: usize,
 ) -> Vec<&'a str> {
     use strsim::jaro_winkler;
@@ -116,7 +150,7 @@ fn find_similar_fonts<'a>(
 
     let target_lower = target.to_lowercase();
     let mut scored_fonts: Vec<_> = available
-        .iter()
+        .into_iter()
         .map(|&font| {
             let font_lower = font.to_lowercase();
             let similarity = jaro_winkler(&target_lower, &font_lower);
@@ -135,3 +169,38 @@ fn find_similar_fonts<'a>(
         .map(|(font, _)| font)
         .collect()
 }
+
+/// A mapping of common localized font names to their English equivalents.
+const LOCALIZED_FONT_MAPPING: &[(&str, &[&str])] = &[
+    // Chinese Simplified
+    ("宋体", &["SimSun"]),
+    ("新宋体", &["NSimSun"]),
+    ("黑体", &["SimHei"]),
+    ("微软雅黑", &["Microsoft YaHei"]),
+    ("楷体", &["KaiTi", "KaiTi_GB2312"]),
+    ("仿宋", &["FangSong", "FangSong_GB2312"]),
+    ("等线", &["DengXian"]),
+    ("幼圆", &["YouYuan"]),
+    ("华文宋体", &["STSong"]),
+    ("华文楷体", &["STKaiti"]),
+    ("华文仿宋", &["STFangsong"]),
+    ("华文黑体", &["STHeiti"]),
+    ("华文细黑", &["STXihei"]),
+    // Chinese Traditional
+    ("新細明體", &["PMingLiU"]),
+    ("細明體", &["MingLiU"]),
+    ("標楷體", &["DFKai-SB"]),
+    ("微軟正黑體", &["Microsoft JhengHei"]),
+    // Japanese
+    ("ＭＳ 明朝", &["MS Mincho"]),
+    ("ＭＳ Ｐ明朝", &["MS PMincho"]),
+    ("ＭＳ ゴシック", &["MS Gothic"]),
+    ("ＭＳ Ｐゴシック", &["MS PGothic"]),
+    ("メイリオ", &["Meiryo"]),
+    // Korean
+    ("맑은 고딕", &["Malgun Gothic"]),
+    ("바탕", &["Batang"]),
+    ("돋움", &["Dotum"]),
+    ("궁서", &["Gungsuh"]),
+    ("굴림", &["Gulim"]),
+];

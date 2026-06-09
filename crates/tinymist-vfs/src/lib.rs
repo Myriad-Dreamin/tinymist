@@ -18,6 +18,10 @@ pub mod system;
 /// model.
 pub mod dummy;
 
+/// Provides mock access models and in-memory workspaces for tests.
+#[cfg(any(test, feature = "mock"))]
+pub mod mock;
+
 /// Provides snapshot models
 pub mod snapshot;
 pub use snapshot::*;

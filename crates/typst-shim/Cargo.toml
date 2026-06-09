@@ -15,11 +15,11 @@ default = []
 nightly = []
 
 [dependencies]
-typst-syntax.workspace = true
-typst-eval.workspace = true
-typst.workspace = true
 cfg-if.workspace = true
 comemo.workspace = true
+typst.workspace = true
+typst-syntax.workspace = true
+typst-eval.workspace = true
 
 [lints]
 workspace = true

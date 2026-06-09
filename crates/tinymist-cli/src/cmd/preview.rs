@@ -103,8 +103,24 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
                 msg = ws.next() => {
                     let msg = match msg {
                         Some(Ok(Message::Text(msg))) => Some(msg),
-                        Some(Ok(msg)) => {
-                            log::error!("unsupported message: {msg:?}");
+                        Some(Ok(Message::Binary(..))) =>{
+                            log::error!("unsupported binary message");
+                            break;
+                        }
+                        Some(Ok(Message::Ping(..))) =>{
+                            log::error!("unsupported ping message");
+                            break;
+                        }
+                        Some(Ok(Message::Pong(..))) =>{
+                            log::error!("unsupported pong message");
+                            break;
+                        }
+                        Some(Ok(Message::Close(..))) =>{
+                            log::error!("unsupported close message");
+                            break;
+                        }
+                        Some(Ok(Message::Frame(..))) =>{
+                            log::error!("unsupported frame message");
                             break;
                         }
                         Some(Err(e)) => {
@@ -140,7 +156,16 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
+    let page_title = tinymist::tool::preview::resolve_page_title(
+        args.preview.page_title.as_deref(),
+        args.compile.input.as_deref(),
+    );
+    let frontend_html = frontend_html(
+        TYPST_PREVIEW_HTML,
+        args.preview.preview_mode,
+        "/",
+        &page_title,
+    );
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!(

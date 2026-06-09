@@ -167,10 +167,6 @@ impl PathPattern {
             return Some(path.as_path().into());
         }
 
-        if self.0.is_empty() {
-            return Some(path.to_path_buf().clean().into());
-        }
-
         let path = path.strip_prefix(&root).ok()?;
         let dir = path.parent();
         let file_name = path.file_name().unwrap_or_default();
@@ -179,11 +175,19 @@ impl PathPattern {
         let f = file_name.to_string_lossy();
         let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
 
+        if self.0.is_empty() {
+            let dest = dir
+                .map(|d| root.join(d).join(f))
+                .unwrap_or_else(|| root.join(f));
+            return Some(dest.clean().into());
+        }
+
         // replace all $root
         let mut path = self.0.replace("$root", &w);
         if let Some(dir) = dir {
             let d = dir.to_string_lossy();
-            path = path.replace("$dir", &d);
+            let d = if d.is_empty() { "." } else { d.as_ref() };
+            path = path.replace("$dir", d);
         }
         path = path.replace("$name", f);
 
@@ -451,6 +455,19 @@ mod tests {
     use super::*;
     use typst::syntax::VirtualPath;
 
+    fn test_root() -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(r"C:\dummy-root")
+        } else {
+            PathBuf::from("/dummy-root")
+        }
+    }
+
+    fn test_entry(path: &str) -> EntryState {
+        let root = test_root();
+        EntryState::new_rooted(root.into(), Some(VirtualPath::new(path)))
+    }
+
     #[test]
     fn test_substitute_path() {
         let root = Path::new("/dummy-root");
@@ -472,6 +489,49 @@ mod tests {
         assert_eq!(
             PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
             Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_keeps_workspace_root_relative() {
+        let entry = test_entry("/Chapter 1.1.typ");
+
+        assert_eq!(
+            PathPattern::new("$dir/$name").substitute(&entry),
+            Some(PathBuf::from("Chapter 1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_default_path_matches_documented_behavior() {
+        let root = test_root();
+        let entry = test_entry("/Chapter 1.1.typ");
+
+        assert_eq!(
+            PathPattern::default().substitute(&entry),
+            Some(root.join("Chapter 1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_preserves_multi_dot_stem() {
+        let root = test_root();
+        let entry = test_entry("/chapters/Chapter 1.1.1.typ");
+
+        assert_eq!(
+            PathPattern::new("$root/out/$dir/$name").substitute(&entry),
+            Some(root.join("out/chapters/Chapter 1.1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_preserves_name_without_extension() {
+        let root = test_root();
+        let entry = test_entry("/README");
+
+        assert_eq!(
+            PathPattern::new("$root/$dir/$name").substitute(&entry),
+            Some(root.join("README").into())
         );
     }
 }

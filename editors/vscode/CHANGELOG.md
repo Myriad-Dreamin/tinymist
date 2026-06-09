@@ -10,6 +10,92 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.18 - [2026-05-10]
+
+### Export
+
+* (Fix) Aligned output path pattern resolution with documented behavior in https://github.com/Myriad-Dreamin/tinymist/pull/2473
+
+### Editor
+
+* (Fix) Kept client flags config-wide and restart-scoped in https://github.com/Myriad-Dreamin/tinymist/pull/2499
+
+### Preview
+
+* Added CLI page-title support for preview HTML titles by @davidsanchez222 in https://github.com/Myriad-Dreamin/tinymist/pull/2445
+
+### Docs
+
+* (Docs) Added compiler settings documentation in https://github.com/Myriad-Dreamin/tinymist/pull/2477
+
+### Testing
+
+* Ensured lockfiles are updated in CI by @selfisekai in https://github.com/Myriad-Dreamin/tinymist/pull/2476
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.16...v0.14.18
+
+## v0.14.16 - [2026-04-03]
+
+### Completion
+
+* (Fix) Used `label("...")` for incompatible citation keys while keeping `<key>` for compatible keys in https://github.com/Myriad-Dreamin/tinymist/pull/2464
+* (Fix) Detected math code interpolation mode correctly for field and method completion in https://github.com/Myriad-Dreamin/tinymist/pull/2453
+
+### Editor
+
+* (Fix) Ignored malformed `tinymist.fontPaths` config values instead of crashing extension activation in https://github.com/Myriad-Dreamin/tinymist/pull/2446
+
+### Rename
+
+* (Fix) Correctly resolved `LinkTarget::Path` against the source file during rename and link updates by @BlueQuantumx and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2368
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.14...v0.14.16
+
+## v0.14.14 - [2026-03-27]
+
+### Preview
+
+* (Fix) Reverted the preview viewport-position tracking change during dock resize in https://github.com/Myriad-Dreamin/tinymist/pull/2433
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.12...v0.14.14
+
+## v0.14.12 - [2026-03-21]
+
+### Server
+
+* (Fix) Configured separate compilation features correctly by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2391
+
+### Editor
+
+* (Fix) Corrected localized message argument placeholder parsing by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2380
+* (Fix) Removed VS Code `alpine-arm64` support in https://github.com/Myriad-Dreamin/tinymist/pull/2424
+* Added browser support for running the tinymist language server in https://github.com/Myriad-Dreamin/tinymist/pull/1944
+* Added an editor menu command to view the AST by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2382
+* Added timeout handling and active-server checks for `onEnter` by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2320
+
+### Preview
+
+* (Fix) Followed viewport position when the dock resizes by @kazutoiris in https://github.com/Myriad-Dreamin/tinymist/pull/2341
+* Added a GPU-based Typst previewer in https://github.com/Myriad-Dreamin/tinymist/pull/2396
+
+### Code Analysis
+
+* (Fix) Checked the callee for `dict.at` by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2415
+* Added unknown font diagnostics with correction suggestions by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2344 and https://github.com/Myriad-Dreamin/tinymist/pull/2383
+* Added path typing for include/import sources by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2384
+* Added const string key support for dict and record typing by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2385
+* Added contextual typing for destructuring and tuple/array flows by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2386
+
+### Testing
+
+* (Test) Ensured diagnostics testing passes on Windows in https://github.com/Myriad-Dreamin/tinymist/pull/1604
+
+### Misc
+
+* Added tinymist release skill by @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/2420
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.10...v0.14.12
+
 ## v0.14.10 - [2026-01-22]
 
 ### Server

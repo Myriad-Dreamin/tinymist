@@ -1,4 +1,4 @@
-#import "@preview/shiroa:0.2.3": *
+#import "@preview/shiroa:0.3.1": *
 #import "/typ/templates/page.typ": heading-sizes, main-color, part-style, project
 #import "tinymist-version.typ": tinymist-package
 

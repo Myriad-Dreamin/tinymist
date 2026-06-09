@@ -46,7 +46,9 @@ const CONFIG_ITEMS: &[&str] = &[
     "compileStatus",
     "lint",
     "completion",
+    "customizedShowDocument",
     "development",
+    "delegateFsRequests",
     "exportPdf",
     "exportTarget",
     "fontPaths",
@@ -62,7 +64,13 @@ const CONFIG_ITEMS: &[&str] = &[
     "projectResolution",
     "rootPath",
     "semanticTokens",
+    "supportClientCodelens",
+    "supportExtendedCodeAction",
+    "supportHtmlInMarkdown",
     "systemFonts",
+    "triggerParameterHints",
+    "triggerSuggest",
+    "triggerSuggestAndParameterHints",
     "typstExtraArgs",
 ];
 // endregion Configuration Items
@@ -156,6 +164,20 @@ pub struct Config {
     pub formatter_prose_wrap: Option<bool>,
     /// The warnings during configuration update.
     pub warnings: Vec<CowStr>,
+}
+
+/// Client options whose changes are applied through a project restart boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RestartScopedClientOptions {
+    notify_status: bool,
+    trigger_suggest: bool,
+    trigger_parameter_hints: bool,
+    trigger_suggest_and_parameter_hints: bool,
+    support_html_in_markdown: bool,
+    support_client_codelens: bool,
+    extended_code_action: bool,
+    customized_show_document: bool,
+    delegate_fs_requests: bool,
 }
 
 impl Config {
@@ -774,6 +796,23 @@ impl Config {
         )
     }
 
+    /// Returns the client options that require a project restart when changed.
+    pub fn restart_scoped_client_opts(&self) -> RestartScopedClientOptions {
+        RestartScopedClientOptions {
+            notify_status: self.notify_status,
+            trigger_suggest: self.completion.trigger_suggest,
+            trigger_parameter_hints: self.completion.trigger_parameter_hints,
+            trigger_suggest_and_parameter_hints: self
+                .completion
+                .trigger_suggest_and_parameter_hints,
+            support_html_in_markdown: self.support_html_in_markdown,
+            support_client_codelens: self.support_client_codelens,
+            extended_code_action: self.extended_code_action,
+            customized_show_document: self.customized_show_document,
+            delegate_fs_requests: self.delegate_fs_requests,
+        }
+    }
+
     #[cfg(not(feature = "system"))]
     fn create_physical_access_model(
         &self,
@@ -944,9 +983,9 @@ impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
 #[serde(rename_all = "camelCase")]
 pub enum FormatterMode {
     /// Disable the formatter.
-    #[default]
     Disable,
     /// Use `typstyle` formatter.
+    #[default]
     Typstyle,
     /// Use `typstfmt` formatter.
     Typstfmt,
@@ -1190,6 +1229,69 @@ mod tests {
         });
         good_config(&mut config, &update);
         assert!(!config.notify_status);
+    }
+
+    #[test]
+    fn test_all_config_items_are_polled() {
+        let sections = Config::get_items()
+            .into_iter()
+            .filter_map(|item| item.section)
+            .collect::<Vec<_>>();
+        let expected = CONFIG_ITEMS
+            .iter()
+            .flat_map(|&item| [format!("tinymist.{item}"), item.to_owned()])
+            .collect::<Vec<_>>();
+
+        assert_eq!(sections, expected);
+    }
+
+    #[test]
+    fn test_polled_restart_scoped_client_options_update_config() {
+        let values = Config::get_items()
+            .into_iter()
+            .map(|item| match item.section.as_deref() {
+                Some("tinymist.compileStatus") => json!("enable"),
+                Some("tinymist.triggerSuggest")
+                | Some("tinymist.triggerParameterHints")
+                | Some("tinymist.triggerSuggestAndParameterHints")
+                | Some("tinymist.supportHtmlInMarkdown")
+                | Some("tinymist.supportClientCodelens")
+                | Some("tinymist.supportExtendedCodeAction")
+                | Some("tinymist.customizedShowDocument")
+                | Some("tinymist.delegateFsRequests") => json!(true),
+                _ => JsonValue::Null,
+            })
+            .collect::<Vec<_>>();
+
+        let update = Config::values_to_map(values);
+        let mut config = Config::default();
+        config.update_by_map(&update).expect("valid config");
+
+        assert!(config.notify_status);
+        assert!(config.completion.trigger_suggest);
+        assert!(config.completion.trigger_parameter_hints);
+        assert!(config.completion.trigger_suggest_and_parameter_hints);
+        assert!(config.support_html_in_markdown);
+        assert!(config.support_client_codelens);
+        assert!(config.extended_code_action);
+        assert!(config.customized_show_document);
+        assert!(config.delegate_fs_requests);
+    }
+
+    #[test]
+    fn test_restart_scoped_client_options_diff() {
+        let old_config = Config::default();
+        let mut new_config = Config::default();
+        let update = json!({
+            "supportClientCodelens": true,
+        });
+
+        good_config(&mut new_config, &update);
+
+        assert_ne!(
+            old_config.restart_scoped_client_opts(),
+            new_config.restart_scoped_client_opts()
+        );
     }
 
     #[test]
@@ -1446,7 +1548,7 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert!(matches!(config.config, FormatterConfig::Disable));
+        assert!(matches!(config.config, FormatterConfig::Typstyle(_)));
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 

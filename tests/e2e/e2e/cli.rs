@@ -33,7 +33,7 @@ fn test_help() {
     ----- stdout -----
     An integrated language service for Typst.
 
-    Usage: tinymist [COMMAND]
+    Usage: tinymist [OPTIONS] [COMMAND]
 
     Commands:
       probe       Probe existence (Nop run)
@@ -41,13 +41,15 @@ fn test_help() {
       dap         Run debug adapter
       preview     Run preview server
       compile     Run compile command like `typst-cli compile`
+      lint        Run Tinymist lint checks
       completion  Generate completion script to stdout
       test        Test a document and give summary
       help        Print this message or the help of the given subcommand(s)
 
     Options:
-      -h, --help     Print help
-      -V, --version  Print version
+          --log-filter <LOG_FILTER>  Configure log filter of tinymist [env: TINYMIST_LOG=REDACTED]
+      -h, --help                     Print help
+      -V, --version                  Print version
 
     ----- stderr -----
     ");
@@ -395,6 +397,12 @@ fn test_help_preview() {
               
               [default: document]
 
+          --page-title <TITLE>
+              Set the preview page title.
+              
+              If not specified, the title falls back to the input filename when available, or otherwise
+              to `"Typst Preview"`.
+
           --partial-rendering <ENABLE_PARTIAL_RENDERING>
               Only render visible part of the document.
               
@@ -523,6 +531,9 @@ fn test_help_preview() {
           --no-open
               Don't open the preview in the browser after compilation. If `--open` is set as well, this
               flag will win
+
+          --verbose
+              Emit INFO level logging. The default is WARN
 
       -h, --help
               Print help (see a summary with '-h')

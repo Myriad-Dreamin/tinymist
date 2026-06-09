@@ -14,10 +14,10 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 
 ## Installation
 
-- (Recommended) [mason.nvim](https://github.com/williamboman/mason.nvim).
+- (Recommended) [mason.nvim](https://github.com/mason-org/mason.nvim).
   ```lua
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = {
       ensure_installed = {
         "tinymist",

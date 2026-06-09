@@ -1,4 +1,4 @@
-#import "@preview/shiroa:0.2.3": templates, book-sys
+#import "@preview/shiroa:0.3.1": book-sys, templates
 #import templates: *
 
 #let is-md-target = book-sys.target == "md"

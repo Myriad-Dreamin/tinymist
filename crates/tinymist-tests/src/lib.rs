@@ -1,5 +1,7 @@
 //! Tests support for tinymist crates.
 
+pub mod mock;
+
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},

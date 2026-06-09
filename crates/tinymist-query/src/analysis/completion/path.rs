@@ -134,7 +134,7 @@ impl CompletionPair<'_, '_, '_> {
                     let sort_text = eco_format!("{sorter:0>digits$}");
                     sorter += 1;
 
-                    // todo: no all clients support label details
+                    // todo: not all clients support label details
                     LspCompletion {
                         label: typst_completion.0,
                         kind: typst_completion.1,

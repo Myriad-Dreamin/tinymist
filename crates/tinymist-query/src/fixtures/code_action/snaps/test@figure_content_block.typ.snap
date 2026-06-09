@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on   content\n||]/* range "
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/figure_content_block.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "figure(\n  caption: [Caption],\n  [\n  content\n]\n)$0",
+      "range": "0:1:2:1"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Wrap content block in figure with a caption"
+ }
+]

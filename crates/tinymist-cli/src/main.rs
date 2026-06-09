@@ -10,6 +10,7 @@ mod cmd {
     #[cfg(feature = "dap")]
     pub mod dap;
     pub mod generate_script;
+    pub mod lint;
     pub mod lsp;
     #[cfg(feature = "preview")]
     pub mod preview;
@@ -31,8 +32,10 @@ use tinymist_l10n::{load_translations, set_translations};
 use tinymist_std::error::prelude::*;
 
 use crate::cmd::*;
+#[cfg(feature = "export")]
 use crate::compile::CompileArgs;
 use crate::conn::client_root;
+use crate::lint::LintArgs;
 use crate::utils::*;
 
 #[cfg(feature = "dhat-heap")]
@@ -61,6 +64,10 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(tinymist::LONG_VERSION.as_str()))]
 struct Args {
+    /// Configure log filter of tinymist
+    #[clap(long = "log-filter", env = "TINYMIST_LOG")]
+    pub log_filter: Option<String>,
+
     /// Mode of the binary
     #[clap(subcommand)]
     pub cmd: Option<Commands>,
@@ -89,8 +96,11 @@ enum Commands {
     #[cfg(feature = "preview")]
     Preview(tinymist::tool::preview::PreviewCliArgs),
     /// Run compile command like `typst-cli compile`
+    #[cfg(feature = "export")]
     #[clap(alias = "c")]
     Compile(CompileArgs),
+    /// Run Tinymist lint checks
+    Lint(LintArgs),
 
     /// Generate completion script to stdout
     Completion(crate::completion::ShellCompletionArgs),
@@ -99,6 +109,7 @@ enum Commands {
     GenerateScript(crate::generate_script::GenerateScriptArgs),
 
     /// Run documents
+    #[cfg(feature = "lock")]
     #[clap(hide(true))] // still in development
     #[clap(subcommand)]
     Doc(tinymist::project::DocCommands),
@@ -122,8 +133,10 @@ fn main() -> Result<()> {
     let _profiler = dhat::Profiler::new_heap();
 
     // Parses command line arguments
-    let cmd = Args::parse().cmd;
-    let cmd = cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
+    let args = Args::parse();
+    let cmd = args
+        .cmd
+        .unwrap_or_else(|| Commands::Lsp(Default::default()));
 
     // Probes soon to avoid other initializations causing errors
     if matches!(cmd, Commands::Probe) {
@@ -134,9 +147,31 @@ fn main() -> Result<()> {
     #[cfg(feature = "l10n")]
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
     // Starts logging
+    let verbose = match &cmd {
+        // Short-running commands, usually run from the CLI.
+        Commands::Completion(..) | Commands::Probe => false,
+        #[cfg(feature = "export")]
+        Commands::Compile(..) => false,
+        Commands::Lint(..) => false,
+
+        // Long-running commands, usually run from the CLI.
+        Commands::Test(test) => test.verbose,
+        Commands::Preview(preview) => preview.verbose,
+
+        // Long-running commands, usually run from an editor.
+        Commands::Lsp(..) | Commands::Dap(..) => true,
+
+        // Hidden commands.
+        Commands::TraceLsp(..)
+        | Commands::Query(..)
+        | Commands::GenerateScript(..)
+        | Commands::Doc(..)
+        | Commands::Task(..)
+        | Commands::Cov(..) => true,
+    };
     let _ = tinymist::init_log(tinymist::InitLogOpts {
-        is_transient_cmd: matches!(cmd, Commands::Compile(..)),
-        is_test_no_verbose: matches!(&cmd, Commands::Test(test) if !test.verbose),
+        verbose,
+        filter: args.log_filter,
         output: None,
     });
 
@@ -153,6 +188,7 @@ fn main() -> Result<()> {
         Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
+        Commands::Lint(args) => crate::lint::lint_main(args),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),

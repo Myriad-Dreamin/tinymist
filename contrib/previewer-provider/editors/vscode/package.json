@@ -1,0 +1,10 @@
+{
+  "name": "tinymist-previewer-fixture",
+  "displayName": "Tinymist Previewer Provider Fixture",
+  "publisher": "myriad-dreamin",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "main": "./out/extension.js"
+}

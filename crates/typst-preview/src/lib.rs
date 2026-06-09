@@ -4,6 +4,7 @@
 mod actor;
 mod debug_loc;
 mod outline;
+pub mod protocol;
 
 pub use crate::actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
@@ -12,7 +13,7 @@ pub use crate::actor::editor::{
 pub use crate::outline::Outline;
 
 use std::sync::{Arc, OnceLock};
-use std::{collections::HashMap, future::Future, path::PathBuf, pin::Pin};
+use std::{borrow::Cow, collections::HashMap, future::Future, path::PathBuf, pin::Pin};
 
 use bytes::Bytes;
 use futures::sink::SinkExt;
@@ -57,16 +58,51 @@ pub struct PreviewConfig {
 }
 
 /// Gets the HTML for the frontend by a given preview mode and server to connect
-pub fn frontend_html(html: &str, mode: PreviewMode, to: &str) -> String {
+pub fn frontend_html(html: &str, mode: PreviewMode, to: &str, page_title: &str) -> String {
     let mode = match mode {
         PreviewMode::Document => "Doc",
         PreviewMode::Slide => "Slide",
     };
+    let page_title = escape_html_text(page_title);
 
-    html.replace("ws://127.0.0.1:23625", to).replace(
-        "preview-arg:previewMode:Doc",
-        format!("preview-arg:previewMode:{mode}").as_str(),
-    )
+    html.replace("ws://127.0.0.1:23625", to)
+        .replace(
+            "preview-arg:previewMode:Doc",
+            format!("preview-arg:previewMode:{mode}").as_str(),
+        )
+        .replace("preview-arg:pageTitle:", &page_title)
+}
+
+// TODO: Drop this local copy after upstreaming the fix to reflexo's vendored
+// XML escape helper, which still predates
+// https://github.com/netvl/xml-rs/commit/59d629458f596611f6627357e522af4d7bcba13e.
+fn escape_html_text(value: &str) -> Cow<'_, str> {
+    let mut escaped = String::new();
+    let mut last = 0;
+
+    for (idx, ch) in value.char_indices() {
+        let replacement = match ch {
+            '&' => "&amp;",
+            '<' => "&lt;",
+            '>' => "&gt;",
+            _ => continue,
+        };
+
+        if escaped.is_empty() {
+            escaped.reserve(value.len() + 16);
+        }
+
+        escaped.push_str(&value[last..idx]);
+        escaped.push_str(replacement);
+        last = idx + ch.len_utf8();
+    }
+
+    if escaped.is_empty() {
+        Cow::Borrowed(value)
+    } else {
+        escaped.push_str(&value[last..]);
+        Cow::Owned(escaped)
+    }
 }
 
 /// Simply creates a previewer.
@@ -315,9 +351,61 @@ pub enum WsMessage {
     Text(String),
     /// A binary WebSocket message
     Binary(Bytes),
+    /// A ping message
+    Ping(Bytes),
+    /// A pong message
+    Pong(Bytes),
 }
 
 pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use reflexo_vec2svg::IncrSvgDocServer;
+    use tinymist_std::typst::TypstDocument;
+
+    use super::{escape_html_text, protocol};
+
+    #[test]
+    fn escapes_html_text_without_breaking_multibyte_code_points() {
+        assert_eq!(escape_html_text("☃<>&"), "☃&lt;&gt;&amp;");
+        assert_eq!(escape_html_text("plain text"), "plain text");
+    }
+
+    #[test]
+    fn full_current_event_uses_new_prefix_after_incremental_render() {
+        tinymist_tests::run_with_sources(
+            "#set page(width: 1pt, height: 1pt, margin: 0pt)",
+            |verse, _| {
+                let world = verse.snapshot();
+                let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+                    .output
+                    .expect("short preview fixture should compile");
+                let document = TypstDocument::Paged(Arc::new(doc));
+                let mut renderer = IncrSvgDocServer::default();
+
+                let first = renderer.pack_delta(&document);
+                assert!(
+                    first.starts_with(protocol::DIFF_V1_PREFIX),
+                    "initial preview update should be diff-v1"
+                );
+
+                let current = protocol::full_current_frame_from_delta(&first)
+                    .expect("full current can be built from an initial incremental frame");
+                assert!(
+                    current.starts_with(protocol::NEW_PREFIX),
+                    "full current preview update should use the new, prefix"
+                );
+                assert!(
+                    current.len() > protocol::NEW_PREFIX.len(),
+                    "full current frame should include a payload"
+                );
+            },
+        );
+    }
+}
 
 pub enum Location {
     Src(SourceLocation),

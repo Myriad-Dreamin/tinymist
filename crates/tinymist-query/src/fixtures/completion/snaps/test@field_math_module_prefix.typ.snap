@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on / (45..46)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/field_math_module_prefix.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "odd",
+    "textEdit": {
+     "newText": "odd(${1:})",
+     "range": {
+      "end": {
+       "character": 9,
+       "line": 3
+      },
+      "start": {
+       "character": 8,
+       "line": 3
+      }
+     }
+    }
+   }
+  ]
+ }
+]

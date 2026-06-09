@@ -7,7 +7,7 @@ use std::ops::Deref;
 use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::hash::hash128;
 use typst::{
-    foundations::{Element, NativeElement, Type, Value},
+    foundations::{Element, NativeElement, Str, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
     syntax::{Span, SyntaxNode, ast::MathTextKind},
     text::LinebreakElem,
@@ -572,7 +572,7 @@ impl ExprWorker<'_> {
         let is_wildcard_import = matches!(typed.imports(), Some(ast::Imports::Wildcard));
 
         let source = typed.source();
-        let mod_expr = self.check_import(typed.source(), true, is_wildcard_import);
+        let mod_expr = self.check_import(source, true, is_wildcard_import);
         crate::log_debug_ct!("checking import: {source:?} => {mod_expr:?}");
 
         let mod_var = typed.new_name().map(Decl::module_alias).or_else(|| {
@@ -674,7 +674,13 @@ impl ExprWorker<'_> {
             }
         };
 
-        Expr::Import(ImportExpr { decl: mod_ref }.into())
+        Expr::Import(
+            ImportExpr {
+                source: self.check(source),
+                decl: mod_ref,
+            }
+            .into(),
+        )
     }
 
     fn check_import(
@@ -931,17 +937,38 @@ impl ExprWorker<'_> {
                 ast::DictItem::Keyed(item) => {
                     let val = self.check(item.expr());
                     let key = item.key();
-                    let analyzed = self.const_eval_expr(key);
-                    let analyzed = match &analyzed {
-                        Some(Value::Str(s)) => Some(s),
-                        _ => None,
-                    };
+                    let analyzed = self
+                        .const_eval_expr(key)
+                        .and_then(|v| match v {
+                            Value::Str(s) => Some(s),
+                            _ => None,
+                        })
+                        .or_else(|| {
+                            let (expr, term) = self.eval_expr(key, InterpretMode::Code);
+
+                            fn const_string_from_ty(ty: &Ty) -> Option<Str> {
+                                match ty {
+                                    Ty::Value(v) => match &v.val {
+                                        Value::Str(s) => Some(s.clone()),
+                                        _ => None,
+                                    },
+                                    _ => None,
+                                }
+                            }
+
+                            term.as_ref()
+                                .and_then(const_string_from_ty)
+                                .or_else(|| match expr {
+                                    Some(Expr::Type(ty)) => const_string_from_ty(&ty),
+                                    _ => None,
+                                })
+                        });
                     let Some(analyzed) = analyzed else {
                         let key = self.check(key);
                         items.push(ArgExpr::NamedRt(Box::new((key, val))));
                         continue;
                     };
-                    let key = Decl::str_name(key.to_untyped().clone(), analyzed).into();
+                    let key = Decl::str_name(key.to_untyped().clone(), analyzed.as_str()).into();
                     items.push(ArgExpr::Named(Box::new((key, val))));
                 }
                 ast::DictItem::Spread(s) => {
@@ -1231,6 +1258,7 @@ impl ExprWorker<'_> {
         crate::log_debug_ct!("checking expr: {expr:?}");
 
         match expr {
+            ast::Expr::Parenthesized(paren) => self.eval_expr(paren.expr(), mode),
             ast::Expr::FieldAccess(field_access) => {
                 let field = Decl::ident_ref(field_access.field());
 
