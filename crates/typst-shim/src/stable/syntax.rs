@@ -1,14 +1,22 @@
 //! Typst Syntax
+use std::ops::Range;
 use std::path::Path;
 
 use typst::syntax::LinkedNode;
 use typst::syntax::RootedPath;
 use typst::syntax::Side;
+use typst::syntax::Source;
+use typst::syntax::Span;
 use typst::syntax::VirtualPath;
 use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
 
 pub use crate::path::resolve_path_from_id;
+
+/// Get the byte range for a span within a source file.
+pub fn source_range(source: &Source, span: impl Into<Span>) -> Option<Range<usize>> {
+    source.range(span.into())
+}
 
 /// The `LinkedNodeExt` trait is designed for compatibility between new and old
 /// versions of `typst`.

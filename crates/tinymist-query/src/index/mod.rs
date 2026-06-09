@@ -19,6 +19,7 @@ use tinymist_std::error::WithContextUntyped;
 use tinymist_std::hash::FxHashMap;
 use tinymist_world::EntryReader;
 use typst::syntax::{FileId, LinkedNode, Source, Span};
+use typst_shim::syntax::source_range;
 
 pub mod protocol;
 use protocol as p;
@@ -219,7 +220,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
     }
 
     fn emit_span(&mut self, span: Span, source: &Source) -> Option<i32> {
-        let range = source.range(span)?;
+        let range = source_range(source, span)?;
         self.emit_element(p::Element::Vertex(p::Vertex::Range {
             range: self.ctx.to_lsp_range(range, source),
             tag: None,
