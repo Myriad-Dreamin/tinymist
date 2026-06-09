@@ -539,7 +539,7 @@ impl LexicalHierarchyWorker {
                 (EcoString::new(), LexicalKind::Block)
             }
             SyntaxKind::Markup => {
-                let name = node.get().to_owned().into_text();
+                let name = node.get().to_owned().full_text();
                 if name.is_empty() {
                     return None;
                 }

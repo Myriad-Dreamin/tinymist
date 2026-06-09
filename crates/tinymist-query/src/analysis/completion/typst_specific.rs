@@ -131,11 +131,11 @@ impl CompletionPair<'_, '_, '_> {
             Some(SelectedNode::Label(node)) => {
                 let range = node.range();
                 let remove_open = node
-                    .text()
+                    .leaf_text()
                     .starts_with('<')
                     .then_some(range.start..range.start + 1);
                 let remove_close = node
-                    .text()
+                    .leaf_text()
                     .ends_with('>')
                     .then_some(range.end - 1..range.end);
                 (remove_open, remove_close)
