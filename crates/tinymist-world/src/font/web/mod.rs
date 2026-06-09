@@ -228,6 +228,7 @@ fn infer_info_from_web_font(
         family,
         variant,
         flags,
+        axes: Vec::new(),
         coverage,
     })
 }
