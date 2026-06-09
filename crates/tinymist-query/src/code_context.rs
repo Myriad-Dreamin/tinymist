@@ -256,7 +256,8 @@ fn eval_path_expr(
             }
 
             let mut expr = typst::syntax::parse_code(code);
-            let mapper = RangeMapper::new([0..code.len()]).context("invalid code range mapper")?;
+            let mapper = RangeMapper::new(std::iter::once(0..code.len()))
+                .context("invalid code range mapper")?;
             expr.synthesize_mapped(id, &mapper)
                 .context("failed to map code span")?;
 
