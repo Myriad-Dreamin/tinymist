@@ -66,7 +66,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 }
                 ArgClass::Named(name) => {
                     let focus_name = focus_name
-                        .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
+                        .get_or_init(|| Interned::new_str(&name.get().clone().full_text()));
                     if focus_name == &param.name {
                         active_parameter = Some(real_offset);
                     }
