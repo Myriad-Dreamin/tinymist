@@ -2,11 +2,12 @@ use std::sync::LazyLock;
 use std::{path::Path, sync::Arc};
 
 use reflexo_typst::TypstPagedDocument;
-use reflexo_typst::{vector::font::GlyphId, TypstFont};
+use reflexo_typst::vector::font::GlyphId;
 use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
 use tinymist_query::GLOBAL_STATS;
 use typst::foundations::Bytes;
+use typst::text::FontInstance;
 use typst::{syntax::VirtualPath, World};
 
 use super::prelude::*;
@@ -205,7 +206,7 @@ fn populate(
 fn render_symbols(
     snap: &LspComputeGraph,
     symbols: &[SymbolItem],
-) -> LspResult<HashMap<String, (TypstFont, GlyphId)>> {
+) -> LspResult<HashMap<String, (FontInstance, GlyphId)>> {
     const PRELUDE: &str = r#"#show math.equation: set text(font: (
   "New Computer Modern Math",
   "Latin Modern Math",
@@ -254,12 +255,12 @@ fn render_symbols(
 fn extract_rendered_symbols<'a>(
     doc: &TypstPagedDocument,
     symbols: impl Iterator<Item = &'a String>,
-) -> HashMap<String, (TypstFont, GlyphId)> {
+) -> HashMap<String, (FontInstance, GlyphId)> {
     use typst::layout::Frame;
     use typst::layout::FrameItem;
 
     struct Worker {
-        res: HashMap<String, (TypstFont, GlyphId)>,
+        res: HashMap<String, (FontInstance, GlyphId)>,
     }
 
     impl Worker {
@@ -315,7 +316,7 @@ fn extract_rendered_symbols<'a>(
 
 fn render_glyphs(
     symbols: &[SymbolItem],
-    glyph_mapping: &HashMap<String, (TypstFont, GlyphId)>,
+    glyph_mapping: &HashMap<String, (FontInstance, GlyphId)>,
 ) -> LspResult<Vec<ResourceSymbolItem>> {
     let glyph_provider = reflexo_vec2svg::GlyphProvider::default();
     let glyph_pass = reflexo_typst::vector::pass::ConvertInnerImpl::new(glyph_provider, false);
@@ -345,7 +346,7 @@ fn render_glyphs(
     Ok(rendered_symbols)
 }
 
-fn create_display_svg(font: &TypstFont, gid: GlyphId, svg_path: &str) -> String {
+fn create_display_svg(font: &FontInstance, gid: GlyphId, svg_path: &str) -> String {
     let face = font.ttf();
 
     let (x_min, x_max) = face
