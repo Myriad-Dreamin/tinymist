@@ -188,10 +188,8 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
-    use typst_shim::syntax::RootedPathExt;
-    use typst_shim::syntax::VirtualPathExt;
+    use typst_shim::syntax::{RootedPathExt, VirtualPathExt, source_range};
 
-    use crate::prelude::source_range;
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
 
@@ -363,8 +361,8 @@ mod type_check_tests {
 
     use typst::syntax::Source;
 
-    use crate::prelude::source_range;
     use crate::tests::*;
+    use typst_shim::syntax::source_range;
 
     use super::{Ty, TypeInfo};
 

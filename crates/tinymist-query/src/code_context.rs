@@ -9,7 +9,7 @@ use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{EntryReader, EntryState, ShadowApi, diag::print_diagnostics_to_string};
 use typst::diag::{At, SourceResult};
 use typst::foundations::{Args, Dict, NativeFunc, eco_format};
-use typst::syntax::Span;
+use typst::syntax::RangeMapper;
 use typst::utils::LazyHash;
 use typst::{
     foundations::{Bytes, IntoValue, StyleChain},
@@ -256,8 +256,9 @@ fn eval_path_expr(
             }
 
             let mut expr = typst::syntax::parse_code(code);
-            let span = Span::from_range(id, 0..code.len());
-            expr.synthesize(span);
+            let mapper = RangeMapper::new([0..code.len()]).context("invalid code range mapper")?;
+            expr.synthesize_mapped(id, &mapper)
+                .context("failed to map code span")?;
 
             let expr = match expr.cast::<ast::Code>() {
                 Some(v) => v,
