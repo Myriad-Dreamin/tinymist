@@ -111,7 +111,7 @@ pub struct SemanticToken {
 impl SemanticToken {
     /// Creates a new semantic token.
     fn new(token_type: TokenType, modifiers: ModifierSet, node: &LinkedNode) -> Self {
-        let source = node.get().clone().into_text();
+        let source = node.get().clone().full_text();
 
         let raw_position = node.offset() as u64;
         let raw_position = ((raw_position >> 32) as u32, raw_position as u32);
