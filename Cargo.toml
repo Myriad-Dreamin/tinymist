@@ -230,7 +230,9 @@ tinymist-vfs = { path = "./crates/tinymist-vfs/", version = "0.14.6", default-fe
 tinymist-world = { path = "./crates/tinymist-world/", version = "0.14.6", default-features = false }
 tinymist-project = { path = "./crates/tinymist-project/", version = "0.14.6" }
 tinymist-task = { path = "./crates/tinymist-task/", version = "0.14.6" }
-typst-shim = { path = "./crates/typst-shim", version = "0.14.6", features = ["nightly"] }
+typst-shim = { path = "./crates/typst-shim", version = "0.14.6", features = [
+    "nightly",
+] }
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
@@ -316,6 +318,7 @@ extend-exclude = ["/.git", "fixtures"]
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
 typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst-bundle = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 typst-layout = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
@@ -330,15 +333,27 @@ typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "night
 typst-utils = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { path = "../typstyle/crates/typstyle-core" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", branch = "nightly" }
+
+# typst-ansi-hl = { path = "../typst-ansi-hl/lib" }
+# typstyle-core = { path = "../typstyle/crates/typstyle-core" }
+
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }
-# typst-timing = { path = "../typst/crates/typst-timing" }
-# typst-svg = { path = "../typst/crates/typst-svg" }
+# typst-bundle = { path = "../typst/crates/typst-bundle" }
+# typst-eval = { path = "../typst/crates/typst-eval" }
+# typst-html = { path = "../typst/crates/typst-html" }
+# typst-layout = { path = "../typst/crates/typst-layout" }
+# typst-library = { path = "../typst/crates/typst-library" }
+# typst-macros = { path = "../typst/crates/typst-macros" }
 # typst-pdf = { path = "../typst/crates/typst-pdf" }
+# typst-realize = { path = "../typst/crates/typst-realize" }
 # typst-render = { path = "../typst/crates/typst-render" }
+# typst-svg = { path = "../typst/crates/typst-svg" }
 # typst-syntax = { path = "../typst/crates/typst-syntax" }
+# typst-timing = { path = "../typst/crates/typst-timing" }
+# typst-utils = { path = "../typst/crates/typst-utils" }
 
 # These patches use local `typstyle-core` for development.
 # typstyle-core = { path = "../typstyle/crates/typstyle-core" }
@@ -346,9 +361,9 @@ typstyle-core = { path = "../typstyle/crates/typstyle-core" }
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { path = "../typst.ts/crates/reflexo/" }
-reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
+reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
+reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
