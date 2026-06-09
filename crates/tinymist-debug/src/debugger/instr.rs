@@ -13,6 +13,7 @@ impl Instrumenter for BreakpointInstr {
             .as_mut()
             .ok_or_else(|| FileError::Other(Some("No active debug session".into())))?;
 
+        session.enable_breakpoints_for(new.id(), &meta);
         session.breakpoints.insert(new.id(), meta);
 
         Ok(new)
@@ -159,12 +160,22 @@ impl InstrumentWorker {
     }
 
     fn make_cov(&mut self, span: Span, kind: BreakpointKind) {
-        self.make_cov_with_scope(span, kind, "(:)");
+        self.make_cov_with_scope(span, kind, "(:)", None);
     }
 
-    fn make_cov_with_scope(&mut self, span: Span, kind: BreakpointKind, scope: &str) {
+    fn make_cov_with_scope(
+        &mut self,
+        span: Span,
+        kind: BreakpointKind,
+        scope: &str,
+        function_name: Option<String>,
+    ) {
         let it = self.meta.meta.len();
-        self.meta.meta.push(BreakpointItem { origin_span: span });
+        self.meta.meta.push(BreakpointItem {
+            kind,
+            function_name,
+            origin_span: span,
+        });
         self.instrumented.push_str("if __breakpoint_");
         self.instrumented.push_str(kind.to_str());
         self.instrumented.push('(');
@@ -213,15 +224,20 @@ impl InstrumentWorker {
 
     fn instrument_closure(&mut self, node: &SyntaxNode, closure: ast::Closure) {
         let body = closure.body().span();
-        let origin = closure
-            .name()
-            .map_or_else(|| node.span(), |name| name.span());
+        let name = closure.name();
+        let origin = name.map_or_else(|| node.span(), |name| name.span());
+        let function_name = name.map(|name| name.as_str().to_owned());
         let scope = Self::closure_scope(closure);
 
         for child in node.children() {
             if body == child.span() {
                 self.instrumented.push_str("{\n");
-                self.make_cov_with_scope(origin, BreakpointKind::Function, &scope);
+                self.make_cov_with_scope(
+                    origin,
+                    BreakpointKind::Function,
+                    &scope,
+                    function_name.clone(),
+                );
                 self.visit_node(child);
                 self.instrumented.push_str("\n}\n");
             } else {

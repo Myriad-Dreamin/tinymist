@@ -63,13 +63,17 @@ pub fn start_session<F: CompilerFeat>(
     base: CompilerWorld<F>,
     adaptor: Arc<dyn DebugAdaptor>,
     rx: mpsc::Receiver<DebugRequest>,
+    function_breakpoints: Vec<String>,
 ) {
     let context = Arc::new(DebugContext {});
 
     std::thread::spawn(move || {
         let world = tinymist_debug::instr_breakpoints(&base);
 
-        if !set_debug_session(Some(DebugSession::new(context))) {
+        let mut session = DebugSession::new(context);
+        session.set_function_breakpoints(function_breakpoints);
+
+        if !set_debug_session(Some(session)) {
             adaptor.terminate();
             return None;
         }

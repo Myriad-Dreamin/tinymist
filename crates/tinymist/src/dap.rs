@@ -27,6 +27,7 @@ use crate::{ConstDapConfig, ServerState};
 #[derive(Default)]
 pub(crate) struct DebugState {
     pub(crate) session: Option<DebugSession>,
+    pub(crate) function_breakpoints: Vec<String>,
 }
 
 impl DebugState {

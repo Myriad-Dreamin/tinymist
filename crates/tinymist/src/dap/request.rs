@@ -147,7 +147,12 @@ impl ServerState {
             client: self.client.clone().to_untyped(),
         });
 
-        tinymist_dap::start_session(snapshot.world.clone(), adaptor.clone(), adaptor_rx);
+        tinymist_dap::start_session(
+            snapshot.world.clone(),
+            adaptor.clone(),
+            adaptor_rx,
+            self.debug.function_breakpoints.clone(),
+        );
 
         self.debug.session = Some(DebugSession {
             config: self.config.const_dap_config.clone(),
@@ -176,6 +181,35 @@ impl ServerState {
     }
 
     // customRequest
+}
+
+impl ServerState {
+    pub(crate) fn set_function_breakpoints(
+        &mut self,
+        args: dapts::SetFunctionBreakpointsArguments,
+    ) -> SchedulableResponse<dapts::SetFunctionBreakpointsResponse> {
+        self.debug.function_breakpoints = args
+            .breakpoints
+            .iter()
+            .map(|breakpoint| breakpoint.name.clone())
+            .collect();
+
+        tinymist_debug::set_debug_function_breakpoints(self.debug.function_breakpoints.clone());
+
+        just_ok(dapts::SetFunctionBreakpointsResponse {
+            breakpoints: args
+                .breakpoints
+                .iter()
+                .enumerate()
+                .map(|(idx, breakpoint)| dapts::Breakpoint {
+                    id: Some((idx + 1) as u64),
+                    message: Some(format!("Function breakpoint: {}", breakpoint.name)),
+                    verified: true,
+                    ..dapts::Breakpoint::default()
+                })
+                .collect(),
+        })
+    }
 }
 
 /// This interface describes the mock-debug specific launch attributes
