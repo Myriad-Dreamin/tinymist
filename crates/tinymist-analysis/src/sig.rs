@@ -295,7 +295,7 @@ fn analyze_closure_signature(
             }
             // todo: pattern
             ast::Param::Named(named) => {
-                let default = unwrap_parens(named.expr()).to_untyped().clone().into_text();
+                let default = unwrap_parens(named.expr()).to_untyped().clone().full_text();
                 add_param(Interned::new(ParamTy {
                     name: named.name().get().into(),
                     docs: Some(eco_format!("Default value: {default}")),
@@ -346,7 +346,7 @@ impl fmt::Display for PatternDisplay<'_> {
                             f,
                             "{}: {}",
                             named.name().as_str(),
-                            unwrap_parens(named.expr()).to_untyped().text()
+                            unwrap_parens(named.expr()).to_untyped().full_text()
                         )?,
                         ast::DestructuringItem::Spread(spread) => write!(
                             f,
