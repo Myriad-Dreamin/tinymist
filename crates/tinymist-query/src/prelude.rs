@@ -24,9 +24,9 @@ pub use typst::diag::{EcoString, Tracepoint};
 pub use typst::foundations::Value;
 pub use typst::syntax::ast::{self, AstNode};
 pub use typst::syntax::{
-    FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
+    DiagSpan, FileId as TypstFileId, LinkedNode, Source, Spanned, SyntaxKind, SyntaxNode,
 };
-pub use typst_shim::syntax::{LinkedNodeExt, RootedPathExt, VirtualPathExt};
+pub use typst_shim::syntax::{LinkedNodeExt, RootedPathExt, VirtualPathExt, source_range};
 
 pub use crate::SemanticRequest;
 pub use crate::analysis::{Definition, LocalContext};
