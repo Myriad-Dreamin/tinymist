@@ -17,17 +17,17 @@ use vello::{
     peniko::{Color, color::parse_color},
 };
 
-use crate::{PageSemantics, SvgResourceResolver, VecPage};
+use crate::{PageAccessibility, SvgResourceResolver, VecPage};
 
-/// A rendered page with its semantic metadata.
+/// A rendered page with its accessibility metadata.
 #[derive(Clone)]
 pub struct RenderedPage {
     /// The flushed Vello scene.
     pub scene: Arc<Scene>,
     /// The page size in Typst page coordinates.
     pub size: Size,
-    /// The page semantic layer.
-    pub semantics: PageSemantics,
+    /// The page AccessKit nodes.
+    pub accessibility: PageAccessibility,
 }
 
 /// Incremental pass from vector to vello scene.
@@ -84,11 +84,11 @@ impl IncrVelloPass {
 
                 let size = Vec2::new(size.x.0 as f64, size.y.0 as f64);
                 let elem = ct.render_item(content);
-                let semantics = elem.page_semantics();
+                let accessibility = elem.page_accessibility();
                 VecPage {
                     size,
                     elem,
-                    semantics,
+                    accessibility,
                     content_hash: *content,
                 }
             })
@@ -99,17 +99,17 @@ impl IncrVelloPass {
 
     /// Flushes a page to the canvas with the given transform.
     pub fn flush_page(&mut self, idx: usize) -> (Arc<Scene>, Vec2) {
-        let page = self.flush_page_with_semantics(idx);
+        let page = self.flush_page_with_accessibility(idx);
         (page.scene, size_to_vec2(page.size))
     }
 
-    fn flush_page_with_semantics(&mut self, idx: usize) -> RenderedPage {
+    fn flush_page_with_accessibility(&mut self, idx: usize) -> RenderedPage {
         if idx >= self.pages.len() {
             log::warn!("Index out of bounds: {idx}");
             return RenderedPage {
                 scene: Arc::new(vello::Scene::new()),
                 size: Size::ZERO,
-                semantics: PageSemantics::default(),
+                accessibility: PageAccessibility::default(),
             };
         }
 
@@ -131,13 +131,13 @@ impl IncrVelloPass {
 
     #[cfg(test)]
     fn flush_pages(&mut self) -> Vec<(Arc<Scene>, Vec2)> {
-        self.flush_pages_with_semantics()
+        self.flush_pages_with_accessibility()
             .into_iter()
             .map(|page| (page.scene, size_to_vec2(page.size)))
             .collect()
     }
 
-    fn flush_pages_with_semantics(&mut self) -> Vec<RenderedPage> {
+    fn flush_pages_with_accessibility(&mut self) -> Vec<RenderedPage> {
         let mut pages = Vec::with_capacity(self.pages.len());
         let mut flushed_pages = Vec::with_capacity(self.pages.len());
         let mut reusable_flushed_pages =
@@ -209,7 +209,7 @@ impl IncrVelloPass {
         RenderedPage {
             scene: Arc::new(elem_scene),
             size: vec2_to_size(*size),
-            semantics: page.semantics.clone(),
+            accessibility: page.accessibility.clone(),
         }
     }
 }
@@ -360,14 +360,14 @@ impl IncrVelloDocClient {
     /// Renders a specific page of the document in the given window.
     pub fn render_pages(&mut self, kern: &mut IncrDocClient) -> Result<Vec<(Arc<Scene>, Size)>> {
         Ok(self
-            .render_pages_with_semantics(kern)?
+            .render_pages_with_accessibility(kern)?
             .into_iter()
             .map(|page| (page.scene, page.size))
             .collect())
     }
 
-    /// Renders pages with their semantic metadata.
-    pub fn render_pages_with_semantics(
+    /// Renders pages with their accessibility metadata.
+    pub fn render_pages_with_accessibility(
         &mut self,
         kern: &mut IncrDocClient,
     ) -> Result<Vec<RenderedPage>> {
@@ -384,7 +384,7 @@ impl IncrVelloDocClient {
         // let ts = sk::Transform::from_scale(s, s);
         // let ts = Affine::scale(s as f64);
 
-        let res = self.vec2vello.flush_pages_with_semantics();
+        let res = self.vec2vello.flush_pages_with_accessibility();
         Ok(res)
     }
 }
@@ -393,6 +393,7 @@ impl IncrVelloDocClient {
 mod tests {
     use std::sync::Arc;
 
+    use masonry::accesskit::{Action, Role};
     use reflexo::{
         hash::Fingerprint,
         vector::{
@@ -505,7 +506,7 @@ mod tests {
     }
 
     #[test]
-    fn render_pages_preserves_link_semantics() {
+    fn render_pages_preserves_link_accessibility_node() {
         let link_id = Fingerprint::from_pair(41, 0);
         let mut module = Module::default();
         module.items.insert(
@@ -526,27 +527,76 @@ mod tests {
 
         let mut client = IncrVelloDocClient::default();
         let rendered = client
-            .render_pages_with_semantics(&mut doc)
-            .expect("link semantics fixture should render");
+            .render_pages_with_accessibility(&mut doc)
+            .expect("link accessibility fixture should render");
 
         assert_eq!(rendered.len(), 1);
-        let links = rendered[0].semantics.links();
-        assert_eq!(links.len(), 1);
-        assert_eq!(links[0].href, "https://example.com");
-        assert_eq!(links[0].rect.width(), 6.0);
-        assert_eq!(links[0].rect.height(), 8.0);
+        let [link] = rendered[0].accessibility.nodes() else {
+            panic!("expected one AccessKit link node");
+        };
+        assert_eq!(link.role(), Role::Link);
+        assert_eq!(link.value(), Some("https://example.com"));
+        assert!(link.supports_action(Action::Click));
+        let bounds = link.bounds().expect("link node should have bounds");
+        assert_eq!(bounds.width(), 6.0);
+        assert_eq!(bounds.height(), 8.0);
         assert_eq!(
             rendered[0]
-                .semantics
-                .hit_test_link(Point::new(3.0, 4.0))
-                .map(|link| link.href.as_str()),
+                .accessibility
+                .hit_test_link(Point::new(3.0, 4.0)),
             Some("https://example.com")
         );
         assert!(
             rendered[0]
-                .semantics
+                .accessibility
                 .hit_test_link(Point::new(12.0, 12.0))
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn render_pages_preserves_text_accessibility_run() {
+        let mut doc = compile_incremental_doc(
+            r#"
+#set page(width: 96pt, height: 48pt, margin: 0pt)
+hello
+"#,
+        );
+
+        let mut client = IncrVelloDocClient::default();
+        let rendered = client
+            .render_pages_with_accessibility(&mut doc)
+            .expect("text accessibility fixture should render");
+
+        assert_eq!(rendered.len(), 1);
+        let text_runs = rendered[0].accessibility.text_runs();
+        assert!(
+            text_runs.iter().any(|run| run.text() == "hello"),
+            "expected rendered text runs to include the source text, got {text_runs:?}"
+        );
+        let run = text_runs
+            .iter()
+            .find(|run| run.text() == "hello")
+            .expect("text run should exist");
+        assert_eq!(run.character_bounds().len(), 5);
+
+        let first = run.character_bounds()[0];
+        let last = run.character_bounds()[4];
+        let first_x = first.x0 + (first.x1 - first.x0) * 0.1;
+        let last_x = last.x1 - (last.x1 - last.x0) * 0.1;
+        let anchor = rendered[0]
+            .accessibility
+            .hit_test_text(Point::new(first_x, (first.y0 + first.y1) / 2.0))
+            .expect("first character should be selectable");
+        let focus = rendered[0]
+            .accessibility
+            .hit_test_text(Point::new(last_x, (last.y0 + last.y1) / 2.0))
+            .expect("last character should be selectable");
+        assert_eq!(
+            rendered[0]
+                .accessibility
+                .selected_text(crate::PageTextSelection { anchor, focus }),
+            "hello"
         );
     }
 

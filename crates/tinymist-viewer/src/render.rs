@@ -32,7 +32,8 @@ use vello::{
 };
 
 use crate::{
-    GroupScene, SemanticLink, SvgResource, SvgResourceFormat, SvgResourceResolver, VecScene,
+    GroupScene, GroupSceneItem, PageAccessibility, PageTextRun, SvgResource, SvgResourceFormat,
+    SvgResourceResolver, VecScene,
 };
 
 pub struct Renderer<'a> {
@@ -71,8 +72,8 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             ts: Affine::IDENTITY,
             clipper: None,
             glyph_style: None,
-            inner: EcoVec::new(),
-            semantic_links: EcoVec::new(),
+            pending_text: None,
+            items: EcoVec::new(),
         }
     }
 
@@ -84,6 +85,9 @@ impl<'m> RenderVm<'m> for Renderer<'m> {
             .map(|font| f64::from(font.units_per_em.0) / f64::from(text.shape.size.0))
             .filter(|scale| scale.is_finite())
             .unwrap_or(1.0);
+        if let Some(font) = self.get_font(&text.shape.font) {
+            g.pending_text = text_run_for_item(text, font);
+        }
         g.glyph_style = Some(resolve_draw_style(self, &text.shape.styles, stroke_scale));
         g
     }
@@ -150,10 +154,10 @@ pub struct RenderStack {
     pub clipper: Option<ir::PathItem>,
     /// The draw style for glyph outlines in text groups.
     glyph_style: Option<DrawStyle>,
-    /// The inner elements.
-    pub inner: EcoVec<(Vec2, Arc<VecScene>)>,
-    /// Semantic links in this group.
-    pub semantic_links: EcoVec<SemanticLink>,
+    /// Text semantics emitted after the text transform is applied.
+    pending_text: Option<PageTextRun>,
+    /// The ordered visual and semantic items.
+    pub items: EcoVec<GroupSceneItem>,
     // /// The bounding box of the group.
     // pub rect: CanvasBBox,
 }
@@ -165,14 +169,115 @@ pub enum GroupKind {
 }
 
 impl From<RenderStack> for Arc<VecScene> {
-    fn from(s: RenderStack) -> Self {
+    fn from(mut s: RenderStack) -> Self {
+        if let Some(text_run) = s.pending_text.take() {
+            s.items.push(GroupSceneItem::Text(text_run));
+        }
         Arc::new(VecScene::Group(GroupScene {
             // todo: detect whether there is a failure converting paths.
             clip: s.clipper.and_then(|it| svg_path(&it.d)),
             ts: s.ts,
-            scenes: s.inner,
-            semantic_links: s.semantic_links,
+            items: s.items,
         }))
+    }
+}
+
+fn text_run_for_item(text: &ir::TextItem, font: &FontItem) -> Option<PageTextRun> {
+    let content = text.content.content.as_ref();
+    if content.is_empty() || text.shape.size.0 == 0.0 || font.units_per_em.0 == 0.0 {
+        return None;
+    }
+
+    let upem = font.units_per_em.0 as f64;
+    let inv_ppem = upem / text.shape.size.0 as f64;
+    if !inv_ppem.is_finite() {
+        return None;
+    }
+
+    let ascender = font.ascender.0 as f64 * upem;
+    let descender = font.descender.0 as f64 * upem;
+    let y0 = descender.min(ascender);
+    let y1 = descender.max(ascender);
+    if y0 == y1 {
+        return None;
+    }
+
+    let width = text.width().0 as f64 * inv_ppem;
+    if width <= 0.0 || !width.is_finite() {
+        return None;
+    }
+
+    let character_count = content.chars().count();
+    if character_count == 0 {
+        return None;
+    }
+
+    let mut character_bounds = text_run_character_bounds(text, font, inv_ppem, y0, y1);
+    if character_bounds.len() != character_count {
+        character_bounds = evenly_spaced_character_bounds(character_count, width, y0, y1);
+    }
+
+    Some(PageTextRun::new(
+        content,
+        masonry::accesskit::Rect::new(0.0, y0, width, y1),
+        character_bounds,
+    ))
+}
+
+fn text_run_character_bounds(
+    text: &ir::TextItem,
+    font: &FontItem,
+    inv_ppem: f64,
+    y0: f64,
+    y1: f64,
+) -> Vec<masonry::accesskit::Rect> {
+    let character_count = text.content.content.chars().count();
+    let mut character_bounds = Vec::with_capacity(character_count);
+    let mut remaining = character_count;
+    let mut cursor = 0.0;
+
+    for (_, advance, glyph) in text.content.glyphs.iter() {
+        if remaining == 0 {
+            break;
+        }
+
+        let cluster_len = glyph_ligature_len(font, *glyph).clamp(1, remaining);
+        let advance = advance.x.0 as f64 * inv_ppem;
+        if !advance.is_finite() {
+            return Vec::new();
+        }
+        let character_advance = advance / cluster_len as f64;
+        for _ in 0..cluster_len {
+            let next = cursor + character_advance;
+            character_bounds.push(masonry::accesskit::Rect::new(cursor, y0, next, y1));
+            cursor = next;
+        }
+        remaining -= cluster_len;
+    }
+
+    character_bounds
+}
+
+fn evenly_spaced_character_bounds(
+    character_count: usize,
+    width: f64,
+    y0: f64,
+    y1: f64,
+) -> Vec<masonry::accesskit::Rect> {
+    let character_width = width / character_count as f64;
+    (0..character_count)
+        .map(|index| {
+            let x0 = character_width * index as f64;
+            masonry::accesskit::Rect::new(x0, y0, x0 + character_width, y1)
+        })
+        .collect()
+}
+
+fn glyph_ligature_len(font: &FontItem, glyph: u32) -> usize {
+    match font.get_glyph(glyph).map(|glyph| glyph.as_ref()) {
+        Some(ir::FlatGlyphItem::Image(glyph)) => glyph.ligature_len.into(),
+        Some(ir::FlatGlyphItem::Outline(glyph)) => glyph.ligature_len.into(),
+        Some(ir::FlatGlyphItem::None) | None => 1,
     }
 }
 
@@ -224,10 +329,10 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         let style = resolve_draw_style(ctx, &path.styles, 1.0);
         render_path_with_style(ctx, &mut scene, &path_data, &style);
 
-        self.inner.push((
-            Vec2::new(0., 0.),
-            Arc::new(VecScene::Scene(Box::new(scene), None)),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(0., 0.),
+            scene: Arc::new(VecScene::Scene(Box::new(scene), None)),
+        });
     }
 
     fn render_link(&mut self, _ctx: &mut C, link: &ir::LinkItem) {
@@ -235,10 +340,16 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         }
 
-        self.semantic_links.push(SemanticLink::new(
-            link.href.as_ref(),
-            Rect::from_origin_size((0.0, 0.0), (link.size.x.0 as f64, link.size.y.0 as f64)),
-        ));
+        self.items
+            .push(GroupSceneItem::Accessibility(PageAccessibility::link_node(
+                link.href.as_ref(),
+                masonry::accesskit::Rect {
+                    x0: 0.0,
+                    y0: 0.0,
+                    x1: link.size.x.0 as f64,
+                    y1: link.size.y.0 as f64,
+                },
+            )));
     }
 
     fn render_image(&mut self, ctx: &mut C, image_item: &ir::ImageItem) {
@@ -255,17 +366,17 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         };
 
-        self.inner.push((
-            Vec2::new(0., 0.),
-            Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(0., 0.),
+            scene: Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
+        });
     }
 
     fn render_item_at(&mut self, ctx: &mut C, pos: ir::Point, item: &Fingerprint) {
-        self.inner.push((
-            Vec2::new(pos.x.0 as f64, pos.y.0 as f64),
-            ctx.render_item(item),
-        ));
+        self.items.push(GroupSceneItem::Scene {
+            pos: Vec2::new(pos.x.0 as f64, pos.y.0 as f64),
+            scene: ctx.render_item(item),
+        });
     }
 
     fn render_glyph(&mut self, ctx: &mut C, pos: Axes<Scalar>, font: &FontItem, glyph: u32) {
@@ -273,7 +384,7 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
         if let Some(style) = &self.glyph_style
             && let Some(glyph) = ctx.get_glyph(font, glyph, style, pos)
         {
-            self.inner.push((pos, glyph));
+            self.items.push(GroupSceneItem::Scene { pos, scene: glyph });
         }
     }
 }

@@ -281,7 +281,7 @@ impl PreviewState {
             .map(|(idx, page)| {
                 let tx = self.tx.clone();
                 let page_scene = page.scene.clone();
-                let page_semantics = page.semantics.clone();
+                let page_accessibility = Arc::new(page.accessibility.clone());
                 let background_color = self.background_color;
                 let width = page.size.width;
                 let height = page.size.height;
@@ -298,32 +298,39 @@ impl PreviewState {
                 };
                 let elem_height = elem_scale * height;
                 // The sized box is necessary to avoid collapsing the canvas.
-                sized_box(doc(
-                    page_scene,
-                    elem_scale,
-                    background_color,
-                    move |pos, bbox| {
-                        if bbox.width() == 0. || bbox.height() == 0. {
-                            return;
-                        }
-
-                        let x = pos.x / bbox.width() * width;
-                        let y = pos.y / bbox.height() * height;
-
-                        if let Some(link) = page_semantics.hit_test_link(Point::new(x, y))
-                            && open_supported_external_link(&link.href)
+                sized_box(
+                    doc(
+                        page_scene,
+                        elem_scale,
+                        background_color,
                         {
-                            return;
-                        }
+                            let page_accessibility = page_accessibility.clone();
+                            move |pos, bbox| {
+                                if bbox.width() == 0. || bbox.height() == 0. {
+                                    return;
+                                }
 
-                        let _ = tx.send(PreviewEvent::Click {
-                            page_idx: idx + 1,
-                            x: x as f32,
-                            y: y as f32,
-                        });
-                    },
-                    |state: &mut PreviewState, action| state.apply_zoom(action),
-                ))
+                                let x = pos.x / bbox.width() * width;
+                                let y = pos.y / bbox.height() * height;
+
+                                if let Some(href) =
+                                    page_accessibility.hit_test_link(Point::new(x, y))
+                                    && open_supported_external_link(href)
+                                {
+                                    return;
+                                }
+
+                                let _ = tx.send(PreviewEvent::Click {
+                                    page_idx: idx + 1,
+                                    x: x as f32,
+                                    y: y as f32,
+                                });
+                            }
+                        },
+                        |state: &mut PreviewState, action| state.apply_zoom(action),
+                    )
+                    .accessibility(page_accessibility),
+                )
                 .fixed_width(Length::const_px(elem_width))
                 .fixed_height(Length::const_px(elem_height))
             })
@@ -686,7 +693,7 @@ impl ezsockets::ClientExt for Client {
 
             self.doc.merge_delta(delta);
 
-            let pages = match self.vello.render_pages_with_semantics(&mut self.doc) {
+            let pages = match self.vello.render_pages_with_accessibility(&mut self.doc) {
                 Ok(scene) => scene,
                 Err(err) => {
                     log::error!("Error rendering pages: {err}");
