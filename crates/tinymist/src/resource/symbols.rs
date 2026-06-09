@@ -1,8 +1,8 @@
 use std::sync::LazyLock;
 use std::{path::Path, sync::Arc};
 
-use reflexo_typst::TypstPagedDocument;
 use reflexo_typst::vector::font::GlyphId;
+use reflexo_typst::TypstPagedDocument;
 use reflexo_vec2svg::SvgGlyphBuilder;
 use sync_ls::LspResult;
 use tinymist_query::GLOBAL_STATS;
