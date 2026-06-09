@@ -27,8 +27,8 @@ impl AstRepr<'_> {
 
         write!(f, "{: >indent$}{:?}(", "", node.kind())?;
 
-        if !node.text().is_empty() {
-            write!(f, "{:?}", node.text())?;
+        if !node.full_text().is_empty() {
+            write!(f, "{:?}", node.full_text())?;
         } else if node.get().children().len() > 0 {
             write!(f, "{:?}, ", node.children().len())?;
             f.write_str("{\n")?;
