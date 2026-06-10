@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 use lsp_types::Url;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::vfs::PathResolution;
 
 use super::prelude::*;
 
@@ -66,9 +67,8 @@ impl LinkTarget {
             LinkTarget::Url(url) => Some(url.as_ref().clone()),
             LinkTarget::Path(id, path) => {
                 // Avoid creating new ids here.
-                let root = ctx.path_for_id(id.join("/")).ok()?;
-                let path_in_workspace = id.vpath().join(Path::new(path.as_str()));
-                let path = root.resolve_to(&path_in_workspace)?;
+                let root = ctx.path_for_id(*id).ok()?.to_err().ok()?;
+                let path = PathResolution::Resolved(root.parent()?.join(path.as_str()));
                 crate::path_res_to_url(path).ok()
             }
         }

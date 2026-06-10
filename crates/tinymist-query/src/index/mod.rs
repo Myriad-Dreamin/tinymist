@@ -178,7 +178,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
                 .flat_map(|(k, v)| {
                     let rng = self.emit_span(*k, &source);
                     let def_rng = self.emit_def_span(v, &source, false);
-                    rng.into_iter().chain(def_rng.into_iter())
+                    rng.into_iter().chain(def_rng)
                 })
                 .collect();
             self.emit_element(p::Element::Edge(p::Edge::Contains(p::EdgeDataMultiIn {

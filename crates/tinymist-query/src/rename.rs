@@ -144,9 +144,8 @@ pub(crate) fn do_rename_file(
     diff: PathBuf,
     edits: &mut HashMap<Url, Vec<TextEdit>>,
 ) -> Option<()> {
-    let def_path = def_fid
-        .vpath()
-        .as_rooted_path()
+    let def_path = def_fid.vpath().get_with_slash();
+    let def_path = std::path::Path::new(def_path)
         .file_name()
         .unwrap_or_default()
         .to_str()
@@ -165,7 +164,11 @@ pub(crate) fn do_rename_file(
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
     // Compare package and vpath so we avoid allocating a joined file id while
     // still distinguishing package files that share the same internal path.
-    file_id.package() == def_fid.package() && file_id.vpath().join(path) == *def_fid.vpath()
+    file_id.package_compat() == def_fid.package_compat()
+        && file_id
+            .vpath()
+            .parent()
+            .is_some_and(|p| p.join(path).is_ok_and(|p| p == *def_fid.vpath()))
 }
 
 struct RenameFileWorker<'a> {
@@ -368,7 +371,7 @@ pub(crate) fn create_change_annotation(
 
 #[cfg(test)]
 mod tests {
-    use std::{path::Path, str::FromStr};
+    use std::str::FromStr;
 
     use super::*;
     use crate::tests::*;
@@ -407,18 +410,18 @@ mod tests {
     fn link_path_match_requires_same_package_spec() {
         let package_v010 = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
         let package_v011 = PackageSpec::from_str("@preview/example:0.1.1").unwrap();
-        let def_fid = TypstFileId::new(
-            Some(package_v010.clone()),
-            VirtualPath::new(Path::new("/assets/logo.typ")),
-        );
-        let same_package_ref = TypstFileId::new(
-            Some(package_v010),
-            VirtualPath::new(Path::new("/docs/main.typ")),
-        );
-        let other_package_ref = TypstFileId::new(
-            Some(package_v011),
-            VirtualPath::new(Path::new("/docs/main.typ")),
-        );
+        let def_fid = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010.clone()),
+            VirtualPath::new("/assets/logo.typ").unwrap(),
+        ));
+        let same_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
+        let other_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v011),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
 
         assert!(link_path_matches_def(
             def_fid,

@@ -568,30 +568,22 @@ impl TypeChecker<'_> {
 
         Some(match selector {
             Ty::With(with) => return Self::content_by_selector(with.sig.as_ref().clone()),
-            Ty::Builtin(BuiltinTy::Type(ty)) => {
-                if ty == Type::of::<typst::foundations::Regex>() {
-                    text_type()
-                } else {
-                    return None;
-                }
+            Ty::Builtin(BuiltinTy::Type(ty)) if ty == Type::of::<typst::foundations::Regex>() => {
+                text_type()
             }
             Ty::Builtin(BuiltinTy::Element(ty)) => Ty::Builtin(BuiltinTy::Content(Some(ty))),
             Ty::Value(ins_ty) => match &ins_ty.val {
                 Value::Str(..) => text_type(),
                 Value::Content(c) => Ty::Builtin(BuiltinTy::Content(Some(c.elem()))),
                 Value::Func(f) => {
-                    if let Some(elem) = f.element() {
+                    if let Some(elem) = f.to_element() {
                         Ty::Builtin(BuiltinTy::Content(Some(elem)))
                     } else {
                         return None;
                     }
                 }
-                Value::Dyn(value) => {
-                    if value.ty() == Type::of::<typst::foundations::Regex>() {
-                        text_type()
-                    } else {
-                        return None;
-                    }
+                Value::Dyn(value) if value.ty() == Type::of::<typst::foundations::Regex>() => {
+                    text_type()
                 }
                 _ => return None,
             },
