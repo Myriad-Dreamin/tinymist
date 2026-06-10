@@ -4,6 +4,7 @@ on:
     branches:
       - main
       - nightly
+      - stable/**
     tags:
       - "*"
   pull_request:
@@ -11,6 +12,7 @@ on:
     branches:
       - main
       - nightly
+      - stable/**
   workflow_dispatch:
 
 env:
