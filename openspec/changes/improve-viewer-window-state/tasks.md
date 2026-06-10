@@ -15,8 +15,9 @@
 - [x] 3.3 Store and restore window state in the VS Code preview integration with `globalState`.
 - [x] 3.4 Add side-by-side pre-layout before spawning the viewer, with post-spawn repair retained.
 - [x] 3.5 Add targeted tests for geometry parsing, validation, and window-state payloads.
-- [x] 3.6 Keep side-by-side layout active even when stored window state exists.
+- [x] 3.6 Keep side-by-side pre-layout active while preserving stored viewer geometry.
 - [x] 3.7 Preserve stored window position across positionless size updates.
+- [x] 3.8 Serialize VS Code window-state storage writes in notification order.
 
 ## 4. Validation
 

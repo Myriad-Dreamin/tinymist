@@ -32,15 +32,17 @@ Restore:
 
 Tinymist server receives the data-plane text command in `WebviewActor`, forwards it to the internal preview editor actor, and then sends a `tinymist/preview/windowState` LSP notification to the editor client. The VS Code preview integration stores schema-versioned records in `ExtensionContext.globalState` under a versioned key and passes the restored initial state to the configured previewer on the next launch. This avoids inventing cross-process file locking in the viewer and lets multiple same-version viewer processes converge through the client's storage semantics. Multiple viewer/client versions are isolated by `schema_version` and the versioned storage key; an incompatible future schema should use a new key or ignore mismatched records.
 
+Resize and move gestures can emit many window-state notifications quickly. The VS Code preview integration serializes `globalState` writes in notification arrival order so slower earlier storage writes cannot overwrite a later resize state.
+
 Neovim and other clients can implement their own persistence later by passing the same initial geometry arguments and consuming the server-forwarded window-state notification.
 
 ## Side-by-side Startup
 
-When `tinymist.gpuViewer.windowLayout` is `sideBySide`, side-by-side layout is the launch strategy. The VS Code provider should try to compute the right-half work-area rectangle and move the VS Code window to the left half before spawning `tinymist-viewer`. The computed right-half rectangle is passed as the viewer's initial size and position so the operating system can create the viewer close to the final side-by-side layout.
+When `tinymist.gpuViewer.windowLayout` is `sideBySide`, the VS Code provider should try to prepare the desktop before spawning `tinymist-viewer`. Pre-layout moves VS Code to the left half and computes the right-half work-area rectangle. This keeps the side-by-side script active even after viewer state persistence has produced a stored record.
 
-Stored window state must not suppress the side-by-side script, because viewer window-state persistence will normally produce a stored record after the first launch. In side-by-side mode, stored state is only a fallback if pre-layout fails before spawn. When `tinymist.gpuViewer.windowLayout` is `disabled`, stored state is the primary initial geometry.
+When a valid stored viewer state exists, that stored state remains the viewer's initial geometry because it represents the user's last accepted resize/move. In that path, the provider skips the post-spawn viewer repair pass so the repair script does not overwrite the restored viewer geometry.
 
-The existing post-spawn arrangement remains as a repair pass in side-by-side mode because native window managers can apply decorations, minimum sizes, DPI conversions, and placement policies differently from the requested initial geometry. If pre-layout fails, the provider falls back to stored state or default placement and still performs the post-spawn repair pass.
+When no valid stored viewer state exists, the computed right-half rectangle is passed as the viewer's initial size and position so the operating system can create the viewer close to the final side-by-side layout. The existing post-spawn arrangement remains as a repair pass in this no-stored-state path because native window managers can apply decorations, minimum sizes, DPI conversions, and placement policies differently from the requested initial geometry. If pre-layout fails and no stored state exists, the provider falls back to default placement and still performs the post-spawn repair pass.
 
 ## Fit Width
 

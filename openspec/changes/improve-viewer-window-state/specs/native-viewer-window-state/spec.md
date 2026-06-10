@@ -57,6 +57,12 @@ The VS Code preview integration SHALL persist and restore viewer window state th
 - **WHEN** the preview integration receives a valid schema-versioned viewer window-state notification from tinymist server
 - **THEN** the integration writes that state to VS Code extension storage for future launches
 
+#### Scenario: Rapid resize updates are stored in notification order
+
+- **WHEN** the preview integration receives multiple valid viewer window-state notifications from one resize gesture
+- **AND** earlier extension-storage writes complete slower than later writes
+- **THEN** the stored viewer window state still reflects the latest notification arrival order
+
 #### Scenario: Positionless updates preserve stored position
 
 - **WHEN** VS Code extension storage contains a valid viewer window-state record with position
@@ -73,16 +79,18 @@ The VS Code preview integration SHALL persist and restore viewer window state th
 
 The VS Code GPU viewer provider SHALL attempt to prepare side-by-side geometry before spawning the native viewer when side-by-side layout is enabled.
 
-#### Scenario: Side-by-side layout has priority over stored state
+#### Scenario: Stored state keeps viewer geometry while pre-layout still runs
 
 - **WHEN** `tinymist.gpuViewer.windowLayout` is `sideBySide`
 - **AND** VS Code extension storage contains a valid schema-versioned viewer window-state record
 - **THEN** the provider still attempts side-by-side pre-layout before launch
-- **AND** still schedules the post-spawn side-by-side repair pass
+- **AND** passes the stored geometry as the viewer's initial window size and position
+- **AND** skips the post-spawn viewer layout repair pass
 
 #### Scenario: Side-by-side pre-layout succeeds
 
 - **WHEN** `tinymist.gpuViewer.windowLayout` is `sideBySide`
+- **AND** no valid stored viewer window state is available
 - **AND** the provider can compute and apply the platform work-area split before launch
 - **THEN** the provider moves VS Code to the left side
 - **AND** passes the right-side rectangle as the viewer's initial window size and position
@@ -90,6 +98,7 @@ The VS Code GPU viewer provider SHALL attempt to prepare side-by-side geometry b
 #### Scenario: Side-by-side pre-layout fails
 
 - **WHEN** `tinymist.gpuViewer.windowLayout` is `sideBySide`
+- **AND** no valid stored viewer window state is available
 - **AND** the provider cannot compute or apply side-by-side geometry before launch
-- **THEN** the provider falls back to stored window state or default placement
+- **THEN** the provider falls back to default placement
 - **AND** the post-spawn side-by-side repair pass can still arrange the windows

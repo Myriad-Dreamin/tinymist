@@ -167,7 +167,7 @@ async function windowLaunchPlanForTask(
     }
 
     return {
-      initialWindowState: sideBySideState ?? storedWindowState,
+      initialWindowState: sideBySideState,
       repairSideBySideLayout: true,
     };
   }
