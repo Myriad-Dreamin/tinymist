@@ -10,6 +10,9 @@ use ezsockets::ClientConfig;
 use ezsockets::client::ClientCloseMode;
 use masonry::layout::Length;
 use masonry::layout::UnitPoint;
+use masonry::properties::Gap;
+use masonry::theme::default_property_set;
+use masonry_winit::app::{AppDriver, MasonryState, MasonryUserEvent};
 use reflexo::debug_loc::DocumentPosition;
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
@@ -23,18 +26,29 @@ use typst::syntax::{FileId, Source, VirtualPath};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
+use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
+use winit::event::{DeviceEvent, StartCause, WindowEvent as WinitWindowEvent};
+use winit::event_loop::ActiveEventLoop;
+use winit::window::WindowId as WinitWindowId;
 use xilem::core::{Edit, MessageProxy, fork};
+use xilem::style::Style as _;
 use xilem::vello::Scene;
 use xilem::vello::kurbo::{Point, Size};
 use xilem::vello::peniko::Color;
-use xilem::view::{ZStackExt as _, flex_col, resize_observer, sized_box, task, zstack};
+use xilem::view::{
+    FlexExt as _, ZStackExt as _, flex_col, resize_observer, sized_box, task, zstack,
+};
 use xilem::{AppState, EventLoop, WidgetView, WindowId, Xilem, window};
+
+mod native_title_bar;
+mod title_bar;
 
 use tinymist_viewer::doc::{ZoomAction, doc};
 use tinymist_viewer::incr::{IncrVelloDocClient, RenderedPage};
 use tinymist_viewer::protocol::preview_update_from_bytes;
 use tinymist_viewer::zoom_portal::zoom_portal;
+use title_bar::{TITLE_BAR_HEIGHT, TitleBarAction, title_bar};
 
 const DEFAULT_ZOOM_SCALE: f64 = 1.0;
 const MIN_ZOOM_SCALE: f64 = 0.1;
@@ -48,6 +62,10 @@ const ZOOM_FACTORS: [f64; 31] = [
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(1);
 const STATUS_BANNER_HEIGHT: f64 = 28.0;
 const EMPTY_STATUS_BANNER_HEIGHT: f64 = 34.0;
+const DEFAULT_VIEWER_INNER_WIDTH: u32 = 800;
+const DEFAULT_VIEWER_CONTENT_HEIGHT: u32 = 800;
+const MIN_VIEWER_INNER_WIDTH: u32 = 800;
+const MIN_VIEWER_INNER_HEIGHT: u32 = DEFAULT_VIEWER_CONTENT_HEIGHT + TITLE_BAR_HEIGHT as u32;
 
 #[derive(Debug, Clone, Parser)]
 struct Args {
@@ -59,6 +77,10 @@ struct Args {
         hide(true)
     )]
     pub data_plane_host: String,
+
+    /// The document title shown in the viewer window.
+    #[clap(long = "document-title", value_name = "TITLE")]
+    pub document_title: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -70,11 +92,16 @@ fn main() -> Result<()> {
 
     let (tx, rx) = mpsc::unbounded_channel();
 
-    let default_size = Size::new(800.0, 800.0);
+    let default_size = Size::new(
+        f64::from(DEFAULT_VIEWER_INNER_WIDTH),
+        f64::from(DEFAULT_VIEWER_CONTENT_HEIGHT),
+    );
     let data_plane_host = args.data_plane_host;
+    let document_title = normalize_document_title(args.document_title);
     let app = Xilem::new(
         PreviewState {
             data_plane_host,
+            document_title,
             window_id: WindowId::next(),
             running: true,
             pages: vec![],
@@ -82,19 +109,102 @@ fn main() -> Result<()> {
             window_size: default_size,
             connection: ConnectionStatus::Connecting,
             status_scene: None,
+            help_overlay_visible: false,
+            help_overlay_scene: None,
             zoom_scale: DEFAULT_ZOOM_SCALE,
             tx,
             rx: Some(rx),
         },
         PreviewState::windows,
     );
-    app.run_in(EventLoop::with_user_event())
+
+    let event_loop = EventLoop::with_user_event()
+        .build()
+        .context("Couldn't build event loop")?;
+    let proxy = event_loop.create_proxy();
+    let (driver, windows) =
+        app.into_driver_and_windows(move |event| proxy.send_event(event).map_err(|err| err.0));
+    let masonry_state =
+        MasonryState::new(event_loop.create_proxy(), windows, default_property_set());
+    let mut app = ViewerEventLoopApp {
+        masonry_state,
+        app_driver: Box::new(driver),
+    };
+    event_loop
+        .run_app(&mut app)
         .context("Couldn't run event loop")?;
     Ok(())
 }
 
+struct ViewerEventLoopApp {
+    masonry_state: MasonryState<'static>,
+    app_driver: Box<dyn AppDriver>,
+}
+
+impl ApplicationHandler<MasonryUserEvent> for ViewerEventLoopApp {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.masonry_state
+            .handle_resumed(event_loop, self.app_driver.as_mut());
+    }
+
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        self.masonry_state.handle_suspended(event_loop);
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        self.masonry_state.handle_about_to_wait(event_loop);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WinitWindowId,
+        event: WinitWindowEvent,
+    ) {
+        native_title_bar::install_for_window_id(window_id);
+        self.masonry_state.handle_window_event(
+            event_loop,
+            window_id,
+            event,
+            self.app_driver.as_mut(),
+        );
+    }
+
+    fn user_event(&mut self, event_loop: &ActiveEventLoop, event: MasonryUserEvent) {
+        self.masonry_state
+            .handle_user_event(event_loop, event, self.app_driver.as_mut());
+    }
+
+    fn device_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        device_id: winit::event::DeviceId,
+        event: DeviceEvent,
+    ) {
+        self.masonry_state.handle_device_event(
+            event_loop,
+            device_id,
+            event,
+            self.app_driver.as_mut(),
+        );
+    }
+
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        self.masonry_state.handle_new_events(event_loop, cause);
+    }
+
+    fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+        self.masonry_state.handle_exiting(event_loop);
+    }
+
+    fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
+        self.masonry_state.handle_memory_warning(event_loop);
+    }
+}
+
 struct PreviewState {
     data_plane_host: String,
+    document_title: Option<String>,
     window_id: WindowId,
     running: bool,
     pages: Vec<RenderedPage>,
@@ -102,6 +212,8 @@ struct PreviewState {
     window_size: Size,
     connection: ConnectionStatus,
     status_scene: Option<StatusScene>,
+    help_overlay_visible: bool,
+    help_overlay_scene: Option<HelpOverlayScene>,
     zoom_scale: f64,
     tx: mpsc::UnboundedSender<PreviewEvent>,
     rx: Option<mpsc::UnboundedReceiver<PreviewEvent>>,
@@ -120,7 +232,11 @@ impl PreviewState {
         let root = self.view();
         std::iter::once(window(window_id, title, root).with_options(|options| {
             options
-                .with_min_inner_size(LogicalSize::new(800.0, 800.0))
+                .with_decorations(false)
+                .with_min_inner_size(LogicalSize::new(
+                    f64::from(MIN_VIEWER_INNER_WIDTH),
+                    f64::from(MIN_VIEWER_INNER_HEIGHT),
+                ))
                 .on_close(|state: &mut PreviewState| {
                     state.running = false;
                 })
@@ -128,9 +244,10 @@ impl PreviewState {
     }
 
     fn window_title(&self) -> String {
+        let base = viewer_window_title(self.document_title.as_deref());
         match self.connection.title_suffix() {
-            Some(suffix) => format!("Tinymist View - {suffix}"),
-            None => "Tinymist View".to_owned(),
+            Some(suffix) => format!("{base} - {suffix}"),
+            None => base,
         }
     }
 
@@ -162,6 +279,42 @@ impl PreviewState {
 
     fn apply_zoom(&mut self, action: ZoomAction) {
         self.zoom_scale = zoom_scale_after_action(self.zoom_scale, action);
+    }
+
+    fn handle_title_bar_action(&mut self, action: TitleBarAction) {
+        match action {
+            TitleBarAction::ToggleHelp => {
+                self.help_overlay_visible = !self.help_overlay_visible;
+            }
+        }
+    }
+
+    fn help_overlay_scene(&mut self, width: f64, height: f64) -> (Arc<Scene>, Size) {
+        if let Some(scene) = &self.help_overlay_scene
+            && scene.matches(width, height)
+        {
+            return (scene.scene.clone(), scene.size);
+        }
+
+        let (scene, size) = match render_help_overlay_scene(width, height) {
+            Ok(scene) => scene,
+            Err(err) => {
+                log::warn!("failed to render help overlay with Typst: {err}");
+                (Arc::new(Scene::new()), Size::new(width, height))
+            }
+        };
+        self.help_overlay_scene = Some(HelpOverlayScene {
+            width,
+            height,
+            scene,
+            size,
+        });
+
+        let scene = self
+            .help_overlay_scene
+            .as_ref()
+            .expect("help overlay scene just set");
+        (scene.scene.clone(), scene.size)
     }
 
     fn view(&mut self) -> impl WidgetView<Edit<Self>> + use<> {
@@ -374,9 +527,36 @@ impl PreviewState {
         } else {
             None
         };
+        let help_overlay = if self.help_overlay_visible {
+            let overlay_width = self.window_size.width.max(1.0).ceil();
+            let overlay_height = self.window_size.height.max(1.0).ceil();
+            let (scene, scene_size) = self.help_overlay_scene(overlay_width, overlay_height);
+            let scene_scale = if scene_size.width > 0.0 {
+                overlay_width / scene_size.width
+            } else {
+                1.0
+            };
 
-        // Listens to window size changes and renders the scene.
-        resize_observer(
+            Some(
+                sized_box(
+                    doc(
+                        scene,
+                        scene_scale,
+                        None,
+                        |_pos, _bbox| {},
+                        |state: &mut PreviewState, action| state.apply_zoom(action),
+                    )
+                    .alt_text("Tinymist preview key bindings"),
+                )
+                .fixed_width(Length::const_px(overlay_width))
+                .fixed_height(Length::const_px(overlay_height))
+                .alignment(UnitPoint::CENTER),
+            )
+        } else {
+            None
+        };
+
+        let preview_content = resize_observer(
             |state: &mut PreviewState, size: Size| {
                 state.window_size = size;
             },
@@ -389,10 +569,19 @@ impl PreviewState {
                         |state: &mut PreviewState, action| state.apply_zoom(action),
                     ),
                     status_overlay,
+                    help_overlay,
                 )),
                 effect,
             ),
-        )
+        );
+
+        flex_col((
+            title_bar(self.window_title(), |state: &mut PreviewState, action| {
+                state.handle_title_bar_action(action)
+            }),
+            preview_content.flex(1.0),
+        ))
+        .gap(Gap::ZERO)
     }
 }
 
@@ -407,6 +596,19 @@ struct StatusScene {
 impl StatusScene {
     fn matches(&self, message: &str, width: f64, height: f64) -> bool {
         self.message == message && self.width == width && self.height == height
+    }
+}
+
+struct HelpOverlayScene {
+    width: f64,
+    height: f64,
+    scene: Arc<Scene>,
+    size: Size,
+}
+
+impl HelpOverlayScene {
+    fn matches(&self, width: f64, height: f64) -> bool {
+        self.width == width && self.height == height
     }
 }
 
@@ -472,18 +674,31 @@ fn render_status_scene(message: &str, width: f64, height: f64) -> Result<(Arc<Sc
         FileId::new(None, VirtualPath::new("/tinymist-viewer-status.typ")),
         status_typst_source(message, width, height),
     );
+    render_typst_scene(source, "status")
+}
+
+fn render_help_overlay_scene(width: f64, height: f64) -> Result<(Arc<Scene>, Size)> {
+    let source = Source::new(
+        FileId::new(None, VirtualPath::new("/tinymist-viewer-help-overlay.typ")),
+        help_overlay_typst_source(width, height),
+    );
+    render_typst_scene(source, "help overlay")
+}
+
+fn render_typst_scene(source: Source, scene_name: &str) -> Result<(Arc<Scene>, Size)> {
     let world = StatusWorld { main: source };
     let compiled = typst::compile::<PagedDocument>(&world);
     for warning in compiled.warnings {
-        log::debug!("Typst status render warning: {warning:?}");
+        log::debug!("Typst {scene_name} render warning: {warning:?}");
     }
     let doc = compiled
         .output
-        .map_err(|errors| anyhow!("failed to compile status text: {errors:?}"))?;
+        .map_err(|errors| anyhow!("failed to compile {scene_name}: {errors:?}"))?;
     let document = TypstDocument::Paged(Arc::new(doc));
     let mut renderer = IncrSvgDocServer::default();
     let frame = renderer.pack_delta(&document);
-    let update = preview_update_from_bytes(&frame).context("status preview frame is invalid")?;
+    let update = preview_update_from_bytes(&frame)
+        .with_context(|| format!("{scene_name} preview frame is invalid"))?;
 
     let mut doc = IncrDocClient::default();
     let mut vello = IncrVelloDocClient::default();
@@ -495,7 +710,9 @@ fn render_status_scene(message: &str, width: f64, height: f64) -> Result<(Arc<Sc
     doc.merge_delta(delta);
 
     let mut pages = vello.render_pages(&mut doc)?;
-    pages.pop().context("Typst status render produced no pages")
+    pages
+        .pop()
+        .with_context(|| format!("Typst {scene_name} render produced no pages"))
 }
 
 fn status_typst_source(message: &str, width: f64, height: f64) -> String {
@@ -506,6 +723,66 @@ fn status_typst_source(message: &str, width: f64, height: f64) -> String {
 #place(center + horizon, text({message}))
 "#
     )
+}
+
+fn help_overlay_typst_source(width: f64, height: f64) -> String {
+    let panel_width = help_overlay_panel_width(width);
+    let key_column_width = (panel_width * 0.4)
+        .clamp(190.0, 270.0)
+        .min(panel_width * 0.48);
+
+    format!(
+        r##"#set page(width: {width}pt, height: {height}pt, margin: 0pt)
+#set text(font: "New Computer Modern", size: 21pt, fill: rgb("#d9d9d9"))
+#let key(body) = box(
+  fill: rgb("#3a3a3a"),
+  stroke: 0.65pt + rgb("#626262"),
+  radius: 4pt,
+  inset: (x: 11pt, y: 5pt),
+  text(size: 18pt, fill: rgb("#f7f7f7"), body),
+)
+#let sep = text(fill: rgb("#858585"))[/]
+#let desc(body) = text(size: 21pt, fill: rgb("#d9d9d9"), body)
+
+#place(center + horizon)[
+  #block(
+    width: {panel_width}pt,
+    fill: rgb("#252525"),
+    stroke: 0.8pt + rgb("#505050"),
+    radius: 8pt,
+    inset: (x: 32pt, y: 30pt),
+  )[
+    #text(size: 27pt, weight: "semibold", fill: rgb("#ffffff"))[Key Bindings]
+    #v(20pt)
+    #grid(
+      columns: ({key_column_width}pt, 1fr),
+      column-gutter: 28pt,
+      row-gutter: 13pt,
+      align: (right + horizon, left + horizon),
+      [#key[Ctrl/Cmd] #key[Wheel]],
+      desc[Zoom around cursor],
+      [#key[Ctrl/Cmd] #key[+] #sep #key[-]],
+      desc[Zoom in or out],
+      [#key[Ctrl/Cmd] #key[0]],
+      desc[Reset zoom],
+      [#key[Arrow keys]],
+      desc[Scroll by line],
+      [#key[Page Up] #sep #key[Page Down]],
+      desc[Scroll by page],
+      [#key[Home] #sep #key[End]],
+      desc[Jump to document edges],
+      [#key[Click page]],
+      desc[Sync source position],
+    )
+  ]
+]
+"##
+    )
+}
+
+fn help_overlay_panel_width(width: f64) -> f64 {
+    let available = (width - 64.0).max(1.0);
+    available.min(760.0).max(420.0).min(width.max(1.0))
 }
 
 fn typst_string_literal(text: &str) -> String {
@@ -591,6 +868,19 @@ fn websocket_address(data_plane_host: &str) -> String {
     }
 }
 
+fn normalize_document_title(title: Option<String>) -> Option<String> {
+    title
+        .map(|title| title.trim().to_owned())
+        .filter(|title| !title.is_empty())
+}
+
+fn viewer_window_title(document_title: Option<&str>) -> String {
+    match document_title {
+        Some(title) if !title.trim().is_empty() => format!("{} - Tinymist View", title.trim()),
+        _ => "Tinymist View".to_owned(),
+    }
+}
+
 fn send_connection_status(proxy: &MessageProxy<RenderRequest>, connection: ConnectionStatus) {
     if let Err(err) = proxy.message(RenderRequest::Connection(connection)) {
         log::debug!("failed to send websocket status to viewer: {err}");
@@ -609,7 +899,7 @@ fn truncate_message(message: String, max_chars: usize) -> String {
 
 fn fitted_page_width(window_width: f64) -> f64 {
     if window_width.is_finite() {
-        (window_width - 0.5).max(1.0)
+        window_width.max(1.0)
     } else {
         1.0
     }
@@ -838,6 +1128,18 @@ mod tests {
     }
 
     #[test]
+    fn fitted_page_width_uses_full_finite_width() {
+        assert_eq!(fitted_page_width(400.5), 400.5);
+        assert_eq!(fitted_page_width(0.25), 1.0);
+    }
+
+    #[test]
+    fn fitted_page_width_uses_safe_width_for_invalid_values() {
+        assert_eq!(fitted_page_width(f64::NAN), 1.0);
+        assert_eq!(fitted_page_width(f64::INFINITY), 1.0);
+    }
+
+    #[test]
     fn zoom_actions_update_and_reset_scale() {
         assert_eq!(zoom_scale_after_action(1.0, ZoomAction::In), 1.1);
         assert_eq!(zoom_scale_after_action(1.1, ZoomAction::In), 1.3);
@@ -887,6 +1189,16 @@ mod tests {
     }
 
     #[test]
+    fn viewer_window_title_uses_document_title_when_available() {
+        assert_eq!(
+            viewer_window_title(Some("main.typ")),
+            "main.typ - Tinymist View"
+        );
+        assert_eq!(viewer_window_title(Some("  ")), "Tinymist View");
+        assert_eq!(viewer_window_title(None), "Tinymist View");
+    }
+
+    #[test]
     fn typst_status_scene_renders() {
         let (scene, size) = render_status_scene("Retrying websocket connection", 320.0, 28.0)
             .expect("status text should render through Typst");
@@ -895,6 +1207,18 @@ mod tests {
         assert!(
             !scene.encoding().is_empty(),
             "status scene should contain glyphs"
+        );
+    }
+
+    #[test]
+    fn typst_help_overlay_scene_renders() {
+        let (scene, size) =
+            render_help_overlay_scene(800.0, 600.0).expect("help overlay should render");
+
+        assert_eq!(size, Size::new(800.0, 600.0));
+        assert!(
+            !scene.encoding().is_empty(),
+            "help overlay scene should contain panel content"
         );
     }
 }
