@@ -2,6 +2,7 @@ import type { Lang } from "./fenced.ts";
 
 // prettier-ignore
 export const languages: Lang[] = [
+  { candidates: ["agda"] },
   { candidates: ["batchfile", "bat", "batch"] },
   { candidates: ["bibtex"] },
   { candidates: ["c", "h"] },
