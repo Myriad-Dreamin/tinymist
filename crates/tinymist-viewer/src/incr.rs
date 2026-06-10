@@ -406,12 +406,14 @@ mod tests {
         },
     };
     use reflexo_vec2svg::IncrSvgDocServer;
-    use tinymist_preview::protocol::DIFF_V1_PREFIX;
     use tinymist_std::typst::TypstDocument;
+    use typst_layout::PagedDocument;
     use vello::{
         Scene,
         kurbo::{Point, Size, Vec2},
     };
+
+    use crate::protocol::DIFF_V1_PREFIX;
 
     use super::{IncrVelloDocClient, IncrVelloPass};
 
@@ -946,7 +948,7 @@ hello
     fn compile_incremental_doc(source: &str) -> IncrDocClient {
         tinymist_tests::run_with_sources(source, |verse, _| {
             let world = verse.snapshot();
-            let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+            let doc = typst::compile::<PagedDocument>(&world)
                 .output
                 .expect("short vello renderer fixture should compile");
             let document = TypstDocument::Paged(Arc::new(doc));

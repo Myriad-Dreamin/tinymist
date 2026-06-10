@@ -595,11 +595,13 @@ mod tests {
     use reflexo::vector::incr::IncrDocClient;
     use reflexo::vector::stream::BytesModuleStream;
     use reflexo_vec2svg::IncrSvgDocServer;
-    use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
     use tinymist_std::typst::TypstDocument;
+    use typst_layout::PagedDocument;
 
     use crate::incr::IncrVelloDocClient;
-    use crate::protocol::preview_update_from_bytes;
+    use crate::protocol::{
+        DIFF_V1_PREFIX, NEW_PREFIX, full_current_frame_from_delta, preview_update_from_bytes,
+    };
     use crate::{PageAccessibility, PageTextPosition, PageTextRun, PageTextSelection};
 
     use super::{PageCanvas, ZoomAction, zoom_action_from_keyboard};
@@ -702,14 +704,14 @@ mod tests {
 
         tinymist_tests::run_with_sources(SOURCE, |verse, _| {
             let world = verse.snapshot();
-            let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+            let doc = typst::compile::<PagedDocument>(&world)
                 .output
                 .expect("short viewer preview fixture should compile");
             let document = TypstDocument::Paged(Arc::new(doc));
             let mut renderer = IncrSvgDocServer::default();
 
             let diff = renderer.pack_delta(&document);
-            let current = tinymist_preview::protocol::full_current_frame_from_delta(&diff)
+            let current = full_current_frame_from_delta(&diff)
                 .expect("full current can be built from an initial incremental frame");
 
             (diff, current)

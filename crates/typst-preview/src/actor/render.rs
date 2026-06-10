@@ -11,7 +11,6 @@ use tokio::sync::{broadcast, mpsc};
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 use crate::debug_loc::SpanInterner;
 use crate::outline::Outline;
-use crate::protocol;
 use crate::{ChangeCursorPositionRequest, CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
 
 #[derive(Debug, Clone)]
@@ -59,20 +58,16 @@ impl RenderActor {
         svg_sender: mpsc::UnboundedSender<Vec<u8>>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
-        Self {
+        let mut res = Self {
             mailbox,
             view,
-            renderer: Self::new_renderer(),
+            renderer: IncrSvgDocServer::default(),
             editor_conn_sender,
             svg_sender,
             webview_sender,
-        }
-    }
-
-    fn new_renderer() -> IncrSvgDocServer {
-        let mut renderer = IncrSvgDocServer::default();
-        renderer.set_should_attach_debug_info(true);
-        renderer
+        };
+        res.renderer.set_should_attach_debug_info(true);
+        res
     }
 
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
@@ -167,24 +162,19 @@ impl RenderActor {
 
     fn render(&mut self, has_full_render: bool, document: &TypstDocument) -> Vec<u8> {
         if has_full_render {
-            self.render_full(document)
+            if let Some(data) = self.render_full() {
+                data
+            } else {
+                self.render_delta(document)
+            }
         } else {
             self.render_delta(document)
         }
     }
 
     #[typst_macros::time]
-    fn render_full(&mut self, document: &TypstDocument) -> Vec<u8> {
-        let mut renderer = Self::new_renderer();
-        let delta = renderer.pack_delta(document);
-        self.renderer = renderer;
-        match protocol::full_current_frame_from_delta(&delta) {
-            Some(frame) => frame,
-            None => {
-                log::warn!("fresh preview renderer did not produce a diff-v1 frame");
-                delta
-            }
-        }
+    fn render_full(&mut self) -> Option<Vec<u8>> {
+        self.renderer.pack_current()
     }
 
     #[typst_macros::time]

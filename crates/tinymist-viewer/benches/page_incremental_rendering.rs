@@ -14,10 +14,11 @@ use masonry_testing::{TestHarness, TestHarnessParams};
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
-use tinymist_preview::protocol::DIFF_V1_PREFIX;
 use tinymist_std::typst::TypstDocument;
 use tinymist_viewer::doc::PageCanvas;
 use tinymist_viewer::incr::IncrVelloDocClient;
+use tinymist_viewer::protocol::DIFF_V1_PREFIX;
+use typst_layout::PagedDocument;
 use vello::Scene;
 use vello::kurbo::Size;
 
@@ -427,7 +428,7 @@ fn compile_document(page_count: usize, changed_page: Option<usize>) -> TypstDocu
 
     tinymist_tests::run_with_sources(&source, |verse, _| {
         let world = verse.snapshot();
-        let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+        let doc = typst::compile::<PagedDocument>(&world)
             .output
             .expect("large-page benchmark fixture should compile");
         TypstDocument::Paged(Arc::new(doc))

@@ -4,7 +4,6 @@
 mod actor;
 mod debug_loc;
 mod outline;
-pub mod protocol;
 
 pub use crate::actor::editor::{
     CompileStatus, ControlPlaneMessage, ControlPlaneResponse, ControlPlaneRx, ControlPlaneTx,
@@ -24,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
-use typst::{layout::Position, syntax::Span};
+use typst::{introspection::PagedPosition, syntax::Span};
 
 use crate::actor::editor::{EditorActor, EditorActorRequest};
 use crate::actor::render::RenderActorRequest;
@@ -361,49 +360,12 @@ pub type SourceLocation = reflexo_typst::debug_loc::SourceLocation;
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
-    use reflexo_vec2svg::IncrSvgDocServer;
-    use tinymist_std::typst::TypstDocument;
-
-    use super::{escape_html_text, protocol};
+    use super::escape_html_text;
 
     #[test]
     fn escapes_html_text_without_breaking_multibyte_code_points() {
         assert_eq!(escape_html_text("☃<>&"), "☃&lt;&gt;&amp;");
         assert_eq!(escape_html_text("plain text"), "plain text");
-    }
-
-    #[test]
-    fn full_current_event_uses_new_prefix_after_incremental_render() {
-        tinymist_tests::run_with_sources(
-            "#set page(width: 1pt, height: 1pt, margin: 0pt)",
-            |verse, _| {
-                let world = verse.snapshot();
-                let doc = typst::compile::<typst::layout::PagedDocument>(&world)
-                    .output
-                    .expect("short preview fixture should compile");
-                let document = TypstDocument::Paged(Arc::new(doc));
-                let mut renderer = IncrSvgDocServer::default();
-
-                let first = renderer.pack_delta(&document);
-                assert!(
-                    first.starts_with(protocol::DIFF_V1_PREFIX),
-                    "initial preview update should be diff-v1"
-                );
-
-                let current = protocol::full_current_frame_from_delta(&first)
-                    .expect("full current can be built from an initial incremental frame");
-                assert!(
-                    current.starts_with(protocol::NEW_PREFIX),
-                    "full current preview update should use the new, prefix"
-                );
-                assert!(
-                    current.len() > protocol::NEW_PREFIX.len(),
-                    "full current frame should include a payload"
-                );
-            },
-        );
     }
 }
 
@@ -496,7 +458,7 @@ pub trait CompileView: Send + Sync {
     }
 
     /// Resolve the document position.
-    fn resolve_document_position(&self, _by: Location) -> Vec<Position> {
+    fn resolve_document_position(&self, _by: Location) -> Vec<PagedPosition> {
         vec![]
     }
 

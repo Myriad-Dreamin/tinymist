@@ -37,6 +37,7 @@ smallvec.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
 typst-assets = { workspace = true, features = ["fonts"] }
+typst-layout.workspace = true
 typst-library.workspace = true
 reflexo.workspace = true
 resvg.workspace = true
@@ -78,6 +79,7 @@ sha2.workspace = true
 tinymist-tests.workspace = true
 typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.14.2" }
 typst-syntax.workspace = true
+typst-utils.workspace = true
 walkdir.workspace = true
 
 [lints]

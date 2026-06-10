@@ -371,11 +371,9 @@ impl<W: Widget + FromDynWidget + ?Sized> Widget for ZoomPortalWidget<W> {
                 let cursor_pos = ctx.local_position(event.state.position);
                 self.start_scrollbar_drag_event_ctx(ctx, portal_size, cursor_pos);
             }
-            PointerEvent::Move(ref event) => {
-                if ctx.is_active() && self.scrollbar_drag.is_some() {
-                    let cursor_pos = ctx.local_position(event.current.position);
-                    self.update_scrollbar_drag_event_ctx(ctx, portal_size, cursor_pos);
-                }
+            PointerEvent::Move(ref event) if ctx.is_active() && self.scrollbar_drag.is_some() => {
+                let cursor_pos = ctx.local_position(event.current.position);
+                self.update_scrollbar_drag_event_ctx(ctx, portal_size, cursor_pos);
             }
             PointerEvent::Scroll(PointerScrollEvent {
                 delta, ref state, ..
@@ -421,11 +419,11 @@ impl<W: Widget + FromDynWidget + ?Sized> Widget for ZoomPortalWidget<W> {
                     }
                 }
             }
-            PointerEvent::Up(..) | PointerEvent::Cancel(..) => {
-                if self.scrollbar_drag.take().is_some() {
-                    ctx.set_handled();
-                    ctx.request_render();
-                }
+            PointerEvent::Up(..) | PointerEvent::Cancel(..)
+                if self.scrollbar_drag.take().is_some() =>
+            {
+                ctx.set_handled();
+                ctx.request_render();
             }
             _ => {}
         }

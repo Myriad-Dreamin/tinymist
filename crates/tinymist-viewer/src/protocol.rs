@@ -1,6 +1,30 @@
 //! Preview data-plane protocol handling for the Vello viewer.
 
-use tinymist_preview::protocol::{PreviewDataFrame, split_preview_data_frame};
+/// Prefix for incremental vector document updates.
+pub const DIFF_V1_PREFIX: &[u8] = b"diff-v1,";
+
+/// Prefix for a full current vector document update.
+pub const NEW_PREFIX: &[u8] = b"new,";
+
+/// A preview data-plane frame with its prefix stripped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PreviewDataFrame<'a> {
+    /// An incremental update.
+    DiffV1(&'a [u8]),
+    /// A full current update.
+    FullCurrent(&'a [u8]),
+}
+
+/// Splits a preview data-plane binary frame into its event kind and payload.
+fn split_preview_data_frame(bytes: &[u8]) -> Option<PreviewDataFrame<'_>> {
+    if let Some(payload) = bytes.strip_prefix(DIFF_V1_PREFIX) {
+        Some(PreviewDataFrame::DiffV1(payload))
+    } else {
+        bytes
+            .strip_prefix(NEW_PREFIX)
+            .map(PreviewDataFrame::FullCurrent)
+    }
+}
 
 /// A preview vector document update ready to merge into the client.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,11 +49,17 @@ pub fn preview_update_from_bytes(bytes: &[u8]) -> Option<PreviewUpdate<'_>> {
     }
 }
 
+/// Converts an incremental frame into a full-current frame.
+pub fn full_current_frame_from_delta(delta: &[u8]) -> Option<Vec<u8>> {
+    let payload = delta.strip_prefix(DIFF_V1_PREFIX)?;
+    Some([NEW_PREFIX, payload].concat())
+}
+
 #[cfg(test)]
 mod tests {
-    use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
-
-    use super::preview_update_from_bytes;
+    use super::{
+        DIFF_V1_PREFIX, NEW_PREFIX, full_current_frame_from_delta, preview_update_from_bytes,
+    };
 
     #[test]
     fn diff_v1_frame_merges_without_reset() {
@@ -49,5 +79,14 @@ mod tests {
 
         assert!(update.reset_before_merge);
         assert_eq!(update.payload, b"x");
+    }
+
+    #[test]
+    fn diff_v1_frame_can_be_converted_to_full_current() {
+        let frame = [DIFF_V1_PREFIX, b"x"].concat();
+
+        let current = full_current_frame_from_delta(&frame).expect("diff-v1 should convert");
+
+        assert_eq!(current, [NEW_PREFIX, b"x"].concat());
     }
 }
