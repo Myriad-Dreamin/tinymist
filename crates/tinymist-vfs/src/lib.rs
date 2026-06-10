@@ -44,7 +44,7 @@ mod path_mapper;
 pub use path_mapper::{PathResolution, RootResolver, WorkspaceResolution, WorkspaceResolver};
 
 use core::fmt;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU16, NonZeroUsize};
 use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
@@ -170,7 +170,7 @@ impl<M: PathAccessModel + Sized> fmt::Debug for Vfs<M> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vfs")
             .field("revision", &self.revision)
-            .field("managed", &self.managed.lock().entries.size())
+            .field("managed", &self.managed.lock().len())
             .field("paths", &self.paths.lock().paths.len())
             .finish()
     }
@@ -208,9 +208,9 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
     /// Detects whether the vfs is clean respecting a given revision and
     /// `file_ids`.
     pub fn is_clean_compile(&self, rev: usize, file_ids: &[FileId]) -> bool {
-        let mut m = self.managed.lock();
+        let m = self.managed.lock();
         for id in file_ids {
-            let Some(entry) = m.entries.get_mut(id) else {
+            let Some(entry) = m.get(*id) else {
                 log::debug!("Vfs(dirty, {id:?}): file id not found");
                 return false;
             };
@@ -285,12 +285,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     pub fn evict(&mut self, threshold: usize) {
         let mut m = self.managed.lock();
         let rev = self.revision.get();
-        for (id, entry) in m.entries.clone().iter() {
-            let entry_rev = entry.bytes.get().map(|e| e.1).unwrap_or_default();
-            if entry_rev + threshold < rev {
-                m.entries.remove_mut(id);
-            }
-        }
+        m.evict(rev, threshold);
     }
 
     /// Takes source cache. It also cleans the cache in the current vfs.
@@ -589,22 +584,52 @@ struct VfsEntry {
     source: Arc<OnceLock<FileResult<Source>>>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct EntryMap {
-    entries: RedBlackTreeMapSync<FileId, VfsEntry>,
+    entries: RedBlackTreeMapSync<NonZeroU16, VfsEntry>,
+}
+
+impl Default for EntryMap {
+    fn default() -> Self {
+        Self {
+            entries: RedBlackTreeMapSync::new_sync(),
+        }
+    }
 }
 
 impl EntryMap {
+    #[inline(always)]
+    fn key(path: FileId) -> NonZeroU16 {
+        path.into_raw()
+    }
+
+    fn len(&self) -> usize {
+        self.entries.size()
+    }
+
+    fn get(&self, path: FileId) -> Option<&VfsEntry> {
+        self.entries.get(&Self::key(path))
+    }
+
     /// Read a slot.
     #[inline(always)]
     fn slot<T>(&mut self, path: FileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
-        if let Some(entry) = self.entries.get_mut(&path) {
-            f(entry)
-        } else {
-            let mut entry = VfsEntry::default();
-            let res = f(&mut entry);
-            self.entries.insert_mut(path, entry);
-            res
+        let key = Self::key(path);
+        if self.entries.get(&key).is_none() {
+            self.entries.insert_mut(key, VfsEntry::default());
+        }
+        f(self
+            .entries
+            .get_mut(&key)
+            .expect("entry was just initialized"))
+    }
+
+    fn evict(&mut self, rev: usize, threshold: usize) {
+        for (id, entry) in self.entries.clone().iter() {
+            let entry_rev = entry.bytes.get().map(|e| e.1).unwrap_or_default();
+            if entry_rev + threshold < rev {
+                self.entries.remove_mut(id);
+            }
         }
     }
 
@@ -620,7 +645,14 @@ pub struct DisplayEntryMap<'a> {
 
 impl fmt::Debug for DisplayEntryMap<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map().entries(self.map.entries.iter()).finish()
+        f.debug_map()
+            .entries(
+                self.map
+                    .entries
+                    .iter()
+                    .map(|(id, entry)| (FileId::from_raw(*id), entry)),
+            )
+            .finish()
     }
 }
 

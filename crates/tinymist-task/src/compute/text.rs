@@ -89,13 +89,13 @@ impl fmt::Display for FullTextDigest<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             TypstDocument::Paged(paged_doc) => {
-                for page in paged_doc.pages.iter() {
+                for page in paged_doc.pages() {
                     Self::export_frame(f, &page.frame)?;
                 }
                 Ok(())
             }
             TypstDocument::Html(html_doc) => {
-                Self::export_element(f, &html_doc.root)?;
+                Self::export_element(f, html_doc.root())?;
                 Ok(())
             }
         }

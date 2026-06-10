@@ -5,7 +5,8 @@ use core::fmt;
 use crate::{CompilerFeat, CompilerWorld, EntryReader, TaskInputs, args::TaskWhen};
 use ecow::EcoString;
 use serde::{Deserialize, Serialize};
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use typst::model::Document;
 
 /// Project instance id. This is slightly different from the project ids that
 /// persist in disk.
@@ -75,16 +76,12 @@ impl CompileSignal {
         match docs {
             Some(TypstDocument::Paged(doc)) => self.should_run_task(when, Some(doc.as_ref())),
             Some(TypstDocument::Html(doc)) => self.should_run_task(when, Some(doc.as_ref())),
-            None => self.should_run_task::<typst::layout::PagedDocument>(when, None),
+            None => self.should_run_task::<TypstPagedDocument>(when, None),
         }
     }
 
     /// Whether the task should run.
-    pub fn should_run_task<D: typst::Document>(
-        &self,
-        when: &TaskWhen,
-        docs: Option<&D>,
-    ) -> Option<bool> {
+    pub fn should_run_task<D: Document>(&self, when: &TaskWhen, docs: Option<&D>) -> Option<bool> {
         match when {
             TaskWhen::Never => Some(false),
             // todo: by script

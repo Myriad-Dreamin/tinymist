@@ -7,6 +7,7 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstHtmlDocument, TypstPagedDocument};
 use typst::diag::{At, SourceResult, Warned};
 use typst::ecow::EcoVec;
+use typst::foundations::Output;
 use typst::syntax::Span;
 
 use crate::snapshot::CompileSnapshot;
@@ -272,7 +273,7 @@ pub type HtmlCompilationTask = CompilationTask<TypstHtmlDocument>;
 /// A task that compiles a document.
 pub struct CompilationTask<D>(std::marker::PhantomData<D>);
 
-impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
+impl<D: Output + Send + Sync + 'static> CompilationTask<D> {
     /// Ensures the main document.
     pub fn ensure_main<F: CompilerFeat>(world: &CompilerWorld<F>) -> SourceResult<()> {
         let main_id = world.main_id();
@@ -327,7 +328,7 @@ impl<D: typst::Document + Send + Sync + 'static> CompilationTask<D> {
 
 impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
 where
-    D: typst::Document + Send + Sync + 'static,
+    D: Output + Send + Sync + 'static,
 {
     type Output = Option<Warned<SourceResult<Arc<D>>>>;
 
@@ -343,7 +344,7 @@ pub struct OptionDocumentTask<D>(std::marker::PhantomData<D>);
 
 impl<F: CompilerFeat, D> WorldComputable<F> for OptionDocumentTask<D>
 where
-    D: typst::Document + Send + Sync + 'static,
+    D: Output + Send + Sync + 'static,
 {
     type Output = Option<Arc<D>>;
 
@@ -358,7 +359,7 @@ where
     }
 }
 
-impl<D> OptionDocumentTask<D> where D: typst::Document + Send + Sync + 'static {}
+impl<D> OptionDocumentTask<D> where D: Output + Send + Sync + 'static {}
 
 /// A task that computes the diagnostics of a document.
 struct CompilationDiagnostics {
@@ -444,7 +445,7 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     }
 
     /// Compiles once from scratch.
-    pub fn pure_compile<D: ::typst::Document + Send + Sync + 'static>(
+    pub fn pure_compile<D: ::typst::foundations::Output + Send + Sync + 'static>(
         &self,
     ) -> Warned<SourceResult<Arc<D>>> {
         CompilationTask::<D>::execute(&self.snap.world)

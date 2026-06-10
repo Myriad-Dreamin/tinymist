@@ -44,7 +44,9 @@ typst-svg.workspace = true
 
 [features]
 
-default = ["pdf", "text"]
+# Upstream Typst 0.15 does not expose the content hint hook. Downstream Typst
+# builds can disable this feature to use their hook.
+default = ["pdf", "text", "no-content-hint"]
 no-content-hint = []
 
 pdf = []
