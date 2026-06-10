@@ -38,7 +38,7 @@ impl IndexWorker {
     fn visit(&mut self, node: &SyntaxNode) {
         match node.cast::<ast::Expr>() {
             Some(ast::Expr::Str(path_str)) => {
-                if path_str.to_untyped().text().len() > 65536 {
+                if path_str.to_untyped().leaf_text().len() > 65536 {
                     // skip long strings
                     return;
                 }
