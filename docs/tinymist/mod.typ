@@ -78,10 +78,11 @@
 /// #ruby[汉][hàn][字][zì].
 /// ```
 #let ruby(..pairs) = {
+  let has-html = "html" in dictionary(std)
   let ks = ()
   let vs = ()
   for (k, v) in pairs.pos().chunks(2) {
-    if sys-is-html-target {
+    if sys-is-html-target and has-html {
       html.elem("ruby")[#k#html.elem("rt", v)]
     } else {
       ks.push(k)

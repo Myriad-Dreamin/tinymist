@@ -88,16 +88,19 @@ See #link("https://myriad-dreamin.github.io/tinymist/")[Online Documentation].
 
 = Packaging
 
-#let channel-img(lnk, img) = if sys-is-html-target {
-  html.elem("a", attrs: (
-    href: lnk,
-    target: "_blank",
-    rel: "noopener noreferrer",
-  ))[
-    #html.elem("img", attrs: (src: img, alt: "Packaging status", style: "max-width: 100%; height: auto;"))
-  ]
-} else {
-  link(lnk)
+#let channel-img(lnk, img) = {
+  let has-html = "html" in dictionary(std)
+  if sys-is-html-target and has-html {
+    html.elem("a", attrs: (
+      href: lnk,
+      target: "_blank",
+      rel: "noopener noreferrer",
+    ))[
+      #html.elem("img", attrs: (src: img, alt: "Packaging status", style: "max-width: 100%; height: auto;"))
+    ]
+  } else {
+    link(lnk)
+  }
 }
 
 Stable Channel:
