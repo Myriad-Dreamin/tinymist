@@ -35,6 +35,13 @@ interface TinymistPreviewerProvider {
   providePreviewer(): Promise<TinymistPreviewer> | TinymistPreviewer;
 }
 
+interface WindowRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 let outputChannel: vscode.OutputChannel | undefined;
 const activeViewers = new Map<string, ChildProcessWithoutNullStreams>();
 
@@ -68,14 +75,17 @@ export function activate(context: vscode.ExtensionContext): TinymistPreviewerPro
 
 export function deactivate() {}
 
-function launchViewer(
+async function launchViewer(
   context: vscode.ExtensionContext,
   task: TinymistPreviewTask,
-): vscode.Disposable {
+): Promise<vscode.Disposable> {
   activeViewers.get(task.taskId)?.kill();
 
   const executable = resolveViewerExecutable(context);
-  const args = ["--data-plane-host", task.dataPlaneHost];
+  const documentTitle = documentTitleForPath(task.documentPath);
+  const viewerTitle = viewerWindowTitle(documentTitle);
+  const layoutMode = getWindowLayoutMode();
+  const args = ["--data-plane-host", task.dataPlaneHost, "--document-title", documentTitle];
   const cwd = path.dirname(task.documentPath);
   appendLog(`Starting ${executable} ${args.join(" ")}`);
 
@@ -89,7 +99,7 @@ function launchViewer(
   });
 
   activeViewers.set(task.taskId, viewer);
-  scheduleWindowLayout(viewer);
+  scheduleWindowLayout(viewer, viewerTitle, layoutMode === "sideBySide");
   viewer.stdout.on("data", (data: Buffer) => appendLog(data.toString()));
   viewer.stderr.on("data", (data: Buffer) => appendLog(data.toString()));
   viewer.on("error", (error) => {
@@ -101,7 +111,7 @@ function launchViewer(
       }
     });
   });
-  viewer.on("exit", (code, signal) => {
+  viewer.on("close", (code, signal) => {
     deleteActiveViewer(task.taskId, viewer);
     appendLog(`Tinymist GPU Viewer exited with code ${code ?? "null"} signal ${signal ?? "null"}`);
   });
@@ -153,9 +163,23 @@ function resolveViewerExecutable(context: vscode.ExtensionContext): string {
   );
 }
 
-function scheduleWindowLayout(viewer: ChildProcessWithoutNullStreams) {
-  if (getWindowLayoutMode() !== "sideBySide") {
-    appendLog("Skipping side-by-side window layout: tinymist.gpuViewer.windowLayout is disabled.");
+function documentTitleForPath(documentPath: string): string {
+  const title = path.basename(documentPath).trim();
+  return title || documentPath.trim() || VIEWER_WINDOW_TITLE;
+}
+
+function viewerWindowTitle(documentTitle: string): string {
+  const title = documentTitle.trim();
+  return title ? `${title} - ${VIEWER_WINDOW_TITLE}` : VIEWER_WINDOW_TITLE;
+}
+
+function scheduleWindowLayout(
+  viewer: ChildProcessWithoutNullStreams,
+  viewerTitle: string,
+  repairSideBySideLayout: boolean,
+) {
+  if (!repairSideBySideLayout) {
+    appendLog("Skipping side-by-side window layout repair.");
     return;
   }
 
@@ -165,8 +189,8 @@ function scheduleWindowLayout(viewer: ChildProcessWithoutNullStreams) {
     return;
   }
 
-  appendLog(`Scheduling side-by-side window layout for viewer pid ${viewerPid}.`);
-  void arrangeWindowsSideBySide(viewerPid).catch((error) => {
+  appendLog(`Scheduling side-by-side window layout repair for viewer pid ${viewerPid}.`);
+  void arrangeWindowsSideBySide(viewerPid, viewerTitle).catch((error) => {
     appendLog(`Could not arrange GPU viewer windows: ${errorMessage(error)}`);
   });
 }
@@ -179,15 +203,15 @@ function getWindowLayoutMode(): WindowLayoutMode {
   return configured === "sideBySide" ? "sideBySide" : "disabled";
 }
 
-async function arrangeWindowsSideBySide(viewerPid: number) {
+async function arrangeWindowsSideBySide(viewerPid: number, viewerTitle: string) {
   await delay(WINDOW_LAYOUT_DELAY_MS);
 
   switch (process.platform) {
     case "win32":
-      await arrangeWindowsSideBySideWin32(viewerPid);
+      await arrangeWindowsSideBySideWin32(viewerPid, viewerTitle);
       return;
     case "darwin":
-      await arrangeWindowsSideBySideMacOS();
+      await arrangeWindowsSideBySideMacOS(viewerTitle);
       return;
     case "linux":
       await arrangeWindowsSideBySideLinux(viewerPid);
@@ -197,10 +221,11 @@ async function arrangeWindowsSideBySide(viewerPid: number) {
   }
 }
 
-async function arrangeWindowsSideBySideWin32(viewerPid: number) {
+async function arrangeWindowsSideBySideWin32(viewerPid: number, viewerTitle: string) {
+  const viewerTitleLiteral = powershellSingleQuotedString(viewerTitle);
   const script = `
 $viewerPid = ${viewerPid}
-$viewerTitle = '${VIEWER_WINDOW_TITLE}'
+$viewerTitle = ${viewerTitleLiteral}
 $codeProcessNames = @('Code', 'Code - Insiders', 'VSCodium', 'Code - OSS')
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -309,9 +334,10 @@ $rightWidth = $workArea.Width - $halfWidth
   await runFile("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]);
 }
 
-async function arrangeWindowsSideBySideMacOS() {
+async function arrangeWindowsSideBySideMacOS(viewerTitle: string) {
+  const viewerTitleLiteral = appleScriptStringLiteral(viewerTitle);
   const script = `
-set viewerTitle to "${VIEWER_WINDOW_TITLE}"
+set viewerTitle to ${viewerTitleLiteral}
 set codeProcessNames to {"Code", "Visual Studio Code", "Code - Insiders", "VSCodium", "Code - OSS"}
 tell application "Finder"
   set desktopBounds to bounds of window of desktop
@@ -344,7 +370,7 @@ tell application "System Events"
   repeat while viewerWindow is missing value and (current date) < deadline
     repeat with candidateProcess in processes
       repeat with candidateWindow in windows of candidateProcess
-        if name of candidateWindow is viewerTitle then
+        if name of candidateWindow contains viewerTitle then
           set viewerWindow to candidateWindow
           exit repeat
         end if
@@ -372,20 +398,51 @@ end tell
   await runFile("osascript", ["-e", script]);
 }
 
+function powershellSingleQuotedString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function appleScriptStringLiteral(value: string): string {
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
 async function arrangeWindowsSideBySideLinux(viewerPid: number) {
   const pair = await waitForWindowPair(viewerPid);
-  const workArea = await getLinuxWorkArea();
-  const halfWidth = Math.floor(workArea.width / 2);
-  const rightWidth = workArea.width - halfWidth;
+  const rects = splitSideBySideWorkArea(await getLinuxWorkArea());
 
-  await moveLinuxWindow(pair.code.id, workArea.x, workArea.y, halfWidth, workArea.height);
+  await moveLinuxWindow(
+    pair.code.id,
+    rects.code.x,
+    rects.code.y,
+    rects.code.width,
+    rects.code.height,
+  );
   await moveLinuxWindow(
     pair.viewer.id,
-    workArea.x + halfWidth,
-    workArea.y,
-    rightWidth,
-    workArea.height,
+    rects.viewer.x,
+    rects.viewer.y,
+    rects.viewer.width,
+    rects.viewer.height,
   );
+}
+
+function splitSideBySideWorkArea(workArea: WindowRect): { code: WindowRect; viewer: WindowRect } {
+  const halfWidth = Math.floor(workArea.width / 2);
+  const rightWidth = workArea.width - halfWidth;
+  return {
+    code: {
+      x: workArea.x,
+      y: workArea.y,
+      width: halfWidth,
+      height: workArea.height,
+    },
+    viewer: {
+      x: workArea.x + halfWidth,
+      y: workArea.y,
+      width: rightWidth,
+      height: workArea.height,
+    },
+  };
 }
 
 interface CommandResult {
@@ -421,13 +478,6 @@ interface LinuxWindow {
   id: string;
   pid: number;
   title: string;
-}
-
-interface LinuxWorkArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
 }
 
 async function waitForWindowPair(
@@ -484,7 +534,7 @@ function isLinuxCodeWindow(window: LinuxWindow): boolean {
   );
 }
 
-async function getLinuxWorkArea(): Promise<LinuxWorkArea> {
+async function getLinuxWorkArea(): Promise<WindowRect> {
   const { stdout } = await runFile("wmctrl", ["-d"]);
   const desktop =
     stdout.split(/\r?\n/).find((line) => line.includes("*")) ??

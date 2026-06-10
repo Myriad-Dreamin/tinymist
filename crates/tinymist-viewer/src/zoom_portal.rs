@@ -18,7 +18,7 @@ use masonry::layout::{LayoutSize, LenDef, LenReq, SizeDef};
 use masonry::theme;
 use tracing::{Span, trace_span};
 use vello::Scene;
-use vello::peniko::Fill;
+use vello::peniko::{Color, Fill};
 use xilem::core::{
     Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewId, ViewMarker, ViewPathTracker,
 };
@@ -32,6 +32,9 @@ const NORMAL_SCROLL_LINE_PX: f64 = 120.0;
 const ZOOM_WHEEL_LINE_PX: f64 = 20.0;
 const ZOOM_WHEEL_THRESHOLD: f64 = 20.0;
 const VIEWPORT_EPSILON: f64 = 1e-12;
+const VIEWPORT_BACKGROUND_COLOR: Color = Color::from_rgb8(0x29, 0x29, 0x29);
+const SCROLLBAR_THUMB_COLOR: Color = Color::from_rgba8(0x80, 0x80, 0x80, 0x8f);
+const SCROLLBAR_THUMB_BORDER_COLOR: Color = Color::from_rgba8(0x80, 0x80, 0x80, 0x40);
 
 /// A view which puts `child` into a scrollable region and handles modified-wheel zoom.
 pub fn zoom_portal<Child, State, Action, F>(
@@ -524,7 +527,9 @@ impl<W: Widget + FromDynWidget + ?Sized> Widget for ZoomPortalWidget<W> {
         );
     }
 
-    fn paint(&mut self, _ctx: &mut PaintCtx<'_>, _props: &PropertiesRef<'_>, _scene: &mut Scene) {}
+    fn paint(&mut self, ctx: &mut PaintCtx<'_>, _props: &PropertiesRef<'_>, scene: &mut Scene) {
+        paint_viewport_background(scene, ctx.content_box_size());
+    }
 
     fn post_paint(
         &mut self,
@@ -767,19 +772,33 @@ fn scrollbar_track_rect(axis: Axis, portal_size: Size) -> Rect {
     )
 }
 
+fn viewport_background_rect(portal_size: Size) -> Rect {
+    portal_size.to_rect()
+}
+
+fn paint_viewport_background(scene: &mut Scene, portal_size: Size) {
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        VIEWPORT_BACKGROUND_COLOR,
+        None,
+        &viewport_background_rect(portal_size),
+    );
+}
+
 fn paint_scrollbar_thumb(scene: &mut Scene, cursor_rect: Rect) {
     let cursor_rect = cursor_rect.to_rounded_rect(theme::SCROLLBAR_RADIUS);
     scene.fill(
         Fill::NonZero,
         Affine::IDENTITY,
-        theme::SCROLLBAR_COLOR,
+        SCROLLBAR_THUMB_COLOR,
         None,
         &cursor_rect,
     );
     scene.stroke(
         &Stroke::new(theme::SCROLLBAR_EDGE_WIDTH),
         Affine::IDENTITY,
-        theme::SCROLLBAR_BORDER_COLOR,
+        SCROLLBAR_THUMB_BORDER_COLOR,
         None,
         &cursor_rect,
     );
@@ -871,12 +890,12 @@ fn anchored_viewport_after_zoom(
 mod tests {
     use masonry::core::ScrollDelta;
     use masonry::dpi::PhysicalPosition;
-    use masonry::kurbo::{Axis, Point, Size};
+    use masonry::kurbo::{Axis, Point, Rect, Size};
 
     use super::{
         ScrollbarGeometry, ZOOM_WHEEL_LINE_PX, ZoomAnchor, anchored_viewport_after_zoom,
         centered_child_origin, content_pos_under_cursor, scroll_delta_logical_px, scroll_progress,
-        scrollbar_at_pos, zoom_action_from_wheel_delta,
+        scrollbar_at_pos, viewport_background_rect, zoom_action_from_wheel_delta,
     };
     use crate::doc::ZoomAction;
 
@@ -1022,6 +1041,14 @@ mod tests {
             scrollbar_at_pos(portal, Size::new(80.0, 80.0), Point::new(96.0, 50.0))
                 .map(|scrollbar| scrollbar.axis),
             None
+        );
+    }
+
+    #[test]
+    fn viewport_background_matches_allocated_body_size() {
+        assert_eq!(
+            viewport_background_rect(Size::new(800.0, 600.0)),
+            Rect::new(0.0, 0.0, 800.0, 600.0)
         );
     }
 
