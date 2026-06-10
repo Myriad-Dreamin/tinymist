@@ -1,5 +1,6 @@
 //! Tinymist Analysis Statistics
 
+use std::cmp::Reverse;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock};
@@ -42,7 +43,7 @@ impl AllocStats {
         }
 
         // sort by total
-        data.sort_by(|x, y| y.4.cmp(&x.4));
+        data.sort_by_key(|y| Reverse(y.4));
 
         // format to html
 
@@ -182,7 +183,7 @@ impl AnalysisStats {
         }
 
         // sort by query duration
-        data.sort_by(|x, y| y.1.max.cmp(&x.1.max));
+        data.sort_by_key(|y| Reverse(y.1.max));
 
         // format to html
 

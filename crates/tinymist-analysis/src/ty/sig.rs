@@ -229,21 +229,17 @@ impl SigCheckDriver<'_> {
                     .check(Sig::DictCons(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
             }
             // todo: deduplicate checking early
-            Ty::Value(ins_ty) => {
-                if self.func_as_sig() {
-                    match &ins_ty.val {
-                        Value::Func(func) => {
-                            self.checker
-                                .check(Sig::Value { val: func, at }, &mut self.ctx, pol);
-                        }
-                        Value::Type(ty) => {
-                            self.checker
-                                .check(Sig::TypeCons { val: ty, at }, &mut self.ctx, pol);
-                        }
-                        _ => {}
-                    }
+            Ty::Value(ins_ty) if self.func_as_sig() => match &ins_ty.val {
+                Value::Func(func) => {
+                    self.checker
+                        .check(Sig::Value { val: func, at }, &mut self.ctx, pol);
                 }
-            }
+                Value::Type(ty) => {
+                    self.checker
+                        .check(Sig::TypeCons { val: ty, at }, &mut self.ctx, pol);
+                }
+                _ => {}
+            },
             Ty::Builtin(BuiltinTy::Type(b_ty)) if self.func_as_sig() => {
                 // todo: distinguish between element and function
                 self.checker
@@ -325,42 +321,32 @@ impl BoundChecker for MethodDriver<'_, '_> {
             // todo: deduplicate checking early
             Ty::Value(v) => {
                 match &v.val {
-                    Value::Func(func) => {
-                        if self.is_binder() {
-                            self.0.checker.check(
-                                Sig::Partialize(&Sig::Value { val: func, at: ty }),
-                                &mut self.0.ctx,
-                                pol,
-                            );
-                        } else {
-                            // todo: general select operator
-                        }
+                    Value::Func(func) if self.is_binder() => {
+                        self.0.checker.check(
+                            Sig::Partialize(&Sig::Value { val: func, at: ty }),
+                            &mut self.0.ctx,
+                            pol,
+                        );
                     }
                     Value::Array(..) => self.array_method(ty, pol),
-                    _ => {}
+                    _ => {
+                        // todo: general select operator
+                    }
                 }
             }
-            Ty::Builtin(BuiltinTy::Element(elem)) => {
+            Ty::Builtin(BuiltinTy::Element(elem)) if self.is_binder() => {
                 // todo: distinguish between element and function
-                if self.is_binder() {
-                    let func = (*elem).into();
-                    self.0.checker.check(
-                        Sig::Partialize(&Sig::Value { val: &func, at: ty }),
-                        &mut self.0.ctx,
-                        pol,
-                    );
-                } else {
-                    // todo: general select operator
-                }
+                let func = (*elem).into();
+                self.0.checker.check(
+                    Sig::Partialize(&Sig::Value { val: &func, at: ty }),
+                    &mut self.0.ctx,
+                    pol,
+                );
             }
-            Ty::Func(sig) => {
-                if self.is_binder() {
-                    self.0
-                        .checker
-                        .check(Sig::Partialize(&Sig::Type(sig)), &mut self.0.ctx, pol);
-                } else {
-                    // todo: general select operator
-                }
+            Ty::Func(sig) if self.is_binder() => {
+                self.0
+                    .checker
+                    .check(Sig::Partialize(&Sig::Type(sig)), &mut self.0.ctx, pol);
             }
             Ty::With(w) => {
                 self.0.ctx.args.push(w.with.clone());

@@ -200,64 +200,60 @@ impl IfaceCheckDriver<'_> {
                 self.checker
                     .check(Iface::Dict(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
             }
-            Ty::Value(ins_ty) => {
-                // todo: deduplicate checking early
-                if self.value_as_iface() {
-                    match &ins_ty.val {
-                        Value::Module(val) => {
-                            self.checker
-                                .check(Iface::ModuleVal { val, at }, &mut self.ctx, pol);
-                        }
-                        Value::Dict(dict) => {
-                            self.checker
-                                .check(Iface::Value { val: dict, at }, &mut self.ctx, pol);
-                        }
-                        Value::Type(ty) => {
-                            self.checker
-                                .check(Iface::TypeType { val: ty, at }, &mut self.ctx, pol);
-                        }
-                        Value::Func(func) => {
-                            self.checker
-                                .check(Iface::Func { val: func, at }, &mut self.ctx, pol);
-                        }
-                        Value::None
-                        | Value::Auto
-                        | Value::Bool(_)
-                        | Value::Int(_)
-                        | Value::Float(_)
-                        | Value::Length(..)
-                        | Value::Angle(..)
-                        | Value::Ratio(..)
-                        | Value::Relative(..)
-                        | Value::Fraction(..)
-                        | Value::Color(..)
-                        | Value::Gradient(..)
-                        | Value::Tiling(..)
-                        | Value::Symbol(..)
-                        | Value::Version(..)
-                        | Value::Str(..)
-                        | Value::Bytes(..)
-                        | Value::Label(..)
-                        | Value::Datetime(..)
-                        | Value::Decimal(..)
-                        | Value::Duration(..)
-                        | Value::Content(..)
-                        | Value::Styles(..)
-                        | Value::Array(..)
-                        | Value::Args(..)
-                        | Value::Dyn(..) => {
-                            self.checker.check(
-                                Iface::Type {
-                                    val: &ins_ty.val.ty(),
-                                    at,
-                                },
-                                &mut self.ctx,
-                                pol,
-                            );
-                        }
-                    }
+            // todo: deduplicate checking early
+            Ty::Value(ins_ty) if self.value_as_iface() => match &ins_ty.val {
+                Value::Module(val) => {
+                    self.checker
+                        .check(Iface::ModuleVal { val, at }, &mut self.ctx, pol);
                 }
-            }
+                Value::Dict(dict) => {
+                    self.checker
+                        .check(Iface::Value { val: dict, at }, &mut self.ctx, pol);
+                }
+                Value::Type(ty) => {
+                    self.checker
+                        .check(Iface::TypeType { val: ty, at }, &mut self.ctx, pol);
+                }
+                Value::Func(func) => {
+                    self.checker
+                        .check(Iface::Func { val: func, at }, &mut self.ctx, pol);
+                }
+                Value::None
+                | Value::Auto
+                | Value::Bool(_)
+                | Value::Int(_)
+                | Value::Float(_)
+                | Value::Length(..)
+                | Value::Angle(..)
+                | Value::Ratio(..)
+                | Value::Relative(..)
+                | Value::Fraction(..)
+                | Value::Color(..)
+                | Value::Gradient(..)
+                | Value::Tiling(..)
+                | Value::Symbol(..)
+                | Value::Version(..)
+                | Value::Str(..)
+                | Value::Bytes(..)
+                | Value::Label(..)
+                | Value::Datetime(..)
+                | Value::Decimal(..)
+                | Value::Duration(..)
+                | Value::Content(..)
+                | Value::Styles(..)
+                | Value::Array(..)
+                | Value::Args(..)
+                | Value::Dyn(..) => {
+                    self.checker.check(
+                        Iface::Type {
+                            val: &ins_ty.val.ty(),
+                            at,
+                        },
+                        &mut self.ctx,
+                        pol,
+                    );
+                }
+            },
             // todo: more builtin types to check
             Ty::Builtin(BuiltinTy::Content(Some(elem))) if self.value_as_iface() => {
                 self.checker
