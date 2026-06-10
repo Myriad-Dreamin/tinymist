@@ -188,8 +188,7 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
-    use typst_shim::syntax::RootedPathExt;
-    use typst_shim::syntax::VirtualPathExt;
+    use typst_shim::syntax::{RootedPathExt, VirtualPathExt, source_range};
 
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
@@ -202,7 +201,7 @@ mod expr_tests {
         fn show_expr(&self, node: &Expr) -> String {
             match node {
                 Expr::Decl(decl) => {
-                    let range = self.range(decl.span()).unwrap_or_default();
+                    let range = source_range(self, decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
                         if WorkspaceResolver::is_package_file(fid) {
                             let package = fid.package_compat().expect("package file");
@@ -363,6 +362,7 @@ mod type_check_tests {
     use typst::syntax::Source;
 
     use crate::tests::*;
+    use typst_shim::syntax::source_range;
 
     use super::{Ty, TypeInfo};
 
@@ -400,7 +400,7 @@ mod type_check_tests {
             let mut mapping = info
                 .mapping
                 .iter()
-                .map(|pair| (source.range(*pair.0).unwrap_or_default(), pair.1))
+                .map(|pair| (source_range(source, *pair.0).unwrap_or_default(), pair.1))
                 .collect::<Vec<_>>();
 
             mapping.sort_by(|x, y| {
@@ -438,7 +438,7 @@ mod post_type_check_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let result = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &result, node);
@@ -473,7 +473,7 @@ mod type_describe_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let ti = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &ti, node);
@@ -623,7 +623,7 @@ mod call_info_tests {
             w.sort_by(|x, y| x.0.span().into_raw().cmp(&y.0.span().into_raw()));
 
             for (arg, arg_call_info) in w {
-                writeln!(f, "{} -> {:?}", arg.clone().into_text(), arg_call_info)?;
+                writeln!(f, "{} -> {:?}", arg.clone().full_text(), arg_call_info)?;
             }
 
             Ok(())

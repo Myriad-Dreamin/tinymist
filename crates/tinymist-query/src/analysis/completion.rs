@@ -342,10 +342,10 @@ impl<'a> CompletionCursor<'a> {
             }
             Some(SelectedNode::Label(from_label)) => {
                 let mut rng = from_label.range();
-                if from_label.text().starts_with('<') && !snippet.starts_with('<') {
+                if from_label.leaf_text().starts_with('<') && !snippet.starts_with('<') {
                     rng.start += 1;
                 }
-                if from_label.text().ends_with('>') && !snippet.ends_with('>') {
+                if from_label.leaf_text().ends_with('>') && !snippet.ends_with('>') {
                     rng.end -= 1;
                 }
 
@@ -358,7 +358,7 @@ impl<'a> CompletionCursor<'a> {
                 } else {
                     from_ref.range()
                 };
-                if from_ref.text().starts_with('@') && !snippet.starts_with('@') {
+                if from_ref.leaf_text().starts_with('@') && !snippet.starts_with('@') {
                     rng.start += 1;
                 }
 
@@ -506,9 +506,9 @@ impl<'a> CompletionWorker<'a> {
         if matches!(
             cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) && cursor.leaf.erroneous()
+        ) && cursor.leaf.diagnosis().errors
         {
-            let mut chars = cursor.leaf.text().chars();
+            let mut chars = cursor.leaf.leaf_text().chars();
             match chars.next() {
                 Some(ch) if ch.is_numeric() => return None,
                 Some('.') => {
@@ -838,8 +838,8 @@ impl CompletionPair<'_, '_, '_> {
                 && node.children().fold(0i32, |acc, node| match node.kind() {
                     SyntaxKind::LeftParen => acc + 1,
                     SyntaxKind::RightParen => acc - 1,
-                    SyntaxKind::Error if node.text() == "(" => acc + 1,
-                    SyntaxKind::Error if node.text() == ")" => acc - 1,
+                    SyntaxKind::Error if node.leaf_text() == "(" => acc + 1,
+                    SyntaxKind::Error if node.leaf_text() == ")" => acc - 1,
                     _ => acc,
                 }) > 0;
             if is_unclosed {

@@ -119,7 +119,7 @@ impl OnEnterWorker<'_> {
             .count();
 
         let comment_prefix = {
-            let mut scanner = unscanny::Scanner::new(leaf.text());
+            let mut scanner = unscanny::Scanner::new(leaf.leaf_text());
             scanner.eat_while('/');
             scanner.eat_if('!');
             scanner.before()

@@ -474,7 +474,11 @@ impl<'a> TestRunner<'a> {
         };
 
         let ppp = self.ctx.png.ppi / 72.0;
-        let pixmap = typst_render::render_merged(doc, ppp, Default::default(), None);
+        let render_options = typst_render::RenderOptions {
+            pixel_per_pt: f64::from(ppp).into(),
+            ..Default::default()
+        };
+        let pixmap = typst_render::render_merged(doc, &render_options, Default::default(), None);
         let output = pixmap.encode_png().context_ut("cannot encode pixmap");
         let output = output.and_then(|output| self.update_example(example, &output, "paged"));
         self.check_result(example, output, "paged")
@@ -485,7 +489,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let output = match typst_html::html(doc) {
+        let output = match typst_html::html(doc, &typst_html::HtmlOptions::default()) {
             Ok(output) => self.update_example(example, output.as_bytes(), "html"),
             Err(err) => {
                 self.diagnostics.lock().push(err);
