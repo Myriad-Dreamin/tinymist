@@ -35,7 +35,7 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
-use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
+use typst::{diag::FileResult, foundations::Bytes, introspection::PagedPosition as TypstPosition};
 
 use super::ServerState;
 use crate::actor::editor::{EditorRequest, ProjVersion};

@@ -23,9 +23,11 @@ use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::Typs
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
+use typst::introspection::Introspector;
 use typst::syntax::{FileId, LinkedNode, Source, Span, ast};
 use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::print_diag_or_error;
 use crate::utils::exit_on_ctrl_c;
@@ -422,7 +424,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn run_example(&self, test: &Source) {
-        let id = test.id().vpath().as_rooted_path().with_extension("");
+        let id = test.id().vpath().as_rooted_path_compat().with_extension("");
         let name = id.file_name().and_then(|s| s.to_str()).unwrap_or_default();
         self.running("example", name);
 
@@ -448,7 +450,10 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn build_example<T: typst::Document>(&self, world: &dyn World) -> (bool, Option<T>) {
+    fn build_example<T: typst::model::Document + typst::foundations::Output>(
+        &self,
+        world: &dyn World,
+    ) -> (bool, Option<T>) {
         let result = typst_shim::compile_opt::<T>(world);
         if !result.warnings.is_empty() {
             self.diagnostics.lock().push(result.warnings);
@@ -557,7 +562,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
         // todo: error multiple times
-        doc.introspector.query_label(label).is_ok()
+        doc.introspector().query_label(label).is_ok()
     }
 }
 
