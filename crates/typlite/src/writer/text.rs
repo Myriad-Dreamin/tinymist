@@ -121,13 +121,16 @@ impl TextWriter {
                 url: _,
                 title: _,
                 alt,
-            } => {
-                if !alt.is_empty() {
-                    for inline in alt {
-                        Self::write_node(inline, output)?;
-                    }
+            } if !alt.is_empty() => {
+                for inline in alt {
+                    Self::write_node(inline, output)?;
                 }
             }
+            Node::Image {
+                url: _,
+                title: _,
+                alt: _,
+            } => {}
             Node::InlineCode(code) => {
                 output.push_str(code);
             }

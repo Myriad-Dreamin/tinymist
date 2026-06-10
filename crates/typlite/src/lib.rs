@@ -22,13 +22,13 @@ use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use typst::World;
 use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
 use typst_html::HtmlDocument;
-use typst_syntax::Span;
-use typst_syntax::VirtualPath;
+use typst_syntax::{RootedPath, Span, VirtualPath, VirtualRoot};
 
 pub use crate::common::Format;
 use crate::diagnostics::WarningCollector;
@@ -38,6 +38,17 @@ use typst_syntax::FileId;
 
 use crate::tinymist_std::typst::LazyHash;
 use crate::tinymist_std::typst::foundations::Value::Str;
+
+fn join_virtual_sibling(base: FileId, path: &str) -> tinymist_std::Result<FileId> {
+    let vpath = base
+        .vpath()
+        .parent()
+        .unwrap_or_else(|| base.vpath().clone())
+        .join(path)
+        .ok()
+        .context_ut("failed to resolve virtual path")?;
+    Ok(FileId::new(RootedPath::new(base.root().clone(), vpath)))
+}
 
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
@@ -142,7 +153,7 @@ impl MarkdownDocument {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        parser.parse(&self.base.root).context_ut("failed to parse")
+        parser.parse(self.base.root()).context_ut("failed to parse")
     }
 
     /// Convert content to markdown string
@@ -289,12 +300,12 @@ impl TypliteFeat {
             bail!("package file is not supported");
         }
 
-        let wrap_main_id = current.join("__wrap_md_main.typ");
+        let wrap_main_id = join_virtual_sibling(current, "__wrap_md_main.typ")?;
 
         let (main_id, main_content) = match self.processor.as_ref() {
             None => (wrap_main_id, None),
             Some(processor) => {
-                let main_id = current.join("__md_main.typ");
+                let main_id = join_virtual_sibling(current, "__md_main.typ")?;
                 let content = format!(
                     r#"#import {processor:?}: article
 #article(include "__wrap_md_main.typ")"#
@@ -314,23 +325,31 @@ impl TypliteFeat {
         }
 
         let task_inputs = TaskInputs {
-            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path())),
+            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path_compat())),
             inputs: Some(Arc::new(LazyHash::new(dict))),
         };
 
         let mut world = world.task(task_inputs).html_task().into_owned();
 
-        let markdown_id = FileId::new(
-            Some(
-                typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0")
-                    .context_ut("failed to import markdown package")?,
-            ),
-            VirtualPath::new("lib.typ"),
+        let markdown_root = VirtualRoot::Package(
+            typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0")
+                .context_ut("failed to import markdown package")?,
         );
+        let markdown_id = FileId::new(RootedPath::new(
+            markdown_root.clone(),
+            VirtualPath::new("lib.typ")
+                .ok()
+                .context_ut("failed to resolve markdown lib path")?,
+        ));
 
         world
             .map_shadow_by_id(
-                markdown_id.join("typst.toml"),
+                FileId::new(RootedPath::new(
+                    markdown_root,
+                    VirtualPath::new("typst.toml")
+                        .ok()
+                        .context_ut("failed to resolve markdown manifest path")?,
+                )),
                 Bytes::from_string(include_str!("markdown-typst.toml")),
             )
             .context_ut("cannot map markdown-typst.toml")?;
