@@ -5,6 +5,7 @@ import * as vscode from "vscode";
 import { resolvePreviewerValue } from "../config";
 import { tinymist } from "../lsp";
 import { loadHTMLFile } from "../util";
+import type { ViewerWindowState } from "./preview-window-state";
 
 export type PreviewerSourceKind = "builtin" | "html" | "extension";
 export type PreviewTarget = "paged" | "html";
@@ -33,6 +34,7 @@ export interface TinymistPreviewTask {
   dataPlaneHost: string;
   dataPlanePort: string | number;
   staticServerPort: string | number;
+  initialWindowState?: ViewerWindowState;
   isBrowsing: boolean;
   isPrimary: boolean;
 }

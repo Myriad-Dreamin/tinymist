@@ -11,7 +11,7 @@ use crate::debug_loc::{InternQuery, SpanInterner};
 use crate::outline::Outline;
 use crate::{
     ChangeCursorPositionRequest, DocToSrcJumpInfo, EditorServer, MemoryFiles, MemoryFilesShort,
-    ResolveSourceLocRequest,
+    ResolveSourceLocRequest, ViewerWindowStateMessage,
 };
 
 use super::webview::WebviewActorRequest;
@@ -39,6 +39,7 @@ pub enum EditorActorRequest {
     Shutdown,
     DocToSrcJumpResolve(DocToSrcJumpResolveRequest),
     DocToSrcJump(DocToSrcJumpInfo),
+    ViewerWindowState(ViewerWindowStateMessage),
     Outline(Outline),
     CompileStatus(CompileStatus),
 }
@@ -146,6 +147,8 @@ pub enum ControlPlaneResponse {
     CompileStatus(CompileStatus),
     #[serde(rename = "outline")]
     Outline(Outline),
+    #[serde(rename = "viewerWindowState")]
+    ViewerWindowState(ViewerWindowStateMessage),
 }
 
 impl<T: EditorServer> EditorActor<T> {
@@ -184,6 +187,9 @@ impl<T: EditorServer> EditorActor<T> {
                         },
                         EditorActorRequest::DocToSrcJump(jump_info) => {
                             self.editor_conn.resp_ctl_plane("DocToSrcJump", ControlPlaneResponse::EditorScrollTo(jump_info)).await
+                        },
+                        EditorActorRequest::ViewerWindowState(state) => {
+                            self.editor_conn.resp_ctl_plane("ViewerWindowState", ControlPlaneResponse::ViewerWindowState(state)).await
                         },
                         EditorActorRequest::DocToSrcJumpResolve(req) => {
                             self.source_scroll_by_span(req.span)

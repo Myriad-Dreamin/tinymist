@@ -35,6 +35,7 @@ import {
   type PreviewerSourceMetadata,
   type ResolvedPreviewer,
 } from "./previewer";
+import { loadStoredViewerWindowState } from "./preview-window-state";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
@@ -537,6 +538,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             dataPlaneHost: `ws://127.0.0.1:${dataPlanePort}`,
             dataPlanePort,
             staticServerPort,
+            initialWindowState: loadStoredViewerWindowState(context),
             isBrowsing: !!isBrowsing,
             isPrimary: !!isPrimary,
           });
