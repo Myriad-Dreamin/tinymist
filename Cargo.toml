@@ -155,6 +155,7 @@ tracing = "0.1"
 
 
 # Linebender
+fontique = { version = "0.7.0", default-features = false }
 xilem = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
 masonry = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false }
 masonry_testing = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da9eae473d4f09a7e69a058c31cfe6d3b2e3", default-features = false, features = [
