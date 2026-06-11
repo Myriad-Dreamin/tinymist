@@ -61,6 +61,11 @@ windows-sys = { workspace = true, features = [
     "Win32_UI_WindowsAndMessaging",
 ] }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Use Fontique's runtime fontconfig loading so Linux release builds do not need
+# a target-specific fontconfig pkg-config setup.
+fontique = { workspace = true, features = ["fontconfig-dlopen"] }
+
 [features]
 
 default = ["no-content-hint", "cli"]

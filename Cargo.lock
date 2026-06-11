@@ -6998,6 +6998,7 @@ dependencies = [
  "ecow",
  "env_logger",
  "ezsockets",
+ "fontique",
  "futures",
  "hayro",
  "image",

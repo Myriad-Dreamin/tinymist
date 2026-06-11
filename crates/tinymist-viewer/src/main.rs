@@ -782,7 +782,7 @@ fn help_overlay_typst_source(width: f64, height: f64) -> String {
 
 fn help_overlay_panel_width(width: f64) -> f64 {
     let available = (width - 64.0).max(1.0);
-    available.min(760.0).max(420.0).min(width.max(1.0))
+    available.clamp(420.0, 760.0).min(width.max(1.0))
 }
 
 fn typst_string_literal(text: &str) -> String {
