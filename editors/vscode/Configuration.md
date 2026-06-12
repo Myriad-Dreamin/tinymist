@@ -157,6 +157,13 @@ Controls how the formatter handles prose line wrapping. If enabled, the formatte
 - **Type**: `boolean`
 - **Default**: `false`
 
+## `tinymist.inlayHints.packageVersionStatus`
+
+Show inline decorations indicating package version status (latest, upgradable, or invalid)
+
+- **Type**: `boolean`
+- **Default**: `true`
+
 ## `tinymist.lint.enabled`
 
 Enable or disable lint checks. Note: restarting the editor is required to change this setting.
@@ -304,6 +311,13 @@ Enable or disable preview features of Typst. Note: restarting the editor is requ
   - `"enable"` : Enable preview features.
   - `"disable"` : Disable preview features.
 - **Default**: `"enable"`
+
+## `tinymist.previewer`
+
+Select the previewer for Typst. `myriad-dreamin.tinymist` uses Tinymist’s built-in previewer. Values starting with `html:` are treated as absolute HTML file paths after VS Code variable substitution, and other non-empty values are treated as extension ids. Overrides are ignored in untrusted workspaces.
+
+- **Type**: `string`
+- **Default**: `"myriad-dreamin.tinymist"`
 
 ## `tinymist.projectResolution`
 
