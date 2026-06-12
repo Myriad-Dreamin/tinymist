@@ -5,7 +5,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
 use crate::{
-    WsMessage,
+    ViewerWindowStateMessage, WsMessage,
     actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
 };
 
@@ -168,6 +168,10 @@ where
                         let path = serde_json::from_str(path);
                         if let Ok(path) = path {
                             self.render_sender.send(RenderActorRequest::WebviewResolveFrameLoc(path)).log_error("WebViewActor");
+                        };
+                    } else if let Some(state) = msg.strip_prefix("viewer-window-state ") {
+                        if let Ok(state) = serde_json::from_str::<ViewerWindowStateMessage>(state) {
+                            self.editor_sender.send(EditorActorRequest::ViewerWindowState(state)).log_error("WebViewActor");
                         };
                     } else {
                         let err = self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {msg}"))).await;

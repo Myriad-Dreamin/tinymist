@@ -17,6 +17,7 @@ use reflexo::debug_loc::DocumentPosition;
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
+use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::mpsc;
 use typst::diag::{FileError, FileResult};
@@ -27,7 +28,7 @@ use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{DeviceEvent, StartCause, WindowEvent as WinitWindowEvent};
 use winit::event_loop::ActiveEventLoop;
 use winit::window::WindowId as WinitWindowId;
@@ -44,6 +45,9 @@ use xilem::{AppState, EventLoop, WidgetView, WindowId, Xilem, window};
 mod native_title_bar;
 mod title_bar;
 
+use tinymist_preview::{
+    ViewerWindowState as ControlPlaneViewerWindowState, ViewerWindowStateMessage,
+};
 use tinymist_viewer::doc::{ZoomAction, doc};
 use tinymist_viewer::incr::{IncrVelloDocClient, RenderedPage};
 use tinymist_viewer::protocol::preview_update_from_bytes;
@@ -66,6 +70,7 @@ const DEFAULT_VIEWER_INNER_WIDTH: u32 = 800;
 const DEFAULT_VIEWER_CONTENT_HEIGHT: u32 = 800;
 const MIN_VIEWER_INNER_WIDTH: u32 = 800;
 const MIN_VIEWER_INNER_HEIGHT: u32 = DEFAULT_VIEWER_CONTENT_HEIGHT + TITLE_BAR_HEIGHT as u32;
+const VIEWER_WINDOW_STATE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Parser)]
 struct Args {
@@ -81,6 +86,23 @@ struct Args {
     /// The document title shown in the viewer window.
     #[clap(long = "document-title", value_name = "TITLE")]
     pub document_title: Option<String>,
+
+    /// Initial native window inner size, for example 960x1080.
+    #[clap(
+        long = "initial-window-inner-size",
+        value_name = "WIDTHxHEIGHT",
+        value_parser = parse_initial_window_inner_size
+    )]
+    pub initial_window_inner_size: Option<PhysicalSize<u32>>,
+
+    /// Initial native window outer position, for example 960,0.
+    #[clap(
+        long = "initial-window-position",
+        value_name = "X,Y",
+        allow_hyphen_values = true,
+        value_parser = parse_initial_window_position
+    )]
+    pub initial_window_position: Option<PhysicalPosition<i32>>,
 }
 
 fn main() -> Result<()> {
@@ -91,7 +113,12 @@ fn main() -> Result<()> {
         .try_init()?;
 
     let (tx, rx) = mpsc::unbounded_channel();
+    let (window_state_tx, window_state_rx) = mpsc::unbounded_channel();
 
+    let initial_window_state = ViewerWindowState::from_initial_geometry(
+        args.initial_window_inner_size,
+        args.initial_window_position,
+    );
     let default_size = Size::new(
         f64::from(DEFAULT_VIEWER_INNER_WIDTH),
         f64::from(DEFAULT_VIEWER_CONTENT_HEIGHT),
@@ -103,6 +130,7 @@ fn main() -> Result<()> {
             data_plane_host,
             document_title,
             window_id: WindowId::next(),
+            initial_window_state,
             running: true,
             pages: vec![],
             background_color: None,
@@ -114,6 +142,7 @@ fn main() -> Result<()> {
             zoom_scale: DEFAULT_ZOOM_SCALE,
             tx,
             rx: Some(rx),
+            window_state_rx: Some(window_state_rx),
         },
         PreviewState::windows,
     );
@@ -129,6 +158,8 @@ fn main() -> Result<()> {
     let mut app = ViewerEventLoopApp {
         masonry_state,
         app_driver: Box::new(driver),
+        window_state: initial_window_state,
+        window_state_tx: Some(window_state_tx),
     };
     event_loop
         .run_app(&mut app)
@@ -139,6 +170,30 @@ fn main() -> Result<()> {
 struct ViewerEventLoopApp {
     masonry_state: MasonryState<'static>,
     app_driver: Box<dyn AppDriver>,
+    window_state: ViewerWindowState,
+    window_state_tx: Option<mpsc::UnboundedSender<ViewerWindowState>>,
+}
+
+impl ViewerEventLoopApp {
+    fn record_window_event(&mut self, event: &WinitWindowEvent) {
+        let changed = match event {
+            WinitWindowEvent::Moved(position) => self.window_state.set_outer_position(*position),
+            WinitWindowEvent::Resized(size) => self.window_state.set_inner_size(*size),
+            _ => false,
+        };
+
+        if changed {
+            self.send_window_state();
+        }
+    }
+
+    fn send_window_state(&mut self) {
+        if let Some(tx) = &self.window_state_tx
+            && tx.send(self.window_state).is_err()
+        {
+            self.window_state_tx = None;
+        }
+    }
 }
 
 impl ApplicationHandler<MasonryUserEvent> for ViewerEventLoopApp {
@@ -162,6 +217,7 @@ impl ApplicationHandler<MasonryUserEvent> for ViewerEventLoopApp {
         event: WinitWindowEvent,
     ) {
         native_title_bar::install_for_window_id(window_id);
+        self.record_window_event(&event);
         self.masonry_state.handle_window_event(
             event_loop,
             window_id,
@@ -202,10 +258,144 @@ impl ApplicationHandler<MasonryUserEvent> for ViewerEventLoopApp {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+struct ViewerWindowState {
+    #[serde(default = "default_viewer_inner_width")]
+    inner_width: u32,
+    #[serde(default = "default_viewer_inner_height")]
+    inner_height: u32,
+    #[serde(default)]
+    outer_x: Option<i32>,
+    #[serde(default)]
+    outer_y: Option<i32>,
+}
+
+impl Default for ViewerWindowState {
+    fn default() -> Self {
+        Self {
+            inner_width: default_viewer_inner_width(),
+            inner_height: default_viewer_inner_height(),
+            outer_x: None,
+            outer_y: None,
+        }
+    }
+}
+
+impl ViewerWindowState {
+    fn from_initial_geometry(
+        size: Option<PhysicalSize<u32>>,
+        position: Option<PhysicalPosition<i32>>,
+    ) -> Self {
+        let mut state = Self::default();
+        if let Some(size) = size {
+            state.inner_width = size.width.max(1);
+            state.inner_height = size.height.max(1);
+        }
+        if let Some(position) = position {
+            state.outer_x = Some(position.x);
+            state.outer_y = Some(position.y);
+        }
+        state
+    }
+
+    fn inner_size(self) -> PhysicalSize<u32> {
+        PhysicalSize::new(self.inner_width, self.inner_height)
+    }
+
+    fn outer_position(self) -> Option<PhysicalPosition<i32>> {
+        Some(PhysicalPosition::new(self.outer_x?, self.outer_y?))
+    }
+
+    fn set_inner_size(&mut self, size: PhysicalSize<u32>) -> bool {
+        if !is_valid_window_inner_size(size) {
+            return false;
+        }
+
+        if self.inner_width == size.width && self.inner_height == size.height {
+            return false;
+        }
+
+        self.inner_width = size.width;
+        self.inner_height = size.height;
+        true
+    }
+
+    fn set_outer_position(&mut self, position: PhysicalPosition<i32>) -> bool {
+        if self.outer_x == Some(position.x) && self.outer_y == Some(position.y) {
+            return false;
+        }
+
+        self.outer_x = Some(position.x);
+        self.outer_y = Some(position.y);
+        true
+    }
+}
+
+fn default_viewer_inner_width() -> u32 {
+    DEFAULT_VIEWER_INNER_WIDTH
+}
+
+fn default_viewer_inner_height() -> u32 {
+    MIN_VIEWER_INNER_HEIGHT
+}
+
+fn is_valid_window_inner_size(size: PhysicalSize<u32>) -> bool {
+    size.width >= MIN_VIEWER_INNER_WIDTH && size.height >= MIN_VIEWER_INNER_HEIGHT
+}
+
+fn viewer_window_state_payload(state: ViewerWindowState) -> serde_json::Result<String> {
+    serde_json::to_string(&ViewerWindowStateMessage {
+        schema_version: VIEWER_WINDOW_STATE_SCHEMA_VERSION,
+        window: ControlPlaneViewerWindowState {
+            inner_width: state.inner_width,
+            inner_height: state.inner_height,
+            outer_x: state.outer_x,
+            outer_y: state.outer_y,
+        },
+    })
+}
+
+fn parse_initial_window_inner_size(value: &str) -> Result<PhysicalSize<u32>, String> {
+    let (width, height) = value
+        .split_once('x')
+        .or_else(|| value.split_once('X'))
+        .ok_or_else(|| "expected WIDTHxHEIGHT".to_owned())?;
+    let width = parse_positive_u32(width, "width")?;
+    let height = parse_positive_u32(height, "height")?;
+    Ok(PhysicalSize::new(width, height))
+}
+
+fn parse_initial_window_position(value: &str) -> Result<PhysicalPosition<i32>, String> {
+    let (x, y) = value
+        .split_once(',')
+        .ok_or_else(|| "expected X,Y".to_owned())?;
+    let x = x
+        .trim()
+        .parse::<i32>()
+        .map_err(|err| format!("invalid x position: {err}"))?;
+    let y = y
+        .trim()
+        .parse::<i32>()
+        .map_err(|err| format!("invalid y position: {err}"))?;
+    Ok(PhysicalPosition::new(x, y))
+}
+
+fn parse_positive_u32(value: &str, name: &str) -> Result<u32, String> {
+    let value = value
+        .trim()
+        .parse::<u32>()
+        .map_err(|err| format!("invalid {name}: {err}"))?;
+    if value == 0 {
+        return Err(format!("{name} must be greater than zero"));
+    }
+    Ok(value)
+}
+
 struct PreviewState {
     data_plane_host: String,
     document_title: Option<String>,
     window_id: WindowId,
+    initial_window_state: ViewerWindowState,
     running: bool,
     pages: Vec<RenderedPage>,
     background_color: Option<Color>,
@@ -217,6 +407,7 @@ struct PreviewState {
     zoom_scale: f64,
     tx: mpsc::UnboundedSender<PreviewEvent>,
     rx: Option<mpsc::UnboundedReceiver<PreviewEvent>>,
+    window_state_rx: Option<mpsc::UnboundedReceiver<ViewerWindowState>>,
 }
 
 impl AppState for PreviewState {
@@ -230,16 +421,23 @@ impl PreviewState {
         let window_id = self.window_id;
         let title = self.window_title();
         let root = self.view();
+        let initial_window_state = self.initial_window_state;
         std::iter::once(window(window_id, title, root).with_options(|options| {
-            options
+            let options = options
                 .with_decorations(false)
                 .with_min_inner_size(LogicalSize::new(
                     f64::from(MIN_VIEWER_INNER_WIDTH),
                     f64::from(MIN_VIEWER_INNER_HEIGHT),
                 ))
-                .on_close(|state: &mut PreviewState| {
-                    state.running = false;
-                })
+                .with_initial_inner_size(initial_window_state.inner_size());
+            let options = if let Some(position) = initial_window_state.outer_position() {
+                options.with_initial_position(position)
+            } else {
+                options
+            };
+            options.on_close(|state: &mut PreviewState| {
+                state.running = false;
+            })
         }))
     }
 
@@ -323,6 +521,7 @@ impl PreviewState {
             |proxy, args: &mut PreviewState| {
                 let address = websocket_address(&args.data_plane_host);
                 let rx = args.rx.take();
+                let mut window_state_rx = args.window_state_rx.take();
                 async move {
                     let Some(mut rx) = rx else {
                         log::warn!("spawn client multiple times for preview");
@@ -374,6 +573,27 @@ impl PreviewState {
                                             log::warn!("Error sending click position to websocket: {err}");
                                         }
                                     }
+                                }
+                            }
+                            state = async {
+                                match &mut window_state_rx {
+                                    Some(rx) => rx.recv().await,
+                                    None => None,
+                                }
+                            }, if window_state_rx.is_some() => {
+                                let Some(state) = state else {
+                                    window_state_rx = None;
+                                    continue;
+                                };
+                                let payload = match viewer_window_state_payload(state) {
+                                    Ok(payload) => payload,
+                                    Err(err) => {
+                                        log::debug!("failed to serialize viewer window state: {err}");
+                                        continue;
+                                    }
+                                };
+                                if let Err(err) = handle.text(format!("viewer-window-state {payload}")) {
+                                    log::debug!("failed to send viewer window state to preview server: {err}");
                                 }
                             }
                             res = &mut future => {
@@ -1186,6 +1406,98 @@ mod tests {
         assert!(!is_supported_external_link("ftp://example.com"));
         assert!(!is_supported_external_link("http:example.com"));
         assert!(!is_supported_external_link("mailto:"));
+    }
+
+    #[test]
+    fn viewer_window_state_ignores_transient_small_sizes() {
+        let mut state = ViewerWindowState::default();
+
+        assert!(!state.set_inner_size(PhysicalSize::new(320, 200)));
+        assert_eq!(
+            state.inner_size(),
+            PhysicalSize::new(MIN_VIEWER_INNER_WIDTH, MIN_VIEWER_INNER_HEIGHT)
+        );
+
+        assert!(state.set_inner_size(PhysicalSize::new(1024, 900)));
+        assert_eq!(state.inner_size(), PhysicalSize::new(1024, 900));
+    }
+
+    #[test]
+    fn initial_window_state_uses_cli_geometry() {
+        let state = ViewerWindowState::from_initial_geometry(
+            Some(PhysicalSize::new(1280, 720)),
+            Some(PhysicalPosition::new(-12, 34)),
+        );
+
+        assert_eq!(state.inner_size(), PhysicalSize::new(1280, 720));
+        assert_eq!(state.outer_position(), Some(PhysicalPosition::new(-12, 34)));
+    }
+
+    #[test]
+    fn parses_initial_window_inner_size() {
+        assert_eq!(
+            parse_initial_window_inner_size("1280x900").expect("size should parse"),
+            PhysicalSize::new(1280, 900)
+        );
+        assert_eq!(
+            parse_initial_window_inner_size("1280X900").expect("size should parse"),
+            PhysicalSize::new(1280, 900)
+        );
+
+        assert!(parse_initial_window_inner_size("1280,900").is_err());
+        assert!(parse_initial_window_inner_size("0x900").is_err());
+        assert!(parse_initial_window_inner_size("1280x0").is_err());
+        assert!(parse_initial_window_inner_size("wide").is_err());
+    }
+
+    #[test]
+    fn parses_initial_window_position() {
+        assert_eq!(
+            parse_initial_window_position("-10,20").expect("position should parse"),
+            PhysicalPosition::new(-10, 20)
+        );
+        assert_eq!(
+            parse_initial_window_position(" 10 , -20 ").expect("position should parse"),
+            PhysicalPosition::new(10, -20)
+        );
+
+        assert!(parse_initial_window_position("10x20").is_err());
+        assert!(parse_initial_window_position("left,20").is_err());
+    }
+
+    #[test]
+    fn cli_accepts_negative_initial_window_position() {
+        let args =
+            Args::try_parse_from(["tinymist-viewer", "--initial-window-position", "-541,349"])
+                .expect("negative window position should parse as an option value");
+
+        assert_eq!(
+            args.initial_window_position,
+            Some(PhysicalPosition::new(-541, 349))
+        );
+    }
+
+    #[test]
+    fn viewer_window_state_payload_uses_schema_payload() {
+        let message = viewer_window_state_payload(ViewerWindowState {
+            inner_width: 1280,
+            inner_height: 900,
+            outer_x: Some(24),
+            outer_y: Some(48),
+        })
+        .expect("state should serialize");
+
+        let payload = serde_json::from_str::<serde_json::Value>(&message)
+            .expect("event payload should be valid json");
+
+        assert_eq!(
+            payload["schema_version"],
+            VIEWER_WINDOW_STATE_SCHEMA_VERSION
+        );
+        assert_eq!(payload["window"]["inner_width"], 1280);
+        assert_eq!(payload["window"]["inner_height"], 900);
+        assert_eq!(payload["window"]["outer_x"], 24);
+        assert_eq!(payload["window"]["outer_y"], 48);
     }
 
     #[test]

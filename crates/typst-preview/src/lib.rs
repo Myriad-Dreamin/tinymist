@@ -471,6 +471,22 @@ pub struct MemoryFilesShort {
     // mtime: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewerWindowState {
+    pub inner_width: u32,
+    pub inner_height: u32,
+    #[serde(default)]
+    pub outer_x: Option<i32>,
+    #[serde(default)]
+    pub outer_y: Option<i32>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ViewerWindowStateMessage {
+    pub schema_version: u32,
+    pub window: ViewerWindowState,
+}
+
 pub trait CompileView: Send + Sync {
     /// Get the compiled document.
     fn doc(&self) -> Option<TypstDocument>;
