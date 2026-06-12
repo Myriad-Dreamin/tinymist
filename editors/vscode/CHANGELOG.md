@@ -21,21 +21,26 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Editor
 
 * (Fix) Accepted base language clients in code actions in https://github.com/Myriad-Dreamin/tinymist/pull/2548
-* Added an extension setting to configure the handler for document preview in https://github.com/Myriad-Dreamin/tinymist/pull/2357
-* Added the Tinymist GPU viewer extension in https://github.com/Myriad-Dreamin/tinymist/pull/2521
 
 ### Preview
+
+#### Builtin Viewer
+
+* Added an extension setting to configure the handler for document preview in https://github.com/Myriad-Dreamin/tinymist/pull/2357
+* Added preview target support and native link handling in https://github.com/Myriad-Dreamin/tinymist/pull/2537
+* Recovered viewer websocket connections in https://github.com/Myriad-Dreamin/tinymist/pull/2536
+
+#### GPU Viewer
 
 * (Fix) Painted default page backgrounds in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2522
 * (Fix) Accepted full current preview frames in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2523
 * (Fix) Rendered SVG and oriented images in the Vello viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2528
 * (Fix) Improved Vello image rendering in https://github.com/Myriad-Dreamin/tinymist/pull/2531
 * (Fix) Corrected Vello stroked text rendering and renderer diff links in https://github.com/Myriad-Dreamin/tinymist/pull/2534
-* (Fix) Recovered viewer websocket connections in https://github.com/Myriad-Dreamin/tinymist/pull/2536
+* Added the Tinymist GPU viewer extension in https://github.com/Myriad-Dreamin/tinymist/pull/2521
 * Added Typst gradient paint rendering in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2525
 * Added renderer diff protocol and viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2530
 * Added Typst pattern paint rendering in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2529
-* Added preview target support and native link handling in https://github.com/Myriad-Dreamin/tinymist/pull/2537
 * Added native zoom controls in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2540
 * Added AccessKit semantics and text selection in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2538
 * Added a native viewer window title bar in https://github.com/Myriad-Dreamin/tinymist/pull/2552
