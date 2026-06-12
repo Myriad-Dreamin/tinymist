@@ -10,6 +10,76 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.14.20 - [2026-06-12]
+
+### Server
+
+* (Fix) Ignored irrelevant filesystem watcher access events in https://github.com/Myriad-Dreamin/tinymist/pull/2509
+* (Fix) Polled missing watched files in project workspaces in https://github.com/Myriad-Dreamin/tinymist/pull/2516
+* Allowed more granular log control by @jyn514 in https://github.com/Myriad-Dreamin/tinymist/pull/2475
+
+### Editor
+
+* (Fix) Accepted base language clients in code actions in https://github.com/Myriad-Dreamin/tinymist/pull/2548
+
+### Preview
+
+#### Builtin Viewer
+
+* Added an extension setting to configure the handler for document preview in https://github.com/Myriad-Dreamin/tinymist/pull/2357
+* Added preview target support and native link handling in https://github.com/Myriad-Dreamin/tinymist/pull/2537
+* Recovered viewer websocket connections in https://github.com/Myriad-Dreamin/tinymist/pull/2536
+
+#### GPU Viewer
+
+* (Fix) Painted default page backgrounds in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2522
+* (Fix) Accepted full current preview frames in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2523
+* (Fix) Rendered SVG and oriented images in the Vello viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2528
+* (Fix) Improved Vello image rendering in https://github.com/Myriad-Dreamin/tinymist/pull/2531
+* (Fix) Corrected Vello stroked text rendering and renderer diff links in https://github.com/Myriad-Dreamin/tinymist/pull/2534
+* Added the Tinymist GPU viewer extension in https://github.com/Myriad-Dreamin/tinymist/pull/2521
+* Added Typst gradient paint rendering in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2525
+* Added renderer diff protocol and viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2530
+* Added Typst pattern paint rendering in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2529
+* Added native zoom controls in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2540
+* Added AccessKit semantics and text selection in the viewer in https://github.com/Myriad-Dreamin/tinymist/pull/2538
+* Added a native viewer window title bar in https://github.com/Myriad-Dreamin/tinymist/pull/2552
+* Persisted native viewer window state in https://github.com/Myriad-Dreamin/tinymist/pull/2550
+* Cached flushed page scenes for incremental viewer rendering in https://github.com/Myriad-Dreamin/tinymist/pull/2533
+* Handled indirect viewer layouts when rendering pages in https://github.com/Myriad-Dreamin/tinymist/pull/2535
+
+### Code Action
+
+* Added a code action for wrapping blocks in figures with captions by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2367
+
+### Inlay Hint
+
+* Added package import version status hints by @QuadnucYard in https://github.com/Myriad-Dreamin/tinymist/pull/2381
+
+### Syntax Highlighting
+
+* Added Verilog raw block highlighting by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2506
+* Added Agda raw block highlighting in https://github.com/Myriad-Dreamin/tinymist/pull/2547
+
+### Linting
+
+* Added the `tinymist lint` command in https://github.com/Myriad-Dreamin/tinymist/pull/2527
+
+### Testing
+
+* (Test) Added crate-local mock harnesses for VFS, world, and project tests in https://github.com/Myriad-Dreamin/tinymist/pull/2503
+* (Test) Added filesystem event matrix coverage for project tests in https://github.com/Myriad-Dreamin/tinymist/pull/2505
+* (Test) Stabilized upstream watcher tests in https://github.com/Myriad-Dreamin/tinymist/pull/2519
+* (Test) Made the Neovim spec container self-contained in https://github.com/Myriad-Dreamin/tinymist/pull/2510
+* (Test) Added a Vello renderer regression suite in https://github.com/Myriad-Dreamin/tinymist/pull/2526
+* (Test) Overlaid link boxes in the Vello suite in https://github.com/Myriad-Dreamin/tinymist/pull/2532
+
+### Misc
+
+* (Fix) Added default patch info for nightly patch crates and updated the Typst crates list by @ParaN3xus in https://github.com/Myriad-Dreamin/tinymist/pull/2517
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.14.18...v0.14.20
+
 ## v0.14.18 - [2026-05-10]
 
 ### Export
