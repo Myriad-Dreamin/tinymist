@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-assertion_line: 192
 description: Completion on / (49..50)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/dict_at_named_param.typ
