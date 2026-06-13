@@ -202,6 +202,18 @@ The path pattern to store Typst artifacts, you can use `$root` or `$dir` or `$na
 - **Type**: `string`
 - **Default**: `""`
 
+## `tinymist.packageCachePath`
+
+Custom path to package cache, defaults to system-dependent location
+
+- **Type**: string | null
+
+## `tinymist.packagePath`
+
+Custom path to local packages, defaults to system-dependent location
+
+- **Type**: string | null
+
 ## `tinymist.preview.background.args`
 
 The arguments that the background preview server used for. It is only used when \`tinymist.preview.background\` is enabled. Check \`tinymist preview\` to see the allowed arguments.
