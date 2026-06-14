@@ -7162,6 +7162,7 @@ dependencies = [
  "time",
  "typst",
  "typst-html",
+ "typst-layout",
  "typst-shim",
  "wasm-bindgen",
  "web-time",
