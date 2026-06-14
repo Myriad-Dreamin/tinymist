@@ -1450,3 +1450,96 @@ impl_internable!(
     BinInst<Expr>,
     ApplyExpr,
 );
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::Ordering;
+    use std::str::FromStr;
+
+    use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
+
+    use super::{Decl, StrictCmp};
+    use crate::prelude::TypstFileId;
+
+    fn package(spec: &str) -> typst::syntax::package::PackageSpec {
+        typst::syntax::package::PackageSpec::from_str(spec).expect("valid package spec")
+    }
+
+    fn rooted_path(root: VirtualRoot, path: &str) -> RootedPath {
+        RootedPath::new(root, VirtualPath::new(path).expect("valid virtual path"))
+    }
+
+    fn file_id(root: VirtualRoot, path: &str) -> TypstFileId {
+        FileId::new(rooted_path(root, path))
+    }
+
+    fn unique_file_id(root: VirtualRoot, path: &str) -> TypstFileId {
+        FileId::unique(rooted_path(root, path))
+    }
+
+    #[test]
+    fn strict_file_id_cmp_eq_for_same_project_path() {
+        let left = file_id(VirtualRoot::Project, "/main.typ");
+        let right = file_id(VirtualRoot::Project, "/main.typ");
+
+        assert_eq!(left, right);
+        assert_eq!(left.strict_cmp(&right), Ordering::Equal);
+        assert_eq!(
+            Decl::module(left).strict_cmp(&Decl::module(right)),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn strict_file_id_cmp_eq_for_same_package_and_path() {
+        let root = VirtualRoot::Package(package("@preview/example:0.1.0"));
+        let left = file_id(root.clone(), "/lib.typ");
+        let right = file_id(root, "/lib.typ");
+
+        assert_eq!(left, right);
+        assert_eq!(left.strict_cmp(&right), Ordering::Equal);
+        assert_eq!(
+            Decl::module(left).strict_cmp(&Decl::module(right)),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn strict_file_id_cmp_ignores_unique_raw_id_for_same_root_and_path() {
+        let root = VirtualRoot::Package(package("@preview/example:0.1.0"));
+        let left = unique_file_id(root.clone(), "/lib.typ");
+        let right = unique_file_id(root, "/lib.typ");
+
+        assert_ne!(left.into_raw(), right.into_raw());
+        assert_eq!(left.root(), right.root());
+        assert_eq!(
+            left.vpath().get_with_slash(),
+            right.vpath().get_with_slash()
+        );
+        assert_eq!(left.strict_cmp(&right), Ordering::Equal);
+        assert_eq!(
+            Decl::module(left).strict_cmp(&Decl::module(right)),
+            Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn strict_file_id_cmp_distinguishes_package_or_path() {
+        let package_root = VirtualRoot::Package(package("@preview/example:0.1.0"));
+        let same_path = "/lib.typ";
+        let project_file = file_id(VirtualRoot::Project, same_path);
+        let package_file = file_id(package_root.clone(), same_path);
+        let other_package_file = file_id(
+            VirtualRoot::Package(package("@preview/other:0.1.0")),
+            same_path,
+        );
+        let other_path = file_id(package_root, "/other.typ");
+
+        assert_ne!(project_file.strict_cmp(&package_file), Ordering::Equal);
+        assert_ne!(
+            package_file.strict_cmp(&other_package_file),
+            Ordering::Equal
+        );
+        assert_ne!(package_file.strict_cmp(&other_path), Ordering::Equal);
+    }
+}
