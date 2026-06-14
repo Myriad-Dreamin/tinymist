@@ -91,14 +91,15 @@ pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
                     return node;
                 };
 
-                let dot = parent.children().find(|n| matches!(n.kind(), SyntaxKind::Dot));
+                let dot = parent
+                    .children()
+                    .find(|n| matches!(n.kind(), SyntaxKind::Dot));
 
                 // Since typst matches `field()` by `case_last_match`, when the field access
                 // `x.` (`Ident(x).Error("")`), it will match the `x` as the
                 // field. We need to check dot position to filter out such cases.
-                if dot.is_some_and(|dot| {
-                    dot.offset() <= node.offset() && field_span == node.span()
-                }) {
+                if dot.is_some_and(|dot| dot.offset() <= node.offset() && field_span == node.span())
+                {
                     node = parent;
                 } else {
                     return node;
