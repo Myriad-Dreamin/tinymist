@@ -18,11 +18,10 @@ use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
 use serde::{Deserialize, Serialize};
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tokio::sync::mpsc;
 use typst::diag::{FileError, FileResult};
-use typst::foundations::{Bytes as TypstBytes, Datetime};
-use typst::layout::PagedDocument;
+use typst::foundations::{Bytes as TypstBytes, Datetime, Duration as TypstDuration};
 use typst::syntax::{FileId, Source, VirtualPath};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
@@ -907,7 +906,7 @@ fn render_help_overlay_scene(width: f64, height: f64) -> Result<(Arc<Scene>, Siz
 
 fn render_typst_scene(source: Source, scene_name: &str) -> Result<(Arc<Scene>, Size)> {
     let world = StatusWorld { main: source };
-    let compiled = typst::compile::<PagedDocument>(&world);
+    let compiled = typst::compile::<TypstPagedDocument>(&world);
     for warning in compiled.warnings {
         log::debug!("Typst {scene_name} render warning: {warning:?}");
     }
@@ -1054,7 +1053,7 @@ impl World for StatusWorld {
         status_typst_base().fonts.get(index).cloned()
     }
 
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _: Option<TypstDuration>) -> Option<Datetime> {
         Some(Datetime::from_ymd(1970, 1, 1).expect("valid deterministic date"))
     }
 }

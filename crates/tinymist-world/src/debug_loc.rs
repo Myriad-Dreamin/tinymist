@@ -2,7 +2,7 @@
 //! file.
 
 pub use lsp_types::PositionEncodingKind;
-pub use typst::layout::Position as TypstPosition;
+pub use typst::introspection::PagedPosition as TypstPosition;
 
 use serde::{Deserialize, Serialize};
 
