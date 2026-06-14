@@ -37,7 +37,7 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
       mtable mtd.right-flush {
         padding-right: 0;
       }
-      
+
       /* Tables */
       mtable {
         math-style: inherit;
@@ -47,7 +47,7 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
         math-style: compact;
         math-shift: compact;
       }
-      
+
       /* Equations */
       mtable.multiline-equation mtd {
         math-depth: inherit;
@@ -58,13 +58,13 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
       math > mtable.multiline-equation mtr:not(:last-child) mtd {
         padding-bottom: 0.5em;
       }
-      
+
       /* Fractions */
       mfrac {
         padding-inline: 0;
         margin-inline: 0.1em;
       }
-      
+
       /* Accents */
       mover[accent="true" i] > :first-child {
         font-feature-settings: "dtls";
@@ -72,7 +72,7 @@ input_file: crates/typlite/src/fixtures/integration/math_block.typ
       mover.dotted[accent="true" i] > :first-child {
         font-feature-settings: "dtls" 0;
       }
-      
+
       /* Other rules for scriptlevel, displaystyle and math-shift */
       munder > :nth-child(2),
       munderover > :nth-child(2) {
