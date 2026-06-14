@@ -89,7 +89,7 @@ pub struct ProjectExport;
 impl ProjectExport {
     /// Exports the document to bytes artifact.
     fn export_bytes<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
@@ -109,7 +109,7 @@ impl ProjectExport {
 
     /// Exports the document to string artifact.
     fn export_string<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = String>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,

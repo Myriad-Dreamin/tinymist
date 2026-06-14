@@ -9,7 +9,8 @@ use tinymist_preview::{
 };
 use tinymist_project::LspCompiledArtifact;
 use tinymist_query::{jump_from_click, jump_from_cursor};
-use typst::layout::{Abs, Point, Position};
+use typst::introspection::PagedPosition as Position;
+use typst::layout::{Abs, Point};
 use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
 use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
@@ -144,7 +145,7 @@ impl tinymist_preview::CompileView for PreviewCompileView {
         let world = self.art.world();
 
         let page = pos.page_no.checked_sub(1)?;
-        let page = doc.pages.get(page)?;
+        let page = doc.pages().get(page)?;
 
         let click = Point::new(Abs::pt(pos.x as f64), Abs::pt(pos.y as f64));
         jump_from_click(world, &page.frame, click)
