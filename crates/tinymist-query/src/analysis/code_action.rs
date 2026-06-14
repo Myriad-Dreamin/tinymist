@@ -9,7 +9,6 @@ use tinymist_analysis::syntax::{
     PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
 };
 use tinymist_std::path::{diff, unix_slash};
-use tinymist_world::vfs::PathResolution;
 use typst::syntax::Side;
 
 use super::get_link_exprs_in;
@@ -257,20 +256,14 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         let file_id = node.span().id()?;
-        let root_path = self.ctx.path_for_id(file_id).ok()?.to_err().ok()?;
-        let root_path = PathResolution::Resolved(root_path.parent()?.to_path_buf());
-        let path_in_workspace = file_id
-            .vpath()
-            .parent()
-            .unwrap_or_else(|| file_id.vpath().clone())
-            .join(importing.as_str())
-            .ok()?;
-        let new_path = root_path.resolve_to(&path_in_workspace)?;
-        let new_file_url = path_to_url(new_path.as_path()).ok()?;
+        let target = resolve_path_from_id(file_id, importing.as_str()).ok()?;
+        let target_id = target.clone().intern();
+        let new_path = self.ctx.path_for_id(target_id).ok()?;
+        let new_file_url = crate::path_res_to_url(new_path).ok()?;
 
         let edit = self.create_file(new_file_url, false);
 
-        let file_to_create = path_in_workspace.get_with_slash();
+        let file_to_create = target.vpath().get_with_slash();
         let action = CodeAction {
             title: format!("Create missing file at `{file_to_create}`"),
             kind: Some(CodeActionKind::QUICKFIX),

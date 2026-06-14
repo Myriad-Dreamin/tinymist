@@ -21,25 +21,14 @@ pub fn resolve_id_by_path(
         manifest.validate(&spec).ok()?;
 
         // Evaluates the entry point.
-        let package_root = manifest_id.vpath().parent()?;
-        return Some(TypstFileId::new(RootedPath::new(
-            manifest_id.root().clone(),
-            package_root
-                .join(manifest.package.entrypoint.as_str())
-                .ok()?,
-        )));
+        return Some(
+            resolve_path_from_id(manifest_id, manifest.package.entrypoint.as_str())
+                .ok()?
+                .intern(),
+        );
     }
 
-    let vpath = if Path::new(import_path).is_relative() {
-        current.vpath().parent()?.join(import_path).ok()?
-    } else {
-        VirtualPath::new(import_path).ok()?
-    };
-
-    Some(TypstFileId::new(RootedPath::new(
-        current.root().clone(),
-        vpath,
-    )))
+    Some(resolve_path_from_id(current, import_path).ok()?.intern())
 }
 
 /// Finds a source instance by its import node.

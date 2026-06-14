@@ -22,8 +22,8 @@ use std::{
 };
 
 use tinymist_package::registry::PackageIndexEntry;
-use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_std::typst_shim::syntax::VirtualPathExt;
+use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
 };

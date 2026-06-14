@@ -45,8 +45,9 @@ pub fn get_entry(world: &LspWorld, tmpl: TemplateSource) -> StrResult<Bytes> {
 
     let entry_point = TypstFileId::new(RootedPath::new(
         toml_id.root().clone(),
-        VirtualPath::new(format!("{}/{}", tmpl_info.path, tmpl_info.entrypoint))
-            .expect("valid template entrypoint"),
+        VirtualPath::new(tmpl_info.path.as_str())
+            .and_then(|path| path.join(tmpl_info.entrypoint.as_str()))
+            .map_err(|err| eco_format!("invalid template entrypoint: {err}"))?,
     ));
 
     world.file(entry_point).map_err(|e| eco_format!("{e}"))

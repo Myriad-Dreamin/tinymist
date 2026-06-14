@@ -8,11 +8,11 @@ use strum::{EnumIter, IntoEnumIterator};
 use typst::foundations::{CastInfo, Regex};
 use typst::layout::Ratio;
 use typst::syntax::FileId;
-use typst_shim::syntax::RootedPathExt;
 use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
 };
+use typst_shim::syntax::RootedPathExt;
 
 use crate::syntax::Decl;
 use crate::ty::*;

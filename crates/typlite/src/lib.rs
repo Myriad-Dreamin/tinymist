@@ -22,7 +22,7 @@ use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst_shim::syntax::VirtualPathExt;
+use tinymist_std::typst_shim::syntax::{VirtualPathExt, resolve_path_from_id};
 use typst::World;
 use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
@@ -38,17 +38,6 @@ use typst_syntax::FileId;
 
 use crate::tinymist_std::typst::LazyHash;
 use crate::tinymist_std::typst::foundations::Value::Str;
-
-fn join_virtual_sibling(base: FileId, path: &str) -> tinymist_std::Result<FileId> {
-    let vpath = base
-        .vpath()
-        .parent()
-        .unwrap_or_else(|| base.vpath().clone())
-        .join(path)
-        .ok()
-        .context_ut("failed to resolve virtual path")?;
-    Ok(FileId::new(RootedPath::new(base.root().clone(), vpath)))
-}
 
 /// The result type for typlite.
 pub type Result<T, Err = Error> = std::result::Result<T, Err>;
@@ -300,12 +289,18 @@ impl TypliteFeat {
             bail!("package file is not supported");
         }
 
-        let wrap_main_id = join_virtual_sibling(current, "__wrap_md_main.typ")?;
+        let wrap_main_id = resolve_path_from_id(current, "__wrap_md_main.typ")
+            .ok()
+            .context_ut("failed to resolve virtual path")?
+            .intern();
 
         let (main_id, main_content) = match self.processor.as_ref() {
             None => (wrap_main_id, None),
             Some(processor) => {
-                let main_id = join_virtual_sibling(current, "__md_main.typ")?;
+                let main_id = resolve_path_from_id(current, "__md_main.typ")
+                    .ok()
+                    .context_ut("failed to resolve virtual path")?
+                    .intern();
                 let content = format!(
                     r#"#import {processor:?}: article
 #article(include "__wrap_md_main.typ")"#

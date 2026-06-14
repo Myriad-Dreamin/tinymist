@@ -162,13 +162,9 @@ pub(crate) fn do_rename_file(
 }
 
 fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
-    // Compare package and vpath so we avoid allocating a joined file id while
-    // still distinguishing package files that share the same internal path.
-    file_id.package_compat() == def_fid.package_compat()
-        && file_id
-            .vpath()
-            .parent()
-            .is_some_and(|p| p.join(path).is_ok_and(|p| p == *def_fid.vpath()))
+    resolve_path_from_id(file_id, path).is_ok_and(|resolved| {
+        resolved.root() == def_fid.root() && resolved.vpath() == def_fid.vpath()
+    })
 }
 
 struct RenameFileWorker<'a> {
@@ -433,5 +429,21 @@ mod tests {
             other_package_ref,
             "../assets/logo.typ"
         ));
+    }
+
+    #[test]
+    fn link_path_match_keeps_root_fallback_for_root_base() {
+        let package = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
+        let root = typst::syntax::VirtualRoot::Package(package);
+        let def_fid = TypstFileId::new(typst::syntax::RootedPath::new(
+            root.clone(),
+            VirtualPath::new("/assets/logo.typ").unwrap(),
+        ));
+        let root_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            root,
+            VirtualPath::new("/").unwrap(),
+        ));
+
+        assert!(link_path_matches_def(def_fid, root_ref, "assets/logo.typ"));
     }
 }

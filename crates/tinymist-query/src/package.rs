@@ -13,6 +13,7 @@ use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
+use typst_shim::syntax::resolve_path_from_id;
 
 use crate::LocalContext;
 
@@ -67,13 +68,8 @@ pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageMani
 }
 
 pub(crate) fn package_entrypoint_id(manifest_id: FileId, entrypoint: &str) -> FileId {
-    manifest_id
-        .map(|path| {
-            path.parent()
-                .expect("manifest path has a parent")
-                .join(entrypoint)
-                .expect("valid package entrypoint")
-        })
+    resolve_path_from_id(manifest_id, entrypoint)
+        .expect("valid package entrypoint")
         .intern()
 }
 
@@ -252,4 +248,40 @@ fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use typst::syntax::package::PackageSpec;
+
+    use super::*;
+
+    fn manifest_id() -> FileId {
+        FileId::new(RootedPath::new(
+            VirtualRoot::Package(
+                PackageSpec::from_str("@preview/example:0.1.0").expect("valid package spec"),
+            ),
+            VirtualPath::new("typst.toml").expect("valid manifest path"),
+        ))
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_relative_to_manifest_parent() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "src/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/src/lib.typ");
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_absolute_path_in_package_root() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/lib.typ");
+    }
 }

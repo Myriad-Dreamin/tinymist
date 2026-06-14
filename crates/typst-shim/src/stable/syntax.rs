@@ -8,6 +8,8 @@ use typst::syntax::VirtualPath;
 use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
 
+pub use crate::path::resolve_path_from_id;
+
 /// The `LinkedNodeExt` trait is designed for compatibility between new and old
 /// versions of `typst`.
 pub trait LinkedNodeExt: Sized {

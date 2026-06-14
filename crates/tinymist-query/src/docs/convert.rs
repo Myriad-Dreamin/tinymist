@@ -24,15 +24,9 @@ pub(crate) fn convert_docs(
 ) -> StrResult<EcoString> {
     let mut entry = ctx.world().entry_state();
     let import_context = source_fid.map(|fid| {
-        let root = ctx
-            .world()
-            .vfs()
-            .file_path(fid)
-            .ok()
-            .and_then(|e| e.to_err().ok())
-            .and_then(|path| path.parent().map(|root| root.to_path_buf()));
+        let root = ctx.world().vfs().resolve_root(fid).ok().flatten();
         if let Some(root) = root {
-            entry = EntryState::new_workspace(root.into());
+            entry = EntryState::new_workspace(root);
         }
 
         let mut imports = Vec::new();

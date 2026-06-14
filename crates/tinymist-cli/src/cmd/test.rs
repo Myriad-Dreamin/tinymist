@@ -20,7 +20,6 @@ use tinymist_query::testing::{TestCaseKind, TestSuites};
 use tinymist_std::ImmutPath;
 use tinymist_std::typst::{TypstDocument, TypstHtmlDocument};
 use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::TypstPagedDocument};
-use typst_shim::syntax::VirtualPathExt;
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
@@ -28,6 +27,7 @@ use typst::introspection::Introspector;
 use typst::syntax::{FileId, LinkedNode, Source, Span, ast};
 use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::print_diag_or_error;
 use crate::utils::exit_on_ctrl_c;
