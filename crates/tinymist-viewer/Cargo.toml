@@ -78,6 +78,7 @@ sha2.workspace = true
 tinymist-tests.workspace = true
 typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.14.2" }
 typst-syntax.workspace = true
+typst-utils.workspace = true
 walkdir.workspace = true
 
 [lints]

@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Cursor;
@@ -20,7 +20,9 @@ use reflexo_vec2svg::IncrSvgDocServer;
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
+use tinymist_std::path::unix_slash;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use tinymist_std::typst_shim::syntax::RootedPathExt;
 use tinymist_viewer::incr::IncrVelloDocClient;
 use tinymist_viewer::{SvgResource, SvgResourceFormat, SvgResourceResolver};
 use typst::diag::{At, FileError, FileResult, SourceResult, StrResult, Warned, bail as typst_bail};
@@ -30,7 +32,7 @@ use typst::foundations::{
 };
 use typst::layout::{Abs, Frame, FrameItem, Margin, PageElem, Size as TypstSize, Transform};
 use typst::model::{Numbering, NumberingPattern};
-use typst::syntax::{FileId, Source, Span, VirtualPath};
+use typst::syntax::{FileId, RootedPath, Source, Span, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook, TextElem, TextSize};
 use typst::utils::LazyHash;
 use typst::visualize::Color as TypstColor;
@@ -288,7 +290,11 @@ fn parse_suite_file(
             .map(|(next_line, _)| lines[*next_line].start)
             .unwrap_or(text.len());
         let source_text = text[source_start..source_end].to_owned();
-        let file_id = FileId::new(None, VirtualPath::new(rel_path));
+        let file_id = FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new(unix_slash(rel_path))
+                .expect("suite path should be valid virtual path"),
+        ));
         let source = Source::new(file_id, source_text);
 
         let old = tests.insert(
@@ -1213,7 +1219,7 @@ struct RenderWorld {
     main: Source,
     root: PathBuf,
     package_root: Option<PathBuf>,
-    slots: Mutex<BTreeMap<FileId, FileSlot>>,
+    slots: Mutex<HashMap<FileId, FileSlot>>,
     base: &'static RenderBase,
 }
 
@@ -1223,7 +1229,7 @@ impl RenderWorld {
             main,
             root,
             package_root,
-            slots: Mutex::new(BTreeMap::new()),
+            slots: Mutex::new(HashMap::new()),
             base: render_base(),
         }
     }
@@ -1237,7 +1243,7 @@ impl RenderWorld {
     }
 
     fn system_path(&self, id: FileId) -> FileResult<SystemPath> {
-        let base = match id.package() {
+        let base = match id.package_compat() {
             Some(spec) => {
                 let package_root = self.package_root.as_ref().ok_or(FileError::AccessDenied)?;
                 PathBuf::from("tests/packages")
@@ -1249,7 +1255,7 @@ impl RenderWorld {
             None => PathBuf::new(),
         };
 
-        let path = id.vpath().resolve(&base).ok_or(FileError::AccessDenied)?;
+        let path = id.vpath().realize(&base);
         if let Ok(asset) = path.strip_prefix("assets") {
             return Ok(SystemPath::Asset(asset.to_path_buf()));
         }
