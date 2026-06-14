@@ -43,8 +43,8 @@ jobs:
       - name: Checkout Typst renderer suite
         uses: actions/checkout@v4
         with:
-          repository: typst/typst
-          ref: v0.14.2
+          repository: ParaN3xus/typst
+          ref: 6743cf2415fb3c11c292d371d16746cbee44c114
           path: typst-upstream
       - uses: typst-community/setup-typst@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -97,7 +97,7 @@ jobs:
         run: cargo test -p tinymist-viewer --test vello_renderer_suite --locked -- --nocapture
         env:
           TINYMIST_TYPST_TESTS: ${{ github.workspace }}/typst-upstream/tests
-          TINYMIST_TYPST_REF: "typst/typst@v0.14.2"
+          TINYMIST_TYPST_REF: "ParaN3xus/typst@6743cf2415fb3c11c292d371d16746cbee44c114"
           TINYMIST_RENDERER_DIFF: "1"
           WGPU_BACKEND: vulkan
           VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.json
