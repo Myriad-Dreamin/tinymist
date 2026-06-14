@@ -946,7 +946,7 @@ hello
     fn compile_incremental_doc(source: &str) -> IncrDocClient {
         tinymist_tests::run_with_sources(source, |verse, _| {
             let world = verse.snapshot();
-            let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+            let doc = typst::compile::<tinymist_std::typst::TypstPagedDocument>(&world)
                 .output
                 .expect("short vello renderer fixture should compile");
             let document = TypstDocument::Paged(Arc::new(doc));

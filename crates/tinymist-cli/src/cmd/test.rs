@@ -23,6 +23,7 @@ use tinymist_std::{bail, error::prelude::*, fs::paths::write_atomic, typst::Typs
 use typst::diag::{Severity, SourceDiagnostic};
 use typst::ecow::EcoVec;
 use typst::foundations::{Context, Label};
+use typst::introspection::Introspector;
 use typst::syntax::{FileId, LinkedNode, Source, Span, ast};
 use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
@@ -448,7 +449,10 @@ impl<'a> TestRunner<'a> {
         }
     }
 
-    fn build_example<T: typst::Document>(&self, world: &dyn World) -> (bool, Option<T>) {
+    fn build_example<T: typst::model::Document + typst::foundations::Output>(
+        &self,
+        world: &dyn World,
+    ) -> (bool, Option<T>) {
         let result = typst_shim::compile_opt::<T>(world);
         if !result.warnings.is_empty() {
             self.diagnostics.lock().push(result.warnings);
@@ -557,7 +561,7 @@ impl<'a> TestRunner<'a> {
             return false;
         };
         // todo: error multiple times
-        doc.introspector.query_label(label).is_ok()
+        doc.introspector().query_label(label).is_ok()
     }
 }
 

@@ -20,7 +20,7 @@ use reflexo_vec2svg::IncrSvgDocServer;
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tinymist_viewer::incr::IncrVelloDocClient;
 use tinymist_viewer::{SvgResource, SvgResourceFormat, SvgResourceResolver};
 use typst::diag::{At, FileError, FileResult, SourceResult, StrResult, Warned, bail as typst_bail};
@@ -28,9 +28,7 @@ use typst::engine::Engine;
 use typst::foundations::{
     Array, Bytes, Context, Datetime, IntoValue, NoneValue, Repr, Smart, Value, func,
 };
-use typst::layout::{
-    Abs, Frame, FrameItem, Margin, PageElem, PagedDocument, Size as TypstSize, Transform,
-};
+use typst::layout::{Abs, Frame, FrameItem, Margin, PageElem, Size as TypstSize, Transform};
 use typst::model::{Numbering, NumberingPattern};
 use typst::syntax::{FileId, Source, Span, VirtualPath};
 use typst::text::{Font, FontBook, TextElem, TextSize};
@@ -387,7 +385,7 @@ fn render_suite_case(
         let width = size.width.ceil().max(1.0) as u32;
         let height = size.height.ceil().max(1.0) as u32;
         let mut page = rasterizer.render_page(&scene, size, width, height, background)?;
-        if let Some(source_page) = compiled.pages.get(page_idx) {
+        if let Some(source_page) = compiled.pages().get(page_idx) {
             render_link_overlays(&mut page, &source_page.frame);
         }
         rendered.push(page);
@@ -396,11 +394,11 @@ fn render_suite_case(
     Ok(merge_pages(&rendered))
 }
 
-fn compile_paged(world: &dyn World) -> Result<PagedDocument> {
+fn compile_paged(world: &dyn World) -> Result<TypstPagedDocument> {
     let Warned {
         output,
         warnings: _,
-    } = typst::compile::<PagedDocument>(world);
+    } = typst::compile::<TypstPagedDocument>(world);
     output.map_err(|errors| anyhow!("{}", format_diagnostics(&errors)))
 }
 
@@ -1312,7 +1310,7 @@ impl World for RenderWorld {
         self.base.fonts.get(index).cloned()
     }
 
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _: Option<typst::foundations::Duration>) -> Option<Datetime> {
         Some(Datetime::from_ymd(1970, 1, 1).unwrap())
     }
 }
