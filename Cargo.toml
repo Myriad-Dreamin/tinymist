@@ -1,7 +1,7 @@
 [workspace.package]
 description = "An integrated language service for Typst."
 authors = ["Myriad-Dreamin <camiyoru@gmail.com>", "Nathan Varner"]
-version = "0.14.20-rc1"
+version = "0.14.25"
 edition = "2024"
 readme = "README.md"
 license = "Apache-2.0"
@@ -190,7 +190,7 @@ typst-render = "0.15.0"
 typst-pdf = "0.15.0"
 typst-syntax = "0.15.0"
 typst-eval = "0.15.0"
-typst-assets = { git = "https://github.com/typst/typst-assets", rev = "3284e80" }
+typst-assets = { git = "https://github.com/typst/typst-assets", rev = "955ae8d" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.5.0"
 typstyle-core = { version = "0.14.4", default-features = false }
@@ -239,16 +239,16 @@ typst-shim = { path = "./crates/typst-shim", version = "0.14.6", features = [
 
 tinymist-tests = { path = "./crates/tinymist-tests/" }
 
-sync-ls = { path = "./crates/sync-lsp", version = "0.14.20-rc1" }
-tinymist = { path = "./crates/tinymist/", version = "0.14.20-rc1", default-features = false }
-tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.20-rc1" }
-tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.20-rc1" }
-tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.20-rc1" }
-tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.20-rc1" }
-tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.20-rc1" }
-tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.20-rc1" }
-tinymist-preview = { path = "./crates/typst-preview", version = "0.14.20-rc1" }
-typlite = { path = "./crates/typlite", version = "0.14.20-rc1", default-features = false }
+sync-ls = { path = "./crates/sync-lsp", version = "0.14.25" }
+tinymist = { path = "./crates/tinymist/", version = "0.14.25", default-features = false }
+tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.14.25" }
+tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.14.25" }
+tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.14.25" }
+tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.14.25" }
+tinymist-query = { path = "./crates/tinymist-query/", version = "0.14.25" }
+tinymist-render = { path = "./crates/tinymist-render/", version = "0.14.25" }
+tinymist-preview = { path = "./crates/typst-preview", version = "0.14.25" }
+typlite = { path = "./crates/typlite", version = "0.14.25", default-features = false }
 
 cmark-writer = { path = "crates/cmark-writer", version = "0.9.0", features = [
     "gfm",
@@ -335,8 +335,8 @@ typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "
 typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
 typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
 
-typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
-typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", branch = "nightly" }
+typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", rev = "0bad09a80e502c0fcd193c72a1f6cc042596a98d" }
+typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", rev = "82b1f5ec016ba258da323b635119384a255578a4" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }

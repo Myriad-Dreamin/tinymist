@@ -18,10 +18,29 @@ RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     python3 && \
     update-ca-certificates
 
-RUN curl -fL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz -o /tmp/nvim-linux-x86_64.tar.gz && \
-    tar -C /opt -xzf /tmp/nvim-linux-x86_64.tar.gz && \
-    ln -s /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim && \
-    rm /tmp/nvim-linux-x86_64.tar.gz
+RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovim && cd neovim && make CMAKE_BUILD_TYPE=RelWithDebInfo
+USER root
+RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
+
+FROM myriaddreamin/tinymist:0.14.25 as tinymist
+
+FROM debian:12
+
+COPY --from=builder /neovim/build/nvim-linux-x86_64.deb /tmp/nvim-linux-x86_64.deb
+
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y curl wget git ripgrep build-essential unzip
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get update && apt-get install -y python3
+RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
+    --mount=target=/var/cache/apt,type=cache,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    apt-get install -y /tmp/nvim-linux-x86_64.deb \
+    && rm /tmp/nvim-linux-x86_64.deb
 
 RUN useradd --create-home --shell /bin/bash runner
 USER runner
