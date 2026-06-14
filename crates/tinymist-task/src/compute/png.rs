@@ -6,7 +6,7 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::foundations::Bytes;
-use typst::model::DocumentInfo;
+use typst::model::Document;
 
 use crate::compute::{parse_color, parse_length, select_pages};
 use crate::model::ExportPngTask;
@@ -44,7 +44,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
                     .into_iter()
                     .map(|(_, page)| page.clone())
                     .collect(),
-                DocumentInfo::default(),
+                doc.info().clone(),
             );
             let gap = gap
                 .as_ref()
