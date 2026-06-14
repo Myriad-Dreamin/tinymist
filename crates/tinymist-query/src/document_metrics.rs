@@ -140,7 +140,7 @@ impl DocumentMetricsWorker<'_> {
     fn work(&mut self, doc: &TypstDocument) -> Option<()> {
         match doc {
             TypstDocument::Paged(paged_doc) => {
-                for page in &paged_doc.pages {
+                for page in paged_doc.pages() {
                     self.work_frame(&page.frame)?;
                 }
 

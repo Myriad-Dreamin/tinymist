@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
-use typst::{layout::Position, syntax::Span};
+use typst::{introspection::PagedPosition, syntax::Span};
 
 use crate::actor::editor::{EditorActor, EditorActorRequest};
 use crate::actor::render::RenderActorRequest;
@@ -364,7 +364,7 @@ mod tests {
     use std::sync::Arc;
 
     use reflexo_vec2svg::IncrSvgDocServer;
-    use tinymist_std::typst::TypstDocument;
+    use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 
     use super::{escape_html_text, protocol};
 
@@ -380,7 +380,7 @@ mod tests {
             "#set page(width: 1pt, height: 1pt, margin: 0pt)",
             |verse, _| {
                 let world = verse.snapshot();
-                let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+                let doc = typst::compile::<TypstPagedDocument>(&world)
                     .output
                     .expect("short preview fixture should compile");
                 let document = TypstDocument::Paged(Arc::new(doc));
@@ -496,7 +496,7 @@ pub trait CompileView: Send + Sync {
     }
 
     /// Resolve the document position.
-    fn resolve_document_position(&self, _by: Location) -> Vec<Position> {
+    fn resolve_document_position(&self, _by: Location) -> Vec<PagedPosition> {
         vec![]
     }
 

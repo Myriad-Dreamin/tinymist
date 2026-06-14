@@ -176,7 +176,7 @@ fn field_definition(ctx: &Arc<SharedContext>, node: ast::FieldAccess) -> Option<
 
 fn bib_definition(
     ctx: &Arc<SharedContext>,
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     key: &str,
 ) -> Option<Definition> {
     let bib_info = ctx.analyze_bib(introspector)?;
@@ -195,7 +195,7 @@ fn bib_definition(
 }
 
 fn ref_definition(
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {

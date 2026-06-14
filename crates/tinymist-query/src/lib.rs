@@ -51,7 +51,7 @@ pub mod testing;
 pub use tinymist_analysis::{stats::GLOBAL_STATS, ty, upstream};
 
 /// The physical position in a document.
-pub type FramePosition = typst::layout::Position;
+pub type FramePosition = typst::introspection::PagedPosition;
 
 mod adt;
 mod lsp_typst_boundary;

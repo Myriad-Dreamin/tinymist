@@ -702,7 +702,7 @@ mod tests {
 
         tinymist_tests::run_with_sources(SOURCE, |verse, _| {
             let world = verse.snapshot();
-            let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+            let doc = typst::compile::<tinymist_std::typst::TypstPagedDocument>(&world)
                 .output
                 .expect("short viewer preview fixture should compile");
             let document = TypstDocument::Paged(Arc::new(doc));
