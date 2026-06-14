@@ -364,7 +364,7 @@ mod tests {
     use std::sync::Arc;
 
     use reflexo_vec2svg::IncrSvgDocServer;
-    use tinymist_std::typst::TypstDocument;
+    use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 
     use super::{escape_html_text, protocol};
 
@@ -380,7 +380,7 @@ mod tests {
             "#set page(width: 1pt, height: 1pt, margin: 0pt)",
             |verse, _| {
                 let world = verse.snapshot();
-                let doc = typst::compile::<typst::layout::PagedDocument>(&world)
+                let doc = typst::compile::<TypstPagedDocument>(&world)
                     .output
                     .expect("short preview fixture should compile");
                 let document = TypstDocument::Paged(Arc::new(doc));
