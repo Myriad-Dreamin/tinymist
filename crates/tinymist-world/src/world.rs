@@ -501,6 +501,122 @@ type NowStorage = chrono::DateTime<chrono::Local>;
 #[cfg(not(any(feature = "web", feature = "system")))]
 type NowStorage = tinymist_std::time::UtcDateTime;
 
+fn duration_offset_seconds(offset: Duration) -> Option<i64> {
+    let seconds = offset.seconds();
+    if !seconds.is_finite() || seconds < i64::MIN as f64 || seconds > i64::MAX as f64 {
+        return None;
+    }
+
+    Some(seconds.trunc() as i64)
+}
+
+#[cfg(any(feature = "web", feature = "system"))]
+fn initial_now(creation_timestamp: Option<i64>) -> NowStorage {
+    creation_timestamp
+        .and_then(|timestamp| chrono::DateTime::from_timestamp(timestamp, 0))
+        .map(Into::into)
+        .unwrap_or_else(|| tinymist_std::time::now().into())
+}
+
+#[cfg(not(any(feature = "web", feature = "system")))]
+fn initial_now(creation_timestamp: Option<i64>) -> NowStorage {
+    use tinymist_std::time::now;
+
+    creation_timestamp
+        .and_then(|timestamp| tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok())
+        .unwrap_or_else(|| now().into())
+}
+
+#[cfg(any(feature = "web", feature = "system"))]
+fn today_from_now(now: &NowStorage, offset: Option<Duration>) -> Option<Datetime> {
+    use chrono::{Datelike, FixedOffset};
+
+    let naive = match offset {
+        None => now.naive_local(),
+        Some(offset) => {
+            let seconds = duration_offset_seconds(offset)?;
+            let seconds = i32::try_from(seconds).ok()?;
+            now.with_timezone(&FixedOffset::east_opt(seconds)?)
+                .naive_local()
+        }
+    };
+
+    Datetime::from_ymd(
+        naive.year(),
+        naive.month().try_into().ok()?,
+        naive.day().try_into().ok()?,
+    )
+}
+
+#[cfg(not(any(feature = "web", feature = "system")))]
+fn today_from_now(now: &NowStorage, offset: Option<Duration>) -> Option<Datetime> {
+    use tinymist_std::time::to_typst_time;
+
+    let now = offset
+        .and_then(|offset| {
+            let timestamp = now
+                .unix_timestamp()
+                .checked_add(duration_offset_seconds(offset)?)?;
+            tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok()
+        })
+        .unwrap_or(*now);
+
+    Some(to_typst_time(now))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn duration(seconds: i64) -> Duration {
+        Duration::construct(seconds, 0, 0, 0, 0)
+    }
+
+    #[test]
+    fn duration_offset_seconds_preserves_signed_whole_seconds() {
+        assert_eq!(duration_offset_seconds(duration(90)), Some(90));
+        assert_eq!(duration_offset_seconds(duration(-90)), Some(-90));
+    }
+
+    #[cfg(any(feature = "web", feature = "system"))]
+    #[test]
+    fn today_from_now_rejects_offsets_outside_fixed_offset_range() {
+        let now = initial_now(Some(0));
+        let too_large = duration(i64::from(i32::MAX) + 1);
+
+        assert_eq!(today_from_now(&now, Some(too_large)), None);
+    }
+
+    #[cfg(not(any(feature = "web", feature = "system")))]
+    #[test]
+    fn today_from_now_uses_creation_timestamp_and_duration_offset() {
+        let now = initial_now(Some(0));
+        let today = today_from_now(&now, None).unwrap();
+        let tomorrow = today_from_now(&now, Some(duration(86_400))).unwrap();
+
+        assert_eq!(
+            (today.year(), today.month(), today.day()),
+            (Some(1970), Some(1), Some(1))
+        );
+        assert_eq!(
+            (tomorrow.year(), tomorrow.month(), tomorrow.day()),
+            (Some(1970), Some(1), Some(2))
+        );
+    }
+
+    #[cfg(not(any(feature = "web", feature = "system")))]
+    #[test]
+    fn initial_now_falls_back_when_creation_timestamp_is_invalid() {
+        let now = initial_now(Some(i64::MAX));
+        let today = today_from_now(&now, None).unwrap();
+
+        assert_eq!(
+            (today.year(), today.month(), today.day()),
+            (Some(1970), Some(1), Some(1))
+        );
+    }
+}
+
 /// The world of the compiler.
 pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
@@ -838,38 +954,10 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// return an error.
     #[cfg(any(feature = "web", feature = "system"))]
     fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
-        use chrono::{Datelike, FixedOffset};
-
-        let now = self.now.get_or_init(|| {
-            if let Some(timestamp) = self.creation_timestamp {
-                chrono::DateTime::from_timestamp(timestamp, 0)
-                    .unwrap_or_else(|| tinymist_std::time::now().into())
-                    .into()
-            } else {
-                tinymist_std::time::now().into()
-            }
-        });
-
-        let naive = match offset {
-            None => now.naive_local(),
-            Some(offset) => {
-                let seconds = offset.seconds().trunc();
-                if !seconds.is_finite()
-                    || seconds < f64::from(i32::MIN)
-                    || seconds > f64::from(i32::MAX)
-                {
-                    return None;
-                }
-                now.with_timezone(&FixedOffset::east_opt(seconds as i32)?)
-                    .naive_local()
-            }
-        };
-
-        Datetime::from_ymd(
-            naive.year(),
-            naive.month().try_into().ok()?,
-            naive.day().try_into().ok()?,
-        )
+        let now = self
+            .now
+            .get_or_init(|| initial_now(self.creation_timestamp));
+        today_from_now(now, offset)
     }
 
     /// Get the current date.
@@ -881,29 +969,10 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// return an error.
     #[cfg(not(any(feature = "web", feature = "system")))]
     fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
-        use tinymist_std::time::{now, to_typst_time};
-
-        let now = self.now.get_or_init(|| {
-            if let Some(timestamp) = self.creation_timestamp {
-                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
-                    .unwrap_or_else(|_| now().into())
-            } else {
-                now().into()
-            }
-        });
-
-        let now = offset
-            .and_then(|offset| {
-                let seconds = offset.seconds();
-                if !seconds.is_finite() || seconds < i64::MIN as f64 || seconds > i64::MAX as f64 {
-                    return None;
-                }
-                let timestamp = now.unix_timestamp().checked_add(seconds.trunc() as i64)?;
-                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok()
-            })
-            .unwrap_or(*now);
-
-        Some(to_typst_time(now))
+        let now = self
+            .now
+            .get_or_init(|| initial_now(self.creation_timestamp));
+        today_from_now(now, offset)
     }
 }
 
