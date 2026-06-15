@@ -734,13 +734,13 @@ impl<'a> SyntaxClass<'a> {
         use SyntaxClass::*;
         match self {
             Label { .. } => false,
-            VarAccess(cls) => cls.node().erroneous(),
+            VarAccess(cls) => cls.node().diagnosis().errors,
             Normal(_, node)
             | Callee(node)
             | At { node }
             | Ref { node, .. }
             | ImportPath(node)
-            | IncludePath(node) => node.erroneous(),
+            | IncludePath(node) => node.diagnosis().errors,
         }
     }
 }

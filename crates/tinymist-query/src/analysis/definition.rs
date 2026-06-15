@@ -2,6 +2,7 @@
 
 use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
+use typst_shim::syntax::source_range;
 
 use super::{InsTy, SharedContext, prelude::*};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
@@ -72,13 +73,8 @@ impl HasNameRange for Decl {
             return None;
         }
 
-        let span = self.span();
-        if let Some(range) = span.range() {
-            return Some(range.clone());
-        }
-
         let src = ctx.source_by_id(self.file_id()?).ok()?;
-        src.range(span)
+        source_range(&src, self.span())
     }
 }
 

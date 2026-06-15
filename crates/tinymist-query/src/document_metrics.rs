@@ -206,7 +206,7 @@ impl DocumentMetricsWorker<'_> {
         let world = self.ctx.world();
         let file_id = span.id()?;
         let source = world.source(file_id).ok()?;
-        let range = source.range(span)?;
+        let range = source_range(&source, span)?;
         let byte_index = range.start + usize::from(span_offset);
         let byte_index = byte_index.min(range.end - 1);
         let line = source.lines().byte_to_line(byte_index)?;
