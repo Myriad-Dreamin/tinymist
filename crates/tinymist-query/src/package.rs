@@ -13,9 +13,7 @@ use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{
-    FileId, LinkedNode, RootedPath, SyntaxKind, VirtualPath, VirtualRoot, ast,
-};
+use typst::syntax::{FileId, LinkedNode, RootedPath, SyntaxKind, VirtualPath, VirtualRoot, ast};
 use typst_shim::syntax::resolve_path_from_id;
 
 use crate::LocalContext;

@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module_raw.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "159",
+    "sortText": "157",
     "textEdit": {
      "newText": "raw",
      "range": {
@@ -43,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_module_raw.typ
     "labelDetails": {
      "description": "(str, align: alignment, block: bool, lang: none | str, syntaxes: [syntax], tab-size: int, theme: [theme]) => raw"
     },
-    "sortText": "160",
+    "sortText": "158",
     "textEdit": {
      "newText": "raw(${1:})",
      "range": {

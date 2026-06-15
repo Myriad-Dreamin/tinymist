@@ -22,7 +22,7 @@ A case distinction.
 
 Content across different branches can be aligned with the `&` symbol.
 
-# Example
+= Example <example>
 ```typ
 $ f(x, y) := cases(
   1 "if" (x dot y)/2 <= 0,
