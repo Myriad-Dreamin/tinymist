@@ -22,6 +22,7 @@ use std::{
 };
 
 use tinymist_package::registry::PackageIndexEntry;
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
@@ -166,7 +167,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             self.snapshot_with(Some(TaskInputs {
                 entry: Some(
                     self.entry_state()
-                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path()),
+                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path_compat()),
                 ),
                 inputs: inputs.and_then(|i| i.inputs),
             }))
@@ -265,7 +266,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 
@@ -656,7 +657,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 

@@ -125,11 +125,8 @@ impl EntryResolver {
             //     root,
             //     Some(FileId::new(None, VirtualPath::new(entry))),
             // )),
-            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
-                Ok(stripped) => Some(EntryState::new_rooted(
-                    root,
-                    Some(VirtualPath::new(stripped)),
-                )),
+            (Some(entry), Some(root)) => match VirtualPath::virtualize(&root, &entry) {
+                Ok(vpath) => Some(EntryState::new_rooted(root, Some(vpath))),
                 Err(err) => {
                     log::info!(
                         "Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}"
@@ -229,7 +226,7 @@ mod entry_tests {
             entry.main(),
             Some(WorkspaceResolver::workspace_file(
                 entry.root().as_ref(),
-                VirtualPath::new("main.typ")
+                VirtualPath::new("main.typ").unwrap()
             ))
         );
     }
@@ -253,7 +250,7 @@ mod entry_tests {
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }
@@ -266,7 +263,7 @@ mod entry_tests {
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }

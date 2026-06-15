@@ -15,6 +15,7 @@ use typst::foundations::func;
 use typst::syntax::ast::AstNode;
 use typst::syntax::{Source, Span, SyntaxNode, ast};
 use typst::{World, WorldExt};
+use typst_shim::syntax::RootedPathExt;
 
 use crate::instrument::Instrumenter;
 
@@ -118,10 +119,11 @@ impl fmt::Display for SummarizedCoverage<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut ids = self.result.regions.keys().collect::<Vec<_>>();
         ids.sort_by(|a, b| {
-            a.package()
+            a.get()
+                .package_compat()
                 .map(crate::PackageSpecCmp::from)
-                .cmp(&b.package().map(crate::PackageSpecCmp::from))
-                .then_with(|| a.vpath().cmp(b.vpath()))
+                .cmp(&b.get().package_compat().map(crate::PackageSpecCmp::from))
+                .then_with(|| a.vpath().get_with_slash().cmp(b.vpath().get_with_slash()))
         });
 
         let summary = ids

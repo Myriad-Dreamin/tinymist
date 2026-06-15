@@ -121,10 +121,7 @@ impl MockWorkspace {
     /// Resolves a test path as a Typst virtual path inside the workspace.
     pub fn virtual_path(&self, path: impl AsRef<Path>) -> FileResult<VirtualPath> {
         let path = self.path(path);
-        let relative = path
-            .strip_prefix(&self.root)
-            .map_err(|_| FileError::AccessDenied)?;
-        Ok(VirtualPath::new(relative))
+        VirtualPath::virtualize(&self.root, &path).map_err(|_| FileError::AccessDenied)
     }
 
     /// Resolves a test path as a workspace [`FileId`].

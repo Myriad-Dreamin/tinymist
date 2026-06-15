@@ -7,12 +7,14 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 use typst::syntax::FileId;
+use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
+use typst_shim::syntax::RootedPathExt;
 
 use crate::LocalContext;
 use crate::adt::interner::Interned;
 use crate::docs::file_id_repr;
-use crate::package::{PackageInfo, get_manifest_id};
+use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
 use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 
 use super::DefDocs;
@@ -22,7 +24,7 @@ pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResu
     let toml_id = get_manifest_id(pkg)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
     module_docs(ctx, entry_point)
 }
 
@@ -34,7 +36,7 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
     let mut scan_ctx = ScanDefCtx {
         ctx,
         root: entry_point,
-        for_spec: entry_point.package(),
+        for_spec: entry_point.package_compat(),
         aliases: &mut aliases,
         extras: &mut extras,
     };
@@ -175,7 +177,7 @@ impl ScanDefCtx<'_> {
         let children = match decl.as_ref() {
             Decl::Module(..) => decl.file_id().and_then(|fid| {
                 // only generate docs for the same package
-                if fid.package() != self.for_spec {
+                if !matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec) {
                     return None;
                 }
 
@@ -235,7 +237,8 @@ impl ScanDefCtx<'_> {
         // Insert module that is not exported
         if let Some(fid) = head.decl.as_ref().and_then(|del| del.file_id()) {
             // only generate docs for the same package
-            if fid.package() == self.for_spec {
+            if matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec)
+            {
                 let av = self.aliases.entry(fid).or_default();
                 if av.is_empty() {
                     let src = self.ctx.expr_stage_by_id(fid);
