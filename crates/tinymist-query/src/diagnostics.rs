@@ -174,7 +174,7 @@ impl<'w> DiagWorker<'w> {
         let uri = self.ctx.uri_for_id(id).ok()?;
         let source = self.ctx.source_by_id(id).ok()?;
 
-        let typst_range = source.range(tracepoint.span)?;
+        let typst_range = source_range(&source, tracepoint.span)?;
         let lsp_range = self.ctx.to_lsp_range(typst_range, &source);
 
         Some(DiagnosticRelatedInformation {
@@ -186,22 +186,22 @@ impl<'w> DiagWorker<'w> {
         })
     }
 
-    fn diagnostic_span_id(&self, typst_diagnostic: &TypstDiagnostic) -> (TypstFileId, Span) {
+    fn diagnostic_span_id(&self, typst_diagnostic: &TypstDiagnostic) -> (TypstFileId, DiagSpan) {
         iter::once(typst_diagnostic.span)
-            .chain(typst_diagnostic.trace.iter().map(|trace| trace.span))
+            .chain(typst_diagnostic.trace.iter().map(|trace| trace.span.into()))
             .find_map(|span| Some((span.id()?, span)))
-            .unwrap_or_else(|| (self.ctx.world().main(), Span::detached()))
+            .unwrap_or_else(|| (self.ctx.world().main(), Span::detached().into()))
     }
 
-    fn diagnostic_range(&self, source: &Source, typst_span: Span) -> LspRange {
+    fn diagnostic_range(&self, source: &Source, typst_span: DiagSpan) -> LspRange {
         // Due to nvaner/typst-lsp#241 and maybe typst/typst#2035, we sometimes fail to
         // find the span. In that case, we use a default span as a better
         // alternative to panicking.
         //
         // This may have been fixed after Typst 0.7.0, but it's still nice to avoid
         // panics in case something similar reappears.
-        match source.find(typst_span) {
-            Some(node) => self.ctx.to_lsp_range(node.range(), source),
+        match source_range(source, typst_span) {
+            Some(range) => self.ctx.to_lsp_range(range, source),
             None => LspRange::new(LspPosition::new(0, 0), LspPosition::new(0, 0)),
         }
     }
@@ -218,7 +218,7 @@ fn diagnostic_message(typst_diagnostic: &TypstDiagnostic) -> String {
     let mut message = typst_diagnostic.message.to_string();
     for hint in &typst_diagnostic.hints {
         message.push_str("\nHint: ");
-        message.push_str(hint);
+        message.push_str(&hint.v);
     }
     message
 }
@@ -263,7 +263,7 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
             && raw
                 .hints
                 .iter()
-                .any(|hint| hint.contains("cannot read file outside of project root"))
+                .any(|hint| hint.v.contains("cannot read file outside of project root"))
     }
 
     fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {

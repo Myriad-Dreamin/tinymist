@@ -175,7 +175,7 @@ impl ReferencesWorker<'_> {
     ) {
         self.references.extend(spans.filter_map(|(span, adjust)| {
             // todo: this is not necessary a name span
-            let mut range = src.range(span)?;
+            let mut range = source_range(src, span)?;
             if let Some((start, end)) = adjust {
                 range.start = (range.start as isize + start) as usize;
                 range.end = (range.end as isize + end) as usize;
