@@ -74,12 +74,13 @@ The extension can export PDFs of your Typst files. This setting controls whether
 
 ## `exportTarget`
 
-The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html` or `bundle`. This configuration only affects how the language server completes your code.
 
 - **Type**: `string`
 - **Valid Values**:
   - `"paged"` : The current export target is for PDF, PNG, and SVG export.
   - `"html"` : The current export target is for HTML export.
+  - `"bundle"` : The current export target is for bundle export.
 - **Default**: `"paged"`
 
 ## `fontPaths`
