@@ -254,7 +254,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -265,7 +265,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1413,7 +1413,7 @@ dependencies = [
  "tinymist-project",
  "tinymist-std",
  "typst",
- "typst-syntax 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -1634,7 +1634,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1875,7 +1875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2963,7 +2963,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.61.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -3323,7 +3323,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4094,7 +4094,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5122,7 +5122,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5341,7 +5341,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e8a457e139c147f57a1c38196802565e92bfdf8c"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=62c49c70d1382f1ac89baeda591760a29152282d#62c49c70d1382f1ac89baeda591760a29152282d"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5367,7 +5367,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e8a457e139c147f57a1c38196802565e92bfdf8c"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=62c49c70d1382f1ac89baeda591760a29152282d#62c49c70d1382f1ac89baeda591760a29152282d"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5399,7 +5399,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e8a457e139c147f57a1c38196802565e92bfdf8c"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=62c49c70d1382f1ac89baeda591760a29152282d#62c49c70d1382f1ac89baeda591760a29152282d"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5427,7 +5427,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.7.0"
-source = "git+https://github.com/ParaN3xus/typst.ts.git?branch=nightly#e8a457e139c147f57a1c38196802565e92bfdf8c"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=62c49c70d1382f1ac89baeda591760a29152282d#62c49c70d1382f1ac89baeda591760a29152282d"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -5722,7 +5722,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5735,7 +5735,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6239,7 +6239,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6273,7 +6273,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6377,7 +6377,7 @@ version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0811b01ca2c4e8718760713911feaf4675c24f94e50530a015ec646cfb622f7c"
 dependencies = [
- "skrifa 0.42.1",
+ "skrifa 0.37.0",
  "yazi",
  "zeno",
 ]
@@ -6503,7 +6503,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6533,7 +6533,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -6764,7 +6764,7 @@ dependencies = [
  "typst-render",
  "typst-shim",
  "typst-svg",
- "typst-timing 0.15.0",
+ "typst-timing 0.15.0-rc.1",
  "typstfmt",
  "typstyle-core",
  "unicode-script",
@@ -6802,7 +6802,7 @@ dependencies = [
  "typst",
  "typst-macros",
  "typst-shim",
- "typst-timing 0.15.0",
+ "typst-timing 0.15.0-rc.1",
  "unscanny",
 ]
 
@@ -6890,7 +6890,7 @@ dependencies = [
  "typst-render",
  "typst-shim",
  "typst-svg",
- "typst-timing 0.15.0",
+ "typst-timing 0.15.0-rc.1",
  "typstfmt",
  "typstyle-core",
  "unicode-script",
@@ -6936,7 +6936,7 @@ dependencies = [
  "typst",
  "typst-library",
  "typst-shim",
- "typst-utils 0.15.0",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -7037,9 +7037,9 @@ dependencies = [
  "tinymist-tests",
  "tokio",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "typst-macros",
- "typst-timing 0.15.0",
+ "typst-timing 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -7069,7 +7069,7 @@ dependencies = [
  "tokio",
  "toml",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "wasm-bindgen",
 ]
 
@@ -7117,13 +7117,13 @@ dependencies = [
  "ttf-parser",
  "typlite",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "typst-layout",
  "typst-library",
  "typst-macros",
  "typst-shim",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unscanny",
  "walkdir",
  "yaml-rust2",
@@ -7206,7 +7206,7 @@ dependencies = [
  "tokio",
  "toml",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "typst-eval",
  "typst-html",
  "typst-layout",
@@ -7293,11 +7293,11 @@ dependencies = [
  "tracing",
  "ttf-parser",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "typst-dev-assets",
  "typst-library",
- "typst-syntax 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "vello",
  "walkdir",
  "windows-sys 0.61.2",
@@ -7338,7 +7338,7 @@ dependencies = [
  "tinymist-vfs",
  "ttf-parser",
  "typst",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=3284e80)",
+ "typst-assets 0.14.2",
  "typst-bundle",
  "typst-shim",
  "wasm-bindgen",
@@ -7800,13 +7800,13 @@ dependencies = [
  "typst",
  "typst-html",
  "typst-svg",
- "typst-syntax 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
 ]
 
 [[package]]
 name = "typst"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "arrayvec",
  "comemo",
@@ -7818,22 +7818,22 @@ dependencies = [
  "typst-library",
  "typst-macros",
  "typst-realize",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
 name = "typst-ansi-hl"
 version = "0.5.0"
-source = "git+https://github.com/ParaN3xus/typst-ansi-hl.git?branch=nightly#0bad09a80e502c0fcd193c72a1f6cc042596a98d"
+source = "git+https://github.com/Myriad-Dreamin/typst-ansi-hl.git?rev=3867cb7229ec6b3e3c8f5b1222af96f98bba9bff#3867cb7229ec6b3e3c8f5b1222af96f98bba9bff"
 dependencies = [
  "ansi_colours",
  "syntect",
  "termcolor",
  "thiserror 2.0.18",
  "two-face",
- "typst-syntax 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -7846,16 +7846,17 @@ dependencies = [
 
 [[package]]
 name = "typst-assets"
-version = "0.14.2"
-source = "git+https://github.com/typst/typst-assets?rev=955ae8d#955ae8db08d6e36694eb9cc61e61f586032ea572"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da9b236d339dce0ec443dc44afe4ba4c6d76b8917bd4b1ae80158d2111f6637b"
 dependencies = [
  "bitflags 2.13.0",
 ]
 
 [[package]]
 name = "typst-bundle"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "comemo",
  "ecow",
@@ -7870,9 +7871,9 @@ dependencies = [
  "typst-pdf",
  "typst-render",
  "typst-svg",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -7882,8 +7883,8 @@ source = "git+https://github.com/typst/typst-dev-assets?tag=v0.14.2#fe6cad916d8b
 
 [[package]]
 name = "typst-eval"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "comemo",
  "ecow",
@@ -7893,16 +7894,16 @@ dependencies = [
  "toml",
  "typst-library",
  "typst-macros",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unicode-segmentation",
 ]
 
 [[package]]
 name = "typst-html"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "az",
  "bumpalo",
@@ -7911,20 +7912,20 @@ dependencies = [
  "palette",
  "rustc-hash 2.1.2",
  "time",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-library",
  "typst-macros",
  "typst-svg",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unicode-math-class",
 ]
 
 [[package]]
 name = "typst-layout"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "az",
  "bumpalo",
@@ -7944,12 +7945,12 @@ dependencies = [
  "rustybuzz",
  "smallvec",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-library",
  "typst-macros",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unicode-bidi",
  "unicode-math-class",
  "unicode-script",
@@ -7958,8 +7959,8 @@ dependencies = [
 
 [[package]]
 name = "typst-library"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "arrayvec",
  "az",
@@ -8006,11 +8007,11 @@ dependencies = [
  "ttf-parser",
  "two-face",
  "typed-arena",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-macros",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unicode-math-class",
  "unicode-normalization",
  "unicode-segmentation",
@@ -8023,8 +8024,8 @@ dependencies = [
 
 [[package]]
 name = "typst-macros"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -8034,8 +8035,8 @@ dependencies = [
 
 [[package]]
 name = "typst-pdf"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "az",
  "bytemuck",
@@ -8051,19 +8052,19 @@ dependencies = [
  "rustc-hash 2.1.2",
  "serde",
  "smallvec",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-layout",
  "typst-library",
  "typst-macros",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
 name = "typst-realize"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "arrayvec",
  "bumpalo",
@@ -8073,15 +8074,15 @@ dependencies = [
  "typst-html",
  "typst-library",
  "typst-macros",
- "typst-syntax 0.15.0",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
 name = "typst-render"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "bytemuck",
  "comemo",
@@ -8092,12 +8093,12 @@ dependencies = [
  "resvg 0.47.0",
  "tiny-skia 0.12.0",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-layout",
  "typst-library",
  "typst-macros",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
 ]
 
 [[package]]
@@ -8108,13 +8109,13 @@ dependencies = [
  "comemo",
  "typst",
  "typst-eval",
- "typst-syntax 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
 ]
 
 [[package]]
 name = "typst-svg"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -8128,12 +8129,12 @@ dependencies = [
  "rustc-hash 2.1.2",
  "ryu",
  "ttf-parser",
- "typst-assets 0.14.2 (git+https://github.com/typst/typst-assets?rev=955ae8d)",
+ "typst-assets 0.15.0",
  "typst-layout",
  "typst-library",
  "typst-macros",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "xmlwriter",
 ]
 
@@ -8157,15 +8158,15 @@ dependencies = [
 
 [[package]]
 name = "typst-syntax"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "ecow",
  "rustc-hash 2.1.2",
  "serde",
  "toml",
- "typst-timing 0.15.0",
- "typst-utils 0.15.0",
+ "typst-timing 0.15.0-rc.1",
+ "typst-utils 0.15.0-rc.1",
  "unicode-ident",
  "unicode-math-class",
  "unicode-script",
@@ -8186,8 +8187,8 @@ dependencies = [
 
 [[package]]
 name = "typst-timing"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "parking_lot",
  "serde",
@@ -8210,8 +8211,8 @@ dependencies = [
 
 [[package]]
 name = "typst-utils"
-version = "0.15.0"
-source = "git+https://github.com/ParaN3xus/typst.git?branch=nightly#6743cf2415fb3c11c292d371d16746cbee44c114"
+version = "0.15.0-rc.1"
+source = "git+https://github.com/Myriad-Dreamin/typst.git?rev=ea2892a1c84bb3495aeb988626a8795a91af8f58#ea2892a1c84bb3495aeb988626a8795a91af8f58"
 dependencies = [
  "libm",
  "once_cell",
@@ -8243,7 +8244,7 @@ dependencies = [
 [[package]]
 name = "typstyle-core"
 version = "0.14.4"
-source = "git+https://github.com/ParaN3xus/typstyle.git?branch=nightly#82b1f5ec016ba258da323b635119384a255578a4"
+source = "git+https://github.com/Myriad-Dreamin/typstyle.git?rev=992f36112200bc0ea61df8a7c2af6d9ae56781dd#992f36112200bc0ea61df8a7c2af6d9ae56781dd"
 dependencies = [
  "ecow",
  "itertools 0.14.0",
@@ -8251,7 +8252,7 @@ dependencies = [
  "rustc-hash 2.1.2",
  "smallvec",
  "thiserror 2.0.18",
- "typst-syntax 0.15.0",
+ "typst-syntax 0.15.0-rc.1",
  "unicode-width 0.2.2",
 ]
 
@@ -8263,7 +8264,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9219,7 +9220,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9405,15 +9406,6 @@ name = "windows-sys"
 version = "0.52.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282be5f36a8ce781fad8c8ae18fa3f9beff57ec1b52cb3de0789201425d9a33d"
-dependencies = [
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-sys"
-version = "0.59.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
 dependencies = [
  "windows-targets 0.52.6",
 ]
