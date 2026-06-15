@@ -153,7 +153,7 @@ impl InstrumentWorker {
     }
 
     fn visit_node_fallback(&mut self, node: &SyntaxNode) {
-        let txt = node.text();
+        let txt = node.leaf_text();
         if !txt.is_empty() {
             self.instrumented.push_str(txt);
         }

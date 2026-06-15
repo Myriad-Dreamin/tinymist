@@ -344,11 +344,11 @@ impl TypeSource {
     pub fn name(&self) -> StrRef {
         self.name_repr
             .get_or_init(|| {
-                let name = self.name_node.text();
+                let name = self.name_node.leaf_text();
                 if !name.is_empty() {
                     return name.into();
                 }
-                let name = self.name_node.clone().into_text();
+                let name = self.name_node.clone().full_text();
                 name.into()
             })
             .clone()
