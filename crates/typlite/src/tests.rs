@@ -119,7 +119,15 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
     );
 
-    [repr.as_str(), res.as_ref()].join("\n=====\n")
+    normalize_snapshot_output(&[repr.as_str(), res.as_ref()].join("\n=====\n"))
+}
+
+fn normalize_snapshot_output(output: &str) -> String {
+    output
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {

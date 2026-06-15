@@ -17,12 +17,12 @@ use masonry::layout::LenReq;
 use reflexo::vector::incr::IncrDocClient;
 use reflexo::vector::stream::BytesModuleStream;
 use reflexo_vec2svg::IncrSvgDocServer;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use tracing::{Span, trace_span};
 use typst::diag::{FileError, FileResult};
-use typst::foundations::{Bytes as TypstBytes, Datetime};
-use typst::layout::PagedDocument;
-use typst::syntax::{FileId, Source, VirtualPath};
+use typst::foundations::{Bytes as TypstBytes, Datetime, Duration as TypstDuration};
+use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt, World};
@@ -773,11 +773,15 @@ fn truncate_title_for_width(title: &str, width: f64) -> String {
 
 fn render_title_scene(title: &str, width: f64, height: f64) -> Result<Arc<Scene>> {
     let source = Source::new(
-        FileId::new(None, VirtualPath::new("/tinymist-viewer-title.typ")),
+        FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new("/tinymist-viewer-title.typ")
+                .expect("title source path should be valid"),
+        )),
         title_typst_source(title, width, height),
     );
     let world = TitleWorld { main: source };
-    let compiled = typst::compile::<PagedDocument>(&world);
+    let compiled = typst::compile::<TypstPagedDocument>(&world);
     for warning in compiled.warnings {
         log::debug!("Typst title render warning: {warning:?}");
     }
@@ -852,19 +856,23 @@ impl World for TitleWorld {
         if id == self.main.id() {
             Ok(self.main.clone())
         } else {
-            Err(FileError::NotFound(id.vpath().as_rooted_path().to_owned()))
+            Err(FileError::NotFound(
+                id.vpath().as_rooted_path_compat().to_owned(),
+            ))
         }
     }
 
     fn file(&self, id: FileId) -> FileResult<TypstBytes> {
-        Err(FileError::NotFound(id.vpath().as_rooted_path().to_owned()))
+        Err(FileError::NotFound(
+            id.vpath().as_rooted_path_compat().to_owned(),
+        ))
     }
 
     fn font(&self, index: usize) -> Option<Font> {
         title_typst_base().fonts.get(index).cloned()
     }
 
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _: Option<TypstDuration>) -> Option<Datetime> {
         Some(Datetime::from_ymd(1970, 1, 1).expect("valid deterministic date"))
     }
 }

@@ -226,7 +226,8 @@ mod tests {
         let instrumented = instr(include_str!(
             "../fixtures/instr_coverage/physica_vector.typ"
         ));
-        insta::assert_snapshot!(instrumented, @r###"
+        insta::assert_snapshot!(instrumented, @r#"
+
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -269,7 +270,7 @@ mod tests {
         }
         if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
         }
-        "###);
+        "#);
     }
 
     #[test]
@@ -289,25 +290,25 @@ mod tests {
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let a = {
         if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {1}
         if __breakpoint_block_end(1) {__breakpoint_block_end_handle(1, (:)); };
         }
         ;
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show: {
         let __bp_functor = main
         __it => {if __breakpoint_show_start(0) {__breakpoint_show_start_handle(0, (:)); };
         __bp_functor(__it); } }
-        "###);
+        ");
     }
 }
