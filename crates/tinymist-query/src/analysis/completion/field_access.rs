@@ -110,7 +110,7 @@ impl CompletionPair<'_, '_, '_> {
             }
             Value::Func(func) if valid_field_access_syntax => {
                 // Autocomplete get rules.
-                if let Some((elem, styles)) = func.element().zip(styles.as_ref()) {
+                if let Some((elem, styles)) = func.to_element().zip(styles.as_ref()) {
                     for param in elem.params().iter().filter(|param| !param.required) {
                         if let Some(value) = elem
                             .field_id(param.name)
@@ -191,11 +191,14 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn is_func(read: &Value) -> bool {
-    matches!(read, Value::Func(func) if func.element().is_none())
+    matches!(read, Value::Func(func) if func.to_element().is_none())
 }
 
 fn is_valid_math_field_access(target: &SyntaxNode) -> bool {
     if let Some(field_access) = target.cast::<ast::FieldAccess>() {
+        return is_valid_math_field_access(field_access.target().to_untyped());
+    }
+    if let Some(field_access) = target.cast::<ast::MathFieldAccess>() {
         return is_valid_math_field_access(field_access.target().to_untyped());
     }
     if matches!(target.kind(), SyntaxKind::Ident | SyntaxKind::MathIdent) {
@@ -212,7 +215,7 @@ fn is_valid_math_postfix(target: &SyntaxNode) -> bool {
 
     if let Some(target) = target.cast::<ast::MathText>() {
         return match target.get() {
-            MathTextKind::Character(ch) => !bad_punc_text(ch),
+            MathTextKind::Grapheme(ch) => !ch.chars().any(bad_punc_text),
             MathTextKind::Number(..) => true,
         };
     }

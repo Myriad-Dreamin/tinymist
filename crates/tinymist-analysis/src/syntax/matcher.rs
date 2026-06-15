@@ -79,7 +79,15 @@ pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
                     return node;
                 };
 
-                let Some(field_access) = parent.cast::<ast::FieldAccess>() else {
+                let field_span = parent
+                    .cast::<ast::FieldAccess>()
+                    .map(|field_access| field_access.field().span())
+                    .or_else(|| {
+                        parent
+                            .cast::<ast::MathFieldAccess>()
+                            .map(|field_access| field_access.field().span())
+                    });
+                let Some(field_span) = field_span else {
                     return node;
                 };
 
@@ -90,9 +98,8 @@ pub fn first_ancestor_expr(node: LinkedNode) -> Option<LinkedNode> {
                 // Since typst matches `field()` by `case_last_match`, when the field access
                 // `x.` (`Ident(x).Error("")`), it will match the `x` as the
                 // field. We need to check dot position to filter out such cases.
-                if dot.is_some_and(|dot| {
-                    dot.offset() <= node.offset() && field_access.field().span() == node.span()
-                }) {
+                if dot.is_some_and(|dot| dot.offset() <= node.offset() && field_span == node.span())
+                {
                     node = parent;
                 } else {
                     return node;
@@ -367,13 +374,15 @@ pub(crate) fn interpret_mode_at_kind(kind: SyntaxKind) -> Option<InterpretMode> 
         | Space | Linebreak | Parbreak | Escape | Shorthand | SmartQuote | RawLang | RawDelim
         | RawTrimmed | LeftBrace | RightBrace | LeftBracket | RightBracket | LeftParen
         | RightParen | Comma | Semicolon | Colon | Star | Underscore | Dollar | Plus | Minus
-        | Slash | Hat | Prime | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq
-        | HyphEq | StarEq | SlashEq | Dots | Arrow | Root | Not | And | Or | None | Auto | As
+        | Slash | Hat | Dot | Eq | EqEq | ExclEq | Lt | LtEq | Gt | GtEq | PlusEq | HyphEq
+        | StarEq | SlashEq | Dots | Arrow | Root | Bang | Not | And | Or | None | Auto | As
         | Named | Keyed | Spread | Error | End => return Option::None,
         Strong | Emph | Link | Ref | RefMarker | Heading | HeadingMarker | ListItem
         | ListMarker | EnumItem | EnumMarker | TermItem | TermMarker => InterpretMode::Markup,
-        MathIdent | MathAlignPoint | MathDelimited | MathAttach | MathPrimes | MathFrac
-        | MathRoot | MathShorthand | MathText => InterpretMode::Math,
+        MathIdent | MathFieldAccess | MathAlignPoint | MathCall | MathArgs | MathDelimited
+        | MathAttach | MathPrimes | MathFrac | MathRoot | MathShorthand | MathText => {
+            InterpretMode::Math
+        }
         Let | Set | Show | Context | If | Else | For | In | While | Break | Continue | Return
         | Import | Include | Closure | Params | LetBinding | SetRule | ShowRule | Contextual
         | Conditional | WhileLoop | ForLoop | LoopBreak | ModuleImport | ImportItems
@@ -507,8 +516,16 @@ pub fn adjust_expr(mut node: LinkedNode) -> Option<LinkedNode> {
         node = node.find(paren_expr.expr().span())?;
     }
     if let Some(parent) = node.parent()
-        && let Some(field_access) = parent.cast::<ast::FieldAccess>()
-        && node.span() == field_access.field().span()
+        && {
+            parent
+                .cast::<ast::FieldAccess>()
+                .map(|field_access| node.span() == field_access.field().span())
+                .unwrap_or(false)
+                || parent
+                    .cast::<ast::MathFieldAccess>()
+                    .map(|field_access| node.span() == field_access.field().span())
+                    .unwrap_or(false)
+        }
     {
         return Some(parent.clone());
     }
@@ -580,8 +597,12 @@ impl<'a> VarClass<'a> {
         Some(match self {
             Self::Ident(node) => node.clone(),
             Self::FieldAccess(node) => {
-                let field_access = node.cast::<ast::FieldAccess>()?;
-                node.find(field_access.target().span())?
+                if let Some(field_access) = node.cast::<ast::FieldAccess>() {
+                    node.find(field_access.target().span())?
+                } else {
+                    let field_access = node.cast::<ast::MathFieldAccess>()?;
+                    node.find(field_access.target().to_untyped().span())?
+                }
             }
             Self::DotAccess(node) => node.clone(),
         })
@@ -797,7 +818,9 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
                     SyntaxKind::Ident
                         | SyntaxKind::MathIdent
                         | SyntaxKind::FieldAccess
+                        | SyntaxKind::MathFieldAccess
                         | SyntaxKind::FuncCall
+                        | SyntaxKind::MathCall
                 ) || (matches!(
                     dot_target.prev_leaf().as_deref().map(SyntaxNode::kind),
                     Some(SyntaxKind::Hash)
@@ -896,11 +919,16 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
             suffix_colon: false,
         },
         ast::Expr::FuncCall(call) => SyntaxClass::Callee(adjusted.find(call.callee().span())?),
+        ast::Expr::MathCall(call) => {
+            SyntaxClass::Callee(adjusted.find(call.callee().to_untyped().span())?)
+        }
         ast::Expr::SetRule(set) => SyntaxClass::Callee(adjusted.find(set.target().span())?),
         ast::Expr::Ident(..) | ast::Expr::MathIdent(..) => {
             SyntaxClass::VarAccess(VarClass::Ident(adjusted))
         }
-        ast::Expr::FieldAccess(..) => SyntaxClass::VarAccess(VarClass::FieldAccess(adjusted)),
+        ast::Expr::FieldAccess(..) | ast::Expr::MathFieldAccess(..) => {
+            SyntaxClass::VarAccess(VarClass::FieldAccess(adjusted))
+        }
         ast::Expr::Str(..) => {
             let parent = adjusted.parent()?;
             if parent.kind() == SyntaxKind::ModuleImport {
@@ -923,6 +951,11 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
 /// Checks if the node might be in code trivia. This is a bit internal so please
 /// check the caller to understand it.
 fn possible_in_code_trivia(kind: SyntaxKind) -> bool {
+    // TODO: this is a hacking to mode detection. related test: crates/tinymist-query/src/fixtures/signature_help/snaps/test@builtin2.typ.snap
+    if matches!(kind, SyntaxKind::MathArgs) {
+        return true;
+    }
+
     !matches!(
         interpret_mode_at_kind(kind),
         Some(InterpretMode::Markup | InterpretMode::Math | InterpretMode::Comment)
@@ -1238,12 +1271,13 @@ pub fn classify_context_outer<'a>(
                 && !matches!(node_syntax, Callee(..)) =>
         {
             let parent = callee.parent()?;
-            let args = match parent.cast::<ast::Expr>() {
-                Some(ast::Expr::FuncCall(call)) => call.args(),
-                Some(ast::Expr::SetRule(set)) => set.args(),
+            let args_span = match parent.cast::<ast::Expr>() {
+                Some(ast::Expr::FuncCall(call)) => call.args().span(),
+                Some(ast::Expr::MathCall(call)) => call.args().span(),
+                Some(ast::Expr::SetRule(set)) => set.args().span(),
                 _ => return None,
             };
-            let args = parent.find(args.span())?;
+            let args = parent.find(args_span)?;
 
             let is_set = parent.kind() == SyntaxKind::SetRule;
             let arg_target = arg_context(args.clone(), node, ArgSourceKind::Call)?;
@@ -1309,10 +1343,11 @@ pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<S
     }
 
     match node_parent.kind() {
-        SyntaxKind::Args => {
+        SyntaxKind::Args | SyntaxKind::MathArgs => {
             let callee = node_ancestors(&node_parent).find_map(|ancestor| {
                 let span = match ancestor.cast::<ast::Expr>()? {
                     ast::Expr::FuncCall(call) => call.callee().span(),
+                    ast::Expr::MathCall(call) => call.callee().to_untyped().span(),
                     ast::Expr::SetRule(set) => set.target().span(),
                     _ => return None,
                 };
@@ -1368,12 +1403,13 @@ pub fn classify_context(node: LinkedNode<'_>, cursor: Option<usize>) -> Option<S
 /// Classifies the context of the callee node.
 fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<SyntaxContext<'a>> {
     let parent = callee.parent()?;
-    let args = match parent.cast::<ast::Expr>() {
-        Some(ast::Expr::FuncCall(call)) => call.args(),
-        Some(ast::Expr::SetRule(set)) => set.args(),
+    let args_span = match parent.cast::<ast::Expr>() {
+        Some(ast::Expr::FuncCall(call)) => call.args().span(),
+        Some(ast::Expr::MathCall(call)) => call.args().span(),
+        Some(ast::Expr::SetRule(set)) => set.args().span(),
         _ => return None,
     };
-    let args = parent.find(args.span())?;
+    let args = parent.find(args_span)?;
 
     let mut parent = &node;
     loop {
@@ -1382,7 +1418,7 @@ fn callee_context<'a>(callee: LinkedNode<'a>, node: LinkedNode<'a>) -> Option<Sy
             ContentBlock | CodeBlock | Str | Raw | LineComment | BlockComment => {
                 return Option::None;
             }
-            Args if parent.range() == args.range() => {
+            Args | MathArgs if parent.range() == args.range() => {
                 break;
             }
             _ => {}

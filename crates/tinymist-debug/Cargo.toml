@@ -24,6 +24,7 @@ tinymist-world = { workspace = true, features = ["system"] }
 typst-library.workspace = true
 typst-shim.workspace = true
 typst.workspace = true
+typst-utils.workspace = true
 
 [dev-dependencies]
 insta.workspace = true

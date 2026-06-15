@@ -10,8 +10,10 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all font families.
     pub fn font_completions(&mut self) {
         let equation = self.cursor.before_window(25).contains("equation");
-        for (family, iter) in self.worker.world().clone().book().families() {
-            let detail = summarize_font_family(iter);
+        let world = self.worker.world().clone();
+        let book = world.book();
+        for (family, iter) in book.families() {
+            let detail = summarize_font_family(iter.filter_map(|id| book.info(id)));
             if !equation || family.contains("Math") {
                 self.value_completion(
                     None,

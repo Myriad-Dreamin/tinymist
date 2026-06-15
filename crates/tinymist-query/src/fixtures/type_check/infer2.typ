@@ -1,5 +1,5 @@
 #text(size: 1pt, font: (), stroke: 1pt, fill: red)[]
-#path(fill: red, stroke: red)
+#curve(fill: red, stroke: red)
 #line(angle: 1deg, length: 1pt, stroke: red)
 #rect(width: 1pt, height: 1pt, fill: red, stroke: red, radius: 1pt, inset: 1pt, outset: 1pt)
 #ellipse(fill: red, stroke: red)

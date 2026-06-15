@@ -9,7 +9,9 @@ use sync_ls::{internal_error, invalid_params, invalid_request, just_ok, Schedula
 use tinymist_std::error::prelude::*;
 use typst::{
     engine::Sink,
-    foundations::Repr,
+    foundations::{Context, Repr},
+    introspection::EmptyIntrospector,
+    routines::SpanMode,
     syntax::{LinkedNode, Span, SyntaxMode},
     World,
 };
@@ -211,11 +213,13 @@ impl ServerState {
             .map_err(|e| invalid_params(format!("{e:?}")))?;
 
         let val = typst_shim::eval::eval_string(
-            &typst::ROUTINES,
             (world as &dyn World).track(),
+            library,
             Sink::new().track_mut(),
+            EmptyIntrospector.track(),
+            Context::none().track(),
             &args.expression,
-            span,
+            SpanMode::Uniform(span),
             SyntaxMode::Code,
             source.scope().clone(),
         )
