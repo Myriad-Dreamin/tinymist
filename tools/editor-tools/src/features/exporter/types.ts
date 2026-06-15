@@ -1,6 +1,15 @@
 export type Scalar = string | number | boolean;
 
-export type ExportFormatId = "pdf" | "png" | "svg" | "html" | "markdown" | "tex" | "text" | "query";
+export type ExportFormatId =
+  | "pdf"
+  | "png"
+  | "svg"
+  | "html"
+  | "bundle"
+  | "markdown"
+  | "tex"
+  | "text"
+  | "query";
 
 export interface OptionSchema {
   key: string;
