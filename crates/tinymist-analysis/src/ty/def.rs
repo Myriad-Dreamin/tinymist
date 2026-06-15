@@ -223,7 +223,7 @@ impl Ty {
     pub fn element(&self) -> Option<Element> {
         match self {
             Ty::Value(ins_ty) => match &ins_ty.val {
-                Value::Func(func) => func.element(),
+                Value::Func(func) => func.to_element(),
                 _ => None,
             },
             Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
@@ -586,9 +586,9 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 return x.span().into_raw().cmp(&y.span().into_raw());
             }
 
-            use typst::foundations::func::Repr;
+            use typst::foundations::FuncInner;
             match (x.inner(), y.inner()) {
-                (Repr::Element(x), Repr::Element(y)) => x.cmp(y),
+                (FuncInner::Element(x), FuncInner::Element(y)) => x.cmp(y),
                 _ => ptr_cmp(x, y),
             }
         }
@@ -819,10 +819,10 @@ impl ParamAttrs {
 impl From<&ParamInfo> for ParamAttrs {
     fn from(param: &ParamInfo) -> Self {
         ParamAttrs {
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
+            positional: param.positional(),
+            named: param.named(),
+            variadic: param.variadic(),
+            settable: param.settable(),
         }
     }
 }

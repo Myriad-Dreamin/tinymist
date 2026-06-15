@@ -236,10 +236,8 @@ impl CompletionScopeChecker<'_> {
             let val = bind.read().clone();
             let has_self = bound_self.is_some()
                 && (if let Value::Func(func) = &val {
-                    let first_pos = func
-                        .params()
-                        .and_then(|params| params.iter().find(|p| p.required));
-                    first_pos.is_some_and(|p| p.name == "self")
+                    let first_pos = func.params().find(|p| p.required());
+                    first_pos.is_some_and(|p| p.name() == Some("self"))
                 } else {
                     false
                 });
@@ -282,11 +280,12 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Content { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
                 let styles = StyleChain::default();
+                let params = val.params();
                 for field_id in 0u8..254u8 {
                     let Some(field_name) = val.field_name(field_id) else {
                         continue;
                     };
-                    let param_info = val.params().iter().find(|p| p.name == field_name);
+                    let param_info = params.iter().find(|p| p.name == field_name);
                     let param_docs = param_info.map(|p| p.docs.into());
                     let ty_from_param = param_info.map(|f| Ty::from_cast_info(&f.input));
 

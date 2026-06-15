@@ -2,7 +2,7 @@ use lsp_types::{InlayHintKind, InlayHintLabel};
 use typst::syntax::{LinkedNode, SyntaxKind, ast};
 
 use crate::{
-    analysis::{ParamKind, analyze_call},
+    analysis::{ParamKind, analyze_call, call_parts},
     package::{find_package_and_latest, parse_package_import},
     prelude::*,
 };
@@ -132,24 +132,22 @@ impl InlayHintWorker<'_> {
                 self.check_package_import(node);
             }
             // Parameter inlay hints
-            SyntaxKind::FuncCall => {
+            SyntaxKind::FuncCall | SyntaxKind::MathCall => {
                 log::trace!("func call found: {node:?}");
                 let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                 crate::log_debug_ct!("got call_info {call_info:?}");
 
-                let call = node.cast::<ast::FuncCall>().unwrap();
-                let args = call.args();
-                let args_node = node.find(args.span())?;
+                let (_callee_node, args_node) = call_parts(node)?;
 
                 let check_single_pos_arg = || {
                     let mut pos = 0;
                     let mut has_rest = false;
                     let mut content_pos = 0;
 
-                    for arg in args.items() {
-                        let Some(arg_node) = args_node.find(arg.span()) else {
+                    for arg_node in args_node.children() {
+                        if arg_node.cast::<ast::Arg>().is_none() {
                             continue;
-                        };
+                        }
 
                         let Some(info) = call_info.arg_mapping.get(&arg_node) else {
                             continue;
@@ -184,10 +182,10 @@ impl InlayHintWorker<'_> {
 
                 let disable_by_single_line_content_block = !SMART.on_content_block_args
                     || 'one_line: {
-                        for arg in args.items() {
-                            let Some(arg_node) = args_node.find(arg.span()) else {
+                        for arg_node in args_node.children() {
+                            if arg_node.cast::<ast::Arg>().is_none() {
                                 continue;
-                            };
+                            }
 
                             let Some(info) = call_info.arg_mapping.get(&arg_node) else {
                                 continue;
@@ -206,10 +204,10 @@ impl InlayHintWorker<'_> {
 
                 let mut is_first_variadic_arg = true;
 
-                for arg in args.items() {
-                    let Some(arg_node) = args_node.find(arg.span()) else {
+                for arg_node in args_node.children() {
+                    if arg_node.cast::<ast::Arg>().is_none() {
                         continue;
-                    };
+                    }
 
                     let Some(info) = call_info.arg_mapping.get(&arg_node) else {
                         continue;

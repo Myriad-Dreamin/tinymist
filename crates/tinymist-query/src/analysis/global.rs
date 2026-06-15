@@ -22,9 +22,9 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
-use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
+use typst::foundations::{Bytes, IntoValue, Module, NativeElement, StyleChain, Styles};
 use typst::introspection::Introspector;
-use typst::layout::Position;
+use typst::introspection::PagedPosition as Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
@@ -1451,9 +1451,10 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    introspector: Tracked<Introspector>,
+    introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
-    let bib_elem = BibliographyElem::find(introspector).ok()?;
+    let bib_elems = introspector.query(&BibliographyElem::ELEM.select());
+    let bib_elem = bib_elems.iter().next()?.to_packed::<BibliographyElem>()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`

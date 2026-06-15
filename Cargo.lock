@@ -6913,6 +6913,7 @@ dependencies = [
  "tinymist-std",
  "tinymist-world",
  "typst",
+ "typst-layout",
  "typst-library",
  "typst-shim",
 ]
@@ -6934,6 +6935,7 @@ dependencies = [
  "typst",
  "typst-library",
  "typst-shim",
+ "typst-utils 0.15.0",
 ]
 
 [[package]]
