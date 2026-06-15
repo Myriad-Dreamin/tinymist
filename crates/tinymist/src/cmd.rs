@@ -340,11 +340,11 @@ impl ServerState {
                 .map_err(internal_error)?;
             let main = entry
                 .main()
-                .map(|e| e.vpath().realize(&root))
                 .ok_or_else(
                     || error_once!("main file must be resolved, got", entry: display_entry()),
                 )
                 .map_err(internal_error)?;
+            let main = main.vpath().realize(&root);
 
             let task = user_action.trace_document(TraceParams {
                 compiler_program: self_path,
