@@ -1527,7 +1527,7 @@ fn test_library() -> Library {
     lib.styles.set(PageElem::height, Smart::Auto);
     lib.styles.set(
         PageElem::margin,
-        Margin::splat(Some(Smart::Custom(Abs::pt(10.0).into()))),
+        Smart::Custom(Margin::splat(Some(Smart::Custom(Abs::pt(10.0).into())))),
     );
     lib.styles
         .set(TextElem::size, TextSize(Abs::pt(10.0).into()));
@@ -1573,7 +1573,7 @@ fn lines(
     #[default(Numbering::Pattern(NumberingPattern::from_str("A").unwrap()))] numbering: Numbering,
 ) -> SourceResult<Value> {
     (1..=count)
-        .map(|n| numbering.apply(engine, context, &[n]))
+        .map(|n| numbering.apply(engine, context, span, &[n]))
         .collect::<SourceResult<Array>>()?
         .join(Some('\n'.into_value()), None, None)
         .at(span)

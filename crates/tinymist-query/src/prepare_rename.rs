@@ -124,7 +124,7 @@ pub(crate) fn prepare_renaming(syntax: &SyntaxClass, def: &Definition) -> Option
 }
 
 fn validate_fn_renaming(def: &Definition) -> Option<()> {
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     let value = def.value();
     let mut func = match &value {
         None => return Some(()),
@@ -140,10 +140,10 @@ fn validate_fn_renaming(def: &Definition) -> Option<()> {
     loop {
         match func.inner() {
             // todo: rename with site
-            Repr::With(w) => func = &w.0,
-            Repr::Closure(..) | Repr::Plugin(..) => return Some(()),
+            FuncInner::With(w) => func = &w.0,
+            FuncInner::Closure(..) | FuncInner::Plugin(..) => return Some(()),
             // native functions can't be renamed
-            Repr::Native(..) | Repr::Element(..) => return None,
+            FuncInner::Native(..) | FuncInner::Element(..) => return None,
         }
     }
 }

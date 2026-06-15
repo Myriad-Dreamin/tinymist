@@ -29,10 +29,10 @@ use typst::{
     diag::{SourceResult, Warned},
     engine::{Engine, Route, Sink, Traced},
     foundations::{Context, Scopes, Value},
-    introspection::Introspector,
-    layout::PagedDocument,
+    introspection::EmptyIntrospector,
     syntax::{Span, ast, parse_code},
 };
+use typst_layout::PagedDocument;
 
 type RequestId = i64;
 
@@ -118,15 +118,16 @@ impl Drop for ResourceLock {
 fn step_global(kind: BreakpointKind, world: &dyn World) {
     let mut resource = RESOURCES.lock();
 
-    let introspector = Introspector::default();
+    let library = world.library();
+    let introspector = EmptyIntrospector;
     let traced = Traced::default();
     let mut sink = Sink::default();
     let route = Route::default();
 
     let engine = Engine {
-        routines: &typst::ROUTINES,
+        library,
         world: world.track(),
-        introspector: introspector.track(),
+        introspector: typst::utils::Protected::new(introspector.track()),
         traced: traced.track(),
         sink: sink.track_mut(),
         route,
@@ -173,9 +174,9 @@ impl BreakpointContext<'_, '_, '_> {
         let mut sink = Sink::new();
         let engine = Engine {
             world: self.engine.world,
+            library: self.engine.library,
             introspector: self.engine.introspector,
             traced: self.engine.traced,
-            routines: self.engine.routines,
             sink: sink.track_mut(),
             route: self.engine.route.clone(),
         };
