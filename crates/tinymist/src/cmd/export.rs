@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use tinymist_project::{
-    ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTeXTask, ExportTextTask,
-    Pages, ProjectTask, QueryTask,
+    ExportBundleTask, ExportHtmlTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTeXTask,
+    ExportTextTask, Pages, ProjectTask, QueryTask,
 };
 use tinymist_std::error::prelude::*;
 use tinymist_task::{ExportMarkdownTask, PageMerge};
@@ -56,6 +56,23 @@ struct ExportPngOpts {
     page_number_template: Option<String>,
     merge: Option<PageMerge>,
     fill: Option<String>,
+    ppi: Option<f32>,
+}
+
+/// See [`ProjectTask`].
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ExportBundleOpts {
+    /// Which pages to export in PDF documents. When unspecified, all pages are
+    /// exported.
+    pages: Option<Vec<Pages>>,
+    /// The creation timestamp for PDF documents (in seconds).
+    creation_timestamp: Option<String>,
+    /// A PDF standard that Typst can enforce conformance with.
+    pdf_standard: Option<Vec<PdfStandard>>,
+    /// Disable PDF tags.
+    no_pdf_tags: Option<bool>,
+    /// PPI for PNG documents.
     ppi: Option<f32>,
 }
 
@@ -135,6 +152,45 @@ impl ServerState {
         self.export(
             path,
             ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            args,
+        )
+    }
+
+    /// Export the current document as bundle file(s).
+    pub fn export_bundle(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
+        let path = get_arg!(args[0] as PathBuf);
+        let opts = get_arg_or_default!(args[1] as ExportBundleOpts);
+
+        let creation_timestamp = if let Some(value) = opts.creation_timestamp {
+            Some(
+                parse_source_date_epoch(&value)
+                    .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
+            )
+        } else {
+            self.config.creation_timestamp()
+        };
+        let no_pdf_tags = opts.no_pdf_tags.unwrap_or(self.config.no_pdf_tags());
+        let pdf_standards = opts
+            .pdf_standard
+            .or_else(|| self.config.pdf_standards())
+            .unwrap_or_default();
+        let ppi = opts.ppi.or_else(|| self.config.ppi()).unwrap_or(144.);
+        let ppi = ppi
+            .try_into()
+            .context("cannot convert ppi")
+            .map_err(invalid_params)?;
+
+        let export = self.config.export_task();
+        self.export(
+            path,
+            ProjectTask::ExportBundle(ExportBundleTask {
+                export,
+                pages: opts.pages,
+                pdf_standards,
+                no_pdf_tags,
+                creation_timestamp,
+                ppi,
+            }),
             args,
         )
     }
