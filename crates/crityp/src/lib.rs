@@ -17,6 +17,7 @@ use ecow::{EcoString, eco_format};
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst_shim::eval::eval_compat;
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Func, Value};
@@ -27,7 +28,7 @@ use typst::introspection::Introspector;
 pub fn bench(c: &mut Criterion, world: &mut LspWorld) -> anyhow::Result<()> {
     // Gets the main source file and its path.
     let main_source = world.source(world.main())?;
-    let main_path = unix_slash(world.main().vpath().as_rooted_path());
+    let main_path = unix_slash(world.main().vpath().as_rooted_path_compat());
 
     let traced = Traced::default();
     let introspector = Introspector::default();

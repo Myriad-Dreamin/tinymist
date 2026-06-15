@@ -12,6 +12,7 @@ use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
 };
+use typst_shim::syntax::RootedPathExt;
 
 use crate::syntax::Decl;
 use crate::ty::*;
@@ -225,9 +226,7 @@ impl TryFrom<FileId> for PackageId {
     type Error = ();
 
     fn try_from(value: FileId) -> Result<Self, Self::Error> {
-        let Some(spec) = value.package() else {
-            return Err(());
-        };
+        let spec = value.package_compat().ok_or(())?;
         Ok(PackageId {
             namespace: spec.namespace.as_str().into(),
             name: spec.name.as_str().into(),

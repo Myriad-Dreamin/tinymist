@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{WorkspaceResolution, WorkspaceResolver};
 use typst::diag::SourceResult;
-use typst::syntax::{FileId, VirtualPath};
+use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
 /// A trait to read the entry state.
 pub trait EntryReader {
@@ -41,12 +41,20 @@ pub struct EntryState {
 }
 
 /// The detached entry.
-pub static DETACHED_ENTRY: LazyLock<FileId> =
-    LazyLock::new(|| FileId::new(None, VirtualPath::new(Path::new("/__detached.typ"))));
+pub static DETACHED_ENTRY: LazyLock<FileId> = LazyLock::new(|| {
+    FileId::unique(RootedPath::new(
+        VirtualRoot::Project,
+        VirtualPath::new("/__detached.typ").unwrap(),
+    ))
+});
 
 /// The memory main entry.
-pub static MEMORY_MAIN_ENTRY: LazyLock<FileId> =
-    LazyLock::new(|| FileId::new(None, VirtualPath::new(Path::new("/__main__.typ"))));
+pub static MEMORY_MAIN_ENTRY: LazyLock<FileId> = LazyLock::new(|| {
+    FileId::unique(RootedPath::new(
+        VirtualRoot::Project,
+        VirtualPath::new("/__main__.typ").unwrap(),
+    ))
+});
 
 impl EntryState {
     /// Creates an entry state with no workspace root and no main file.
@@ -66,7 +74,7 @@ impl EntryState {
     pub fn new_rootless(main: VirtualPath) -> Self {
         Self {
             root: None,
-            main: Some(FileId::new(None, main)),
+            main: Some(FileId::unique(RootedPath::new(VirtualRoot::Project, main))),
         }
     }
 
@@ -87,8 +95,10 @@ impl EntryState {
     /// Creates an entry state with only a main file given.
     pub fn new_rooted_by_parent(entry: ImmutPath) -> Option<Self> {
         let root = entry.parent().map(ImmutPath::from);
-        let main =
-            WorkspaceResolver::workspace_file(root.as_ref(), VirtualPath::new(entry.file_name()?));
+        let main = WorkspaceResolver::workspace_file(
+            root.as_ref(),
+            VirtualPath::new(entry.file_name()?.to_str()?).ok()?,
+        );
 
         Some(Self {
             root,
@@ -123,7 +133,10 @@ impl EntryState {
 
     /// Selects an entry in the workspace.
     pub fn select_in_workspace(&self, path: &Path) -> EntryState {
-        let id = WorkspaceResolver::workspace_file(self.root.as_ref(), VirtualPath::new(path));
+        let id = WorkspaceResolver::workspace_file(
+            self.root.as_ref(),
+            VirtualPath::new(path.to_str().expect("virtual path must be utf-8")).unwrap(),
+        );
 
         Self {
             root: self.root.clone(),
@@ -135,10 +148,10 @@ impl EntryState {
     pub fn try_select_path_in_workspace(&self, path: &Path) -> Result<Option<EntryState>> {
         Ok(match self.workspace_root() {
             Some(root) => match path.strip_prefix(&root) {
-                Ok(path) => Some(EntryState::new_rooted(
-                    root.clone(),
-                    Some(VirtualPath::new(path)),
-                )),
+                Ok(path) => match VirtualPath::virtualize(&root, path) {
+                    Ok(path) => Some(EntryState::new_rooted(root.clone(), Some(path))),
+                    Err(_) => None,
+                },
                 Err(err) => {
                     return Err(
                         error_once!("entry file is not in workspace", err: err, entry: path.display(), root: root.display()),
@@ -221,7 +234,10 @@ impl TryFrom<EntryOpts> for EntryState {
         match value {
             EntryOpts::Workspace { root, main: entry } => Ok(EntryState::new_rooted(
                 root.as_path().into(),
-                entry.map(VirtualPath::new),
+                entry.map(|entry| {
+                    VirtualPath::new(entry.to_string_lossy())
+                        .expect("entry path must be a valid virtual path")
+                }),
             )),
             EntryOpts::RootByParent { entry } => {
                 if entry.is_relative() {

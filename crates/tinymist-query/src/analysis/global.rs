@@ -29,6 +29,7 @@ use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
+use typst_shim::syntax::VirtualPathExt;
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
@@ -356,8 +357,13 @@ impl LocalContext {
             .get_or_init(|| {
                 if let Some(root) = self.world().entry_state().workspace_root() {
                     scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
-                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
+                        VirtualPath::virtualize(&root, &root.join(path))
+                            .ok()
+                            .map(|path| WorkspaceResolver::workspace_file(Some(&root), path))
                     })
+                    .into_iter()
+                    .flatten()
+                    .collect()
                 } else {
                     vec![]
                 }
@@ -365,7 +371,7 @@ impl LocalContext {
             .iter()
             .filter(move |fid| {
                 fid.vpath()
-                    .as_rooted_path()
+                    .as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -401,7 +407,7 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path_compat()));
         ids
     }
 
@@ -602,7 +608,7 @@ impl SharedContext {
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
-            .as_rootless_path()
+            .as_rootless_path_compat()
             .extension()
             .and_then(|ext| ext.to_str());
         // yaml/yml/bib

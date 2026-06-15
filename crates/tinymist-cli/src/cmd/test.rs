@@ -27,6 +27,7 @@ use typst::introspection::Introspector;
 use typst::syntax::{FileId, LinkedNode, Source, Span, ast};
 use typst::{World, utils::PicoStr};
 use typst_shim::eval::TypstEngine;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::print_diag_or_error;
 use crate::utils::exit_on_ctrl_c;
@@ -423,7 +424,7 @@ impl<'a> TestRunner<'a> {
     }
 
     fn run_example(&self, test: &Source) {
-        let id = test.id().vpath().as_rooted_path().with_extension("");
+        let id = test.id().vpath().as_rooted_path_compat().with_extension("");
         let name = id.file_name().and_then(|s| s.to_str()).unwrap_or_default();
         self.running("example", name);
 
