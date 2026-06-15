@@ -1627,7 +1627,7 @@ mod tests {
         assert_snapshot!(map_syntax(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
-== Heading"#).trim(), @r"
+== Heading"#).trim(), @"
         #let x = 1  
          nnnnvvnnn  
         Text
@@ -1636,13 +1636,13 @@ Text
                    nnnnvvnnn   
         == Heading
         ");
-        assert_snapshot!(map_syntax(r#"#let f(x);"#).trim(), @r"
+        assert_snapshot!(map_syntax(r#"#let f(x);"#).trim(), @"
         #let f(x);
          nnnnv v
         ");
         assert_snapshot!(map_syntax(r#"#{
   calc.  
-}"#).trim(), @r"
+}"#).trim(), @"
         #{
          n
           calc.  
@@ -1657,7 +1657,7 @@ Text
         assert_snapshot!(map_context(r#"#let x = 1  
 Text
 = Heading #let y = 2;  
-== Heading"#).trim(), @r"
+== Heading"#).trim(), @"
         #let x = 1  
          nnnnvvnnn  
         Text
@@ -1666,32 +1666,32 @@ Text
                    nnnnvvnnn   
         == Heading
         ");
-        assert_snapshot!(map_context(r#"#let f(x);"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#let f(x);"#).trim(), @"
         #let f(x);
          nnnnv v
         ");
-        assert_snapshot!(map_context(r#"#f(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#f(1, 2)   Test"#).trim(), @"
         #f(1, 2)   Test
          vpppppp
         ");
-        assert_snapshot!(map_context(r#"#()   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#()   Test"#).trim(), @"
         #()   Test
          ee
         ");
-        assert_snapshot!(map_context(r#"#(1)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(1)   Test"#).trim(), @"
         #(1)   Test
          PPP
         ");
-        assert_snapshot!(map_context(r#"#(a: 1)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(a: 1)   Test"#).trim(), @"
         #(a: 1)   Test
          eeeeee
         ");
-        assert_snapshot!(map_context(r#"#(1, 2)   Test"#).trim(), @r"
+        assert_snapshot!(map_context(r#"#(1, 2)   Test"#).trim(), @"
         #(1, 2)   Test
          eeeeee
         ");
         assert_snapshot!(map_context(r#"#(1, 2)  
-  Test"#).trim(), @r"
+  Test"#).trim(), @"
         #(1, 2)  
          eeeeee  
           Test
@@ -1700,58 +1700,58 @@ Text
 
     #[test]
     fn ref_syntax() {
-        assert_snapshot!(map_syntax("@ab:"), @r###"
+        assert_snapshot!(map_syntax("@ab:"), @"
         @ab:
         rrrr
-        "###);
-        assert_snapshot!(map_syntax("@"), @r"
+        ");
+        assert_snapshot!(map_syntax("@"), @"
         @
         r
         ");
-        assert_snapshot!(map_syntax("@;"), @r"
+        assert_snapshot!(map_syntax("@;"), @"
         @;
         r
         ");
-        assert_snapshot!(map_syntax("@ t"), @r"
+        assert_snapshot!(map_syntax("@ t"), @"
         @ t
         r
         ");
-        assert_snapshot!(map_syntax("@ab"), @r###"
+        assert_snapshot!(map_syntax("@ab"), @"
         @ab
         rrr
-        "###);
-        assert_snapshot!(map_syntax("@ab:"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab:"), @"
         @ab:
         rrrr
-        "###);
-        assert_snapshot!(map_syntax("@ab:ab"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab:ab"), @"
         @ab:ab
         rrrrrr
-        "###);
-        assert_snapshot!(map_syntax("@ab:ab:"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab:ab:"), @"
         @ab:ab:
         rrrrrrr
-        "###);
-        assert_snapshot!(map_syntax("@ab:ab:ab"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab:ab:ab"), @"
         @ab:ab:ab
         rrrrrrrrr
-        "###);
-        assert_snapshot!(map_syntax("@ab[]:"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab[]:"), @"
         @ab[]:
         rrrnn
-        "###);
-        assert_snapshot!(map_syntax("@ab[ab]:"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab[ab]:"), @"
         @ab[ab]:
         rrrn  n
-        "###);
-        assert_snapshot!(map_syntax("@ab :ab: ab"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab :ab: ab"), @"
         @ab :ab: ab
         rrr
-        "###);
-        assert_snapshot!(map_syntax("@ab :ab:ab"), @r###"
+        ");
+        assert_snapshot!(map_syntax("@ab :ab:ab"), @"
         @ab :ab:ab
         rrr
-        "###);
+        ");
     }
 
     fn access_node(s: &str, cursor: i32) -> String {
@@ -1803,7 +1803,7 @@ Text
 
     #[test]
     fn test_access_field() {
-        assert_snapshot!(access_field("#(a.b)", 5), @r"Field: b");
+        assert_snapshot!(access_field("#(a.b)", 5), @"Field: b");
         assert_snapshot!(access_field("#a.", 3), @"DotSuffix: 3");
         assert_snapshot!(access_field("$a.$", 3), @"DotSuffix: 3");
         assert_snapshot!(access_field("#(a.)", 4), @"DotSuffix: 4");
@@ -1819,7 +1819,7 @@ Text
         assert_snapshot!(access_field("#{`a`.}", 6), @"DotSuffix: 6");
         assert_snapshot!(access_node("#{$a$.}", 6), @"$a$");
         assert_snapshot!(access_field("#{$a$.}", 6), @"DotSuffix: 6");
-        assert_snapshot!(access_node("#{\"a\".}", 6), @"\"a\"");
+        assert_snapshot!(access_node("#{\"a\".}", 6), @r#""a""#);
         assert_snapshot!(access_field("#{\"a\".}", 6), @"DotSuffix: 6");
         assert_snapshot!(access_node("#{<a>.}", 6), @"<a>");
         assert_snapshot!(access_field("#{<a>.}", 6), @"DotSuffix: 6");

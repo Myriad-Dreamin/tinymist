@@ -510,26 +510,23 @@ mod tests {
         let mut values = ROUTE_MAPS.values().map(access).collect::<Vec<_>>();
         values.sort();
 
-        insta::assert_snapshot!(values.as_slice().join("\n"), @r"
+        insta::assert_snapshot!(values.as_slice().join("\n"), @"
         https://typst.app/docs/reference/data-loading/cbor/
-        https://typst.app/docs/reference/data-loading/cbor/#definitions-decode
         https://typst.app/docs/reference/data-loading/cbor/#definitions-encode
         https://typst.app/docs/reference/data-loading/csv/
-        https://typst.app/docs/reference/data-loading/csv/#definitions-decode
         https://typst.app/docs/reference/data-loading/json/
-        https://typst.app/docs/reference/data-loading/json/#definitions-decode
         https://typst.app/docs/reference/data-loading/json/#definitions-encode
         https://typst.app/docs/reference/data-loading/read/
         https://typst.app/docs/reference/data-loading/toml/
-        https://typst.app/docs/reference/data-loading/toml/#definitions-decode
         https://typst.app/docs/reference/data-loading/toml/#definitions-encode
         https://typst.app/docs/reference/data-loading/xml/
-        https://typst.app/docs/reference/data-loading/xml/#definitions-decode
         https://typst.app/docs/reference/data-loading/yaml/
-        https://typst.app/docs/reference/data-loading/yaml/#definitions-decode
         https://typst.app/docs/reference/data-loading/yaml/#definitions-encode
         https://typst.app/docs/reference/foundations/arguments/
         https://typst.app/docs/reference/foundations/arguments/#definitions-at
+        https://typst.app/docs/reference/foundations/arguments/#definitions-filter
+        https://typst.app/docs/reference/foundations/arguments/#definitions-len
+        https://typst.app/docs/reference/foundations/arguments/#definitions-map
         https://typst.app/docs/reference/foundations/arguments/#definitions-named
         https://typst.app/docs/reference/foundations/arguments/#definitions-pos
         https://typst.app/docs/reference/foundations/array/
@@ -576,15 +573,19 @@ mod tests {
         https://typst.app/docs/reference/foundations/bytes/#definitions-slice
         https://typst.app/docs/reference/foundations/calc/#functions-abs
         https://typst.app/docs/reference/foundations/calc/#functions-acos
+        https://typst.app/docs/reference/foundations/calc/#functions-acosh
         https://typst.app/docs/reference/foundations/calc/#functions-asin
+        https://typst.app/docs/reference/foundations/calc/#functions-asinh
         https://typst.app/docs/reference/foundations/calc/#functions-atan
         https://typst.app/docs/reference/foundations/calc/#functions-atan2
+        https://typst.app/docs/reference/foundations/calc/#functions-atanh
         https://typst.app/docs/reference/foundations/calc/#functions-binom
         https://typst.app/docs/reference/foundations/calc/#functions-ceil
         https://typst.app/docs/reference/foundations/calc/#functions-clamp
         https://typst.app/docs/reference/foundations/calc/#functions-cos
         https://typst.app/docs/reference/foundations/calc/#functions-cosh
         https://typst.app/docs/reference/foundations/calc/#functions-div-euclid
+        https://typst.app/docs/reference/foundations/calc/#functions-erf
         https://typst.app/docs/reference/foundations/calc/#functions-even
         https://typst.app/docs/reference/foundations/calc/#functions-exp
         https://typst.app/docs/reference/foundations/calc/#functions-fact
@@ -631,9 +632,11 @@ mod tests {
         https://typst.app/docs/reference/foundations/decimal/
         https://typst.app/docs/reference/foundations/dictionary/
         https://typst.app/docs/reference/foundations/dictionary/#definitions-at
+        https://typst.app/docs/reference/foundations/dictionary/#definitions-filter
         https://typst.app/docs/reference/foundations/dictionary/#definitions-insert
         https://typst.app/docs/reference/foundations/dictionary/#definitions-keys
         https://typst.app/docs/reference/foundations/dictionary/#definitions-len
+        https://typst.app/docs/reference/foundations/dictionary/#definitions-map
         https://typst.app/docs/reference/foundations/dictionary/#definitions-pairs
         https://typst.app/docs/reference/foundations/dictionary/#definitions-remove
         https://typst.app/docs/reference/foundations/dictionary/#definitions-values
@@ -666,6 +669,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/label/
         https://typst.app/docs/reference/foundations/module/
         https://typst.app/docs/reference/foundations/panic/
+        https://typst.app/docs/reference/foundations/path/
         https://typst.app/docs/reference/foundations/plugin/
         https://typst.app/docs/reference/foundations/plugin/#definitions-transition
         https://typst.app/docs/reference/foundations/regex/
@@ -675,6 +679,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/selector/#definitions-and
         https://typst.app/docs/reference/foundations/selector/#definitions-before
         https://typst.app/docs/reference/foundations/selector/#definitions-or
+        https://typst.app/docs/reference/foundations/selector/#definitions-within
         https://typst.app/docs/reference/foundations/str/
         https://typst.app/docs/reference/foundations/str/#definitions-at
         https://typst.app/docs/reference/foundations/str/#definitions-clusters
@@ -935,6 +940,7 @@ mod tests {
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
         https://typst.app/docs/reference/model/cite/
+        https://typst.app/docs/reference/model/divider/
         https://typst.app/docs/reference/model/document/
         https://typst.app/docs/reference/model/emph/
         https://typst.app/docs/reference/model/entry/#definitions-body
@@ -1006,6 +1012,7 @@ mod tests {
         https://typst.app/docs/reference/visualize/color/#definitions-rotate
         https://typst.app/docs/reference/visualize/color/#definitions-saturate
         https://typst.app/docs/reference/visualize/color/#definitions-space
+        https://typst.app/docs/reference/visualize/color/#definitions-spot
         https://typst.app/docs/reference/visualize/color/#definitions-to-hex
         https://typst.app/docs/reference/visualize/color/#definitions-transparentize
         https://typst.app/docs/reference/visualize/curve/
@@ -1033,12 +1040,11 @@ mod tests {
         https://typst.app/docs/reference/visualize/gradient/#definitions-space
         https://typst.app/docs/reference/visualize/gradient/#definitions-stops
         https://typst.app/docs/reference/visualize/image/
-        https://typst.app/docs/reference/visualize/image/#definitions-decode
         https://typst.app/docs/reference/visualize/line/
-        https://typst.app/docs/reference/visualize/path/
         https://typst.app/docs/reference/visualize/polygon/
         https://typst.app/docs/reference/visualize/polygon/#definitions-regular
         https://typst.app/docs/reference/visualize/rect/
+        https://typst.app/docs/reference/visualize/spot/#definitions-tint
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
         https://typst.app/docs/reference/visualize/tiling/

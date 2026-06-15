@@ -458,7 +458,8 @@ mod tests {
     #[test]
     fn test_physica_vector() {
         let instrumented = instr(include_str!("fixtures/instr_coverage/physica_vector.typ"));
-        insta::assert_snapshot!(instrumented, @r###"
+        insta::assert_snapshot!(instrumented, @r#"
+
         // A show rule, should be used like:
         //   #show: super-plus-as-dagger
         //   U^+U = U U^+ = I
@@ -498,7 +499,7 @@ mod tests {
         }
         __cov_pc(8);
         }
-        "###);
+        "#);
     }
 
     #[test]
@@ -518,7 +519,7 @@ mod tests {
     fn test_instrument_coverage_show_content() {
         let source = Source::detached("#show math.equation: context it => it");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show math.equation: {
         let __cov_show_body = context (it => {
         __cov_pc(0);
@@ -527,14 +528,14 @@ mod tests {
         })
         __it => {__cov_pc(2);
         if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_inline_block() {
         let source = Source::detached("#let main-size = {1} + 2 + {3}");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let main-size = {
         __cov_pc(0);
         {1}
@@ -544,7 +545,7 @@ mod tests {
         {3}
         __cov_pc(3);
         }
-        "###);
+        ");
     }
 
     #[test]
@@ -557,7 +558,7 @@ mod tests {
 }",
         );
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let main-size = if is-web-target {
         __cov_pc(0);
         {
@@ -571,42 +572,42 @@ mod tests {
         }
         __cov_pc(3);
         }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let a = {
         __cov_pc(0);
         {1}
         __cov_pc(1);
         };
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show: {
         let __cov_show_body = main
         __it => {__cov_pc(0);
         if type(__cov_show_body) == function { __cov_show_body(__it); } else { __cov_show_body } } }
-        "###);
+        ");
     }
 
     #[test]
     fn test_instrument_coverage_set() {
         let source = Source::detached("#show raw: set text(12pt)");
         let (new, _meta) = instrument_coverage(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show raw: __it => {__cov_pc(0);
         set text(12pt)
         __it; }
-        "###);
+        ");
     }
 }

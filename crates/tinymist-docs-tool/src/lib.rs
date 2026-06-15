@@ -2,12 +2,13 @@
 //! source.
 
 use std::{
+    collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
-use cargo_metadata::{MetadataCommand, Package};
+use cargo_metadata::{Metadata, MetadataCommand, Package};
 use regex::Regex;
 use serde::Serialize;
 use ttf_parser::{Face, name_id};
@@ -111,6 +112,28 @@ fn resolve_typst_assets_package() -> Result<Package> {
         .exec()
         .context("failed to resolve Cargo metadata for the tinymist workspace")?;
 
+    if let Some(source) = typst_assets_workspace_source(&metadata)? {
+        let mut packages = metadata.packages.into_iter().filter(|package| {
+            package.name == "typst-assets"
+                && package.source.as_ref().is_some_and(|package_source| {
+                    source_matches_dependency_source(package_source, &source)
+                })
+        });
+        let Some(package) = packages.next() else {
+            bail!("failed to locate the workspace `typst-assets` package from source {source}");
+        };
+
+        if let Some(extra) = packages.next() {
+            bail!(
+                "expected a single resolved `typst-assets` package from source {source}, found at least {} and {}",
+                package.version,
+                extra.version
+            );
+        }
+
+        return Ok(package);
+    }
+
     let mut packages = metadata
         .packages
         .into_iter()
@@ -128,6 +151,44 @@ fn resolve_typst_assets_package() -> Result<Package> {
     }
 
     Ok(package)
+}
+
+fn typst_assets_workspace_source(metadata: &Metadata) -> Result<Option<String>> {
+    let mut sources = BTreeSet::new();
+
+    for package in &metadata.packages {
+        if !metadata.workspace_members.contains(&package.id) {
+            continue;
+        }
+
+        for dependency in &package.dependencies {
+            if dependency.name == "typst-assets"
+                && let Some(source) = &dependency.source
+            {
+                sources.insert(source.clone());
+            }
+        }
+    }
+
+    if sources.len() > 1 {
+        bail!(
+            "workspace members depend on multiple `typst-assets` sources: {}",
+            sources.into_iter().collect::<Vec<_>>().join(", ")
+        );
+    }
+
+    Ok(sources.into_iter().next())
+}
+
+fn source_matches_dependency_source(
+    package_source: &cargo_metadata::Source,
+    dependency_source: &str,
+) -> bool {
+    package_source.repr == dependency_source
+        || package_source
+            .repr
+            .strip_prefix(dependency_source)
+            .is_some_and(|suffix| suffix.starts_with('#'))
 }
 
 fn extract_font_relative_paths(source: &str) -> Result<Vec<String>> {
@@ -222,7 +283,9 @@ fn prettify_display_name(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_font_relative_paths, load_inventory};
+    use cargo_metadata::Source;
+
+    use super::{extract_font_relative_paths, load_inventory, source_matches_dependency_source};
 
     #[test]
     fn extracts_embedded_font_assets_from_source() {
@@ -266,5 +329,22 @@ pub fn fonts() -> impl Iterator<Item = &'static [u8]> {
                 .iter()
                 .any(|font| font.file_name == "NewCMMath-Regular.otf")
         );
+    }
+
+    #[test]
+    fn matches_resolved_git_source_to_dependency_source() {
+        let package_source = Source {
+            repr: "git+https://github.com/typst/typst-assets?rev=3284e80#3284e80cc102b402"
+                .to_owned(),
+        };
+
+        assert!(source_matches_dependency_source(
+            &package_source,
+            "git+https://github.com/typst/typst-assets?rev=3284e80"
+        ));
+        assert!(!source_matches_dependency_source(
+            &package_source,
+            "git+https://github.com/typst/typst-assets?rev=955ae8d"
+        ));
     }
 }

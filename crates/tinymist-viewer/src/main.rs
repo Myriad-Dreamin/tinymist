@@ -903,7 +903,11 @@ fn render_status_scene(message: &str, width: f64, height: f64) -> Result<(Arc<Sc
 
 fn render_help_overlay_scene(width: f64, height: f64) -> Result<(Arc<Scene>, Size)> {
     let source = Source::new(
-        FileId::new(None, VirtualPath::new("/tinymist-viewer-help-overlay.typ")),
+        FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new("/tinymist-viewer-help-overlay.typ")
+                .expect("help overlay source path should be valid"),
+        )),
         help_overlay_typst_source(width, height),
     );
     render_typst_scene(source, "help overlay")
