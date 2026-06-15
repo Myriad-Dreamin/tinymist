@@ -647,7 +647,7 @@ impl ExportTask {
                 ExportPng(config) => PngExport::run(&graph, paged_doc()?,& config)?.with_pages(total_pages()),
                 Query(config) => DocumentQuery::run(&graph, paged_doc()?, &config)??.into(),
                 ExportHtml(ExportHtmlTask { export: _ }) =>
-                    typst_html::html(html_doc()?)
+                    typst_html::html(html_doc()?, &typst_html::HtmlOptions::default())
                         .map_err(|e| format!("export error: {e:?}"))
                         .context_ut("failed to export to html")?.into(),
                 ExportBundle(..) => unreachable!(),
@@ -775,13 +775,18 @@ fn export_bundle_artifact(
     })?;
 
     let options = BundleOptions {
-        pixel_per_pt: config.ppi.to_f32() / 72.0,
+        html: typst_html::HtmlOptions::default(),
         pdf: pdf_options(
             config.pages.as_deref(),
             &config.pdf_standards,
             config.no_pdf_tags,
             config.creation_timestamp,
         )?,
+        png: typst_render::RenderOptions {
+            pixel_per_pt: f64::from(config.ppi.to_f32() / 72.0).into(),
+            ..Default::default()
+        },
+        svg: typst_svg::SvgOptions::default(),
     };
     let fs = typst_bundle::export(&bundle, &options).map_err(|errors| {
         print_diagnostics_to_string(
