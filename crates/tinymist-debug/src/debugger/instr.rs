@@ -68,7 +68,10 @@ impl InstrumentWorker {
                     self.instrument_block_child(
                         node,
                         cond_expr.if_body().span(),
-                        cond_expr.else_body().unwrap_or_default().span(),
+                        cond_expr
+                            .else_body()
+                            .map(|expr| expr.span())
+                            .unwrap_or(Span::detached()),
                     );
                     return;
                 }
@@ -116,6 +119,8 @@ impl InstrumentWorker {
                 | ast::Expr::MathPrimes(..)
                 | ast::Expr::MathFrac(..)
                 | ast::Expr::MathRoot(..)
+                | ast::Expr::MathFieldAccess(..)
+                | ast::Expr::MathCall(..)
                 | ast::Expr::Ident(..)
                 | ast::Expr::None(..)
                 | ast::Expr::Auto(..)

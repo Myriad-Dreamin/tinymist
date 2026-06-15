@@ -739,6 +739,8 @@ trait DataFlowVisitor {
             }
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
             ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
+            ast::Expr::MathFieldAccess(expr) => self.math_field_access(expr),
+            ast::Expr::MathCall(expr) => self.math_call(expr),
 
             ast::Expr::Ident(expr) => self.ident(expr),
             ast::Expr::MathIdent(expr) => self.math_ident(expr),
@@ -819,6 +821,22 @@ trait DataFlowVisitor {
 
     fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
         self.expr(expr.target())
+    }
+
+    fn math_access(&mut self, access: ast::MathAccess<'_>) -> Option<()> {
+        match access {
+            ast::MathAccess::MathIdent(expr) => self.math_ident(expr),
+            ast::MathAccess::MathFieldAccess(expr) => self.math_field_access(expr),
+        }
+    }
+
+    fn math_field_access(&mut self, expr: ast::MathFieldAccess<'_>) -> Option<()> {
+        self.math_access(expr.target())
+    }
+
+    fn math_call(&mut self, expr: ast::MathCall<'_>) -> Option<()> {
+        self.exprs(expr.args().to_untyped().exprs())?;
+        self.math_access(expr.callee())
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
