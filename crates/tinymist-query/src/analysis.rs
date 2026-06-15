@@ -31,6 +31,7 @@ pub use global::*;
 pub(crate) use post_tyck::*;
 pub(crate) use tinymist_analysis::stats::{AnalysisStats, QueryStatGuard};
 pub(crate) use tyck::*;
+pub use typst_shim::syntax::VirtualPathExt;
 
 use std::sync::Arc;
 
@@ -137,7 +138,8 @@ impl LspQuerySnapshot {
                 .ok_or_else(|| eco_format!("cannot get package root (parent of {toml_path:?})"))?;
 
             let manifest = crate::package::get_manifest(world, toml_id)?;
-            let entry_point = toml_id.join(&manifest.package.entrypoint);
+            let entry_point =
+                crate::package::package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
             Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
         });
@@ -186,6 +188,8 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
+    use typst_shim::syntax::RootedPathExt;
+    use typst_shim::syntax::VirtualPathExt;
 
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
@@ -200,12 +204,14 @@ mod expr_tests {
                 Expr::Decl(decl) => {
                     let range = self.range(decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        let vpath = fid.vpath().as_rooted_path();
-                        match fid.package() {
-                            Some(package) if WorkspaceResolver::is_package_file(fid) => {
-                                format!(" in {package:?}{}", unix_slash(vpath))
-                            }
-                            Some(_) | None => format!(" in {}", unix_slash(vpath)),
+                        if WorkspaceResolver::is_package_file(fid) {
+                            let package = fid.package_compat().expect("package file");
+                            format!(
+                                " in {package:?}{}",
+                                unix_slash(fid.vpath().as_rooted_path_compat())
+                            )
+                        } else {
+                            format!(" in {}", unix_slash(fid.vpath().as_rooted_path_compat()))
                         }
                     } else {
                         "".to_string()
@@ -310,7 +316,7 @@ mod module_tests {
             fn ids(ids: EcoVec<FileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
-                    .map(|id| unix_slash(id.vpath().as_rooted_path()))
+                    .map(|id| unix_slash(id.vpath().as_rooted_path_compat()))
                     .collect();
                 ids.sort();
                 ids
@@ -322,7 +328,7 @@ mod module_tests {
                 .into_iter()
                 .map(|(id, v)| {
                     (
-                        unix_slash(id.vpath().as_rooted_path()),
+                        unix_slash(id.vpath().as_rooted_path_compat()),
                         ids(v.dependencies),
                         ids(v.dependents),
                     )
