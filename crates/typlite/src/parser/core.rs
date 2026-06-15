@@ -58,7 +58,13 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            tag::p | tag::span | tag::div => {
+            tag::p => {
+                self.flush_inline_buffer();
+                self.convert_children(element)?;
+                Ok(())
+            }
+
+            tag::span | tag::div => {
                 self.convert_children(element)?;
                 Ok(())
             }
@@ -90,11 +96,10 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            md_tag::parbreak => {
-                self.flush_inline_buffer();
-                Ok(())
-            }
-
+            // md_tag::parbreak => {
+            //     self.flush_inline_buffer();
+            //     Ok(())
+            // }
             md_tag::heading => {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
