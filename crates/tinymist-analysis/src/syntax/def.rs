@@ -146,7 +146,9 @@ impl ExprInfoRepr {
     #[allow(dead_code)]
     fn show(&self) {
         use std::io::Write;
-        let vpath = self.fid.vpath().realize(Path::new("target/exprs/"));
+        let Ok(vpath) = self.fid.vpath().realize(Path::new("target/exprs/")) else {
+            return;
+        };
         let root = vpath.with_extension("root.expr");
         std::fs::create_dir_all(root.parent().unwrap()).unwrap();
         std::fs::write(root, format!("{}", self.root)).unwrap();

@@ -799,13 +799,18 @@ fn export_bundle_artifact(
     })?;
 
     Ok(ExportArtifact::Bundle {
-        items: collect_bundle_files(&fs),
+        items: collect_bundle_files(&fs)?,
     })
 }
 
-fn collect_bundle_files(fs: &VirtualFs) -> Vec<(PathBuf, Bytes)> {
+fn collect_bundle_files(fs: &VirtualFs) -> Result<Vec<(PathBuf, Bytes)>> {
     fs.iter()
-        .map(|(path, data)| (path.realize(Path::new("")), data.clone()))
+        .map(|(path, data)| {
+            let path = path
+                .realize(Path::new(""))
+                .map_err(|err| anyhow::anyhow!("failed to realize bundle path {path:?}: {err}"))?;
+            Ok((path, data.clone()))
+        })
         .collect()
 }
 

@@ -320,20 +320,20 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-bundle = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-eval = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-html = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-layout = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-library = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-macros = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-pdf = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-realize = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-render = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-svg = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-syntax = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-timing = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
-typst-utils = { git = "https://github.com/ParaN3xus/typst.git", branch = "nightly" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-bundle = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-layout = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-realize = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
+typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", branch = "tinymist-v0.15.0-rc1" }
 
 typst-ansi-hl = { git = "https://github.com/ParaN3xus/typst-ansi-hl.git", branch = "nightly" }
 typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", branch = "nightly" }
@@ -360,9 +360,9 @@ typstyle-core = { git = "https://github.com/ParaN3xus/typstyle.git", branch = "n
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
-reflexo-typst = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
-reflexo-vec2svg = { git = "https://github.com/ParaN3xus/typst.ts.git", branch = "nightly" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", branch = "tinymist-v0.15.0-rc1" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", branch = "tinymist-v0.15.0-rc1" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", branch = "tinymist-v0.15.0-rc1" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

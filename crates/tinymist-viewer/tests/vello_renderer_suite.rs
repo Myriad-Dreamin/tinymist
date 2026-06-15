@@ -1311,7 +1311,10 @@ impl RenderWorld {
             None => PathBuf::new(),
         };
 
-        let path = id.vpath().realize(&base);
+        let path = id
+            .vpath()
+            .realize(&base)
+            .map_err(|_| FileError::AccessDenied)?;
         if let Ok(asset) = path.strip_prefix("assets") {
             return Ok(SystemPath::Asset(asset.to_path_buf()));
         }
