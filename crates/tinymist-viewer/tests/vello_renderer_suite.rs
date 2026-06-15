@@ -405,7 +405,7 @@ fn compile_paged(world: &dyn World) -> Result<TypstPagedDocument> {
         output,
         warnings: _,
     } = typst::compile::<TypstPagedDocument>(world);
-    output.map_err(|errors| anyhow!("{}", format_diagnostics(&errors)))
+    output.map_err(|errors| anyhow!("{}", format_diagnostics(errors.as_ref())))
 }
 
 fn format_diagnostics(errors: &[typst::diag::SourceDiagnostic]) -> String {
@@ -413,7 +413,7 @@ fn format_diagnostics(errors: &[typst::diag::SourceDiagnostic]) -> String {
     for error in errors {
         let _ = writeln!(out, "{}", error.message);
         for hint in &error.hints {
-            let _ = writeln!(out, "  hint: {hint}");
+            let _ = writeln!(out, "  hint: {}", hint.v);
         }
     }
     out

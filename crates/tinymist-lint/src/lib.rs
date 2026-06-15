@@ -14,7 +14,7 @@ use typst::{
     diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
     syntax::{
-        FileId, Span, Spanned, SyntaxNode,
+        DiagSpan, FileId, Span, Spanned, SyntaxNode,
         ast::{self, AstNode},
     },
 };
@@ -53,8 +53,8 @@ pub fn lint_file(
 /// duplicating warnings.
 #[derive(Default, Clone, Hash)]
 pub struct KnownIssues {
-    unknown_vars: EcoVec<Span>,
-    unknown_fonts: EcoVec<(Span, EcoString)>,
+    unknown_vars: EcoVec<DiagSpan>,
+    unknown_fonts: EcoVec<(DiagSpan, EcoString)>,
 }
 
 impl KnownIssues {
@@ -71,8 +71,6 @@ impl KnownIssues {
                 unknown_fonts.push((diag.span, font_name));
             }
         }
-        unknown_vars.sort_by_key(|span| span.into_raw());
-        unknown_fonts.sort_by_key(|(span, _)| span.into_raw());
         let unknown_vars = EcoVec::from(unknown_vars);
         let unknown_fonts = EcoVec::from(unknown_fonts);
         Self {
@@ -82,14 +80,14 @@ impl KnownIssues {
     }
 
     pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
-        self.unknown_vars.contains(&ident.span())
+        self.unknown_vars.contains(&ident.span().into())
     }
 
     pub(crate) fn get_unknown_font(&self, span: Span) -> Option<&EcoString> {
+        let span = DiagSpan::from(span);
         self.unknown_fonts
-            .binary_search_by_key(&span.into_raw(), |(s, _)| s.into_raw())
-            .ok()
-            .map(|i| &self.unknown_fonts[i].1)
+            .iter()
+            .find_map(|(candidate, name)| (*candidate == span).then_some(name))
     }
 }
 
