@@ -39,73 +39,89 @@ const MERGE_OPTS: OptionSchema[] = [
   },
 ];
 
+const PDF_OPTS: OptionSchema[] = [
+  {
+    key: "pdf.creationTimestamp",
+    type: "datetime",
+    label: "Creation Timestamp",
+    description: "The document's creation date (leave empty for current time)",
+    default: "",
+    validate: (value: string) => {
+      if (value.trim() === "") {
+        return; // Allow empty input
+      }
+      if (!/^\d+$/.test(value)) {
+        return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
+      }
+      const num = Number(value);
+      if (Number.isNaN(num) || !Number.isInteger(num) || num < 0) {
+        return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
+      }
+    },
+  },
+  {
+    key: "pdf.pdfVersion",
+    type: "select",
+    label: "PDF Version",
+    description: "Optional version of the PDF document",
+    options: [
+      { value: "1.4", label: "PDF 1.4" },
+      { value: "1.5", label: "PDF 1.5" },
+      { value: "1.6", label: "PDF 1.6" },
+      { value: "1.7", label: "PDF 1.7" },
+      { value: "2.0", label: "PDF 2.0" },
+    ],
+  },
+  {
+    key: "pdf.pdfValidator",
+    type: "select",
+    label: "PDF Validator",
+    description: "Optional validator for exporting PDF documents to a specific subset of PDF",
+    options: [
+      { value: "a-1b", label: "PDF/A-1b" },
+      { value: "a-1a", label: "PDF/A-1a" },
+      { value: "a-2b", label: "PDF/A-2b" },
+      { value: "a-2u", label: "PDF/A-2u" },
+      { value: "a-2a", label: "PDF/A-2a" },
+      { value: "a-3b", label: "PDF/A-3b" },
+      { value: "a-3u", label: "PDF/A-3u" },
+      { value: "a-3a", label: "PDF/A-3a" },
+      { value: "a-4", label: "PDF/A-4" },
+      { value: "a-4f", label: "PDF/A-4f" },
+      { value: "a-4e", label: "PDF/A-4e" },
+      { value: "ua-1", label: "PDF/UA-1" },
+    ],
+  },
+  {
+    key: "pdf.pdfTags",
+    type: "boolean",
+    label: "PDF Tags",
+    description: "Include tagged structure in the PDF for better accessibility.",
+    default: true,
+  },
+];
+
+const PPI_OPT: OptionSchema = {
+  key: "png.ppi",
+  type: "number",
+  label: "PPI (Pixels per inch)",
+  description: "Resolution for the exported image",
+  default: 144,
+  min: 0,
+  validate: (value: string) => {
+    const num = Number(value);
+    if (Number.isNaN(num) || !Number.isFinite(num) || num <= 0) {
+      return "PPI must be a valid positive number";
+    }
+  },
+};
+
 export const EXPORT_FORMATS: ExportFormat[] = [
   {
     id: "pdf",
     label: "PDF",
     fileExtension: "pdf",
-    options: [
-      PAGES_OPT,
-      {
-        key: "pdf.creationTimestamp",
-        type: "datetime",
-        label: "Creation Timestamp",
-        description: "The document's creation date (leave empty for current time)",
-        default: "",
-        validate: (value: string) => {
-          if (value.trim() === "") {
-            return; // Allow empty input
-          }
-          if (!/^\d+$/.test(value)) {
-            return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
-          }
-          const num = Number(value);
-          if (Number.isNaN(num) || !Number.isInteger(num) || num < 0) {
-            return "Creation timestamp must be a valid non-negative integer UNIX timestamp";
-          }
-        },
-      },
-      {
-        key: "pdf.pdfVersion",
-        type: "select",
-        label: "PDF Version",
-        description: "Optional version of the PDF document",
-        options: [
-          { value: "1.4", label: "PDF 1.4" },
-          { value: "1.5", label: "PDF 1.5" },
-          { value: "1.6", label: "PDF 1.6" },
-          { value: "1.7", label: "PDF 1.7" },
-          { value: "2.0", label: "PDF 2.0" },
-        ],
-      },
-      {
-        key: "pdf.pdfValidator",
-        type: "select",
-        label: "PDF Validator",
-        description: "Optional validator for exporting PDF documents to a specific subset of PDF",
-        options: [
-          { value: "a-1b", label: "PDF/A-1b" },
-          { value: "a-1a", label: "PDF/A-1a" },
-          { value: "a-2b", label: "PDF/A-2b" },
-          { value: "a-2u", label: "PDF/A-2u" },
-          { value: "a-2a", label: "PDF/A-2a" },
-          { value: "a-3b", label: "PDF/A-3b" },
-          { value: "a-3u", label: "PDF/A-3u" },
-          { value: "a-3a", label: "PDF/A-3a" },
-          { value: "a-4", label: "PDF/A-4" },
-          { value: "a-4f", label: "PDF/A-4f" },
-          { value: "a-4e", label: "PDF/A-4e" },
-          { value: "ua-1", label: "PDF/UA-1" },
-        ],
-      },
-      {
-        key: "pdf.pdfTags",
-        type: "boolean",
-        label: "PDF Tags",
-        description: "Include tagged structure in the PDF for better accessibility.",
-        default: true,
-      },
-    ],
+    options: [PAGES_OPT, ...PDF_OPTS],
   },
   {
     id: "png",
@@ -114,20 +130,7 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     options: [
       ...IMAGE_PAGES_OPTS,
       ...MERGE_OPTS,
-      {
-        key: "png.ppi",
-        type: "number",
-        label: "PPI (Pixels per inch)",
-        description: "Resolution for the exported image",
-        default: 144,
-        min: 0,
-        validate: (value: string) => {
-          const num = Number(value);
-          if (Number.isNaN(num) || !Number.isFinite(num) || num <= 0) {
-            return "PPI must be a valid positive number";
-          }
-        },
-      },
+      PPI_OPT,
       {
         key: "png.fill",
         type: "color",
@@ -148,6 +151,12 @@ export const EXPORT_FORMATS: ExportFormat[] = [
     label: "HTML",
     fileExtension: "html",
     options: [],
+  },
+  {
+    id: "bundle",
+    label: "Bundle",
+    fileExtension: "",
+    options: [PAGES_OPT, ...PDF_OPTS, PPI_OPT],
   },
   {
     id: "markdown",

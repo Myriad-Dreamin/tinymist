@@ -1,6 +1,6 @@
 /// We test that whether current target is HTML (which is used by the converter).
 /// `ieee` will not style the document if `is-html-target` is true.
-#let is-html-target = ("target" in dictionary(std))
+#let is-html-target = ("html" in dictionary(std))
 
 #let title-state = state("tex:title", "")
 #let authors-state = state("tex:authors", ())
