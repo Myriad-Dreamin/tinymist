@@ -170,7 +170,7 @@ impl DocumentMetricsWorker<'_> {
     }
 
     fn work_text(&mut self, text: &TextItem) -> Option<()> {
-        let font_key = text.font.clone();
+        let font_key = text.font.font().clone();
         let glyph_len = text.glyphs.len();
 
         let has_source_info = if let Some(font_info) = self.font_info.get(&font_key) {

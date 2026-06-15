@@ -24,7 +24,13 @@ use reflexo::{
     },
 };
 use smallvec::SmallVec;
-use typst::visualize::{Color as TypstColor, ColorSpace as TypstColorSpace, WeightedColor};
+use typst::{
+    foundations::Smart,
+    visualize::{
+        Color as TypstColor, ColorSpace as TypstColorSpace,
+        ProcessColorSpace as TypstProcessColorSpace, WeightedColor,
+    },
+};
 use vello::peniko;
 use vello::{
     Scene,
@@ -1141,7 +1147,7 @@ fn raw_gradient_stops(gradient: &GradientItem) -> peniko::ColorStops {
 
 fn sample_gradient_color(
     gradient: &GradientItem,
-    mixing_space: TypstColorSpace,
+    mixing_space: TypstProcessColorSpace,
     t: f64,
 ) -> Option<TypstColor> {
     let t = t.clamp(0.0, 1.0);
@@ -1177,21 +1183,21 @@ fn sample_gradient_color(
             WeightedColor::new(typst_color_from_rgba8(col_0), 1.0 - t),
             WeightedColor::new(typst_color_from_rgba8(col_1), t),
         ],
-        mixing_space,
+        Smart::Custom(TypstColorSpace::Process(mixing_space)),
     )
     .ok()
 }
 
-fn typst_color_space(space: ColorSpace) -> Option<TypstColorSpace> {
+fn typst_color_space(space: ColorSpace) -> Option<TypstProcessColorSpace> {
     Some(match space {
         ColorSpace::Luma | ColorSpace::Srgb => return None,
-        ColorSpace::Oklab => TypstColorSpace::Oklab,
-        ColorSpace::Oklch => TypstColorSpace::Oklch,
-        ColorSpace::D65Gray => TypstColorSpace::D65Gray,
-        ColorSpace::LinearRgb => TypstColorSpace::LinearRgb,
-        ColorSpace::Hsl => TypstColorSpace::Hsl,
-        ColorSpace::Hsv => TypstColorSpace::Hsv,
-        ColorSpace::Cmyk => TypstColorSpace::Cmyk,
+        ColorSpace::Oklab => TypstProcessColorSpace::Oklab,
+        ColorSpace::Oklch => TypstProcessColorSpace::Oklch,
+        ColorSpace::D65Gray => TypstProcessColorSpace::D65Gray,
+        ColorSpace::LinearRgb => TypstProcessColorSpace::LinearRgb,
+        ColorSpace::Hsl => TypstProcessColorSpace::Hsl,
+        ColorSpace::Hsv => TypstProcessColorSpace::Hsv,
+        ColorSpace::Cmyk => TypstProcessColorSpace::Cmyk,
     })
 }
 
