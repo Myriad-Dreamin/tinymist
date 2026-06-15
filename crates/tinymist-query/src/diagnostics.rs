@@ -32,7 +32,7 @@ fn collect_lint_diagnostics_with_known(
         if WorkspaceResolver::is_package_file(dep)
             || dep
                 .vpath()
-                .as_rooted_path()
+                .as_rooted_path_compat()
                 .extension()
                 .is_none_or(|e| e != "typ")
         {

@@ -90,7 +90,7 @@ pub(crate) fn prepare_renaming(syntax: &SyntaxClass, def: &Definition) -> Option
     if WorkspaceResolver::is_package_file(def_fid) {
         crate::log_debug_ct!(
             "prepare_rename: is in a package {pkg:?}, def: {def:?}",
-            pkg = def_fid.package(),
+            pkg = def_fid.package_compat(),
         );
         return None;
     }

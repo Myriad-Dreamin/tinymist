@@ -44,7 +44,7 @@ mod path_mapper;
 pub use path_mapper::{PathResolution, RootResolver, WorkspaceResolution, WorkspaceResolver};
 
 use core::fmt;
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU16, NonZeroUsize};
 use std::sync::OnceLock;
 use std::{path::Path, sync::Arc};
 
@@ -57,7 +57,7 @@ use typst::syntax::Source;
 use typst::utils::LazyHash;
 
 use crate::notify::NotifyAccessModel;
-use crate::overlay::OverlayAccessModel;
+use crate::overlay::{OverlayAccessModel, RawFileId};
 use crate::resolve::ResolveAccessModel;
 
 pub use tinymist_std::ImmutPath;
@@ -101,7 +101,8 @@ pub trait AccessModel {
 type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<M>>;
 /// we add notify access model here since notify access model doesn't introduce
 /// overheads by our observation
-type VfsAccessModel<M> = OverlayAccessModel<FileId, ResolveAccessModel<VfsPathAccessModel<M>>>;
+type VfsAccessModel<M> =
+    OverlayAccessModel<FileId, ResolveAccessModel<VfsPathAccessModel<M>>, RawFileId>;
 
 /// A trait to perform file system query.
 pub trait FsProvider {
@@ -210,7 +211,7 @@ impl<M: PathAccessModel + Clone + Sized> Vfs<M> {
     pub fn is_clean_compile(&self, rev: usize, file_ids: &[FileId]) -> bool {
         let mut m = self.managed.lock();
         for id in file_ids {
-            let Some(entry) = m.entries.get_mut(id) else {
+            let Some(entry) = m.get_mut(*id) else {
                 log::debug!("Vfs(dirty, {id:?}): file id not found");
                 return false;
             };
@@ -306,6 +307,11 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     /// Resolve the real path for a file id.
     pub fn file_path(&self, id: FileId) -> Result<PathResolution, FileError> {
         self.access_model.inner.resolver.path_for_id(id)
+    }
+
+    /// Resolves the root path for a file id.
+    pub fn resolve_root(&self, id: FileId) -> FileResult<Option<ImmutPath>> {
+        self.access_model.inner.resolver.resolve_root(id)
     }
 
     /// Get paths to all the shadowing paths in [`OverlayAccessModel`].
@@ -591,21 +597,32 @@ struct VfsEntry {
 
 #[derive(Debug, Clone, Default)]
 struct EntryMap {
-    entries: RedBlackTreeMapSync<FileId, VfsEntry>,
+    entries: RedBlackTreeMapSync<EntryId, VfsEntry>,
 }
+
+type EntryId = NonZeroU16;
 
 impl EntryMap {
     /// Read a slot.
     #[inline(always)]
-    fn slot<T>(&mut self, path: FileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
-        if let Some(entry) = self.entries.get_mut(&path) {
+    fn slot<T>(&mut self, id: FileId, f: impl FnOnce(&mut VfsEntry) -> T) -> T {
+        let id = Self::key(id);
+        if let Some(entry) = self.entries.get_mut(&id) {
             f(entry)
         } else {
             let mut entry = VfsEntry::default();
             let res = f(&mut entry);
-            self.entries.insert_mut(path, entry);
+            self.entries.insert_mut(id, entry);
             res
         }
+    }
+
+    fn get_mut(&mut self, id: FileId) -> Option<&mut VfsEntry> {
+        self.entries.get_mut(&Self::key(id))
+    }
+
+    fn key(id: FileId) -> EntryId {
+        id.into_raw()
     }
 
     fn display(&self) -> DisplayEntryMap<'_> {
