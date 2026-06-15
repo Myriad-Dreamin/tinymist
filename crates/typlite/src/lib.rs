@@ -11,6 +11,7 @@ pub mod parser;
 pub mod tags;
 pub mod writer;
 
+use std::ops::Range;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -28,7 +29,7 @@ use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
 use typst_html::HtmlDocument;
-use typst_syntax::{RootedPath, Span, VirtualPath, VirtualRoot};
+use typst_syntax::{DiagSpan, LinkedNode, RootedPath, Source, Span, VirtualPath, VirtualRoot};
 
 pub use crate::common::Format;
 use crate::diagnostics::WarningCollector;
@@ -113,7 +114,7 @@ impl MarkdownDocument {
         mut diagnostic: SourceDiagnostic,
         info: &WrapInfo,
     ) -> Option<SourceDiagnostic> {
-        if let Some(span) = info.remap_span(self.world.as_ref(), diagnostic.span) {
+        if let Some(span) = info.remap_diag_span(self.world.as_ref(), diagnostic.span) {
             diagnostic.span = span;
         } else {
             return None;
@@ -131,6 +132,20 @@ impl MarkdownDocument {
                     None => None,
                 },
             )
+            .collect();
+
+        diagnostic.hints = diagnostic
+            .hints
+            .into_iter()
+            .filter_map(|mut spanned| {
+                match info.remap_diag_span(self.world.as_ref(), spanned.span) {
+                    Some(span) => {
+                        spanned.span = span;
+                        Some(spanned)
+                    }
+                    None => None,
+                }
+            })
             .collect();
 
         Some(diagnostic)
@@ -213,13 +228,29 @@ pub struct WrapInfo {
 }
 
 impl WrapInfo {
+    /// Translate a diagnostic span from the wrapper file back into the original
+    /// file.
+    pub fn remap_diag_span(&self, world: &dyn typst::World, span: DiagSpan) -> Option<DiagSpan> {
+        if span.id() != Some(self.wrap_file_id) {
+            return Some(span);
+        }
+
+        let range = self.remap_range(world, world.range(span)?)?;
+        Some(DiagSpan::from_range(self.original_file_id, range))
+    }
+
     /// Translate a span from the wrapper file back into the original file.
     pub fn remap_span(&self, world: &dyn typst::World, span: Span) -> Option<Span> {
         if span.id() != Some(self.wrap_file_id) {
             return Some(span);
         }
 
-        let range = world.range(span)?;
+        let range = self.remap_range(world, world.range(span)?)?;
+        let original_source = world.source(self.original_file_id).ok()?;
+        WrapInfo::span_covering_range(&original_source, range)
+    }
+
+    fn remap_range(&self, world: &dyn typst::World, range: Range<usize>) -> Option<Range<usize>> {
         let start = range.start.checked_sub(self.prefix_len_bytes)?;
         let end = range.end.checked_sub(self.prefix_len_bytes)?;
 
@@ -230,7 +261,22 @@ impl WrapInfo {
             return None;
         }
 
-        Some(Span::from_range(self.original_file_id, start..end))
+        Some(start..end)
+    }
+
+    fn span_covering_range(source: &Source, range: Range<usize>) -> Option<Span> {
+        fn inner(node: LinkedNode<'_>, range: &Range<usize>) -> Option<Span> {
+            let node_range = node.range();
+            if range.start < node_range.start || range.end > node_range.end {
+                return None;
+            }
+
+            node.children()
+                .find_map(|child| inner(child, range))
+                .or_else(|| Some(node.span()))
+        }
+
+        inner(LinkedNode::new(source.root()), &range)
     }
 }
 
