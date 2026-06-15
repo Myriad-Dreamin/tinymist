@@ -307,7 +307,7 @@ pub fn is_mark(sk: SyntaxKind) -> bool {
 /// Checks if the node can be recognized as an identifier.
 pub fn is_ident_like(node: &SyntaxNode) -> bool {
     fn can_be_ident(node: &SyntaxNode) -> bool {
-        typst::syntax::is_ident(node.text())
+        typst::syntax::is_ident(node.leaf_text())
     }
 
     use SyntaxKind::*;
@@ -625,7 +625,7 @@ impl<'a> VarClass<'a> {
                 });
 
                 let ident_case = ident.map(|ident| {
-                    if ident.text().is_empty() {
+                    if ident.leaf_text().is_empty() {
                         FieldClass::DotSuffix(SourceSpanOffset {
                             span: ident.span(),
                             offset: 0,
@@ -748,7 +748,7 @@ impl<'a> SyntaxClass<'a> {
 /// Classifies node's syntax (inner syntax) that can be operated on by IDE
 /// functionality.
 pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClass<'_>> {
-    if matches!(node.kind(), SyntaxKind::Error) && node.text().starts_with('<') {
+    if matches!(node.kind(), SyntaxKind::Error) && node.leaf_text().starts_with('<') {
         return Some(SyntaxClass::error_as_label(node));
     }
 
@@ -760,7 +760,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
         }
 
         // Gets the trivia text before the cursor.
-        let previous_text = node.text().as_bytes();
+        let previous_text = node.leaf_text().as_bytes();
         let previous_text = if node.range().contains(&cursor) {
             &previous_text[..cursor - node.offset()]
         } else {
@@ -839,7 +839,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
                 || (matches!(
                     node.kind(),
                     SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
-                ) && node.text().starts_with("."))
+                ) && node.leaf_text().starts_with("."))
         }
         && let Some(dot_access) = classify_dot_access(&node)
     {
@@ -880,7 +880,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
                 || (matches!(
                     node.kind(),
                     SyntaxKind::Text | SyntaxKind::MathText | SyntaxKind::Error
-                ) && node.text().starts_with(":"))
+                ) && node.leaf_text().starts_with(":"))
         }
         && let Some(ref_syntax) = classify_ref(&node)
     {
@@ -889,7 +889,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
 
     if node.kind() == SyntaxKind::Text
         && node.offset() + 1 == cursor
-        && node.text().starts_with('@')
+        && node.leaf_text().starts_with('@')
     {
         return Some(SyntaxClass::At { node });
     }
@@ -1760,7 +1760,7 @@ Text
 
     fn access_node_(s: &str, cursor: i32) -> Option<String> {
         access_var(s, cursor, |_source, var| {
-            Some(var.accessed_node()?.get().clone().into_text().into())
+            Some(var.accessed_node()?.get().clone().full_text().into())
         })
     }
 
@@ -1772,7 +1772,7 @@ Text
         access_var(s, cursor, |source, var| {
             let field = var.accessing_field()?;
             Some(match field {
-                FieldClass::Field(ident) => format!("Field: {}", ident.text()),
+                FieldClass::Field(ident) => format!("Field: {}", ident.leaf_text()),
                 FieldClass::DotSuffix(span_offset) => {
                     let offset = source.find(span_offset.span)?.offset() + span_offset.offset;
                     format!("DotSuffix: {offset:?}")
