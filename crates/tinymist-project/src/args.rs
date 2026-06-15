@@ -254,6 +254,14 @@ impl TaskCompileArgs {
                 merge: None,
             }),
             OutputFormat::Html => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            OutputFormat::Bundle => ProjectTask::ExportBundle(ExportBundleTask {
+                export,
+                pages: self.pages.clone(),
+                pdf_standards: self.pdf.standard.clone(),
+                no_pdf_tags: self.pdf.no_tags,
+                creation_timestamp: None,
+                ppi: self.png.ppi.try_into().unwrap(),
+            }),
         };
 
         Ok(ApplyProjectTask {
