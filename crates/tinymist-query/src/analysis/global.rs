@@ -171,7 +171,6 @@ impl Analysis {
     pub fn clear_cache(&self) {
         self.caches.signatures.clear();
         self.caches.docstrings.clear();
-        self.caches.converted_docs.clear();
         self.caches.def_signatures.clear();
         self.caches.static_signatures.clear();
         self.caches.terms.clear();
@@ -300,7 +299,6 @@ impl LocalContextGuard {
         caches.terms.retain(|(l, _)| retainer(*l));
         caches.signatures.retain(|(l, _)| retainer(*l));
         caches.docstrings.retain(|(l, _)| retainer(*l));
-        caches.converted_docs.retain(|(l, _)| retainer(*l));
     }
 }
 
@@ -1119,22 +1117,6 @@ impl SharedContext {
         .clone()
     }
 
-    pub(crate) fn convert_docs_cached(
-        self: &Arc<Self>,
-        docs: &str,
-        source_fid: Option<TypstFileId>,
-    ) -> StrResult<EcoString> {
-        let dark = matches!(self.analysis.color_theme, ColorTheme::Dark);
-        let res = self.analysis.caches.converted_docs.entry(
-            hash128(&(source_fid, docs, self.analysis.remove_html, dark)),
-            self.lifetime,
-        );
-        res.get_or_init(|| {
-            crate::docs::convert_docs(self, docs, source_fid, crate::docs::DocsContent::Plain)
-        })
-        .clone()
-    }
-
     /// Remove html tags from markup content if necessary.
     pub fn remove_html(&self, markup: EcoString) -> EcoString {
         if !self.analysis.remove_html {
@@ -1324,7 +1306,6 @@ pub struct AnalysisGlobalCaches {
     static_signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     signatures: CacheMap<DeferredCompute<Option<Signature>>>,
     docstrings: CacheMap<DeferredCompute<Option<Arc<DocString>>>>,
-    converted_docs: CacheMap<DeferredCompute<StrResult<EcoString>>>,
     terms: CacheMap<(Value, Ty)>,
 }
 
