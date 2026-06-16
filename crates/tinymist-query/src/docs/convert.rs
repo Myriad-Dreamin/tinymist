@@ -17,18 +17,12 @@ use typst::syntax::FileId;
 use typst_shim::syntax::VirtualPathExt;
 
 use crate::analysis::SharedContext;
-
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub(crate) enum DocsContent {
-    Plain,
-    Official,
-}
+use crate::docs::{DocText, DocTextKind};
 
 pub(crate) fn convert_docs(
     ctx: &SharedContext,
-    content: &str,
+    content: &DocText,
     source_fid: Option<FileId>,
-    docs_content: DocsContent,
 ) -> StrResult<EcoString> {
     let mut entry = ctx.world().entry_state();
     let import_context = source_fid.map(|fid| {
@@ -67,7 +61,7 @@ pub(crate) fn convert_docs(
         inputs: None,
     });
 
-    let content = prepare_docs_content(content, docs_content);
+    let content = prepare_docs_content(content);
 
     // todo: bad performance: content.to_owned()
     w.map_shadow_by_id(w.main(), Bytes::from_string(content))?;
@@ -88,9 +82,9 @@ pub(crate) fn convert_docs(
     Ok(conv.replace("```example", "```typ"))
 }
 
-fn prepare_docs_content(content: &str, docs_content: DocsContent) -> String {
-    if docs_content != DocsContent::Official {
-        return content.to_owned();
+fn prepare_docs_content(content: &DocText) -> String {
+    if content.kind() != DocTextKind::Official {
+        return content.raw().to_string();
     }
 
     let mut prepared = String::new();
@@ -107,7 +101,7 @@ fn prepare_docs_content(content: &str, docs_content: DocsContent) -> String {
     prepared.push_str("}\n");
     prepared.push_str("#let footnote(body) = [(#body)]\n");
     prepared.push('\n');
-    prepared.push_str(&rewrite_builtin_doc_refs(content));
+    prepared.push_str(&rewrite_builtin_doc_refs(content.raw()));
     prepared
 }
 
@@ -260,10 +254,12 @@ mod tests {
                 let docs = "#docs-table(table.header[A][B], [C], [D])";
                 let shared = ctx.shared();
 
-                let plain_err = convert_docs(shared, docs, None, DocsContent::Plain).unwrap_err();
+                let plain = DocText::plain(docs.into());
+                let plain_err = convert_docs(shared, &plain, None).unwrap_err();
                 assert!(plain_err.contains("unknown variable: docs-table"));
 
-                let official = convert_docs(shared, docs, None, DocsContent::Official).unwrap();
+                let official_docs = DocText::official(docs.into());
+                let official = convert_docs(shared, &official_docs, None).unwrap();
                 assert!(official.contains("| A | B |"));
                 assert!(official.contains("| C | D |"));
             });

@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, ops::Deref, sync::LazyLock};
 
 use ecow::eco_format;
 use tinymist_analysis::stats::GLOBAL_STATS;
-use typst::diag::StrResult;
 use typst::foundations::{IntoValue, Module, Str, Type};
 
 use crate::{StrRef, adt::interner::Interned};
@@ -58,8 +57,8 @@ static EMPTY_MODULE: LazyLock<Module> =
 
 impl DocsChecker<'_> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = self
-            .convert_docs(&docs)
+        let docs_text = crate::docs::DocText::plain(docs.as_str().into());
+        let converted = crate::docs::convert_docs(self.ctx, &docs_text, Some(self.fid))
             .and_then(|converted| identify_pat_docs(&converted));
 
         let converted = match Self::fallback_docs(converted, &docs) {
@@ -94,7 +93,9 @@ impl DocsChecker<'_> {
     }
 
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted = self.convert_docs(&docs).and_then(identify_tidy_module_docs);
+        let docs_text = crate::docs::DocText::plain(docs.as_str().into());
+        let converted = crate::docs::convert_docs(self.ctx, &docs_text, Some(self.fid))
+            .and_then(identify_tidy_module_docs);
 
         let converted = match Self::fallback_docs(converted, &docs) {
             Ok(docs) => docs,
@@ -363,14 +364,5 @@ impl DocsChecker<'_> {
             }
             _ => None,
         }
-    }
-
-    fn convert_docs(&self, docs: &str) -> StrResult<EcoString> {
-        crate::docs::convert_docs(
-            self.ctx,
-            docs,
-            Some(self.fid),
-            crate::docs::DocsContent::Plain,
-        )
     }
 }

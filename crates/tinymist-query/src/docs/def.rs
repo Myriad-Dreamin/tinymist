@@ -11,7 +11,6 @@ use typst::syntax::Span;
 
 use crate::LocalContext;
 use crate::analysis::SharedContext;
-use crate::docs::DocsContent;
 
 pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.id()?).ok()?;
@@ -117,7 +116,8 @@ fn convert_official_doc(ctx: &SharedContext, docs: EcoString) -> EcoString {
         return docs;
     }
 
-    match crate::docs::convert_docs(ctx, &docs, None, DocsContent::Official) {
+    let docs_text = DocText::official(docs.clone());
+    match crate::docs::convert_docs(ctx, &docs_text, None) {
         Ok(converted) => {
             let converted = remove_list_annotations(&converted);
             ctx.remove_html(converted.trim().into())
@@ -135,7 +135,8 @@ pub(crate) fn convert_typst_docs(ctx: &mut LocalContext, docs: EcoString) -> Eco
     }
 
     let shared = ctx.shared_();
-    match crate::docs::convert_docs(&shared, &docs, None, DocsContent::Plain) {
+    let docs_text = DocText::plain(docs.clone());
+    match crate::docs::convert_docs(&shared, &docs_text, None) {
         Ok(converted) => {
             let converted = remove_list_annotations(&converted);
             ctx.remove_html(converted.trim().into())
