@@ -806,7 +806,7 @@ fn export_bundle_artifact(
 fn collect_bundle_files(fs: &VirtualFs) -> Result<Vec<(PathBuf, Bytes)>> {
     fs.iter()
         .map(|(path, data)| {
-            let path = path.realize(Path::new(""));
+            let path = path.realize(Path::new(""))?;
             Ok((path, data.clone()))
         })
         .collect()

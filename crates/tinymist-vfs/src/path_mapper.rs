@@ -55,7 +55,9 @@ impl PathResolution {
     /// Resolves a virtual path relative to this path resolution.
     pub fn resolve_to(&self, path: &VirtualPath) -> Option<PathResolution> {
         match self {
-            PathResolution::Resolved(root) => Some(PathResolution::Resolved(path.realize(root))),
+            PathResolution::Resolved(root) => {
+                Some(PathResolution::Resolved(path.realize(root).ok()?))
+            }
             PathResolution::Rootless(root) => Some(PathResolution::Rootless(Cow::Owned(
                 root.as_ref().join(path.get_without_slash()).ok()?,
             ))),
@@ -80,7 +82,7 @@ pub trait RootResolver {
             }
         };
 
-        Ok(PathResolution::Resolved(file_id.vpath().realize(&root)))
+        Ok(PathResolution::Resolved(file_id.vpath().realize(&root)?))
     }
 
     /// Resolves the root path for a given file ID.
@@ -305,7 +307,7 @@ impl fmt::Debug for Resolving {
         };
 
         let path = match WorkspaceResolver::resolve(id) {
-            Ok(Workspace(workspace)) => Some(id.vpath().realize(&workspace.path())),
+            Ok(Workspace(workspace)) => id.vpath().realize(&workspace.path()).ok(),
             Ok(UntitledRooted(..)) => Some(id.vpath().as_rootless_path_compat().to_owned()),
             Ok(Rootless | Package) | Err(_) => None,
         };
@@ -326,7 +328,7 @@ impl fmt::Display for Resolving {
         };
 
         let path = match WorkspaceResolver::resolve(id) {
-            Ok(Workspace(workspace)) => Some(id.vpath().realize(&workspace.path())),
+            Ok(Workspace(workspace)) => id.vpath().realize(&workspace.path()).ok(),
             Ok(UntitledRooted(..)) => Some(Path::new(id.vpath().get_without_slash()).to_owned()),
             Ok(Rootless | Package) | Err(_) => None,
         };
