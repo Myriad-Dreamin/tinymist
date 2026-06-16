@@ -3,9 +3,8 @@
 use ecow::EcoString;
 use itertools::Either;
 use tinymist_analysis::docs::tidy::remove_list_annotations;
-use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
+use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature_with_docs};
 use tinymist_derive::BindTyCtx;
-use typst::foundations::FuncInner;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
@@ -346,68 +345,9 @@ fn analyze_dyn_signature(
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
-    let sig = func_signature(func.clone());
-    if func_has_official_docs(&func) {
-        Some(convert_official_signature_docs(ctx, sig))
-    } else {
-        Some(sig)
-    }
-}
-
-fn func_has_official_docs(func: &Func) -> bool {
-    let mut func = func;
-    loop {
-        match func.inner() {
-            FuncInner::With(with) => func = &with.as_ref().0,
-            FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => return true,
-            FuncInner::Closure(..) => return false,
-        }
-    }
-}
-
-fn convert_official_signature_docs(ctx: &Arc<SharedContext>, sig: Signature) -> Signature {
-    match sig {
-        Signature::Primary(primary) => {
-            Signature::Primary(convert_official_primary_signature_docs(ctx, &primary))
-        }
-        Signature::Partial(partial) => Signature::Partial(Arc::new(PartialSignature {
-            signature: convert_official_primary_signature_docs(ctx, &partial.signature),
-            with_stack: partial.with_stack.clone(),
-        })),
-    }
-}
-
-fn convert_official_primary_signature_docs(
-    ctx: &Arc<SharedContext>,
-    primary: &PrimarySignature,
-) -> Arc<PrimarySignature> {
-    let param_specs = primary
-        .param_specs
-        .iter()
-        .map(|param| {
-            Interned::new(ParamTy {
-                name: param.name.clone(),
-                docs: param
-                    .docs
-                    .clone()
-                    .map(|docs| convert_official_doc(ctx, docs)),
-                default: param.default.clone(),
-                ty: param.ty.clone(),
-                attrs: param.attrs,
-            })
-        })
-        .collect();
-
-    Arc::new(PrimarySignature {
-        docs: primary
-            .docs
-            .clone()
-            .map(|docs| convert_official_doc(ctx, docs)),
-        param_specs,
-        has_fill_or_size_or_stroke: primary.has_fill_or_size_or_stroke,
-        sig_ty: primary.sig_ty.clone(),
-        _broken: primary._broken,
-    })
+    Some(func_signature_with_docs(func, |docs| {
+        convert_official_doc(ctx, docs)
+    }))
 }
 
 fn convert_official_doc(ctx: &Arc<SharedContext>, docs: EcoString) -> EcoString {

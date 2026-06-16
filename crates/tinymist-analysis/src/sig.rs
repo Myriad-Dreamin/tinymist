@@ -164,9 +164,23 @@ pub struct PartialSignature {
 /// Gets the signature of a function.
 #[comemo::memoize]
 pub fn func_signature(func: Func) -> Signature {
+    func_signature_impl(func, |docs| docs)
+}
+
+/// Gets the signature of a function, converting official docs while building it.
+pub fn func_signature_with_docs(
+    func: Func,
+    convert_docs: impl FnMut(EcoString) -> EcoString,
+) -> Signature {
+    func_signature_impl(func, convert_docs)
+}
+
+fn func_signature_impl(
+    mut func: Func,
+    mut convert_docs: impl FnMut(EcoString) -> EcoString,
+) -> Signature {
     use typst::foundations::FuncInner;
     let mut with_stack = eco_vec![];
-    let mut func = func;
     while let FuncInner::With(with) = func.inner() {
         let (inner, args) = with.as_ref();
         with_stack.push(ArgsInfo {
@@ -217,25 +231,30 @@ pub fn func_signature(func: Func) -> Signature {
         }
     };
 
-    let ret_ty = match func.inner() {
+    let (docs, ret_ty) = match func.inner() {
         FuncInner::With(..) => unreachable!(),
         FuncInner::Closure(closure) => {
             analyze_closure_signature(closure.clone(), &mut add_param);
-            None
+            (func.docs().map(From::from), None)
         }
         FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
             for param in func.params() {
                 let name = param.name().unwrap_or_default();
                 add_param(Interned::new(ParamTy {
                     name: name.into(),
-                    docs: param.to_native().map(|native| native.docs.into()),
+                    docs: param
+                        .to_native()
+                        .map(|native| convert_docs(native.docs.into())),
                     default: param.default().map(|default| truncated_repr(&default)),
                     ty: Ty::from_param_site(&func, &param),
                     attrs: (&param).into(),
                 }));
             }
 
-            func.returns().map(|r| Ty::from_return_site(&func, r))
+            (
+                func.docs().map(|docs| convert_docs(docs.into())),
+                func.returns().map(|r| Ty::from_return_site(&func, r)),
+            )
         }
     };
 
@@ -252,7 +271,7 @@ pub fn func_signature(func: Func) -> Signature {
     }
 
     let signature = Arc::new(PrimarySignature {
-        docs: func.docs().map(From::from),
+        docs,
         param_specs,
         has_fill_or_size_or_stroke,
         sig_ty: sig_ty.into(),
