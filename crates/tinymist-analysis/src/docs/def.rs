@@ -400,6 +400,12 @@ pub type TypelessParamDocs = ParamDocsT<()>;
 /// Documentation about a parameter.
 pub type ParamDocs = ParamDocsT<TypeRepr>;
 
+/// Resolves lazy documentation text.
+pub trait DocTextResolver {
+    /// Gets display-ready documentation text.
+    fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString;
+}
+
 /// Describes a function parameter.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ParamDocsT<T> {
@@ -418,17 +424,12 @@ pub struct ParamDocsT<T> {
 
 impl ParamDocs {
     /// Create a new parameter documentation.
-    pub fn new(param: &ParamTy, ty: Option<&Ty>) -> Self {
+    pub fn new(ctx: &mut impl DocTextResolver, param: &ParamTy, ty: Option<&Ty>) -> Self {
         let docs = param
             .docs
             .as_ref()
-            .map(|docs| docs.raw().clone())
+            .map(|docs| ctx.resolve_doc_text(docs))
             .unwrap_or_default();
-        Self::new_with_docs(param, ty, docs)
-    }
-
-    /// Create a new parameter documentation with display-ready docs.
-    pub fn new_with_docs(param: &ParamTy, ty: Option<&Ty>, docs: EcoString) -> Self {
         Self {
             name: param.name.as_ref().into(),
             docs,

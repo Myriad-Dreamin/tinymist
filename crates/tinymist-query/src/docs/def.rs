@@ -3,7 +3,9 @@ use std::sync::OnceLock;
 use ecow::EcoString;
 use tinymist_analysis::Signature;
 use tinymist_analysis::docs::tidy::remove_list_annotations;
-use tinymist_analysis::docs::{DocText, ParamDocs, SignatureDocs, VarDocs, format_ty};
+use tinymist_analysis::docs::{
+    DocText, DocTextResolver, ParamDocs, SignatureDocs, VarDocs, format_ty,
+};
 use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
 
@@ -72,36 +74,12 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
     let ret_in = type_sig.body.as_ref();
 
     let pos = pos_in
-        .map(|(param, ty)| {
-            let docs = param
-                .docs
-                .as_ref()
-                .map(|docs| resolve_doc_text(ctx, docs))
-                .unwrap_or_default();
-            ParamDocs::new_with_docs(param, ty, docs)
-        })
+        .map(|(param, ty)| ParamDocs::new(ctx, param, ty))
         .collect::<Vec<_>>();
     let named = named_in
-        .map(|(param, ty)| {
-            let docs = param
-                .docs
-                .as_ref()
-                .map(|docs| resolve_doc_text(ctx, docs))
-                .unwrap_or_default();
-            (
-                param.name.clone(),
-                ParamDocs::new_with_docs(param, ty, docs),
-            )
-        })
+        .map(|(param, ty)| (param.name.clone(), ParamDocs::new(ctx, param, ty)))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let rest = rest_in.map(|(param, ty)| {
-        let docs = param
-            .docs
-            .as_ref()
-            .map(|docs| resolve_doc_text(ctx, docs))
-            .unwrap_or_default();
-        ParamDocs::new_with_docs(param, ty, docs)
-    });
+    let rest = rest_in.map(|(param, ty)| ParamDocs::new(ctx, param, ty));
 
     let ret_ty = format_ty(ret_in);
 
@@ -126,6 +104,12 @@ pub(crate) fn resolve_doc_text(ctx: &mut LocalContext, docs: &DocText) -> EcoStr
     let shared = ctx.shared();
     docs.get_or_init(|raw| convert_official_doc(shared, raw.clone()))
         .clone()
+}
+
+impl DocTextResolver for LocalContext {
+    fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString {
+        resolve_doc_text(self, docs)
+    }
 }
 
 fn convert_official_doc(ctx: &SharedContext, docs: EcoString) -> EcoString {
