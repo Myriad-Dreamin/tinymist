@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::sync::OnceLock;
 
 use ecow::EcoString;
@@ -124,17 +123,17 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
 }
 
 pub(crate) fn resolve_doc_text(ctx: &mut LocalContext, docs: &DocText) -> EcoString {
-    let shared = ctx.shared_();
-    docs.get_or_init(|raw| convert_official_doc(&shared, raw.clone()))
+    let shared = ctx.shared();
+    docs.get_or_init(|raw| convert_official_doc(shared, raw.clone()))
         .clone()
 }
 
-fn convert_official_doc(ctx: &Arc<SharedContext>, docs: EcoString) -> EcoString {
+fn convert_official_doc(ctx: &SharedContext, docs: EcoString) -> EcoString {
     if docs.trim().is_empty() {
         return docs;
     }
 
-    match ctx.convert_docs_cached(&docs, None, DocsContent::Official) {
+    match crate::docs::convert_docs(ctx, &docs, None, DocsContent::Official) {
         Ok(converted) => {
             let converted = remove_list_annotations(&converted);
             ctx.remove_html(converted.trim().into())
