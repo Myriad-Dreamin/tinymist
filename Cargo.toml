@@ -360,9 +360,9 @@ typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = 
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "b80de68117d2b441584bc9c603488b4526bc316a" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "b80de68117d2b441584bc9c603488b4526bc316a" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "b80de68117d2b441584bc9c603488b4526bc316a" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
