@@ -59,7 +59,7 @@ impl DocsChecker<'_> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
         let converted = self
             .ctx
-            .convert_docs_cached(&docs, Some(self.fid), crate::docs::DocsContent::Plain)
+            .convert_docs_cached(&docs, Some(self.fid))
             .and_then(|converted| identify_pat_docs(&converted));
 
         let converted = match Self::fallback_docs(converted, &docs) {
@@ -96,7 +96,7 @@ impl DocsChecker<'_> {
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
         let converted = self
             .ctx
-            .convert_docs_cached(&docs, Some(self.fid), crate::docs::DocsContent::Plain)
+            .convert_docs_cached(&docs, Some(self.fid))
             .and_then(identify_tidy_module_docs);
 
         let converted = match Self::fallback_docs(converted, &docs) {

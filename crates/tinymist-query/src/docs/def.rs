@@ -151,7 +151,7 @@ pub(crate) fn convert_typst_docs(ctx: &mut LocalContext, docs: EcoString) -> Eco
     }
 
     let shared = ctx.shared_();
-    match shared.convert_docs_cached(&docs, None, DocsContent::Plain) {
+    match shared.convert_docs_cached(&docs, None) {
         Ok(converted) => {
             let converted = remove_list_annotations(&converted);
             ctx.remove_html(converted.trim().into())

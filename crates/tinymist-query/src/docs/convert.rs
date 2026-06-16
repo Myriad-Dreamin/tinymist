@@ -260,14 +260,10 @@ mod tests {
                 let docs = "#docs-table(table.header[A][B], [C], [D])";
                 let shared = ctx.shared();
 
-                let plain_err = shared
-                    .convert_docs_cached(docs, None, DocsContent::Plain)
-                    .unwrap_err();
+                let plain_err = convert_docs(shared, docs, None, DocsContent::Plain).unwrap_err();
                 assert!(plain_err.contains("unknown variable: docs-table"));
 
-                let official = shared
-                    .convert_docs_cached(docs, None, DocsContent::Official)
-                    .unwrap();
+                let official = convert_docs(shared, docs, None, DocsContent::Official).unwrap();
                 assert!(official.contains("| A | B |"));
                 assert!(official.contains("| C | D |"));
             });

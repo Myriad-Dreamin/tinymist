@@ -1123,21 +1123,16 @@ impl SharedContext {
         self: &Arc<Self>,
         docs: &str,
         source_fid: Option<TypstFileId>,
-        docs_content: crate::docs::DocsContent,
     ) -> StrResult<EcoString> {
         let dark = matches!(self.analysis.color_theme, ColorTheme::Dark);
         let res = self.analysis.caches.converted_docs.entry(
-            hash128(&(
-                source_fid,
-                docs,
-                docs_content,
-                self.analysis.remove_html,
-                dark,
-            )),
+            hash128(&(source_fid, docs, self.analysis.remove_html, dark)),
             self.lifetime,
         );
-        res.get_or_init(|| crate::docs::convert_docs(self, docs, source_fid, docs_content))
-            .clone()
+        res.get_or_init(|| {
+            crate::docs::convert_docs(self, docs, source_fid, crate::docs::DocsContent::Plain)
+        })
+        .clone()
     }
 
     /// Remove html tags from markup content if necessary.
