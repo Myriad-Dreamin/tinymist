@@ -88,7 +88,10 @@ impl SemanticRequest for SignatureHelpRequest {
                     .unwrap_or("any")
             ));
 
-            let documentation = param.docs.as_ref().map(|docs| markdown_docs(docs.clone()));
+            let documentation = param
+                .docs
+                .as_ref()
+                .map(|docs| markdown_docs(crate::docs::resolve_doc_text(ctx, docs)));
 
             params.push(ParameterInformation {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
@@ -116,7 +119,7 @@ impl SemanticRequest for SignatureHelpRequest {
                     .primary()
                     .docs
                     .as_ref()
-                    .map(|docs| markdown_docs(docs.clone())),
+                    .map(|docs| markdown_docs(crate::docs::resolve_doc_text(ctx, docs))),
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
             }],

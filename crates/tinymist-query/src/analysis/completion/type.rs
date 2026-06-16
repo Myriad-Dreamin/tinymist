@@ -92,7 +92,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             Ty::Param(param) => {
                 // todo: variadic
 
-                let docs = docs.or_else(|| param.docs.as_deref());
+                let docs = docs.or_else(|| param.docs.as_ref().map(|docs| docs.raw().as_str()));
                 if param.attrs.positional {
                     self.type_completion(&param.ty, docs);
                 }

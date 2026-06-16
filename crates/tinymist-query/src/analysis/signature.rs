@@ -1,14 +1,12 @@
 //! Analysis of function signatures.
 
-use ecow::EcoString;
 use itertools::Either;
-use tinymist_analysis::docs::tidy::remove_list_annotations;
-use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature_with_docs};
+use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
 use tinymist_derive::BindTyCtx;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{DocsContent, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
+use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::classify_def_loosely;
 use crate::ty::{
     BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigWithTy, TyCtx, TypeInfo,
@@ -146,7 +144,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name,
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::positional(),
@@ -168,7 +166,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: name.clone(),
-                    docs: docstring.map(|doc| doc.docs.clone()),
+                    docs: docstring.map(|doc| DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::named(),
@@ -180,7 +178,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: doc.name.clone(),
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
                     attrs: ParamAttrs::variadic(),
@@ -188,7 +186,7 @@ pub(crate) fn sig_of_type(
             }
 
             let sig = Signature::Primary(Arc::new(PrimarySignature {
-                docs: Some(docstring.docs.clone()),
+                docs: Some(DocText::plain(docstring.docs.clone())),
                 param_specs,
                 has_fill_or_size_or_stroke,
                 sig_ty,
@@ -345,24 +343,5 @@ fn analyze_dyn_signature(
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
-    Some(func_signature_with_docs(func, |docs| {
-        convert_official_doc(ctx, docs)
-    }))
-}
-
-fn convert_official_doc(ctx: &Arc<SharedContext>, docs: EcoString) -> EcoString {
-    if docs.trim().is_empty() {
-        return docs;
-    }
-
-    match ctx.convert_docs_cached(&docs, None, DocsContent::Official) {
-        Ok(converted) => {
-            let converted = remove_list_annotations(&converted);
-            ctx.remove_html(converted.trim().into())
-        }
-        Err(err) => {
-            log::warn!("failed to convert official Typst docs to Markdown: {err}");
-            ctx.remove_html(docs)
-        }
-    }
+    Some(func_signature(func))
 }

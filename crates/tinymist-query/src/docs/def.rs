@@ -1,13 +1,15 @@
+use std::sync::Arc;
 use std::sync::OnceLock;
 
 use ecow::EcoString;
 use tinymist_analysis::Signature;
 use tinymist_analysis::docs::tidy::remove_list_annotations;
-use tinymist_analysis::docs::{ParamDocs, SignatureDocs, VarDocs, format_ty};
+use tinymist_analysis::docs::{DocText, ParamDocs, SignatureDocs, VarDocs, format_ty};
 use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
 
 use crate::LocalContext;
+use crate::analysis::SharedContext;
 use crate::docs::DocsContent;
 
 pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
@@ -52,7 +54,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     }
 }
 
-pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
+pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<SignatureDocs> {
     let type_sig = sig.type_sig().clone();
 
     let pos_in = sig
@@ -71,16 +73,45 @@ pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
     let ret_in = type_sig.body.as_ref();
 
     let pos = pos_in
-        .map(|(param, ty)| ParamDocs::new(param, ty))
+        .map(|(param, ty)| {
+            let docs = param
+                .docs
+                .as_ref()
+                .map(|docs| resolve_doc_text(ctx, docs))
+                .unwrap_or_default();
+            ParamDocs::new_with_docs(param, ty, docs)
+        })
         .collect::<Vec<_>>();
     let named = named_in
-        .map(|(param, ty)| (param.name.clone(), ParamDocs::new(param, ty)))
+        .map(|(param, ty)| {
+            let docs = param
+                .docs
+                .as_ref()
+                .map(|docs| resolve_doc_text(ctx, docs))
+                .unwrap_or_default();
+            (
+                param.name.clone(),
+                ParamDocs::new_with_docs(param, ty, docs),
+            )
+        })
         .collect::<std::collections::BTreeMap<_, _>>();
-    let rest = rest_in.map(|(param, ty)| ParamDocs::new(param, ty));
+    let rest = rest_in.map(|(param, ty)| {
+        let docs = param
+            .docs
+            .as_ref()
+            .map(|docs| resolve_doc_text(ctx, docs))
+            .unwrap_or_default();
+        ParamDocs::new_with_docs(param, ty, docs)
+    });
 
     let ret_ty = format_ty(ret_in);
 
-    let docs = sig.primary().docs.clone().unwrap_or_default();
+    let docs = sig
+        .primary()
+        .docs
+        .as_ref()
+        .map(|docs| resolve_doc_text(ctx, docs))
+        .unwrap_or_default();
 
     Some(SignatureDocs {
         docs,
@@ -90,6 +121,29 @@ pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
         ret_ty,
         hover_docs: OnceLock::new(),
     })
+}
+
+pub(crate) fn resolve_doc_text(ctx: &mut LocalContext, docs: &DocText) -> EcoString {
+    let shared = ctx.shared_();
+    docs.get_or_init(|raw| convert_official_doc(&shared, raw.clone()))
+        .clone()
+}
+
+fn convert_official_doc(ctx: &Arc<SharedContext>, docs: EcoString) -> EcoString {
+    if docs.trim().is_empty() {
+        return docs;
+    }
+
+    match ctx.convert_docs_cached(&docs, None, DocsContent::Official) {
+        Ok(converted) => {
+            let converted = remove_list_annotations(&converted);
+            ctx.remove_html(converted.trim().into())
+        }
+        Err(err) => {
+            log::warn!("failed to convert official Typst docs to Markdown: {err}");
+            ctx.remove_html(docs)
+        }
+    }
 }
 
 pub(crate) fn convert_typst_docs(ctx: &mut LocalContext, docs: EcoString) -> EcoString {
