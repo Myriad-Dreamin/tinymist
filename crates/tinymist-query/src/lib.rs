@@ -380,9 +380,9 @@ mod polymorphic {
         /// The response to the hover request.
         Hover(Option<Hover>),
         /// The response to the goto definition request.
-        GotoDefinition(Option<GotoDefinitionResponse>),
+        GotoDefinition(Option<DefinitionResponse>),
         /// The response to the goto declaration request.
-        GotoDeclaration(Option<GotoDeclarationResponse>),
+        GotoDeclaration(Option<DeclarationResponse>),
         /// The response to the references request.
         References(Option<Vec<LspLocation>>),
         /// The response to the inlay hint request.
@@ -404,7 +404,7 @@ mod polymorphic {
         /// The response to the signature help request.
         SignatureHelp(Option<SignatureHelp>),
         /// The response to the prepare rename request.
-        PrepareRename(Option<PrepareRenameResponse>),
+        PrepareRename(Option<PrepareRenameResult>),
         /// The response to the rename request.
         Rename(Option<WorkspaceEdit>),
         /// The response to the will rename files request.
@@ -416,9 +416,9 @@ mod polymorphic {
         /// The response to the workspace label request.
         WorkspaceLabel(Option<Vec<SymbolInformation>>),
         /// The response to the semantic tokens full request.
-        SemanticTokensFull(Option<SemanticTokensResult>),
+        SemanticTokensFull(Option<SemanticTokens>),
         /// The response to the semantic tokens delta request.
-        SemanticTokensDelta(Option<SemanticTokensFullDeltaResult>),
+        SemanticTokensDelta(Option<SemanticTokensDeltaResponse>),
         /// The response to the formatting request.
         Formatting(Option<Vec<TextEdit>>),
         /// The response to the folding range request.

@@ -270,8 +270,8 @@ impl LspHarness {
         self.root.path().join(rel)
     }
 
-    fn uri(&self, rel: &str) -> Url {
-        Url::from_file_path(self.path(rel)).expect("fixture path should convert to file URL")
+    fn uri(&self, rel: &str) -> Uri {
+        Uri::from_file_path(self.path(rel)).expect("fixture path should convert to file URL")
     }
 
     fn text_document(&self, rel: &str) -> TextDocumentIdentifier {
@@ -372,11 +372,13 @@ impl LspHarness {
         self.server
             .edit_source(
                 self.path(rel).as_path().into(),
-                vec![TextDocumentContentChangeEvent {
-                    range: None,
-                    range_length: None,
-                    text: source.to_owned(),
-                }],
+                vec![
+                    TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                        TextDocumentContentChangeWholeDocument {
+                            text: source.to_owned(),
+                        },
+                    ),
+                ],
                 encoding,
             )
             .expect("failed to edit open source");
@@ -390,8 +392,8 @@ impl LspHarness {
         self.drain_project_events();
     }
 
-    fn goto_definition_uris(&mut self, rel: &str, position: Position) -> Vec<Url> {
-        let response = self.server.goto_definition(GotoDefinitionParams {
+    fn goto_definition_uris(&mut self, rel: &str, position: Position) -> Vec<Uri> {
+        let response = self.server.goto_definition(DefinitionParams {
             text_document_position_params: self.text_position(
                 rel,
                 position.line,
@@ -400,22 +402,28 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<GotoDefinitionResponse> = self.decode_egress_response(response);
+        let result: Option<DefinitionResponse> = self.decode_egress_response(response);
         match result {
-            Some(GotoDefinitionResponse::Scalar(location)) => vec![location.uri],
-            Some(GotoDefinitionResponse::Array(locations)) => {
+            Some(DefinitionResponse::Definition(Definition::Location(location))) => {
+                vec![location.uri]
+            }
+            Some(DefinitionResponse::Definition(Definition::LocationList(locations))) => {
                 locations.into_iter().map(|location| location.uri).collect()
             }
-            Some(GotoDefinitionResponse::Link(links)) => {
+            Some(DefinitionResponse::DefinitionLinkList(links)) => {
                 links.into_iter().map(|link| link.target_uri).collect()
             }
             None => vec![],
         }
     }
 
-    fn reference_uris(&mut self, rel: &str, position: Position) -> Vec<Url> {
+    fn reference_uris(&mut self, rel: &str, position: Position) -> Vec<Uri> {
         let response = self.server.references(ReferenceParams {
-            text_document_position: self.text_position(rel, position.line, position.character),
+            text_document_position_params: self.text_position(
+                rel,
+                position.line,
+                position.character,
+            ),
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
             context: ReferenceContext {
@@ -440,28 +448,33 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
         let result: Option<Hover> = self.decode_egress_response(response);
+        #[allow(deprecated)]
         result.map(|hover| match hover.contents {
-            HoverContents::Scalar(MarkedString::String(text)) => text,
-            HoverContents::Scalar(MarkedString::LanguageString(text)) => text.value,
-            HoverContents::Array(items) => items
+            Contents::MarkedString(MarkedString::String(text)) => text,
+            Contents::MarkedString(MarkedString::MarkedStringWithLanguage(text)) => text.value,
+            Contents::MarkedStringList(items) => items
                 .into_iter()
                 .map(|item| match item {
                     MarkedString::String(text) => text,
-                    MarkedString::LanguageString(text) => text.value,
+                    MarkedString::MarkedStringWithLanguage(text) => text.value,
                 })
                 .collect::<Vec<_>>()
                 .join("\n"),
-            HoverContents::Markup(markup) => markup.value,
+            Contents::MarkupContent(markup) => markup.value,
         })
     }
 
     fn completion_labels(&mut self, rel: &str, position: Position) -> BTreeSet<String> {
         let response = self.server.completion(CompletionParams {
-            text_document_position: self.text_position(rel, position.line, position.character),
+            text_document_position_params: self.text_position(
+                rel,
+                position.line,
+                position.character,
+            ),
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
             context: Some(CompletionContext {
-                trigger_kind: CompletionTriggerKind::INVOKED,
+                trigger_kind: CompletionTriggerKind::Invoked,
                 trigger_character: None,
             }),
         });
@@ -470,6 +483,8 @@ impl LspHarness {
             .unwrap_or_else(|| CompletionList {
                 is_incomplete: false,
                 items: vec![],
+                apply_kind: None,
+                item_defaults: None,
             })
             .items
             .into_iter()
@@ -477,7 +492,7 @@ impl LspHarness {
             .collect()
     }
 
-    fn workspace_symbol_uris(&mut self, query: &str) -> Vec<Url> {
+    fn workspace_symbol_uris(&mut self, query: &str) -> Vec<Uri> {
         let response = self.server.symbol(WorkspaceSymbolParams {
             query: query.to_owned(),
             work_done_progress_params: WorkDoneProgressParams::default(),
@@ -499,13 +514,14 @@ impl LspHarness {
         });
         let result: Option<DocumentSymbolResponse> = self.decode_egress_response(response);
         match result {
-            Some(DocumentSymbolResponse::Nested(symbols)) => symbols
+            Some(DocumentSymbolResponse::DocumentSymbolList(symbols)) => symbols
                 .into_iter()
                 .flat_map(flatten_document_symbol)
                 .collect(),
-            Some(DocumentSymbolResponse::Flat(symbols)) => {
-                symbols.into_iter().map(|symbol| symbol.name).collect()
-            }
+            Some(DocumentSymbolResponse::SymbolInformationList(symbols)) => symbols
+                .into_iter()
+                .map(|symbol| symbol.base_symbol_information.name)
+                .collect(),
             None => BTreeSet::new(),
         }
     }
@@ -516,13 +532,8 @@ impl LspHarness {
             work_done_progress_params: WorkDoneProgressParams::default(),
             partial_result_params: PartialResultParams::default(),
         });
-        let result: Option<SemanticTokensResult> = self.decode_egress_response(response);
-        match result.expect("expected semantic token response") {
-            SemanticTokensResult::Tokens(tokens) => tokens,
-            SemanticTokensResult::Partial(_) => {
-                panic!("unexpected partial semantic token response")
-            }
-        }
+        let result: Option<SemanticTokens> = self.decode_egress_response(response);
+        result.expect("expected semantic token response")
     }
 
     fn semantic_delta_result_id(
@@ -538,17 +549,20 @@ impl LspHarness {
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             });
-        let result: Option<SemanticTokensFullDeltaResult> = self.decode_egress_response(response);
+        let result: Option<SemanticTokensDeltaResponse> = self.decode_egress_response(response);
         match result.expect("expected semantic token delta response") {
-            SemanticTokensFullDeltaResult::Tokens(tokens) => tokens.result_id,
-            SemanticTokensFullDeltaResult::TokensDelta(delta) => delta.result_id,
-            SemanticTokensFullDeltaResult::PartialTokensDelta { .. } => None,
+            SemanticTokensDeltaResponse::SemanticTokens(tokens) => tokens.result_id,
+            SemanticTokensDeltaResponse::SemanticTokensDelta(delta) => delta.result_id,
         }
     }
 
     fn rename_edit(&mut self, rel: &str, position: Position, new_name: &str) -> WorkspaceEdit {
         let response = self.server.rename(RenameParams {
-            text_document_position: self.text_position(rel, position.line, position.character),
+            text_document_position_params: self.text_position(
+                rel,
+                position.line,
+                position.character,
+            ),
             new_name: new_name.to_owned(),
             work_done_progress_params: WorkDoneProgressParams::default(),
         });
@@ -632,7 +646,7 @@ impl LspHarness {
         timeout: Duration,
         description: &str,
         pump_events: bool,
-        mut matches: impl FnMut(&DiagnosticPublication, &Url) -> bool,
+        mut matches: impl FnMut(&DiagnosticPublication, &Uri) -> bool,
     ) -> DiagnosticPublication {
         let deadline = Instant::now() + timeout;
         let main_uri = self.uri(MAIN);
@@ -801,7 +815,7 @@ impl LspHarness {
 
 fn diagnostics_are_empty(
     diagnostics: Option<&tinymist_query::DiagnosticsMap>,
-    main_uri: &Url,
+    main_uri: &Uri,
 ) -> bool {
     diagnostics.is_none_or(|diagnostics| {
         diagnostics.values().all(|items| items.is_empty())
@@ -813,7 +827,7 @@ fn diagnostics_are_empty(
 
 fn diagnostics_are_present_on_main(
     diagnostics: Option<&tinymist_query::DiagnosticsMap>,
-    main_uri: &Url,
+    main_uri: &Uri,
 ) -> bool {
     diagnostics
         .and_then(|diagnostics| diagnostics.get(main_uri))
@@ -1495,14 +1509,15 @@ fn assert_workspace_edit_carries_rename_assistance(
     );
 }
 
-fn workspace_edit_resource_renames(edit: &WorkspaceEdit) -> Vec<Url> {
+fn workspace_edit_resource_renames(edit: &WorkspaceEdit) -> Vec<Uri> {
     let mut renames = Vec::new();
-    let Some(DocumentChanges::Operations(operations)) = &edit.document_changes else {
+
+    let Some(changes) = &edit.document_changes else {
         return renames;
     };
 
-    for operation in operations {
-        if let DocumentChangeOperation::Op(ResourceOp::Rename(rename)) = operation {
+    for change in changes {
+        if let DocumentChange::RenameFile(rename) = change {
             renames.push(rename.new_uri.clone());
         }
     }
@@ -1526,7 +1541,7 @@ fn applied_workspace_edit_to_main(harness: &LspHarness, edit: &WorkspaceEdit) ->
     Some(after)
 }
 
-fn workspace_edit_text_edits(edit: &WorkspaceEdit, uri: &Url) -> Vec<TextEdit> {
+fn workspace_edit_text_edits(edit: &WorkspaceEdit, uri: &Uri) -> Vec<TextEdit> {
     let mut edits = Vec::new();
 
     if let Some(changes) = &edit.changes {
@@ -1536,19 +1551,10 @@ fn workspace_edit_text_edits(edit: &WorkspaceEdit, uri: &Url) -> Vec<TextEdit> {
     }
 
     if let Some(document_changes) = &edit.document_changes {
-        match document_changes {
-            DocumentChanges::Edits(document_edits) => {
-                for document_edit in document_edits {
-                    collect_text_document_edit(uri, document_edit, &mut edits);
-                }
-            }
-            DocumentChanges::Operations(operations) => {
-                for operation in operations {
-                    if let DocumentChangeOperation::Edit(document_edit) = operation {
-                        collect_text_document_edit(uri, document_edit, &mut edits);
-                    }
-                }
-            }
+        for change in document_changes {
+            if let DocumentChange::TextDocumentEdit(document_edit) = change {
+                collect_text_document_edit(uri, document_edit, &mut edits);
+            };
         }
     }
 
@@ -1556,18 +1562,19 @@ fn workspace_edit_text_edits(edit: &WorkspaceEdit, uri: &Url) -> Vec<TextEdit> {
 }
 
 fn collect_text_document_edit(
-    uri: &Url,
+    uri: &Uri,
     document_edit: &TextDocumentEdit,
     edits: &mut Vec<TextEdit>,
 ) {
-    if document_edit.text_document.uri != *uri {
+    if document_edit.text_document.text_document_identifier.uri != *uri {
         return;
     }
 
     for edit in &document_edit.edits {
         match edit {
-            OneOf::Left(edit) => edits.push(edit.clone()),
-            OneOf::Right(edit) => edits.push(edit.text_edit.clone()),
+            Edit::TextEdit(edit) => edits.push(edit.clone()),
+            Edit::AnnotatedTextEdit(edit) => edits.push(edit.text_edit.clone()),
+            Edit::SnippetTextEdit(_) => {}
         }
     }
 }

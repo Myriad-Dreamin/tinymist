@@ -115,11 +115,11 @@ impl From<LexicalKind> for SymbolKind {
     fn from(value: LexicalKind) -> Self {
         use LexicalVarKind::*;
         match value {
-            LexicalKind::Heading(..) => SymbolKind::NAMESPACE,
-            LexicalKind::Var(ValRef | Variable) => SymbolKind::VARIABLE,
-            LexicalKind::Var(Function) => SymbolKind::FUNCTION,
-            LexicalKind::Var(LabelRef | Label | BibKey) => SymbolKind::CONSTANT,
-            LexicalKind::Block | LexicalKind::CommentGroup => SymbolKind::CONSTANT,
+            LexicalKind::Heading(..) => SymbolKind::Namespace,
+            LexicalKind::Var(ValRef | Variable) => SymbolKind::Variable,
+            LexicalKind::Var(Function) => SymbolKind::Function,
+            LexicalKind::Var(LabelRef | Label | BibKey) => SymbolKind::Constant,
+            LexicalKind::Block | LexicalKind::CommentGroup => SymbolKind::Constant,
         }
     }
 }

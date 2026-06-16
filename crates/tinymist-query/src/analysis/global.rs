@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;

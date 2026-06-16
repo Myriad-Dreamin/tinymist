@@ -525,10 +525,10 @@ impl Redact for RedactFields {
 }
 
 pub(crate) fn file_uri(uri: &str) -> String {
-    file_uri_(&lsp_types::Url::parse(uri).unwrap())
+    file_uri_(&lsp_types::Uri::parse(uri).unwrap())
 }
 
-pub(crate) fn file_uri_(uri: &lsp_types::Url) -> String {
+pub(crate) fn file_uri_(uri: &lsp_types::Uri) -> String {
     let uri = uri.to_file_path().unwrap();
     file_path_(&uri)
 }

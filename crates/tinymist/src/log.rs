@@ -1,5 +1,6 @@
 //! Logging Functionality
 
+use lsp_types::LspNotificationMethod;
 use serde::{Deserialize, Serialize};
 
 use super::*;
@@ -104,7 +105,9 @@ struct Log {
     data: String,
 }
 
-impl lsp_types::notification::Notification for Log {
-    const METHOD: &'static str = "tmLog";
+impl lsp_types::Notification for Log {
+    const METHOD: LspNotificationMethod<'_> = LspNotificationMethod::Custom("tmLog");
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ServerToClient;
     type Params = Self;
 }

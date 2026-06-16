@@ -2,6 +2,7 @@
 
 pub use compile::{PreviewCompileView, ProjectPreviewHandler};
 pub use http::{make_http_server, HttpServer};
+use lsp_types::LspNotificationMethod;
 
 mod compile;
 mod http;
@@ -11,8 +12,8 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 use clap::{Parser, ValueEnum};
 use futures::{SinkExt, TryStreamExt};
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
-use lsp_types::notification::Notification;
-use lsp_types::Url;
+use lsp_types::Notification;
+use lsp_types::Uri as Url;
 use reflexo_typst::error::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -603,14 +604,20 @@ struct ScrollSource;
 
 impl Notification for ScrollSource {
     type Params = DocToSrcJumpInfo;
-    const METHOD: &'static str = "tinymist/preview/scrollSource";
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ClientToServer;
+    const METHOD: LspNotificationMethod<'_> =
+        LspNotificationMethod::Custom("tinymist/preview/scrollSource");
 }
 
 struct NotifDocumentOutline;
 
 impl Notification for NotifDocumentOutline {
     type Params = tinymist_preview::Outline;
-    const METHOD: &'static str = "tinymist/documentOutline";
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ClientToServer;
+    const METHOD: LspNotificationMethod<'_> =
+        LspNotificationMethod::Custom("tinymist/documentOutline");
 }
 
 #[derive(Serialize, Deserialize)]
@@ -624,7 +631,10 @@ struct NotifViewerWindowState;
 
 impl Notification for NotifViewerWindowState {
     type Params = ViewerWindowStateParams;
-    const METHOD: &'static str = "tinymist/preview/windowState";
+    const METHOD: LspNotificationMethod<'static> =
+        LspNotificationMethod::Custom("tinymist/preview/windowState");
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ServerToClient;
 }
 
 fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInfo, tid: &str) {
@@ -654,7 +664,7 @@ fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInf
         }
     };
 
-    client.send_lsp_request::<lsp_types::request::ShowDocument>(
+    client.send_lsp_request::<lsp_types::ShowDocumentRequest>(
         lsp_types::ShowDocumentParams {
             uri,
             external: None,

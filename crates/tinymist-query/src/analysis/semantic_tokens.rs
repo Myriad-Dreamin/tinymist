@@ -9,7 +9,7 @@ use std::{
 };
 
 use lsp_types::SemanticToken;
-use lsp_types::{SemanticTokenModifier, SemanticTokenType};
+use lsp_types::{SemanticTokenModifiers, SemanticTokenTypes};
 use parking_lot::Mutex;
 use strum::EnumIter;
 use tinymist_std::ImmutPath;
@@ -115,20 +115,20 @@ impl Drop for SemanticTokenContext {
     }
 }
 
-const BOOL: SemanticTokenType = SemanticTokenType::new("bool");
-const PUNCTUATION: SemanticTokenType = SemanticTokenType::new("punct");
-const ESCAPE: SemanticTokenType = SemanticTokenType::new("escape");
-const LINK: SemanticTokenType = SemanticTokenType::new("link");
-const RAW: SemanticTokenType = SemanticTokenType::new("raw");
-const LABEL: SemanticTokenType = SemanticTokenType::new("label");
-const REF: SemanticTokenType = SemanticTokenType::new("ref");
-const HEADING: SemanticTokenType = SemanticTokenType::new("heading");
-const LIST_MARKER: SemanticTokenType = SemanticTokenType::new("marker");
-const LIST_TERM: SemanticTokenType = SemanticTokenType::new("term");
-const DELIMITER: SemanticTokenType = SemanticTokenType::new("delim");
-const INTERPOLATED: SemanticTokenType = SemanticTokenType::new("pol");
-const ERROR: SemanticTokenType = SemanticTokenType::new("error");
-const TEXT: SemanticTokenType = SemanticTokenType::new("text");
+const BOOL: SemanticTokenTypes = SemanticTokenTypes::new("bool");
+const PUNCTUATION: SemanticTokenTypes = SemanticTokenTypes::new("punct");
+const ESCAPE: SemanticTokenTypes = SemanticTokenTypes::new("escape");
+const LINK: SemanticTokenTypes = SemanticTokenTypes::new("link");
+const RAW: SemanticTokenTypes = SemanticTokenTypes::new("raw");
+const LABEL: SemanticTokenTypes = SemanticTokenTypes::new("label");
+const REF: SemanticTokenTypes = SemanticTokenTypes::new("ref");
+const HEADING: SemanticTokenTypes = SemanticTokenTypes::new("heading");
+const LIST_MARKER: SemanticTokenTypes = SemanticTokenTypes::new("marker");
+const LIST_TERM: SemanticTokenTypes = SemanticTokenTypes::new("term");
+const DELIMITER: SemanticTokenTypes = SemanticTokenTypes::new("delim");
+const INTERPOLATED: SemanticTokenTypes = SemanticTokenTypes::new("pol");
+const ERROR: SemanticTokenTypes = SemanticTokenTypes::new("error");
+const TEXT: SemanticTokenTypes = SemanticTokenTypes::new("text");
 
 /// Very similar to `typst_ide::Tag`, but with convenience traits, and
 /// extensible because we want to further customize highlighting
@@ -193,20 +193,20 @@ pub enum TokenType {
     None,
 }
 
-impl From<TokenType> for SemanticTokenType {
+impl From<TokenType> for SemanticTokenTypes {
     fn from(token_type: TokenType) -> Self {
         use TokenType::*;
 
         match token_type {
-            Comment => Self::COMMENT,
-            String => Self::STRING,
-            Keyword => Self::KEYWORD,
-            Operator => Self::OPERATOR,
-            Number => Self::NUMBER,
-            Function => Self::FUNCTION,
-            Decorator => Self::DECORATOR,
-            Type => Self::TYPE,
-            Namespace => Self::NAMESPACE,
+            Comment => Self::Comment,
+            String => Self::String,
+            Keyword => Self::Keyword,
+            Operator => Self::Operator,
+            Number => Self::Number,
+            Function => Self::Function,
+            Decorator => Self::Decorator,
+            Type => Self::Type,
+            Namespace => Self::Namespace,
             Bool => BOOL,
             Punctuation => PUNCTUATION,
             Escape => ESCAPE,
@@ -226,9 +226,9 @@ impl From<TokenType> for SemanticTokenType {
     }
 }
 
-const STRONG: SemanticTokenModifier = SemanticTokenModifier::new("strong");
-const EMPH: SemanticTokenModifier = SemanticTokenModifier::new("emph");
-const MATH: SemanticTokenModifier = SemanticTokenModifier::new("math");
+const STRONG: SemanticTokenModifiers = SemanticTokenModifiers::new("strong");
+const EMPH: SemanticTokenModifiers = SemanticTokenModifiers::new("emph");
+const MATH: SemanticTokenModifiers = SemanticTokenModifiers::new("math");
 
 /// A modifier to some semantic token.
 #[derive(Clone, Copy, EnumIter)]
@@ -260,7 +260,7 @@ impl Modifier {
     }
 }
 
-impl From<Modifier> for SemanticTokenModifier {
+impl From<Modifier> for SemanticTokenModifiers {
     fn from(modifier: Modifier) -> Self {
         use Modifier::*;
 
@@ -268,9 +268,9 @@ impl From<Modifier> for SemanticTokenModifier {
             Strong => STRONG,
             Emph => EMPH,
             Math => MATH,
-            ReadOnly => Self::READONLY,
-            Static => Self::STATIC,
-            DefaultLibrary => Self::DEFAULT_LIBRARY,
+            ReadOnly => Self::Readonly,
+            Static => Self::Static,
+            DefaultLibrary => Self::DefaultLibrary,
         }
     }
 }

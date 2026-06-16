@@ -17,6 +17,7 @@
 //!
 //! The [`CompileHandlerImpl`] will push information to other actors.
 
+use lsp_types::LspNotificationMethod;
 use reflexo_typst::TypstDocument;
 use serde::{Deserialize, Serialize};
 pub use tinymist_project::*;
@@ -816,7 +817,9 @@ pub enum DevEvent {
     Export(DevExportEvent),
 }
 
-impl lsp_types::notification::Notification for DevEvent {
-    const METHOD: &'static str = "tinymist/devEvent";
+impl lsp_types::Notification for DevEvent {
+    const METHOD: LspNotificationMethod<'_> = LspNotificationMethod::Custom("tinymist/devEvent");
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ServerToClient;
     type Params = Self;
 }

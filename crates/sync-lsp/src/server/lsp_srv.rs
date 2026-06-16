@@ -1,4 +1,4 @@
-use lsp_types::{notification::Notification as Notif, request::Request as Req, *};
+use lsp_types::{Notification as Notif, Request as Req, *};
 
 use super::*;
 
@@ -27,7 +27,7 @@ impl LspClient {
     ) {
         let mut req_queue = self.req_queue.lock();
         let request = req_queue.outgoing.register(
-            R::METHOD.to_owned(),
+            R::METHOD.to_string(),
             params,
             Box::new(|s, resp| handler(s, resp.try_into().unwrap())),
         );
@@ -42,7 +42,7 @@ impl LspClient {
 
     /// Sends a typed notification to the client.
     pub fn send_notification<N: Notif>(&self, params: &N::Params) {
-        self.send_notification_(lsp::Notification::new(N::METHOD.to_owned(), params));
+        self.send_notification_(lsp::Notification::new(N::METHOD.to_string(), params));
     }
 
     /// Sends an untyped notification to the client.
@@ -199,7 +199,7 @@ where
         // }
 
         while let Ok(msg) = inbox.recv() {
-            const EXIT_METHOD: &str = notification::Exit::METHOD;
+            const EXIT_METHOD: LspNotificationMethod = ExitNotification::METHOD;
             let loop_start = tinymist_std::time::now();
             match msg {
                 Evt(event) => {
@@ -228,7 +228,7 @@ where
                     self.client.handle.spawn(fut);
                 }
                 Msg(LspMessage::Notification(not)) => {
-                    let is_exit = not.method == EXIT_METHOD;
+                    let is_exit = not.method == EXIT_METHOD.as_str();
                     let track_id = self
                         .next_not_id
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -294,8 +294,8 @@ where
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
     pub fn on_lsp_request(&mut self, method: &str, params: JsonValue) -> ScheduleResult {
-        match (&mut self.state, method) {
-            (State::Uninitialized(args), request::Initialize::METHOD) => {
+        match (&mut self.state, LspRequestMethod::from(method)) {
+            (State::Uninitialized(args), InitializeRequest::METHOD) => {
                 // todo: what will happen if the request cannot be deserialized?
                 let params = serde_json::from_value::<Args::I>(params);
                 match params {
@@ -311,15 +311,15 @@ where
             (State::Uninitialized(..) | State::Initializing(..), _) => {
                 just_result(Err(not_initialized()))
             }
-            (_, request::Initialize::METHOD) => {
+            (_, InitializeRequest::METHOD) => {
                 just_result(Err(invalid_request("server is already initialized")))
             }
             // todo: generalize this
-            (State::Ready(..), request::ExecuteCommand::METHOD) => self.on_execute_command(params),
+            (State::Ready(..), ExecuteCommandRequest::METHOD) => self.on_execute_command(params),
             (State::Ready(s), method) => 'serve_req: {
-                let is_shutdown = method == request::Shutdown::METHOD;
+                let is_shutdown = method == ShutdownRequest::METHOD;
 
-                let Some(handler) = self.requests.get(method) else {
+                let Some(handler) = self.requests.get(&method) else {
                     log::warn!("unhandled lsp request: {method}");
                     break 'serve_req just_result(Err(method_not_found()));
                 };
@@ -351,20 +351,20 @@ where
 
         // todo: generalize this
         if command == "tinymist.getResources" {
-            self.get_resources(arguments)
+            self.get_resources(arguments.unwrap_or_default())
         } else {
             let Some(handler) = self.commands.get(command.as_str()) else {
                 log::error!("asked to execute unknown command: {command}");
                 return Err(method_not_found());
             };
-            handler(s, arguments)
+            handler(s, arguments.unwrap_or_default())
         }
     }
 
     /// Handles an incoming notification.
     pub fn on_notification(&mut self, method: &str, params: JsonValue) -> LspResult<()> {
         let handle = |s, method: &str, params: JsonValue| {
-            let Some(handler) = self.notifications.get(method) else {
+            let Some(handler) = self.notifications.get(&method.into()) else {
                 log::warn!("unhandled notification: {method}");
                 return Ok(());
             };
@@ -372,8 +372,8 @@ where
             handler(s, params)
         };
 
-        match (&mut self.state, method) {
-            (state, notification::Initialized::METHOD) => {
+        match (&mut self.state, LspNotificationMethod::from(method)) {
+            (state, InitializedNotification::METHOD) => {
                 let mut s = State::ShuttingDown;
                 std::mem::swap(state, &mut s);
                 match s {
@@ -394,7 +394,7 @@ where
                 };
                 handle(s, method, params)
             }
-            (State::Ready(state), method) => handle(state, method, params),
+            (State::Ready(state), method) => handle(state, method.as_str(), params),
             // todo: whether it is safe to ignore notifications
             (State::Uninitialized(..) | State::Initializing(..), method) => {
                 log::warn!("server is not ready yet, while received notification {method}");

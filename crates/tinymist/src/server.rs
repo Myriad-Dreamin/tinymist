@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub(crate) use futures::Future;
-use lsp_types::request::ShowMessageRequest;
+use lsp_types::ShowMessageRequest;
 use lsp_types::*;
 use reflexo::debug_loc::LspPosition;
 use sync_ls::*;
@@ -31,7 +31,7 @@ pub(crate) fn as_path(inp: TextDocumentIdentifier) -> PathBuf {
     as_path_(&inp.uri)
 }
 
-pub(crate) fn as_path_(uri: &Url) -> PathBuf {
+pub(crate) fn as_path_(uri: &Uri) -> PathBuf {
     tinymist_query::url_to_path(uri)
 }
 
@@ -248,8 +248,7 @@ impl ServerState {
         provider: LspBuilder<T>,
     ) -> LspBuilder<T> {
         type State = ServerState;
-        use lsp_types::notification::*;
-        use lsp_types::request::*;
+        use lsp_types::*;
 
         #[cfg(feature = "preview")]
         let provider = provider
@@ -277,7 +276,7 @@ impl ServerState {
 
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         let mut provider = provider
-            .with_request::<Shutdown>(State::shutdown)
+            .with_request::<ShutdownRequest>(State::shutdown)
             // customized event
             .with_event(
                 &LspInterrupt::Compile(ProjectInsId::default()),
@@ -288,18 +287,18 @@ impl ServerState {
                 State::server_event::<T>,
             )
             // lantency sensitive
-            .with_request_::<Completion>(State::completion)
-            .with_request_::<SemanticTokensFullRequest>(State::semantic_tokens_full)
-            .with_request_::<SemanticTokensFullDeltaRequest>(State::semantic_tokens_full_delta)
+            .with_request_::<CompletionRequest>(State::completion)
+            .with_request_::<SemanticTokensRequest>(State::semantic_tokens_full)
+            .with_request_::<SemanticTokensDeltaRequest>(State::semantic_tokens_full_delta)
             .with_request_::<DocumentHighlightRequest>(State::document_highlight)
             .with_request_::<DocumentSymbolRequest>(State::document_symbol)
             // Sync for low latency
-            .with_request_::<Formatting>(State::formatting)
-            .with_request_::<RangeFormatting>(State::range_formatting)
+            .with_request_::<DocumentFormattingRequest>(State::formatting)
+            .with_request_::<DocumentRangeFormattingRequest>(State::range_formatting)
             .with_request_::<SelectionRangeRequest>(State::selection_range)
             // latency insensitive
             .with_request_::<InlayHintRequest>(State::inlay_hint)
-            .with_request_::<DocumentColor>(State::document_color)
+            .with_request_::<DocumentColorRequest>(State::document_color)
             .with_request_::<DocumentLinkRequest>(State::document_link)
             .with_request_::<ColorPresentationRequest>(State::color_presentation)
             .with_request_::<HoverRequest>(State::hover)
@@ -308,21 +307,23 @@ impl ServerState {
             .with_request_::<FoldingRangeRequest>(State::folding_range)
             .with_request_::<SignatureHelpRequest>(State::signature_help)
             .with_request_::<PrepareRenameRequest>(State::prepare_rename)
-            .with_request_::<Rename>(State::rename)
-            .with_request_::<GotoDefinition>(State::goto_definition)
-            .with_request_::<GotoDeclaration>(State::goto_declaration)
-            .with_request_::<References>(State::references)
+            .with_request_::<RenameRequest>(State::rename)
+            .with_request_::<DefinitionRequest>(State::goto_definition)
+            .with_request_::<DeclarationRequest>(State::goto_declaration)
+            .with_request_::<ReferencesRequest>(State::references)
             .with_request_::<WorkspaceSymbolRequest>(State::symbol)
             .with_request_::<OnEnter>(State::on_enter)
-            .with_request_::<WillRenameFiles>(State::will_rename_files)
+            .with_request_::<WillRenameFilesRequest>(State::will_rename_files)
             .with_request_::<FsChange>(State::fs_change)
             // notifications
-            .with_notification::<Initialized>(State::initialized)
-            .with_notification::<DidOpenTextDocument>(State::did_open)
-            .with_notification::<DidCloseTextDocument>(State::did_close)
-            .with_notification::<DidChangeTextDocument>(State::did_change)
-            .with_notification::<DidSaveTextDocument>(State::did_save)
-            .with_notification::<DidChangeConfiguration>(State::did_change_configuration)
+            .with_notification::<InitializedNotification>(State::initialized)
+            .with_notification::<DidOpenTextDocumentNotification>(State::did_open)
+            .with_notification::<DidCloseTextDocumentNotification>(State::did_close)
+            .with_notification::<DidChangeTextDocumentNotification>(State::did_change)
+            .with_notification::<DidSaveTextDocumentNotification>(State::did_save)
+            .with_notification::<DidChangeConfigurationNotification>(
+                State::did_change_configuration,
+            )
             // commands
             .with_command_("tinymist.exportPdf", State::export_pdf)
             .with_command_("tinymist.exportSvg", State::export_svg)
@@ -474,7 +475,7 @@ impl ServerState {
             for warning in self.config.warnings.iter() {
                 self.client.send_lsp_request::<ShowMessageRequest>(
                     ShowMessageRequestParams {
-                        typ: MessageType::WARNING,
+                        kind: MessageType::Warning,
                         message: tinymist_l10n::t!(
                             "tinymist.config.badServerConfig",
                             "bad server configuration: {warning}",
@@ -528,10 +529,10 @@ fn test_as_path() {
     use reflexo::path::PathClean;
     use std::path::Path;
 
-    let uri = Url::parse("untitled:/path/to/file").unwrap();
+    let uri = Uri::parse("untitled:/path/to/file").unwrap();
     assert_eq!(as_path_(&uri), Path::new("/untitled/path/to/file").clean());
 
-    let uri = Url::parse("untitled:/path/to/file%20with%20space").unwrap();
+    let uri = Uri::parse("untitled:/path/to/file%20with%20space").unwrap();
     assert_eq!(
         as_path_(&uri),
         Path::new("/untitled/path/to/file with space").clean()

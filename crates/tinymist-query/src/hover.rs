@@ -73,7 +73,10 @@ impl SemanticRequest for HoverRequest {
         Some(Hover {
             // Neovim shows ugly hover if the hover content is in array, so we join them
             // manually with divider bars.
-            contents: HoverContents::Scalar(MarkedString::String(contents.join("\n\n---\n\n"))),
+            contents: Contents::MarkupContent(MarkupContent::new(
+                MarkupKind::Markdown,
+                contents.join("\n\n---\n\n"),
+            )),
             range: Some(range),
         })
     }
@@ -624,23 +627,24 @@ mod tests {
             };
 
             // write contents
+            #[allow(deprecated)]
             match contents {
-                HoverContents::Markup(content) => {
+                Contents::MarkupContent(content) => {
                     writeln!(f, "{}", content.value)?;
                 }
-                HoverContents::Scalar(MarkedString::String(content)) => {
+                Contents::MarkedString(lsp_types::MarkedString::String(content)) => {
                     writeln!(f, "{content}")?;
                 }
-                HoverContents::Scalar(MarkedString::LanguageString(lang_str)) => {
-                    writeln!(f, "=== {} ===\n{}", lang_str.language, lang_str.value)?
-                }
-                HoverContents::Array(contents) => {
+                Contents::MarkedString(lsp_types::MarkedString::MarkedStringWithLanguage(
+                    lang_str,
+                )) => writeln!(f, "=== {} ===\n{}", lang_str.language, lang_str.value)?,
+                Contents::MarkedStringList(contents) => {
                     // interperse the contents with a divider
                     let content = contents
                         .iter()
                         .map(|content| match content {
-                            MarkedString::String(text) => text.to_string(),
-                            MarkedString::LanguageString(lang_str) => {
+                            lsp_types::MarkedString::String(text) => text.to_string(),
+                            lsp_types::MarkedString::MarkedStringWithLanguage(lang_str) => {
                                 format!("=== {} ===\n{}", lang_str.language, lang_str.value)
                             }
                         })

@@ -77,15 +77,18 @@ impl ServerState {
             .ok_or_else(|| error_once!("file missing", path: path.display()))?;
 
         for change in content {
-            let replacement = change.text;
-            match change.range {
-                Some(lsp_range) => {
-                    let range = to_typst_range(lsp_range, position_encoding, source)
-                        .expect("invalid range");
-                    source.edit(range, &replacement);
+            match change {
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument { text },
+                ) => {
+                    source.replace(&text);
                 }
-                None => {
-                    source.replace(&replacement);
+                TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                    TextDocumentContentChangePartial { text, range, .. },
+                ) => {
+                    let range =
+                        to_typst_range(range, position_encoding, source).expect("invalid range");
+                    source.edit(range, &text);
                 }
             }
         }
@@ -135,7 +138,7 @@ impl ServerState {
 
         for change in params.inserts {
             let path: ImmutPath =
-                tinymist_query::url_to_path(&Url::parse(&change.uri).unwrap()).into();
+                tinymist_query::url_to_path(&Uri::parse(&change.uri).unwrap()).into();
             let content: FileResult<Bytes> = match change.content {
                 FileChangeResult::Ok { content } => base64::engine::general_purpose::STANDARD
                     .decode(content)
@@ -150,7 +153,7 @@ impl ServerState {
         }
 
         for path in params.removes {
-            removes.push(tinymist_query::url_to_path(&Url::parse(&path).unwrap()).into());
+            removes.push(tinymist_query::url_to_path(&Uri::parse(&path).unwrap()).into());
         }
 
         let update = FilesystemEvent::Update(FileChangeSet { inserts, removes }, params.is_sync);
@@ -344,10 +347,11 @@ impl ServerState {
 /// The file system change request.
 pub enum FsChange {}
 
-impl lsp_types::request::Request for FsChange {
+impl lsp_types::Request for FsChange {
     type Params = FsChangeParams;
     type Result = ();
-    const METHOD: &'static str = "tinymist/fsChange";
+    const METHOD: LspRequestMethod<'_> = LspRequestMethod::Custom("tinymist/fsChange");
+    const MESSAGE_DIRECTION: MessageDirection = MessageDirection::ClientToServer;
 }
 
 /// The file system change parameters.

@@ -17,6 +17,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, Weak};
 
 use futures::future::MaybeDone;
+use lsp_types::{LspNotificationMethod, LspRequestMethod};
 use parking_lot::Mutex;
 use serde::Serialize;
 use serde_json::{Value as JsonValue, from_value};
@@ -634,8 +635,8 @@ type RawHandler<S, T> = fn(srv: &mut S, args: T) -> ScheduleResult;
 type BoxPureHandler<S, T> = Box<dyn Fn(&mut S, T) -> LspResult<()>>;
 type BoxHandler<S, T> = Box<dyn Fn(&mut S, T) -> SchedulableResponse<JsonValue>>;
 type ExecuteCmdMap<S> = HashMap<&'static str, BoxHandler<S, Vec<JsonValue>>>;
-type RegularCmdMap<S> = HashMap<&'static str, BoxHandler<S, JsonValue>>;
-type NotifyCmdMap<S> = HashMap<&'static str, BoxPureHandler<S, JsonValue>>;
+type RegularCmdMap<S> = HashMap<LspRequestMethod<'static>, BoxHandler<S, JsonValue>>;
+type NotifyCmdMap<S> = HashMap<LspNotificationMethod<'static>, BoxPureHandler<S, JsonValue>>;
 type ResourceMap<S> = HashMap<ImmutPath, BoxHandler<S, Vec<JsonValue>>>;
 type MayInitBoxHandler<A, S, T> =
     Box<dyn for<'a> Fn(ServiceState<'a, A, S>, &LspClient, T) -> anyhow::Result<()>>;

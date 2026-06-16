@@ -36,7 +36,7 @@ pub use typst_shim::syntax::VirtualPathExt;
 use std::sync::Arc;
 
 use ecow::eco_format;
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use tinymist_project::LspComputeGraph;
 use tinymist_std::error::WithContextUntyped;
 use tinymist_std::{Result, bail};

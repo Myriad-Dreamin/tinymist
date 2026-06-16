@@ -23,17 +23,17 @@ pub struct SemanticTokensFullRequest {
 }
 
 impl SemanticRequest for SemanticTokensFullRequest {
-    type Response = SemanticTokensResult;
+    type Response = SemanticTokens;
 
     /// Handles the request to compute the semantic tokens for a given document.
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let (tokens, result_id) = ctx.cached_tokens(&source);
 
-        Some(SemanticTokensResult::Tokens(SemanticTokens {
+        Some(SemanticTokens {
             result_id,
             data: tokens.as_ref().clone(),
-        }))
+        })
     }
 }
 
@@ -139,18 +139,9 @@ mod tests {
             let request = SemanticTokensFullRequest { path: path.clone() };
 
             let mut result = request.request(ctx).unwrap();
-            if let SemanticTokensResult::Tokens(tokens) = &mut result {
-                tokens.result_id.take();
-            }
+            result.result_id.take();
 
-            match &result {
-                SemanticTokensResult::Tokens(tokens) => {
-                    check_tokens(tokens);
-                }
-                SemanticTokensResult::Partial(_) => {
-                    panic!("Unexpected partial result");
-                }
-            }
+            check_tokens(&result);
 
             assert_snapshot!(serde_json::to_string(&result).unwrap());
         });

@@ -3,7 +3,7 @@
 mod figure;
 
 use ecow::eco_format;
-use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions};
+use lsp_types::{ChangeAnnotation, CreateFile, CreateFileOptions, Message};
 use regex::Regex;
 use tinymist_analysis::syntax::{
     PreviousItem, SyntaxClass, adjust_expr, node_ancestors, previous_items,
@@ -68,7 +68,7 @@ impl<'a> CodeActionWorker<'a> {
             && !only.is_empty()
             && !only
                 .iter()
-                .any(|kind| *kind == CodeActionKind::EMPTY || *kind == CodeActionKind::QUICKFIX)
+                .any(|kind| *kind == CodeActionKind::Empty || *kind == CodeActionKind::QuickFix)
         {
             return None;
         }
@@ -78,14 +78,16 @@ impl<'a> CodeActionWorker<'a> {
                 continue;
             }
 
-            match match_autofix_kind(diag.message.as_str()) {
-                Some(AutofixKind::UnknownVariable) => {
-                    self.autofix_unknown_variable(root, range);
+            if let Message::String(message) = &diag.message {
+                match match_autofix_kind(message) {
+                    Some(AutofixKind::UnknownVariable) => {
+                        self.autofix_unknown_variable(root, range);
+                    }
+                    Some(AutofixKind::FileNotFound) => {
+                        self.autofix_file_not_found(root, range);
+                    }
+                    _ => {}
                 }
-                Some(AutofixKind::FileNotFound) => {
-                    self.autofix_file_not_found(root, range);
-                }
-                _ => {}
             }
         }
 
@@ -200,7 +202,7 @@ impl<'a> CodeActionWorker<'a> {
         let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
         let action = CodeAction {
             title: "Create missing variable".to_string(),
-            kind: Some(CodeActionKind::QUICKFIX),
+            kind: Some(CodeActionKind::QuickFix),
             edit: Some(edit),
             ..CodeAction::default()
         };
@@ -229,7 +231,7 @@ impl<'a> CodeActionWorker<'a> {
         let edit = self.local_edit(EcoSnippetTextEdit::new(range, new_text))?;
         let action = CodeAction {
             title: "Add spaces between letters".to_string(),
-            kind: Some(CodeActionKind::QUICKFIX),
+            kind: Some(CodeActionKind::QuickFix),
             edit: Some(edit),
             ..CodeAction::default()
         };
@@ -266,7 +268,7 @@ impl<'a> CodeActionWorker<'a> {
         let file_to_create = target.vpath().get_with_slash();
         let action = CodeAction {
             title: format!("Create missing file at `{file_to_create}`"),
-            kind: Some(CodeActionKind::QUICKFIX),
+            kind: Some(CodeActionKind::QuickFix),
             edit: Some(edit),
             ..CodeAction::default()
         };
@@ -366,7 +368,7 @@ impl<'a> CodeActionWorker<'a> {
             let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeAction {
                 title: "Convert to relative path".to_string(),
-                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                kind: Some(CodeActionKind::RefactorRewrite),
                 edit: Some(edit),
                 ..CodeAction::default()
             };
@@ -393,7 +395,7 @@ impl<'a> CodeActionWorker<'a> {
             let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeAction {
                 title: "Convert to absolute path".to_string(),
-                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                kind: Some(CodeActionKind::RefactorRewrite),
                 edit: Some(edit),
                 ..CodeAction::default()
             };
@@ -440,7 +442,7 @@ impl<'a> CodeActionWorker<'a> {
 
         let action = CodeAction {
             title: "Wrap with content block".to_string(),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            kind: Some(CodeActionKind::RefactorRewrite),
             edit: Some(edit),
             ..CodeAction::default()
         };
@@ -463,7 +465,7 @@ impl<'a> CodeActionWorker<'a> {
             // Decrease depth of heading
             let action = CodeAction {
                 title: "Decrease depth of heading".to_string(),
-                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                kind: Some(CodeActionKind::RefactorRewrite),
                 edit: Some(self.local_edit(EcoSnippetTextEdit::new_plain(
                     self.ctx.to_lsp_range(marker_range.clone(), &self.source),
                     EcoString::inline("=").repeat(depth - 1),
@@ -476,7 +478,7 @@ impl<'a> CodeActionWorker<'a> {
         // Increase depth of heading
         let action = CodeAction {
             title: "Increase depth of heading".to_string(),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            kind: Some(CodeActionKind::RefactorRewrite),
             edit: Some(self.local_edit(EcoSnippetTextEdit::new_plain(
                 self.ctx.to_lsp_range(marker_range, &self.source),
                 EcoString::inline("=").repeat(depth + 1),
@@ -568,7 +570,7 @@ impl<'a> CodeActionWorker<'a> {
 
             Some(CodeAction {
                 title: title.to_owned(),
-                kind: Some(CodeActionKind::REFACTOR_REWRITE),
+                kind: Some(CodeActionKind::RefactorRewrite),
                 edit: Some(self.local_edits(edits)?),
                 ..CodeAction::default()
             })
@@ -593,14 +595,14 @@ impl<'a> CodeActionWorker<'a> {
     fn create_file(&self, uri: Url, needs_confirmation: bool) -> EcoWorkspaceEdit {
         let change_id = "Typst Create Missing Files".to_string();
 
-        let create_op = EcoDocumentChangeOperation::Op(lsp_types::ResourceOp::Create(CreateFile {
+        let create_op = EcoDocumentChangeOperation::CreateFile(CreateFile {
             uri,
             options: Some(CreateFileOptions {
                 overwrite: Some(false),
                 ignore_if_exists: None,
             }),
             annotation_id: Some(change_id.clone()),
-        }));
+        });
 
         let mut change_annotations = HashMap::new();
         change_annotations.insert(
