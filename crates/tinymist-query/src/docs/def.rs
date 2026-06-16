@@ -1,11 +1,14 @@
 use std::sync::OnceLock;
 
+use ecow::EcoString;
 use tinymist_analysis::Signature;
+use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_analysis::docs::{ParamDocs, SignatureDocs, VarDocs, format_ty};
 use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
 
 use crate::LocalContext;
+use crate::docs::DocsContent;
 
 pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.id()?).ok()?;
@@ -38,7 +41,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
             })
         }
         DocSource::Ins(ins) => ins.syntax.as_ref().map(|src| {
-            let docs = src.doc.as_ref().into();
+            let docs = convert_typst_docs(ctx, src.doc.as_ref().into());
             VarDocs {
                 docs,
                 return_ty,
@@ -69,20 +72,40 @@ pub(crate) fn sig_docs(sig: &Signature) -> Option<SignatureDocs> {
 
     let pos = pos_in
         .map(|(param, ty)| ParamDocs::new(param, ty))
-        .collect();
+        .collect::<Vec<_>>();
     let named = named_in
         .map(|(param, ty)| (param.name.clone(), ParamDocs::new(param, ty)))
-        .collect();
+        .collect::<std::collections::BTreeMap<_, _>>();
     let rest = rest_in.map(|(param, ty)| ParamDocs::new(param, ty));
 
     let ret_ty = format_ty(ret_in);
 
+    let docs = sig.primary().docs.clone().unwrap_or_default();
+
     Some(SignatureDocs {
-        docs: sig.primary().docs.clone().unwrap_or_default(),
+        docs,
         pos,
         named,
         rest,
         ret_ty,
         hover_docs: OnceLock::new(),
     })
+}
+
+pub(crate) fn convert_typst_docs(ctx: &mut LocalContext, docs: EcoString) -> EcoString {
+    if docs.trim().is_empty() {
+        return docs;
+    }
+
+    let shared = ctx.shared_();
+    match shared.convert_docs_cached(&docs, None, DocsContent::Plain) {
+        Ok(converted) => {
+            let converted = remove_list_annotations(&converted);
+            ctx.remove_html(converted.trim().into())
+        }
+        Err(err) => {
+            log::warn!("failed to convert Typst docs to Markdown: {err}");
+            ctx.remove_html(docs)
+        }
+    }
 }

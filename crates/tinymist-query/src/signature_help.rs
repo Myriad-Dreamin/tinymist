@@ -88,14 +88,11 @@ impl SemanticRequest for SignatureHelpRequest {
                     .unwrap_or("any")
             ));
 
+            let documentation = param.docs.as_ref().map(|docs| markdown_docs(docs.clone()));
+
             params.push(ParameterInformation {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: param.docs.as_ref().map(|docs| {
-                    Documentation::MarkupContent(MarkupContent {
-                        value: docs.as_ref().into(),
-                        kind: MarkupKind::Markdown,
-                    })
-                }),
+                documentation,
             });
         }
         label.push(')');
@@ -115,7 +112,11 @@ impl SemanticRequest for SignatureHelpRequest {
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {
                 label: label.to_string(),
-                documentation: sig.primary().docs.as_deref().map(markdown_docs),
+                documentation: sig
+                    .primary()
+                    .docs
+                    .as_ref()
+                    .map(|docs| markdown_docs(docs.clone())),
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
             }],
@@ -125,10 +126,10 @@ impl SemanticRequest for SignatureHelpRequest {
     }
 }
 
-fn markdown_docs(docs: &str) -> Documentation {
+fn markdown_docs(docs: EcoString) -> Documentation {
     Documentation::MarkupContent(MarkupContent {
         kind: MarkupKind::Markdown,
-        value: docs.to_owned(),
+        value: docs.into(),
     })
 }
 

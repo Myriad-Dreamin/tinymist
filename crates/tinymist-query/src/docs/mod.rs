@@ -9,7 +9,7 @@ use tinymist_std::path::unix_slash;
 use typst::syntax::FileId;
 use typst_shim::syntax::VirtualPathExt;
 
-pub(crate) use convert::convert_docs;
+pub(crate) use convert::{DocsContent, convert_docs};
 pub(crate) use def::*;
 pub use module::*;
 pub use package::*;

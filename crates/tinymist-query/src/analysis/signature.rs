@@ -1,12 +1,15 @@
 //! Analysis of function signatures.
 
+use ecow::EcoString;
 use itertools::Either;
+use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
 use tinymist_derive::BindTyCtx;
+use typst::foundations::FuncInner;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
+use crate::docs::{DocsContent, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::classify_def_loosely;
 use crate::ty::{
     BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigWithTy, TyCtx, TypeInfo,
@@ -343,5 +346,83 @@ fn analyze_dyn_signature(
         SignatureTarget::Convert(func) | SignatureTarget::Runtime(func) => func.clone(),
     };
 
-    Some(func_signature(func))
+    let sig = func_signature(func.clone());
+    if func_has_official_docs(&func) {
+        Some(convert_official_signature_docs(ctx, sig))
+    } else {
+        Some(sig)
+    }
+}
+
+fn func_has_official_docs(func: &Func) -> bool {
+    let mut func = func;
+    loop {
+        match func.inner() {
+            FuncInner::With(with) => func = &with.as_ref().0,
+            FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => return true,
+            FuncInner::Closure(..) => return false,
+        }
+    }
+}
+
+fn convert_official_signature_docs(ctx: &Arc<SharedContext>, sig: Signature) -> Signature {
+    match sig {
+        Signature::Primary(primary) => {
+            Signature::Primary(convert_official_primary_signature_docs(ctx, &primary))
+        }
+        Signature::Partial(partial) => Signature::Partial(Arc::new(PartialSignature {
+            signature: convert_official_primary_signature_docs(ctx, &partial.signature),
+            with_stack: partial.with_stack.clone(),
+        })),
+    }
+}
+
+fn convert_official_primary_signature_docs(
+    ctx: &Arc<SharedContext>,
+    primary: &PrimarySignature,
+) -> Arc<PrimarySignature> {
+    let param_specs = primary
+        .param_specs
+        .iter()
+        .map(|param| {
+            Interned::new(ParamTy {
+                name: param.name.clone(),
+                docs: param
+                    .docs
+                    .clone()
+                    .map(|docs| convert_official_doc(ctx, docs)),
+                default: param.default.clone(),
+                ty: param.ty.clone(),
+                attrs: param.attrs,
+            })
+        })
+        .collect();
+
+    Arc::new(PrimarySignature {
+        docs: primary
+            .docs
+            .clone()
+            .map(|docs| convert_official_doc(ctx, docs)),
+        param_specs,
+        has_fill_or_size_or_stroke: primary.has_fill_or_size_or_stroke,
+        sig_ty: primary.sig_ty.clone(),
+        _broken: primary._broken,
+    })
+}
+
+fn convert_official_doc(ctx: &Arc<SharedContext>, docs: EcoString) -> EcoString {
+    if docs.trim().is_empty() {
+        return docs;
+    }
+
+    match ctx.convert_docs_cached(&docs, None, DocsContent::Official) {
+        Ok(converted) => {
+            let converted = remove_list_annotations(&converted);
+            ctx.remove_html(converted.trim().into())
+        }
+        Err(err) => {
+            log::warn!("failed to convert official Typst docs to Markdown: {err}");
+            ctx.remove_html(docs)
+        }
+    }
 }

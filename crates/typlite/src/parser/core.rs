@@ -96,10 +96,10 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            // md_tag::parbreak => {
-            //     self.flush_inline_buffer();
-            //     Ok(())
-            // }
+            md_tag::parbreak => {
+                self.flush_inline_buffer();
+                Ok(())
+            }
             md_tag::heading => {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
