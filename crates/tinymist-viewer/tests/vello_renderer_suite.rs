@@ -1311,7 +1311,7 @@ impl RenderWorld {
             None => PathBuf::new(),
         };
 
-        let path = id.vpath().realize(&base);
+        let path = id.vpath().realize(&base)?;
         if let Ok(asset) = path.strip_prefix("assets") {
             return Ok(SystemPath::Asset(asset.to_path_buf()));
         }

@@ -69,7 +69,7 @@ impl LinkTarget {
             LinkTarget::Path(id, path) => {
                 let resolved = resolve_path_from_id(*id, path.as_str()).ok()?;
                 let path = match ctx.world().vfs().resolve_root(*id).ok()? {
-                    Some(root) => PathResolution::Resolved(resolved.vpath().realize(&root)),
+                    Some(root) => PathResolution::Resolved(resolved.vpath().realize(&root).ok()?),
                     None => PathResolution::Rootless(Cow::Owned(resolved.vpath().clone())),
                 };
                 crate::path_res_to_url(path).ok()

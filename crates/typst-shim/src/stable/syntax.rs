@@ -2,20 +2,28 @@
 use std::ops::Range;
 use std::path::Path;
 
+use typst::syntax::DiagSpan;
+use typst::syntax::DiagSpanKind;
 use typst::syntax::LinkedNode;
 use typst::syntax::RootedPath;
 use typst::syntax::Side;
 use typst::syntax::Source;
-use typst::syntax::Span;
 use typst::syntax::VirtualPath;
 use typst::syntax::VirtualRoot;
 use typst::syntax::package::PackageSpec;
 
 pub use crate::path::resolve_path_from_id;
 
-/// Get the byte range for a span within a source file.
-pub fn source_range(source: &Source, span: impl Into<Span>) -> Option<Range<usize>> {
-    source.range(span.into())
+/// Get the byte range for a diagnostic span within a source file.
+pub fn source_range(source: &Source, span: impl Into<DiagSpan>) -> Option<Range<usize>> {
+    match span.into().get() {
+        DiagSpanKind::Detached => None,
+        DiagSpanKind::Number { id, num, sub_range } if id == source.id() => {
+            source.range(num, sub_range)
+        }
+        DiagSpanKind::Range { id, range } if id == source.id() => Some(range),
+        _ => None,
+    }
 }
 
 /// The `LinkedNodeExt` trait is designed for compatibility between new and old

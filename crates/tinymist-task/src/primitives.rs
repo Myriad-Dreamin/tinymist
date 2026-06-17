@@ -159,7 +159,7 @@ impl PathPattern {
             return None;
         }
         // Files without a path are not exported
-        let path = main.vpath().realize(&root);
+        let path = main.vpath().realize(&root).ok()?;
 
         // todo: handle untitled path
         if let Ok(path) = path.strip_prefix("/untitled") {

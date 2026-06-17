@@ -177,19 +177,19 @@ reflexo = { version = "0.7.0", default-features = false, features = [
 reflexo-typst = { version = "0.7.0", default-features = false }
 reflexo-vec2svg = { version = "0.7.0" }
 
-typst = "0.15.0-rc.1"
-typst-bundle = "0.15.0-rc.1"
-typst-layout = "0.15.0-rc.1"
-typst-html = "0.15.0-rc.1"
-typst-library = "0.15.0-rc.1"
-typst-macros = "0.15.0-rc.1"
-typst-utils = "0.15.0-rc.1"
-typst-timing = "0.15.0-rc.1"
-typst-svg = "0.15.0-rc.1"
-typst-render = "0.15.0-rc.1"
-typst-pdf = "0.15.0-rc.1"
-typst-syntax = "0.15.0-rc.1"
-typst-eval = "0.15.0-rc.1"
+typst = "0.15.0"
+typst-bundle = "0.15.0"
+typst-layout = "0.15.0"
+typst-html = "0.15.0"
+typst-library = "0.15.0"
+typst-macros = "0.15.0"
+typst-utils = "0.15.0"
+typst-timing = "0.15.0"
+typst-svg = "0.15.0"
+typst-render = "0.15.0"
+typst-pdf = "0.15.0"
+typst-syntax = "0.15.0"
+typst-eval = "0.15.0"
 typst-assets = { git = "https://github.com/typst/typst-assets", rev = "3284e80" }
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.5.0"
@@ -320,20 +320,20 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-bundle = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-layout = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-realize = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
-typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "ea2892a1c84bb3495aeb988626a8795a91af8f58" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-bundle = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-layout = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-realize = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
 
 typst-ansi-hl = { git = "https://github.com/Myriad-Dreamin/typst-ansi-hl.git", rev = "3867cb7229ec6b3e3c8f5b1222af96f98bba9bff" }
 typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = "992f36112200bc0ea61df8a7c2af6d9ae56781dd" }
@@ -360,9 +360,9 @@ typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = 
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "69580cd8c6c8dbe4ba9a5622d194cbcf3e4cb04e" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }
