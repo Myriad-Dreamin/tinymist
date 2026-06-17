@@ -1,5 +1,6 @@
 use core::fmt;
 use std::collections::{BTreeMap, HashMap};
+use std::hash::{Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 
 use ecow::{EcoString, eco_format};
@@ -9,6 +10,93 @@ use super::tidy::*;
 use crate::syntax::DeclExpr;
 use crate::ty::{Interned, ParamAttrs, ParamTy, StrRef, Ty, TypeVarBounds};
 use crate::upstream::plain_docs_sentence;
+
+/// The source format of documentation text.
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DocTextKind {
+    /// Documentation that is already ready to display as Markdown.
+    Plain,
+    /// Official Typst documentation that must be converted before display.
+    Official,
+}
+
+/// Lazily resolved documentation text.
+#[derive(Debug, Clone)]
+pub struct DocText {
+    raw: EcoString,
+    kind: DocTextKind,
+    resolved: OnceLock<EcoString>,
+}
+
+impl DocText {
+    /// Creates documentation that is already ready to display as Markdown.
+    pub fn plain(raw: EcoString) -> Self {
+        Self {
+            raw,
+            kind: DocTextKind::Plain,
+            resolved: OnceLock::new(),
+        }
+    }
+
+    /// Creates official Typst documentation that must be converted before display.
+    pub fn official(raw: EcoString) -> Self {
+        Self {
+            raw,
+            kind: DocTextKind::Official,
+            resolved: OnceLock::new(),
+        }
+    }
+
+    /// Gets the raw documentation text.
+    pub fn raw(&self) -> &EcoString {
+        &self.raw
+    }
+
+    /// Gets the source format of this documentation text.
+    pub fn kind(&self) -> DocTextKind {
+        self.kind
+    }
+
+    /// Gets display-ready documentation text.
+    pub fn get_or_init(
+        &self,
+        convert_official: impl FnOnce(&EcoString) -> EcoString,
+    ) -> &EcoString {
+        match self.kind {
+            DocTextKind::Plain => &self.raw,
+            DocTextKind::Official => self.resolved.get_or_init(|| convert_official(&self.raw)),
+        }
+    }
+}
+
+impl PartialEq for DocText {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.raw == other.raw
+    }
+}
+
+impl Eq for DocText {}
+
+impl PartialOrd for DocText {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DocText {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.kind
+            .cmp(&other.kind)
+            .then_with(|| self.raw.cmp(&other.raw))
+    }
+}
+
+impl Hash for DocText {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
+        self.raw.hash(state);
+    }
+}
 
 /// The documentation string of an item
 #[derive(Debug, Clone, Default)]
@@ -312,6 +400,12 @@ pub type TypelessParamDocs = ParamDocsT<()>;
 /// Documentation about a parameter.
 pub type ParamDocs = ParamDocsT<TypeRepr>;
 
+/// Resolves lazy documentation text.
+pub trait DocTextResolver {
+    /// Gets display-ready documentation text.
+    fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString;
+}
+
 /// Describes a function parameter.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ParamDocsT<T> {
@@ -330,10 +424,15 @@ pub struct ParamDocsT<T> {
 
 impl ParamDocs {
     /// Create a new parameter documentation.
-    pub fn new(param: &ParamTy, ty: Option<&Ty>) -> Self {
+    pub fn new(ctx: &mut impl DocTextResolver, param: &ParamTy, ty: Option<&Ty>) -> Self {
+        let docs = param
+            .docs
+            .as_ref()
+            .map(|docs| ctx.resolve_doc_text(docs))
+            .unwrap_or_default();
         Self {
             name: param.name.as_ref().into(),
-            docs: param.docs.clone().unwrap_or_default(),
+            docs,
             cano_type: format_ty(ty.or(Some(&param.ty))),
             default: param.default.clone(),
             attrs: param.attrs,

@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
+use ecow::EcoString;
 use lsp_types::Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
@@ -520,7 +521,7 @@ impl LocalContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig)?;
+                let docs = crate::docs::sig_docs(self, &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {

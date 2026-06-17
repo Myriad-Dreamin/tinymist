@@ -6,7 +6,7 @@ use tinymist_derive::BindTyCtx;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
+use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::classify_def_loosely;
 use crate::ty::{
     BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigWithTy, TyCtx, TypeInfo,
@@ -144,7 +144,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name,
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::positional(),
@@ -166,7 +166,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: name.clone(),
-                    docs: docstring.map(|doc| doc.docs.clone()),
+                    docs: docstring.map(|doc| DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::named(),
@@ -178,7 +178,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: doc.name.clone(),
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
                     attrs: ParamAttrs::variadic(),
@@ -186,7 +186,7 @@ pub(crate) fn sig_of_type(
             }
 
             let sig = Signature::Primary(Arc::new(PrimarySignature {
-                docs: Some(docstring.docs.clone()),
+                docs: Some(DocText::plain(docstring.docs.clone())),
                 param_specs,
                 has_fill_or_size_or_stroke,
                 sig_ty,

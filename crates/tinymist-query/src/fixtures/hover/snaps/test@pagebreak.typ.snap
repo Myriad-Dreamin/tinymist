@@ -20,7 +20,8 @@ A manual page break.
 
 Must not be used inside any containers.
 
-= Example <example>
+## Example
+
 ```typ
 The next page contains
 more details on compound theory.
@@ -30,14 +31,9 @@ more details on compound theory.
 In 1984, the first ...
 ```
 
-Even without manual page breaks, content will be automatically paginated
-based on the configured page size. You can set @page.height[the page height]
-to `auto` to let the page grow dynamically until a manual page break
-occurs.
+Even without manual page breaks, content will be automatically paginated based on the configured page size. You can set [the page height](https://typst.app/docs/reference/layout/page/#parameters-height) to `auto` to let the page grow dynamically until a manual page break occurs.
 
-Pagination tries to avoid single lines of text at the top or bottom of a
-page (these are called _widows_ and _orphans_). You can adjust the
-@text.costs parameter to disable this behavior.
+Pagination tries to avoid single lines of text at the top or bottom of a page (these are called _widows_ and _orphans_). You can adjust the [text.costs](https://typst.app/docs/reference/text/text/#parameters-costs) parameter to disable this behavior.
 
 # Named Parameters
 
@@ -47,8 +43,7 @@ page (these are called _widows_ and _orphans_). You can adjust the
 type: "even" | "odd" | none
 ```
 
-If given, ensures that the next page will be an even/odd page, with an
-empty page in between if necessary.
+If given, ensures that the next page will be an even/odd page, with an empty page in between if necessary.
 
 ```typ
 #set page(height: 30pt)
@@ -64,8 +59,7 @@ Third.
 type: bool
 ```
 
-If `true`, the page break is skipped if the current page is already
-empty.
+If `true`, the page break is skipped if the current page is already empty.
 
 
 ======

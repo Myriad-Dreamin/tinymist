@@ -51,7 +51,9 @@ Who loves to lie with me,
 ```)
 ````
 
-Source in grid \begin{table}[htbp]
+Source in grid
+
+\begin{table}[htbp]
 \centering
 \begin{tabular}{cc}
 \hline

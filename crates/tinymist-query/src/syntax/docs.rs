@@ -7,7 +7,7 @@ use typst::foundations::{IntoValue, Module, Str, Type};
 use crate::{StrRef, adt::interner::Interned};
 use crate::{adt::snapshot_map::SnapshotMap, analysis::SharedContext};
 use crate::{
-    docs::{DocString, VarDoc, convert_docs, identify_pat_docs, identify_tidy_module_docs},
+    docs::{DocString, VarDoc, identify_pat_docs, identify_tidy_module_docs},
     prelude::*,
     syntax::{Decl, DefKind},
     ty::{BuiltinTy, DynTypeBounds, InsTy, PackageId, SigTy, Ty, TypeVar, TypeVarBounds},
@@ -57,7 +57,8 @@ static EMPTY_MODULE: LazyLock<Module> =
 
 impl DocsChecker<'_> {
     pub fn check_pat_docs(mut self, docs: String) -> Option<DocString> {
-        let converted = convert_docs(self.ctx, &docs, Some(self.fid))
+        let docs_text = crate::docs::DocText::plain(docs.as_str().into());
+        let converted = crate::docs::convert_docs(self.ctx, &docs_text, Some(self.fid))
             .and_then(|converted| identify_pat_docs(&converted));
 
         let converted = match Self::fallback_docs(converted, &docs) {
@@ -92,8 +93,9 @@ impl DocsChecker<'_> {
     }
 
     pub fn check_module_docs(self, docs: String) -> Option<DocString> {
-        let converted =
-            convert_docs(self.ctx, &docs, Some(self.fid)).and_then(identify_tidy_module_docs);
+        let docs_text = crate::docs::DocText::plain(docs.as_str().into());
+        let converted = crate::docs::convert_docs(self.ctx, &docs_text, Some(self.fid))
+            .and_then(identify_tidy_module_docs);
 
         let converted = match Self::fallback_docs(converted, &docs) {
             Ok(docs) => docs,

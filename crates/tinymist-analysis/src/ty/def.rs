@@ -20,7 +20,7 @@ use typst::{
 use super::{BoundPred, BuiltinTy, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    docs::UntypedDefDocs,
+    docs::{DocText, UntypedDefDocs},
     syntax::{DeclExpr, UnaryOp},
 };
 
@@ -833,7 +833,7 @@ pub struct ParamTy {
     /// The name of the parameter.
     pub name: StrRef,
     /// The docstring of the parameter.
-    pub docs: Option<EcoString>,
+    pub docs: Option<DocText>,
     /// The default value of the variable.
     pub default: Option<EcoString>,
     /// The type of the parameter.

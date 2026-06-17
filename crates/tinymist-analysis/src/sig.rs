@@ -4,12 +4,13 @@ use core::fmt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use ecow::{EcoString, EcoVec, eco_format, eco_vec};
+use ecow::{EcoVec, eco_format, eco_vec};
 use typst::foundations::{Closure, ClosureNode, Func};
 use typst::syntax::ast;
 use typst::syntax::ast::AstNode;
 use typst::utils::LazyHash;
 
+use crate::docs::DocText;
 // use super::{BoundChecker, Definition};
 use crate::ty::{InsTy, ParamTy, SigTy, StrRef, Ty};
 use crate::ty::{Interned, ParamAttrs};
@@ -71,7 +72,7 @@ impl Signature {
 #[derive(Debug, Clone)]
 pub struct PrimarySignature {
     /// The documentation of the function
-    pub docs: Option<EcoString>,
+    pub docs: Option<DocText>,
     /// The documentation of the parameter.
     pub param_specs: Vec<Interned<ParamTy>>,
     /// Whether the function has fill, stroke, or size parameters.
@@ -217,25 +218,30 @@ pub fn func_signature(func: Func) -> Signature {
         }
     };
 
-    let ret_ty = match func.inner() {
+    let (docs, ret_ty) = match func.inner() {
         FuncInner::With(..) => unreachable!(),
         FuncInner::Closure(closure) => {
             analyze_closure_signature(closure.clone(), &mut add_param);
-            None
+            (func.docs().map(|docs| DocText::plain(docs.into())), None)
         }
         FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
             for param in func.params() {
                 let name = param.name().unwrap_or_default();
                 add_param(Interned::new(ParamTy {
                     name: name.into(),
-                    docs: param.to_native().map(|native| native.docs.into()),
+                    docs: param
+                        .to_native()
+                        .map(|native| DocText::official(native.docs.into())),
                     default: param.default().map(|default| truncated_repr(&default)),
                     ty: Ty::from_param_site(&func, &param),
                     attrs: (&param).into(),
                 }));
             }
 
-            func.returns().map(|r| Ty::from_return_site(&func, r))
+            (
+                func.docs().map(|docs| DocText::official(docs.into())),
+                func.returns().map(|r| Ty::from_return_site(&func, r)),
+            )
         }
     };
 
@@ -252,7 +258,7 @@ pub fn func_signature(func: Func) -> Signature {
     }
 
     let signature = Arc::new(PrimarySignature {
-        docs: func.docs().map(From::from),
+        docs,
         param_specs,
         has_fill_or_size_or_stroke,
         sig_ty: sig_ty.into(),
@@ -298,7 +304,7 @@ fn analyze_closure_signature(
                 let default = unwrap_parens(named.expr()).to_untyped().clone().full_text();
                 add_param(Interned::new(ParamTy {
                     name: named.name().get().into(),
-                    docs: Some(eco_format!("Default value: {default}")),
+                    docs: Some(DocText::plain(eco_format!("Default value: {default}"))),
                     default: Some(default),
                     ty: Ty::Any,
                     attrs: ParamAttrs::named(),
