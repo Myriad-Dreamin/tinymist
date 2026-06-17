@@ -1670,7 +1670,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1911,7 +1911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2934,7 +2934,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -3288,7 +3288,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4038,7 +4038,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5066,7 +5066,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -5662,7 +5662,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6304,7 +6304,7 @@ version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0811b01ca2c4e8718760713911feaf4675c24f94e50530a015ec646cfb622f7c"
 dependencies = [
- "skrifa 0.42.1",
+ "skrifa 0.37.0",
  "yazi",
  "zeno",
 ]
@@ -6430,7 +6430,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6460,7 +6460,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6868,7 +6868,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-derive"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "quote",
  "syn 2.0.117",
@@ -6889,7 +6889,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-l10n"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -6918,7 +6918,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-package"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6971,7 +6971,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-project"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -7071,7 +7071,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-std"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7111,7 +7111,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-task"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "anyhow",
  "clap",
@@ -7160,7 +7160,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-vfs"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "comemo",
  "ecow",
@@ -7234,7 +7234,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-world"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -8023,7 +8023,7 @@ dependencies = [
 
 [[package]]
 name = "typst-shim"
-version = "0.15.0-rc1"
+version = "0.15.0-rc2"
 dependencies = [
  "cfg-if",
  "comemo",
@@ -9113,7 +9113,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9178,19 +9178,6 @@ dependencies = [
  "windows-link 0.1.3",
  "windows-result 0.3.4",
  "windows-strings 0.4.2",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link 0.2.1",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -9289,15 +9276,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-result"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7781fa89eaf60850ac3d2da7af8e5242a5ea78d1a11c49bf2910bb5a73853eb5"
-dependencies = [
- "windows-link 0.2.1",
-]
-
-[[package]]
 name = "windows-strings"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9314,15 +9292,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56e6c93f3a0c3b36176cb1327a4958a0353d5d166c2a35cb268ace15e91d3b57"
 dependencies = [
  "windows-link 0.1.3",
-]
-
-[[package]]
-name = "windows-strings"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7837d08f69c77cf6b07689544538e017c1bfcf57e34b4c0ff58e6c2cd3b37091"
-dependencies = [
- "windows-link 0.2.1",
 ]
 
 [[package]]
