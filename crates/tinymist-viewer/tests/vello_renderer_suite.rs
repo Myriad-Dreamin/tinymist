@@ -52,28 +52,6 @@ const RENDERER_DIFF_MANIFEST: &str = "renderer-diff-manifest.json";
 const HASH_BITS: usize = 16;
 const OFFICIAL_GROUP: &str = "official";
 const VELLO_GROUP: &str = "vello";
-const UNSUPPORTED_REF_CASES: &[&str] = &[
-    // These cases rely on Typst's upstream test runner injecting a `bounds`
-    // helper; the lightweight viewer runner compiles cases directly.
-    "baseline-box-align",
-    "baseline-breakable-display-math",
-    "baseline-display-math",
-    "baseline-inline-math",
-    "baseline-isolated-box",
-    "baseline-move",
-    "baseline-paragraph",
-    "baseline-rotate",
-    "baseline-rotate-multiline",
-    "baseline-scale",
-    "baseline-scale-multiline",
-    "baseline-shapes",
-    "baseline-skew",
-    "baseline-skew-multiline",
-    // Uses the upstream runner-only `selector-within` polyfill.
-    "query-within",
-    // Requires a math font that is not available in the Linux CI image.
-    "math-font-fallback-class",
-];
 
 #[test]
 fn typst_suite_vello_renderer_hashes() -> Result<()> {
@@ -91,13 +69,7 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         .context("viewer crate should live under <workspace>/crates/tinymist-viewer")?;
     let output_root = workspace_root.join(OUTPUT_ROOT);
     let artifact_root = output_root.join(RENDERER_DIFF_ARTIFACT);
-    let ref_root = typst_ref_root(&tests_root).with_context(|| {
-        format!(
-            "Typst tests root {} contains no PNG refs under ref/ or ref/render/",
-            tests_root.display()
-        )
-    })?;
-    let cases = all_ref_cases(&ref_root)?;
+    let cases = all_ref_cases(&tests_root)?;
     let collected = Box::new(collect_tests(&tests_root)?);
     let make_bundle = env_flag("TINYMIST_RENDERER_DIFF");
 
@@ -121,12 +93,7 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
     let mut manifest_cases = vec![];
 
     for name in cases {
-        if unsupported_ref_case(&name) {
-            eprintln!("skipping unsupported Typst renderer suite case {name}");
-            continue;
-        }
-
-        let ref_png = ref_root.join(format!("{name}.png"));
+        let ref_png = tests_root.join("ref").join(format!("{name}.png"));
         if !ref_png.exists() {
             let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
             writeln!(failures, "{failure}")?;
@@ -216,46 +183,23 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
     Ok(())
 }
 
-fn unsupported_ref_case(name: &str) -> bool {
-    UNSUPPORTED_REF_CASES.contains(&name)
-}
-
 fn typst_tests_root() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("TINYMIST_TYPST_TESTS").map(PathBuf::from)
         && path.join("suite").is_dir()
-        && typst_ref_root(&path).is_some()
+        && path.join("ref").is_dir()
     {
         return Some(path);
     }
 
     let home = std::env::var_os("HOME")?;
     let path = PathBuf::from(home).join("work/rust/typst/tests");
-    (path.join("suite").is_dir() && typst_ref_root(&path).is_some()).then_some(path)
+    (path.join("suite").is_dir() && path.join("ref").is_dir()).then_some(path)
 }
 
-fn typst_ref_root(tests_root: &Path) -> Option<PathBuf> {
-    let render_ref_root = tests_root.join("ref/render");
-    if ref_root_has_png_refs(&render_ref_root) {
-        return Some(render_ref_root);
-    }
-
-    let flat_ref_root = tests_root.join("ref");
-    ref_root_has_png_refs(&flat_ref_root).then_some(flat_ref_root)
-}
-
-fn ref_root_has_png_refs(ref_root: &Path) -> bool {
-    let Ok(entries) = fs::read_dir(ref_root) else {
-        return false;
-    };
-
-    entries
-        .filter_map(Result::ok)
-        .any(|entry| entry.path().extension().is_some_and(|ext| ext == "png"))
-}
-
-fn all_ref_cases(ref_root: &Path) -> Result<Vec<String>> {
+fn all_ref_cases(tests_root: &Path) -> Result<Vec<String>> {
+    let ref_root = tests_root.join("ref");
     let mut cases = vec![];
-    for entry in fs::read_dir(ref_root)
+    for entry in fs::read_dir(&ref_root)
         .with_context(|| format!("failed to read Typst ref root {}", ref_root.display()))?
     {
         let entry = entry?;
@@ -1311,7 +1255,10 @@ impl RenderWorld {
             None => PathBuf::new(),
         };
 
-        let path = id.vpath().realize(&base);
+        let path = id
+            .vpath()
+            .realize(&base)
+            .map_err(|_| FileError::AccessDenied)?;
         if let Ok(asset) = path.strip_prefix("assets") {
             return Ok(SystemPath::Asset(asset.to_path_buf()));
         }
