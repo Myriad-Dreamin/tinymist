@@ -13,13 +13,15 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ## v0.15.0 - [2026-06-16]
 
 * Bumped Typst integration and world crates to v0.15.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/2574 and https://github.com/Myriad-Dreamin/tinymist/pull/2575
-* Completed the v0.14.20 release-version bump cycle in https://github.com/Myriad-Dreamin/tinymist/pull/2554 and https://github.com/Myriad-Dreamin/tinymist/pull/2571
+* Bumped Typst to v0.15.0 and updated Typst dependency versions in https://github.com/Myriad-Dreamin/tinymist/pull/2579 and https://github.com/Myriad-Dreamin/tinymist/pull/2582
+* Bumped world crates to v0.15.0-rc2 in https://github.com/Myriad-Dreamin/tinymist/pull/2583
 
 ### Server
 
 * (Fix) Ignored irrelevant filesystem watcher access events in https://github.com/Myriad-Dreamin/tinymist/pull/2509
 * (Fix) Polled missing watched files in project workspaces in https://github.com/Myriad-Dreamin/tinymist/pull/2516
 * (Fix) Skipped release-candidate tags when selecting changelog compare bases in https://github.com/Myriad-Dreamin/tinymist/pull/2556
+* (Fix) Preserved entry path selection contract in https://github.com/Myriad-Dreamin/tinymist/pull/2580
 
 ### Editor
 
@@ -67,6 +69,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Linting
 
 * Added the `tinymist lint` command in https://github.com/Myriad-Dreamin/tinymist/pull/2527
+
+### Docs
+
+* Converted builtin Typst docs to Markdown in https://github.com/Myriad-Dreamin/tinymist/pull/2581
 
 ### Testing
 
