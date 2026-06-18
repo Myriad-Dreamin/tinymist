@@ -1,9 +1,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
-use reflexo_typst::debug_loc::{
-    DocumentPosition, ElementPoint, LspPosition, SourceLocation, SourceSpanOffset,
-};
+use reflexo_typst::debug_loc::{DocumentPosition, LspPosition, SourceLocation, SourceSpanOffset};
 use reflexo_vec2svg::IncrSvgDocServer;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
@@ -12,20 +10,15 @@ use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 use crate::debug_loc::SpanInterner;
 use crate::outline::Outline;
 use crate::protocol;
-use crate::{ChangeCursorPositionRequest, CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
-
-#[derive(Debug, Clone)]
-pub struct ResolveSpanRequest(pub Vec<ElementPoint>);
+use crate::{CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
 
 #[derive(Debug, Clone)]
 pub enum RenderActorRequest {
     RenderFullLatest,
     RenderIncremental,
     EditorResolveSpanRange(Range<SourceSpanOffset>),
-    WebviewResolveSpan(ResolveSpanRequest),
     WebviewResolveFrameLoc(DocumentPosition),
     ResolveSourceLoc(ResolveSourceLocRequest),
-    ChangeCursorPosition(ChangeCursorPositionRequest),
 }
 
 impl RenderActorRequest {
@@ -34,10 +27,8 @@ impl RenderActorRequest {
             Self::RenderFullLatest => true,
             Self::RenderIncremental => false,
             Self::EditorResolveSpanRange(_) => false,
-            Self::WebviewResolveSpan(_) => false,
             Self::ResolveSourceLoc(_) => false,
             Self::WebviewResolveFrameLoc(_) => false,
-            Self::ChangeCursorPosition(_) => false,
         }
     }
 }
@@ -70,9 +61,7 @@ impl RenderActor {
     }
 
     fn new_renderer() -> IncrSvgDocServer {
-        let mut renderer = IncrSvgDocServer::default();
-        renderer.set_should_attach_debug_info(true);
-        renderer
+        IncrSvgDocServer::default()
     }
 
     async fn process_message(&mut self, msg: RenderActorRequest) -> bool {
@@ -85,27 +74,11 @@ impl RenderActor {
 
                 self.editor_resolve_span_range(span_range);
             }
-            RenderActorRequest::WebviewResolveSpan(ResolveSpanRequest(element_path)) => {
-                log::debug!("RenderActor: resolving WebviewResolveSpan: {element_path:?}");
-                let spans = match self.renderer.resolve_span_by_element_path(&element_path) {
-                    Ok(spans) => spans,
-                    Err(err) => {
-                        log::info!("RenderActor: failed to resolve span: {err}");
-                        return false;
-                    }
-                };
-
-                log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
-                // end position is used
-                if let Some(spans) = spans {
-                    self.editor_resolve_span_range(spans.0..spans.1);
-                }
-            }
             RenderActorRequest::WebviewResolveFrameLoc(frame_loc) => {
                 log::debug!("RenderActor: resolving WebviewResolveFrameLoc: {frame_loc:?}");
                 let spans = self.resolve_span_by_frame_loc(&frame_loc);
 
-                log::debug!("RenderActor: resolved WebviewResolveSpan: {spans:?}");
+                log::debug!("RenderActor: resolved WebviewResolveFrameLoc: {spans:?}");
                 // end position is used
                 if let Some(spans) = spans {
                     self.editor_resolve_span_range(spans.0..spans.1);
@@ -115,11 +88,6 @@ impl RenderActor {
                 log::debug!("RenderActor: resolving ResolveSourceLoc: {req:?}");
 
                 self.resolve_source_loc(req);
-            }
-            RenderActorRequest::ChangeCursorPosition(req) => {
-                log::debug!("RenderActor: processing ChangeCursorPosition: {req:?}");
-
-                self.change_cursor_position(req);
             }
             RenderActorRequest::RenderFullLatest | RenderActorRequest::RenderIncremental => {}
         }
@@ -267,27 +235,6 @@ impl RenderActor {
             (.., Some(info)) | (Some(info), None) => Some(info),
             (None, None) => None,
         }
-    }
-
-    fn change_cursor_position(&mut self, req: ChangeCursorPositionRequest) -> Option<()> {
-        let span = self
-            .view()?
-            .resolve_source_span(crate::Location::Src(SourceLocation {
-                filepath: req.filepath.to_string_lossy().to_string(),
-                pos: LspPosition {
-                    line: req.line,
-                    character: req.character,
-                },
-            }))?;
-        log::info!("RenderActor: changing cursor position: {span:?}");
-
-        let paths = self.renderer.resolve_element_paths_by_span(span).ok()?;
-        log::info!("RenderActor: resolved element paths: {paths:?}");
-        let _ = self
-            .webview_sender
-            .send(WebviewActorRequest::CursorPaths(paths));
-
-        Some(())
     }
 
     fn resolve_source_loc(&self, req: ResolveSourceLocRequest) -> Option<()> {

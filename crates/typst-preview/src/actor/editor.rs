@@ -212,8 +212,12 @@ impl<T: EditorServer> EditorActor<T> {
                 Some(msg) = self.editor_conn.next() => {
                     match msg {
                         ControlPlaneMessage::ChangeCursorPosition(cursor_info) => {
-                            log::debug!("EditorActor: received message from editor: {cursor_info:?}");
-                            self.renderer_sender.send(RenderActorRequest::ChangeCursorPosition(cursor_info)).log_error("EditorActor");
+                            log::error!(
+                                "The experimental cursor indicator feature has been temporarily disabled to improve overall performance. It will be re-enabled once it is ready. Request ignored: {}:{}:{}",
+                                cursor_info.filepath.display(),
+                                cursor_info.line,
+                                cursor_info.character,
+                            );
                         }
                         ControlPlaneMessage::ResolveSourceLoc(jump_info) => {
                             log::debug!("EditorActor: received message from editor: {jump_info:?}");
