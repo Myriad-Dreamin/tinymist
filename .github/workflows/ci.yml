@@ -197,11 +197,31 @@ jobs:
   checks-neovim:
     name: Neovim Spec Tests
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [prepare-build]
+    permissions:
+      actions: read
+      contents: read
     env:
       RUST_TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@v4
+      - name: Wait for tinymist binary artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_NAME: artifacts-build-local-${{ env.RUST_TARGET }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..720}; do
+            if gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts" \
+              --jq '.artifacts[].name' | grep -Fxq "$ARTIFACT_NAME"; then
+              echo "Found artifact: $ARTIFACT_NAME"
+              exit 0
+            fi
+            echo "Waiting for $ARTIFACT_NAME ($attempt/720)"
+            sleep 30
+          done
+          echo "Timed out waiting for artifact: $ARTIFACT_NAME" >&2
+          exit 1
       - name: Download tinymist binary artifact
         uses: actions/download-artifact@v4
         with:
