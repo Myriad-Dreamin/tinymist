@@ -518,37 +518,38 @@ mod tests {
     fn format_std_method(name: &str, func: &Func) -> String {
         let params = func
             .params()
-            .map(|params| {
-                params
-                    .iter()
-                    .map(|param| {
-                        let mode = match (param.positional, param.named, param.variadic) {
-                            (_, _, true) => "rest",
-                            (true, true, false) => "pos+named",
-                            (true, false, false) => "pos",
-                            (false, true, false) => "named",
-                            (false, false, false) => "arg",
-                        };
-                        let required = if param.required && !param.variadic {
-                            "!"
-                        } else {
-                            ""
-                        };
-                        let default = param
-                            .default
-                            .map(|default| format!(" = {}", super::truncated_repr(&default())))
-                            .unwrap_or_default();
-                        format!(
-                            "{}{}: {}{default} [{mode}]",
-                            param.name,
-                            required,
-                            format_cast_info(&param.input)
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
+            .map(|param| {
+                let positional = param.positional();
+                let named = param.named();
+                let variadic = param.variadic();
+                let mode = match (positional, named, variadic) {
+                    (_, _, true) => "rest",
+                    (true, true, false) => "pos+named",
+                    (true, false, false) => "pos",
+                    (false, true, false) => "named",
+                    (false, false, false) => "arg",
+                };
+                let required = if param.required() && !variadic {
+                    "!"
+                } else {
+                    ""
+                };
+                let default = param
+                    .default()
+                    .map(|default| format!(" = {}", super::truncated_repr(&default)))
+                    .unwrap_or_default();
+                let input = param
+                    .to_native()
+                    .map(|native| format_cast_info(&native.input))
+                    .unwrap_or_else(|| "?".into());
+                format!(
+                    "{}{}: {input}{default} [{mode}]",
+                    param.name().unwrap_or_default(),
+                    required,
+                )
             })
-            .unwrap_or_else(|| "?".into());
+            .collect::<Vec<_>>()
+            .join(", ");
         let returns = func
             .returns()
             .map(format_cast_info)
@@ -626,12 +627,12 @@ mod tests {
                 entry.routes.iter().cloned().collect::<Vec<_>>().join(", ")
             )
             .unwrap();
-            writeln!(
-                snapshot,
-                "  fields: {}",
-                entry.fields.iter().cloned().collect::<Vec<_>>().join(", ")
-            )
-            .unwrap();
+            let fields = entry.fields.iter().cloned().collect::<Vec<_>>().join(", ");
+            if fields.is_empty() {
+                writeln!(snapshot, "  fields:").unwrap();
+            } else {
+                writeln!(snapshot, "  fields: {fields}").unwrap();
+            }
             writeln!(snapshot, "  methods:").unwrap();
             for method in &entry.methods {
                 writeln!(snapshot, "    - {method}").unwrap();

@@ -34,7 +34,7 @@
     position: (self: Self.with(_array-v), searcher: pos((value: pos(_array-v)) => bool)) => union(int, none),
     product: (self: Self.with(_array-v), default: named(any, required: false)) => any,
     push: (self: Self.with(_array-v), value: pos(_array-v)) => none,
-    range: (start: pos(int, required: false, default: 0), end: pos(int), step: named(int, required: false, default: 1)) => Self.with(int),
+    range: (start: pos(int, required: false, default: 0), end: pos(int), inclusive: named(bool, required: false, default: false), step: named(int, required: false, default: 1)) => Self.with(int),
     reduce: (self: Self.with(_array-v), reducer: pos((acc: pos(_array-v), value: pos(_array-v)) => _array-v)) => _array-v,
     remove: (self: Self.with(_array-v), index: pos(int), default: named(any, required: false)) => _array-v,
     rev: (self: Self.with(_array-v)) => Self.with(_array-v),
@@ -94,8 +94,8 @@
     lighten: (self: Self, factor: pos(ratio)) => color,
     linear-rgb: (red: pos(union(int, ratio)), green: pos(union(int, ratio)), blue: pos(union(int, ratio)), alpha: pos(union(int, ratio)), color: pos(color)) => color,
     luma: (lightness: pos(union(int, ratio)), alpha: pos(ratio), color: pos(color)) => color,
-    mix: (colors: rest(arr(union(color, array))), space: named(any, required: false, default: oklab)) => color,
-    negate: (self: Self, space: named(any, required: false, default: oklab)) => color,
+    mix: (colors: rest(arr(union(color, array))), space: named(any, required: false, default: auto)) => color,
+    negate: (self: Self, space: named(any, required: false, default: auto)) => color,
     oklab: (lightness: pos(ratio), a: pos(union(float, ratio)), b: pos(union(float, ratio)), alpha: pos(ratio), color: pos(color)) => color,
     oklch: (lightness: pos(ratio), chroma: pos(union(float, ratio)), hue: pos(angle), alpha: pos(ratio), color: pos(color)) => color,
     opacify: (self: Self, scale: pos(ratio)) => color,
@@ -105,6 +105,14 @@
     space: (self: Self) => any,
     to-hex: (self: Self) => str,
     transparentize: (self: Self, scale: pos(ratio)) => color,
+  ),
+);
+
+#let spot = rec(
+  name: "spot colorant",
+  self: any,
+  scope: (
+    tint: (self: Self, value: pos(ratio)) => color,
   ),
 );
 
@@ -125,7 +133,7 @@
   self: counter,
   scope: (
     at: (self: Self, selector: pos(union(label, function, location, selector))) => union(int, array),
-    display: (self: Self, numbering: pos(union(str, function, auto), required: false, default: auto), both: named(bool, required: false, default: false)) => any,
+    display: (self: Self, numbering: pos(union(str, function, auto), required: false, default: auto), at: named(union(label, function, location, selector, auto), required: false, default: auto), both: named(bool, required: false, default: false)) => any,
     final: (self: Self) => union(int, array),
     get: (self: Self) => union(int, array),
     step: (self: Self, level: named(int, required: false, default: 1)) => content,
@@ -160,9 +168,11 @@
   self: dictionary,
   scope: (
     at: (self: Self, key: pos(str), default: named(any, required: false)) => any,
+    filter: (self: Self, test: pos(function)) => Self,
     insert: (self: Self, key: pos(str), value: pos(any)) => none,
     keys: (self: Self) => array,
     len: (self: Self) => int,
+    map: (self: Self, mapper: pos(function)) => Self,
     pairs: (self: Self) => array,
     remove: (self: Self, key: pos(str), default: named(any, required: false)) => any,
     values: (self: Self) => array,
@@ -227,12 +237,12 @@
   scope: (
     angle: (self: Self) => union(angle, none),
     center: (self: Self) => union(array, none),
-    conic: (stops: rest(arr(union(color, array))), angle: named(angle, required: false, default: 0deg), space: named(any, required: false, default: oklab), relative: named(union("self", "parent", auto), required: false, default: auto), center: named(array, required: false, default: (50%, 50%))) => gradient,
+    conic: (stops: rest(arr(union(color, array))), angle: named(angle, required: false, default: 0deg), space: named(any, required: false, default: auto), relative: named(union("self", "parent", auto), required: false, default: auto), center: named(array, required: false, default: (50%, 50%))) => gradient,
     focal-center: (self: Self) => union(array, none),
     focal-radius: (self: Self) => union(ratio, none),
     kind: (self: Self) => function,
-    linear: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: oklab), relative: named(union("self", "parent", auto), required: false, default: auto), dir: pos(direction, required: false, default: ltr), angle: pos(angle)) => gradient,
-    radial: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: oklab), relative: named(union("self", "parent", auto), required: false, default: auto), center: named(array, required: false, default: (50%, 50%)), radius: named(ratio, required: false, default: 50%), focal-center: named(union(array, auto), required: false, default: auto), focal-radius: named(ratio, required: false, default: 0%)) => gradient,
+    linear: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: auto), relative: named(union("self", "parent", auto), required: false, default: auto), dir: pos(direction, required: false, default: ltr), angle: pos(angle)) => gradient,
+    radial: (stops: rest(arr(union(color, array))), space: named(any, required: false, default: auto), relative: named(union("self", "parent", auto), required: false, default: auto), center: named(array, required: false, default: (50%, 50%)), radius: named(ratio, required: false, default: 50%), focal-center: named(union(array, auto), required: false, default: auto), focal-radius: named(ratio, required: false, default: 0%)) => gradient,
     radius: (self: Self) => union(ratio, none),
     relative: (self: Self) => union("self", "parent", auto),
     repeat: (self: Self, repetitions: pos(int), mirror: named(bool, required: false, default: false)) => gradient,
@@ -292,6 +302,11 @@
   scope: (:),
 );
 
+#let path = rec(
+  name: "path",
+  scope: (:),
+);
+
 #let ratio = rec(
   name: "ratio",
   scope: (:),
@@ -315,6 +330,7 @@
     "and": (self: Self, others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
     before: (self: Self, end: pos(union(label, function, location, selector)), inclusive: named(bool, required: false, default: true)) => selector,
     "or": (self: Self, others: rest(arr(union(str, function, label, regex, location, selector)))) => selector,
+    within: (self: Self, ancestor: pos(union(label, function, location, selector))) => selector,
   ),
 );
 

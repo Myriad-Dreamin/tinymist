@@ -1,14 +1,14 @@
 #![allow(unused)]
 
 use core::fmt;
-use std::{collections::VecDeque, path::Path, sync::OnceLock};
+use std::{collections::VecDeque, sync::OnceLock};
 
 use comemo::Track;
 use tinymist_world::args;
 use typst::{
     engine::Engine,
     foundations::{
-        Args, Closure, ClosureNode, Context, Func, Repr as ValueRepr, Str, Value, func::Repr,
+        Args, Closure, ClosureNode, Context, Func, FuncInner, Repr as ValueRepr, Str, Value,
     },
     syntax::{Source, Span, ast},
 };
@@ -60,7 +60,7 @@ struct TvCtx {
 
 impl TySchemeWorker<'_> {
     fn is_typing_item(&self, v: &Value) -> bool {
-        matches!(v, Value::Func(f) if f.span().id().is_some_and(|s| s.vpath().as_rooted_path() == Path::new("/typings.typ")))
+        matches!(v, Value::Func(f) if f.span().id().is_some_and(|s| s.vpath().get_with_slash() == "/typings.typ"))
     }
 }
 
@@ -84,7 +84,7 @@ impl TySchemeWorker<'_> {
         };
 
         let with = match closure.inner() {
-            Repr::With(c) => c,
+            FuncInner::With(c) => c,
             _ => return TyMark::Any,
         };
 
@@ -93,12 +93,12 @@ impl TySchemeWorker<'_> {
 
     fn define_typing(&mut self, k: &str, func: &Func, mut args: Args) -> TyMark {
         match func.inner() {
-            Repr::Native(..) | Repr::Element(..) | Repr::Plugin(..) => TyMark::Any,
-            Repr::With(with) => {
+            FuncInner::Native(..) | FuncInner::Element(..) | FuncInner::Plugin(..) => TyMark::Any,
+            FuncInner::With(with) => {
                 args.items = with.1.items.iter().cloned().chain(args.items).collect();
                 self.define_typing(k, &with.0, args)
             }
-            Repr::Closure(closure) => self.ty_cons(k, args).unwrap_or(TyMark::Any),
+            FuncInner::Closure(closure) => self.ty_cons(k, args).unwrap_or(TyMark::Any),
         }
     }
 
@@ -339,10 +339,11 @@ impl TySchemeWorker<'_> {
             Value::Type(ty) => Ty::Builtin(BuiltinTy::Type(*ty)),
             Value::Dyn(dyn_val) => Ty::Builtin(BuiltinTy::Type(dyn_val.ty())),
             Value::Func(func) => match func.inner() {
-                Repr::Closure(closure) => self.term_sig(func, closure).unwrap_or(Ty::Any),
-                Repr::With(..) | Repr::Native(..) | Repr::Element(..) | Repr::Plugin(..) => {
-                    Ty::Func(func_signature(func.clone()).type_sig())
-                }
+                FuncInner::Closure(closure) => self.term_sig(func, closure).unwrap_or(Ty::Any),
+                FuncInner::With(..)
+                | FuncInner::Native(..)
+                | FuncInner::Element(..)
+                | FuncInner::Plugin(..) => Ty::Func(func_signature(func.clone()).type_sig()),
             },
             _ if is_plain_value(value) => Ty::Value(InsTy::new(value.clone())),
             _ => Ty::Any,
@@ -404,7 +405,6 @@ impl TySchemeWorker<'_> {
             ClosureNode::Closure(node) => node.cast::<ast::Closure>()?,
             ClosureNode::Context(_) => return None,
         };
-        let name = syntax.name().unwrap_or_default().get();
         let mut defaults = closure.defaults.iter();
 
         for param in syntax.params().children() {
@@ -483,7 +483,8 @@ pub mod tests {
         Feature, Features, Library, LibraryExt, World,
         engine::{Route, Sink, Traced},
         foundations::{Bytes, Scope, Type},
-        introspection::Introspector,
+        introspection::EmptyIntrospector,
+        syntax::{FileId, RootedPath, VirtualPath},
     };
 
     use crate::{tests::*, ty::TypeInfo, ty::def::TypeInterface};
@@ -531,12 +532,13 @@ pub mod tests {
     ) -> T {
         let route = Route::default();
         let mut sink = Sink::default();
-        let introspector = Introspector::default();
+        let introspector = EmptyIntrospector;
         let traced = Traced::default();
+        let library = world.library();
         let engine = Engine {
-            routines: &typst::ROUTINES,
+            library,
             world: world.track(),
-            introspector: introspector.track(),
+            introspector: typst::utils::Protected::new(introspector.track()),
             traced: traced.track(),
             sink: sink.track_mut(),
             route,
@@ -552,17 +554,24 @@ pub mod tests {
         f(&mut worker)
     }
 
+    fn sibling_file_id(main_id: FileId, path: &str) -> FileId {
+        FileId::new(RootedPath::new(
+            main_id.root().clone(),
+            VirtualPath::new(path).expect("valid virtual path"),
+        ))
+    }
+
     fn map_typings_std(world: &mut tinymist_project::LspWorld) {
         let main_id = world.main();
         world
             .map_shadow_by_id(
-                main_id.join("/typings.typ"),
+                sibling_file_id(main_id, "/typings.typ"),
                 Bytes::from_string(include_str!(typ_path!("packages/typings/lib.typ"))),
             )
             .unwrap();
         world
             .map_shadow_by_id(
-                main_id.join("/std.typ"),
+                sibling_file_id(main_id, "/std.typ"),
                 Bytes::from_string(
                     include_str!(typ_path!("typings/std.typ"))
                         .replace("/typ/packages/typings/lib.typ", "typings.typ"),
@@ -574,7 +583,7 @@ pub mod tests {
     fn parse_typings_std(
         world: &tinymist_project::LspWorld,
     ) -> (typst::foundations::Module, typst::syntax::Source) {
-        let std_id = world.main().join("/std.typ");
+        let std_id = sibling_file_id(world.main(), "/std.typ");
         let source = world.source(std_id).unwrap();
         let module = typst_shim::eval::eval_compat(world, &source).unwrap_or_else(|err| {
             panic!("Failed to evaluate typings std module: {err:?}");
@@ -633,20 +642,18 @@ pub mod tests {
             if let Value::Func(func) = binding.read() {
                 let params = func
                     .params()
-                    .map(|params| {
-                        params
-                            .iter()
-                            .map(|param| ParamShape {
-                                name: param.name.to_string(),
-                                kind: param_shape_kind(ParamAttrs::from(param)),
-                                required: param.required && !param.variadic,
-                                default: param.default.map(|default| {
-                                    crate::upstream::truncated_repr(&default()).to_string()
-                                }),
-                            })
-                            .collect()
+                    .map(|param| {
+                        let variadic = param.variadic();
+                        ParamShape {
+                            name: param.name().unwrap_or_default().to_owned(),
+                            kind: param_shape_kind(ParamAttrs::from(&param)),
+                            required: param.required() && !variadic,
+                            default: param.default().map(|default| {
+                                crate::upstream::truncated_repr(&default).to_string()
+                            }),
+                        }
                     })
-                    .unwrap_or_default();
+                    .collect();
                 methods.insert(name.to_string(), params);
             }
         }
@@ -658,7 +665,7 @@ pub mod tests {
         let Value::Func(func) = value else {
             return None;
         };
-        let Repr::With(with) = func.inner() else {
+        let FuncInner::With(with) = func.inner() else {
             return None;
         };
 
@@ -708,7 +715,7 @@ pub mod tests {
         method: &str,
         func: &Func,
     ) -> Vec<ParamShape> {
-        let Repr::Closure(closure) = func.inner() else {
+        let FuncInner::Closure(closure) = func.inner() else {
             panic!("{export}.{method} is not generated as a closure");
         };
         let syntax = match &closure.node {
@@ -789,7 +796,8 @@ pub mod tests {
 
         let actual = record
             .interface()
-            .filter_map(|(name, ty)| matches!(ty, Ty::Func(_)).then(|| name.to_string()))
+            .filter(|&(_, ty)| matches!(ty, Ty::Func(_)))
+            .map(|(name, _)| name.to_string())
             .collect::<BTreeSet<_>>();
         let expected = expected.keys().cloned().collect::<BTreeSet<_>>();
 

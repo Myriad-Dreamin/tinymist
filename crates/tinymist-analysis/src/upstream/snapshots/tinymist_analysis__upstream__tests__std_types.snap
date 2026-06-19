@@ -2,7 +2,7 @@
 source: crates/tinymist-analysis/src/upstream/mod.rs
 expression: snapshot
 ---
-count: 34
+count: 36
 
 alignment
   short: alignment
@@ -26,9 +26,12 @@ arguments
   short: arguments
   paths: std.arguments
   routes: reference/foundations/arguments/
-  fields: at, named, pos
+  fields: at, filter, len, map, named, pos
   methods:
     - at(self!: arguments [pos], key!: int | str [pos], default: any [named]) -> any @reference/foundations/arguments/#definitions-at
+    - filter(self!: arguments [pos], test!: function [pos]) -> arguments @reference/foundations/arguments/#definitions-filter
+    - len(self!: arguments [pos]) -> int @reference/foundations/arguments/#definitions-len
+    - map(self!: arguments [pos], mapper!: function [pos]) -> arguments @reference/foundations/arguments/#definitions-map
     - named(self!: arguments [pos]) -> dictionary @reference/foundations/arguments/#definitions-named
     - pos(self!: arguments [pos]) -> array @reference/foundations/arguments/#definitions-pos
 
@@ -60,7 +63,7 @@ array
     - position(self!: array [pos], searcher!: function [pos]) -> int | none @reference/foundations/array/#definitions-position
     - product(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-product
     - push(self!: array [pos], value!: any [pos]) -> none @reference/foundations/array/#definitions-push
-    - range(start: int = 0 [pos], end!: int [pos], step: int = 1 [named]) -> array @reference/foundations/array/#definitions-range
+    - range(start: int = 0 [pos], end!: int [pos], inclusive: bool = false [named], step: int = 1 [named]) -> array @reference/foundations/array/#definitions-range
     - reduce(self!: array [pos], reducer!: function [pos]) -> any @reference/foundations/array/#definitions-reduce
     - remove(self!: array [pos], index!: int [pos], default: any [named]) -> any @reference/foundations/array/#definitions-remove
     - rev(self!: array [pos]) -> array @reference/foundations/array/#definitions-rev
@@ -76,7 +79,7 @@ boolean
   short: bool
   paths: std.bool
   routes: reference/foundations/bool/
-  fields: 
+  fields:
   methods:
 
 bytes
@@ -93,7 +96,7 @@ color
   short: color
   paths: std.color
   routes: reference/visualize/color/
-  fields: aqua, black, blue, cmyk, components, darken, desaturate, eastern, fuchsia, gray, green, hsl, hsv, lighten, lime, linear-rgb, luma, map, maroon, mix, navy, negate, oklab, oklch, olive, opacify, orange, purple, red, rgb, rotate, saturate, silver, space, teal, to-hex, transparentize, white, yellow
+  fields: aqua, black, blue, cmyk, components, darken, desaturate, eastern, fuchsia, gray, green, hsl, hsv, lighten, lime, linear-rgb, luma, map, maroon, mix, navy, negate, oklab, oklch, olive, opacify, orange, purple, red, rgb, rotate, saturate, silver, space, spot, teal, to-hex, transparentize, white, yellow
   methods:
     - cmyk(cyan!: ratio [pos], magenta!: ratio [pos], yellow!: ratio [pos], key!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-cmyk
     - components(self!: color [pos], alpha: bool = true [named]) -> array @reference/visualize/color/#definitions-components
@@ -104,15 +107,15 @@ color
     - lighten(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-lighten
     - linear-rgb(red!: int | ratio [pos], green!: int | ratio [pos], blue!: int | ratio [pos], alpha!: int | ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-linear-rgb
     - luma(lightness!: int | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-luma
-    - mix(colors: color | array [rest], space: any = oklab [named]) -> color @reference/visualize/color/#definitions-mix
-    - negate(self!: color [pos], space: any = oklab [named]) -> color @reference/visualize/color/#definitions-negate
+    - mix(colors: color | array [rest], space: spot | any | auto = auto [named]) -> color @reference/visualize/color/#definitions-mix
+    - negate(self!: color [pos], space: spot | any | auto = auto [named]) -> color @reference/visualize/color/#definitions-negate
     - oklab(lightness!: ratio [pos], a!: float | ratio [pos], b!: float | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklab
     - oklch(lightness!: ratio [pos], chroma!: float | ratio [pos], hue!: angle [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklch
     - opacify(self!: color [pos], scale!: ratio [pos]) -> color @reference/visualize/color/#definitions-opacify
     - rgb(red!: int | ratio [pos], green!: int | ratio [pos], blue!: int | ratio [pos], alpha!: int | ratio [pos], hex!: str [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-rgb
     - rotate(self!: color [pos], angle!: angle [pos], space: any = oklch [named]) -> color @reference/visualize/color/#definitions-rotate
     - saturate(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-saturate
-    - space(self!: color [pos]) -> any @reference/visualize/color/#definitions-space
+    - space(self!: color [pos]) -> spot | any @reference/visualize/color/#definitions-space
     - to-hex(self!: color [pos]) -> str @reference/visualize/color/#definitions-to-hex
     - transparentize(self!: color [pos], scale!: ratio [pos]) -> color @reference/visualize/color/#definitions-transparentize
 
@@ -135,7 +138,7 @@ counter
   fields: at, display, final, get, step, update
   methods:
     - at(self!: counter [pos], selector!: label | function | location | selector [pos]) -> int | array @reference/introspection/counter/#definitions-at
-    - display(self!: counter [pos], numbering: str | function | auto = auto [pos], both: bool = false [named]) -> any @reference/introspection/counter/#definitions-display
+    - display(self!: counter [pos], numbering: str | function | auto = auto [pos], at: label | function | location | selector | auto = auto [named], both: bool = false [named]) -> any @reference/introspection/counter/#definitions-display
     - final(self!: counter [pos]) -> int | array @reference/introspection/counter/#definitions-final
     - get(self!: counter [pos]) -> int | array @reference/introspection/counter/#definitions-get
     - step(self!: counter [pos], level: int = 1 [named]) -> content @reference/introspection/counter/#definitions-step
@@ -154,7 +157,7 @@ datetime
     - month(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-month
     - ordinal(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-ordinal
     - second(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-second
-    - today(offset: int | auto = auto [named]) -> datetime @reference/foundations/datetime/#definitions-today
+    - today(offset: duration | int | auto = auto [named]) -> datetime @reference/foundations/datetime/#definitions-today
     - weekday(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-weekday
     - year(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-year
 
@@ -162,19 +165,21 @@ decimal
   short: decimal
   paths: std.decimal
   routes: reference/foundations/decimal/
-  fields: 
+  fields:
   methods:
 
 dictionary
   short: dictionary
   paths: std.dictionary
   routes: reference/foundations/dictionary/
-  fields: at, insert, keys, len, pairs, remove, values
+  fields: at, filter, insert, keys, len, map, pairs, remove, values
   methods:
     - at(self!: dictionary [pos], key!: str [pos], default: any [named]) -> any @reference/foundations/dictionary/#definitions-at
+    - filter(self!: dictionary [pos], test!: function [pos]) -> dictionary @reference/foundations/dictionary/#definitions-filter
     - insert(self!: dictionary [pos], key!: str [pos], value!: any [pos]) -> none @reference/foundations/dictionary/#definitions-insert
     - keys(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-keys
     - len(self!: dictionary [pos]) -> int @reference/foundations/dictionary/#definitions-len
+    - map(self!: dictionary [pos], mapper!: function [pos]) -> dictionary @reference/foundations/dictionary/#definitions-map
     - pairs(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-pairs
     - remove(self!: dictionary [pos], key!: str [pos], default: any [named]) -> any @reference/foundations/dictionary/#definitions-remove
     - values(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-values
@@ -221,7 +226,7 @@ fraction
   short: fraction
   paths: std.fraction
   routes: reference/layout/fraction/
-  fields: 
+  fields:
   methods:
 
 function
@@ -241,26 +246,26 @@ gradient
   methods:
     - angle(self!: gradient [pos]) -> angle | none @reference/visualize/gradient/#definitions-angle
     - center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-center
-    - conic(stops: color | array [rest], angle: angle = 0deg [named], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named]) -> gradient @reference/visualize/gradient/#definitions-conic
+    - conic(stops: color | array [rest], angle: angle = 0deg [named], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named]) -> gradient @reference/visualize/gradient/#definitions-conic
     - focal-center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-focal-center
     - focal-radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-focal-radius
     - kind(self!: gradient [pos]) -> function @reference/visualize/gradient/#definitions-kind
-    - linear(stops: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], dir: direction = ltr [pos], angle!: angle [pos]) -> gradient @reference/visualize/gradient/#definitions-linear
-    - radial(stops: color | array [rest], space: any = oklab [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named], radius: ratio = 50% [named], focal-center: array | auto = auto [named], focal-radius: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-radial
+    - linear(stops: color | array [rest], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], dir: direction = ltr [pos], angle!: angle [pos]) -> gradient @reference/visualize/gradient/#definitions-linear
+    - radial(stops: color | array [rest], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named], radius: ratio = 50% [named], focal-center: array | auto = auto [named], focal-radius: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-radial
     - radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-radius
     - relative(self!: gradient [pos]) -> "self" | "parent" | auto @reference/visualize/gradient/#definitions-relative
     - repeat(self!: gradient [pos], repetitions!: int [pos], mirror: bool = false [named]) -> gradient @reference/visualize/gradient/#definitions-repeat
     - sample(self!: gradient [pos], t!: ratio | angle [pos]) -> color @reference/visualize/gradient/#definitions-sample
     - samples(self!: gradient [pos], ts: ratio | angle [rest]) -> array @reference/visualize/gradient/#definitions-samples
     - sharp(self!: gradient [pos], steps!: int [pos], smoothness: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-sharp
-    - space(self!: gradient [pos]) -> any @reference/visualize/gradient/#definitions-space
+    - space(self!: gradient [pos]) -> spot | any @reference/visualize/gradient/#definitions-space
     - stops(self!: gradient [pos]) -> array @reference/visualize/gradient/#definitions-stops
 
 integer
   short: int
   paths: std.int
   routes: reference/foundations/int/
-  fields: bit-and, bit-lshift, bit-not, bit-or, bit-rshift, bit-xor, from-bytes, signum, to-bytes
+  fields: bit-and, bit-lshift, bit-not, bit-or, bit-rshift, bit-xor, from-bytes, max, min, signum, to-bytes
   methods:
     - bit-and(self!: int [pos], rhs!: int [pos]) -> int @reference/foundations/int/#definitions-bit-and
     - bit-lshift(self!: int [pos], shift!: int [pos]) -> int @reference/foundations/int/#definitions-bit-lshift
@@ -276,7 +281,7 @@ label
   short: label
   paths: std.label
   routes: reference/foundations/label/
-  fields: 
+  fields:
   methods:
 
 length
@@ -305,40 +310,56 @@ module
   short: module
   paths: std.module
   routes: reference/foundations/module/
-  fields: 
+  fields:
+  methods:
+
+path
+  short: path
+  paths: std.path
+  routes: reference/foundations/path/
+  fields:
   methods:
 
 ratio
   short: ratio
   paths: std.ratio
   routes: reference/layout/ratio/
-  fields: 
+  fields:
   methods:
 
 regex
   short: regex
   paths: std.regex
   routes: reference/foundations/regex/
-  fields: 
+  fields:
   methods:
 
 relative length
   short: relative
   paths: std.relative
   routes: reference/layout/relative/
-  fields: 
+  fields:
   methods:
 
 selector
   short: selector
   paths: std.selector
   routes: reference/foundations/selector/
-  fields: after, and, before, or
+  fields: after, and, before, or, within
   methods:
     - after(self!: str | function | label | regex | location | selector [pos], start!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-after
     - and(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-and
     - before(self!: str | function | label | regex | location | selector [pos], end!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-before
     - or(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-or
+    - within(self!: str | function | label | regex | location | selector [pos], ancestor!: label | function | location | selector [pos]) -> selector @reference/foundations/selector/#definitions-within
+
+spot colorant
+  short: spot
+  paths: std.color.spot
+  routes: reference/visualize/color/#definitions-spot
+  fields: tint
+  methods:
+    - tint(self!: spot [pos], value!: ratio [pos]) -> color @reference/visualize/spot/#definitions-tint
 
 state
   short: state
@@ -383,28 +404,28 @@ stroke
   short: stroke
   paths: std.stroke
   routes: reference/visualize/stroke/
-  fields: 
+  fields:
   methods:
 
 symbol
   short: symbol
   paths: std.symbol
   routes: reference/foundations/symbol/
-  fields: 
+  fields:
   methods:
 
 tiling
   short: tiling
-  paths: std.pattern, std.tiling
+  paths: std.tiling
   routes: reference/visualize/tiling/
-  fields: 
+  fields:
   methods:
 
 type
   short: type
   paths: std.type
   routes: reference/foundations/type/
-  fields: 
+  fields:
   methods:
 
 version
