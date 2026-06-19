@@ -1,7 +1,7 @@
 import { PreviewMode } from "./typst-doc.mjs";
 import { TypstCancellationToken } from "./typst-cancel.mjs";
 import { TypstPatchAttrs, isDummyPatchElem } from "./typst-patch.mjs";
-import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
+import type { ContainerDOMState, GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
 import type { CanvasPage, TypstCanvasDocument } from "./typst-doc.canvas.mjs";
 import { patchSvgToContainer } from "./typst-patch.svg.mjs";
 import { ElementPoint, resolveSourceLeaf } from "./typst-debug-info.mjs";
@@ -352,28 +352,37 @@ export function provideSvgDoc<
       return Number.isFinite(height) && height > 0 ? height : undefined;
     }
 
-    private resolveViewportTopY(svg: SVGElement, scrollEl: HTMLElement) {
+    private resolveAppliedSvgScaleY(svg: SVGElement) {
       const svgHeight = this.resolveSvgDocumentHeight(svg);
-      if (svgHeight === undefined) {
-        return undefined;
+      const appliedHeight = Number.parseFloat(svg.getAttribute("height") || "NaN");
+      if (svgHeight !== undefined && Number.isFinite(appliedHeight) && appliedHeight > 0) {
+        return appliedHeight / svgHeight;
       }
 
-      const svgRect = svg.getBoundingClientRect();
-      const actualScaleY = svgRect.height / svgHeight;
-      if (!Number.isFinite(actualScaleY) || actualScaleY <= 0) {
-        return undefined;
-      }
-
-      return (scrollEl.getBoundingClientRect().top - svgRect.top) / actualScaleY;
+      return undefined;
     }
 
-    private captureViewportTopResizeAnchor(svg: SVGElement, scrollEl: HTMLElement) {
-      const viewportTopY = this.resolveViewportTopY(svg, scrollEl);
-      if (viewportTopY === undefined) {
+    private resolveViewportTopY(domState: ContainerDOMState, appliedScaleY: number) {
+      const { scrollTop, contentTopOffset } = domState;
+      if (
+        scrollTop === undefined ||
+        contentTopOffset === undefined ||
+        !Number.isFinite(scrollTop) ||
+        !Number.isFinite(contentTopOffset) ||
+        !Number.isFinite(appliedScaleY) ||
+        appliedScaleY <= 0
+      ) {
         return undefined;
       }
 
-      const pages = this.collectSvgAnchorPages(svg);
+      return (scrollTop - contentTopOffset) / appliedScaleY;
+    }
+
+    private captureViewportTopResizeAnchor(
+      pages: SvgAnchorPage[],
+      svgHeight: number,
+      viewportTopY: number,
+    ) {
       const containingPage = pages.find(
         (page) => viewportTopY >= page.y && viewportTopY <= page.y + page.height,
       );
@@ -386,19 +395,14 @@ export function provideSvgDoc<
         } satisfies SvgResizePageAnchor;
       }
 
-      return this.captureSvgGapAnchor(svg, pages, viewportTopY);
+      return this.captureSvgGapAnchor(pages, svgHeight, viewportTopY);
     }
 
     private captureSvgGapAnchor(
-      svg: SVGElement,
       pages: SvgAnchorPage[],
+      svgHeight: number,
       viewportTopY: number,
     ): SvgResizeGapAnchor | undefined {
-      const svgHeight = this.resolveSvgDocumentHeight(svg);
-      if (svgHeight === undefined) {
-        return undefined;
-      }
-
       let beforePage: SvgAnchorPage | undefined;
       let afterPage: SvgAnchorPage | undefined;
       for (const page of pages) {
@@ -439,15 +443,12 @@ export function provideSvgDoc<
       return gapAnchor;
     }
 
-    private resolveSyntheticYForResizeAnchor(svg: SVGElement, anchor: SvgResizeAnchor) {
-      const pages = this.collectSvgAnchorPages(svg);
-
+    private resolveSyntheticYForResizeAnchor(
+      anchor: SvgResizeAnchor,
+      pages: SvgAnchorPage[],
+      svgHeight: number,
+    ) {
       if (anchor.kind === "gap") {
-        const svgHeight = this.resolveSvgDocumentHeight(svg);
-        if (svgHeight === undefined) {
-          return undefined;
-        }
-
         const beforePage =
           anchor.beforePageNumber !== undefined
             ? pages.find((page) => page.pageNumber === anchor.beforePageNumber)
@@ -490,25 +491,27 @@ export function provideSvgDoc<
 
     // Note: one should retrieve dom state before rescale
     rescale$svg() {
-      // get dom state from cache, so we are free from layout reflowing
       const svg = this.hookedElem.firstElementChild as SVGElement;
       if (!svg) {
         return;
       }
 
+      // get dom state from cache, so we are free from layout reflowing
+      const domState = this.cachedDOMState;
       const scale = this.getSvgScaleRatio();
       if (scale === 0) {
         console.warn("determine scale as 0, skip rescale");
         return;
       }
 
-      // During panel resize, only the auto-fit scale should change 
+      // During panel resize, only the auto-fit scale should change
       // while the user-driven scale ratio does not. Keep the
       // same viewport-top anchor for the whole resize burst instead of
       // resampling after each intermediate frame to avoid accumulating jitter.
       const scrollElement = this.hookedElem.parentElement;
       const prevScale = this.lastSvgScale;
       const prevScaleRatio = this.lastSvgScaleRatio;
+      const prevAppliedScale = this.resolveAppliedSvgScaleY(svg);
       // Manual zoom changes currentScaleRatio and is handled by
       // installRescaleHandler's cursor-centered scroll adjustment.
       const scaleRatioChanged =
@@ -522,6 +525,8 @@ export function provideSvgDoc<
         scrollElement instanceof HTMLElement &&
         prevScale !== undefined &&
         prevScale > 0 &&
+        prevAppliedScale !== undefined &&
+        prevAppliedScale > 0 &&
         prevScaleRatio !== undefined &&
         !scaleRatioChanged &&
         (Math.abs(scale - prevScale) > SVG_SCALE_EPSILON || this.svgResizeAnchor !== undefined);
@@ -529,22 +534,30 @@ export function provideSvgDoc<
       let restoreScroll: (() => void) | undefined;
       if (shouldAnchor) {
         const scrollEl = scrollElement as HTMLElement;
-        const svgRect = svg.getBoundingClientRect();
-        const containerRect = scrollEl.getBoundingClientRect();
-        const fixedTopOffset = svgRect.top - containerRect.top + scrollEl.scrollTop;
-        const sampledContentY = (scrollEl.scrollTop - fixedTopOffset) / prevScale!;
+        const fixedTopOffset = domState.contentTopOffset;
+        const sampledContentY = this.resolveViewportTopY(domState, prevAppliedScale);
         const reusableAnchor =
           this.svgResizeAnchor &&
           Math.abs(this.svgResizeAnchor.scaleRatio - this.currentScaleRatio) < SVG_SCALE_EPSILON
             ? this.svgResizeAnchor
             : undefined;
         const contentY = reusableAnchor?.contentY ?? sampledContentY;
-        if (Number.isFinite(contentY)) {
+        if (
+          fixedTopOffset !== undefined &&
+          Number.isFinite(fixedTopOffset) &&
+          contentY !== undefined &&
+          Number.isFinite(contentY)
+        ) {
+          const pages = this.collectSvgAnchorPages(svg);
+          const svgHeight = this.resolveSvgDocumentHeight(svg);
           // A raw document y-coordinate is enough within page content. In page
           // margins, use a gap anchor so scale-dependent margin height does not
           // leak into the restored scroll position.
           const viewportAnchor =
-            reusableAnchor?.viewportAnchor ?? this.captureViewportTopResizeAnchor(svg, scrollEl);
+            reusableAnchor?.viewportAnchor ??
+            (svgHeight !== undefined
+              ? this.captureViewportTopResizeAnchor(pages, svgHeight, contentY)
+              : undefined);
           this.svgResizeAnchor = {
             contentY,
             scaleRatio: this.currentScaleRatio,
@@ -553,18 +566,18 @@ export function provideSvgDoc<
           this.keepSvgResizeAnchorAlive();
           restoreScroll = () => {
             const viewportAnchorY = viewportAnchor
-              ? this.resolveSyntheticYForResizeAnchor(svg, viewportAnchor)
+              ? svgHeight !== undefined
+                ? this.resolveSyntheticYForResizeAnchor(viewportAnchor, pages, svgHeight)
+                : undefined
               : undefined;
             const targetY = viewportAnchorY ?? contentY;
             const target = targetY * scale + fixedTopOffset;
-            const max = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
-            scrollEl.scrollTop = Math.max(0, Math.min(max, target));
+            if (Number.isFinite(target)) {
+              scrollEl.scrollTop = Math.max(0, target);
+            }
           };
         }
       }
-
-      // get dom state from cache, so we are free from layout reflowing
-      const container = this.cachedDOMState;
 
       // apply scale
       const dataWidth = Number.parseFloat(svg.getAttribute("data-width")!);
@@ -574,10 +587,10 @@ export function provideSvgDoc<
 
       this.rescaleSvgOn(svg);
 
-      const widthAdjust = Math.max((container.width - scaledWidth) / 2, 0);
+      const widthAdjust = Math.max((domState.width - scaledWidth) / 2, 0);
       let transformAttr = "";
       if (this.previewMode === PreviewMode.Slide) {
-        const heightAdjust = Math.max((container.height - scaledHeight) / 2, 0);
+        const heightAdjust = Math.max((domState.height - scaledHeight) / 2, 0);
         transformAttr = `translate(${widthAdjust}px, ${heightAdjust}px)`;
       } else {
         transformAttr = `translate(${widthAdjust}px, 0px)`;
@@ -600,7 +613,7 @@ export function provideSvgDoc<
     }
 
     private decorateSvgElement(svg: SVGElement, mode: PreviewMode) {
-      const container = this.cachedDOMState;
+      const domState = this.cachedDOMState;
       const kShouldMixinCanvas = this.previewMode === PreviewMode.Doc && this.shouldMixinCanvas();
 
       // the <rect> could only have integer width and height
@@ -654,7 +667,7 @@ export function provideSvgDoc<
 
       /// Prepare scale
       // scale derived from svg width and container with.
-      const computedScale = container.width ? container.width / maxWidth : 1;
+      const computedScale = domState.width ? domState.width / maxWidth : 1;
       // respect current scale ratio
       const scale = 1 / (this.currentScaleRatio * computedScale);
       const fontSize = 12 * scale;

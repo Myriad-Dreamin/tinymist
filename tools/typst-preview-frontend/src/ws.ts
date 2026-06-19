@@ -58,12 +58,18 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       kModule,
       previewMode,
       isContentPreview,
-      // set rescale target to `body`
+      // set rescale target to the scroll container
       retrieveDOMState() {
+        const contentElem = hookedElem.firstElementChild || hookedElem;
+        const contentRect = contentElem.getBoundingClientRect();
+        const resizeTargetRect = resizeTarget.getBoundingClientRect();
+        const contentTopOffset = contentRect.top - resizeTargetRect.top + resizeTarget.scrollTop;
         return {
           width: resizeTarget.clientWidth,
           height: resizeTarget.offsetHeight,
-          boundingRect: resizeTarget.getBoundingClientRect(),
+          boundingRect: resizeTargetRect,
+          scrollTop: resizeTarget.scrollTop,
+          contentTopOffset,
         };
       },
     });
@@ -212,16 +218,16 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           }
           break;
         case "j":
-          resizeTarget.scrollBy({ top: + scrollDelta, behavior: "instant" });
+          resizeTarget.scrollBy({ top: +scrollDelta, behavior: "instant" });
           break;
         case "k":
-          resizeTarget.scrollBy({ top: - scrollDelta, behavior: "instant" });
+          resizeTarget.scrollBy({ top: -scrollDelta, behavior: "instant" });
           break;
         case "h":
-          resizeTarget.scrollBy({ top: - scrollDelta * 10, behavior: "smooth" });
+          resizeTarget.scrollBy({ top: -scrollDelta * 10, behavior: "smooth" });
           break;
         case "l":
-          resizeTarget.scrollBy({ top: + scrollDelta * 10, behavior: "smooth" });
+          resizeTarget.scrollBy({ top: +scrollDelta * 10, behavior: "smooth" });
           break;
         case "?":
           blurInput();

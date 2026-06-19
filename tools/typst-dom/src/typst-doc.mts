@@ -12,6 +12,12 @@ export interface ContainerDOMState {
     left: number;
     top: number;
   };
+  /// cached scroll top of the scroll container that owns the document root
+  scrollTop?: number;
+  /// cached CSS-pixel offset from the scroll container content top to the
+  /// document root top, computed as
+  /// `documentRootRect.top - scrollContainerRect.top + scrollTop`.
+  contentTopOffset?: number;
 }
 
 export type RenderMode = "svg" | "canvas";
@@ -135,6 +141,8 @@ export class TypstDocumentContext<O = any> {
       left: 0,
       top: 0,
     },
+    scrollTop: 0,
+    contentTopOffset: 0,
   };
 
   constructor(opts: Options & O) {
@@ -153,10 +161,19 @@ export class TypstDocumentContext<O = any> {
       this.retrieveDOMState =
         retrieveDOMState ??
         (() => {
+          const scrollEl = this.hookedElem.parentElement;
+          const contentElem = this.hookedElem.firstElementChild || this.hookedElem;
+          const contentRect = contentElem.getBoundingClientRect();
+          const scrollTop = scrollEl instanceof HTMLElement ? scrollEl.scrollTop : 0;
+          const scrollRect =
+            scrollEl instanceof HTMLElement ? scrollEl.getBoundingClientRect() : contentRect;
+          const contentTopOffset = contentRect.top - scrollRect.top + scrollTop;
           return {
             width: this.hookedElem.offsetWidth,
             height: this.hookedElem.offsetHeight,
             boundingRect: this.hookedElem.getBoundingClientRect(),
+            scrollTop,
+            contentTopOffset,
           };
         });
       this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
@@ -355,7 +372,7 @@ export class TypstDocumentContext<O = any> {
       return 0;
     }
 
-    const container = this.cachedDOMState;
+    const domState = this.cachedDOMState;
 
     const svgWidth = Number.parseFloat(
       svg.getAttribute("data-width") || svg.getAttribute("width") || "1",
@@ -365,8 +382,8 @@ export class TypstDocumentContext<O = any> {
     );
     this.currentRealScale =
       this.previewMode === PreviewMode.Slide
-        ? Math.min(container.width / svgWidth, container.height / svgHeight)
-        : container.width / svgWidth;
+        ? Math.min(domState.width / svgWidth, domState.height / svgHeight)
+        : domState.width / svgWidth;
 
     return this.currentRealScale * this.currentScaleRatio;
   }
