@@ -60,7 +60,6 @@ pub fn init_log(
         .filter_module("typlite", base_level)
         .filter_module("reflexo", base_level)
         .filter_module("sync_ls", base_level)
-        .filter_module("reflexo_typst2vec::pass::span2vec", Error)
         .filter_module("reflexo_typst::diag::console", base_level);
 
     if let Some(f) = filter {
