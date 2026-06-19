@@ -58,7 +58,7 @@ select {
 
 .app-shell {
   display: grid;
-  grid-template-rows: auto auto auto auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto auto;
   gap: 12px;
   min-height: 100vh;
   padding: 16px;
@@ -272,6 +272,7 @@ select {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   gap: 12px;
+  align-items: start;
   min-height: 0;
 }
 
@@ -285,7 +286,11 @@ select {
 
 .case-panel {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
 }
 
 .filters {
@@ -329,6 +334,7 @@ select {
 }
 
 .case-list {
+  min-height: 0;
   overflow: auto;
   padding: 6px;
   scrollbar-color: #8fb0c1 #eef3f6;
@@ -416,7 +422,7 @@ select {
 }
 
 .detail-panel {
-  overflow: auto;
+  overflow: visible;
   padding: 12px;
 }
 
@@ -573,6 +579,7 @@ select {
   }
 
   .case-panel {
+    position: static;
     max-height: 420px;
   }
 
