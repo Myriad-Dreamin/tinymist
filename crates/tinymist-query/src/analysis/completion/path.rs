@@ -139,7 +139,7 @@ impl CompletionPair<'_, '_, '_> {
                         label: typst_completion.0,
                         kind: typst_completion.1,
                         detail: None,
-                        text_edit: Some(text_edit),
+                        text_edit: Some(text_edit.into()),
                         // don't sort me
                         sort_text: Some(sort_text),
                         filter_text: Some("".into()),

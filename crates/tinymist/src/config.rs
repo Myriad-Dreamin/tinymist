@@ -878,6 +878,8 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// Allow insert/replace text edits in completion items.
+    pub completion_insert_replace_support: bool,
     /// The locale of the editor.
     pub locale: Option<String>,
 }
@@ -914,6 +916,7 @@ impl From<&InitializeParams> for ConstConfig {
         let sema = try_(|| doc?.semantic_tokens.as_ref());
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
+        let completion_item = try_(|| doc?.completion.as_ref()?.completion_item.as_ref());
 
         let locale = params
             .initialization_options
@@ -930,6 +933,10 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            completion_insert_replace_support: try_or(
+                || completion_item?.insert_replace_support,
+                false,
+            ),
             locale: locale.map(ToOwned::to_owned),
         }
     }
@@ -1635,9 +1642,34 @@ mod tests {
 
     #[test]
     fn test_default_lsp_config_initialize() {
-        let (_conf, err) =
+        let (conf, err) =
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
+        assert!(!conf.const_config.completion_insert_replace_support);
+    }
+
+    #[test]
+    fn test_lsp_config_completion_insert_replace_support() {
+        let params = InitializeParams {
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    completion: Some(CompletionClientCapabilities {
+                        completion_item: Some(CompletionItemCapability {
+                            insert_replace_support: Some(true),
+                            ..CompletionItemCapability::default()
+                        }),
+                        ..CompletionClientCapabilities::default()
+                    }),
+                    ..TextDocumentClientCapabilities::default()
+                }),
+                ..ClientCapabilities::default()
+            },
+            ..InitializeParams::default()
+        };
+
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.const_config.completion_insert_replace_support);
     }
 
     #[test]
