@@ -12,11 +12,14 @@ export interface ContainerDOMState {
     left: number;
     top: number;
   };
-  /// cached scroll top of the scroll container that owns the document root
+  /// cached scroll top of the scroll container.
+  /// In the default DOM retriever, this is
+  /// `hookedElem.parentElement.scrollTop` if `hookedElem.parentElement` is an HTMLElement,
+  /// otherwise `0`.
   scrollTop?: number;
   /// cached CSS-pixel offset from the scroll container content top to the
   /// document root top, computed as
-  /// `documentRootRect.top - scrollContainerRect.top + scrollTop`.
+  /// `contentRect.top - scrollRect.top + scrollTop`.
   contentTopOffset?: number;
 }
 
