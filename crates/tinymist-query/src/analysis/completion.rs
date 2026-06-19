@@ -343,6 +343,19 @@ impl<'a> CompletionCursor<'a> {
         }
     }
 
+    fn capture_suffix_as_first_arg(&self, snippet: &mut EcoString, replace: Range<usize>) -> bool {
+        if self.cursor >= replace.end {
+            return false;
+        }
+
+        let suffix = &self.text[self.cursor..replace.end];
+        if suffix.is_empty() || !suffix.chars().all(is_id_continue) {
+            return false;
+        }
+
+        fill_first_empty_placeholder(snippet, suffix)
+    }
+
     /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
@@ -391,8 +404,15 @@ impl<'a> CompletionCursor<'a> {
             None => self.from..self.cursor,
         };
 
-        let insert_range = self.insert_range_of(replace_range.clone());
-        let text_edit = self.completion_text_edit(insert_range, replace_range, snippet);
+        let text_edit = if item.capture_suffix
+            && self.capture_suffix_as_first_arg(&mut snippet, replace_range.clone())
+        {
+            let replace_range = self.lsp_range_of(replace_range);
+            EcoTextEdit::new(replace_range, snippet).into()
+        } else {
+            let insert_range = self.insert_range_of(replace_range.clone());
+            self.completion_text_edit(insert_range, replace_range, snippet)
+        };
 
         LspCompletion {
             label: item.label.clone(),
@@ -979,6 +999,25 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     }
 
     &s[rng]
+}
+
+fn fill_first_empty_placeholder(snippet: &mut EcoString, text: &str) -> bool {
+    let Some(pos) = snippet.find("${}") else {
+        return false;
+    };
+
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('$', "\\$")
+        .replace('}', "\\}");
+    let mut filled = EcoString::new();
+    filled.push_str(&snippet[..pos]);
+    filled.push_str("${");
+    filled.push_str(&escaped);
+    filled.push('}');
+    filled.push_str(&snippet[pos + "${}".len()..]);
+    *snippet = filled;
+    true
 }
 
 static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =

@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-description: Completion on s (88..89)
+description: Completion on s (89..90)
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/insert_replace.typ
 ---
@@ -18,26 +18,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/insert_replace.typ
     "labelDetails": {
      "description": "(any) => any"
     },
-    "sortText": "221",
+    "sortText": "373",
     "textEdit": {
-     "insert": {
+     "newText": "underbrace(${1:sum})",
+     "range": {
       "end": {
-       "character": 8,
+       "character": 12,
        "line": 4
       },
       "start": {
-       "character": 1,
-       "line": 4
-      }
-     },
-     "newText": "underbrace(${1:})",
-     "replace": {
-      "end": {
-       "character": 11,
-       "line": 4
-      },
-      "start": {
-       "character": 1,
+       "character": 2,
        "line": 4
       }
      }

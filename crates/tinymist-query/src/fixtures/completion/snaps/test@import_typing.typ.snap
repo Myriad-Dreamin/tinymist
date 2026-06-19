@@ -20,7 +20,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_typing.typ
     },
     "sortText": "217",
     "textEdit": {
-     "newText": "todo(${1:})",
+     "newText": "todo(${1:o})",
      "range": {
       "end": {
        "character": 3,

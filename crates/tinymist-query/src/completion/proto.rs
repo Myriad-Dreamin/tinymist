@@ -104,6 +104,10 @@ pub struct Completion {
     ///
     /// Should default to the `label` if `None`.
     pub apply: Option<EcoString>,
+    /// Whether the completion may capture the right-side identifier suffix as
+    /// the first snippet argument.
+    #[serde(skip)]
+    pub capture_suffix: bool,
     /// An optional short description, at most one sentence.
     pub detail: Option<EcoString>,
     /// An optional array of additional text edits that are applied when

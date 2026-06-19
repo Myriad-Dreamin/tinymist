@@ -20,7 +20,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/bracket_strong.typ
     },
     "sortText": "198",
     "textEdit": {
-     "newText": "strong(${1:})",
+     "newText": "strong(${1:t})",
      "range": {
       "end": {
        "character": 26,

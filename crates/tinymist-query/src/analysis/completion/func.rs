@@ -86,6 +86,7 @@ impl CompletionPair<'_, '_, '_> {
                     );
                 self.push_completion(Completion {
                     apply: Some(eco_format!("{name}(${{}})")),
+                    capture_suffix: true,
                     label: paren_label(&name, &fn_feat, is_set),
                     ..base.clone()
                 });
