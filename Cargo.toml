@@ -320,20 +320,20 @@ extend-exclude = ["/.git", "fixtures"]
 # These patches use a different version of `typst`, which only exports some private functions and information for code analysis.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-typst = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-bundle = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-layout = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-realize = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
-typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", rev = "391c2dcd698aabf2917db0336868d16f197057d9" }
+typst = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-bundle = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-eval = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-html = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-layout = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-library = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-macros = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-pdf = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-realize = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-render = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-svg = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-syntax = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
+typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.0" }
 
 typst-ansi-hl = { git = "https://github.com/Myriad-Dreamin/typst-ansi-hl.git", rev = "3867cb7229ec6b3e3c8f5b1222af96f98bba9bff" }
 typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = "992f36112200bc0ea61df8a7c2af6d9ae56781dd" }
