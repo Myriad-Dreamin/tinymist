@@ -35,6 +35,13 @@ export function hasSvgScaleRatioChanged(
   );
 }
 
+export function shouldRestoreHorizontalResizeAnchor(
+  currentScaleRatio: number,
+  epsilon = SVG_SCALE_EPSILON,
+) {
+  return currentScaleRatio > 1 + epsilon;
+}
+
 export function resolveViewportStart(
   scroll: number | undefined,
   contentOffset: number | undefined,

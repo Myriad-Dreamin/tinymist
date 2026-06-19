@@ -12,6 +12,7 @@ import {
   resolveScrollForViewportStart,
   resolveSyntheticYForResizeAnchor,
   resolveViewportStart,
+  shouldRestoreHorizontalResizeAnchor,
 } from "./typst-doc.resize-anchor.mjs";
 import type { SvgAnchorPage, SvgResizeAnchor } from "./typst-doc.resize-anchor.mjs";
 
@@ -427,7 +428,9 @@ export function provideSvgDoc<
         const anchoredContentX =
           contentX !== undefined && Number.isFinite(contentX) ? contentX : undefined;
         const canRestoreY = fixedTopOffset !== undefined && anchoredContentY !== undefined;
-        const canRestoreX = anchoredContentX !== undefined;
+        const canRestoreX =
+          shouldRestoreHorizontalResizeAnchor(this.currentScaleRatio) &&
+          anchoredContentX !== undefined;
         if (canRestoreY || canRestoreX) {
           const pages = canRestoreY ? this.collectSvgAnchorPages(svg) : [];
           const svgHeight = canRestoreY ? this.resolveSvgDocumentHeight(svg) : undefined;
