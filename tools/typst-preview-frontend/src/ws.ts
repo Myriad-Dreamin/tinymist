@@ -64,12 +64,16 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         const contentRect = contentElem.getBoundingClientRect();
         const resizeTargetRect = resizeTarget.getBoundingClientRect();
         const contentTopOffset = contentRect.top - resizeTargetRect.top + resizeTarget.scrollTop;
+        const contentLeftOffset =
+          contentRect.left - resizeTargetRect.left + resizeTarget.scrollLeft;
         return {
           width: resizeTarget.clientWidth,
           height: resizeTarget.offsetHeight,
           boundingRect: resizeTargetRect,
           scrollTop: resizeTarget.scrollTop,
+          scrollLeft: resizeTarget.scrollLeft,
           contentTopOffset,
+          contentLeftOffset,
         };
       },
     });

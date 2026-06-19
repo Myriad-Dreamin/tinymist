@@ -17,10 +17,19 @@ export interface ContainerDOMState {
   /// `hookedElem.parentElement.scrollTop` if `hookedElem.parentElement` is an HTMLElement,
   /// otherwise `0`.
   scrollTop?: number;
+  /// cached scroll left of the scroll container.
+  /// In the default DOM retriever, this is
+  /// `hookedElem.parentElement.scrollLeft` if `hookedElem.parentElement` is an HTMLElement,
+  /// otherwise `0`.
+  scrollLeft?: number;
   /// cached CSS-pixel offset from the scroll container content top to the
   /// document root top, computed as
   /// `contentRect.top - scrollRect.top + scrollTop`.
   contentTopOffset?: number;
+  /// cached CSS-pixel offset from the scroll container content left to the
+  /// document root left, computed as
+  /// `contentRect.left - scrollRect.left + scrollLeft`.
+  contentLeftOffset?: number;
 }
 
 export type RenderMode = "svg" | "canvas";
@@ -145,7 +154,9 @@ export class TypstDocumentContext<O = any> {
       top: 0,
     },
     scrollTop: 0,
+    scrollLeft: 0,
     contentTopOffset: 0,
+    contentLeftOffset: 0,
   };
 
   constructor(opts: Options & O) {
@@ -168,15 +179,19 @@ export class TypstDocumentContext<O = any> {
           const contentElem = this.hookedElem.firstElementChild || this.hookedElem;
           const contentRect = contentElem.getBoundingClientRect();
           const scrollTop = scrollEl instanceof HTMLElement ? scrollEl.scrollTop : 0;
+          const scrollLeft = scrollEl instanceof HTMLElement ? scrollEl.scrollLeft : 0;
           const scrollRect =
             scrollEl instanceof HTMLElement ? scrollEl.getBoundingClientRect() : contentRect;
           const contentTopOffset = contentRect.top - scrollRect.top + scrollTop;
+          const contentLeftOffset = contentRect.left - scrollRect.left + scrollLeft;
           return {
             width: this.hookedElem.offsetWidth,
             height: this.hookedElem.offsetHeight,
             boundingRect: this.hookedElem.getBoundingClientRect(),
             scrollTop,
+            scrollLeft,
             contentTopOffset,
+            contentLeftOffset,
           };
         });
       this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
