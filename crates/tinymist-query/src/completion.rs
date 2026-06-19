@@ -244,7 +244,7 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    item.text_edit.as_ref().unwrap().new_text.as_str(),
+                    item.text_edit.as_ref().unwrap().new_text().as_str(),
                     "label(\"DBLP:books/lib/Knuth86a\")"
                 );
 

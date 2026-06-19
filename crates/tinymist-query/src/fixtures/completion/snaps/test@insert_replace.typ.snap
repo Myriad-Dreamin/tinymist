@@ -1,0 +1,48 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: Completion on s (88..89)
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/insert_replace.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "tinymist.triggerSuggestAndParameterHints",
+     "title": ""
+    },
+    "kind": 3,
+    "label": "underbrace",
+    "labelDetails": {
+     "description": "(any) => any"
+    },
+    "sortText": "221",
+    "textEdit": {
+     "insert": {
+      "end": {
+       "character": 8,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     },
+     "newText": "underbrace(${1:})",
+     "replace": {
+      "end": {
+       "character": 11,
+       "line": 4
+      },
+      "start": {
+       "character": 1,
+       "line": 4
+      }
+     }
+    }
+   }
+  ]
+ }
+]

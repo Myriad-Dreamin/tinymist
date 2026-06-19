@@ -96,6 +96,10 @@ pub fn run_with_ctx_<T>(
             trigger_suggest: true,
             trigger_parameter_hints: true,
             trigger_suggest_and_parameter_hints: true,
+            insert_replace_edit: properties
+                .get("insert_replace")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false),
             ..Default::default()
         },
         ..Analysis::default()
