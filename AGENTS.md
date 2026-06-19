@@ -18,6 +18,7 @@ This is the tinymist language service, integrated with editor frontends and othe
 - Prefer the smallest test command that covers your change, but widen validation when work spans Rust, editor tooling, generated docs, or feature flags.
 - Preserve unrelated user changes. The worktree may already be dirty.
 - Avoid editing dependency pins, version metadata, or release files unless the task actually requires it.
+- Use Conventional Commits for commit messages, for example `fix(renderer-diff): keep sidebar scrollable`.
 
 ## OpenSpec Workflow
 
