@@ -6935,6 +6935,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tar",
+ "temp-env",
+ "tempfile",
  "tinymist-std",
  "toml",
  "typst",
