@@ -10,6 +10,25 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.15.2 - [2026-06-20]
+
+* Pinned Typst dependencies to the tinymist/v0.15.0 tag in https://github.com/Myriad-Dreamin/tinymist/pull/2588
+
+### Server
+
+* (Fix) Avoided resolving lockfiles under Typst file paths in https://github.com/Myriad-Dreamin/tinymist/pull/2593
+
+### Completion
+
+* Avoided deleting text after the cursor by @hongjr03 in https://github.com/Myriad-Dreamin/tinymist/pull/2591
+
+### Preview
+
+* (Fix) Restored the scroll position when resizing the preview panel by @hooyuser in https://github.com/Myriad-Dreamin/tinymist/pull/2495
+* Removed legacy span pass usage from preview in https://github.com/Myriad-Dreamin/tinymist/pull/2586
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.0...v0.15.2
+
 ## v0.15.0 - [2026-06-16]
 
 * Bumped Typst integration and world crates to v0.15.0-rc1 in https://github.com/Myriad-Dreamin/tinymist/pull/2574 and https://github.com/Myriad-Dreamin/tinymist/pull/2575
