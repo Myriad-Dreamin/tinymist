@@ -532,7 +532,10 @@ impl PreviewState {
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
-            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
+            log::info!(
+                target: crate::PREVIEW_COMPAT_LOG_TARGET,
+                "PreviewTask({task_id}): preview server listening on: {addr}"
+            );
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(addr.port()),

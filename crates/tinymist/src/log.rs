@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use super::*;
 
+/// Log target for preview address announcements that external tools parse.
+pub const PREVIEW_COMPAT_LOG_TARGET: &str = "tinymist::compat::preview";
+
 /// Options for initializing the logger.
 pub struct InitLogOpts {
     /// Whether the command should use verbose logging.
@@ -54,19 +57,33 @@ pub fn init_log(
         });
     }
 
+    configure_log_filters(&mut builder, base_level, filter.as_deref());
+
+    Ok(builder.try_init()?)
+}
+
+fn configure_log_filters(
+    builder: &mut env_logger::Builder,
+    base_level: log::LevelFilter,
+    filter: Option<&str>,
+) {
+    use log::LevelFilter::*;
+
     builder
         .filter_module("tinymist", base_level)
         .filter_module("tinymist_preview", base_level)
         .filter_module("typlite", base_level)
         .filter_module("reflexo", base_level)
         .filter_module("sync_ls", base_level)
-        .filter_module("reflexo_typst::diag::console", base_level);
+        .filter_module("reflexo_typst::diag::console", base_level)
+        // typst-preview.nvim and similar tools discover preview URLs by parsing
+        // these INFO lines. Keep only this narrow compatibility target visible
+        // in non-verbose CLI mode.
+        .filter_module(PREVIEW_COMPAT_LOG_TARGET, Info);
 
     if let Some(f) = filter {
-        builder.parse_filters(&f);
+        builder.parse_filters(f);
     }
-
-    Ok(builder.try_init()?)
 }
 
 struct LogNotification(LspClient, Vec<u8>);
@@ -106,4 +123,42 @@ struct Log {
 impl lsp_types::notification::Notification for Log {
     const METHOD: &'static str = "tmLog";
     type Params = Self;
+}
+
+#[cfg(test)]
+mod tests {
+    use log::{Level, Log, Metadata};
+
+    use super::*;
+
+    fn test_logger(verbose: bool, filter: Option<&str>) -> env_logger::Logger {
+        use log::LevelFilter::*;
+
+        let base_level = if verbose { Info } else { Warn };
+        let mut builder = env_logger::builder();
+        configure_log_filters(&mut builder, base_level, filter);
+        builder.build()
+    }
+
+    fn enabled(logger: &env_logger::Logger, target: &str, level: Level) -> bool {
+        logger.enabled(&Metadata::builder().target(target).level(level).build())
+    }
+
+    #[test]
+    fn non_verbose_keeps_only_preview_address_info_enabled() {
+        let logger = test_logger(false, None);
+
+        assert!(enabled(&logger, PREVIEW_COMPAT_LOG_TARGET, Level::Info));
+        assert!(!enabled(&logger, "tinymist::tool::preview", Level::Info));
+        assert!(enabled(&logger, "tinymist::tool::preview", Level::Warn));
+    }
+
+    #[test]
+    fn explicit_filter_can_override_preview_address_info() {
+        let filter = format!("{PREVIEW_COMPAT_LOG_TARGET}=warn");
+        let logger = test_logger(false, Some(&filter));
+
+        assert!(!enabled(&logger, PREVIEW_COMPAT_LOG_TARGET, Level::Info));
+        assert!(enabled(&logger, PREVIEW_COMPAT_LOG_TARGET, Level::Warn));
+    }
 }
