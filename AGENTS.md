@@ -76,6 +76,12 @@ This is the tinymist language service, integrated with editor frontends and othe
 - List the validation you ran.
 - Call out anything you could not verify locally.
 
+## Commit and PR Conventions
+
+- Write commit messages in Conventional Commits format, such as `fix(query): handle missing labels`.
+- Keep PR content limited to a list of modified features and issue operations, such as `Close #123`.
+- Do not include validation logs, command transcripts, or detailed execution notes in PR content.
+
 ## Rust Conventions
 
 - Follow workspace lints in `Cargo.toml`. `missing_docs`, `missing_safety_doc`, and `undocumented_unsafe_blocks` are all watched in this repo.
