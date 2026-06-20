@@ -25,7 +25,6 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Preview
 
 * (Fix) Restored the scroll position when resizing the preview panel by @hooyuser in https://github.com/Myriad-Dreamin/tinymist/pull/2495
-* (Fix) Improved renderer diff panel scrolling in https://github.com/Myriad-Dreamin/tinymist/pull/2589
 * Removed legacy span pass usage from preview in https://github.com/Myriad-Dreamin/tinymist/pull/2586
 
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.0...v0.15.2
