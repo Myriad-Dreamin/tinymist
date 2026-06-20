@@ -41,17 +41,16 @@ if [ ! -x "$tinymist_bin" ]; then
   exit 1
 fi
 
-mkdir -p "$script_dir/target/.local" "$script_dir/target/.cache"
-
 (cd "$script_dir/samples" && docker build -t "$image_name" -f lazyvim-dev/Dockerfile .)
 
 docker_run_args=(
   --rm
-  -v "$repo_root/tests/workspaces:/home/runner/dev/workspaces"
+  --tmpfs /home/runner/dev/workspaces:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/.local:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/.cache:uid=1000,gid=1000,mode=755
+  -v "$repo_root/tests/workspaces:/home/runner/workspaces-src:ro"
   -v "$script_dir:/home/runner/dev"
   -v "$tinymist_bin:/usr/local/bin/tinymist:ro"
-  -v "$script_dir/target/.local:/home/runner/.local"
-  -v "$script_dir/target/.cache:/home/runner/.cache"
   -w /home/runner/dev
 )
 
@@ -59,4 +58,8 @@ if [ -t 0 ] && [ -t 1 ]; then
   docker_run_args+=(-it)
 fi
 
-docker run "${docker_run_args[@]}" "$image_name" "${docker_args[@]}"
+docker run "${docker_run_args[@]}" "$image_name" bash -lc '
+  set -euo pipefail
+  cp -R /home/runner/workspaces-src/book /home/runner/dev/workspaces/book
+  exec "$@"
+' bash "${docker_args[@]}"
