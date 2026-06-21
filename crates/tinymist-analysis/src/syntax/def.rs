@@ -484,9 +484,14 @@ impl Decl {
 
     /// Creates a variable declaration from a string literal.
     pub fn lit(name: &str) -> Self {
+        Self::lit_at(name, Span::detached())
+    }
+
+    /// Creates a variable declaration from a string literal at the given span.
+    pub fn lit_at(name: &str, at: Span) -> Self {
         Self::Var(SpannedDecl {
             name: name.into(),
-            at: Span::detached(),
+            at,
         })
     }
 

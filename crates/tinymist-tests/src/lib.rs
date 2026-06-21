@@ -15,18 +15,33 @@ use typst::{foundations::Bytes, syntax::VirtualPath};
 
 pub use insta::{Settings, assert_debug_snapshot, assert_snapshot, glob, with_settings};
 
+/// The directory where `tinymist-tests` is located.
+pub const _MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
 /// Runs snapshot tests.
 #[macro_export]
 macro_rules! snapshot_testing {
     ($name:expr, $f:expr) => {
+        const _MANIFEST_DIR: &str = $crate::_MANIFEST_DIR;
         let name = $name;
         let name = if name.is_empty() { "playground" } else { name };
+        let base_dir = format!(
+            "{}/src",
+            if name == "playground" {
+                _MANIFEST_DIR
+            } else {
+                env!("CARGO_MANIFEST_DIR")
+            }
+        );
+
         let mut settings = $crate::Settings::new();
         settings.set_prepend_module_to_snapshot(false);
-        settings.set_snapshot_path(format!("fixtures/{name}/snaps"));
+
+        let snapshot_dir = format!("{}/src/fixtures/{name}/snaps", env!("CARGO_MANIFEST_DIR"));
+        settings.set_snapshot_path(snapshot_dir);
         settings.bind(|| {
             let glob_path = format!("fixtures/{name}/*.typ");
-            $crate::glob!(&glob_path, |path| {
+            $crate::glob!(base_dir, &glob_path, |path| {
                 let contents = std::fs::read_to_string(path).unwrap();
                 #[cfg(windows)]
                 let contents = contents.replace("\r\n", "\n");

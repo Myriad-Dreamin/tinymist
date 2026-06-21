@@ -1,0 +1,437 @@
+---
+source: crates/tinymist-analysis/src/upstream/mod.rs
+expression: snapshot
+---
+count: 36
+
+alignment
+  short: alignment
+  paths: std.alignment
+  routes: reference/layout/alignment/
+  fields: axis, bottom, center, end, horizon, inv, left, right, start, top
+  methods:
+    - axis(self!: alignment [pos]) -> "horizontal" | "vertical" | none @reference/layout/alignment/#definitions-axis
+    - inv(self!: alignment [pos]) -> alignment @reference/layout/alignment/#definitions-inv
+
+angle
+  short: angle
+  paths: std.angle
+  routes: reference/layout/angle/
+  fields: deg, rad
+  methods:
+    - deg(self!: angle [pos]) -> float @reference/layout/angle/#definitions-deg
+    - rad(self!: angle [pos]) -> float @reference/layout/angle/#definitions-rad
+
+arguments
+  short: arguments
+  paths: std.arguments
+  routes: reference/foundations/arguments/
+  fields: at, filter, len, map, named, pos
+  methods:
+    - at(self!: arguments [pos], key!: int | str [pos], default: any [named]) -> any @reference/foundations/arguments/#definitions-at
+    - filter(self!: arguments [pos], test!: function [pos]) -> arguments @reference/foundations/arguments/#definitions-filter
+    - len(self!: arguments [pos]) -> int @reference/foundations/arguments/#definitions-len
+    - map(self!: arguments [pos], mapper!: function [pos]) -> arguments @reference/foundations/arguments/#definitions-map
+    - named(self!: arguments [pos]) -> dictionary @reference/foundations/arguments/#definitions-named
+    - pos(self!: arguments [pos]) -> array @reference/foundations/arguments/#definitions-pos
+
+array
+  short: array
+  paths: std.array
+  routes: reference/foundations/array/
+  fields: all, any, at, chunks, contains, dedup, enumerate, filter, find, first, flatten, fold, insert, intersperse, join, last, len, map, pop, position, product, push, range, reduce, remove, rev, slice, sorted, split, sum, to-dict, windows, zip
+  methods:
+    - all(self!: array [pos], test!: function [pos]) -> bool @reference/foundations/array/#definitions-all
+    - any(self!: array [pos], test!: function [pos]) -> bool @reference/foundations/array/#definitions-any
+    - at(self!: array [pos], index!: int [pos], default: any [named]) -> any @reference/foundations/array/#definitions-at
+    - chunks(self!: array [pos], chunk-size!: int [pos], exact: bool = false [named]) -> array @reference/foundations/array/#definitions-chunks
+    - contains(self!: array [pos], value!: any [pos]) -> bool @reference/foundations/array/#definitions-contains
+    - dedup(self!: array [pos], key: function [named]) -> array @reference/foundations/array/#definitions-dedup
+    - enumerate(self!: array [pos], start: int = 0 [named]) -> array @reference/foundations/array/#definitions-enumerate
+    - filter(self!: array [pos], test!: function [pos]) -> array @reference/foundations/array/#definitions-filter
+    - find(self!: array [pos], searcher!: function [pos]) -> any | none @reference/foundations/array/#definitions-find
+    - first(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-first
+    - flatten(self!: array [pos]) -> array @reference/foundations/array/#definitions-flatten
+    - fold(self!: array [pos], init!: any [pos], folder!: function [pos]) -> any @reference/foundations/array/#definitions-fold
+    - insert(self!: array [pos], index!: int [pos], value!: any [pos]) -> none @reference/foundations/array/#definitions-insert
+    - intersperse(self!: array [pos], separator!: any [pos]) -> array @reference/foundations/array/#definitions-intersperse
+    - join(self!: array [pos], separator: any | none = none [pos], last: any [named], default: any | none = none [named]) -> any @reference/foundations/array/#definitions-join
+    - last(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-last
+    - len(self!: array [pos]) -> int @reference/foundations/array/#definitions-len
+    - map(self!: array [pos], mapper!: function [pos]) -> array @reference/foundations/array/#definitions-map
+    - pop(self!: array [pos]) -> any @reference/foundations/array/#definitions-pop
+    - position(self!: array [pos], searcher!: function [pos]) -> int | none @reference/foundations/array/#definitions-position
+    - product(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-product
+    - push(self!: array [pos], value!: any [pos]) -> none @reference/foundations/array/#definitions-push
+    - range(start: int = 0 [pos], end!: int [pos], inclusive: bool = false [named], step: int = 1 [named]) -> array @reference/foundations/array/#definitions-range
+    - reduce(self!: array [pos], reducer!: function [pos]) -> any @reference/foundations/array/#definitions-reduce
+    - remove(self!: array [pos], index!: int [pos], default: any [named]) -> any @reference/foundations/array/#definitions-remove
+    - rev(self!: array [pos]) -> array @reference/foundations/array/#definitions-rev
+    - slice(self!: array [pos], start!: int [pos], end: int | none = none [pos], count: int [named]) -> array @reference/foundations/array/#definitions-slice
+    - sorted(self!: array [pos], key: function [named], by: function [named]) -> array @reference/foundations/array/#definitions-sorted
+    - split(self!: array [pos], at!: any [pos]) -> array @reference/foundations/array/#definitions-split
+    - sum(self!: array [pos], default: any [named]) -> any @reference/foundations/array/#definitions-sum
+    - to-dict(self!: array [pos]) -> dictionary @reference/foundations/array/#definitions-to-dict
+    - windows(self!: array [pos], window-size!: int [pos]) -> array @reference/foundations/array/#definitions-windows
+    - zip(self!: array [pos], exact: bool = false [named], others: array [rest]) -> array @reference/foundations/array/#definitions-zip
+
+boolean
+  short: bool
+  paths: std.bool
+  routes: reference/foundations/bool/
+  fields:
+  methods:
+
+bytes
+  short: bytes
+  paths: std.bytes
+  routes: reference/foundations/bytes/
+  fields: at, len, slice
+  methods:
+    - at(self!: bytes [pos], index!: int [pos], default: any [named]) -> any @reference/foundations/bytes/#definitions-at
+    - len(self!: bytes [pos]) -> int @reference/foundations/bytes/#definitions-len
+    - slice(self!: bytes [pos], start!: int [pos], end: int | none = none [pos], count: int [named]) -> bytes @reference/foundations/bytes/#definitions-slice
+
+color
+  short: color
+  paths: std.color
+  routes: reference/visualize/color/
+  fields: aqua, black, blue, cmyk, components, darken, desaturate, eastern, fuchsia, gray, green, hsl, hsv, lighten, lime, linear-rgb, luma, map, maroon, mix, navy, negate, oklab, oklch, olive, opacify, orange, purple, red, rgb, rotate, saturate, silver, space, spot, teal, to-hex, transparentize, white, yellow
+  methods:
+    - cmyk(cyan!: ratio [pos], magenta!: ratio [pos], yellow!: ratio [pos], key!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-cmyk
+    - components(self!: color [pos], alpha: bool = true [named]) -> array @reference/visualize/color/#definitions-components
+    - darken(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-darken
+    - desaturate(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-desaturate
+    - hsl(hue!: angle [pos], saturation!: int | ratio [pos], lightness!: int | ratio [pos], alpha!: int | ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-hsl
+    - hsv(hue!: angle [pos], saturation!: int | ratio [pos], value!: int | ratio [pos], alpha!: int | ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-hsv
+    - lighten(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-lighten
+    - linear-rgb(red!: int | ratio [pos], green!: int | ratio [pos], blue!: int | ratio [pos], alpha!: int | ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-linear-rgb
+    - luma(lightness!: int | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-luma
+    - mix(colors: color | array [rest], space: spot | any | auto = auto [named]) -> color @reference/visualize/color/#definitions-mix
+    - negate(self!: color [pos], space: spot | any | auto = auto [named]) -> color @reference/visualize/color/#definitions-negate
+    - oklab(lightness!: ratio [pos], a!: float | ratio [pos], b!: float | ratio [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklab
+    - oklch(lightness!: ratio [pos], chroma!: float | ratio [pos], hue!: angle [pos], alpha!: ratio [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-oklch
+    - opacify(self!: color [pos], scale!: ratio [pos]) -> color @reference/visualize/color/#definitions-opacify
+    - rgb(red!: int | ratio [pos], green!: int | ratio [pos], blue!: int | ratio [pos], alpha!: int | ratio [pos], hex!: str [pos], color!: color [pos]) -> color @reference/visualize/color/#definitions-rgb
+    - rotate(self!: color [pos], angle!: angle [pos], space: any = oklch [named]) -> color @reference/visualize/color/#definitions-rotate
+    - saturate(self!: color [pos], factor!: ratio [pos]) -> color @reference/visualize/color/#definitions-saturate
+    - space(self!: color [pos]) -> spot | any @reference/visualize/color/#definitions-space
+    - to-hex(self!: color [pos]) -> str @reference/visualize/color/#definitions-to-hex
+    - transparentize(self!: color [pos], scale!: ratio [pos]) -> color @reference/visualize/color/#definitions-transparentize
+
+content
+  short: content
+  paths: std.content
+  routes: reference/foundations/content/
+  fields: at, fields, func, has, location
+  methods:
+    - at(self!: content [pos], field!: str [pos], default: any [named]) -> any @reference/foundations/content/#definitions-at
+    - fields(self!: content [pos]) -> dictionary @reference/foundations/content/#definitions-fields
+    - func(self!: content [pos]) -> function @reference/foundations/content/#definitions-func
+    - has(self!: content [pos], field!: str [pos]) -> bool @reference/foundations/content/#definitions-has
+    - location(self!: content [pos]) -> location | none @reference/foundations/content/#definitions-location
+
+counter
+  short: counter
+  paths: std.counter
+  routes: reference/introspection/counter/
+  fields: at, display, final, get, step, update
+  methods:
+    - at(self!: counter [pos], selector!: label | function | location | selector [pos]) -> int | array @reference/introspection/counter/#definitions-at
+    - display(self!: counter [pos], numbering: str | function | auto = auto [pos], at: label | function | location | selector | auto = auto [named], both: bool = false [named]) -> any @reference/introspection/counter/#definitions-display
+    - final(self!: counter [pos]) -> int | array @reference/introspection/counter/#definitions-final
+    - get(self!: counter [pos]) -> int | array @reference/introspection/counter/#definitions-get
+    - step(self!: counter [pos], level: int = 1 [named]) -> content @reference/introspection/counter/#definitions-step
+    - update(self!: counter [pos], update!: int | array | function [pos]) -> content @reference/introspection/counter/#definitions-update
+
+datetime
+  short: datetime
+  paths: std.datetime
+  routes: reference/foundations/datetime/
+  fields: day, display, hour, minute, month, ordinal, second, today, weekday, year
+  methods:
+    - day(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-day
+    - display(self!: datetime [pos], pattern: str | auto = auto [pos]) -> str @reference/foundations/datetime/#definitions-display
+    - hour(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-hour
+    - minute(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-minute
+    - month(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-month
+    - ordinal(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-ordinal
+    - second(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-second
+    - today(offset: duration | int | auto = auto [named]) -> datetime @reference/foundations/datetime/#definitions-today
+    - weekday(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-weekday
+    - year(self!: datetime [pos]) -> int | none @reference/foundations/datetime/#definitions-year
+
+decimal
+  short: decimal
+  paths: std.decimal
+  routes: reference/foundations/decimal/
+  fields:
+  methods:
+
+dictionary
+  short: dictionary
+  paths: std.dictionary
+  routes: reference/foundations/dictionary/
+  fields: at, filter, insert, keys, len, map, pairs, remove, values
+  methods:
+    - at(self!: dictionary [pos], key!: str [pos], default: any [named]) -> any @reference/foundations/dictionary/#definitions-at
+    - filter(self!: dictionary [pos], test!: function [pos]) -> dictionary @reference/foundations/dictionary/#definitions-filter
+    - insert(self!: dictionary [pos], key!: str [pos], value!: any [pos]) -> none @reference/foundations/dictionary/#definitions-insert
+    - keys(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-keys
+    - len(self!: dictionary [pos]) -> int @reference/foundations/dictionary/#definitions-len
+    - map(self!: dictionary [pos], mapper!: function [pos]) -> dictionary @reference/foundations/dictionary/#definitions-map
+    - pairs(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-pairs
+    - remove(self!: dictionary [pos], key!: str [pos], default: any [named]) -> any @reference/foundations/dictionary/#definitions-remove
+    - values(self!: dictionary [pos]) -> array @reference/foundations/dictionary/#definitions-values
+
+direction
+  short: direction
+  paths: std.direction
+  routes: reference/layout/direction/
+  fields: axis, btt, end, from, inv, ltr, rtl, sign, start, to, ttb
+  methods:
+    - axis(self!: direction [pos]) -> "horizontal" | "vertical" @reference/layout/direction/#definitions-axis
+    - end(self!: direction [pos]) -> alignment @reference/layout/direction/#definitions-end
+    - from(side!: alignment [pos]) -> direction @reference/layout/direction/#definitions-from
+    - inv(self!: direction [pos]) -> direction @reference/layout/direction/#definitions-inv
+    - sign(self!: direction [pos]) -> int @reference/layout/direction/#definitions-sign
+    - start(self!: direction [pos]) -> alignment @reference/layout/direction/#definitions-start
+    - to(side!: alignment [pos]) -> direction @reference/layout/direction/#definitions-to
+
+duration
+  short: duration
+  paths: std.duration
+  routes: reference/foundations/duration/
+  fields: days, hours, minutes, seconds, weeks
+  methods:
+    - days(self!: duration [pos]) -> float @reference/foundations/duration/#definitions-days
+    - hours(self!: duration [pos]) -> float @reference/foundations/duration/#definitions-hours
+    - minutes(self!: duration [pos]) -> float @reference/foundations/duration/#definitions-minutes
+    - seconds(self!: duration [pos]) -> float @reference/foundations/duration/#definitions-seconds
+    - weeks(self!: duration [pos]) -> float @reference/foundations/duration/#definitions-weeks
+
+float
+  short: float
+  paths: std.float
+  routes: reference/foundations/float/
+  fields: from-bytes, inf, is-infinite, is-nan, nan, signum, to-bytes
+  methods:
+    - from-bytes(bytes!: bytes [pos], endian: "big" | "little" = "little" [named]) -> float @reference/foundations/float/#definitions-from-bytes
+    - is-infinite(self!: float [pos]) -> bool @reference/foundations/float/#definitions-is-infinite
+    - is-nan(self!: float [pos]) -> bool @reference/foundations/float/#definitions-is-nan
+    - signum(self!: float [pos]) -> float @reference/foundations/float/#definitions-signum
+    - to-bytes(self!: float [pos], endian: "big" | "little" = "little" [named], size: int = 8 [named]) -> bytes @reference/foundations/float/#definitions-to-bytes
+
+fraction
+  short: fraction
+  paths: std.fraction
+  routes: reference/layout/fraction/
+  fields:
+  methods:
+
+function
+  short: function
+  paths: std.function
+  routes: reference/foundations/function/
+  fields: where, with
+  methods:
+    - where(self!: function [pos], fields: any [rest]) -> selector @reference/foundations/function/#definitions-where
+    - with(self!: function [pos], arguments: any [rest]) -> function @reference/foundations/function/#definitions-with
+
+gradient
+  short: gradient
+  paths: std.gradient
+  routes: reference/visualize/gradient/
+  fields: angle, center, conic, focal-center, focal-radius, kind, linear, radial, radius, relative, repeat, sample, samples, sharp, space, stops
+  methods:
+    - angle(self!: gradient [pos]) -> angle | none @reference/visualize/gradient/#definitions-angle
+    - center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-center
+    - conic(stops: color | array [rest], angle: angle = 0deg [named], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named]) -> gradient @reference/visualize/gradient/#definitions-conic
+    - focal-center(self!: gradient [pos]) -> array | none @reference/visualize/gradient/#definitions-focal-center
+    - focal-radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-focal-radius
+    - kind(self!: gradient [pos]) -> function @reference/visualize/gradient/#definitions-kind
+    - linear(stops: color | array [rest], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], dir: direction = ltr [pos], angle!: angle [pos]) -> gradient @reference/visualize/gradient/#definitions-linear
+    - radial(stops: color | array [rest], space: spot | any | auto = auto [named], relative: "self" | "parent" | auto = auto [named], center: array = (50%, 50%) [named], radius: ratio = 50% [named], focal-center: array | auto = auto [named], focal-radius: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-radial
+    - radius(self!: gradient [pos]) -> ratio | none @reference/visualize/gradient/#definitions-radius
+    - relative(self!: gradient [pos]) -> "self" | "parent" | auto @reference/visualize/gradient/#definitions-relative
+    - repeat(self!: gradient [pos], repetitions!: int [pos], mirror: bool = false [named]) -> gradient @reference/visualize/gradient/#definitions-repeat
+    - sample(self!: gradient [pos], t!: ratio | angle [pos]) -> color @reference/visualize/gradient/#definitions-sample
+    - samples(self!: gradient [pos], ts: ratio | angle [rest]) -> array @reference/visualize/gradient/#definitions-samples
+    - sharp(self!: gradient [pos], steps!: int [pos], smoothness: ratio = 0% [named]) -> gradient @reference/visualize/gradient/#definitions-sharp
+    - space(self!: gradient [pos]) -> spot | any @reference/visualize/gradient/#definitions-space
+    - stops(self!: gradient [pos]) -> array @reference/visualize/gradient/#definitions-stops
+
+integer
+  short: int
+  paths: std.int
+  routes: reference/foundations/int/
+  fields: bit-and, bit-lshift, bit-not, bit-or, bit-rshift, bit-xor, from-bytes, max, min, signum, to-bytes
+  methods:
+    - bit-and(self!: int [pos], rhs!: int [pos]) -> int @reference/foundations/int/#definitions-bit-and
+    - bit-lshift(self!: int [pos], shift!: int [pos]) -> int @reference/foundations/int/#definitions-bit-lshift
+    - bit-not(self!: int [pos]) -> int @reference/foundations/int/#definitions-bit-not
+    - bit-or(self!: int [pos], rhs!: int [pos]) -> int @reference/foundations/int/#definitions-bit-or
+    - bit-rshift(self!: int [pos], shift!: int [pos], logical: bool = false [named]) -> int @reference/foundations/int/#definitions-bit-rshift
+    - bit-xor(self!: int [pos], rhs!: int [pos]) -> int @reference/foundations/int/#definitions-bit-xor
+    - from-bytes(bytes!: bytes [pos], endian: "big" | "little" = "little" [named], signed: bool = true [named]) -> int @reference/foundations/int/#definitions-from-bytes
+    - signum(self!: int [pos]) -> int @reference/foundations/int/#definitions-signum
+    - to-bytes(self!: int [pos], endian: "big" | "little" = "little" [named], size: int = 8 [named]) -> bytes @reference/foundations/int/#definitions-to-bytes
+
+label
+  short: label
+  paths: std.label
+  routes: reference/foundations/label/
+  fields:
+  methods:
+
+length
+  short: length
+  paths: std.length
+  routes: reference/layout/length/
+  fields: cm, inches, mm, pt, to-absolute
+  methods:
+    - cm(self!: length [pos]) -> float @reference/layout/length/#definitions-cm
+    - inches(self!: length [pos]) -> float @reference/layout/length/#definitions-inches
+    - mm(self!: length [pos]) -> float @reference/layout/length/#definitions-mm
+    - pt(self!: length [pos]) -> float @reference/layout/length/#definitions-pt
+    - to-absolute(self!: length [pos]) -> length @reference/layout/length/#definitions-to-absolute
+
+location
+  short: location
+  paths: std.location
+  routes: reference/introspection/location/
+  fields: page, page-numbering, position
+  methods:
+    - page(self!: location [pos]) -> int @reference/introspection/location/#definitions-page
+    - page-numbering(self!: location [pos]) -> str | function | none @reference/introspection/location/#definitions-page-numbering
+    - position(self!: location [pos]) -> dictionary @reference/introspection/location/#definitions-position
+
+module
+  short: module
+  paths: std.module
+  routes: reference/foundations/module/
+  fields:
+  methods:
+
+path
+  short: path
+  paths: std.path
+  routes: reference/foundations/path/
+  fields:
+  methods:
+
+ratio
+  short: ratio
+  paths: std.ratio
+  routes: reference/layout/ratio/
+  fields:
+  methods:
+
+regex
+  short: regex
+  paths: std.regex
+  routes: reference/foundations/regex/
+  fields:
+  methods:
+
+relative length
+  short: relative
+  paths: std.relative
+  routes: reference/layout/relative/
+  fields:
+  methods:
+
+selector
+  short: selector
+  paths: std.selector
+  routes: reference/foundations/selector/
+  fields: after, and, before, or, within
+  methods:
+    - after(self!: str | function | label | regex | location | selector [pos], start!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-after
+    - and(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-and
+    - before(self!: str | function | label | regex | location | selector [pos], end!: label | function | location | selector [pos], inclusive: bool = true [named]) -> selector @reference/foundations/selector/#definitions-before
+    - or(self!: str | function | label | regex | location | selector [pos], others: str | function | label | regex | location | selector [rest]) -> selector @reference/foundations/selector/#definitions-or
+    - within(self!: str | function | label | regex | location | selector [pos], ancestor!: label | function | location | selector [pos]) -> selector @reference/foundations/selector/#definitions-within
+
+spot colorant
+  short: spot
+  paths: std.color.spot
+  routes: reference/visualize/color/#definitions-spot
+  fields: tint
+  methods:
+    - tint(self!: spot [pos], value!: ratio [pos]) -> color @reference/visualize/spot/#definitions-tint
+
+state
+  short: state
+  paths: std.state
+  routes: reference/introspection/state/
+  fields: at, final, get, update
+  methods:
+    - at(self!: state [pos], selector!: label | function | location | selector [pos]) -> any @reference/introspection/state/#definitions-at
+    - final(self!: state [pos]) -> any @reference/introspection/state/#definitions-final
+    - get(self!: state [pos]) -> any @reference/introspection/state/#definitions-get
+    - update(self!: state [pos], update!: function | any [pos]) -> content @reference/introspection/state/#definitions-update
+
+string
+  short: str
+  paths: std.str
+  routes: reference/foundations/str/
+  fields: at, clusters, codepoints, contains, ends-with, find, first, from-unicode, last, len, match, matches, normalize, position, replace, rev, slice, split, starts-with, to-unicode, trim
+  methods:
+    - at(self!: str [pos], index!: int [pos], default: any [named]) -> any @reference/foundations/str/#definitions-at
+    - clusters(self!: str [pos]) -> array @reference/foundations/str/#definitions-clusters
+    - codepoints(self!: str [pos]) -> array @reference/foundations/str/#definitions-codepoints
+    - contains(self!: str [pos], pattern!: str | regex [pos]) -> bool @reference/foundations/str/#definitions-contains
+    - ends-with(self!: str [pos], pattern!: str | regex [pos]) -> bool @reference/foundations/str/#definitions-ends-with
+    - find(self!: str [pos], pattern!: str | regex [pos]) -> str | none @reference/foundations/str/#definitions-find
+    - first(self!: str [pos], default: str [named]) -> str @reference/foundations/str/#definitions-first
+    - from-unicode(value!: int [pos]) -> str @reference/foundations/str/#definitions-from-unicode
+    - last(self!: str [pos], default: str [named]) -> str @reference/foundations/str/#definitions-last
+    - len(self!: str [pos]) -> int @reference/foundations/str/#definitions-len
+    - match(self!: str [pos], pattern!: str | regex [pos]) -> dictionary | none @reference/foundations/str/#definitions-match
+    - matches(self!: str [pos], pattern!: str | regex [pos]) -> array @reference/foundations/str/#definitions-matches
+    - normalize(self!: str [pos], form: "nfc" | "nfd" | "nfkc" | "nfkd" = "nfc" [named]) -> str @reference/foundations/str/#definitions-normalize
+    - position(self!: str [pos], pattern!: str | regex [pos]) -> int | none @reference/foundations/str/#definitions-position
+    - replace(self!: str [pos], pattern!: str | regex [pos], replacement!: str | function [pos], count: int [named]) -> str @reference/foundations/str/#definitions-replace
+    - rev(self!: str [pos]) -> str @reference/foundations/str/#definitions-rev
+    - slice(self!: str [pos], start!: int [pos], end: int | none = none [pos], count: int [named]) -> str @reference/foundations/str/#definitions-slice
+    - split(self!: str [pos], pattern: str | regex | none = none [pos]) -> array @reference/foundations/str/#definitions-split
+    - starts-with(self!: str [pos], pattern!: str | regex [pos]) -> bool @reference/foundations/str/#definitions-starts-with
+    - to-unicode(character!: str [pos]) -> int @reference/foundations/str/#definitions-to-unicode
+    - trim(self!: str [pos], pattern: str | regex | none = none [pos], at: alignment [named], repeat: bool = true [named]) -> str @reference/foundations/str/#definitions-trim
+
+stroke
+  short: stroke
+  paths: std.stroke
+  routes: reference/visualize/stroke/
+  fields:
+  methods:
+
+symbol
+  short: symbol
+  paths: std.symbol
+  routes: reference/foundations/symbol/
+  fields:
+  methods:
+
+tiling
+  short: tiling
+  paths: std.tiling
+  routes: reference/visualize/tiling/
+  fields:
+  methods:
+
+type
+  short: type
+  paths: std.type
+  routes: reference/foundations/type/
+  fields:
+  methods:
+
+version
+  short: version
+  paths: std.version
+  routes: reference/foundations/version/
+  fields: at
+  methods:
+    - at(self!: version [pos], index!: int [pos]) -> int @reference/foundations/version/#definitions-at

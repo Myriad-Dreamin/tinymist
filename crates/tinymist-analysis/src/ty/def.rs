@@ -805,6 +805,16 @@ impl ParamAttrs {
         }
     }
 
+    /// Creates an attribute for a parameter that can be passed positionally or by name.
+    pub fn pos_named() -> ParamAttrs {
+        ParamAttrs {
+            positional: true,
+            named: true,
+            variadic: false,
+            settable: false,
+        }
+    }
+
     /// Creates a variadic parameter attribute.
     pub fn variadic() -> ParamAttrs {
         ParamAttrs {
@@ -836,6 +846,8 @@ pub struct ParamTy {
     pub docs: Option<DocText>,
     /// The default value of the variable.
     pub default: Option<EcoString>,
+    /// Whether the parameter is required.
+    pub required: bool,
     /// The type of the parameter.
     pub ty: Ty,
     /// The attributes of the parameter.
@@ -855,6 +867,7 @@ impl ParamTy {
             ty,
             docs: None,
             default: None,
+            required: true,
             attrs,
         })
     }

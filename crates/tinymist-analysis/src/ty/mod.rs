@@ -9,6 +9,7 @@ mod describe;
 mod iface;
 mod mutate;
 mod prelude;
+mod scheme;
 mod select;
 mod sig;
 mod simplify;
