@@ -3,7 +3,7 @@
   "displayName": "Tinymist GPU Viewer",
   "description": "GPU-backed Typst previewer provider for Tinymist.",
   "publisher": "myriad-dreamin",
-  "version": "0.15.2-rc3",
+  "version": "0.15.2-rc4",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
