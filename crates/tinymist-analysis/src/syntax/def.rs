@@ -498,6 +498,11 @@ impl Decl {
         })
     }
 
+    /// Creates a generated variable declaration tied to a source span.
+    pub fn generated_var(name: Interned<str>, at: Span) -> Self {
+        Self::Var(SpannedDecl { name, at })
+    }
+
     /// Creates a variable declaration from an identifier.
     pub fn var(ident: ast::Ident) -> Self {
         Self::Var(SpannedDecl {
@@ -1293,6 +1298,8 @@ pub struct IfExpr {
 pub struct WhileExpr {
     /// The condition expression evaluated each iteration.
     pub cond: Expr,
+    /// Optional loop-entry marker used by flow-sensitive summaries.
+    pub entry: Option<Expr>,
     /// The body expression executed while condition is true.
     pub body: Expr,
 }
@@ -1304,6 +1311,8 @@ pub struct ForExpr {
     pub pattern: Interned<Pattern>,
     /// The expression that produces values to iterate over.
     pub iter: Expr,
+    /// Optional loop-entry marker used by flow-sensitive summaries.
+    pub entry: Option<Expr>,
     /// The body expression executed for each iteration.
     pub body: Expr,
 }

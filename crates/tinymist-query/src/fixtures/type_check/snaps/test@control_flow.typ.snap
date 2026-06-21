@@ -3,16 +3,27 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 ---
+"for$1" = Any
+"while$1" = Any
 "x0" = IfTy { cond: true, then: 1, else_: None }
 "x1" = IfTy { cond: false, then: 2, else_: None }
 "x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Type(int), 0), op: Gt }, then: 1, else_: 2 }, op: Context }
-"x3" = () => ( ⪰ None | "s" | 1)
-"x" = ( ⪰ None | "s" | 1)
-"x4" = (Any) => ( ⪰ None | 1)
+"x3" = () => IfTy { cond: true, then: 1, else_: "s" }
+"x$1" = None
+"x$2" = 1
+"x$3" = "s"
+"x$4" = IfTy { cond: true, then: 1, else_: "s" }
+"x4" = (Any) => IfTy { cond: Any, then: 1, else_: None }
 "cond" = Any
-"w" = ( ⪰ None | 1)
-"x5" = () => None
-"y" = None
+"w$1" = None
+"w$2" = IfTy { cond: Any, then: 1, else_: None }
+"w$3" = 1
+"w$4" = IfTy { cond: Any, then: 1, else_: None }
+"x5" = () => IfTy { cond: Any, then: Any, else_: None }
+"y$1" = None
+"y$2" = IfTy { cond: Any, then: Any, else_: None }
+"y$3" = Any
+"y$4" = IfTy { cond: Any, then: Any, else_: None }
 "item" = ( ⪰ "s" | 1)
 =====
 5..7 -> @x0
@@ -23,20 +34,13 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 74..85 -> (Func(page) | (Func(page) | Type(location).page))
 74..87 -> Type(int)
 118..120 -> @x3
-133..134 -> @x
-158..159 -> @x
-179..180 -> @x
-193..194 -> @x
+133..134 -> (@x$1 | @x$2 | @x$3 | @x$4)
 202..204 -> @x4
 205..209 -> @cond
-221..222 -> @w
+221..222 -> (@w$1 | @w$2 | @w$3 | @w$4)
 238..242 -> @cond
-249..250 -> @w
-261..262 -> @w
 270..272 -> @x5
-285..286 -> @y
+285..286 -> (@y$1 | @y$2 | @y$3 | @y$4)
 300..304 -> @item
 308..316 -> (1, "s", )
-323..324 -> @y
 327..331 -> @item
-338..339 -> @y

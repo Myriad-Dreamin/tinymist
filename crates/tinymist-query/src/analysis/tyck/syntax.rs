@@ -679,6 +679,10 @@ impl TypeChecker<'_> {
     }
 
     fn check_while_loop(&mut self, while_loop: &Interned<WhileExpr>) -> Ty {
+        if let Some(entry) = &while_loop.entry {
+            let entry = self.check(entry);
+            self.constrain(&entry, &Ty::Boolean(None));
+        }
         let _cond = self.check(&while_loop.cond);
         let _body = self.check(&while_loop.body);
 
@@ -686,6 +690,10 @@ impl TypeChecker<'_> {
     }
 
     fn check_for_loop(&mut self, for_loop: &Interned<ForExpr>) -> Ty {
+        if let Some(entry) = &for_loop.entry {
+            let entry = self.check(entry);
+            self.constrain(&entry, &Ty::Boolean(None));
+        }
         let iter = self.check(&for_loop.iter);
         let pattern = self.check_pattern_exp(&for_loop.pattern);
 

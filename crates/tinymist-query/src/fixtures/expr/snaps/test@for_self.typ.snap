@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/expr/for_self.typ
+---
+fn for_self()
+  let y$1 = 0
+  for item in (1, 2) entry for$1 {
+    let y$2 = if for$1 { y$3 } else { y$1 }
+    let y$3 = y$2 + item
+  }
+  let y$4 = if for$1 { y$3 } else { y$1 }
+  y$4

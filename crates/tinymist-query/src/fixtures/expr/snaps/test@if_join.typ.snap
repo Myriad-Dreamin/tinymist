@@ -1,0 +1,14 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/expr/if_join.typ
+---
+fn if_join()
+  let x$1 = none
+  if true {
+    let x$2 = 1
+  } else {
+    let x$3 = "s"
+  }
+  let x$4 = if true { x$2 } else { x$3 }
+  x$4

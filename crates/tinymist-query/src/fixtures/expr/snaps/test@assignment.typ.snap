@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/expr/assignment.typ
+---
+fn assignment()
+  let x$1 = none
+  let x$2 = 1
+  x$2

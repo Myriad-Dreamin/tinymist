@@ -1,3 +1,4 @@
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::DerefMut;
 
 use parking_lot::Mutex;
@@ -113,6 +114,7 @@ pub(crate) fn expr_of(
         buffer: vec![],
         module_items: FxHashMap::default(),
         init_stage: true,
+        flow: None,
         comment_matcher: DocCommentMatcher::default(),
         route,
     };
@@ -163,6 +165,37 @@ struct LexicalContext {
     last: ExprScope,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FlowValue {
+    Version(DeclExpr),
+    PendingIf {
+        cond: Expr,
+        then_value: Box<FlowValue>,
+        else_value: Box<FlowValue>,
+    },
+    PendingLoop {
+        header: Expr,
+        entry_value: Box<FlowValue>,
+        body_value: Box<FlowValue>,
+    },
+}
+
+#[derive(Debug, Clone, Default)]
+struct FlowContext {
+    env: BTreeMap<DeclExpr, FlowValue>,
+    next_versions: BTreeMap<DeclExpr, usize>,
+    next_entries: BTreeMap<&'static str, usize>,
+    pending: Vec<Expr>,
+    assigned_names: BTreeSet<Interned<str>>,
+}
+
+#[derive(Debug, Clone)]
+struct LoopSelfJoin {
+    decl: DeclExpr,
+    version: DeclExpr,
+    entry_value: FlowValue,
+}
+
 impl Default for LexicalContext {
     fn default() -> Self {
         LexicalContext {
@@ -187,6 +220,7 @@ pub(crate) struct ExprWorker<'a> {
     lexical: LexicalContext,
     module_items: FxHashMap<DeclExpr, ModuleItemLayout>,
     init_stage: bool,
+    flow: Option<FlowContext>,
 
     route: &'a mut ExprRoute,
     comment_matcher: DocCommentMatcher,
@@ -210,6 +244,417 @@ impl ExprWorker<'_> {
         if !last.is_empty() {
             self.lexical.scopes.push(last);
         }
+    }
+
+    fn flow_assigned(&self, decl: &DeclExpr) -> bool {
+        self.flow
+            .as_ref()
+            .is_some_and(|flow| flow.assigned_names.contains(decl.name()))
+    }
+
+    fn flow_env(&self) -> Option<BTreeMap<DeclExpr, FlowValue>> {
+        self.flow.as_ref().map(|flow| flow.env.clone())
+    }
+
+    fn flow_flush_pending(&mut self, items: &mut Vec<Expr>) {
+        if let Some(flow) = &mut self.flow {
+            items.append(&mut flow.pending);
+        }
+    }
+
+    fn flow_wrap_pending(&mut self, expr: Expr) -> Expr {
+        let Some(flow) = &mut self.flow else {
+            return expr;
+        };
+        if flow.pending.is_empty() {
+            return expr;
+        }
+
+        let mut exprs = std::mem::take(&mut flow.pending);
+        exprs.push(expr);
+        Expr::Block(exprs.into())
+    }
+
+    fn flow_new_version(&mut self, decl: &DeclExpr) -> Option<DeclExpr> {
+        let flow = self.flow.as_mut()?;
+        let next = flow.next_versions.entry(decl.clone()).or_default();
+        *next += 1;
+        let name = format!("{}${next}", decl.name());
+        Some(Decl::generated_var(Interned::new_str(&name), decl.span()).into())
+    }
+
+    fn flow_new_entry(&mut self, kind: &'static str) -> Option<Expr> {
+        let flow = self.flow.as_mut()?;
+        let next = flow.next_entries.entry(kind).or_default();
+        *next += 1;
+        let name = format!("{kind}${next}");
+        Some(Expr::Decl(
+            Decl::generated_var(Interned::new_str(&name), Span::detached()).into(),
+        ))
+    }
+
+    fn flow_make_let(&self, decl: DeclExpr, span: Span, body: Expr) -> Expr {
+        Expr::Let(
+            LetExpr {
+                span,
+                pattern: Pattern::Simple(decl).into(),
+                body: Some(body),
+            }
+            .into(),
+        )
+    }
+
+    fn flow_bind_params(&mut self, sig: &PatternSig) {
+        for param in &sig.pos {
+            self.flow_bind_param_pattern(param);
+        }
+        for (decl, _) in &sig.named {
+            self.flow_bind_param_decl(decl);
+        }
+        if let Some((decl, _)) = &sig.spread_left {
+            self.flow_bind_param_decl(decl);
+        }
+        if let Some((decl, _)) = &sig.spread_right {
+            self.flow_bind_param_decl(decl);
+        }
+    }
+
+    fn flow_bind_param_pattern(&mut self, pattern: &Pattern) {
+        match pattern {
+            Pattern::Simple(decl) => self.flow_bind_param_decl(decl),
+            Pattern::Sig(sig) => {
+                for pattern in &sig.pos {
+                    self.flow_bind_param_pattern(pattern);
+                }
+                for (decl, pattern) in &sig.named {
+                    self.flow_bind_param_decl(decl);
+                    self.flow_bind_param_pattern(pattern);
+                }
+                if let Some((decl, pattern)) = &sig.spread_left {
+                    self.flow_bind_param_decl(decl);
+                    self.flow_bind_param_pattern(pattern);
+                }
+                if let Some((decl, pattern)) = &sig.spread_right {
+                    self.flow_bind_param_decl(decl);
+                    self.flow_bind_param_pattern(pattern);
+                }
+            }
+            Pattern::Expr(..) => {}
+        }
+    }
+
+    fn flow_bind_param_decl(&mut self, decl: &DeclExpr) {
+        if !self.flow_assigned(decl) {
+            return;
+        }
+
+        let Some(version) = self.flow_new_version(decl) else {
+            return;
+        };
+        if let Some(flow) = &mut self.flow {
+            flow.env
+                .insert(decl.clone(), FlowValue::Version(version.clone()));
+        }
+        let init = self.flow_make_let(version, decl.span(), Expr::Decl(decl.clone()));
+        if let Some(flow) = &mut self.flow {
+            flow.pending.push(init);
+        }
+    }
+
+    fn flow_read_expr(&mut self, expr: Expr) -> Expr {
+        match expr {
+            Expr::Ref(ref_expr) => {
+                if let Some(decl) = self.flow_ref_decl(&ref_expr)
+                    && self
+                        .flow
+                        .as_ref()
+                        .is_some_and(|flow| flow.env.contains_key(&decl))
+                {
+                    return Expr::Decl(self.flow_materialize(&decl));
+                }
+
+                Expr::Ref(ref_expr)
+            }
+            Expr::Decl(decl)
+                if self
+                    .flow
+                    .as_ref()
+                    .is_some_and(|flow| flow.env.contains_key(&decl)) =>
+            {
+                Expr::Decl(self.flow_materialize(&decl))
+            }
+            expr => expr,
+        }
+    }
+
+    fn flow_ref_decl(&self, ref_expr: &RefExpr) -> Option<DeclExpr> {
+        ref_expr
+            .root
+            .as_ref()
+            .and_then(expr_as_decl)
+            .or_else(|| ref_expr.step.as_ref().and_then(expr_as_decl))
+    }
+
+    fn flow_ensure_initialized(&mut self, decl: &DeclExpr) {
+        if self
+            .flow
+            .as_ref()
+            .is_none_or(|flow| flow.env.contains_key(decl))
+        {
+            return;
+        }
+
+        let Some(version) = self.flow_new_version(decl) else {
+            return;
+        };
+        if let Some(flow) = &mut self.flow {
+            flow.env
+                .insert(decl.clone(), FlowValue::Version(version.clone()));
+        }
+        let init = self.flow_make_let(version, decl.span(), Expr::Decl(decl.clone()));
+        if let Some(flow) = &mut self.flow {
+            flow.pending.push(init);
+        }
+    }
+
+    fn flow_assign(&mut self, lhs: &Expr, rhs: Expr) -> Option<Expr> {
+        let decl = assigned_decl_of(lhs)?;
+        if !self.flow_assigned(&decl) {
+            return None;
+        }
+
+        self.flow_ensure_initialized(&decl);
+        let version = self.flow_new_version(&decl)?;
+        if let Some(flow) = &mut self.flow {
+            flow.env
+                .insert(decl.clone(), FlowValue::Version(version.clone()));
+        }
+
+        Some(self.flow_make_let(version, decl.span(), rhs))
+    }
+
+    fn flow_branch(
+        &mut self,
+        env: BTreeMap<DeclExpr, FlowValue>,
+        f: impl FnOnce(&mut Self) -> Expr,
+    ) -> (Expr, BTreeMap<DeclExpr, FlowValue>) {
+        if self.flow.is_none() {
+            return (f(self), BTreeMap::new());
+        }
+
+        let (saved_env, saved_pending) = {
+            let flow = self.flow.as_mut().unwrap();
+            (
+                std::mem::replace(&mut flow.env, env),
+                std::mem::take(&mut flow.pending),
+            )
+        };
+
+        let expr = f(self);
+        let expr = self.flow_wrap_pending(expr);
+        let branch_env = self.flow.as_ref().unwrap().env.clone();
+
+        let flow = self.flow.as_mut().unwrap();
+        flow.env = saved_env;
+        flow.pending = saved_pending;
+
+        (expr, branch_env)
+    }
+
+    fn flow_merge_if(
+        &mut self,
+        entry_env: BTreeMap<DeclExpr, FlowValue>,
+        then_env: BTreeMap<DeclExpr, FlowValue>,
+        else_env: BTreeMap<DeclExpr, FlowValue>,
+        cond: Expr,
+    ) {
+        let Some(flow) = &mut self.flow else {
+            return;
+        };
+
+        let mut merged = entry_env.clone();
+        for (decl, entry_value) in entry_env {
+            let then_value = then_env
+                .get(&decl)
+                .cloned()
+                .unwrap_or_else(|| entry_value.clone());
+            let else_value = else_env
+                .get(&decl)
+                .cloned()
+                .unwrap_or_else(|| entry_value.clone());
+
+            let value = if then_value == else_value {
+                then_value
+            } else {
+                FlowValue::PendingIf {
+                    cond: cond.clone(),
+                    then_value: Box::new(then_value),
+                    else_value: Box::new(else_value),
+                }
+            };
+            merged.insert(decl, value);
+        }
+
+        flow.env = merged;
+    }
+
+    fn flow_merge_loop(
+        &mut self,
+        entry_env: BTreeMap<DeclExpr, FlowValue>,
+        body_env: BTreeMap<DeclExpr, FlowValue>,
+        header: Expr,
+    ) {
+        let Some(flow) = &mut self.flow else {
+            return;
+        };
+
+        let mut merged = entry_env.clone();
+        for (decl, entry_value) in entry_env {
+            let body_value = body_env
+                .get(&decl)
+                .cloned()
+                .unwrap_or_else(|| entry_value.clone());
+
+            let value = if body_value == entry_value {
+                body_value
+            } else {
+                FlowValue::PendingLoop {
+                    header: header.clone(),
+                    entry_value: Box::new(entry_value),
+                    body_value: Box::new(body_value),
+                }
+            };
+            merged.insert(decl, value);
+        }
+
+        flow.env = merged;
+    }
+
+    fn flow_loop_entry(
+        &mut self,
+        entry_env: &BTreeMap<DeclExpr, FlowValue>,
+        assigned_names: &BTreeSet<Interned<str>>,
+    ) -> (BTreeMap<DeclExpr, FlowValue>, Vec<LoopSelfJoin>) {
+        let mut loop_env = entry_env.clone();
+        let mut joins = Vec::new();
+
+        for (decl, entry_value) in entry_env {
+            if !assigned_names.contains(decl.name()) {
+                continue;
+            }
+            let Some(version) = self.flow_new_version(decl) else {
+                continue;
+            };
+            // Loop bodies read the header version; after the body is checked,
+            // the version is defined from the backedge and the loop entry.
+            loop_env.insert(decl.clone(), FlowValue::Version(version.clone()));
+            joins.push(LoopSelfJoin {
+                decl: decl.clone(),
+                version,
+                entry_value: entry_value.clone(),
+            });
+        }
+
+        (loop_env, joins)
+    }
+
+    fn flow_loop_self_lets(
+        &self,
+        joins: Vec<LoopSelfJoin>,
+        body_env: &BTreeMap<DeclExpr, FlowValue>,
+        header: Expr,
+    ) -> Vec<Expr> {
+        joins
+            .into_iter()
+            .map(|join| {
+                let body_value = body_env
+                    .get(&join.decl)
+                    .cloned()
+                    .unwrap_or_else(|| FlowValue::Version(join.version.clone()));
+                let body = Expr::Conditional(
+                    IfExpr {
+                        cond: header.clone(),
+                        then: flow_value_expr(body_value),
+                        else_: flow_value_expr(join.entry_value),
+                    }
+                    .into(),
+                );
+                self.flow_make_let(join.version, join.decl.span(), body)
+            })
+            .collect()
+    }
+
+    fn flow_materialize(&mut self, decl: &DeclExpr) -> DeclExpr {
+        let value = self
+            .flow
+            .as_ref()
+            .and_then(|flow| flow.env.get(decl))
+            .cloned()
+            .unwrap_or_else(|| FlowValue::Version(decl.clone()));
+
+        match value {
+            FlowValue::Version(version) => version,
+            FlowValue::PendingIf {
+                cond,
+                then_value,
+                else_value,
+            } => {
+                let then = Expr::Decl(self.flow_materialize_value(decl, *then_value));
+                let else_ = Expr::Decl(self.flow_materialize_value(decl, *else_value));
+                self.flow_materialize_join(decl, cond, then, else_)
+            }
+            FlowValue::PendingLoop {
+                header,
+                entry_value,
+                body_value,
+            } => {
+                let then = Expr::Decl(self.flow_materialize_value(decl, *body_value));
+                let else_ = Expr::Decl(self.flow_materialize_value(decl, *entry_value));
+                self.flow_materialize_join(decl, header, then, else_)
+            }
+        }
+    }
+
+    fn flow_materialize_value(&mut self, decl: &DeclExpr, value: FlowValue) -> DeclExpr {
+        match value {
+            FlowValue::Version(version) => version,
+            _ => {
+                let old = self
+                    .flow
+                    .as_mut()
+                    .and_then(|flow| flow.env.insert(decl.clone(), value));
+                let version = self.flow_materialize(decl);
+                if let Some(flow) = &mut self.flow {
+                    match old {
+                        Some(old) => {
+                            flow.env.insert(decl.clone(), old);
+                        }
+                        None => {
+                            flow.env.remove(decl);
+                        }
+                    }
+                }
+                version
+            }
+        }
+    }
+
+    fn flow_materialize_join(
+        &mut self,
+        decl: &DeclExpr,
+        cond: Expr,
+        then: Expr,
+        else_: Expr,
+    ) -> DeclExpr {
+        let version = self.flow_new_version(decl).unwrap_or_else(|| decl.clone());
+        let join = Expr::Conditional(IfExpr { cond, then, else_ }.into());
+        let stmt = self.flow_make_let(version.clone(), decl.span(), join);
+        if let Some(flow) = &mut self.flow {
+            flow.pending.push(stmt);
+            flow.env
+                .insert(decl.clone(), FlowValue::Version(version.clone()));
+        }
+        version
     }
 
     #[must_use]
@@ -424,6 +869,18 @@ impl ExprWorker<'_> {
                 let decl = Decl::pattern(span).into();
                 self.check_docstring(&decl, docs, DefKind::Variable);
                 let pattern = self.check_pattern(pat);
+
+                if let Pattern::Simple(decl) = pattern.as_ref()
+                    && self.flow_assigned(decl)
+                {
+                    let version = self.flow_new_version(decl).unwrap_or_else(|| decl.clone());
+                    if let Some(flow) = &mut self.flow {
+                        flow.env
+                            .insert(decl.clone(), FlowValue::Version(version.clone()));
+                    }
+                    return self.flow_make_let(version, span, body.unwrap_or_else(none_expr));
+                }
+
                 Expr::Let(Interned::new(LetExpr {
                     span,
                     pattern,
@@ -439,6 +896,8 @@ impl ExprWorker<'_> {
             Some(name) => Decl::func(name).into(),
             None => Decl::closure(typed.span()).into(),
         };
+        let body_expr = typed.body();
+        let assigned_names = collect_assigned_names(body_expr.clone());
         self.check_docstring(&decl, docs, DefKind::Function);
         self.resolve_as(Decl::as_def(&decl, None));
 
@@ -494,7 +953,16 @@ impl ExprWorker<'_> {
                 spread_right,
             };
 
-            (pattern, this.defer(typed.body()))
+            let prev_flow = this.flow.replace(FlowContext {
+                assigned_names,
+                ..Default::default()
+            });
+            this.flow_bind_params(&pattern);
+            let body = this.defer(body_expr);
+            let body = this.flow_wrap_pending(body);
+            this.flow = prev_flow;
+
+            (pattern, body)
         });
 
         self.scope_mut()
@@ -1029,9 +1497,28 @@ impl ExprWorker<'_> {
     }
 
     fn check_binary(&mut self, typed: ast::Binary) -> Expr {
-        let lhs = self.check(typed.lhs());
+        let lhs = if typed.op() == ast::BinOp::Assign {
+            self.check_assign_lhs(typed.lhs())
+        } else {
+            self.check(typed.lhs())
+        };
         let rhs = self.check(typed.rhs());
+        if typed.op() == ast::BinOp::Assign
+            && let Some(assign) = self.flow_assign(&lhs, rhs.clone())
+        {
+            return assign;
+        }
         Expr::Binary(BinInst::new(typed.op(), lhs, rhs))
+    }
+
+    fn check_assign_lhs(&mut self, typed: ast::Expr) -> Expr {
+        match typed {
+            ast::Expr::Ident(ident) => {
+                self.resolve_ident(Decl::ident_ref(ident).into(), InterpretMode::Code)
+            }
+            ast::Expr::Parenthesized(parenthesized) => self.check_assign_lhs(parenthesized.expr()),
+            _ => self.check(typed),
+        }
     }
 
     fn check_destruct_assign(&mut self, typed: ast::DestructAssignment) -> Expr {
@@ -1091,33 +1578,159 @@ impl ExprWorker<'_> {
 
     fn check_conditional(&mut self, typed: ast::Conditional) -> Expr {
         let cond = self.check(typed.condition());
-        let then = self.defer(typed.if_body());
-        let else_ = typed
-            .else_body()
-            .map_or_else(none_expr, |expr| self.defer(expr));
+        let Some(entry_env) = self.flow_env() else {
+            let then = self.defer(typed.if_body());
+            let else_ = typed
+                .else_body()
+                .map_or_else(none_expr, |expr| self.defer(expr));
+            return Expr::Conditional(IfExpr { cond, then, else_ }.into());
+        };
+
+        let (then, then_env) =
+            self.flow_branch(entry_env.clone(), |this| this.defer(typed.if_body()));
+        let (else_, else_env) = self.flow_branch(entry_env.clone(), |this| {
+            typed
+                .else_body()
+                .map_or_else(none_expr, |expr| this.defer(expr))
+        });
+        self.flow_merge_if(entry_env, then_env, else_env, cond.clone());
+
         Expr::Conditional(IfExpr { cond, then, else_ }.into())
     }
 
     fn check_while_loop(&mut self, typed: ast::WhileLoop) -> Expr {
         let cond = self.check(typed.condition());
-        let body = self.defer(typed.body());
-        Expr::WhileLoop(WhileExpr { cond, body }.into())
+        let Some(entry_env) = self.flow_env() else {
+            let body = self.defer(typed.body());
+            return Expr::WhileLoop(
+                WhileExpr {
+                    cond,
+                    entry: None,
+                    body,
+                }
+                .into(),
+            );
+        };
+
+        let entry = self
+            .flow_new_entry("while")
+            .unwrap_or_else(|| Expr::Type(Ty::Boolean(None)));
+        let assigned_names = collect_assigned_names(typed.body());
+        let (loop_env, self_joins) = self.flow_loop_entry(&entry_env, &assigned_names);
+        let (body, body_env) = self.flow_branch(loop_env, |this| this.defer(typed.body()));
+        let body = prepend_stmts(
+            self.flow_loop_self_lets(self_joins, &body_env, entry.clone()),
+            body,
+        );
+        self.flow_merge_loop(entry_env, body_env, entry.clone());
+
+        Expr::WhileLoop(
+            WhileExpr {
+                cond,
+                entry: Some(entry),
+                body,
+            }
+            .into(),
+        )
     }
 
     fn check_for_loop(&mut self, typed: ast::ForLoop) -> Expr {
         self.with_scope(|this| {
             let pattern = this.check_pattern(typed.pattern());
             let iter = this.check(typed.iterable());
+            let Some(entry_env) = this.flow_env() else {
+                let body = this.defer(typed.body());
+                return Expr::ForLoop(
+                    ForExpr {
+                        pattern,
+                        iter,
+                        entry: None,
+                        body,
+                    }
+                    .into(),
+                );
+            };
+
+            let entry = this
+                .flow_new_entry("for")
+                .unwrap_or_else(|| Expr::Type(Ty::Boolean(None)));
+            let assigned_names = collect_assigned_names(typed.body());
+            let (loop_env, self_joins) = this.flow_loop_entry(&entry_env, &assigned_names);
+            let saved_flow = {
+                let flow = this.flow.as_mut().unwrap();
+                (
+                    std::mem::replace(&mut flow.env, loop_env),
+                    std::mem::take(&mut flow.pending),
+                )
+            };
+            let pattern = this.flow_bind_for_pattern(&pattern);
             let body = this.defer(typed.body());
+            let body = this.flow_wrap_pending(body);
+            let body_env = this.flow.as_ref().unwrap().env.clone();
+            {
+                let flow = this.flow.as_mut().unwrap();
+                flow.env = saved_flow.0;
+                flow.pending = saved_flow.1;
+            }
+
+            let body = prepend_stmts(
+                this.flow_loop_self_lets(self_joins, &body_env, entry.clone()),
+                body,
+            );
+            this.flow_merge_loop(entry_env, body_env, entry.clone());
+
             Expr::ForLoop(
                 ForExpr {
                     pattern,
                     iter,
+                    entry: Some(entry),
                     body,
                 }
                 .into(),
             )
         })
+    }
+
+    fn flow_bind_for_pattern(&mut self, pattern: &Pattern) -> Interned<Pattern> {
+        match pattern {
+            Pattern::Simple(decl) if self.flow_assigned(decl) => {
+                let version = self.flow_new_version(decl).unwrap_or_else(|| decl.clone());
+                if let Some(flow) = &mut self.flow {
+                    flow.env
+                        .insert(decl.clone(), FlowValue::Version(version.clone()));
+                }
+                Pattern::Simple(version).into()
+            }
+            Pattern::Simple(..) | Pattern::Expr(..) => pattern.clone().into(),
+            Pattern::Sig(sig) => {
+                let pos = sig
+                    .pos
+                    .iter()
+                    .map(|pattern| self.flow_bind_for_pattern(pattern))
+                    .collect();
+                let named = sig
+                    .named
+                    .iter()
+                    .map(|(decl, pattern)| (decl.clone(), self.flow_bind_for_pattern(pattern)))
+                    .collect();
+                let spread_left = sig
+                    .spread_left
+                    .as_ref()
+                    .map(|(decl, pattern)| (decl.clone(), self.flow_bind_for_pattern(pattern)));
+                let spread_right = sig
+                    .spread_right
+                    .as_ref()
+                    .map(|(decl, pattern)| (decl.clone(), self.flow_bind_for_pattern(pattern)));
+
+                Pattern::Sig(Box::new(PatternSig {
+                    pos,
+                    named,
+                    spread_left,
+                    spread_right,
+                }))
+                .into()
+            }
+        }
     }
 
     fn check_inline_markup(&mut self, markup: ast::Markup) -> Expr {
@@ -1154,7 +1767,9 @@ impl ExprWorker<'_> {
         let mut items = Vec::with_capacity(4);
         for n in children {
             if let Some(expr) = n.cast::<ast::Expr>() {
-                items.push(self.check(expr));
+                let expr = self.check(expr);
+                self.flow_flush_pending(&mut items);
+                items.push(expr);
                 self.comment_matcher.reset();
                 continue;
             }
@@ -1205,11 +1820,13 @@ impl ExprWorker<'_> {
     }
 
     fn check_ident(&mut self, ident: ast::Ident) -> Expr {
-        self.resolve_ident(Decl::ident_ref(ident).into(), InterpretMode::Code)
+        let expr = self.resolve_ident(Decl::ident_ref(ident).into(), InterpretMode::Code);
+        self.flow_read_expr(expr)
     }
 
     fn check_math_ident(&mut self, ident: ast::MathIdent) -> Expr {
-        self.resolve_ident(Decl::math_ident_ref(ident).into(), InterpretMode::Math)
+        let expr = self.resolve_ident(Decl::math_ident_ref(ident).into(), InterpretMode::Math);
+        self.flow_read_expr(expr)
     }
 
     fn resolve_as(&mut self, r: Interned<RefExpr>) {
@@ -1438,6 +2055,106 @@ impl ExprWorker<'_> {
         let res = imported.as_ref().deref().clone();
         self.import_buffer.push((fid, imported));
         res
+    }
+}
+
+fn expr_as_decl(expr: &Expr) -> Option<DeclExpr> {
+    match expr {
+        Expr::Decl(decl) => Some(decl.clone()),
+        _ => None,
+    }
+}
+
+fn assigned_decl_of(expr: &Expr) -> Option<DeclExpr> {
+    match expr {
+        Expr::Decl(decl) => Some(decl.clone()),
+        Expr::Ref(ref_expr) => ref_expr
+            .root
+            .as_ref()
+            .and_then(expr_as_decl)
+            .or_else(|| ref_expr.step.as_ref().and_then(expr_as_decl)),
+        _ => None,
+    }
+}
+
+fn flow_value_expr(value: FlowValue) -> Expr {
+    match value {
+        FlowValue::Version(version) => Expr::Decl(version),
+        FlowValue::PendingIf {
+            cond,
+            then_value,
+            else_value,
+        } => Expr::Conditional(
+            IfExpr {
+                cond,
+                then: flow_value_expr(*then_value),
+                else_: flow_value_expr(*else_value),
+            }
+            .into(),
+        ),
+        FlowValue::PendingLoop {
+            header,
+            entry_value,
+            body_value,
+        } => Expr::Conditional(
+            IfExpr {
+                cond: header,
+                then: flow_value_expr(*body_value),
+                else_: flow_value_expr(*entry_value),
+            }
+            .into(),
+        ),
+    }
+}
+
+fn prepend_stmts(mut prefix: Vec<Expr>, body: Expr) -> Expr {
+    if prefix.is_empty() {
+        return body;
+    }
+
+    match body {
+        Expr::Block(exprs) => {
+            prefix.extend(exprs.iter().cloned());
+            Expr::Block(prefix.into())
+        }
+        body => {
+            prefix.push(body);
+            Expr::Block(prefix.into())
+        }
+    }
+}
+
+fn collect_assigned_names(expr: ast::Expr) -> BTreeSet<Interned<str>> {
+    let mut assigned = BTreeSet::new();
+    collect_assigned_names_node(expr.to_untyped(), &mut assigned);
+    assigned
+}
+
+fn collect_assigned_names_node(node: &SyntaxNode, assigned: &mut BTreeSet<Interned<str>>) {
+    if node.cast::<ast::Closure>().is_some() {
+        return;
+    }
+
+    if let Some(binary) = node.cast::<ast::Binary>()
+        && binary.op() == ast::BinOp::Assign
+    {
+        collect_assigned_target_names(binary.lhs(), assigned);
+    }
+
+    for child in node.children() {
+        collect_assigned_names_node(child, assigned);
+    }
+}
+
+fn collect_assigned_target_names(expr: ast::Expr, assigned: &mut BTreeSet<Interned<str>>) {
+    match expr {
+        ast::Expr::Ident(ident) => {
+            assigned.insert(ident.get().into());
+        }
+        ast::Expr::Parenthesized(parenthesized) => {
+            collect_assigned_target_names(parenthesized.expr(), assigned);
+        }
+        _ => {}
     }
 }
 

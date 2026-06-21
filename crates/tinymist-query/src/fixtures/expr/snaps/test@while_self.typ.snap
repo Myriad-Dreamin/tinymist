@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/expr/while_self.typ
+---
+fn while_self(cond)
+  let w$1 = 0
+  while cond entry while$1 {
+    let w$2 = if while$1 { w$3 } else { w$1 }
+    let w$3 = w$2 + 1
+  }
+  let w$4 = if while$1 { w$3 } else { w$1 }
+  w$4

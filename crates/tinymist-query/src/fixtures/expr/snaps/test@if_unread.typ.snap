@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/expr/if_unread.typ
+---
+fn if_unread()
+  let x$1 = none
+  if true {
+    let x$2 = 1
+  } else {
+    let x$3 = "s"
+  }
+  none

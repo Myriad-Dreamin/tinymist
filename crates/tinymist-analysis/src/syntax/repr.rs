@@ -331,6 +331,10 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
     fn write_while_loop(&mut self, while_expr: &Interned<WhileExpr>) -> fmt::Result {
         self.f.write_str("while(")?;
         self.write_expr(&while_expr.cond)?;
+        if let Some(entry) = &while_expr.entry {
+            self.f.write_str(", entry = ")?;
+            self.write_expr(entry)?;
+        }
         self.f.write_str(", ")?;
         self.write_expr(&while_expr.body)?;
         self.f.write_str(")")
@@ -342,6 +346,10 @@ impl<'a, T: fmt::Write> ExprPrinter<'a, T> {
         self.write_pattern(&for_expr.pattern)?;
         self.f.write_str(", ")?;
         self.write_expr(&for_expr.iter)?;
+        if let Some(entry) = &for_expr.entry {
+            self.f.write_str(", entry = ")?;
+            self.write_expr(entry)?;
+        }
         self.f.write_str(", ")?;
         self.write_expr(&for_expr.body)?;
         self.f.write_str(")")

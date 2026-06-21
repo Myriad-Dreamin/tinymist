@@ -420,6 +420,259 @@ mod type_check_tests {
 }
 
 #[cfg(test)]
+mod expr_root_tests {
+    use crate::syntax::{
+        ArgExpr, DeclExpr, Expr, FuncExpr, IfExpr, LetExpr, Pattern, PatternSig, RefExpr,
+    };
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("expr", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let exprs = ctx.shared_().expr_stage(&source);
+            let result = render_root(&exprs.root);
+
+            assert_snapshot!(result);
+        });
+    }
+
+    fn render_root(expr: &Expr) -> String {
+        let mut out = Vec::new();
+        render_stmt(expr, 0, &mut out);
+        out.join("\n")
+    }
+
+    fn render_stmt(expr: &Expr, indent: usize, out: &mut Vec<String>) {
+        match expr {
+            Expr::Block(exprs) => {
+                for expr in exprs.iter() {
+                    render_stmt(expr, indent, out);
+                }
+            }
+            Expr::Func(func) => render_func(func, indent, out),
+            Expr::Let(let_expr) => render_let(let_expr, indent, out),
+            Expr::Conditional(if_expr) => render_if(if_expr, indent, out),
+            Expr::WhileLoop(while_expr) => {
+                out.push(format!(
+                    "{}while {}{} {{",
+                    pad(indent),
+                    render_inline(&while_expr.cond),
+                    render_entry(&while_expr.entry)
+                ));
+                render_stmt(&while_expr.body, indent + 1, out);
+                out.push(format!("{}}}", pad(indent)));
+            }
+            Expr::ForLoop(for_expr) => {
+                out.push(format!(
+                    "{}for {} in {}{} {{",
+                    pad(indent),
+                    render_pattern(&for_expr.pattern),
+                    render_inline(&for_expr.iter),
+                    render_entry(&for_expr.entry)
+                ));
+                render_stmt(&for_expr.body, indent + 1, out);
+                out.push(format!("{}}}", pad(indent)));
+            }
+            expr => out.push(format!("{}{}", pad(indent), render_inline(expr))),
+        }
+    }
+
+    fn render_func(func: &FuncExpr, indent: usize, out: &mut Vec<String>) {
+        out.push(format!(
+            "{}fn {}({})",
+            pad(indent),
+            render_decl(&func.decl),
+            render_sig(&func.params)
+        ));
+        render_stmt(&func.body, indent + 1, out);
+    }
+
+    fn render_let(let_expr: &LetExpr, indent: usize, out: &mut Vec<String>) {
+        let pat = render_pattern(&let_expr.pattern);
+        if let Some(body) = &let_expr.body {
+            out.push(format!(
+                "{}let {pat} = {}",
+                pad(indent),
+                render_inline(body)
+            ));
+        } else {
+            out.push(format!("{}let {pat}", pad(indent)));
+        }
+    }
+
+    fn render_if(if_expr: &IfExpr, indent: usize, out: &mut Vec<String>) {
+        out.push(format!(
+            "{}if {} {{",
+            pad(indent),
+            render_inline(&if_expr.cond)
+        ));
+        render_stmt(&if_expr.then, indent + 1, out);
+        out.push(format!("{}}} else {{", pad(indent)));
+        render_stmt(&if_expr.else_, indent + 1, out);
+        out.push(format!("{}}}", pad(indent)));
+    }
+
+    fn render_inline(expr: &Expr) -> String {
+        match expr {
+            Expr::Block(exprs) => {
+                let exprs = exprs.iter().map(render_inline).collect::<Vec<_>>();
+                format!("{{ {} }}", exprs.join("; "))
+            }
+            Expr::Array(args) => {
+                let args = args.args.iter().map(render_arg).collect::<Vec<_>>();
+                format!("({})", args.join(", "))
+            }
+            Expr::Args(args) => {
+                let args = args.args.iter().map(render_arg).collect::<Vec<_>>();
+                args.join(", ")
+            }
+            Expr::Binary(binary) => {
+                let (lhs, rhs) = &binary.operands;
+                format!(
+                    "{} {} {}",
+                    render_inline(lhs),
+                    binary.op.as_str(),
+                    render_inline(rhs)
+                )
+            }
+            Expr::Unary(unary) => format!("{:?} {}", unary.op, render_inline(&unary.lhs)),
+            Expr::Apply(apply) => {
+                format!(
+                    "{}({})",
+                    render_inline(&apply.callee),
+                    render_inline(&apply.args)
+                )
+            }
+            Expr::Func(func) => format!(
+                "fn {}({})",
+                render_decl(&func.decl),
+                render_sig(&func.params)
+            ),
+            Expr::Let(let_expr) => {
+                let body = let_expr
+                    .body
+                    .as_ref()
+                    .map(render_inline)
+                    .unwrap_or_else(|| "none".to_owned());
+                format!("let {} = {body}", render_pattern(&let_expr.pattern))
+            }
+            Expr::Ref(ref_expr) => render_ref(ref_expr),
+            Expr::Select(select) => format!(
+                "{}.{}",
+                render_inline(&select.lhs),
+                render_decl(&select.key)
+            ),
+            Expr::Conditional(if_expr) => format!(
+                "if {} {{ {} }} else {{ {} }}",
+                render_inline(&if_expr.cond),
+                render_inline(&if_expr.then),
+                render_inline(&if_expr.else_)
+            ),
+            Expr::WhileLoop(while_expr) => format!(
+                "while {}{}",
+                render_inline(&while_expr.cond),
+                render_entry(&while_expr.entry)
+            ),
+            Expr::ForLoop(for_expr) => format!(
+                "for {} in {}{}",
+                render_pattern(&for_expr.pattern),
+                render_inline(&for_expr.iter),
+                render_entry(&for_expr.entry)
+            ),
+            Expr::Type(..) => expr.repr().to_string(),
+            Expr::Decl(decl) => render_decl(decl),
+            Expr::Star => "*".to_owned(),
+            _ => expr.repr().to_string(),
+        }
+    }
+
+    fn render_arg(arg: &ArgExpr) -> String {
+        match arg {
+            ArgExpr::Pos(pos) => render_inline(pos),
+            ArgExpr::Named(named) => {
+                let (key, value) = named.as_ref();
+                format!("{}: {}", render_decl(key), render_inline(value))
+            }
+            ArgExpr::NamedRt(named) => {
+                let (key, value) = named.as_ref();
+                format!("{}: {}", render_inline(key), render_inline(value))
+            }
+            ArgExpr::Spread(spread) => format!("..{}", render_inline(spread)),
+        }
+    }
+
+    fn render_entry(entry: &Option<Expr>) -> String {
+        entry
+            .as_ref()
+            .map(|entry| format!(" entry {}", render_inline(entry)))
+            .unwrap_or_default()
+    }
+
+    fn render_sig(sig: &PatternSig) -> String {
+        let mut params = Vec::new();
+        for pos in &sig.pos {
+            params.push(render_pattern(pos));
+        }
+        for (decl, pattern) in &sig.named {
+            params.push(format!(
+                "{}: {}",
+                render_decl(decl),
+                render_pattern(pattern)
+            ));
+        }
+        if let Some((decl, pattern)) = &sig.spread_left {
+            params.push(format!(
+                "..{}: {}",
+                render_decl(decl),
+                render_pattern(pattern)
+            ));
+        }
+        if let Some((decl, pattern)) = &sig.spread_right {
+            params.push(format!(
+                "..{}: {}",
+                render_decl(decl),
+                render_pattern(pattern)
+            ));
+        }
+        params.join(", ")
+    }
+
+    fn render_pattern(pattern: &Pattern) -> String {
+        match pattern {
+            Pattern::Simple(decl) => render_decl(decl),
+            Pattern::Expr(expr) => render_inline(expr),
+            Pattern::Sig(sig) => format!("({})", render_sig(sig)),
+        }
+    }
+
+    fn render_ref(ref_expr: &RefExpr) -> String {
+        ref_expr
+            .root
+            .as_ref()
+            .and_then(|root| match root {
+                Expr::Decl(decl) => Some(render_decl(decl)),
+                _ => None,
+            })
+            .unwrap_or_else(|| render_decl(&ref_expr.decl))
+    }
+
+    fn render_decl(decl: &DeclExpr) -> String {
+        let name = decl.name();
+        if name.is_empty() {
+            format!("{decl:?}")
+        } else {
+            name.as_ref().to_owned()
+        }
+    }
+
+    fn pad(indent: usize) -> String {
+        "  ".repeat(indent)
+    }
+}
+
+#[cfg(test)]
 mod post_type_check_tests {
 
     use typst::syntax::LinkedNode;
