@@ -6,7 +6,10 @@
 //!
 //! See [Crate Docs](https://myriad-dreamin.github.io/tinymist/rs/tinymist_index/index.html).
 
-#![cfg_attr(feature = "typst-plugin", allow(missing_docs))]
+#![cfg_attr(
+    all(feature = "typst-plugin", target_arch = "wasm32"),
+    allow(missing_docs)
+)]
 
 use std::{
     io::BufReader,
@@ -17,7 +20,10 @@ use lsp_types::GotoDefinitionParams;
 use tinymist_query::{
     CompilerQueryRequest, GotoDefinitionRequest, index::query::IndexQueryCtx, url_to_path,
 };
+#[cfg(all(feature = "typst-plugin", target_arch = "wasm32"))]
 use wasm_minimal_protocol::*;
+
+#[cfg(all(feature = "typst-plugin", target_arch = "wasm32"))]
 initiate_protocol!();
 
 type StrResult<T> = Result<T, String>;
@@ -30,13 +36,13 @@ struct IndexCtx {
 }
 
 /// Creates an index.
-#[cfg_attr(feature = "typst-plugin", wasm_func)]
+#[cfg_attr(all(feature = "typst-plugin", target_arch = "wasm32"), wasm_func)]
 pub fn create_index(db: &[u8], opts: &[u8]) -> StrResult<Vec<u8>> {
     create_index_inner(db, opts).map(|_| vec![])
 }
 
 /// Queries the index.
-#[cfg_attr(feature = "typst-plugin", wasm_func)]
+#[cfg_attr(all(feature = "typst-plugin", target_arch = "wasm32"), wasm_func)]
 pub fn query_index(kind: &[u8], request: &[u8]) -> StrResult<Vec<u8>> {
     let kind = str::from_utf8(kind).map_err(to_string)?;
     let request = parse_request(kind, request)?;
