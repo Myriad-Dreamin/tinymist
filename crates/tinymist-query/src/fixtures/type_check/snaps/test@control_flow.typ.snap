@@ -8,6 +8,12 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 "x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Type(int), 0), op: Gt }, then: 1, else_: 2 }, op: Context }
 "x3" = () => ( ⪰ None | "s" | 1)
 "x" = ( ⪰ None | "s" | 1)
+"x4" = (Any) => ( ⪰ None | 1)
+"cond" = Any
+"w" = ( ⪰ None | 1)
+"x5" = () => None
+"y" = None
+"item" = ( ⪰ "s" | 1)
 =====
 5..7 -> @x0
 31..33 -> @x1
@@ -21,3 +27,16 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 158..159 -> @x
 179..180 -> @x
 193..194 -> @x
+202..204 -> @x4
+205..209 -> @cond
+221..222 -> @w
+238..242 -> @cond
+249..250 -> @w
+261..262 -> @w
+270..272 -> @x5
+285..286 -> @y
+300..304 -> @item
+308..316 -> (1, "s", )
+323..324 -> @y
+327..331 -> @item
+338..339 -> @y

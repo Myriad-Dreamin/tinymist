@@ -18,3 +18,17 @@
   }
   x
 }
+#let x4(cond) = {
+  let w = none
+  while cond {
+    w = 1
+  }
+  w
+}
+#let x5() = {
+  let y = none
+  for item in (1, "s") {
+    y = item
+  }
+  y
+}
