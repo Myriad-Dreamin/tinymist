@@ -6,6 +6,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 "x0" = IfTy { cond: true, then: 1, else_: None }
 "x1" = IfTy { cond: false, then: 2, else_: None }
 "x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Type(int), 0), op: Gt }, then: 1, else_: 2 }, op: Context }
+"x3" = () => ( ⪰ None | "s" | 1)
+"x" = ( ⪰ None | "s" | 1)
 =====
 5..7 -> @x0
 31..33 -> @x1
@@ -14,3 +16,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 74..80 -> Type(location)
 74..85 -> (Func(page) | (Func(page) | Type(location).page))
 74..87 -> Type(int)
+118..120 -> @x3
+133..134 -> @x
+158..159 -> @x
+179..180 -> @x
+193..194 -> @x

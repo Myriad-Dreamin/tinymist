@@ -9,3 +9,12 @@
 } else {
   2
 }
+#let x3() = {
+  let x = none
+  if true {
+    x = 1
+  } else {
+    x = "s"
+  }
+  x
+}
