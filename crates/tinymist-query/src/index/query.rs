@@ -328,7 +328,7 @@ fn range_len_key(range: &Range) -> (u32, u32) {
 #[cfg(test)]
 mod tests {
     use std::io::BufReader;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     use lsp_types::{HoverContents, MarkedString};
 
@@ -336,41 +336,55 @@ mod tests {
 
     #[test]
     fn hover_from_result_set() {
-        let mut index = read_index(&[
-            r#"{"id":1,"type":"vertex","label":"document","uri":"file:///workspace/main.typ","languageId":"typst"}"#,
-            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#,
-            r#"{"id":3,"type":"vertex","label":"resultSet"}"#,
-            r#"{"id":4,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#,
-            r#"{"id":5,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#,
-            r#"{"id":6,"type":"edge","label":"next","outV":2,"inV":3}"#,
-            r#"{"id":7,"type":"edge","label":"textDocument/hover","outV":3,"inV":4}"#,
+        let path = fixture_path();
+        let mut index = read_index([
+            document_line(&path),
+            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#.to_owned(),
+            r#"{"id":3,"type":"vertex","label":"resultSet"}"#.to_owned(),
+            r#"{"id":4,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#.to_owned(),
+            r#"{"id":5,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#.to_owned(),
+            r#"{"id":6,"type":"edge","label":"next","outV":2,"inV":3}"#.to_owned(),
+            r#"{"id":7,"type":"edge","label":"textDocument/hover","outV":3,"inV":4}"#.to_owned(),
         ]);
 
-        assert_hover(&mut index);
+        assert_hover(&mut index, path);
     }
 
     #[test]
     fn hover_from_range() {
-        let mut index = read_index(&[
-            r#"{"id":1,"type":"vertex","label":"document","uri":"file:///workspace/main.typ","languageId":"typst"}"#,
-            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#,
-            r#"{"id":3,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#,
-            r#"{"id":4,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#,
-            r#"{"id":5,"type":"edge","label":"textDocument/hover","outV":2,"inV":3}"#,
+        let path = fixture_path();
+        let mut index = read_index([
+            document_line(&path),
+            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#.to_owned(),
+            r#"{"id":3,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#.to_owned(),
+            r#"{"id":4,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#.to_owned(),
+            r#"{"id":5,"type":"edge","label":"textDocument/hover","outV":2,"inV":3}"#.to_owned(),
         ]);
 
-        assert_hover(&mut index);
+        assert_hover(&mut index, path);
     }
 
-    fn read_index(lines: &[&str]) -> IndexQueryCtx {
-        let mut input = lines.join("\n");
+    fn fixture_path() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("main.typ")
+    }
+
+    fn document_line(path: &Path) -> String {
+        let uri = path_to_url(path).unwrap();
+        format!(
+            r#"{{"id":1,"type":"vertex","label":"document","uri":{},"languageId":"typst"}}"#,
+            serde_json::to_string(uri.as_str()).unwrap()
+        )
+    }
+
+    fn read_index(lines: impl IntoIterator<Item = String>) -> IndexQueryCtx {
+        let mut input = lines.into_iter().collect::<Vec<_>>().join("\n");
         input.push('\n');
         IndexQueryCtx::read(&mut BufReader::new(input.as_bytes())).unwrap()
     }
 
-    fn assert_hover(index: &mut IndexQueryCtx) {
+    fn assert_hover(index: &mut IndexQueryCtx, path: PathBuf) {
         let response = index.request(CompilerQueryRequest::Hover(HoverRequest {
-            path: PathBuf::from("/workspace/main.typ"),
+            path,
             position: Position {
                 line: 0,
                 character: 1,
