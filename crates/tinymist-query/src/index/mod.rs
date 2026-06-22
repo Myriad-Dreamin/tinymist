@@ -22,6 +22,7 @@ use typst::syntax::{FileId, LinkedNode, Source, Span};
 use typst_shim::syntax::source_range;
 
 pub mod protocol;
+pub mod query;
 use protocol as p;
 
 /// The dumped knowledge.
@@ -59,10 +60,12 @@ impl fmt::Display for KnowledgeWithContext<'_> {
             results: FxHashMap::default(),
         };
 
-        encoder.emit_meta(&self.knowledge.meta).map_err(|err| {
-            log::error!("cannot write meta data: {err}");
-            fmt::Error
-        })?;
+        encoder
+            .emit_meta(self.knowledge.meta.clone())
+            .map_err(|err| {
+                log::error!("cannot write meta data: {err}");
+                fmt::Error
+            })?;
         encoder.emit_files(&self.knowledge.files).map_err(|err| {
             log::error!("cannot write files: {err}");
             fmt::Error
@@ -113,7 +116,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
             self.writer
                 .write_element(
                     id,
-                    p::Element::Vertex(p::Vertex::Document(&p::Document {
+                    p::Element::Vertex(p::Vertex::Document(p::Document {
                         uri: self.ctx.uri_for_id(fid).unwrap_or_else(|err| {
                             log::error!("cannot get uri for {fid:?}: {err}");
                             Url::parse("file:///unknown").unwrap()
@@ -148,7 +151,7 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
         Ok(id)
     }
 
-    fn emit_meta(&mut self, meta: &p::MetaData) -> tinymist_std::Result<()> {
+    fn emit_meta(&mut self, meta: p::MetaData) -> tinymist_std::Result<()> {
         let obj = p::Element::Vertex(p::Vertex::MetaData(meta));
         self.emit_element(obj).map(|_| ())
     }
@@ -173,15 +176,21 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
                 in_v: semantic_tokens_id,
             })))?;
 
-            let tokens_id = file
-                .references
-                .iter()
-                .flat_map(|(k, v)| {
-                    let rng = self.emit_span(*k, &source);
-                    let def_rng = self.emit_def_span(v, &source, false);
-                    rng.into_iter().chain(def_rng.into_iter())
-                })
-                .collect();
+            let mut tokens_id = vec![];
+            for (s, def) in &file.references {
+                if let Some(range_id) = self.emit_span(*s, &source) {
+                    let res_id = self.alloc_result_id(*s)?;
+                    self.emit_element(p::Element::Edge(p::Edge::Next(p::EdgeData {
+                        out_v: range_id,
+                        in_v: res_id,
+                    })))?;
+                    tokens_id.push(range_id);
+                }
+
+                if let Some(def_range_id) = self.emit_def_span(def, &source, false) {
+                    tokens_id.push(def_range_id);
+                }
+            }
             self.emit_element(p::Element::Edge(p::Edge::Contains(p::EdgeDataMultiIn {
                 out_v: fid,
                 in_vs: tokens_id,
@@ -189,10 +198,6 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
 
             for (s, def) in &file.references {
                 let res_id = self.alloc_result_id(*s)?;
-                self.emit_element(p::Element::Edge(p::Edge::Next(p::EdgeData {
-                    out_v: res_id,
-                    in_v: fid,
-                })))?;
                 let def_id = self.emit_element(p::Element::Vertex(p::Vertex::DefinitionResult))?;
                 let Some(def_range) = self.emit_def_span(def, &source, true) else {
                     continue;
@@ -268,7 +273,17 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
         .workspace_root()
         .ok_or_else(|| tinymist_std::error_once!("workspace root is not set"))?;
 
-    let files = ctx.source_files().clone();
+    let mut files = ctx.source_files().clone();
+    if let Some(main) = ctx.world().entry_state().main()
+        && !files.contains(&main)
+    {
+        files.push(main);
+    }
+    for fid in ctx.depended_source_files() {
+        if !files.contains(&fid) {
+            files.push(fid);
+        }
+    }
 
     let mut worker = DumpWorker {
         ctx,
