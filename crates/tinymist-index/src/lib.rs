@@ -16,9 +16,10 @@ use std::{
     sync::{Mutex, OnceLock},
 };
 
-use lsp_types::GotoDefinitionParams;
+use lsp_types::{GotoDefinitionParams, HoverParams};
 use tinymist_query::{
-    CompilerQueryRequest, GotoDefinitionRequest, index::query::IndexQueryCtx, url_to_path,
+    CompilerQueryRequest, GotoDefinitionRequest, HoverRequest, index::query::IndexQueryCtx,
+    url_to_path,
 };
 #[cfg(all(feature = "typst-plugin", target_arch = "wasm32"))]
 use wasm_minimal_protocol::*;
@@ -52,6 +53,9 @@ pub fn query_index(kind: &[u8], request: &[u8]) -> StrResult<Vec<u8>> {
     };
     match response {
         None => Ok("null".as_bytes().to_vec()),
+        Some(tinymist_query::CompilerQueryResponse::Hover(response)) => {
+            serde_json::to_vec(&response).map_err(to_string)
+        }
         Some(tinymist_query::CompilerQueryResponse::GotoDefinition(response)) => {
             serde_json::to_vec(&response).map_err(to_string)
         }
@@ -61,6 +65,13 @@ pub fn query_index(kind: &[u8], request: &[u8]) -> StrResult<Vec<u8>> {
 
 fn parse_request(kind: &str, request: &[u8]) -> StrResult<CompilerQueryRequest> {
     Ok(match kind {
+        "hover" => CompilerQueryRequest::Hover({
+            let req: HoverParams = serde_json::from_slice(request).map_err(to_string)?;
+            HoverRequest {
+                path: url_to_path(&req.text_document_position_params.text_document.uri),
+                position: req.text_document_position_params.position,
+            }
+        }),
         "goto_definition" => CompilerQueryRequest::GotoDefinition({
             let req: GotoDefinitionParams = serde_json::from_slice(request).map_err(to_string)?;
             GotoDefinitionRequest {

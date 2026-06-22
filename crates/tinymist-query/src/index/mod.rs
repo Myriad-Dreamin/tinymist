@@ -13,7 +13,7 @@ use crate::index::protocol::ResultSet;
 use crate::prelude::Definition;
 use crate::{LocalContext, path_to_url};
 use ecow::EcoString;
-use lsp_types::Url;
+use lsp_types::{Hover, Url};
 use tinymist_analysis::syntax::classify_syntax;
 use tinymist_std::error::WithContextUntyped;
 use tinymist_std::hash::FxHashMap;
@@ -58,6 +58,7 @@ impl fmt::Display for KnowledgeWithContext<'_> {
             id: IdCounter::new(),
             files: &mut files,
             results: FxHashMap::default(),
+            hover_results: FxHashMap::default(),
         };
 
         encoder
@@ -107,6 +108,7 @@ struct LsifEncoder<'a, W: fmt::Write> {
     id: IdCounter,
     files: &'a mut FxHashMap<FileId, i32>,
     results: FxHashMap<Span, i32>,
+    hover_results: FxHashMap<String, i32>,
 }
 
 impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
@@ -177,17 +179,24 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
             })))?;
 
             let mut tokens_id = vec![];
-            for (s, def) in &file.references {
+            for (s, reference) in &file.references {
+                let def = &reference.definition;
                 if let Some(range_id) = self.emit_span(*s, &source) {
                     let res_id = self.alloc_result_id(*s)?;
                     self.emit_element(p::Element::Edge(p::Edge::Next(p::EdgeData {
                         out_v: range_id,
                         in_v: res_id,
                     })))?;
+                    if let Some(hover) = &reference.hover {
+                        self.emit_hover(res_id, hover)?;
+                    }
                     tokens_id.push(range_id);
                 }
 
                 if let Some(def_range_id) = self.emit_def_span(def, &source, false) {
+                    if let Some(hover) = &reference.hover {
+                        self.emit_hover(def_range_id, hover)?;
+                    }
                     tokens_id.push(def_range_id);
                 }
             }
@@ -196,7 +205,8 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
                 in_vs: tokens_id,
             })))?;
 
-            for (s, def) in &file.references {
+            for (s, reference) in &file.references {
+                let def = &reference.definition;
                 let res_id = self.alloc_result_id(*s)?;
                 let def_id = self.emit_element(p::Element::Vertex(p::Vertex::DefinitionResult))?;
                 let Some(def_range) = self.emit_def_span(def, &source, true) else {
@@ -222,6 +232,28 @@ impl<'a, W: fmt::Write> LsifEncoder<'a, W> {
             }
         }
         Ok(())
+    }
+
+    fn emit_hover(&mut self, out_v: i32, hover: &Hover) -> tinymist_std::Result<()> {
+        let hover_id = self.alloc_hover_id(hover)?;
+        self.emit_element(p::Element::Edge(p::Edge::Hover(p::EdgeData {
+            out_v,
+            in_v: hover_id,
+        })))?;
+        Ok(())
+    }
+
+    fn alloc_hover_id(&mut self, hover: &Hover) -> tinymist_std::Result<i32> {
+        let key = serde_json::to_string(hover).context_ut("cannot serialize hover")?;
+        if let Some(id) = self.hover_results.get(&key) {
+            return Ok(*id);
+        }
+
+        let id = self.emit_element(p::Element::Vertex(p::Vertex::HoverResult {
+            result: hover.clone(),
+        }))?;
+        self.hover_results.insert(key, id);
+        Ok(id)
     }
 
     fn emit_span(&mut self, span: Span, source: &Source) -> Option<i32> {
@@ -260,7 +292,15 @@ pub struct FileIndex {
     /// The documentation of the file.
     pub documentation: Option<EcoString>,
     /// The references in the file.
-    pub references: FxHashMap<Span, Definition>,
+    pub references: FxHashMap<Span, ReferenceIndex>,
+}
+
+/// The index of a reference.
+pub struct ReferenceIndex {
+    /// The definition referenced by the source span.
+    pub definition: Definition,
+    /// The static hover result for the referenced definition.
+    pub hover: Option<Hover>,
 }
 
 /// Dumps typst knowledge in [LSIF] format from workspace.
@@ -289,6 +329,7 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
         ctx,
         strings: FxHashMap::default(),
         references: FxHashMap::default(),
+        hovers: FxHashMap::default(),
     };
     let files = files
         .iter()
@@ -316,7 +357,9 @@ struct DumpWorker<'a> {
     /// A string interner.
     strings: FxHashMap<EcoString, EcoString>,
     /// The references collected so far.
-    references: FxHashMap<Span, Definition>,
+    references: FxHashMap<Span, ReferenceIndex>,
+    /// The static hover results collected so far.
+    hovers: FxHashMap<Definition, Option<Hover>>,
 }
 
 impl DumpWorker<'_> {
@@ -355,10 +398,12 @@ impl DumpWorker<'_> {
                 return;
             }
 
-            let Some(def) = self.ctx.def_of_syntax(source, syntax) else {
+            let Some(definition) = self.ctx.def_of_syntax(source, syntax) else {
                 return;
             };
-            self.references.insert(span, def);
+            let hover = self.hover(&definition);
+            self.references
+                .insert(span, ReferenceIndex { definition, hover });
 
             return;
         }
@@ -366,5 +411,15 @@ impl DumpWorker<'_> {
         for child in node.children() {
             self.walk(source, &child);
         }
+    }
+
+    fn hover(&mut self, definition: &Definition) -> Option<Hover> {
+        if let Some(hover) = self.hovers.get(definition) {
+            return hover.clone();
+        }
+
+        let hover = crate::hover::hover_from_definition(self.ctx, definition, None);
+        self.hovers.insert(definition.clone(), hover.clone());
+        hover
     }
 }
