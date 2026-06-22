@@ -5,45 +5,51 @@ use tinymist_world::vfs::WorkspaceResolver;
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     fn unique_const_string(ty: &Ty) -> Option<EcoString> {
-        fn visit(ty: &Ty, acc: &mut Option<EcoString>) -> bool {
+        fn merge_unique<'a>(mut values: impl Iterator<Item = &'a Ty>) -> Option<EcoString> {
+            let first = unique_const_string(values.next()?)?;
+            values.try_fold(first, |acc, ty| {
+                let value = unique_const_string(ty)?;
+                (value == acc).then_some(acc)
+            })
+        }
+
+        fn unique_bound_const<'a>(values: impl Iterator<Item = &'a Ty>) -> Option<EcoString> {
+            let mut found = None;
+            for ty in values {
+                let Some(value) = unique_const_string(ty) else {
+                    continue;
+                };
+                if found.as_ref().is_some_and(|prev| prev != &value) {
+                    return None;
+                }
+                found = Some(value);
+            }
+            found
+        }
+
+        fn unique_const_string(ty: &Ty) -> Option<EcoString> {
             match ty {
                 Ty::Value(ins) => match &ins.val {
-                    Value::Str(s) => {
-                        let s: EcoString = s.as_str().into();
-                        if acc.as_ref().is_some_and(|prev| prev != &s) {
-                            return false;
-                        }
-                        *acc = Some(s);
-                        true
-                    }
-                    _ => true,
+                    Value::Str(s) => Some(s.as_str().into()),
+                    _ => None,
                 },
-                Ty::Let(bounds) => bounds.lbs.iter().all(|ty| visit(ty, acc)),
-                Ty::Union(types) => types.iter().all(|ty| visit(ty, acc)),
-                Ty::Param(p) => visit(&p.ty, acc),
-                Ty::Array(elem) => visit(elem, acc),
-                Ty::Tuple(elems) => elems.iter().all(|ty| visit(ty, acc)),
-                Ty::Dict(record) => record.interface().all(|(_, ty)| visit(ty, acc)),
-                Ty::Select(sel) => visit(&sel.ty, acc),
-                Ty::With(with) => {
-                    visit(&with.sig, acc) && with.with.inputs().all(|ty| visit(ty, acc))
-                }
-                Ty::Args(args) => args.inputs().all(|ty| visit(ty, acc)),
-                Ty::Func(sig) | Ty::Pattern(sig) => sig.inputs().all(|ty| visit(ty, acc)),
-                Ty::Unary(unary) => visit(&unary.lhs, acc),
-                Ty::Binary(binary) => {
+                Ty::Param(p) => unique_const_string(&p.ty),
+                Ty::Let(bounds) => unique_bound_const(bounds.lbs.iter()),
+                Ty::Union(types) => unique_bound_const(types.iter()),
+                Ty::Binary(binary) if binary.op == ast::BinOp::Add => {
                     let [lhs, rhs] = binary.operands();
-                    visit(lhs, acc) && visit(rhs, acc)
+                    Some(eco_format!(
+                        "{}{}",
+                        unique_const_string(lhs)?,
+                        unique_const_string(rhs)?
+                    ))
                 }
-                Ty::If(if_) => {
-                    visit(&if_.cond, acc) && visit(&if_.then, acc) && visit(&if_.else_, acc)
-                }
-                Ty::Builtin(_) | Ty::Var(_) | Ty::Any | Ty::Boolean(_) => true,
+                Ty::If(if_) => merge_unique([if_.then.as_ref(), if_.else_.as_ref()].into_iter()),
+                _ => None,
             }
         }
 
-        let mut acc = None;
-        visit(ty, &mut acc).then_some(acc).flatten()
+        unique_const_string(ty)
     }
 
     fn const_string_expr(&mut self, node: &LinkedNode) -> Option<EcoString> {
