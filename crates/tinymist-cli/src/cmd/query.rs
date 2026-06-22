@@ -37,6 +37,9 @@ pub struct QueryLsifArgs {
     /// The output path for the requested lsif.
     #[clap(short, long)]
     pub output: String,
+    /// The output path for structured analysis statistics.
+    #[clap(long, hide(true))]
+    pub stats_output: Option<String>,
     // /// The format of requested lsif.
     // #[clap(long)]
     // pub format: Option<QueryDocsFormat>,
@@ -104,7 +107,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
     }
     let verse = compile.resolve()?;
     let snap = verse.computation();
-    let snap = analysis.query_snapshot(snap, None);
+    let snap = analysis.clone().query_snapshot(snap, None);
 
     let (id, path) = match &cmds {
         QueryCommands::Lsif(args) => (&args.id, &args.path),
@@ -132,6 +135,19 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
 
             let output_path = Path::new(&args.output);
             std::fs::write(output_path, res).context_ut("failed to write lsif output")?;
+            if let Some(stats_output) = args.stats_output {
+                let stats = serde_json::to_vec_pretty(&analysis.report_query_stats_json())
+                    .context_ut("failed to serialize analysis stats")?;
+                let stats_output_path = Path::new(&stats_output);
+                if let Some(parent) = stats_output_path.parent()
+                    && !parent.as_os_str().is_empty()
+                {
+                    std::fs::create_dir_all(parent)
+                        .context_ut("failed to create stats output directory")?;
+                }
+                std::fs::write(stats_output_path, stats)
+                    .context_ut("failed to write stats output")?;
+            }
         }
         QueryCommands::PackageDocs(args) => {
             let res = snap.run_within_package(&info, |a| {
