@@ -387,11 +387,7 @@ impl<'a> PostTypeChecker<'a> {
                         let [lhs, rhs] = binary.operands();
                         has_path(this, lhs) || has_path(this, rhs)
                     }
-                    Ty::If(if_) => {
-                        has_path(this, &if_.cond)
-                            || has_path(this, &if_.then)
-                            || has_path(this, &if_.else_)
-                    }
+                    Ty::If(if_) => has_path(this, &if_.then) || has_path(this, &if_.else_),
                     Ty::Var(v) => this.info.vars.get(&v.def).is_some_and(|bounds| {
                         let bounds = bounds.bounds.bounds().read();
                         bounds.lbs.iter().any(|ty| has_path(this, ty))
