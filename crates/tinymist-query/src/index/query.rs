@@ -11,10 +11,12 @@ use std::io::{BufRead, Read};
 use tinymist_std::error::prelude::*;
 use tinymist_std::hash::{FxHashMap, FxHashSet};
 
-use crate::{CompilerQueryRequest, CompilerQueryResponse, GotoDefinitionRequest, path_to_url};
+use crate::{
+    CompilerQueryRequest, CompilerQueryResponse, GotoDefinitionRequest, HoverRequest, path_to_url,
+};
 
 use super::protocol::*;
-use lsp_types::{GotoDefinitionResponse, LocationLink, Position, Range, Url};
+use lsp_types::{GotoDefinitionResponse, Hover, LocationLink, Position, Range, Url};
 
 /// The context for querying the index.
 #[derive(Default)]
@@ -81,11 +83,28 @@ impl IndexQueryCtx {
     /// Requests the index for a compiler query.
     pub fn request(&mut self, request: CompilerQueryRequest) -> Option<CompilerQueryResponse> {
         match request {
+            CompilerQueryRequest::Hover(request) => {
+                Some(CompilerQueryResponse::Hover(self.hover(request)))
+            }
             CompilerQueryRequest::GotoDefinition(request) => Some(
                 CompilerQueryResponse::GotoDefinition(self.goto_definition(request)),
             ),
             _ => None,
         }
+    }
+
+    fn hover(&self, request: HoverRequest) -> Option<Hover> {
+        let uri = path_to_url(&request.path).ok()?;
+        let doc_id = *self.document_by_uri.get(&uri)?;
+        let source_range_id = self.find_range(doc_id, request.position)?;
+        let source_range = self.range_of(source_range_id)?;
+        let hover_result_id = self.hover_result(source_range_id).or_else(|| {
+            let result_id = self.next_result(source_range_id)?;
+            self.hover_result(result_id)
+        })?;
+        let mut hover = self.hover_value(hover_result_id)?;
+        hover.range.get_or_insert(source_range);
+        Some(hover)
     }
 
     fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<GotoDefinitionResponse> {
@@ -177,6 +196,20 @@ impl IndexQueryCtx {
                 Edge::Definition(data) => Some(data.in_v),
                 _ => None,
             })
+    }
+
+    fn hover_result(&self, out_v: Id) -> Option<Id> {
+        self.edges.get(&out_v)?.iter().find_map(|edge| match edge {
+            Edge::Hover(data) => Some(data.in_v),
+            _ => None,
+        })
+    }
+
+    fn hover_value(&self, hover_result_id: Id) -> Option<Hover> {
+        match self.graph.get(&hover_result_id)? {
+            Vertex::HoverResult { result } => Some(result.clone()),
+            _ => None,
+        }
     }
 
     fn definition_links(
@@ -290,4 +323,80 @@ fn range_len_key(range: &Range) -> (u32, u32) {
         range.end.line.saturating_sub(range.start.line),
         range.end.character.saturating_sub(range.start.character),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::BufReader;
+    use std::path::PathBuf;
+
+    use lsp_types::{HoverContents, MarkedString};
+
+    use super::*;
+
+    #[test]
+    fn hover_from_result_set() {
+        let mut index = read_index(&[
+            r#"{"id":1,"type":"vertex","label":"document","uri":"file:///workspace/main.typ","languageId":"typst"}"#,
+            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#,
+            r#"{"id":3,"type":"vertex","label":"resultSet"}"#,
+            r#"{"id":4,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#,
+            r#"{"id":5,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#,
+            r#"{"id":6,"type":"edge","label":"next","outV":2,"inV":3}"#,
+            r#"{"id":7,"type":"edge","label":"textDocument/hover","outV":3,"inV":4}"#,
+        ]);
+
+        assert_hover(&mut index);
+    }
+
+    #[test]
+    fn hover_from_range() {
+        let mut index = read_index(&[
+            r#"{"id":1,"type":"vertex","label":"document","uri":"file:///workspace/main.typ","languageId":"typst"}"#,
+            r#"{"id":2,"type":"vertex","label":"range","start":{"line":0,"character":0},"end":{"line":0,"character":4}}"#,
+            r#"{"id":3,"type":"vertex","label":"hoverResult","result":{"contents":"hello"}}"#,
+            r#"{"id":4,"type":"edge","label":"contains","outV":1,"inVs":[2]}"#,
+            r#"{"id":5,"type":"edge","label":"textDocument/hover","outV":2,"inV":3}"#,
+        ]);
+
+        assert_hover(&mut index);
+    }
+
+    fn read_index(lines: &[&str]) -> IndexQueryCtx {
+        let mut input = lines.join("\n");
+        input.push('\n');
+        IndexQueryCtx::read(&mut BufReader::new(input.as_bytes())).unwrap()
+    }
+
+    fn assert_hover(index: &mut IndexQueryCtx) {
+        let response = index.request(CompilerQueryRequest::Hover(HoverRequest {
+            path: PathBuf::from("/workspace/main.typ"),
+            position: Position {
+                line: 0,
+                character: 1,
+            },
+        }));
+
+        let Some(CompilerQueryResponse::Hover(Some(hover))) = response else {
+            panic!("expected hover response");
+        };
+
+        assert_eq!(
+            hover.range,
+            Some(Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 4,
+                },
+            })
+        );
+        assert_eq!(
+            hover.contents,
+            HoverContents::Scalar(MarkedString::String("hello".to_owned()))
+        );
+    }
 }
