@@ -10,7 +10,7 @@ use lsp_types::Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
-use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::stats::{AllocStats, QueryStatReportEntry};
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
@@ -182,6 +182,11 @@ impl Analysis {
     /// Report the statistics of the analysis.
     pub fn report_query_stats(&self) -> String {
         self.stats.report()
+    }
+
+    /// Report the structured statistics of the analysis.
+    pub fn report_query_stats_json(&self) -> Vec<QueryStatReportEntry> {
+        self.stats.report_json()
     }
 
     /// Report the statistics of the allocation.

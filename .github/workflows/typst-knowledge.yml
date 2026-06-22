@@ -1,0 +1,75 @@
+name: tinymist::typst_knowledge
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: typst-knowledge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  typst-knowledge:
+    name: Generate Typst package knowledge report
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      RUSTFLAGS: "-Dwarnings"
+      TINYMIST_PACKAGE_LSIF_JOBS: "2"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-shared-key: x86_64-unknown-linux-gnu
+          cache-save-if: false
+
+      - name: Build tinymist
+        run: cargo build --bin tinymist --release --locked
+
+      - name: Download packages and generate LSIF report
+        run: |
+          node scripts/package-lsif-report.mjs \
+            --tinymist target/release/tinymist \
+            --package-cache-path target/typst/packages \
+            --out target/typst-knowledge-report
+
+      - name: Upload HTML preview
+        id: html_preview
+        if: always()
+        uses: pavi2410/html-preview-action@v5
+        with:
+          html_file: index.html
+          site_root: target/typst-knowledge-report
+          upload: archive
+          archive_name: typst-knowledge-report
+          retention_days: 30
+          job_summary: false
+
+      - name: Add report summary
+        if: always()
+        run: |
+          if [ -f target/typst-knowledge-report/summary.md ]; then
+            cat target/typst-knowledge-report/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          preview_url="${{ steps.html_preview.outputs.url }}"
+          if [ -n "${preview_url}" ]; then
+            {
+              echo ""
+              echo "[Open Typst knowledge HTML report](${preview_url})"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
