@@ -29,6 +29,10 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * (Fix) Kept preview address logs visible by default in https://github.com/Myriad-Dreamin/tinymist/pull/2599
 * Removed legacy span pass usage from preview in https://github.com/Myriad-Dreamin/tinymist/pull/2586
 
+### LSIF
+
+* Added LSIF definition query support in https://github.com/Myriad-Dreamin/tinymist/pull/2607
+
 **Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.0...v0.15.2
 
 ## v0.15.0 - [2026-06-16]
