@@ -44,18 +44,88 @@
 #let builtin-ty = code.with(attrs: (class: "type-builtin"))
 
 #let file-by-uri(files, uri) = {
+  let index = 0
   for file in files {
     if file.at("uri", default: none) == uri {
-      return file
+      return (index: index, ..file)
     }
+    index += 1
   }
   none
 }
 
-#let lsif-definition(symbol-ctx, info) = {
-  let db = symbol-ctx.at("lsif", default: none)
+#let index-public-symbols(symbol-ctx, module-info) = {
+  let db = symbol-ctx.at("index", default: none)
+  if db == none {
+    return ()
+  }
+
+  let path = module-info.at("path", default: none)
+  if path == none {
+    return ()
+  }
+
+  let result = query(db, "public_symbols", str(path))
+  if result == none {
+    ()
+  } else {
+    result
+  }
+}
+
+#let index-symbol-kind-matches(index-kind, info-kind) = {
+  if index-kind == info-kind {
+    return true
+  }
+
+  let value-kinds = ("constant", "variable")
+  if value-kinds.contains(index-kind) and value-kinds.contains(info-kind) {
+    return true
+  }
+
+  false
+}
+
+#let index-symbol(symbol-ctx, info) = {
+  let symbol = info.at("symbol", default: none)
+  if symbol != none {
+    return symbol
+  }
+
+  let public-symbols = symbol-ctx.at("public-symbols", default: none)
+  if public-symbols == none {
+    let module-info = symbol-ctx.at("module-info", default: none)
+    if module-info == none {
+      return none
+    }
+    public-symbols = index-public-symbols(symbol-ctx, module-info)
+  }
+
+  for item in public-symbols {
+    if item.name == info.name and index-symbol-kind-matches(item.kind, info.kind) {
+      return item.symbol
+    }
+  }
+
+  none
+}
+
+#let index-definition(symbol-ctx, info) = {
+  let db = symbol-ctx.at("index", default: none)
+  if db == none {
+    return none
+  }
+
+  let symbol = index-symbol(symbol-ctx, info)
+  if symbol != none {
+    let result = query(db, "textDocument/definition", symbol)
+    if result != none and result.len() > 0 {
+      return result.at(0)
+    }
+  }
+
   let source = info.at("source", default: none)
-  if db == none or source == none {
+  if source == none {
     return none
   }
 
@@ -115,10 +185,20 @@
   none
 }
 
-#let lsif-hover(symbol-ctx, info) = {
-  let db = symbol-ctx.at("lsif", default: none)
+#let index-hover(symbol-ctx, info) = {
+  let db = symbol-ctx.at("index", default: none)
+  if db == none {
+    return none
+  }
+
+  let symbol = index-symbol(symbol-ctx, info)
+  if symbol != none {
+    let result = query(db, "textDocument/hover", symbol)
+    return hover-markdown(result)
+  }
+
   let source = info.at("source", default: none)
-  if db == none or source == none {
+  if source == none {
     return none
   }
 
@@ -542,7 +622,7 @@
 }
 
 #let hover-oneliner(symbol-ctx, info) = {
-  let docs = lsif-hover(symbol-ctx, info)
+  let docs = index-hover(symbol-ctx, info)
   if docs != none {
     let in-code = false
     for line in str(docs).split("\n") {
@@ -1047,18 +1127,27 @@
 }
 
 #let function-param-source-dest(symbol-ctx, info, data, param) = {
-  let param-sources = info.at("param_sources", default: (:))
-  let param-source = param-sources.at(param.name, default: none)
-  if param-source != none {
-    return source-query-line-dest(symbol-ctx, param-source, param-source.position.line + 1)
+  let source = info.at("source", default: none)
+  if source != none {
+    let line = source.position.line + 1 + function-hover-signature-param-line-offset(data.signature, param.name)
+    return source-query-line-dest(symbol-ctx, source, line)
   }
 
-  let source = info.at("source", default: none)
-  if source == none {
+  let definition = index-definition(symbol-ctx, info)
+  if definition == none {
     return none
   }
 
-  let line = source.position.line + 1 + function-hover-signature-param-line-offset(data.signature, param.name)
+  let file = file-by-uri(symbol-ctx.files, str(definition.targetUri))
+  if file == none {
+    return none
+  }
+
+  let source = (
+    file: file.index,
+    position: definition.targetSelectionRange.start,
+  )
+  let line = definition.targetSelectionRange.start.line + 1 + function-hover-signature-param-line-offset(data.signature, param.name)
   source-query-line-dest(symbol-ctx, source, line)
 }
 
@@ -1158,7 +1247,7 @@
 }
 
 #let function-symbol-page(symbol-ctx, info) = {
-  let plain-docs = lsif-hover(symbol-ctx, info)
+  let plain-docs = index-hover(symbol-ctx, info)
   let data = if plain-docs == none {
     (signature: "", docs: "", positional: (), named: (), rest: ())
   } else {
@@ -1196,7 +1285,7 @@
   }
 
   if info.is_external {
-    let definition = lsif-definition(symbol-ctx, info)
+    let definition = index-definition(symbol-ctx, info)
     let file = if definition != none {
       file-by-uri(symbol-ctx.files, str(definition.targetUri))
     } else {
@@ -1242,7 +1331,7 @@
 
     html.elem("div", attrs: (class: "detail-header doc-symbol-" + info.kind), [=== #title])
 
-    let plain-docs = lsif-hover(symbol-ctx, info)
+    let plain-docs = index-hover(symbol-ctx, info)
     if plain-docs != none {
       markdown-docs(plain-docs)
     }
@@ -1261,7 +1350,7 @@
   //   par(symlink("Symbol Docs"))
   // }
 
-  let plain-docs = lsif-hover(symbol-ctx, info)
+  let plain-docs = index-hover(symbol-ctx, info)
   if plain-docs != none {
     markdown-docs(plain-docs)
   }
@@ -1325,6 +1414,7 @@
     in-module: info.prefix,
     module-index: module-index,
     module-info: info,
+    public-symbols: index-public-symbols(symbol-ctx, info),
     ..symbol-ctx,
   )
 
@@ -1393,20 +1483,20 @@
   }
 }
 
-#let symbol-context(info, lsif, bundle: false, path: none) = {
+#let symbol-context(info, index, bundle: false, path: none) = {
   (
-    lsif: lsif,
+    index: index,
     bundle: bundle,
     path: path,
     ..analyze-package(info),
   )
 }
 
-#let package-module-page(info, lsif, module-index: none, show-header: true, bundle: false, path: none) = {
+#let package-module-page(info, index, module-index: none, show-header: true, bundle: false, path: none) = {
   let title = "@" + info.meta.namespace + "/" + info.meta.name + " " + info.meta.version
 
   package-setup(title)
-  let symbol-ctx = symbol-context(info, lsif, bundle: bundle, path: path)
+  let symbol-ctx = symbol-context(info, index, bundle: bundle, path: path)
   let module-entry = info.modules.at(module-index)
 
   if show-header {
@@ -1435,7 +1525,7 @@
   }
 }
 
-#let package-module-document(info, lsif, module-index: none, path: none) = {
+#let package-module-document(info, index, module-index: none, path: none) = {
   let module-entry = info.modules.at(module-index)
   let info-title = package-title(info)
   let title = info-title + " - " + module-title(module-entry.at(2))
@@ -1443,7 +1533,7 @@
   document(path, title: title)[
     #package-module-page(
       info,
-      lsif,
+      index,
       module-index: module-index,
       show-header: module-index == 0,
       bundle: true,
@@ -1452,11 +1542,11 @@
   ]
 }
 
-#let package-module-symbol-page(info, lsif, module-index: none, section: none, symbol-index: none, path: none) = {
+#let package-module-symbol-page(info, index, module-index: none, section: none, symbol-index: none, path: none) = {
   let title = package-title(info)
 
   package-setup(title)
-  let symbol-ctx = symbol-context(info, lsif, bundle: true, path: path)
+  let symbol-ctx = symbol-context(info, index, bundle: true, path: path)
   let module-entry = info.modules.at(module-index)
   let module-info = module-entry.at(2)
   let m = analyze-module(module-entry.at(1))
@@ -1478,6 +1568,7 @@
       in-module: module-info.prefix,
       module-index: module-index,
       module-info: module-info,
+      public-symbols: index-public-symbols(symbol-ctx, module-info),
       ..symbol-ctx,
     )
     #if child.kind == "function" {
@@ -1490,7 +1581,7 @@
   ]
 }
 
-#let package-module-symbol-document(info, lsif, module-index: none, section: none, symbol-index: none, path: none) = {
+#let package-module-symbol-document(info, index, module-index: none, section: none, symbol-index: none, path: none) = {
   let module-entry = info.modules.at(module-index)
   let m = analyze-module(module-entry.at(1))
   let child = m.at(section, default: ()).at(symbol-index)
@@ -1500,7 +1591,7 @@
   document(path, title: title)[
     #package-module-symbol-page(
       info,
-      lsif,
+      index,
       module-index: module-index,
       section: section,
       symbol-index: symbol-index,
@@ -1560,18 +1651,18 @@
   ]
 }
 
-#let package-doc(info, lsif: none) = {
+#let package-doc(info, scip: none) = {
   let info = json(info)
-  let lsif = if lsif == none {
+  let index = if scip == none {
     none
   } else {
-    create_index(lsif)
+    create_index(scip)
   }
   let title = package-title(info)
 
   package-setup(title)
 
-  let symbol-ctx = symbol-context(info, lsif)
+  let symbol-ctx = symbol-context(info, index)
 
   package-layout(info, symbol-ctx)[
     #package-header(info, title)

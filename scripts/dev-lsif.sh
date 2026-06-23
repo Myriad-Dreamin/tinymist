@@ -58,13 +58,13 @@ prepare_bundle_output() {
 }
 
 ensure_input() {
-  local lsif="target/preview-touying-0.6.0.lsif.jsonl"
-  if [[ -f "$input" && ( "$input" != "$default_input" || -f "$lsif" ) && ( "$input" != "$default_bundle_input" || -f "$lsif" ) ]]; then
+  local scip="target/preview-touying-0.6.0.scip"
+  if [[ -f "$input" && ( "$input" != "$default_input" || -f "$scip" ) && ( "$input" != "$default_bundle_input" || -f "$scip" ) ]]; then
     return
   fi
 
   if [[ "$input" == "$default_input" || "$input" == "$default_bundle_input" ]]; then
-    echo "Generating $input and $lsif with the package-doc touying fixture..."
+    echo "Generating $input and $scip with the package-doc touying fixture..."
     require_cmd cargo
     cargo test -p tinymist-query docs::package::tests::touying -- --nocapture
   fi

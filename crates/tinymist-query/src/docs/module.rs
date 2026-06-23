@@ -75,15 +75,15 @@ pub struct DefInfo {
     pub name: EcoString,
     /// The kind of the definition.
     pub kind: DefKind,
+    /// The SCIP symbol for index-backed queries.
+    #[serde(skip)]
+    pub symbol: Option<String>,
     /// The location (file, start, end) of the definition.
     #[serde(skip)]
     pub loc: Option<(usize, usize, usize)>,
-    /// The source position for LSIF-backed queries.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The source position for index-backed queries.
+    #[serde(skip)]
     pub source: Option<SourceQuery>,
-    /// Source positions for function parameters.
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    pub param_sources: HashMap<EcoString, SourceQuery>,
     /// Whether the definition external to the module.
     pub is_external: bool,
     /// The module link to the definition
@@ -115,7 +115,7 @@ pub struct DefInfo {
     pub children: Vec<DefInfo>,
 }
 
-/// A source position that can be used to query an LSIF index.
+/// A source position that can be used to query a package index.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SourceQuery {
     /// The source file index in the package document file table.
@@ -241,9 +241,9 @@ impl ScanDefCtx<'_> {
             parsed_docs: def_docs,
             decl: Some(decl.clone()),
             children: children.unwrap_or_default(),
+            symbol: None,
             loc: None,
             source: None,
-            param_sources: HashMap::new(),
             is_external: false,
             module_link: None,
             bundle_link: None,

@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 
 use ecow::{EcoString, EcoVec};
 use indexmap::IndexSet;
-use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_std::path::unix_slash;
@@ -16,7 +15,9 @@ use typst_shim::syntax::{RootedPathExt, source_range};
 
 use crate::LocalContext;
 use crate::docs::{DefDocs, PackageDefInfo, SourceQuery, file_id_repr, module_docs};
+use crate::index::{ScipPublicApi, ScipPublicModule};
 use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
+use crate::prelude::Definition;
 use crate::syntax::DefKind;
 
 /// Documentation Information about a package.
@@ -157,6 +158,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
         for (parent_ident, mut def) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
 
+            set_scip_symbol(ctx, &mut def);
             let module_val = def.decl.as_ref().unwrap();
             let fid = module_val.file_id();
             let aka = fid.map(&mut akas).unwrap_or_default();
@@ -179,6 +181,7 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
             };
 
             for child in def.children.iter_mut() {
+                set_scip_symbol(ctx, child);
                 let span = child.decl.as_ref().map(|decl| decl.span());
                 let fid_range = span.and_then(|v| {
                     v.id().and_then(|fid| {
@@ -190,14 +193,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                             file: allocated,
                             position: start,
                         });
-                        if matches!(child.kind, DefKind::Function) {
-                            child.param_sources = function_param_sources(
-                                src.text(),
-                                child.name.as_str(),
-                                allocated,
-                                start,
-                            );
-                        }
                         Some((allocated, rng.start, rng.end))
                     })
                 });
@@ -330,6 +325,40 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     Ok(doc)
 }
 
+impl PackageDoc {
+    /// Gets the public API overlay for SCIP encoding.
+    pub fn scip_public_api(&self) -> ScipPublicApi {
+        ScipPublicApi {
+            modules: self
+                .modules
+                .iter()
+                .map(|(_, def, info)| ScipPublicModule {
+                    file_path: info.path.as_ref().map(|path| unix_slash(path)),
+                    module_symbol: def.symbol.clone(),
+                    public_symbols: def
+                        .children
+                        .iter()
+                        .filter(|child| is_public_api_symbol(child))
+                        .filter_map(|child| child.symbol.clone())
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+}
+
+fn is_public_api_symbol(def: &crate::docs::DefInfo) -> bool {
+    !def.name.as_ref().starts_with('_')
+}
+
+fn set_scip_symbol(ctx: &LocalContext, def: &mut crate::docs::DefInfo) {
+    let Some(decl) = def.decl.as_ref() else {
+        return;
+    };
+    let definition = Definition::new(decl.clone(), None);
+    def.symbol = crate::index::scip::scip_symbol(ctx.shared(), &definition).ok();
+}
+
 /// Generate full documents in markdown format
 pub fn package_docs_typ(doc: &PackageDoc) -> StrResult<String> {
     let mut out = String::new();
@@ -339,7 +368,7 @@ pub fn package_docs_typ(doc: &PackageDoc) -> StrResult<String> {
     let pi = &doc.meta;
     let _ = writeln!(
         out,
-        "#package-doc(bytes(read(\"{}-{}-{}.json\")), lsif: read(\"{}-{}-{}.lsif.jsonl\", encoding: none))",
+        "#package-doc(bytes(read(\"{}-{}-{}.json\")), scip: read(\"{}-{}-{}.scip\", encoding: none))",
         pi.namespace, pi.name, pi.version, pi.namespace, pi.name, pi.version,
     );
 
@@ -456,12 +485,12 @@ pub fn package_docs_bundle_typ(doc: &PackageDoc) -> StrResult<Vec<PackageDocTypF
     );
     let _ = writeln!(
         entry,
-        "#let package-lsif = create_index(read(\"../{base}.lsif.jsonl\", encoding: none))"
+        "#let package-index = create_index(read(\"../{base}.scip\", encoding: none))"
     );
     for path in &module_paths {
-        let _ = writeln!(entry, "#{}(package-info, package-lsif)", path.module_func);
+        let _ = writeln!(entry, "#{}(package-info, package-index)", path.module_func);
         for symbol in &path.symbol_paths {
-            let _ = writeln!(entry, "#{}(package-info, package-lsif)", symbol.func);
+            let _ = writeln!(entry, "#{}(package-info, package-index)", symbol.func);
         }
     }
     for path in &module_paths {
@@ -483,7 +512,7 @@ pub fn package_docs_bundle_typ(doc: &PackageDoc) -> StrResult<Vec<PackageDocTypF
         );
         let _ = writeln!(
             content,
-            "#let {func}(package-info, package-lsif) = package-module-document(package-info, package-lsif, module-index: {idx}, path: {})",
+            "#let {func}(package-info, package-index) = package-module-document(package-info, package-index, module-index: {idx}, path: {})",
             typst_string(&path.module_output),
             func = path.module_func,
         );
@@ -501,7 +530,7 @@ pub fn package_docs_bundle_typ(doc: &PackageDoc) -> StrResult<Vec<PackageDocTypF
             );
             let _ = writeln!(
                 content,
-                "#let {func}(package-info, package-lsif) = package-module-symbol-document(package-info, package-lsif, module-index: {idx}, section: {}, symbol-index: {}, path: {})",
+                "#let {func}(package-info, package-index) = package-module-symbol-document(package-info, package-index, module-index: {idx}, section: {}, symbol-index: {}, path: {})",
                 typst_string(symbol.section),
                 symbol.symbol_index,
                 typst_string(&symbol.output),
@@ -681,143 +710,6 @@ fn relative_import_to_common(source: &Path) -> String {
 
 fn typst_string(value: &str) -> String {
     serde_json::to_string(value).expect("Typst string serialization must succeed")
-}
-
-fn function_param_sources(
-    source: &str,
-    function_name: &str,
-    file: usize,
-    start: Position,
-) -> HashMap<EcoString, SourceQuery> {
-    let mut result = HashMap::new();
-    let lines = source.lines().collect::<Vec<_>>();
-    let start_line = start.line as usize;
-    let search_start = start_line.saturating_sub(1);
-    let search_end = (start_line + 3).min(lines.len());
-
-    let Some((open_line, open_byte)) = (search_start..search_end).find_map(|line_idx| {
-        let line = lines.get(line_idx)?;
-        let name_at = line.find(function_name)?;
-        let after_name = name_at + function_name.len();
-        let open_at = line.get(after_name..)?.find('(')?;
-        Some((line_idx, after_name + open_at))
-    }) else {
-        return result;
-    };
-
-    let mut current = String::new();
-    let mut current_line = None;
-    let mut depth = 0usize;
-    let mut quote = None;
-    let mut escaped = false;
-
-    for (line_idx, line) in lines.iter().enumerate().skip(open_line) {
-        let start_byte = if line_idx == open_line {
-            open_byte + '('.len_utf8()
-        } else {
-            0
-        };
-
-        let mut chars = line.char_indices().peekable();
-        while let Some((byte_idx, ch)) = chars.next() {
-            if byte_idx < start_byte {
-                continue;
-            }
-
-            if let Some(end_quote) = quote {
-                current.push(ch);
-                if escaped {
-                    escaped = false;
-                } else if ch == '\\' {
-                    escaped = true;
-                } else if ch == end_quote {
-                    quote = None;
-                }
-                continue;
-            }
-
-            if ch == '/' && matches!(chars.peek(), Some((_, '/'))) {
-                break;
-            }
-
-            if current_line.is_none() && !ch.is_whitespace() && ch != ',' {
-                current_line = Some(line_idx);
-            }
-
-            match ch {
-                '"' | '\'' => {
-                    quote = Some(ch);
-                    current.push(ch);
-                }
-                '(' | '[' | '{' => {
-                    depth += 1;
-                    current.push(ch);
-                }
-                ')' if depth == 0 => {
-                    record_param_source(&mut result, file, &current, current_line);
-                    return result;
-                }
-                ')' | ']' | '}' => {
-                    depth = depth.saturating_sub(1);
-                    current.push(ch);
-                }
-                ',' if depth == 0 => {
-                    record_param_source(&mut result, file, &current, current_line);
-                    current.clear();
-                    current_line = None;
-                }
-                _ => current.push(ch),
-            }
-        }
-
-        if current_line.is_some() {
-            current.push('\n');
-        }
-    }
-
-    result
-}
-
-fn record_param_source(
-    result: &mut HashMap<EcoString, SourceQuery>,
-    file: usize,
-    segment: &str,
-    line: Option<usize>,
-) {
-    let Some(line) = line else {
-        return;
-    };
-    let Some(name) = source_param_name(segment) else {
-        return;
-    };
-
-    result.insert(
-        name.into(),
-        SourceQuery {
-            file,
-            position: Position {
-                line: line as u32,
-                character: 0,
-            },
-        },
-    );
-}
-
-fn source_param_name(segment: &str) -> Option<&str> {
-    let text = segment.trim();
-    if text.starts_with("//") {
-        return None;
-    }
-
-    let text = text.strip_prefix("..").unwrap_or(text).trim_start();
-    let end = text
-        .char_indices()
-        .find_map(|(idx, ch)| {
-            (ch.is_whitespace() || matches!(ch, ':' | '=' | ',' | ')')).then_some(idx)
-        })
-        .unwrap_or(text.len());
-    let name = text[..end].trim();
-    (!name.is_empty()).then_some(name)
 }
 
 fn module_heading_anchor(primary: &str) -> String {
@@ -1066,7 +958,7 @@ struct ConvertResult {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use tinymist_world::package::{PackageRegistry, PackageSpec, registry::PREVIEW_NS};
 
@@ -1085,8 +977,11 @@ mod tests {
                 name: pkg.name,
                 version: pkg.version.to_string(),
             };
+            let public_api = Arc::new(Mutex::new(None));
+            let public_api_docs = public_api.clone();
             run_with_ctx(verse, path, &|a, _p| {
                 let docs = package_docs(a, &pi).unwrap();
+                *public_api_docs.lock().unwrap() = Some(docs.scip_public_api());
                 let dest = format!(
                     "../../target/{}-{}-{}.json",
                     pi.namespace, pi.name, pi.version
@@ -1119,18 +1014,25 @@ mod tests {
                 }
             });
             let analysis = Arc::new(Analysis::default());
-            let lsif = analysis
+            let public_api_index = public_api.clone();
+            let scip = analysis
                 .query_snapshot(verse.computation(), None)
                 .run_within_package(&pi, |a| {
                     let knowledge = crate::index::knowledge(a).unwrap();
-                    Ok(knowledge.bind(a.shared()).to_string())
+                    let public_api = public_api_index.lock().unwrap();
+                    let public_api = public_api
+                        .as_ref()
+                        .expect("package docs must build public API before SCIP");
+                    knowledge
+                        .bind(a.shared())
+                        .to_scip_bytes_with_public_api(&public_api)
                 })
                 .unwrap();
             let dest = format!(
-                "../../target/{}-{}-{}.lsif.jsonl",
+                "../../target/{}-{}-{}.scip",
                 pi.namespace, pi.name, pi.version
             );
-            std::fs::write(dest, lsif).unwrap();
+            std::fs::write(dest, scip).unwrap();
         })
     }
 
