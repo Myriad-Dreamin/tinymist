@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use ecow::{EcoString, EcoVec, eco_vec};
 use itertools::Itertools;
+use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 use typst::syntax::FileId;
@@ -75,20 +76,33 @@ pub struct DefInfo {
     /// The kind of the definition.
     pub kind: DefKind,
     /// The location (file, start, end) of the definition.
+    #[serde(skip)]
     pub loc: Option<(usize, usize, usize)>,
+    /// The source position for LSIF-backed queries.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<SourceQuery>,
+    /// Source positions for function parameters.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub param_sources: HashMap<EcoString, SourceQuery>,
     /// Whether the definition external to the module.
     pub is_external: bool,
     /// The module link to the definition
     pub module_link: Option<String>,
+    /// The bundle-mode link to the definition.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundle_link: Option<String>,
     /// The symbol link to the definition
     pub symbol_link: Option<String>,
     /// The link to the definition if it is external.
     pub external_link: Option<String>,
     /// The one-line documentation of the definition.
+    #[serde(skip_serializing)]
     pub oneliner: Option<String>,
     /// The raw documentation of the definition.
+    #[serde(skip_serializing)]
     pub docs: Option<EcoString>,
     /// The parsed documentation of the definition.
+    #[serde(skip_serializing)]
     pub parsed_docs: Option<DefDocs>,
     /// The value of the definition.
     #[serde(skip)]
@@ -99,6 +113,15 @@ pub struct DefInfo {
     pub decl: Option<Interned<Decl>>,
     /// The children of the definition.
     pub children: Vec<DefInfo>,
+}
+
+/// A source position that can be used to query an LSIF index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceQuery {
+    /// The source file index in the package document file table.
+    pub file: usize,
+    /// The source position for a `textDocument/definition` query.
+    pub position: Position,
 }
 
 /// Information about the definitions in a package.
@@ -219,8 +242,11 @@ impl ScanDefCtx<'_> {
             decl: Some(decl.clone()),
             children: children.unwrap_or_default(),
             loc: None,
+            source: None,
+            param_sources: HashMap::new(),
             is_external: false,
             module_link: None,
+            bundle_link: None,
             symbol_link: None,
             external_link: None,
             oneliner: None,
