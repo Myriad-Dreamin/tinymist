@@ -76,6 +76,10 @@ zh = "syntaxOnly 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭）,
 en = "failed to parse typstExtraArgs: {err}, args: {args}"
 zh = "解析 typstExtraArgs 失败：{err}，参数：{args}"
 
+[tinymist.config.badTypstExtraArgs.joinedOptionValueHint]
+en = "`tinymist.typstExtraArgs` is an argv array, so `\"{arg}\"` is treated as one argument. Split the option and value into two entries like `\"{option}\", \"{value}\"`, or use `\"{option}={value}\"` when the option accepts the `--flag=value` form."
+zh = "`tinymist.typstExtraArgs` 是 argv 数组，因此 `\"{arg}\"` 会被当作一个参数。请将选项和值拆成两个条目，例如 `\"{option}\", \"{value}\"`；如果该选项支持 `--flag=value` 形式，也可以使用 `\"{option}={value}\"`。"
+
 [tinymist.config.deserializeError]
 en = "failed to deserialize \"{key}\": {err}"
 zh = "配置“{key}”的格式错误：{err}"
