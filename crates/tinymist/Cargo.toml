@@ -65,6 +65,7 @@ toml.workspace = true
 ttf-parser.workspace = true
 typlite = { workspace = true, default-features = false }
 typst.workspace = true
+typst-bundle.workspace = true
 typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
@@ -153,6 +154,7 @@ system = [
     "reflexo-typst/system",
     "sync-ls/system",
     "tinymist-project/system",
+    "tinymist-query/lsp",
     "tinymist-query/local-registry",
     "tokio/io-std",
     "tokio/rt-multi-thread",

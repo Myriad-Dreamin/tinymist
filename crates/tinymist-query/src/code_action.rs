@@ -94,7 +94,8 @@ impl SemanticRequest for CodeActionRequest {
 #[cfg(test)]
 mod tests {
     use tinymist_lint::KnownIssues;
-    use typst::{diag::Warned, layout::PagedDocument};
+    use typst::diag::Warned;
+    use typst_layout::PagedDocument;
 
     use super::*;
     use crate::{DiagWorker, tests::*};

@@ -1,6 +1,5 @@
 use core::fmt::{self, Write};
 use std::cmp::Reverse;
-use std::str::FromStr;
 
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::package::{PackageSpec, PackageSpecExt};
@@ -10,6 +9,7 @@ use typst_shim::syntax::LinkedNodeExt;
 use crate::analysis::get_link_exprs_in;
 use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
+use crate::package::parse_package_import;
 use crate::prelude::*;
 use crate::upstream::{Tooltip, route_of_value, truncated_repr};
 
@@ -26,6 +26,76 @@ pub struct HoverRequest {
     pub path: PathBuf,
     /// The position of the symbol to get hover information for.
     pub position: LspPosition,
+}
+
+pub(crate) fn hover_from_definition(
+    ctx: &mut LocalContext,
+    def: &Definition,
+    range: Option<LspRange>,
+) -> Option<Hover> {
+    let mut contents = vec![];
+
+    use Decl::*;
+    match def.decl.as_ref() {
+        Label(..) => {
+            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                contents.push(format!("Ref: `{}`\n", def.name()));
+                contents.push(format!("```typc\n{}\n```", truncated_repr(&val)));
+            } else {
+                contents.push(format!("Label: `{}`\n", def.name()));
+            }
+        }
+        BibEntry(..) => {
+            contents.push(format!("Bibliography: `{}`", def.name()));
+        }
+        _ => {
+            let sym_docs = ctx.def_docs(def);
+
+            if matches!(
+                def.decl.kind(),
+                DefKind::Function | DefKind::Variable | DefKind::Constant
+            ) && !def.name().is_empty()
+            {
+                let mut type_doc = String::new();
+                type_doc.push_str("let ");
+                type_doc.push_str(def.name());
+
+                match &sym_docs {
+                    Some(DefDocs::Variable(docs)) => {
+                        push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
+                    }
+                    Some(DefDocs::Function(docs)) => {
+                        let _ = docs.print(&mut type_doc);
+                        push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
+                    }
+                    _ => {}
+                }
+
+                contents.push(format!("```typc\n{type_doc};\n```"));
+            }
+
+            if let Some(doc) = sym_docs {
+                let hover_docs = doc.hover_docs();
+
+                if !hover_docs.trim().is_empty() {
+                    contents.push(hover_docs.into());
+                }
+            }
+
+            if let Some(link) = ExternalDocLink::get(def) {
+                contents.push(link.to_string());
+            }
+        }
+    }
+
+    if contents.is_empty() {
+        return None;
+    }
+
+    Some(Hover {
+        contents: HoverContents::Scalar(MarkedString::String(contents.join("\n\n---\n\n"))),
+        range,
+    })
 }
 
 impl SemanticRequest for HoverRequest {
@@ -219,26 +289,10 @@ impl HoverWorker<'_> {
     }
 
     fn package_import(&mut self, node: &LinkedNode) -> Option<()> {
-        // Check if we're in a string literal that's part of an import
-        if !matches!(node.kind(), SyntaxKind::Str) {
-            return None;
-        }
-
-        // Navigate up to find the ModuleImport node
-        let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
-
-        // Check if this is a package import
-        if let ast::Expr::Str(str_node) = import_node.source()
-            && let import_str = str_node.get()
-            && import_str.starts_with("@")
-            && let Ok(package_spec) = PackageSpec::from_str(&import_str)
-        {
-            self.def
-                .push(self.get_package_hover_info(&package_spec, node));
-            return Some(());
-        }
-
-        None
+        let package_spec = parse_package_import(node)?;
+        self.def
+            .push(self.get_package_hover_info(&package_spec, node));
+        Some(())
     }
 
     /// Get package information for hover content
@@ -532,17 +586,17 @@ impl ExternalDocLink {
             return None;
         };
 
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         let mut func = &func;
         loop {
             match func.inner() {
-                Repr::Element(..) | Repr::Native(..) => {
+                FuncInner::Element(..) | FuncInner::Native(..) => {
                     return Self::builtin_value_tooltip(base, &Value::Func(func.clone()));
                 }
-                Repr::With(w) => {
+                FuncInner::With(w) => {
                     func = &w.0;
                 }
-                Repr::Closure(..) | Repr::Plugin(..) => {
+                FuncInner::Closure(..) | FuncInner::Plugin(..) => {
                     return None;
                 }
             }

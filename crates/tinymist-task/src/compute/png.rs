@@ -6,6 +6,7 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::foundations::Bytes;
+use typst::model::Document;
 
 use crate::compute::{parse_color, parse_length, select_pages};
 use crate::model::ExportPngTask;
@@ -35,21 +36,25 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
         };
 
         let ppp = ppi / 72.;
+        let render_options = typst_render::RenderOptions {
+            pixel_per_pt: f64::from(ppp).into(),
+            ..Default::default()
+        };
 
         let exported_pages = select_pages(doc, &config.pages);
         if let Some(PageMerge { ref gap }) = config.merge {
-            let dummy_doc = TypstPagedDocument {
-                pages: exported_pages
+            let dummy_doc = TypstPagedDocument::new(
+                exported_pages
                     .into_iter()
                     .map(|(_, page)| page.clone())
                     .collect(),
-                ..Default::default()
-            };
+                doc.info().clone(),
+            );
             let gap = gap
                 .as_ref()
                 .and_then(|gap| parse_length(gap).ok())
                 .unwrap_or_default();
-            let pixmap = typst_render::render_merged(&dummy_doc, ppp, gap, fill);
+            let pixmap = typst_render::render_merged(&dummy_doc, &render_options, gap, fill);
             let png = pixmap
                 .encode_png()
                 .map(Bytes::new)
@@ -59,7 +64,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PngExport {
             let exported = exported_pages
                 .into_iter()
                 .map(|(i, page)| {
-                    let pixmap = typst_render::render(page, ppp);
+                    let pixmap = typst_render::render(page, &render_options);
                     let png = pixmap
                         .encode_png()
                         .map(Bytes::new)

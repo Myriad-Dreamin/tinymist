@@ -18,6 +18,7 @@ This is the tinymist language service, integrated with editor frontends and othe
 - Prefer the smallest test command that covers your change, but widen validation when work spans Rust, editor tooling, generated docs, or feature flags.
 - Preserve unrelated user changes. The worktree may already be dirty.
 - Avoid editing dependency pins, version metadata, or release files unless the task actually requires it.
+- Use Conventional Commits for commit messages, for example `fix(renderer-diff): keep sidebar scrollable`.
 
 ## OpenSpec Workflow
 
@@ -74,6 +75,12 @@ This is the tinymist language service, integrated with editor frontends and othe
 - Report the behavior change in user-facing terms.
 - List the validation you ran.
 - Call out anything you could not verify locally.
+
+## Commit and PR Conventions
+
+- Write commit messages in Conventional Commits format, such as `fix(query): handle missing labels`.
+- Keep PR content limited to a list of modified features and issue operations, such as `Close #123`.
+- Do not include validation logs, command transcripts, or detailed execution notes in PR content.
 
 ## Rust Conventions
 

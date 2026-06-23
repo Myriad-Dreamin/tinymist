@@ -1,13 +1,10 @@
 use futures::{SinkExt, StreamExt};
-use reflexo_typst::debug_loc::{DocumentPosition, ElementPoint};
+use reflexo_typst::debug_loc::DocumentPosition;
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{broadcast, mpsc};
 
 use super::{editor::EditorActorRequest, render::RenderActorRequest};
-use crate::{
-    WsMessage,
-    actor::{editor::DocToSrcJumpResolveRequest, render::ResolveSpanRequest},
-};
+use crate::{ViewerWindowStateMessage, WsMessage, actor::editor::DocToSrcJumpResolveRequest};
 
 // pub type CursorPosition = DocumentPosition;
 pub type SrcToDocJumpInfo = DocumentPosition;
@@ -17,7 +14,6 @@ pub enum WebviewActorRequest {
     ViewportPosition(DocumentPosition),
     SrcToDocJump(Vec<SrcToDocJumpInfo>),
     // CursorPosition(CursorPosition),
-    CursorPaths(Vec<Vec<ElementPoint>>),
 }
 
 fn position_req(
@@ -97,16 +93,6 @@ where
                             self.webview_websocket_conn.send(WsMessage::Binary(msg.into()))
                               .await.log_error("WebViewActor");
                         }
-                        // WebviewActorRequest::CursorPosition(jump_info) => {
-                        //     let msg = position_req("cursor", jump_info);
-                        //     self.webview_websocket_conn.send(WsMessage::Binary(msg.into_bytes())).await.log_error("WebViewActor");
-                        // }
-                        WebviewActorRequest::CursorPaths(jump_info) => {
-                            let json = serde_json::to_string(&jump_info).unwrap();
-                            let msg = format!("cursor-paths,{json}");
-                            self.webview_websocket_conn.send(WsMessage::Binary(msg.into()))
-                              .await.log_error("WebViewActor");
-                        }
                     }
                 }
                 Some(svg) = self.svg_receiver.recv() => {
@@ -155,19 +141,15 @@ where
                         let pos = DocumentPosition { page_no, x, y };
 
                         self.broadcast_sender.send(WebviewActorRequest::ViewportPosition(pos)).log_error("WebViewActor");
-                    } else if msg.starts_with("srcpath") {
-                        let path = msg.split(' ').nth(1).unwrap();
-                        let path = serde_json::from_str(path);
-                        if let Ok(path) = path {
-                            let path: Vec<(u32, u32, String)> = path;
-                            let path = path.into_iter().map(ElementPoint::from).collect::<Vec<_>>();
-                            self.render_sender.send(RenderActorRequest::WebviewResolveSpan(ResolveSpanRequest(path))).log_error("WebViewActor");
-                        };
                     } else if msg.starts_with("src-point") {
                         let path = msg.split(' ').nth(1).unwrap();
                         let path = serde_json::from_str(path);
                         if let Ok(path) = path {
                             self.render_sender.send(RenderActorRequest::WebviewResolveFrameLoc(path)).log_error("WebViewActor");
+                        };
+                    } else if let Some(state) = msg.strip_prefix("viewer-window-state ") {
+                        if let Ok(state) = serde_json::from_str::<ViewerWindowStateMessage>(state) {
+                            self.editor_sender.send(EditorActorRequest::ViewerWindowState(state)).log_error("WebViewActor");
                         };
                     } else {
                         let err = self.webview_websocket_conn.send(WsMessage::Text(format!("error, received unknown message: {msg}"))).await;

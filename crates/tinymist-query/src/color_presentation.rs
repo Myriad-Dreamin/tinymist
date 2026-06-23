@@ -1,5 +1,5 @@
 use typst::foundations::Repr;
-use typst::visualize::Color;
+use typst::visualize::{Color, Rgb};
 
 use crate::prelude::*;
 
@@ -35,7 +35,7 @@ pub struct ColorPresentationRequest {
 impl ColorPresentationRequest {
     /// Serve the request.
     pub fn request(self) -> Option<Vec<ColorPresentation>> {
-        let color = typst::visualize::Color::Rgb(typst::visualize::Rgb::new(
+        let color = Color::from(Rgb::new(
             self.color.red,
             self.color.green,
             self.color.blue,
@@ -43,15 +43,15 @@ impl ColorPresentationRequest {
         ));
         Some(vec![
             simple(format!("{:?}", color.to_hex())),
-            simple(Color::Rgb(color.to_rgb()).repr().to_string()),
-            simple(Color::Luma(color.to_luma()).repr().to_string()),
-            simple(Color::Oklab(color.to_oklab()).repr().to_string()),
-            simple(Color::Oklch(color.to_oklch()).repr().to_string()),
-            simple(Color::Rgb(color.to_rgb()).repr().to_string()),
-            simple(Color::LinearRgb(color.to_linear_rgb()).repr().to_string()),
-            simple(Color::Cmyk(color.to_cmyk()).repr().to_string()),
-            simple(Color::Hsl(color.to_hsl()).repr().to_string()),
-            simple(Color::Hsv(color.to_hsv()).repr().to_string()),
+            simple(Color::from(color.to_rgb()).repr().to_string()),
+            simple(Color::from(color.to_luma()).repr().to_string()),
+            simple(Color::from(color.to_oklab()).repr().to_string()),
+            simple(Color::from(color.to_oklch()).repr().to_string()),
+            simple(Color::from(color.to_rgb()).repr().to_string()),
+            simple(Color::from(color.to_linear_rgb()).repr().to_string()),
+            simple(Color::from(color.to_cmyk()).repr().to_string()),
+            simple(Color::from(color.to_hsl()).repr().to_string()),
+            simple(Color::from(color.to_hsv()).repr().to_string()),
         ])
     }
 }

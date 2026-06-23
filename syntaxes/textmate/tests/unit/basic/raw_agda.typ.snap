@@ -1,0 +1,19 @@
+>```agda module Test where ```
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#   ^^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+#       ^^^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst meta.embedded.block.agda
+#                          ^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>
+>```agda
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.begin.typst
+#   ^^^^ source.typst markup.raw.block.typst fenced_code.block.language.typst
+>module Test where
+#^^^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst
+>
+>id : Set -> Set
+#^^^^^^^^^^^^^^^^ source.typst markup.raw.block.typst
+>id A = A
+#^^^^^^^^^ source.typst markup.raw.block.typst
+>```
+#^^^ source.typst markup.raw.block.typst punctuation.definition.raw.end.typst
+>

@@ -9,7 +9,7 @@ use sync_ls::{
 };
 use tinymist_dap::DebugRequest;
 use tinymist_std::error::prelude::*;
-use typst::World;
+use typst::{World, WorldExt};
 
 use super::*;
 
@@ -254,10 +254,9 @@ impl ServerState {
         }
 
         let current_span = *session.adaptor.current_span.lock();
-        let current_source = current_span
-            .and_then(|span| Some((span, session.snapshot.world.source(span.id()?).ok()?)));
-        let current_location = current_source.and_then(|(span, source)| {
-            Some((source.range(span).or_else(|| span.range())?, source))
+        let current_location = current_span.and_then(|span| {
+            let source = session.snapshot.world.source(span.id()?).ok()?;
+            Some((session.snapshot.world.range(span)?, source))
         });
         let (source, position, line_count) = if let Some((range, source)) = current_location {
             (

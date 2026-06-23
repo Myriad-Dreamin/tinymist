@@ -29,12 +29,12 @@ The supported entry point is:
 ./bootstrap.sh test
 ```
 
-This builds/runs the `tinymist-nvim-spec-local` Neovim development container, mounts
-`tests/workspaces` as `/home/runner/dev/workspaces`, runs
-`tinymist compile` for the `book` fixture, then runs `spec/main.py` with
-headless Neovim and the `inanis` runner. The container must provide the Lua
-test dependencies on `/home/runner/packpath/*`, especially `inanis.nvim`,
-`plenary.nvim`, and `nvim-lspconfig`.
+This builds/runs the `tinymist-nvim-spec-local` Neovim development container,
+mounts `tests/workspaces` read-only, copies the `book` fixture into a tmpfs
+workspace at `/home/runner/dev/workspaces`, runs `tinymist compile` for that
+fixture, then runs `spec/main.py` with headless Neovim and the `inanis` runner.
+The container must provide the Lua test dependencies on `/home/runner/packpath/*`,
+especially `inanis.nvim`, `plenary.nvim`, and `nvim-lspconfig`.
 
 The Neovim development image intentionally does not bundle `tinymist`.
 `bootstrap.sh` mounts a host-built binary into the container as

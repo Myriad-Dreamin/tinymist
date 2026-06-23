@@ -1,7 +1,7 @@
 {
   "generatedBy": "cargo run --quiet --bin tinymist-docs-tool -- --output docs/tinymist/generated/compiler-settings-fonts.json",
   "typstAssets": {
-    "version": "0.14.2"
+    "version": "0.15.0"
   },
   "fonts": [
     {

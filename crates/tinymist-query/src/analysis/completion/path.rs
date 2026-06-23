@@ -42,8 +42,8 @@ impl CompletionPair<'_, '_, '_> {
 
         let src_path = id.vpath();
         let base = id;
-        let dst_path = src_path.join(path);
-        let mut compl_path = dst_path.as_rootless_path();
+        let dst_path = src_path.join(path.to_str()?).ok()?;
+        let mut compl_path = dst_path.as_rootless_path_compat();
         if !compl_path.is_dir() {
             compl_path = compl_path.parent().unwrap_or(Path::new(""));
         }
@@ -70,14 +70,14 @@ impl CompletionPair<'_, '_, '_> {
 
             let label: EcoString = if has_root {
                 // diff with root
-                unix_slash(path.vpath().as_rooted_path()).into()
+                unix_slash(path.vpath().as_rooted_path_compat()).into()
             } else {
                 let base = base
                     .vpath()
-                    .as_rooted_path()
+                    .as_rooted_path_compat()
                     .parent()
                     .unwrap_or(Path::new("/"));
-                let path = path.vpath().as_rooted_path();
+                let path = path.vpath().as_rooted_path_compat();
                 let w = tinymist_std::path::diff(path, base)?;
                 unix_slash(&w).into()
             };
@@ -139,7 +139,7 @@ impl CompletionPair<'_, '_, '_> {
                         label: typst_completion.0,
                         kind: typst_completion.1,
                         detail: None,
-                        text_edit: Some(text_edit),
+                        text_edit: Some(text_edit.into()),
                         // don't sort me
                         sort_text: Some(sort_text),
                         filter_text: Some("".into()),

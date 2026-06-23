@@ -7,9 +7,11 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_world::{CompileSnapshot, CompilerFeat, ExportComputation, WorldComputeGraph};
 use typst::foundations::Bytes;
-use typst::layout::{Abs, Page};
+use typst::layout::Abs;
+use typst::model::Document;
 use typst::syntax::{SyntaxNode, ast};
 use typst::visualize::Color;
+use typst_layout::Page;
 
 use crate::{Pages, TaskWhen, exported_page_ranges};
 
@@ -42,7 +44,7 @@ pub struct ExportTimings;
 
 impl ExportTimings {
     /// Checks if the export is needed.
-    pub fn needs_run<F: CompilerFeat, D: typst::Document>(
+    pub fn needs_run<F: CompilerFeat, D: Document>(
         snap: &CompileSnapshot<F>,
         timing: Option<&TaskWhen>,
         docs: Option<&D>,
@@ -74,7 +76,7 @@ fn select_pages<'a>(
 ) -> Vec<(usize, &'a Page)> {
     let pages = pages.as_ref().map(|pages| exported_page_ranges(pages));
     document
-        .pages
+        .pages()
         .iter()
         .enumerate()
         .filter(|(i, _)| {
@@ -87,8 +89,11 @@ fn select_pages<'a>(
 
 fn parse_length(gap: &str) -> Result<Abs> {
     let length = typst::syntax::parse_code(gap);
-    if length.erroneous() {
-        bail!("invalid length: {gap}, errors: {:?}", length.errors());
+    if length.diagnosis().errors {
+        bail!(
+            "invalid length: {gap}, errors: {:?}",
+            length.errors_and_warnings().0
+        );
     }
 
     let length: Option<ast::Numeric> = descendants(&length).into_iter().find_map(SyntaxNode::cast);

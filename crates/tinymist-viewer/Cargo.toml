@@ -27,6 +27,7 @@ image.workspace = true
 indexmap.workspace = true
 log.workspace = true
 masonry.workspace = true
+masonry_winit.workspace = true
 open.workspace = true
 parking_lot.workspace = true
 reflexo-vec2svg.workspace = true
@@ -49,6 +50,21 @@ ttf-parser.workspace = true
 vello.workspace = true
 winit.workspace = true
 xilem.workspace = true
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Use Fontique's runtime fontconfig loading so Linux release builds do not need
+# a target-specific fontconfig pkg-config setup.
+fontique = { workspace = true, features = ["fontconfig-dlopen"] }
 
 [features]
 
@@ -76,8 +92,9 @@ masonry_winit.workspace = true
 pollster = "0.4"
 sha2.workspace = true
 tinymist-tests.workspace = true
-typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.14.2" }
+typst-dev-assets = { git = "https://github.com/typst/typst-dev-assets", tag = "v0.15.0" }
 typst-syntax.workspace = true
+typst-utils.workspace = true
 walkdir.workspace = true
 
 [lints]

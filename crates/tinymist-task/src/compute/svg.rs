@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
+use typst::model::Document;
 
 use crate::compute::{parse_length, select_pages};
 use crate::model::ExportSvgTask;
@@ -22,28 +23,29 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for SvgExport {
         doc: &Arc<TypstPagedDocument>,
         config: &ExportSvgTask,
     ) -> Result<Self::Output> {
+        let svg_options = typst_svg::SvgOptions::default();
         let exported_pages = select_pages(doc, &config.pages);
         if let Some(PageMerge { ref gap }) = config.merge {
             // Typst does not expose svg-merging API.
             // Therefore, we have to create a dummy document here.
-            let dummy_doc = TypstPagedDocument {
-                pages: exported_pages
+            let dummy_doc = TypstPagedDocument::new(
+                exported_pages
                     .into_iter()
                     .map(|(_, page)| page.clone())
                     .collect(),
-                ..Default::default()
-            };
+                doc.info().clone(),
+            );
             let gap = gap
                 .as_ref()
                 .and_then(|gap| parse_length(gap).ok())
                 .unwrap_or_default();
-            let svg = typst_svg::svg_merged(&dummy_doc, gap);
+            let svg = typst_svg::svg_merged(&dummy_doc, &svg_options, gap);
             Ok(ImageOutput::Merged(svg))
         } else {
             let exported = exported_pages
                 .into_iter()
                 .map(|(i, page)| {
-                    let svg = typst_svg::svg(page);
+                    let svg = typst_svg::svg(page, &svg_options);
                     Ok(PagedOutput {
                         page: i,
                         value: svg,

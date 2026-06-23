@@ -1,5 +1,6 @@
 //! Package management tools.
 
+use std::borrow::Cow;
 use std::path::PathBuf;
 
 use ecow::eco_format;
@@ -7,14 +8,16 @@ use ecow::eco_format;
 use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::PackageSpec;
 use tinymist_world::package::registry::PackageIndexEntry;
+use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, VirtualPath};
+use typst::syntax::{FileId, LinkedNode, RootedPath, SyntaxKind, VirtualPath, VirtualRoot, ast};
+use typst_shim::syntax::resolve_path_from_id;
 
 use crate::LocalContext;
+use crate::analysis::SharedContext;
 
 /// Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,16 +44,75 @@ impl From<PackageIndexEntry> for PackageInfo {
     }
 }
 
+/// Parses a package import from a string literal node in an import statement.
+/// Returns the PackageSpec if it's a valid package import.
+pub fn parse_package_import(node: &LinkedNode) -> Option<PackageSpec> {
+    if !matches!(node.kind(), SyntaxKind::Str) {
+        return None;
+    }
+
+    let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
+
+    let ast::Expr::Str(str_node) = import_node.source() else {
+        return None;
+    };
+    let import_str = str_node.get();
+    if import_str.starts_with('@') {
+        import_str.parse().ok()
+    } else {
+        None
+    }
+}
+
+/// Finds the package entry for a given package spec, and also the latest
+/// version entry.
+pub fn find_package_and_latest<'a>(
+    ctx: &'a SharedContext,
+    package_spec: &PackageSpec,
+) -> (
+    Option<Cow<'a, PackageIndexEntry>>,
+    Option<Cow<'a, PackageIndexEntry>>,
+) {
+    let versionless_spec = package_spec.versionless();
+
+    if package_spec.is_preview() {
+        let packages = ctx.world().packages();
+
+        let current = packages.iter().find(|it| it.matches(package_spec));
+        let latest = packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (current.map(Cow::Borrowed), latest.map(Cow::Borrowed))
+    } else if cfg!(feature = "local-registry") {
+        let local_packages = ctx.non_preview_packages();
+
+        let current = local_packages.iter().find(|it| it.matches(package_spec));
+        let latest = local_packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (
+            current.map(|p| Cow::Owned(p.clone())),
+            latest.map(|p| Cow::Owned(p.clone())),
+        )
+    } else {
+        (None, None)
+    }
+}
+
 /// Parses the manifest of the package located at `package_path`.
 pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<FileId> {
-    Ok(FileId::new(
-        Some(PackageSpec {
+    Ok(FileId::new(RootedPath::new(
+        VirtualRoot::Package(PackageSpec {
             namespace: spec.namespace.clone(),
             name: spec.name.clone(),
             version: spec.version.parse()?,
         }),
-        VirtualPath::new("typst.toml"),
-    ))
+        VirtualPath::new("typst.toml").expect("valid manifest path"),
+    )))
 }
 
 /// Parses the manifest of the package located at `package_path`.
@@ -66,12 +128,18 @@ pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageMani
         .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
+pub(crate) fn package_entrypoint_id(manifest_id: FileId, entrypoint: &str) -> FileId {
+    resolve_path_from_id(manifest_id, entrypoint)
+        .expect("valid package entrypoint")
+        .intern()
+}
+
 /// Check Package.
 pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()> {
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
     ctx.shared_().preload_package(entry_point);
     Ok(())
@@ -168,10 +236,10 @@ pub fn list_package(
                     name: package_name.clone(),
                     version,
                 };
-                let manifest_id = typst::syntax::FileId::new(
-                    Some(spec.clone()),
-                    typst::syntax::VirtualPath::new("typst.toml"),
-                );
+                let manifest_id = typst::syntax::FileId::new(typst::syntax::RootedPath::new(
+                    typst::syntax::VirtualRoot::Package(spec.clone()),
+                    typst::syntax::VirtualPath::new("typst.toml").expect("valid manifest path"),
+                ));
                 let Some(manifest) =
                     once_log(get_manifest(world, manifest_id), "read package manifest")
                 else {
@@ -241,4 +309,40 @@ fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use typst::syntax::package::PackageSpec;
+
+    use super::*;
+
+    fn manifest_id() -> FileId {
+        FileId::new(RootedPath::new(
+            VirtualRoot::Package(
+                PackageSpec::from_str("@preview/example:0.1.0").expect("valid package spec"),
+            ),
+            VirtualPath::new("typst.toml").expect("valid manifest path"),
+        ))
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_relative_to_manifest_parent() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "src/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/src/lib.typ");
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_absolute_path_in_package_root() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/lib.typ");
+    }
 }

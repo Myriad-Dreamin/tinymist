@@ -5,11 +5,12 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
+use ecow::EcoString;
 use lsp_types::Url;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
-use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::stats::{AllocStats, QueryStatReportEntry};
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
@@ -22,13 +23,14 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
-use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
+use typst::foundations::{Bytes, IntoValue, Module, NativeElement, StyleChain, Styles};
 use typst::introspection::Introspector;
-use typst::layout::Position;
+use typst::introspection::PagedPosition as Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
+use typst_shim::syntax::VirtualPathExt;
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
@@ -180,6 +182,11 @@ impl Analysis {
     /// Report the statistics of the analysis.
     pub fn report_query_stats(&self) -> String {
         self.stats.report()
+    }
+
+    /// Report the structured statistics of the analysis.
+    pub fn report_query_stats_json(&self) -> Vec<QueryStatReportEntry> {
+        self.stats.report_json()
     }
 
     /// Report the statistics of the allocation.
@@ -356,8 +363,13 @@ impl LocalContext {
             .get_or_init(|| {
                 if let Some(root) = self.world().entry_state().workspace_root() {
                     scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
-                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
+                        VirtualPath::virtualize(&root, &root.join(path))
+                            .ok()
+                            .map(|path| WorkspaceResolver::workspace_file(Some(&root), path))
                     })
+                    .into_iter()
+                    .flatten()
+                    .collect()
                 } else {
                     vec![]
                 }
@@ -365,7 +377,7 @@ impl LocalContext {
             .iter()
             .filter(move |fid| {
                 fid.vpath()
-                    .as_rooted_path()
+                    .as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -401,7 +413,7 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path_compat()));
         ids
     }
 
@@ -514,7 +526,7 @@ impl LocalContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig)?;
+                let docs = crate::docs::sig_docs(self, &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
@@ -602,7 +614,7 @@ impl SharedContext {
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
-            .as_rootless_path()
+            .as_rootless_path_compat()
             .extension()
             .and_then(|ext| ext.to_str());
         // yaml/yml/bib
@@ -1031,7 +1043,7 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+    pub fn analyze_bib(&self, introspector: &dyn Introspector) -> Option<Arc<BibInfo>> {
         let world = self.world();
         let world = (world as &dyn World).track();
 
@@ -1445,9 +1457,10 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    introspector: Tracked<Introspector>,
+    introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
-    let bib_elem = BibliographyElem::find(introspector).ok()?;
+    let bib_elems = introspector.query(&BibliographyElem::ELEM.select());
+    let bib_elem = bib_elems.iter().next()?.to_packed::<BibliographyElem>()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`

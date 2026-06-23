@@ -102,7 +102,11 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         Err(err) => return format!("failed to convert to markdown: {err}"),
     };
 
-    let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
+    let repr = typst_html::html(
+        &redact(doc.base.clone()),
+        &typst_html::HtmlOptions { pretty: true },
+    )
+    .unwrap();
     let res = match kind {
         ConvKind::Md { .. } => doc.to_md_string().unwrap(),
         ConvKind::LaTeX => doc.to_tex_string().unwrap(),
@@ -115,12 +119,20 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
     );
 
-    [repr.as_str(), res.as_ref()].join("\n=====\n")
+    normalize_snapshot_output(&[repr.as_str(), res.as_ref()].join("\n=====\n"))
+}
+
+fn normalize_snapshot_output(output: &str) -> String {
+    output
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {
     let mut doc = doc;
-    for node in doc.root.children.make_mut().iter_mut() {
+    for node in doc.root_mut().children.make_mut().iter_mut() {
         redact_node(node);
     }
     doc

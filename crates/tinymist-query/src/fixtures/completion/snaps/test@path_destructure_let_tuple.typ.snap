@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-assertion_line: 196
 description: "Completion on \" (38..39)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_destructure_let_tuple.typ

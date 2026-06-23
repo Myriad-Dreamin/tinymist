@@ -1,0 +1,105 @@
+name: tinymist::typst_knowledge
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: typst-knowledge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  typst-knowledge:
+    name: Generate Typst package knowledge report
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64
+    timeout-minutes: 360
+    env:
+      TINYMIST_PACKAGE_LSIF_JOBS: "2"
+      TINYMIST_KNOWLEDGE_DATA_ARTIFACT: typst-knowledge-data
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust non-interactively if not already installed
+        run: |
+          if ! command -v cargo > /dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Restore Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          shared-key: x86_64-unknown-linux-gnu
+          save-if: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build tinymist
+        run: cargo build --bin tinymist --release --locked
+        env:
+          RUSTFLAGS: "-Dwarnings"
+
+      - name: Checkout Typst packages
+        uses: actions/checkout@v4
+        with:
+          repository: typst/packages
+          path: typst-packages
+          fetch-depth: 1
+          sparse-checkout: packages
+
+      - name: Generate LSIF report
+        run: |
+          node scripts/package-lsif-report.mjs \
+            --tinymist target/release/tinymist \
+            --package-cache-path typst-packages/packages \
+            --out target/typst-knowledge-data \
+            --preview-out target/typst-knowledge-preview
+
+      - name: Upload LSIF data artifact
+        id: lsif_data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: typst-knowledge-data
+          path: target/typst-knowledge-data
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload HTML preview
+        id: html_preview
+        if: always()
+        uses: pavi2410/html-preview-action@v5
+        with:
+          html_file: index.html
+          site_root: target/typst-knowledge-preview
+          upload: auto
+          archive_name: typst-knowledge-report
+          retention_days: 30
+          job_summary: false
+
+      - name: Add report summary
+        if: always()
+        run: |
+          if [ -f target/typst-knowledge-data/summary.md ]; then
+            cat target/typst-knowledge-data/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          preview_url="${{ steps.html_preview.outputs.url }}"
+          if [ -n "${preview_url}" ]; then
+            {
+              echo ""
+              echo "[Open Typst knowledge HTML report](${preview_url})"
+              echo ""
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi

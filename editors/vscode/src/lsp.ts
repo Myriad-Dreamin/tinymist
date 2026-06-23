@@ -24,6 +24,7 @@ import {
 } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { saveStoredViewerWindowState } from "./features/preview-window-state";
 import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
 import type { createSystemLanguageClient } from "./lsp.system";
@@ -359,6 +360,7 @@ export class LanguageState {
   exportSvg = exportCommand("tinymist.exportSvg");
   exportPng = exportCommand("tinymist.exportPng");
   exportHtml = exportCommand("tinymist.exportHtml");
+  exportBundle = exportCommand("tinymist.exportBundle");
   exportMarkdown = exportCommand("tinymist.exportMarkdown");
   exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
@@ -675,6 +677,11 @@ export class LanguageState {
     // (Optional) The server requests to update the document outline
     client.onNotification("tinymist/documentOutline", async (data: any) => {
       previewProcessOutline(data);
+    });
+
+    // (Optional) The server reports native previewer window state updates from the control plane.
+    client.onNotification("tinymist/preview/windowState", async (data: unknown) => {
+      await saveStoredViewerWindowState(this.context, data);
     });
   }
 

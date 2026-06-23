@@ -340,11 +340,14 @@ impl ServerState {
                 .map_err(internal_error)?;
             let main = entry
                 .main()
-                .and_then(|e| e.vpath().resolve(&root))
                 .ok_or_else(
                     || error_once!("main file must be resolved, got", entry: display_entry()),
                 )
                 .map_err(internal_error)?;
+            let main = main
+                .vpath()
+                .realize(&root)
+                .map_err(|err| internal_error(format!("cannot realize main path: {err}")))?;
 
             let task = user_action.trace_document(TraceParams {
                 compiler_program: self_path,

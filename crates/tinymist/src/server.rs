@@ -330,6 +330,7 @@ impl ServerState {
             .with_command_("tinymist.exportPng", State::export_png)
             .with_command_("tinymist.exportText", State::export_text)
             .with_command_("tinymist.exportHtml", State::export_html)
+            .with_command_("tinymist.exportBundle", State::export_bundle)
             .with_command_("tinymist.exportMarkdown", State::export_markdown)
             .with_command_("tinymist.exportTeX", State::export_tex)
             .with_command_("tinymist.exportQuery", State::export_query)

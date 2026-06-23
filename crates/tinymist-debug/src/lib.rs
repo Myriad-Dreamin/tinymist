@@ -27,7 +27,7 @@ use cov::*;
 use instrument::InstrumentWorld;
 
 /// Collects the coverage of a single execution.
-pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
+pub fn collect_coverage<D: typst::model::Document + typst::foundations::Output, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
     let (cov, result) = with_cov(base, |instr| {

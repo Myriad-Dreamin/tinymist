@@ -7,6 +7,28 @@ const exec = util.promisify(execSync);
 const root = resolve(import.meta.dirname, "..");
 const dry = process.argv.includes("--dry");
 
+const shellQuote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
+
+const gitOutput = (command) => {
+  return execSync(command, { cwd: root, encoding: "utf-8" }).trim();
+};
+
+const gitHeadHash = gitOutput("git rev-parse HEAD");
+let gitHeadBranch = "";
+try {
+  gitHeadBranch = gitOutput("git symbolic-ref --short HEAD");
+} catch {
+  gitHeadBranch = "";
+}
+const gitHead = gitHeadBranch ? `ref: refs/heads/${gitHeadBranch}` : gitHeadHash;
+const gitInputFlags = [
+  ["tinymist-git-head", gitHead],
+  ["tinymist-git-head-branch", gitHeadBranch],
+  ["tinymist-git-head-hash", gitHeadHash],
+]
+  .map(([key, value]) => `--input ${shellQuote(`${key}=${value}`)}`)
+  .join(" ");
+
 const yarn = (cmd, stdio = "inherit") => {
   const script = `yarn run ${cmd}`;
   if (dry) {
@@ -20,7 +42,10 @@ const typlite = (input, output) => {
     : `--assets-path ${relative(root, resolve(output, "../assets/images/", basename(input.slice(0, -4))))}`;
 
   // return stdout
-  const res = yarn(`--silent typlite ${assets_flag} --root ${root} ${input} -`, "pipe");
+  const res = yarn(
+    `--silent typlite ${gitInputFlags} ${assets_flag} --root ${root} ${input} -`,
+    "pipe",
+  );
   return res.toString();
 };
 

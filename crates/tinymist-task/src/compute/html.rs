@@ -20,7 +20,7 @@ impl<F: CompilerFeat> ExportComputation<F, TypstHtmlDocument> for HtmlExport {
         doc: &Arc<TypstHtmlDocument>,
         _config: &ExportHtmlTask,
     ) -> Result<String> {
-        Ok(typst_html::html(doc)?)
+        Ok(typst_html::html(doc, &typst_html::HtmlOptions::default())?)
     }
 }
 

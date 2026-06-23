@@ -223,12 +223,13 @@ The extension can export PDFs of your Typst files. This setting controls whether
 
 ## `tinymist.exportTarget`
 
-The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code.
+The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html` or `bundle`. This configuration only affects how the language server completes your code.
 
 - **Type**: `string`
 - **Valid Values**:
   - `"paged"` : The current export target is for PDF, PNG, and SVG export.
   - `"html"` : The current export target is for HTML export.
+  - `"bundle"` : The current export target is for bundle export.
 - **Default**: `"paged"`
 
 ## `tinymist.fontPaths`
@@ -268,6 +269,13 @@ Controls how the formatter handles prose line wrapping. If enabled, the formatte
 
 - **Type**: `boolean`
 - **Default**: `false`
+
+## `tinymist.inlayHints.packageVersionStatus`
+
+Show inline decorations indicating package version status (latest, upgradable, or invalid)
+
+- **Type**: `boolean`
+- **Default**: `true`
 
 ## `tinymist.lint.enabled`
 
@@ -416,6 +424,13 @@ Enable or disable preview features of Typst. Note: restarting the editor is requ
   - `"enable"` : Enable preview features.
   - `"disable"` : Disable preview features.
 - **Default**: `"enable"`
+
+## `tinymist.previewer`
+
+Select the previewer for Typst. `myriad-dreamin.tinymist` uses Tinymist’s built-in previewer. Values starting with `html:` are treated as absolute HTML file paths after VS Code variable substitution, and other non-empty values are treated as extension ids. Overrides are ignored in untrusted workspaces.
+
+- **Type**: `string`
+- **Default**: `"myriad-dreamin.tinymist"`
 
 ## `tinymist.projectResolution`
 

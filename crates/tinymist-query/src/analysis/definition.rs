@@ -2,6 +2,7 @@
 
 use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
+use typst_shim::syntax::source_range;
 
 use super::{InsTy, SharedContext, prelude::*};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
@@ -72,13 +73,8 @@ impl HasNameRange for Decl {
             return None;
         }
 
-        let span = self.span();
-        if let Some(range) = span.range() {
-            return Some(range.clone());
-        }
-
         let src = ctx.source_by_id(self.file_id()?).ok()?;
-        src.range(span)
+        source_range(&src, self.span())
     }
 }
 
@@ -176,7 +172,7 @@ fn field_definition(ctx: &Arc<SharedContext>, node: ast::FieldAccess) -> Option<
 
 fn bib_definition(
     ctx: &Arc<SharedContext>,
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     key: &str,
 ) -> Option<Definition> {
     let bib_info = ctx.analyze_bib(introspector)?;
@@ -195,7 +191,7 @@ fn bib_definition(
 }
 
 fn ref_definition(
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
@@ -311,10 +307,10 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
         return false;
     };
 
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     match (x.inner(), y.inner()) {
-        (Repr::Native(x), Repr::Native(y)) => x == y,
-        (Repr::Element(x), Repr::Element(y)) => x == y,
+        (FuncInner::Native(x), FuncInner::Native(y)) => x == y,
+        (FuncInner::Element(x), FuncInner::Element(y)) => x == y,
         _ => false,
     }
 }

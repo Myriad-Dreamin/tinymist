@@ -200,7 +200,7 @@ mod tests {
                 let files = ctx
                     .source_files()
                     .iter()
-                    .filter(|id| !id.vpath().as_rootless_path().ends_with("lib.typ"));
+                    .filter(|id| !id.vpath().get_without_slash().ends_with("lib.typ"));
                 for id in files.copied().collect::<Vec<_>>() {
                     test(ctx, id);
                 }
@@ -244,7 +244,7 @@ mod tests {
                     .unwrap();
 
                 assert_eq!(
-                    item.text_edit.as_ref().unwrap().new_text.as_str(),
+                    item.text_edit.as_ref().unwrap().new_text().as_str(),
                     "label(\"DBLP:books/lib/Knuth86a\")"
                 );
 

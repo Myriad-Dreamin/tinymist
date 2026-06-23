@@ -29,9 +29,21 @@ pub use tinymist_project::LspUniverse;
 pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
+use crate::index::query::IndexQueryCtx;
 pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};
 use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
+
+pub fn lsif_testing(name: &str, f: &impl Fn(&mut LocalContext, &mut IndexQueryCtx, PathBuf)) {
+    use crate::index::*;
+    snapshot_testing(name, &move |ctx, path| {
+        // todo: error test
+        let knowledge = knowledge(ctx).expect("failed to generate knowledge");
+        let res = knowledge.bind(ctx.shared()).to_string();
+        let mut index = IndexQueryCtx::read(&mut res.as_bytes()).expect("failed to read index");
+        f(ctx, &mut index, path);
+    });
+}
 
 #[derive(Default, Clone, Copy)]
 pub struct Opts {
@@ -65,13 +77,14 @@ pub fn run_with_ctx_<T>(
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
     let root = verse.entry_state().workspace_root().unwrap();
-    let paths = verse
-        .shadow_paths()
+    let mut shadow_paths = verse.shadow_paths();
+    shadow_paths.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+    let paths = shadow_paths
         .into_iter()
         .map(|path| {
             WorkspaceResolver::workspace_file(
                 Some(&root),
-                VirtualPath::new(path.strip_prefix(&root).unwrap()),
+                VirtualPath::virtualize(&root, &path).unwrap(),
             )
         })
         .collect::<Vec<_>>();
@@ -95,6 +108,10 @@ pub fn run_with_ctx_<T>(
             trigger_suggest: true,
             trigger_parameter_hints: true,
             trigger_suggest_and_parameter_hints: true,
+            insert_replace_edit: properties
+                .get("insert_replace")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false),
             ..Default::default()
         },
         ..Analysis::default()

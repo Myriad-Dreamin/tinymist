@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Cursor;
@@ -20,7 +20,9 @@ use reflexo_vec2svg::IncrSvgDocServer;
 use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 use tinymist_preview::protocol::DIFF_V1_PREFIX;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::path::unix_slash;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use tinymist_std::typst_shim::syntax::RootedPathExt;
 use tinymist_viewer::incr::IncrVelloDocClient;
 use tinymist_viewer::{SvgResource, SvgResourceFormat, SvgResourceResolver};
 use typst::diag::{At, FileError, FileResult, SourceResult, StrResult, Warned, bail as typst_bail};
@@ -28,11 +30,9 @@ use typst::engine::Engine;
 use typst::foundations::{
     Array, Bytes, Context, Datetime, IntoValue, NoneValue, Repr, Smart, Value, func,
 };
-use typst::layout::{
-    Abs, Frame, FrameItem, Margin, PageElem, PagedDocument, Size as TypstSize, Transform,
-};
+use typst::layout::{Abs, Frame, FrameItem, Margin, PageElem, Size as TypstSize, Transform};
 use typst::model::{Numbering, NumberingPattern};
-use typst::syntax::{FileId, Source, Span, VirtualPath};
+use typst::syntax::{FileId, RootedPath, Source, Span, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook, TextElem, TextSize};
 use typst::utils::LazyHash;
 use typst::visualize::Color as TypstColor;
@@ -52,6 +52,28 @@ const RENDERER_DIFF_MANIFEST: &str = "renderer-diff-manifest.json";
 const HASH_BITS: usize = 16;
 const OFFICIAL_GROUP: &str = "official";
 const VELLO_GROUP: &str = "vello";
+const UNSUPPORTED_REF_CASES: &[&str] = &[
+    // These cases rely on Typst's upstream test runner injecting a `bounds`
+    // helper; the lightweight viewer runner compiles cases directly.
+    "baseline-box-align",
+    "baseline-breakable-display-math",
+    "baseline-display-math",
+    "baseline-inline-math",
+    "baseline-isolated-box",
+    "baseline-move",
+    "baseline-paragraph",
+    "baseline-rotate",
+    "baseline-rotate-multiline",
+    "baseline-scale",
+    "baseline-scale-multiline",
+    "baseline-shapes",
+    "baseline-skew",
+    "baseline-skew-multiline",
+    // Uses the upstream runner-only `selector-within` polyfill.
+    "query-within",
+    // Requires a math font that is not available in the Linux CI image.
+    "math-font-fallback-class",
+];
 
 #[test]
 fn typst_suite_vello_renderer_hashes() -> Result<()> {
@@ -69,7 +91,13 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
         .context("viewer crate should live under <workspace>/crates/tinymist-viewer")?;
     let output_root = workspace_root.join(OUTPUT_ROOT);
     let artifact_root = output_root.join(RENDERER_DIFF_ARTIFACT);
-    let cases = all_ref_cases(&tests_root)?;
+    let ref_root = typst_ref_root(&tests_root).with_context(|| {
+        format!(
+            "Typst tests root {} contains no PNG refs under ref/ or ref/render/",
+            tests_root.display()
+        )
+    })?;
+    let cases = all_ref_cases(&ref_root)?;
     let collected = Box::new(collect_tests(&tests_root)?);
     let make_bundle = env_flag("TINYMIST_RENDERER_DIFF");
 
@@ -93,7 +121,12 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
     let mut manifest_cases = vec![];
 
     for name in cases {
-        let ref_png = tests_root.join("ref").join(format!("{name}.png"));
+        if unsupported_ref_case(&name) {
+            eprintln!("skipping unsupported Typst renderer suite case {name}");
+            continue;
+        }
+
+        let ref_png = ref_root.join(format!("{name}.png"));
         if !ref_png.exists() {
             let failure = format!("{name}: missing upstream PNG ref at {}", ref_png.display());
             writeln!(failures, "{failure}")?;
@@ -183,23 +216,46 @@ fn typst_suite_vello_renderer_hashes() -> Result<()> {
     Ok(())
 }
 
+fn unsupported_ref_case(name: &str) -> bool {
+    UNSUPPORTED_REF_CASES.contains(&name)
+}
+
 fn typst_tests_root() -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("TINYMIST_TYPST_TESTS").map(PathBuf::from)
         && path.join("suite").is_dir()
-        && path.join("ref").is_dir()
+        && typst_ref_root(&path).is_some()
     {
         return Some(path);
     }
 
     let home = std::env::var_os("HOME")?;
     let path = PathBuf::from(home).join("work/rust/typst/tests");
-    (path.join("suite").is_dir() && path.join("ref").is_dir()).then_some(path)
+    (path.join("suite").is_dir() && typst_ref_root(&path).is_some()).then_some(path)
 }
 
-fn all_ref_cases(tests_root: &Path) -> Result<Vec<String>> {
-    let ref_root = tests_root.join("ref");
+fn typst_ref_root(tests_root: &Path) -> Option<PathBuf> {
+    let render_ref_root = tests_root.join("ref/render");
+    if ref_root_has_png_refs(&render_ref_root) {
+        return Some(render_ref_root);
+    }
+
+    let flat_ref_root = tests_root.join("ref");
+    ref_root_has_png_refs(&flat_ref_root).then_some(flat_ref_root)
+}
+
+fn ref_root_has_png_refs(ref_root: &Path) -> bool {
+    let Ok(entries) = fs::read_dir(ref_root) else {
+        return false;
+    };
+
+    entries
+        .filter_map(Result::ok)
+        .any(|entry| entry.path().extension().is_some_and(|ext| ext == "png"))
+}
+
+fn all_ref_cases(ref_root: &Path) -> Result<Vec<String>> {
     let mut cases = vec![];
-    for entry in fs::read_dir(&ref_root)
+    for entry in fs::read_dir(ref_root)
         .with_context(|| format!("failed to read Typst ref root {}", ref_root.display()))?
     {
         let entry = entry?;
@@ -290,7 +346,11 @@ fn parse_suite_file(
             .map(|(next_line, _)| lines[*next_line].start)
             .unwrap_or(text.len());
         let source_text = text[source_start..source_end].to_owned();
-        let file_id = FileId::new(None, VirtualPath::new(rel_path));
+        let file_id = FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new(unix_slash(rel_path))
+                .expect("suite path should be valid virtual path"),
+        ));
         let source = Source::new(file_id, source_text);
 
         let old = tests.insert(
@@ -387,7 +447,7 @@ fn render_suite_case(
         let width = size.width.ceil().max(1.0) as u32;
         let height = size.height.ceil().max(1.0) as u32;
         let mut page = rasterizer.render_page(&scene, size, width, height, background)?;
-        if let Some(source_page) = compiled.pages.get(page_idx) {
+        if let Some(source_page) = compiled.pages().get(page_idx) {
             render_link_overlays(&mut page, &source_page.frame);
         }
         rendered.push(page);
@@ -396,12 +456,12 @@ fn render_suite_case(
     Ok(merge_pages(&rendered))
 }
 
-fn compile_paged(world: &dyn World) -> Result<PagedDocument> {
+fn compile_paged(world: &dyn World) -> Result<TypstPagedDocument> {
     let Warned {
         output,
         warnings: _,
-    } = typst::compile::<PagedDocument>(world);
-    output.map_err(|errors| anyhow!("{}", format_diagnostics(&errors)))
+    } = typst::compile::<TypstPagedDocument>(world);
+    output.map_err(|errors| anyhow!("{}", format_diagnostics(errors.as_ref())))
 }
 
 fn format_diagnostics(errors: &[typst::diag::SourceDiagnostic]) -> String {
@@ -409,7 +469,7 @@ fn format_diagnostics(errors: &[typst::diag::SourceDiagnostic]) -> String {
     for error in errors {
         let _ = writeln!(out, "{}", error.message);
         for hint in &error.hints {
-            let _ = writeln!(out, "  hint: {hint}");
+            let _ = writeln!(out, "  hint: {}", hint.v);
         }
     }
     out
@@ -1215,7 +1275,7 @@ struct RenderWorld {
     main: Source,
     root: PathBuf,
     package_root: Option<PathBuf>,
-    slots: Mutex<BTreeMap<FileId, FileSlot>>,
+    slots: Mutex<HashMap<FileId, FileSlot>>,
     base: &'static RenderBase,
 }
 
@@ -1225,7 +1285,7 @@ impl RenderWorld {
             main,
             root,
             package_root,
-            slots: Mutex::new(BTreeMap::new()),
+            slots: Mutex::new(HashMap::new()),
             base: render_base(),
         }
     }
@@ -1239,7 +1299,7 @@ impl RenderWorld {
     }
 
     fn system_path(&self, id: FileId) -> FileResult<SystemPath> {
-        let base = match id.package() {
+        let base = match id.package_compat() {
             Some(spec) => {
                 let package_root = self.package_root.as_ref().ok_or(FileError::AccessDenied)?;
                 PathBuf::from("tests/packages")
@@ -1251,7 +1311,7 @@ impl RenderWorld {
             None => PathBuf::new(),
         };
 
-        let path = id.vpath().resolve(&base).ok_or(FileError::AccessDenied)?;
+        let path = id.vpath().realize(&base)?;
         if let Ok(asset) = path.strip_prefix("assets") {
             return Ok(SystemPath::Asset(asset.to_path_buf()));
         }
@@ -1312,7 +1372,7 @@ impl World for RenderWorld {
         self.base.fonts.get(index).cloned()
     }
 
-    fn today(&self, _: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _: Option<typst::foundations::Duration>) -> Option<Datetime> {
         Some(Datetime::from_ymd(1970, 1, 1).unwrap())
     }
 }
@@ -1523,7 +1583,7 @@ fn test_library() -> Library {
     lib.styles.set(PageElem::height, Smart::Auto);
     lib.styles.set(
         PageElem::margin,
-        Margin::splat(Some(Smart::Custom(Abs::pt(10.0).into()))),
+        Smart::Custom(Margin::splat(Some(Smart::Custom(Abs::pt(10.0).into())))),
     );
     lib.styles
         .set(TextElem::size, TextSize(Abs::pt(10.0).into()));
@@ -1569,7 +1629,7 @@ fn lines(
     #[default(Numbering::Pattern(NumberingPattern::from_str("A").unwrap()))] numbering: Numbering,
 ) -> SourceResult<Value> {
     (1..=count)
-        .map(|n| numbering.apply(engine, context, &[n]))
+        .map(|n| numbering.apply(engine, context, span, &[n]))
         .collect::<SourceResult<Array>>()?
         .join(Some('\n'.into_value()), None, None)
         .at(span)

@@ -256,14 +256,14 @@ impl<'a> CodeActionWorker<'a> {
         }
 
         let file_id = node.span().id()?;
-        let root_path = self.ctx.path_for_id(file_id.join("/")).ok()?;
-        let path_in_workspace = file_id.vpath().join(importing.as_str());
-        let new_path = path_in_workspace.resolve(root_path.as_path())?;
-        let new_file_url = path_to_url(&new_path).ok()?;
+        let target = resolve_path_from_id(file_id, importing.as_str()).ok()?;
+        let target_id = target.clone().intern();
+        let new_path = self.ctx.path_for_id(target_id).ok()?;
+        let new_file_url = crate::path_res_to_url(new_path).ok()?;
 
         let edit = self.create_file(new_file_url, false);
 
-        let file_to_create = unix_slash(path_in_workspace.as_rooted_path());
+        let file_to_create = target.vpath().get_with_slash();
         let action = CodeAction {
             title: format!("Create missing file at `{file_to_create}`"),
             kind: Some(CodeActionKind::QUICKFIX),
@@ -361,7 +361,7 @@ impl<'a> CodeActionWorker<'a> {
 
         if path.starts_with("/") {
             // Convert absolute path to relative path
-            let cur_path = id.vpath().as_rooted_path().parent().unwrap();
+            let cur_path = id.vpath().as_rooted_path_compat().parent().unwrap();
             let new_path = diff(path, cur_path)?;
             let edit = self.edit_str(node, unix_slash(&new_path))?;
             let action = CodeAction {
@@ -373,7 +373,12 @@ impl<'a> CodeActionWorker<'a> {
             self.actions.push(action);
         } else {
             // Convert relative path to absolute path
-            let mut new_path = id.vpath().as_rooted_path().parent().unwrap().to_path_buf();
+            let mut new_path = id
+                .vpath()
+                .as_rooted_path_compat()
+                .parent()
+                .unwrap()
+                .to_path_buf();
             for i in path.components() {
                 match i {
                     std::path::Component::ParentDir => {

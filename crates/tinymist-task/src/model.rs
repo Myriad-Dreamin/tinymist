@@ -68,6 +68,8 @@ pub enum ProjectTask {
     ExportSvg(ExportSvgTask),
     /// An export HTML task.
     ExportHtml(ExportHtmlTask),
+    /// An export bundle task.
+    ExportBundle(ExportBundleTask),
     /// An export HTML task.
     ExportSvgHtml(ExportHtmlTask),
     /// An export Markdown task.
@@ -92,6 +94,7 @@ impl ProjectTask {
             | Self::ExportPng(..)
             | Self::ExportSvg(..)
             | Self::ExportHtml(..)
+            | Self::ExportBundle(..)
             | Self::ExportSvgHtml(..)
             | Self::ExportMd(..)
             | Self::ExportTeX(..)
@@ -108,6 +111,7 @@ impl ProjectTask {
             Self::ExportPng(task) => &task.export,
             Self::ExportSvg(task) => &task.export,
             Self::ExportHtml(task) => &task.export,
+            Self::ExportBundle(task) => &task.export,
             Self::ExportSvgHtml(task) => &task.export,
             Self::ExportTeX(task) => &task.export,
             Self::ExportMd(task) => &task.export,
@@ -124,6 +128,7 @@ impl ProjectTask {
             Self::ExportPng(task) => &mut task.export,
             Self::ExportSvg(task) => &mut task.export,
             Self::ExportHtml(task) => &mut task.export,
+            Self::ExportBundle(task) => &mut task.export,
             Self::ExportSvgHtml(task) => &mut task.export,
             Self::ExportTeX(task) => &mut task.export,
             Self::ExportMd(task) => &mut task.export,
@@ -137,6 +142,7 @@ impl ProjectTask {
         match self {
             Self::ExportPdf { .. } => "pdf",
             Self::Preview(..) | Self::ExportSvgHtml { .. } | Self::ExportHtml { .. } => "html",
+            Self::ExportBundle { .. } => "",
             Self::ExportMd { .. } => "md",
             Self::ExportTeX { .. } => "tex",
             Self::ExportText { .. } => "txt",
@@ -308,6 +314,31 @@ pub struct ExportHtmlTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+}
+
+/// An export bundle task specifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportBundleTask {
+    /// The shared export arguments.
+    #[serde(flatten)]
+    pub export: ExportTask,
+    /// Which pages to export in PDF documents. When unspecified, all pages are
+    /// exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with for PDF documents.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub pdf_standards: Vec<PdfStandard>,
+    /// Disable tagged PDF output for PDF documents.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub no_pdf_tags: bool,
+    /// The document's creation date formatted as a UNIX timestamp (in seconds).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub creation_timestamp: Option<i64>,
+    /// The PPI (pixels per inch) to use for PNG documents.
+    pub ppi: Scalar,
 }
 
 /// An export markdown task specifier.

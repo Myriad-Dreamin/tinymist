@@ -69,7 +69,10 @@ impl InstrumentWorker {
                     self.instrument_block_child(
                         node,
                         cond_expr.if_body().span(),
-                        cond_expr.else_body().unwrap_or_default().span(),
+                        cond_expr
+                            .else_body()
+                            .map(|expr| expr.span())
+                            .unwrap_or(Span::detached()),
                     );
                     return;
                 }
@@ -117,6 +120,8 @@ impl InstrumentWorker {
                 | ast::Expr::MathPrimes(..)
                 | ast::Expr::MathFrac(..)
                 | ast::Expr::MathRoot(..)
+                | ast::Expr::MathFieldAccess(..)
+                | ast::Expr::MathCall(..)
                 | ast::Expr::Ident(..)
                 | ast::Expr::None(..)
                 | ast::Expr::Auto(..)
@@ -149,7 +154,7 @@ impl InstrumentWorker {
     }
 
     fn visit_node_fallback(&mut self, node: &SyntaxNode) {
-        let txt = node.text();
+        let txt = node.leaf_text();
         if !txt.is_empty() {
             self.instrumented.push_str(txt);
         }
@@ -377,14 +382,14 @@ mod tests {
     fn test_instrument_breakpoint_nested() {
         let source = Source::detached("#let a = {1};");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #let a = {
         if __breakpoint_block_start(0) {__breakpoint_block_start_handle(0, (:)); };
         {1}
         if __breakpoint_block_end(1) {__breakpoint_block_end_handle(1, (:)); };
         }
         ;
-        "###);
+        ");
     }
 
     #[test]
@@ -394,7 +399,7 @@ mod tests {
 #let inc = value => value + 1"#,
         );
         let (new, _meta) = instrument_breakpoints(source).unwrap();
-        assert!(new.root().errors().is_empty());
+        assert!(new.root().errors_and_warnings().0.is_empty());
         insta::assert_snapshot!(new.text(), @r###"
         #let add(x, y: 1, ..rest) = {
         if __breakpoint_function(0) {__breakpoint_function_handle(0, (x: x, y: y, rest: rest)); };
@@ -412,11 +417,11 @@ mod tests {
     fn test_instrument_breakpoint_functor() {
         let source = Source::detached("#show: main");
         let (new, _meta) = instrument_breakpoints(source).unwrap();
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @"
         #show: {
         let __bp_functor = main
         __it => {if __breakpoint_show_start(0) {__breakpoint_show_start_handle(0, (:)); };
         __bp_functor(__it); } }
-        "###);
+        ");
     }
 }

@@ -4,7 +4,7 @@ description = "Typst's World implementation for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.14.6"
+version = "0.15.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -48,6 +48,7 @@ ttf-parser.workspace = true
 typst-shim.workspace = true
 typst-assets.workspace = true
 typst.workspace = true
+typst-bundle.workspace = true
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
 

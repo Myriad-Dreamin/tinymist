@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-assertion_line: 196
 description: "Completion on \" (42..43)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/include_destructure_spread.typ

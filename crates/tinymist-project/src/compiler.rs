@@ -14,9 +14,9 @@ use tinymist_world::vfs::notify::{
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
-    CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader,
-    EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask, ProjectInsId, TaskInputs,
-    WorldComputeGraph, WorldDeps,
+    BundleCompilationTask, CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse,
+    DiagnosticsTask, EntryReader, EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask,
+    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::World;
@@ -91,6 +91,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> CompiledArtifact<F> {
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
         let doc = if is_html {
             graph.shared_compile_html().expect("html").map(From::from)
         } else {
@@ -101,6 +102,19 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             diag: graph.shared_diagnostics().expect("diag"),
             graph,
             doc,
+            deps: OnceLock::default(),
+        }
+    }
+
+    /// Runs diagnostics without precompiling a paged or HTML document.
+    pub fn from_graph_without_doc(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
+        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(false)));
+        let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(false)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(true)));
+        CompiledArtifact {
+            diag: graph.shared_diagnostics().expect("diag"),
+            graph,
+            doc: None,
             deps: OnceLock::default(),
         }
     }
@@ -882,9 +896,9 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         move || {
             let compiled = if syntax_only {
                 let main = graph.snap.world.main();
-                let source_res = graph.world().source(main).at(Span::from_range(main, 0..0));
+                let source_res = graph.world().source(main).at(Span::detached());
                 let syntax_res = source_res.and_then(|source| {
-                    let errors = source.root().errors();
+                    let errors = source.root().errors_and_warnings().0;
                     if errors.is_empty() {
                         Ok(())
                     } else {
@@ -900,7 +914,11 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                     deps: OnceLock::default(),
                 }
             } else {
-                CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html))
+                match export_target {
+                    ExportTarget::Bundle => CompiledArtifact::from_graph_without_doc(graph),
+                    ExportTarget::Html => CompiledArtifact::from_graph(graph, true),
+                    ExportTarget::Paged => CompiledArtifact::from_graph(graph, false),
+                }
             };
 
             let res = CompileStatusResult {

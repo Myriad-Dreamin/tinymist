@@ -16,13 +16,11 @@ use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use typst::World;
 use typst::foundations::{
-    AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str,
-    repr,
+    AutoValue, Func, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str, repr,
 };
 use typst::syntax::ast::{self, AstNode, Param};
 use typst::syntax::{is_id_continue, is_id_start, is_ident};
 use typst::text::RawElem;
-use typst::visualize::Color;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
@@ -30,8 +28,8 @@ use crate::adt::interner::Interned;
 use crate::analysis::{BuiltinTy, LocalContext, PathKind, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
-    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoTextEdit, ParsedSnippet, PostfixSnippet,
-    PostfixSnippetScope, PrefixSnippet,
+    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoCompletionTextEdit, EcoInsertReplaceEdit,
+    EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,
 };
 use crate::prelude::*;
 use crate::syntax::{
@@ -81,6 +79,9 @@ pub struct CompletionFeat {
     /// hints.
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_suggest_and_parameter_hints: bool,
+    /// Whether the client supports LSP insert/replace completion text edits.
+    #[serde(skip)]
+    pub insert_replace_edit: bool,
 
     /// The Way to complete symbols.
     pub symbol: Option<SymbolCompletionWay>,
@@ -279,7 +280,7 @@ impl<'a> CompletionCursor<'a> {
 
             match self.syntax_context.clone() {
                 Some(SyntaxContext::Arg { args, .. }) => {
-                    args_node = Some(args.cast::<ast::Args>()?.to_untyped().clone());
+                    args_node = Some(args.get().clone());
                 }
                 Some(SyntaxContext::Normal(node))
                     if (matches!(node.kind(), SyntaxKind::ContentBlock)
@@ -319,6 +320,40 @@ impl<'a> CompletionCursor<'a> {
         lsp_rng
     }
 
+    fn insert_range_of(&self, replace: Range<usize>) -> Range<usize> {
+        let end = self.cursor.clamp(replace.start, replace.end);
+        replace.start..end
+    }
+
+    fn completion_text_edit(
+        &mut self,
+        insert: Range<usize>,
+        replace: Range<usize>,
+        new_text: EcoString,
+    ) -> EcoCompletionTextEdit {
+        let insert = self.lsp_range_of(insert);
+        let replace = self.lsp_range_of(replace);
+
+        if self.ctx.analysis.completion_feat.insert_replace_edit && insert != replace {
+            EcoInsertReplaceEdit::new(insert, replace, new_text).into()
+        } else {
+            EcoTextEdit::new(replace, new_text).into()
+        }
+    }
+
+    fn capture_suffix_as_first_arg(&self, snippet: &mut EcoString, replace: Range<usize>) -> bool {
+        if self.cursor >= replace.end {
+            return false;
+        }
+
+        let suffix = &self.text[self.cursor..replace.end];
+        if suffix.is_empty() || !suffix.chars().all(is_id_continue) {
+            return false;
+        }
+
+        fill_first_empty_placeholder(snippet, suffix)
+    }
+
     /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
@@ -338,18 +373,18 @@ impl<'a> CompletionCursor<'a> {
                     rng.end = self.cursor;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
             Some(SelectedNode::Label(from_label)) => {
                 let mut rng = from_label.range();
-                if from_label.text().starts_with('<') && !snippet.starts_with('<') {
+                if from_label.leaf_text().starts_with('<') && !snippet.starts_with('<') {
                     rng.start += 1;
                 }
-                if from_label.text().ends_with('>') && !snippet.ends_with('>') {
+                if from_label.leaf_text().ends_with('>') && !snippet.ends_with('>') {
                     rng.end -= 1;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
             Some(node @ (SelectedNode::At(from_ref) | SelectedNode::Ref(from_ref))) => {
                 let mut rng = if matches!(node, SelectedNode::At(..)) {
@@ -358,16 +393,24 @@ impl<'a> CompletionCursor<'a> {
                 } else {
                     from_ref.range()
                 };
-                if from_ref.text().starts_with('@') && !snippet.starts_with('@') {
+                if from_ref.leaf_text().starts_with('@') && !snippet.starts_with('@') {
                     rng.start += 1;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
-            None => self.lsp_range_of(self.from..self.cursor),
+            None => self.from..self.cursor,
         };
 
-        let text_edit = EcoTextEdit::new(replace_range, snippet);
+        let text_edit = if item.capture_suffix
+            && self.capture_suffix_as_first_arg(&mut snippet, replace_range.clone())
+        {
+            let replace_range = self.lsp_range_of(replace_range);
+            EcoTextEdit::new(replace_range, snippet).into()
+        } else {
+            let insert_range = self.insert_range_of(replace_range.clone());
+            self.completion_text_edit(insert_range, replace_range, snippet)
+        };
 
         LspCompletion {
             label: item.label.clone(),
@@ -467,7 +510,7 @@ impl<'a> CompletionWorker<'a> {
     fn enrich(&mut self, prefix: &str, suffix: &str) {
         for LspCompletion { text_edit, .. } in &mut self.completions {
             let apply = match text_edit {
-                Some(EcoTextEdit { new_text, .. }) => new_text,
+                Some(text_edit) => text_edit.new_text_mut(),
                 _ => continue,
             };
 
@@ -506,9 +549,9 @@ impl<'a> CompletionWorker<'a> {
         if matches!(
             cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) && cursor.leaf.erroneous()
+        ) && cursor.leaf.diagnosis().errors
         {
-            let mut chars = cursor.leaf.text().chars();
+            let mut chars = cursor.leaf.leaf_text().chars();
             match chars.next() {
                 Some(ch) if ch.is_numeric() => return None,
                 Some('.') => {
@@ -559,10 +602,8 @@ impl<'a> CompletionWorker<'a> {
         }
 
         for item in &mut self.completions {
-            if let Some(EcoTextEdit {
-                ref mut new_text, ..
-            }) = item.text_edit
-            {
+            if let Some(text_edit) = &mut item.text_edit {
+                let new_text = text_edit.new_text_mut();
                 *new_text = to_lsp_snippet(new_text);
             }
         }
@@ -617,12 +658,11 @@ impl CompletionPair<'_, '_, '_> {
                 };
             }
             Some(SyntaxContext::Arg { args, .. }) => {
-                // The existing arguments are not interesting
-                let args = args.cast::<ast::Args>()?;
-                for arg in args.items() {
-                    if let ast::Arg::Named(named) = arg {
-                        self.worker.seen_field(named.name().into());
-                    }
+                for arg in args.children() {
+                    let Some(ast::Arg::Named(named)) = arg.cast::<ast::Arg>() else {
+                        continue;
+                    };
+                    self.worker.seen_field(named.name().into());
                 }
             }
             // todo: complete field by types
@@ -839,8 +879,8 @@ impl CompletionPair<'_, '_, '_> {
                 && node.children().fold(0i32, |acc, node| match node.kind() {
                     SyntaxKind::LeftParen => acc + 1,
                     SyntaxKind::RightParen => acc - 1,
-                    SyntaxKind::Error if node.text() == "(" => acc + 1,
-                    SyntaxKind::Error if node.text() == ")" => acc - 1,
+                    SyntaxKind::Error if node.leaf_text() == "(" => acc + 1,
+                    SyntaxKind::Error if node.leaf_text() == ")" => acc - 1,
                     _ => acc,
                 }) > 0;
             if is_unclosed {
@@ -957,6 +997,25 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     }
 
     &s[rng]
+}
+
+fn fill_first_empty_placeholder(snippet: &mut EcoString, text: &str) -> bool {
+    let Some(pos) = snippet.find("${}") else {
+        return false;
+    };
+
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('$', "\\$")
+        .replace('}', "\\}");
+    let mut filled = EcoString::new();
+    filled.push_str(&snippet[..pos]);
+    filled.push_str("${");
+    filled.push_str(&escaped);
+    filled.push('}');
+    filled.push_str(&snippet[pos + "${}".len()..]);
+    *snippet = filled;
+    true
 }
 
 static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =

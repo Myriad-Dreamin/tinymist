@@ -14,13 +14,13 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use lsp_types::notification::Notification;
 use lsp_types::Url;
 use reflexo_typst::error::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
+    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, ViewerWindowState, WsMessage,
 };
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
@@ -480,6 +480,13 @@ impl PreviewState {
                         }
                     }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
+                    ViewerWindowState(s) => client.send_notification::<NotifViewerWindowState>(
+                        &ViewerWindowStateParams {
+                            task_id: tid.clone(),
+                            schema_version: s.schema_version,
+                            window: s.window,
+                        },
+                    ),
                 }
             }
 
@@ -525,7 +532,10 @@ impl PreviewState {
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
-            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
+            log::info!(
+                target: crate::PREVIEW_COMPAT_LOG_TARGET,
+                "PreviewTask({task_id}): preview server listening on: {addr}"
+            );
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(addr.port()),
@@ -604,6 +614,20 @@ struct NotifDocumentOutline;
 impl Notification for NotifDocumentOutline {
     type Params = tinymist_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
+}
+
+#[derive(Serialize, Deserialize)]
+struct ViewerWindowStateParams {
+    task_id: String,
+    schema_version: u32,
+    window: ViewerWindowState,
+}
+
+struct NotifViewerWindowState;
+
+impl Notification for NotifViewerWindowState {
+    type Params = ViewerWindowStateParams;
+    const METHOD: &'static str = "tinymist/preview/windowState";
 }
 
 fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInfo, tid: &str) {

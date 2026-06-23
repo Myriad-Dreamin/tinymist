@@ -16,6 +16,7 @@ use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
 use typst::layout::PageRanges;
 use typst::syntax::FileId;
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 /// A scalar that is not NaN.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -80,7 +81,7 @@ impl Id {
     /// Creates a new project Id from a world.
     pub fn from_world<F: CompilerFeat>(world: &CompilerWorld<F>, ctx: CtxPath) -> Option<Self> {
         let entry = world.entry_state();
-        let id = unix_slash(entry.main()?.vpath().as_rootless_path());
+        let id = unix_slash(entry.main()?.vpath().as_rootless_path_compat());
 
         // todo: entry root may not be set, so we should use the cwd
         let path = &ResourcePath::from_user_sys(Path::new(&id), ctx);
@@ -158,7 +159,7 @@ impl PathPattern {
             return None;
         }
         // Files without a path are not exported
-        let path = main.vpath().resolve(&root)?;
+        let path = main.vpath().realize(&root).ok()?;
 
         // todo: handle untitled path
         if let Ok(path) = path.strip_prefix("/untitled") {
@@ -357,16 +358,19 @@ impl ResourcePath {
 
     /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
-        let package = id.package();
-        match package {
-            Some(package) => ResourcePath(
+        if let Some(package) = id.package_compat() {
+            ResourcePath(
                 "file_id".into(),
-                format!("{package}{}", unix_slash(id.vpath().as_rooted_path())),
-            ),
-            None => ResourcePath(
+                format!(
+                    "{package}{}",
+                    unix_slash(id.vpath().as_rooted_path_compat())
+                ),
+            )
+        } else {
+            ResourcePath(
                 "file_id".into(),
-                format!("$root{}", unix_slash(id.vpath().as_rooted_path())),
-            ),
+                format!("$root{}", unix_slash(id.vpath().as_rooted_path_compat())),
+            )
         }
     }
 
@@ -465,14 +469,16 @@ mod tests {
 
     fn test_entry(path: &str) -> EntryState {
         let root = test_root();
-        EntryState::new_rooted(root.into(), Some(VirtualPath::new(path)))
+        EntryState::new_rooted(root.into(), Some(VirtualPath::new(path).unwrap()))
     }
 
     #[test]
     fn test_substitute_path() {
         let root = Path::new("/dummy-root");
-        let entry =
-            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
+        let entry = EntryState::new_rooted(
+            root.into(),
+            Some(VirtualPath::new("/dir1/dir2/file.txt").unwrap()),
+        );
 
         assert_eq!(
             PathPattern::new("/substitute/$dir/$name").substitute(&entry),
