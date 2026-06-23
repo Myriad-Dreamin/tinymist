@@ -14,6 +14,7 @@ use crate::prelude::Definition;
 use crate::{LocalContext, path_to_url};
 use ecow::EcoString;
 use lsp_types::{Hover, Url};
+use tinymist_analysis::docs::DefDocs;
 use tinymist_analysis::syntax::classify_syntax;
 use tinymist_std::error::WithContextUntyped;
 use tinymist_std::hash::FxHashMap;
@@ -23,6 +24,7 @@ use typst_shim::syntax::source_range;
 
 pub mod protocol;
 pub mod query;
+mod scip_utils;
 use protocol as p;
 
 /// The dumped knowledge.
@@ -48,6 +50,10 @@ pub struct KnowledgeWithContext<'a> {
     knowledge: &'a Knowledge,
     ctx: &'a Arc<SharedContext>,
 }
+
+pub mod scip;
+pub mod scip_query;
+pub use scip::{ScipPublicApi, ScipPublicModule};
 
 impl fmt::Display for KnowledgeWithContext<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -301,6 +307,8 @@ pub struct ReferenceIndex {
     pub definition: Definition,
     /// The static hover result for the referenced definition.
     pub hover: Option<Hover>,
+    /// The typed documentation for the referenced definition.
+    pub def_docs: Option<DefDocs>,
 }
 
 /// Dumps typst knowledge in [LSIF] format from workspace.
@@ -330,6 +338,7 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
         strings: FxHashMap::default(),
         references: FxHashMap::default(),
         hovers: FxHashMap::default(),
+        def_docs: FxHashMap::default(),
     };
     let files = files
         .iter()
@@ -360,6 +369,8 @@ struct DumpWorker<'a> {
     references: FxHashMap<Span, ReferenceIndex>,
     /// The static hover results collected so far.
     hovers: FxHashMap<Definition, Option<Hover>>,
+    /// The typed documentation collected so far.
+    def_docs: FxHashMap<Definition, Option<DefDocs>>,
 }
 
 impl DumpWorker<'_> {
@@ -402,8 +413,15 @@ impl DumpWorker<'_> {
                 return;
             };
             let hover = self.hover(&definition);
-            self.references
-                .insert(span, ReferenceIndex { definition, hover });
+            let def_docs = self.def_docs(&definition);
+            self.references.insert(
+                span,
+                ReferenceIndex {
+                    definition,
+                    hover,
+                    def_docs,
+                },
+            );
 
             return;
         }
@@ -421,5 +439,15 @@ impl DumpWorker<'_> {
         let hover = crate::hover::hover_from_definition(self.ctx, definition, None);
         self.hovers.insert(definition.clone(), hover.clone());
         hover
+    }
+
+    fn def_docs(&mut self, definition: &Definition) -> Option<DefDocs> {
+        if let Some(docs) = self.def_docs.get(definition) {
+            return docs.clone();
+        }
+
+        let docs = self.ctx.def_docs(definition);
+        self.def_docs.insert(definition.clone(), docs.clone());
+        docs
     }
 }

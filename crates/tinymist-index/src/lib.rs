@@ -11,14 +11,12 @@
     allow(missing_docs)
 )]
 
-use std::{
-    io::BufReader,
-    sync::{Mutex, OnceLock},
-};
+use std::sync::{Mutex, OnceLock};
 
 use lsp_types::{GotoDefinitionParams, HoverParams};
 use tinymist_query::{
-    CompilerQueryRequest, GotoDefinitionRequest, HoverRequest, index::query::IndexQueryCtx,
+    CompilerQueryRequest, CompilerQueryResponse, GotoDefinitionRequest, HoverRequest,
+    index::scip_query::{ScipPublicSymbol, ScipQueryCtx},
     url_to_path,
 };
 #[cfg(all(feature = "typst-plugin", target_arch = "wasm32"))]
@@ -33,7 +31,37 @@ static INDEX: OnceLock<Mutex<IndexCtx>> = OnceLock::new();
 
 struct IndexCtx {
     /// The database for the index.
-    index: IndexQueryCtx,
+    index: ScipQueryCtx,
+}
+
+enum IndexRequest {
+    Compiler(CompilerQueryRequest),
+    PublicSymbols(String),
+}
+
+enum IndexResponse {
+    Compiler(Option<CompilerQueryResponse>),
+    PublicSymbols(Vec<ScipPublicSymbol>),
+}
+
+impl IndexCtx {
+    fn request(&mut self, request: IndexRequest) -> IndexResponse {
+        match request {
+            IndexRequest::Compiler(request) => IndexResponse::Compiler(self.index.request(request)),
+            IndexRequest::PublicSymbols(path) => {
+                IndexResponse::PublicSymbols(self.index.public_symbols(&path))
+            }
+        }
+    }
+}
+
+impl IndexResponse {
+    fn to_bytes(&self) -> StrResult<Vec<u8>> {
+        match self {
+            Self::Compiler(response) => serde_json::to_vec(response).map_err(to_string),
+            Self::PublicSymbols(response) => serde_json::to_vec(response).map_err(to_string),
+        }
+    }
 }
 
 /// Creates an index.
@@ -49,43 +77,53 @@ pub fn query_index(kind: &[u8], request: &[u8]) -> StrResult<Vec<u8>> {
     let request = parse_request(kind, request)?;
     let response = {
         let mut index = INDEX.get().ok_or("index was not created")?.lock().unwrap();
-        index.index.request(request)
+        index.request(request)
     };
-    match response {
-        None => Ok("null".as_bytes().to_vec()),
-        Some(tinymist_query::CompilerQueryResponse::Hover(response)) => {
-            serde_json::to_vec(&response).map_err(to_string)
-        }
-        Some(tinymist_query::CompilerQueryResponse::GotoDefinition(response)) => {
-            serde_json::to_vec(&response).map_err(to_string)
-        }
-        _ => Err("unknown response kind".to_owned())?,
-    }
+    response.to_bytes()
 }
 
-fn parse_request(kind: &str, request: &[u8]) -> StrResult<CompilerQueryRequest> {
+fn parse_request(kind: &str, request: &[u8]) -> StrResult<IndexRequest> {
     Ok(match kind {
-        "hover" => CompilerQueryRequest::Hover({
-            let req: HoverParams = serde_json::from_slice(request).map_err(to_string)?;
-            HoverRequest {
-                path: url_to_path(&req.text_document_position_params.text_document.uri),
-                position: req.text_document_position_params.position,
-            }
-        }),
-        "goto_definition" => CompilerQueryRequest::GotoDefinition({
-            let req: GotoDefinitionParams = serde_json::from_slice(request).map_err(to_string)?;
-            GotoDefinitionRequest {
-                path: url_to_path(&req.text_document_position_params.text_document.uri),
-                position: req.text_document_position_params.position,
-            }
-        }),
+        "textDocument/hover" => IndexRequest::Compiler(parse_hover_request(request)?),
+        "textDocument/definition" => {
+            IndexRequest::Compiler(parse_goto_definition_request(request)?)
+        }
+        "public_symbols" => {
+            IndexRequest::PublicSymbols(serde_json::from_slice(request).map_err(to_string)?)
+        }
         kind => Err(format!("unknown request kind: {kind}"))?,
     })
 }
 
+fn parse_hover_request(request: &[u8]) -> StrResult<CompilerQueryRequest> {
+    if let Ok(symbol) = serde_json::from_slice(request) {
+        return Ok(CompilerQueryRequest::HoverSymbol(symbol));
+    }
+
+    let req: HoverParams = serde_json::from_slice(request).map_err(to_string)?;
+    Ok(CompilerQueryRequest::Hover(HoverRequest {
+        path: url_to_path(&req.text_document_position_params.text_document.uri),
+        position: req.text_document_position_params.position,
+    }))
+}
+
+fn parse_goto_definition_request(request: &[u8]) -> StrResult<CompilerQueryRequest> {
+    if let Ok(symbol) = serde_json::from_slice(request) {
+        return Ok(CompilerQueryRequest::GotoDefinitionSymbol(symbol));
+    }
+
+    let req: GotoDefinitionParams = serde_json::from_slice(request).map_err(to_string)?;
+    Ok(CompilerQueryRequest::GotoDefinition(
+        GotoDefinitionRequest {
+            path: url_to_path(&req.text_document_position_params.text_document.uri),
+            position: req.text_document_position_params.position,
+        },
+    ))
+}
+
 /// Creates an index.
 fn create_index_inner(db: &[u8], opts: &[u8]) -> StrResult<()> {
-    let index = IndexQueryCtx::read(&mut BufReader::new(db)).map_err(to_string)?;
+    let index = ScipQueryCtx::read(db).map_err(to_string)?;
     let _ = opts;
 
     let index = INDEX.set(Mutex::new(IndexCtx { index }));

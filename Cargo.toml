@@ -137,6 +137,8 @@ serde_repr = "0.1"
 serde_with = { version = "3.6", features = ["base64"] }
 serde_yaml = "0.9"
 serde-wasm-bindgen = "^0.6"
+protobuf = "=3.7.2"
+scip = "0.8.1"
 tar = "0.4"
 toml = { version = "0.8", default-features = false, features = [
     "parse",

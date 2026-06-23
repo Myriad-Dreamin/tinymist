@@ -28,12 +28,14 @@ log.workspace = true
 lsp-types.workspace = true
 parking_lot.workspace = true
 percent-encoding.workspace = true
+protobuf.workspace = true
 rayon.workspace = true
 regex.workspace = true
 rpds.workspace = true
 rust_iso639 = { workspace = true, optional = true }
 rust_iso3166 = { workspace = true, optional = true }
 rustc-hash.workspace = true
+scip.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
