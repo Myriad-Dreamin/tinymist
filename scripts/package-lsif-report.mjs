@@ -8,13 +8,14 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 
-const DEFAULT_REGISTRY = "https://packages.typst.org";
-
 function parseArgs(argv) {
   const args = {
     out: "target/typst-knowledge-report",
-    packageCachePath: "target/typst/packages",
-    registryUrl: DEFAULT_REGISTRY,
+    previewOut: undefined,
+    packageCachePath: "typst-packages/packages",
+    dataArtifactName: process.env.TINYMIST_KNOWLEDGE_DATA_ARTIFACT || "typst-knowledge-data",
+    githubRepository: process.env.GITHUB_REPOSITORY || "",
+    githubRunId: process.env.GITHUB_RUN_ID || "",
     jobs: Number(process.env.TINYMIST_PACKAGE_LSIF_JOBS || 2),
     limit: undefined,
   };
@@ -38,17 +39,23 @@ function parseArgs(argv) {
       case "--out":
         args.out = next();
         break;
+      case "--preview-out":
+        args.previewOut = next();
+        break;
       case "--tinymist":
         args.tinymist = next();
         break;
       case "--package-cache-path":
         args.packageCachePath = next();
         break;
-      case "--registry-url":
-        args.registryUrl = trimTrailingSlash(next());
+      case "--data-artifact-name":
+        args.dataArtifactName = next();
         break;
-      case "--index-url":
-        args.indexUrl = next();
+      case "--github-repository":
+        args.githubRepository = next();
+        break;
+      case "--github-run-id":
+        args.githubRunId = next();
         break;
       case "--jobs":
         args.jobs = Number.parseInt(next(), 10);
@@ -72,9 +79,8 @@ function parseArgs(argv) {
   if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
     throw new Error("--limit must be a positive integer");
   }
-  args.registryUrl = trimTrailingSlash(args.registryUrl);
-  args.indexUrl ||= `${args.registryUrl}/preview/index.json`;
   args.out = path.resolve(args.out);
+  args.previewOut = path.resolve(args.previewOut || args.out);
   args.packageCachePath = path.resolve(args.packageCachePath);
   args.tinymist = resolveCommand(args.tinymist);
   args.jobs = Math.min(args.jobs, Math.max(1, os.availableParallelism?.() || args.jobs));
@@ -92,33 +98,23 @@ function resolveCommand(value) {
 function printHelp() {
   console.log(`Usage: node scripts/package-lsif-report.mjs [options]
 
-Downloads all Typst registry packages, runs tinymist LSIF for each package
+Scans a local typst/packages checkout, runs tinymist LSIF for each package
 version, and writes an HTML report.
 
 Options:
   --tinymist <path>              Path to the tinymist binary
-  --out <dir>                   Report output directory
-  --package-cache-path <dir>    Typst package cache root to populate
-  --registry-url <url>          Registry base URL (default: ${DEFAULT_REGISTRY})
-  --index-url <url>             Package index URL
+  --out <dir>                   LSIF data output directory
+  --preview-out <dir>           Single-file HTML preview output directory
+  --package-cache-path <dir>    Local typst/packages "packages" directory
+  --data-artifact-name <name>   GitHub Actions artifact name used by the HTML viewer
+  --github-repository <repo>    GitHub repository in owner/name form
+  --github-run-id <id>          GitHub Actions run id
   --jobs <n>                    Parallel LSIF jobs (default: 2)
   --limit <n>                   Process only the first n packages, for local smoke tests
 `);
 }
 
-function trimTrailingSlash(value) {
-  return value.replace(/\/+$/, "");
-}
-
-function normalizeIndexEntry(raw) {
-  const name = raw.name ?? raw.package?.name;
-  const version = raw.version ?? raw.package?.version;
-  const namespace = raw.namespace || raw.package?.namespace || "preview";
-
-  if (!name || !version) {
-    throw new Error(`Malformed package index entry: ${JSON.stringify(raw)}`);
-  }
-
+function packageEntry(namespace, name, version) {
   const displayId = namespace === "preview"
     ? `${name}:${version}`
     : `${namespace}/${name}:${version}`;
@@ -131,31 +127,8 @@ function normalizeIndexEntry(raw) {
   };
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-  }
-  return response.json();
-}
-
-async function downloadFile(url, outputPath) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
-  }
-
-  await fs.mkdir(path.dirname(outputPath), { recursive: true });
-  const data = Buffer.from(await response.arrayBuffer());
-  await fs.writeFile(outputPath, data);
-}
-
 function packageDir(cacheRoot, pkg) {
   return path.join(cacheRoot, pkg.namespace, pkg.name, pkg.version);
-}
-
-function archiveName(pkg) {
-  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.tar.gz`;
 }
 
 function lsifName(pkg) {
@@ -175,20 +148,34 @@ async function exists(filePath) {
   }
 }
 
-async function downloadPackage(args, pkg) {
-  const targetDir = packageDir(args.packageCachePath, pkg);
-  const manifestPath = path.join(targetDir, "typst.toml");
-  if (await exists(manifestPath)) {
-    return { pkg, skipped: true };
+async function readDirectoryDirs(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right, "en"));
+}
+
+async function discoverPackages(packageCachePath) {
+  if (!(await exists(packageCachePath))) {
+    throw new Error(`Package directory does not exist: ${packageCachePath}`);
   }
 
-  const url = `${args.registryUrl}/${pkg.namespace}/${pkg.name}-${pkg.version}.tar.gz`;
-  const archivePath = path.join(args.out, "downloads", archiveName(pkg));
-  await downloadFile(url, archivePath);
-  await fs.rm(targetDir, { recursive: true, force: true });
-  await fs.mkdir(targetDir, { recursive: true });
-  await run("tar", ["-xzf", archivePath, "-C", targetDir], { cwd: args.out });
-  return { pkg, skipped: false };
+  const packages = [];
+  for (const namespace of await readDirectoryDirs(packageCachePath)) {
+    const namespaceDir = path.join(packageCachePath, namespace);
+    for (const name of await readDirectoryDirs(namespaceDir)) {
+      const packageDirPath = path.join(namespaceDir, name);
+      for (const version of await readDirectoryDirs(packageDirPath)) {
+        const versionDir = path.join(packageDirPath, version);
+        if (await exists(path.join(versionDir, "typst.toml"))) {
+          packages.push(packageEntry(namespace, name, version));
+        }
+      }
+    }
+  }
+
+  return packages.sort((left, right) => left.displayId.localeCompare(right.displayId, "en"));
 }
 
 async function run(command, commandArgs, options = {}) {
@@ -438,6 +425,10 @@ function attr(value) {
   return escapeHtml(value).replaceAll("`", "&#96;");
 }
 
+function scriptJson(value) {
+  return JSON.stringify(value).replaceAll("</", "<\\/");
+}
+
 function performanceStats(rows) {
   const values = rows
     .filter((row) => row.status === "ok" && Number.isFinite(row.totalMs))
@@ -525,11 +516,16 @@ async function writeReport(args, rows) {
   const failed = rows.filter((row) => row.status !== "ok");
   const generatedAt = new Date().toISOString();
   const durationChart = renderDurationChart(rows);
+  const artifactConfig = {
+    repository: args.githubRepository,
+    runId: args.githubRunId,
+    name: args.dataArtifactName,
+  };
 
   const htmlRows = rows.map((row) => {
     const statusClass = row.status === "ok" ? "ok" : "failed";
     const detail = row.status === "ok"
-      ? `<a href="${attr(row.href)}" data-lsif="${attr(row.href)}" data-package="${attr(row.displayId)}">View LSIF</a>`
+      ? `<a href="#viewer" data-lsif="${attr(row.href)}" data-package="${attr(row.displayId)}">View LSIF</a>`
       : `<span class="error">${escapeHtml(row.error)}</span>`;
     return `<tr class="${statusClass}">
   <td data-sort="${attr(row.displayId)}"><code>${escapeHtml(row.displayId)}</code></td>
@@ -762,6 +758,7 @@ async function writeReport(args, rows) {
       display: flex;
       justify-content: space-between;
       gap: 16px;
+      align-items: center;
       padding: 10px 12px;
       border-bottom: 1px solid var(--border);
       color: var(--muted);
@@ -811,12 +808,13 @@ ${htmlRows}
     <section id="viewer" hidden>
       <header>
         <strong id="viewer-title"></strong>
-        <a id="viewer-raw" href="">Open raw LSIF</a>
+        <a id="viewer-raw" href="">Open data artifact</a>
       </header>
       <pre id="viewer-content"></pre>
     </section>
   </main>
   <script>
+    const artifactConfig = ${scriptJson(artifactConfig)};
     const filter = document.getElementById("filter");
     const tbody = document.getElementById("rows");
     let rows = Array.from(document.querySelectorAll("#rows tr"));
@@ -857,25 +855,174 @@ ${htmlRows}
     const viewerTitle = document.getElementById("viewer-title");
     const viewerRaw = document.getElementById("viewer-raw");
     const viewerContent = document.getElementById("viewer-content");
+    let artifactZipPromise;
+    let artifactDownloadUrl = artifactConfig.repository && artifactConfig.runId
+      ? "https://github.com/" + artifactConfig.repository + "/actions/runs/" + artifactConfig.runId + "#artifacts"
+      : "";
+    viewerRaw.href = artifactDownloadUrl || "#";
+
+    async function findArtifactDownloadUrl() {
+      if (!artifactConfig.repository || !artifactConfig.runId || !artifactConfig.name) {
+        throw new Error("Missing GitHub Actions artifact metadata in this report.");
+      }
+      if (artifactDownloadUrl && artifactDownloadUrl.includes("/actions/artifacts/")) {
+        return artifactDownloadUrl;
+      }
+
+      const listUrl = "https://api.github.com/repos/"
+        + artifactConfig.repository
+        + "/actions/runs/"
+        + artifactConfig.runId
+        + "/artifacts?per_page=100";
+      const response = await fetch(listUrl, {
+        headers: { Accept: "application/vnd.github+json" },
+      });
+      if (!response.ok) {
+        throw new Error("artifact list request failed: " + response.status + " " + response.statusText);
+      }
+
+      const payload = await response.json();
+      const artifacts = Array.isArray(payload.artifacts) ? payload.artifacts : [];
+      const artifact = artifacts.find((item) => item.name === artifactConfig.name && !item.expired)
+        || artifacts.find((item) => item.name === artifactConfig.name);
+      if (!artifact) {
+        throw new Error("artifact not found: " + artifactConfig.name);
+      }
+
+      artifactDownloadUrl = artifact.archive_download_url;
+      viewerRaw.href = artifactDownloadUrl;
+      return artifactDownloadUrl;
+    }
+
+    async function loadArtifactZip() {
+      if (!artifactZipPromise) {
+        artifactZipPromise = (async () => {
+          const downloadUrl = await findArtifactDownloadUrl();
+          const response = await fetch(downloadUrl, {
+            headers: { Accept: "application/vnd.github+json" },
+          });
+          if (!response.ok) {
+            throw new Error("artifact download failed: " + response.status + " " + response.statusText);
+          }
+          return response.arrayBuffer();
+        })();
+      }
+      return artifactZipPromise;
+    }
+
+    function readU16(view, offset) {
+      return view.getUint16(offset, true);
+    }
+
+    function readU32(view, offset) {
+      return view.getUint32(offset, true);
+    }
+
+    function zipEntries(view) {
+      const eocdSignature = 0x06054b50;
+      const centralSignature = 0x02014b50;
+      const minOffset = Math.max(0, view.byteLength - 0xffff - 22);
+      let eocdOffset = -1;
+
+      for (let offset = view.byteLength - 22; offset >= minOffset; offset -= 1) {
+        if (readU32(view, offset) === eocdSignature) {
+          eocdOffset = offset;
+          break;
+        }
+      }
+      if (eocdOffset < 0) {
+        throw new Error("zip end-of-central-directory record was not found");
+      }
+
+      const totalEntries = readU16(view, eocdOffset + 10);
+      let offset = readU32(view, eocdOffset + 16);
+      const decoder = new TextDecoder();
+      const entries = [];
+
+      for (let index = 0; index < totalEntries; index += 1) {
+        if (readU32(view, offset) !== centralSignature) {
+          throw new Error("zip central directory is malformed");
+        }
+
+        const method = readU16(view, offset + 10);
+        const compressedSize = readU32(view, offset + 20);
+        const uncompressedSize = readU32(view, offset + 24);
+        const nameLength = readU16(view, offset + 28);
+        const extraLength = readU16(view, offset + 30);
+        const commentLength = readU16(view, offset + 32);
+        const localHeaderOffset = readU32(view, offset + 42);
+        if (compressedSize === 0xffffffff || uncompressedSize === 0xffffffff || localHeaderOffset === 0xffffffff) {
+          throw new Error("zip64 artifacts are not supported by this viewer");
+        }
+
+        const nameBytes = new Uint8Array(view.buffer, offset + 46, nameLength);
+        entries.push({
+          name: decoder.decode(nameBytes),
+          method,
+          compressedSize,
+          uncompressedSize,
+          localHeaderOffset,
+        });
+        offset += 46 + nameLength + extraLength + commentLength;
+      }
+
+      return entries;
+    }
+
+    async function inflateRaw(bytes) {
+      if (!("DecompressionStream" in globalThis)) {
+        throw new Error("this browser cannot decompress zip entries");
+      }
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    async function readZipText(buffer, fileName) {
+      const view = new DataView(buffer);
+      const entries = zipEntries(view);
+      const entry = entries.find((item) => item.name === fileName)
+        || entries.find((item) => item.name.endsWith("/" + fileName));
+      if (!entry) {
+        throw new Error("file not found in artifact: " + fileName);
+      }
+
+      const localSignature = 0x04034b50;
+      const localOffset = entry.localHeaderOffset;
+      if (readU32(view, localOffset) !== localSignature) {
+        throw new Error("zip local file header is malformed");
+      }
+
+      const nameLength = readU16(view, localOffset + 26);
+      const extraLength = readU16(view, localOffset + 28);
+      const dataOffset = localOffset + 30 + nameLength + extraLength;
+      const compressed = new Uint8Array(buffer, dataOffset, entry.compressedSize);
+      let content;
+      if (entry.method === 0) {
+        content = compressed;
+      } else if (entry.method === 8) {
+        content = await inflateRaw(compressed);
+      } else {
+        throw new Error("unsupported zip compression method: " + entry.method);
+      }
+
+      if (entry.uncompressedSize !== 0 && content.byteLength !== entry.uncompressedSize) {
+        throw new Error("zip entry size mismatch for " + fileName);
+      }
+      return new TextDecoder().decode(content);
+    }
+
     for (const link of document.querySelectorAll("[data-lsif]")) {
       link.addEventListener("click", async (event) => {
-        if (location.protocol === "file:") {
-          return;
-        }
         event.preventDefault();
         viewer.hidden = false;
         viewerTitle.textContent = link.dataset.package;
-        viewerRaw.href = link.href;
         viewerContent.textContent = "Loading " + link.dataset.lsif + " ...";
         viewer.scrollIntoView({ block: "start" });
         try {
-          const response = await fetch(link.href);
-          if (!response.ok) {
-            throw new Error(response.status + " " + response.statusText);
-          }
-          viewerContent.textContent = await response.text();
+          const zip = await loadArtifactZip();
+          viewerContent.textContent = await readZipText(zip, link.dataset.lsif);
         } catch (error) {
-          viewerContent.textContent = "Could not load LSIF into this page: " + error + "\\nUse the raw LSIF link above.";
+          viewerContent.textContent = "Could not load LSIF into this page: " + error + "\\nUse the data artifact link above.";
         }
       });
     }
@@ -903,6 +1050,7 @@ ${htmlRows}
       href: row.href,
       error: row.error,
     })),
+    artifact: artifactConfig,
   };
 
   const summaryMd = [
@@ -911,11 +1059,13 @@ ${htmlRows}
     `- Packages: ${rows.length}`,
     `- Failures: ${failed.length}`,
     `- Overall LSIF hash: \`${overallHash ?? "unavailable"}\``,
-    `- Report entry: \`${path.relative(process.cwd(), path.join(args.out, "index.html"))}\``,
+    `- Preview entry: \`${path.relative(process.cwd(), path.join(args.previewOut, "index.html"))}\``,
+    `- Data artifact: \`${args.dataArtifactName}\``,
     "",
   ].join("\n");
 
-  await fs.writeFile(path.join(args.out, "index.html"), html);
+  await fs.mkdir(args.previewOut, { recursive: true });
+  await fs.writeFile(path.join(args.previewOut, "index.html"), html);
   await fs.writeFile(path.join(args.out, "summary.json"), `${JSON.stringify(summaryJson, null, 2)}\n`);
   await fs.writeFile(path.join(args.out, "summary.md"), summaryMd);
 }
@@ -923,29 +1073,17 @@ ${htmlRows}
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   await fs.mkdir(args.out, { recursive: true });
-  await fs.mkdir(args.packageCachePath, { recursive: true });
 
-  console.log(`Fetching package index: ${args.indexUrl}`);
-  const rawIndex = await fetchJson(args.indexUrl);
-  const rawPackages = Array.isArray(rawIndex) ? rawIndex : rawIndex.packages ?? rawIndex.entries;
-  if (!Array.isArray(rawPackages)) {
-    throw new Error("Package index must be an array or an object with a packages/entries array");
+  console.log(`Scanning packages in ${args.packageCachePath}`);
+  let packages = await discoverPackages(args.packageCachePath);
+  if (packages.length === 0) {
+    throw new Error(`No Typst packages found in ${args.packageCachePath}`);
   }
-
-  let packages = rawPackages
-    .map(normalizeIndexEntry)
-    .sort((left, right) => left.displayId.localeCompare(right.displayId, "en"));
 
   if (args.limit !== undefined) {
     packages = packages.slice(0, args.limit);
   }
   console.log(`Found ${packages.length} package versions`);
-
-  console.log(`Downloading packages into ${args.packageCachePath}`);
-  for (const [index, pkg] of packages.entries()) {
-    process.stdout.write(`[download ${index + 1}/${packages.length}] ${pkg.displayId}\n`);
-    await downloadPackage(args, pkg);
-  }
 
   console.log(`Generating LSIF with ${args.jobs} parallel job(s)`);
   const rows = await mapLimit(packages, args.jobs, async (pkg, index) => {
@@ -972,7 +1110,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Report written to ${path.join(args.out, "index.html")}`);
+  console.log(`Report written to ${path.join(args.previewOut, "index.html")}`);
 }
 
 main().catch((error) => {
