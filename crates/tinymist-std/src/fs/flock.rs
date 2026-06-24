@@ -562,3 +562,37 @@ mod sys {
         }
     }
 }
+
+#[cfg(not(any(unix, windows)))]
+mod sys {
+    use std::fs::File;
+    use std::io::{Error, Result};
+
+    pub(super) fn lock_shared(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn lock_exclusive(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn try_lock_shared(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn try_lock_exclusive(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn unlock(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn error_contended(_err: &Error) -> bool {
+        false
+    }
+
+    pub(super) fn error_unsupported(_err: &Error) -> bool {
+        false
+    }
+}

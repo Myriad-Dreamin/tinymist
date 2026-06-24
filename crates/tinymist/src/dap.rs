@@ -4,14 +4,22 @@ mod event;
 mod init;
 mod request;
 
+use std::sync::Arc;
+
+use dapts::StoppedEventReason;
 pub use init::*;
+use parking_lot::Mutex;
 
 use reflexo_typst::vfs::PathResolution;
+use reflexo_typst::TypstPagedDocument;
 use serde::{Deserialize, Serialize};
-use sync_ls::{invalid_request, LspResult};
+use sync_ls::{invalid_request, LspClient, LspResult};
+use tinymist_dap::{BreakpointContext, DebugAdaptor, DebugRequest};
 use tinymist_query::PositionEncoding;
+use typst::diag::{SourceResult, Warned};
+use typst::foundations::{Repr, Value};
 // use sync_lsp::RequestId;
-use typst::syntax::{FileId, Source};
+use typst::syntax::{FileId, Source, Span};
 
 use crate::project::LspCompileSnapshot;
 use crate::{ConstDapConfig, ServerState};
@@ -19,6 +27,7 @@ use crate::{ConstDapConfig, ServerState};
 #[derive(Default)]
 pub(crate) struct DebugState {
     pub(crate) session: Option<DebugSession>,
+    pub(crate) function_breakpoints: Vec<String>,
 }
 
 impl DebugState {
@@ -31,13 +40,9 @@ impl DebugState {
 
 pub(crate) struct DebugSession {
     config: ConstDapConfig,
+    adaptor: Arc<Debuggee>,
 
     snapshot: LspCompileSnapshot,
-    /// A faked thread id. We don't support multiple threads, so we can use a
-    /// hardcoded ID for the default thread.
-    thread_id: u64,
-    /// Whether the debugger should stop on entry.
-    stop_on_entry: bool,
 
     /// The current source file.
     source: Source,
@@ -95,4 +100,113 @@ pub struct DapPosition {
     /// If the character value is greater than the line length it defaults back
     /// to the line length.
     pub character: u64,
+}
+
+struct Debuggee {
+    tx: std::sync::mpsc::Sender<DebugRequest>,
+    current_span: Mutex<Option<Span>>,
+    /// Whether the debugger should stop on entry.
+    stop_on_entry: bool,
+    /// A faked thread id. We don't support multiple threads, so we can use a
+    /// hardcoded ID for the default thread.
+    thread_id: u64,
+    /// The client to respond DAP messages.
+    client: LspClient,
+}
+
+impl DebugAdaptor for Debuggee {
+    fn before_compile(&self) {
+        *self.current_span.lock() = None;
+
+        if self.stop_on_entry {
+            self.client
+                .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
+                    all_threads_stopped: Some(true),
+                    reason: StoppedEventReason::Entry,
+                    description: Some("Paused at the start of the document".into()),
+                    thread_id: Some(self.thread_id),
+                    hit_breakpoint_ids: None,
+                    preserve_focus_hint: Some(false),
+                    text: None,
+                });
+        }
+    }
+
+    fn after_compile(&self, result: Warned<SourceResult<TypstPagedDocument>>) {
+        *self.current_span.lock() = None;
+
+        // if args.compile_error {
+        // simulate a compile/build error in "launch" request:
+        // the error should not result in a modal dialog since 'showUser' is
+        // set to false. A missing 'showUser' should result in a
+        // modal dialog.
+
+        // this.sendErrorResponse(response, {
+        //   id: 1001,
+        //   format: `compile error: some fake error.`,
+        //   showUser:
+        //     args.compileError === "show" ? true : args.compileError ===
+        // "hide" ? false : undefined, });
+        // } else {
+        // this.sendResponse(response);
+        // }
+
+        // Since we haven't implemented breakpoints, we can only stop intermediately and
+        // response completions in repl console.
+        self.client
+            .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
+                all_threads_stopped: Some(true),
+                reason: StoppedEventReason::Pause,
+                description: Some("Paused at the end of the document".into()),
+                thread_id: Some(self.thread_id),
+                hit_breakpoint_ids: None,
+                preserve_focus_hint: Some(false),
+                text: None,
+            });
+    }
+
+    fn terminate(&self) {}
+
+    fn stopped(&self, ctx: &BreakpointContext) {
+        let source_span = ctx.source_span();
+        if source_span.id().is_none() {
+            *self.current_span.lock() = None;
+            return;
+        }
+
+        *self.current_span.lock() = Some(source_span);
+
+        let reason = match ctx.kind {
+            tinymist_dap::BreakpointKind::Function => StoppedEventReason::FunctionBreakpoint,
+            _ => StoppedEventReason::Breakpoint,
+        };
+
+        self.client
+            .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
+                all_threads_stopped: Some(true),
+                reason,
+                description: Some(format!("Paused at {} breakpoint", ctx.kind.to_str())),
+                thread_id: Some(self.thread_id),
+                hit_breakpoint_ids: None,
+                preserve_focus_hint: Some(false),
+                text: None,
+            });
+    }
+
+    fn respond(&self, id: i64, result: SourceResult<Value>) {
+        let req_id = sync_ls::RequestId::from(id as i32);
+        let response = match result {
+            Ok(val) => sync_ls::dap::Response::success(
+                id,
+                dapts::EvaluateResponse {
+                    result: format!("{}", val.repr()),
+                    ty: Some(format!("{}", val.ty().repr())),
+                    ..dapts::EvaluateResponse::default()
+                },
+            ),
+            Err(err) => sync_ls::dap::Response::error(id, Some(format!("{err:?}")), None),
+        };
+
+        self.client.respond(req_id, response.into());
+    }
 }

@@ -1,21 +1,15 @@
-use std::path::{Path, PathBuf};
+use std::{path::Path, sync::Arc};
 
-use comemo::Track;
-use dapts::{CompletionItem, ProcessEventStartMethod, StoppedEventReason, ThreadEventReason};
+use dapts::{ProcessEventStartMethod, ThreadEventReason};
 use reflexo::ImmutPath;
 use reflexo_typst::{EntryReader, TaskInputs};
 use serde::Deserialize;
-use sync_ls::{internal_error, invalid_params, invalid_request, just_ok, SchedulableResponse};
-use tinymist_std::error::prelude::*;
-use typst::{
-    engine::Sink,
-    foundations::{Context, Repr},
-    introspection::EmptyIntrospector,
-    routines::SpanMode,
-    syntax::{LinkedNode, Span, SyntaxMode},
-    World,
+use sync_ls::{
+    internal_error, invalid_request, just_ok, RequestId, SchedulableResponse, ScheduledResult,
 };
-use typst_shim::syntax::LinkedNodeExt;
+use tinymist_dap::DebugRequest;
+use tinymist_std::error::prelude::*;
+use typst::{World, WorldExt};
 
 use super::*;
 
@@ -28,6 +22,30 @@ impl ServerState {
         _args: dapts::ConfigurationDoneArguments,
     ) -> SchedulableResponse<()> {
         just_ok(())
+    }
+
+    /// Resumes the debuggee after a stopped event.
+    pub(crate) fn continue_debug(
+        &mut self,
+        args: dapts::ContinueArguments,
+    ) -> SchedulableResponse<dapts::ContinueResponse> {
+        let session = self.debug.session()?;
+        if args.thread_id != session.adaptor.thread_id {
+            return Err(invalid_request(format!(
+                "unknown debug thread: {}",
+                args.thread_id
+            )));
+        }
+
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Continue)
+            .map_err(|_| internal_error("debug session is closed"))?;
+
+        just_ok(dapts::ContinueResponse {
+            all_threads_continued: Some(true),
+        })
     }
 
     /// Should stop the debug session.
@@ -120,11 +138,26 @@ impl ServerState {
         let main_eof = main_source.text().len();
         let source = main_source.clone();
 
-        self.debug.session = Some(DebugSession {
-            config: self.config.const_dap_config.clone(),
-            snapshot,
+        let (adaptor_tx, adaptor_rx) = std::sync::mpsc::channel();
+        let adaptor = Arc::new(Debuggee {
+            tx: adaptor_tx,
+            current_span: Default::default(),
             stop_on_entry: args.stop_on_entry.unwrap_or_default(),
             thread_id: 1,
+            client: self.client.clone().to_untyped(),
+        });
+
+        tinymist_dap::start_session(
+            snapshot.world.clone(),
+            adaptor.clone(),
+            adaptor_rx,
+            self.debug.function_breakpoints.clone(),
+        );
+
+        self.debug.session = Some(DebugSession {
+            config: self.config.const_dap_config.clone(),
+            adaptor,
+            snapshot,
             // Since we haven't implemented breakpoints, we can only stop intermediately and
             // response completions in repl console.
             source,
@@ -141,27 +174,42 @@ impl ServerState {
         self.client
             .send_dap_event::<dapts::event::Thread>(dapts::ThreadEvent {
                 reason: ThreadEventReason::Started,
-                thread_id: self.debug.session()?.thread_id,
-            });
-
-        // Since we haven't implemented breakpoints, we can only stop intermediately and
-        // response completions in repl console.
-        let _ = self.debug.session()?.stop_on_entry;
-        self.client
-            .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
-                all_threads_stopped: Some(true),
-                reason: StoppedEventReason::Pause,
-                description: Some("Paused at the end of the document".into()),
-                thread_id: Some(self.debug.session()?.thread_id),
-                hit_breakpoint_ids: None,
-                preserve_focus_hint: Some(false),
-                text: None,
+                thread_id: self.debug.session()?.adaptor.thread_id,
             });
 
         just_ok(())
     }
 
     // customRequest
+}
+
+impl ServerState {
+    pub(crate) fn set_function_breakpoints(
+        &mut self,
+        args: dapts::SetFunctionBreakpointsArguments,
+    ) -> SchedulableResponse<dapts::SetFunctionBreakpointsResponse> {
+        self.debug.function_breakpoints = args
+            .breakpoints
+            .iter()
+            .map(|breakpoint| breakpoint.name.clone())
+            .collect();
+
+        tinymist_debug::set_debug_function_breakpoints(self.debug.function_breakpoints.clone());
+
+        just_ok(dapts::SetFunctionBreakpointsResponse {
+            breakpoints: args
+                .breakpoints
+                .iter()
+                .enumerate()
+                .map(|(idx, breakpoint)| dapts::Breakpoint {
+                    id: Some((idx + 1) as u64),
+                    message: Some(format!("Function breakpoint: {}", breakpoint.name)),
+                    verified: true,
+                    ..dapts::Breakpoint::default()
+                })
+                .collect(),
+        })
+    }
 }
 
 /// This interface describes the mock-debug specific launch attributes
@@ -192,44 +240,79 @@ impl ServerState {
             }],
         })
     }
+
+    pub(crate) fn debug_stack_trace(
+        &mut self,
+        args: dapts::StackTraceArguments,
+    ) -> SchedulableResponse<dapts::StackTraceResponse> {
+        let session = self.debug.session()?;
+        if args.thread_id != session.adaptor.thread_id {
+            return Err(invalid_request(format!(
+                "unknown debug thread: {}",
+                args.thread_id
+            )));
+        }
+
+        let current_span = *session.adaptor.current_span.lock();
+        let current_location = current_span.and_then(|span| {
+            let source = session.snapshot.world.source(span.id()?).ok()?;
+            Some((session.snapshot.world.range(span)?, source))
+        });
+        let (source, position, line_count) = if let Some((range, source)) = current_location {
+            (
+                session.to_dap_source(source.id()),
+                session.to_dap_position(range.start, &source),
+                source.text().lines().count().max(1) as u64,
+            )
+        } else {
+            (
+                session.to_dap_source(session.source.id()),
+                session.to_dap_position(session.position, &session.source),
+                session.source.text().lines().count().max(1) as u64,
+            )
+        };
+        let line = if session.config.lines_start_at1 {
+            position.line.clamp(1, line_count)
+        } else {
+            position.line.min(line_count.saturating_sub(1))
+        };
+
+        just_ok(dapts::StackTraceResponse {
+            stack_frames: vec![dapts::StackFrame {
+                can_restart: None,
+                column: position.character.min(u32::MAX as u64) as u32,
+                end_column: None,
+                end_line: None,
+                id: 1,
+                instruction_pointer_reference: None,
+                line: line.min(u32::MAX as u64) as u32,
+                module_id: None,
+                name: "main".into(),
+                presentation_hint: None,
+                source: Some(source),
+            }],
+            total_frames: Some(1),
+        })
+    }
 }
 
 impl ServerState {
     pub(crate) fn evaluate_repl(
         &mut self,
+        req_id: RequestId,
         args: dapts::EvaluateArguments,
-    ) -> SchedulableResponse<dapts::EvaluateResponse> {
+    ) -> ScheduledResult {
         let session = self.debug.session()?;
-        let world = &session.snapshot.world;
-        let library = &world.library;
 
-        let root = session.source.root();
-        let span = LinkedNode::new(root)
-            .leaf_at_compat(session.position)
-            .map(|node| node.span())
-            .unwrap_or_else(Span::detached);
-
-        let source = typst_shim::eval::eval_compat(&world, &session.source)
-            .map_err(|e| invalid_params(format!("{e:?}")))?;
-
-        let val = typst_shim::eval::eval_string(
-            (world as &dyn World).track(),
-            library,
-            Sink::new().track_mut(),
-            EmptyIntrospector.track(),
-            Context::none().track(),
-            &args.expression,
-            SpanMode::Uniform(span),
-            SyntaxMode::Code,
-            source.scope().clone(),
-        )
-        .map_err(|e| invalid_params(format!("{e:?}")))?;
-
-        just_ok(dapts::EvaluateResponse {
-            result: format!("{}", val.repr()),
-            ty: Some(format!("{}", val.ty().repr())),
-            ..dapts::EvaluateResponse::default()
-        })
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Evaluate(
+                RequestId::dap(req_id),
+                args.expression,
+            ))
+            .map_err(|_| internal_error("debug session is closed"))?;
+        Ok(Some(()))
     }
 
     pub(crate) fn complete_repl(

@@ -9,7 +9,8 @@ image_name="${TINYMIST_NVIM_IMAGE:-tinymist-nvim-spec-local}"
 
 case "${1:-}" in
   test)
-    docker_args=(python3 ./spec/main.py)
+    shift
+    docker_args=(python3 ./spec/main.py "$@")
     ;;
   bash)
     docker_args=(bash)
@@ -41,11 +42,19 @@ if [ ! -x "$tinymist_bin" ]; then
   exit 1
 fi
 
-(cd "$script_dir/samples" && docker build -t "$image_name" -f lazyvim-dev/Dockerfile .)
+mkdir -p "$script_dir/target/.local" "$script_dir/target/.cache"
+
+docker_build_args=(-t "$image_name" -f lazyvim-dev/Dockerfile)
+if [ -n "${TINYMIST_NVIM_DOCKER_BUILD_NETWORK:-}" ]; then
+  docker_build_args+=(--network "$TINYMIST_NVIM_DOCKER_BUILD_NETWORK")
+fi
+
+(cd "$script_dir/samples" && docker build "${docker_build_args[@]}" .)
 
 docker_run_args=(
   --rm
   --tmpfs /home/runner/dev/workspaces:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/dev/target:uid=1000,gid=1000,mode=755
   --tmpfs /home/runner/.local:uid=1000,gid=1000,mode=755
   --tmpfs /home/runner/.cache:uid=1000,gid=1000,mode=755
   -v "$repo_root/tests/workspaces:/home/runner/workspaces-src:ro"

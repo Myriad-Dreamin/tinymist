@@ -62,7 +62,7 @@ def prepare():
 if __name__ == "__main__":
     # Check if any test files are provided as command line arguments
     if len(sys.argv) > 1:
-        test_files = " ".join(sys.argv[1:])
+        test_files = sys.argv[1:]
     else:
         test_files = None
 

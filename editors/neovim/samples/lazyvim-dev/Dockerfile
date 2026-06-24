@@ -32,6 +32,7 @@ RUN set -eux; \
       AndrewRadev/switch.vim \
       andymass/vim-matchup \
       neovim/nvim-lspconfig \
+      mfussenegger/nvim-dap \
       nvim-lua/plenary.nvim \
       tomtom/tcomment_vim \
       lewis6991/satellite.nvim \

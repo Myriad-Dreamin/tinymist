@@ -63,13 +63,17 @@ pub fn start_session<F: CompilerFeat>(
     base: CompilerWorld<F>,
     adaptor: Arc<dyn DebugAdaptor>,
     rx: mpsc::Receiver<DebugRequest>,
+    function_breakpoints: Vec<String>,
 ) {
     let context = Arc::new(DebugContext {});
 
     std::thread::spawn(move || {
         let world = tinymist_debug::instr_breakpoints(&base);
 
-        if !set_debug_session(Some(DebugSession::new(context))) {
+        let mut session = DebugSession::new(context);
+        session.set_function_breakpoints(function_breakpoints);
+
+        if !set_debug_session(Some(session)) {
             adaptor.terminate();
             return None;
         }
@@ -137,10 +141,22 @@ fn step_global(kind: BreakpointKind, world: &dyn World) {
 
     let span = Span::detached();
 
+    let mut scopes = Scopes::new(Some(world.library()));
+    if matches!(kind, BreakpointKind::AfterCompile) {
+        let m = world
+            .source(world.main())
+            .ok()
+            .and_then(|s| typst_shim::eval::eval_compat(world, &s).ok());
+
+        if let Some(m) = m {
+            scopes.top = m.scope().clone();
+        }
+    }
+
     let context = BreakpointContext {
         engine: &engine,
         context: context.track(),
-        scopes: Scopes::new(Some(world.library())),
+        scopes,
         span,
         kind,
     };
@@ -160,6 +176,11 @@ pub struct BreakpointContext<'a, 'b, 'c> {
 }
 
 impl BreakpointContext<'_, '_, '_> {
+    /// The original source span that caused the breakpoint stop.
+    pub fn source_span(&self) -> Span {
+        self.span
+    }
+
     fn evaluate(&self, expr: &str) -> SourceResult<Value> {
         let mut root = parse_code(expr);
         root.synthesize(self.span);

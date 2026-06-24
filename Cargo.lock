@@ -6692,6 +6692,7 @@ dependencies = [
  "temp-env",
  "tempfile",
  "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-dap",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",

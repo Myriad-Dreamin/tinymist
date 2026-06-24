@@ -244,6 +244,7 @@ tinymist = { path = "./crates/tinymist/", version = "0.15.2", default-features =
 tinymist-analysis = { path = "./crates/tinymist-analysis/", version = "0.15.2" }
 tinymist-cli = { path = "./crates/tinymist-cli/", version = "0.15.2" }
 tinymist-debug = { path = "./crates/tinymist-debug/", version = "0.15.2" }
+tinymist-dap = { path = "./crates/tinymist-dap/", version = "0.15.2" }
 tinymist-lint = { path = "./crates/tinymist-lint/", version = "0.15.2" }
 tinymist-query = { path = "./crates/tinymist-query/", version = "0.15.2" }
 tinymist-render = { path = "./crates/tinymist-render/", version = "0.15.2" }

@@ -82,6 +82,8 @@ pub struct BreakpointInfo {
 }
 
 pub struct BreakpointItem {
+    pub kind: BreakpointKind,
+    pub function_name: Option<String>,
     pub origin_span: Span,
 }
 
@@ -103,6 +105,7 @@ pub trait DebugSessionHandler: Send + Sync {
 /// The debug session.
 pub struct DebugSession {
     enabled: FxHashSet<(FileId, usize, BreakpointKind)>,
+    function_breakpoints: FxHashSet<String>,
     /// The breakpoint meta.
     breakpoints: FxHashMap<FileId, Arc<BreakpointInfo>>,
 
@@ -115,8 +118,36 @@ impl DebugSession {
     pub fn new(handler: Arc<dyn DebugSessionHandler>) -> Self {
         Self {
             enabled: FxHashSet::default(),
+            function_breakpoints: FxHashSet::default(),
             breakpoints: FxHashMap::default(),
             handler,
+        }
+    }
+
+    /// Replaces the currently enabled function breakpoints by name.
+    pub fn set_function_breakpoints(&mut self, names: impl IntoIterator<Item = String>) {
+        self.function_breakpoints = names.into_iter().collect();
+        self.enabled
+            .retain(|(_, _, kind)| *kind != BreakpointKind::Function);
+
+        for (fid, info) in self.breakpoints.clone() {
+            self.enable_breakpoints_for(fid, &info);
+        }
+    }
+
+    fn enable_breakpoints_for(&mut self, fid: FileId, info: &BreakpointInfo) {
+        for (id, item) in info.meta.iter().enumerate() {
+            if !matches!(item.kind, BreakpointKind::Function) {
+                continue;
+            }
+
+            if item
+                .function_name
+                .as_ref()
+                .is_some_and(|name| self.function_breakpoints.contains(name))
+            {
+                self.enabled.insert((fid, id, BreakpointKind::Function));
+            }
         }
     }
 }
@@ -133,11 +164,22 @@ where
 pub fn set_debug_session(session: Option<DebugSession>) -> bool {
     let mut lock = DEBUG_SESSION.write();
 
-    if session.is_some() {
+    if session.is_some() && lock.is_some() {
         return false;
     }
 
     let _ = std::mem::replace(&mut *lock, session);
+    true
+}
+
+/// Updates function breakpoints for the active debug session, if any.
+pub fn set_debug_function_breakpoints(names: impl IntoIterator<Item = String>) -> bool {
+    let mut session = DEBUG_SESSION.write();
+    let Some(session) = session.as_mut() else {
+        return false;
+    };
+
+    session.set_function_breakpoints(names);
     true
 }
 
