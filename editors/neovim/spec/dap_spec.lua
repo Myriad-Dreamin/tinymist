@@ -213,4 +213,94 @@ describe('DAP breakpoints', function()
     assert.are.same(1, function_stack.line)
     assert.are.same(program, function_stack.source.path)
   end)
+
+  it('maps a source line breakpoint to a structural block breakpoint', function()
+    local root, program = prepare_program('source-line-breakpoint', {
+      '#let answer = {',
+      '  let x = 40',
+      '  x + 2',
+      '}',
+      '#answer',
+    })
+    local key = 'tinymist-dap-source-line-breakpoint'
+    local stopped = {}
+    local configured = false
+    local breakpoint_stack
+    local end_value
+    local failure
+
+    cleanup_listener(key)
+    dap.listeners.after.event_stopped[key] = function(session, body)
+      stopped[#stopped + 1] = body.reason or '<unknown>'
+
+      if body.reason == 'entry' then
+        request(session, 'setBreakpoints', {
+          source = { path = program },
+          breakpoints = {
+            { line = 2 },
+          },
+        }, function(err, response)
+          failure = failure or err
+          configured = response
+            and response.breakpoints
+            and response.breakpoints[1]
+            and response.breakpoints[1].verified
+            or false
+          continue_debug(session, body.threadId, function(continue_err)
+            failure = failure or continue_err
+          end)
+        end)
+        return
+      end
+
+      if body.reason == 'breakpoint' then
+        request(session, 'stackTrace', {
+          threadId = body.threadId or 1,
+        }, function(err, response)
+          failure = failure or err
+          breakpoint_stack = response and response.stackFrames and response.stackFrames[1] or breakpoint_stack
+          continue_debug(session, body.threadId, function(continue_err)
+            failure = failure or continue_err
+          end)
+        end)
+        return
+      end
+
+      if body.reason == 'pause' then
+        request(session, 'evaluate', {
+          expression = 'answer',
+          context = 'repl',
+          frameId = 1,
+        }, function(err, response)
+          failure = failure or err
+          end_value = response and response.result or end_value
+        end)
+      end
+    end
+
+    dap.run {
+      type = 'tinymist',
+      request = 'launch',
+      name = 'Tinymist source line breakpoint DAP spec',
+      program = program,
+      root = root,
+      stopOnEntry = true,
+    }
+
+    local ok = vim.wait(20000, function()
+      return failure ~= nil or end_value ~= nil
+    end, 50)
+
+    cleanup_listener(key)
+    finish_session()
+
+    assert.message(('timed out waiting for source breakpoint flow; stopped=%s'):format(vim.inspect(stopped))).is_true(ok)
+    assert.message(failure or 'source breakpoint DAP flow failed').is_nil(failure)
+    assert.is_true(configured)
+    assert.are.same('42', end_value)
+    assert.are.same({ 'entry', 'breakpoint', 'pause' }, stopped)
+    assert.is_not_nil(breakpoint_stack)
+    assert.are.same(1, breakpoint_stack.line)
+    assert.are.same(program, breakpoint_stack.source.path)
+  end)
 end)

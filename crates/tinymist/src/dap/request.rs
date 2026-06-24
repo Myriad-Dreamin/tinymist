@@ -1,6 +1,10 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
-use dapts::{ProcessEventStartMethod, ThreadEventReason};
+use dapts::{BreakpointReason, ProcessEventStartMethod, ThreadEventReason};
+use lsp_types::Url;
 use reflexo::ImmutPath;
 use reflexo_typst::{EntryReader, TaskInputs};
 use serde::Deserialize;
@@ -152,14 +156,23 @@ impl ServerState {
             adaptor.clone(),
             adaptor_rx,
             self.debug.function_breakpoints.clone(),
+            self.debug
+                .source_breakpoints
+                .iter()
+                .filter_map(|(path, breakpoints)| {
+                    Some((
+                        snapshot.world.file_id_by_path(path).ok()?,
+                        breakpoints.clone(),
+                    ))
+                })
+                .collect(),
         );
 
         self.debug.session = Some(DebugSession {
             config: self.config.const_dap_config.clone(),
             adaptor,
             snapshot,
-            // Since we haven't implemented breakpoints, we can only stop intermediately and
-            // response completions in repl console.
+            // Keep the main source and EOF position as the fallback stack frame.
             source,
             position: main_eof,
         });
@@ -184,6 +197,114 @@ impl ServerState {
 }
 
 impl ServerState {
+    pub(crate) fn set_breakpoints(
+        &mut self,
+        args: dapts::SetBreakpointsArguments,
+    ) -> SchedulableResponse<dapts::SetBreakpointsResponse> {
+        let requested = source_breakpoints_from_args(args.breakpoints, args.lines);
+        let Some(path) = self.dap_source_path(&args.source) else {
+            return just_ok(dapts::SetBreakpointsResponse {
+                breakpoints: requested
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, breakpoint)| {
+                        failed_source_breakpoint(
+                            idx,
+                            &args.source,
+                            breakpoint.line,
+                            breakpoint.column,
+                            "source breakpoints require source.path",
+                        )
+                    })
+                    .collect(),
+            });
+        };
+
+        let mut unsupported = Vec::with_capacity(requested.len());
+        let mut source_breakpoints = Vec::new();
+        for breakpoint in &requested {
+            let unsupported_message = unsupported_source_breakpoint_message(breakpoint);
+            unsupported.push(unsupported_message);
+
+            if unsupported_message.is_none() {
+                source_breakpoints.push(tinymist_debug::SourceBreakpoint {
+                    line: self.dap_line_to_zero_based(breakpoint.line),
+                    column: breakpoint
+                        .column
+                        .map(|column| self.dap_column_to_zero_based(column)),
+                });
+            }
+        }
+
+        if source_breakpoints.is_empty() {
+            self.debug.source_breakpoints.remove(&path);
+        } else {
+            self.debug
+                .source_breakpoints
+                .insert(path.clone(), source_breakpoints.clone());
+        }
+
+        let active_resolutions = self
+            .debug
+            .session
+            .as_ref()
+            .and_then(|session| session.snapshot.world.source_by_path(&path).ok())
+            .and_then(|source| {
+                tinymist_debug::set_debug_source_breakpoints(source, source_breakpoints.clone())
+            });
+        let mut active_resolutions = active_resolutions.into_iter().flatten();
+
+        let breakpoints = requested
+            .iter()
+            .zip(unsupported)
+            .enumerate()
+            .map(|(idx, (breakpoint, unsupported_message))| {
+                if let Some(message) = unsupported_message {
+                    return failed_source_breakpoint(
+                        idx,
+                        &args.source,
+                        breakpoint.line,
+                        breakpoint.column,
+                        message,
+                    );
+                }
+
+                let Some(resolution) = active_resolutions.next() else {
+                    return pending_source_breakpoint(idx, &args.source, breakpoint);
+                };
+
+                let Some(resolved) = resolution.resolved else {
+                    if resolution.pending {
+                        return pending_source_breakpoint(idx, &args.source, breakpoint);
+                    }
+
+                    return failed_source_breakpoint(
+                        idx,
+                        &args.source,
+                        breakpoint.line,
+                        breakpoint.column,
+                        "no block/function breakpoint location found near this line",
+                    );
+                };
+
+                dapts::Breakpoint {
+                    id: Some((idx + 1) as u64),
+                    line: Some(self.zero_based_line_to_dap(resolved.line)),
+                    column: Some(self.zero_based_column_to_dap(resolved.column)),
+                    message: Some(format!(
+                        "Mapped to nearest Typst {} breakpoint",
+                        resolved.kind.to_str()
+                    )),
+                    source: Some(args.source.clone()),
+                    verified: true,
+                    ..dapts::Breakpoint::default()
+                }
+            })
+            .collect();
+
+        just_ok(dapts::SetBreakpointsResponse { breakpoints })
+    }
+
     pub(crate) fn set_function_breakpoints(
         &mut self,
         args: dapts::SetFunctionBreakpointsArguments,
@@ -209,6 +330,128 @@ impl ServerState {
                 })
                 .collect(),
         })
+    }
+}
+
+impl ServerState {
+    fn dap_source_path(&self, source: &dapts::Source) -> Option<PathBuf> {
+        let path = source.path.as_ref()?;
+        match self.config.const_dap_config.path_format {
+            crate::DapPathFormat::Uri => {
+                let uri = Url::parse(path).ok()?;
+                Some(tinymist_query::url_to_path(&uri))
+            }
+            crate::DapPathFormat::Path | crate::DapPathFormat::Unknown => Some(PathBuf::from(path)),
+            _ => Some(PathBuf::from(path)),
+        }
+    }
+
+    fn dap_line_to_zero_based(&self, line: u32) -> u32 {
+        if self.config.const_dap_config.lines_start_at1 {
+            line.saturating_sub(1)
+        } else {
+            line
+        }
+    }
+
+    fn dap_column_to_zero_based(&self, column: u32) -> u32 {
+        if self.config.const_dap_config.columns_start_at1 {
+            column.saturating_sub(1)
+        } else {
+            column
+        }
+    }
+
+    fn zero_based_line_to_dap(&self, line: u32) -> u32 {
+        if self.config.const_dap_config.lines_start_at1 {
+            line.saturating_add(1)
+        } else {
+            line
+        }
+    }
+
+    fn zero_based_column_to_dap(&self, column: u32) -> u32 {
+        if self.config.const_dap_config.columns_start_at1 {
+            column.saturating_add(1)
+        } else {
+            column
+        }
+    }
+}
+
+fn source_breakpoints_from_args(
+    breakpoints: Option<Vec<dapts::SourceBreakpoint>>,
+    lines: Option<Vec<u64>>,
+) -> Vec<dapts::SourceBreakpoint> {
+    if let Some(breakpoints) = breakpoints {
+        return breakpoints;
+    }
+
+    lines
+        .unwrap_or_default()
+        .into_iter()
+        .map(|line| dapts::SourceBreakpoint {
+            column: None,
+            condition: None,
+            hit_condition: None,
+            line: line.min(u32::MAX as u64) as u32,
+            log_message: None,
+            mode: None,
+        })
+        .collect()
+}
+
+fn unsupported_source_breakpoint_message(
+    breakpoint: &dapts::SourceBreakpoint,
+) -> Option<&'static str> {
+    if breakpoint.condition.is_some() {
+        return Some("conditional source breakpoints are not supported");
+    }
+    if breakpoint.hit_condition.is_some() {
+        return Some("hit-count source breakpoints are not supported");
+    }
+    if breakpoint.log_message.is_some() {
+        return Some("logpoints are not supported");
+    }
+    if breakpoint.mode.is_some() {
+        return Some("breakpoint modes are not supported");
+    }
+
+    None
+}
+
+fn pending_source_breakpoint(
+    idx: usize,
+    source: &dapts::Source,
+    breakpoint: &dapts::SourceBreakpoint,
+) -> dapts::Breakpoint {
+    dapts::Breakpoint {
+        id: Some((idx + 1) as u64),
+        line: Some(breakpoint.line),
+        column: breakpoint.column,
+        message: Some("Line breakpoint will bind to the nearest Typst block/function hook".into()),
+        source: Some(source.clone()),
+        verified: true,
+        ..dapts::Breakpoint::default()
+    }
+}
+
+fn failed_source_breakpoint(
+    idx: usize,
+    source: &dapts::Source,
+    line: u32,
+    column: Option<u32>,
+    message: impl Into<String>,
+) -> dapts::Breakpoint {
+    dapts::Breakpoint {
+        id: Some((idx + 1) as u64),
+        line: Some(line),
+        column,
+        message: Some(message.into()),
+        reason: Some(BreakpointReason::Failed),
+        source: Some(source.clone()),
+        verified: false,
+        ..dapts::Breakpoint::default()
     }
 }
 

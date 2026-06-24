@@ -4,6 +4,8 @@ mod event;
 mod init;
 mod request;
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use dapts::StoppedEventReason;
@@ -28,6 +30,7 @@ use crate::{ConstDapConfig, ServerState};
 pub(crate) struct DebugState {
     pub(crate) session: Option<DebugSession>,
     pub(crate) function_breakpoints: Vec<String>,
+    pub(crate) source_breakpoints: HashMap<PathBuf, Vec<tinymist_debug::SourceBreakpoint>>,
 }
 
 impl DebugState {
@@ -151,8 +154,7 @@ impl DebugAdaptor for Debuggee {
         // this.sendResponse(response);
         // }
 
-        // Since we haven't implemented breakpoints, we can only stop intermediately and
-        // response completions in repl console.
+        // Stop at the end of compilation so the REPL can inspect module scope.
         self.client
             .send_dap_event::<dapts::event::Stopped>(dapts::StoppedEvent {
                 all_threads_stopped: Some(true),

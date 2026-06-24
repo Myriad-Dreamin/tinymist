@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use comemo::Tracked;
 use parking_lot::RwLock;
+use tinymist_analysis::location::{PositionEncoding, to_lsp_position};
 use tinymist_std::hash::{FxHashMap, FxHashSet};
 use tinymist_world::vfs::FileId;
 use typst::World;
@@ -13,6 +14,7 @@ use typst::diag::FileResult;
 use typst::engine::Engine;
 use typst::foundations::{Binding, Context, Dict, Scopes, func};
 use typst::syntax::{Source, Span};
+use typst_shim::syntax::source_range;
 
 use crate::instrument::Instrumenter;
 
@@ -87,6 +89,41 @@ pub struct BreakpointItem {
     pub origin_span: Span,
 }
 
+/// A source breakpoint requested by line and optional column.
+///
+/// Lines and columns are zero-based. Columns are measured as UTF-16 code units.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SourceBreakpoint {
+    /// The requested source line.
+    pub line: u32,
+    /// The requested source column.
+    pub column: Option<u32>,
+}
+
+/// The result of resolving a source breakpoint to a structural breakpoint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceBreakpointResolution {
+    /// The original requested breakpoint.
+    pub requested: SourceBreakpoint,
+    /// The structural breakpoint this request maps to, if any.
+    pub resolved: Option<ResolvedSourceBreakpoint>,
+    /// Whether the source breakpoint is waiting for instrumentation metadata.
+    pub pending: bool,
+}
+
+/// A structural breakpoint selected for a source breakpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedSourceBreakpoint {
+    /// The structural breakpoint id within the instrumented source metadata.
+    pub id: usize,
+    /// The kind of structural breakpoint.
+    pub kind: BreakpointKind,
+    /// The resolved zero-based source line.
+    pub line: u32,
+    /// The resolved zero-based UTF-16 source column.
+    pub column: u32,
+}
+
 static DEBUG_SESSION: RwLock<Option<DebugSession>> = RwLock::new(None);
 
 /// The debug session handler.
@@ -104,8 +141,10 @@ pub trait DebugSessionHandler: Send + Sync {
 
 /// The debug session.
 pub struct DebugSession {
-    enabled: FxHashSet<(FileId, usize, BreakpointKind)>,
+    enabled_function_breakpoints: FxHashSet<(FileId, usize, BreakpointKind)>,
+    enabled_source_breakpoints: FxHashSet<(FileId, usize, BreakpointKind)>,
     function_breakpoints: FxHashSet<String>,
+    source_breakpoints: FxHashMap<FileId, Vec<SourceBreakpoint>>,
     /// The breakpoint meta.
     breakpoints: FxHashMap<FileId, Arc<BreakpointInfo>>,
 
@@ -117,8 +156,10 @@ impl DebugSession {
     /// Creates a new debug session.
     pub fn new(handler: Arc<dyn DebugSessionHandler>) -> Self {
         Self {
-            enabled: FxHashSet::default(),
+            enabled_function_breakpoints: FxHashSet::default(),
+            enabled_source_breakpoints: FxHashSet::default(),
             function_breakpoints: FxHashSet::default(),
+            source_breakpoints: FxHashMap::default(),
             breakpoints: FxHashMap::default(),
             handler,
         }
@@ -127,15 +168,58 @@ impl DebugSession {
     /// Replaces the currently enabled function breakpoints by name.
     pub fn set_function_breakpoints(&mut self, names: impl IntoIterator<Item = String>) {
         self.function_breakpoints = names.into_iter().collect();
-        self.enabled
-            .retain(|(_, _, kind)| *kind != BreakpointKind::Function);
+        self.enabled_function_breakpoints.clear();
 
         for (fid, info) in self.breakpoints.clone() {
-            self.enable_breakpoints_for(fid, &info);
+            self.enable_function_breakpoints_for(fid, &info);
         }
     }
 
-    fn enable_breakpoints_for(&mut self, fid: FileId, info: &BreakpointInfo) {
+    /// Replaces source breakpoints for a file id.
+    pub fn set_source_breakpoints(
+        &mut self,
+        fid: FileId,
+        breakpoints: impl IntoIterator<Item = SourceBreakpoint>,
+    ) {
+        let breakpoints = breakpoints.into_iter().collect::<Vec<_>>();
+
+        if breakpoints.is_empty() {
+            self.source_breakpoints.remove(&fid);
+        } else {
+            self.source_breakpoints.insert(fid, breakpoints);
+        }
+
+        self.enabled_source_breakpoints
+            .retain(|(enabled_fid, _, _)| *enabled_fid != fid);
+    }
+
+    /// Replaces source breakpoints for a source and resolves them if metadata is available.
+    pub fn set_source_breakpoints_for(
+        &mut self,
+        source: &Source,
+        breakpoints: impl IntoIterator<Item = SourceBreakpoint>,
+    ) -> Vec<SourceBreakpointResolution> {
+        let fid = source.id();
+        self.set_source_breakpoints(fid, breakpoints);
+
+        let Some(info) = self.breakpoints.get(&fid).cloned() else {
+            return self.pending_source_breakpoints(fid);
+        };
+
+        self.enable_source_breakpoints_for(source, &info)
+    }
+
+    fn enable_breakpoints_for(
+        &mut self,
+        source: &Source,
+        info: &BreakpointInfo,
+    ) -> Vec<SourceBreakpointResolution> {
+        let fid = source.id();
+        self.enable_function_breakpoints_for(fid, info);
+        self.enable_source_breakpoints_for(source, info)
+    }
+
+    fn enable_function_breakpoints_for(&mut self, fid: FileId, info: &BreakpointInfo) {
         for (id, item) in info.meta.iter().enumerate() {
             if !matches!(item.kind, BreakpointKind::Function) {
                 continue;
@@ -146,9 +230,150 @@ impl DebugSession {
                 .as_ref()
                 .is_some_and(|name| self.function_breakpoints.contains(name))
             {
-                self.enabled.insert((fid, id, BreakpointKind::Function));
+                self.enabled_function_breakpoints
+                    .insert((fid, id, BreakpointKind::Function));
             }
         }
+    }
+
+    fn enable_source_breakpoints_for(
+        &mut self,
+        source: &Source,
+        info: &BreakpointInfo,
+    ) -> Vec<SourceBreakpointResolution> {
+        let fid = source.id();
+        self.enabled_source_breakpoints
+            .retain(|(enabled_fid, _, _)| *enabled_fid != fid);
+
+        let Some(breakpoints) = self.source_breakpoints.get(&fid).cloned() else {
+            return vec![];
+        };
+
+        let candidates = SourceBreakpointCandidate::collect(source, info);
+
+        breakpoints
+            .into_iter()
+            .map(|requested| {
+                let resolved =
+                    best_source_breakpoint_candidate(&requested, &candidates).map(|candidate| {
+                        self.enabled_source_breakpoints
+                            .insert((fid, candidate.id, candidate.kind));
+
+                        ResolvedSourceBreakpoint {
+                            id: candidate.id,
+                            kind: candidate.kind,
+                            line: candidate.line,
+                            column: candidate.column,
+                        }
+                    });
+
+                SourceBreakpointResolution {
+                    requested,
+                    resolved,
+                    pending: false,
+                }
+            })
+            .collect()
+    }
+
+    fn pending_source_breakpoints(&self, fid: FileId) -> Vec<SourceBreakpointResolution> {
+        self.source_breakpoints
+            .get(&fid)
+            .into_iter()
+            .flatten()
+            .cloned()
+            .map(|requested| SourceBreakpointResolution {
+                requested,
+                resolved: None,
+                pending: true,
+            })
+            .collect()
+    }
+
+    fn breakpoint_enabled(&self, bp: &(FileId, usize, BreakpointKind)) -> bool {
+        self.enabled_function_breakpoints.contains(bp)
+            || self.enabled_source_breakpoints.contains(bp)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SourceBreakpointCandidate {
+    id: usize,
+    kind: BreakpointKind,
+    line: u32,
+    column: u32,
+}
+
+impl SourceBreakpointCandidate {
+    fn collect(source: &Source, info: &BreakpointInfo) -> Vec<Self> {
+        info.meta
+            .iter()
+            .enumerate()
+            .filter_map(|(id, item)| {
+                if !is_source_breakpoint_target(item.kind) {
+                    return None;
+                }
+
+                let range = source_range(source, item.origin_span)?;
+                let position = to_lsp_position(range.start, PositionEncoding::Utf16, source);
+
+                Some(Self {
+                    id,
+                    kind: item.kind,
+                    line: position.line,
+                    column: position.character,
+                })
+            })
+            .collect()
+    }
+}
+
+fn best_source_breakpoint_candidate(
+    breakpoint: &SourceBreakpoint,
+    candidates: &[SourceBreakpointCandidate],
+) -> Option<SourceBreakpointCandidate> {
+    candidates
+        .iter()
+        .min_by_key(|candidate| {
+            let line_bucket = if matches!(candidate.kind, BreakpointKind::BlockEnd) {
+                3
+            } else if candidate.line == breakpoint.line {
+                0
+            } else if candidate.line > breakpoint.line {
+                1
+            } else {
+                2
+            };
+            let column = breakpoint.column.unwrap_or(0);
+
+            (
+                line_bucket,
+                candidate.line.abs_diff(breakpoint.line),
+                source_breakpoint_kind_priority(candidate.kind),
+                candidate.column.abs_diff(column),
+                candidate.id,
+            )
+        })
+        .copied()
+}
+
+fn is_source_breakpoint_target(kind: BreakpointKind) -> bool {
+    matches!(
+        kind,
+        BreakpointKind::Function
+            | BreakpointKind::BlockStart
+            | BreakpointKind::ShowStart
+            | BreakpointKind::BlockEnd
+    )
+}
+
+fn source_breakpoint_kind_priority(kind: BreakpointKind) -> u8 {
+    match kind {
+        BreakpointKind::Function => 0,
+        BreakpointKind::BlockStart => 1,
+        BreakpointKind::ShowStart => 2,
+        BreakpointKind::BlockEnd => 3,
+        _ => 4,
     }
 }
 
@@ -183,6 +408,17 @@ pub fn set_debug_function_breakpoints(names: impl IntoIterator<Item = String>) -
     true
 }
 
+/// Updates source breakpoints for an active debug session, if any.
+pub fn set_debug_source_breakpoints(
+    source: Source,
+    breakpoints: impl IntoIterator<Item = SourceBreakpoint>,
+) -> Option<Vec<SourceBreakpointResolution>> {
+    let mut session = DEBUG_SESSION.write();
+    let session = session.as_mut()?;
+
+    Some(session.set_source_breakpoints_for(&source, breakpoints))
+}
+
 /// Software breakpoints
 fn check_soft_breakpoint(span: Span, id: usize, kind: BreakpointKind) -> Option<bool> {
     let fid = span.id()?;
@@ -191,7 +427,7 @@ fn check_soft_breakpoint(span: Span, id: usize, kind: BreakpointKind) -> Option<
     let session = session.as_ref()?;
 
     let bp_feature = (fid, id, kind);
-    Some(session.enabled.contains(&bp_feature))
+    Some(session.breakpoint_enabled(&bp_feature))
 }
 
 /// Software breakpoints
@@ -210,7 +446,7 @@ fn soft_breakpoint_handle(
         let session = session.as_ref()?;
 
         let bp_feature = (fid, id, kind);
-        if !session.enabled.contains(&bp_feature) {
+        if !session.breakpoint_enabled(&bp_feature) {
             return None;
         }
 

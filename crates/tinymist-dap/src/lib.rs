@@ -21,9 +21,9 @@ use std::sync::{Arc, mpsc};
 use comemo::Track;
 use comemo::Tracked;
 use parking_lot::Mutex;
-use tinymist_debug::{DebugSession, DebugSessionHandler, set_debug_session};
+use tinymist_debug::{DebugSession, DebugSessionHandler, SourceBreakpoint, set_debug_session};
 use tinymist_std::typst_shim::eval::{Eval, Vm};
-use tinymist_world::{CompilerFeat, CompilerWorld};
+use tinymist_world::{CompilerFeat, CompilerWorld, vfs::FileId};
 use typst::{
     __bail as bail, World,
     diag::{SourceResult, Warned},
@@ -64,6 +64,7 @@ pub fn start_session<F: CompilerFeat>(
     adaptor: Arc<dyn DebugAdaptor>,
     rx: mpsc::Receiver<DebugRequest>,
     function_breakpoints: Vec<String>,
+    source_breakpoints: Vec<(FileId, Vec<SourceBreakpoint>)>,
 ) {
     let context = Arc::new(DebugContext {});
 
@@ -72,6 +73,9 @@ pub fn start_session<F: CompilerFeat>(
 
         let mut session = DebugSession::new(context);
         session.set_function_breakpoints(function_breakpoints);
+        for (fid, breakpoints) in source_breakpoints {
+            session.set_source_breakpoints(fid, breakpoints);
+        }
 
         if !set_debug_session(Some(session)) {
             adaptor.terminate();
