@@ -54,6 +54,7 @@ fi
 docker_run_args=(
   --rm
   --tmpfs /home/runner/dev/workspaces:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/dev/target:uid=1000,gid=1000,mode=755
   --tmpfs /home/runner/.local:uid=1000,gid=1000,mode=755
   --tmpfs /home/runner/.cache:uid=1000,gid=1000,mode=755
   -v "$repo_root/tests/workspaces:/home/runner/workspaces-src:ro"

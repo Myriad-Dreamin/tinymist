@@ -57,7 +57,7 @@ tinymist-std.workspace = true
 tinymist-preview = { workspace = true, optional = true }
 tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-render.workspace = true
-tinymist-dap.workspace = true
+tinymist-dap = { workspace = true, optional = true }
 tinymist-task.workspace = true
 tokio = { workspace = true }
 tokio-util.workspace = true
@@ -116,7 +116,7 @@ no-content-hint = ["reflexo-typst/no-content-hint"]
 # Allows to detect battery status (to determine whether to run in syntax-only mode).
 battery = ["tinymist-std/battery"]
 # Enables DAP protocol.
-dap = ["sync-ls/dap", "tinymist-debug"]
+dap = ["sync-ls/dap", "tinymist-dap", "tinymist-debug"]
 # Enables preview server.
 preview = [
     "http-body-util",

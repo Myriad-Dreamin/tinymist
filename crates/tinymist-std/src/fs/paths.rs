@@ -305,6 +305,16 @@ pub fn path2bytes(path: &Path) -> Result<&[u8]> {
             )),
         }
     }
+    #[cfg(not(any(unix, windows)))]
+    {
+        match path.as_os_str().to_str() {
+            Some(s) => Ok(s.as_bytes()),
+            None => Err(anyhow::format_err!(
+                "invalid non-unicode path: {}",
+                path.display()
+            )),
+        }
+    }
 }
 
 /// Converts UTF-8 bytes to a path.
@@ -315,6 +325,14 @@ pub fn bytes2path(bytes: &[u8]) -> Result<PathBuf> {
         Ok(PathBuf::from(OsStr::from_bytes(bytes)))
     }
     #[cfg(windows)]
+    {
+        use std::str;
+        match str::from_utf8(bytes) {
+            Ok(s) => Ok(PathBuf::from(s)),
+            Err(..) => Err(anyhow::format_err!("invalid non-unicode path")),
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         use std::str;
         match str::from_utf8(bytes) {
@@ -550,7 +568,18 @@ fn _link_or_copy(src: &Path, dst: &Path) -> Result<()> {
         } else {
             src
         };
-        symlink(src, dst)
+        #[cfg(any(unix, windows, target_os = "redox"))]
+        {
+            symlink(src, dst)
+        }
+        #[cfg(not(any(unix, windows, target_os = "redox")))]
+        {
+            let _ = src;
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "symlinks are not supported on this target",
+            ))
+        }
     } else if cfg!(target_os = "macos") {
         // There seems to be a race condition with APFS when hard-linking
         // binaries. Gatekeeper does not have signing or hash information
