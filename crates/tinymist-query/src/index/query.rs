@@ -18,7 +18,7 @@ use crate::{
 use super::protocol::*;
 use lsp_types::{GotoDefinitionResponse, Hover, LocationLink, Position, Range, Url};
 
-/// The context for querying the index.
+/// The context for querying an LSIF JSONL index.
 #[derive(Default)]
 pub struct IndexQueryCtx {
     meta: Option<MetaData>,
