@@ -5,15 +5,15 @@ use typst::syntax::ast::{self, AstNode};
 use super::*;
 
 impl Instrumenter for BreakpointInstr {
-    fn instrument(&self, _source: Source) -> FileResult<Source> {
-        let (new, meta) = instrument_breakpoints(_source)?;
+    fn instrument(&self, source: Source) -> FileResult<Source> {
+        let (new, meta) = instrument_breakpoints(source.clone())?;
 
         let mut session = DEBUG_SESSION.write();
         let session = session
             .as_mut()
             .ok_or_else(|| FileError::Other(Some("No active debug session".into())))?;
 
-        session.enable_breakpoints_for(new.id(), &meta);
+        session.enable_breakpoints_for(&source, &meta);
         session.breakpoints.insert(new.id(), meta);
 
         Ok(new)
@@ -423,5 +423,46 @@ mod tests {
         __it => {if __breakpoint_show_start(0) {__breakpoint_show_start_handle(0, (:)); };
         __bp_functor(__it); } }
         ");
+    }
+
+    struct NoopHandler;
+
+    impl DebugSessionHandler for NoopHandler {
+        fn on_breakpoint(
+            &self,
+            _engine: &Engine,
+            _context: Tracked<Context>,
+            _scopes: Scopes,
+            _span: Span,
+            _kind: BreakpointKind,
+        ) {
+        }
+    }
+
+    #[test]
+    fn test_source_breakpoint_resolves_to_block_start() {
+        let source = Source::detached(
+            r#"#let answer = {
+  let x = 40
+  x + 2
+}
+#answer"#,
+        );
+        let (_new, meta) = instrument_breakpoints(source.clone()).unwrap();
+        let mut session = DebugSession::new(Arc::new(NoopHandler));
+        session.breakpoints.insert(source.id(), meta);
+
+        let resolutions = session.set_source_breakpoints_for(
+            &source,
+            vec![SourceBreakpoint {
+                line: 1,
+                column: None,
+            }],
+        );
+
+        assert_eq!(resolutions.len(), 1);
+        let resolved = resolutions[0].resolved.unwrap();
+        assert_eq!(resolved.kind, BreakpointKind::BlockStart);
+        assert_eq!(resolved.line, 0);
     }
 }
