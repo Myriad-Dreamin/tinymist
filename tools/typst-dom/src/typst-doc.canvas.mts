@@ -173,6 +173,7 @@ export function provideCanvasDoc<
             body: true,
           },
         });
+        const canvasUpdated = !cached || cacheKey !== result.cacheKey;
         if (cacheKey !== result.cacheKey) {
           console.log("updateCanvas one miss", cacheKey, result.cacheKey);
           // console.log('renderCanvas', pageInfo.index, performance.now() - tt1, result);
@@ -185,7 +186,9 @@ export function provideCanvasDoc<
           pageInfo.elem.setAttribute("data-cache-key", result.cacheKey);
         }
 
-        await waitABit();
+        if (canvasUpdated) {
+          await waitABit();
+        }
       }
 
       console.log("updateCanvas done", performance.now() - perf);
