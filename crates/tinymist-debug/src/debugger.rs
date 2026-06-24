@@ -136,6 +136,7 @@ pub trait DebugSessionHandler: Send + Sync {
         scopes: Scopes,
         span: Span,
         kind: BreakpointKind,
+        function_name: Option<String>,
     );
 }
 
@@ -363,6 +364,7 @@ fn is_source_breakpoint_target(kind: BreakpointKind) -> bool {
         BreakpointKind::Function
             | BreakpointKind::BlockStart
             | BreakpointKind::ShowStart
+            | BreakpointKind::Return
             | BreakpointKind::BlockEnd
     )
 }
@@ -372,8 +374,9 @@ fn source_breakpoint_kind_priority(kind: BreakpointKind) -> u8 {
         BreakpointKind::Function => 0,
         BreakpointKind::BlockStart => 1,
         BreakpointKind::ShowStart => 2,
-        BreakpointKind::BlockEnd => 3,
-        _ => 4,
+        BreakpointKind::Return => 3,
+        BreakpointKind::BlockEnd => 4,
+        _ => 5,
     }
 }
 
@@ -441,7 +444,7 @@ fn soft_breakpoint_handle(
 ) -> Option<()> {
     let fid = span.id()?;
 
-    let (handler, origin_span) = {
+    let (handler, origin_span, function_name) = {
         let session = DEBUG_SESSION.read();
         let session = session.as_ref()?;
 
@@ -451,7 +454,11 @@ fn soft_breakpoint_handle(
         }
 
         let item = session.breakpoints.get(&fid)?.meta.get(id)?;
-        (session.handler.clone(), item.origin_span)
+        (
+            session.handler.clone(),
+            item.origin_span,
+            item.function_name.clone(),
+        )
     };
 
     let mut scopes = Scopes::new(Some(engine.world.library()));
@@ -461,7 +468,7 @@ fn soft_breakpoint_handle(
         }
     }
 
-    handler.on_breakpoint(engine, context, scopes, origin_span, kind);
+    handler.on_breakpoint(engine, context, scopes, origin_span, kind, function_name);
     Some(())
 }
 
