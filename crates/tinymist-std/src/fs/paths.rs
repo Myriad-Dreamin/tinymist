@@ -636,6 +636,47 @@ pub fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<u64> {
         .with_context(|| format!("failed to copy `{}` to `{}`", from.display(), to.display()))
 }
 
+/// Recursively copies a directory.
+///
+/// Symlinks are followed and copied as their target contents.
+pub fn copy_dir_all<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
+    let from = from.as_ref();
+    let to = to.as_ref();
+    _copy_dir_all(from, to)
+}
+
+fn _copy_dir_all(from: &Path, to: &Path) -> Result<()> {
+    create_dir_all(to)?;
+    let entries = from
+        .read_dir()
+        .with_context(|| format!("failed to read directory `{}`", from.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .with_context(|| format!("failed to read directory entry in `{}`", from.display()))?;
+        let source = entry.path();
+        let target = to.join(entry.file_name());
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("failed to read file type for `{}`", source.display()))?;
+
+        if file_type.is_dir() {
+            copy_dir_all(&source, &target)?;
+        } else if file_type.is_file() {
+            copy(&source, &target)?;
+        } else if file_type.is_symlink() {
+            let metadata = metadata(&source)?;
+            if metadata.is_dir() {
+                copy_dir_all(&source, &target)?;
+            } else {
+                copy(&source, &target)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Strips `base` from `path`.
 ///
 /// This canonicalizes both paths before stripping. This is useful if the

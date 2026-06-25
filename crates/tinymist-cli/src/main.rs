@@ -12,6 +12,8 @@ mod cmd {
     pub mod generate_script;
     pub mod lint;
     pub mod lsp;
+    #[cfg(feature = "export")]
+    pub mod package;
     #[cfg(feature = "preview")]
     pub mod preview;
     pub mod query;
@@ -101,6 +103,10 @@ enum Commands {
     Compile(CompileArgs),
     /// Run Tinymist lint checks
     Lint(LintArgs),
+    /// Run package tools
+    #[cfg(feature = "export")]
+    #[clap(subcommand)]
+    Package(crate::package::PackageCommands),
 
     /// Generate completion script to stdout
     Completion(crate::completion::ShellCompletionArgs),
@@ -153,21 +159,28 @@ fn main() -> Result<()> {
         #[cfg(feature = "export")]
         Commands::Compile(..) => false,
         Commands::Lint(..) => false,
+        #[cfg(feature = "export")]
+        Commands::Package(package::PackageCommands::Docs(args)) => args.watch,
 
         // Long-running commands, usually run from the CLI.
         Commands::Test(test) => test.verbose,
+        #[cfg(feature = "preview")]
         Commands::Preview(preview) => preview.verbose,
 
         // Long-running commands, usually run from an editor.
-        Commands::Lsp(..) | Commands::Dap(..) => true,
+        Commands::Lsp(..) => true,
+        #[cfg(feature = "dap")]
+        Commands::Dap(..) => true,
 
         // Hidden commands.
         Commands::TraceLsp(..)
         | Commands::Query(..)
         | Commands::GenerateScript(..)
-        | Commands::Doc(..)
-        | Commands::Task(..)
         | Commands::Cov(..) => true,
+        #[cfg(feature = "lock")]
+        Commands::Doc(..) => true,
+        #[cfg(feature = "lock")]
+        Commands::Task(..) => true,
     };
     let _ = tinymist::init_log(tinymist::InitLogOpts {
         verbose,
@@ -189,6 +202,8 @@ fn main() -> Result<()> {
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
         Commands::Lint(args) => crate::lint::lint_main(args),
+        #[cfg(feature = "export")]
+        Commands::Package(args) => block_on(crate::package::package_main(args)),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),
