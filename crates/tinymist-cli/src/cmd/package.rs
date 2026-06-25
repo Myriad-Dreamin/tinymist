@@ -1,6 +1,7 @@
 //! Package-related CLI commands.
 
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 
 use clap::ValueHint;
@@ -10,6 +11,7 @@ use tinymist::project::{
 };
 use tinymist::tool::project::{ProjectOpts, start_project};
 use tinymist::{CompileFontArgs, CompileOnceArgs, Config, ExportTask};
+use tinymist_project::world::package::{PackageRegistry, PackageSpec};
 use tinymist_project::{Feature, WorldProvider};
 use tinymist_query::analysis::Analysis;
 use tinymist_query::package::PackageInfo;
@@ -120,6 +122,11 @@ struct PackageDocsContext {
     dist: PathBuf,
 }
 
+struct PackageDocsInput {
+    package_root: PathBuf,
+    namespace: Option<String>,
+}
+
 impl PackageDocsContext {
     fn new(args: PackageDocsArgs) -> Result<Self> {
         let repo_root = find_repo_root()?;
@@ -128,16 +135,17 @@ impl PackageDocsContext {
             .input
             .as_deref()
             .context("package docs requires INPUT package path")?;
-        let package_root = absolutize(Path::new(package_input))?;
+        let resolved_input = resolve_package_docs_input(&args, package_input)?;
+        let package_root = resolved_input.package_root;
         let manifest_path = package_root.join("typst.toml");
         let manifest_data = std::fs::read_to_string(&manifest_path)
             .context_ut("failed to read package manifest")?;
         let manifest: PackageManifest = toml::from_str(&manifest_data)
             .map_err(map_string_err("failed to parse package manifest"))?;
 
-        let namespace = args
+        let namespace = resolved_input
             .namespace
-            .clone()
+            .or_else(|| args.namespace.clone())
             .or_else(|| infer_namespace(&package_root, &manifest))
             .unwrap_or_else(|| "preview".to_owned());
         let package_name = manifest.package.name.to_string();
@@ -358,6 +366,30 @@ async fn export_docs_bundle(ctx: &PackageDocsContext) -> Result<()> {
     });
     ExportTask::do_export(task, artifact, None).await?;
     Ok(())
+}
+
+fn resolve_package_docs_input(args: &PackageDocsArgs, input: &str) -> Result<PackageDocsInput> {
+    if !input.starts_with('@') {
+        return Ok(PackageDocsInput {
+            package_root: absolutize(Path::new(input))?,
+            namespace: None,
+        });
+    }
+
+    let spec =
+        PackageSpec::from_str(input).map_err(map_string_err("failed to parse package spec"))?;
+    let registry = tinymist::world::system::SystemUniverseBuilder::resolve_package(
+        args.compile.cert.as_deref().map(From::from),
+        Some(&args.compile.package),
+    );
+    let package_root = registry
+        .resolve(&spec)
+        .map_err(|err| anyhow::anyhow!("failed to resolve package {input}: {err}"))?;
+
+    Ok(PackageDocsInput {
+        package_root: package_root.as_ref().to_path_buf(),
+        namespace: Some(spec.namespace.to_string()),
+    })
 }
 
 fn find_repo_root() -> Result<PathBuf> {
