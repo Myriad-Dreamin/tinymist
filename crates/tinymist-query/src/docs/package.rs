@@ -1025,7 +1025,7 @@ mod tests {
                         .expect("package docs must build public API before SCIP");
                     knowledge
                         .bind(a.shared())
-                        .to_scip_bytes_with_public_api(&public_api)
+                        .to_scip_bytes_with_public_api(public_api)
                 })
                 .unwrap();
             let dest = format!(
