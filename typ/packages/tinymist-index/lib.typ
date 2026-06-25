@@ -47,6 +47,23 @@
   }
 }
 
+/// Queries source tokens for a module source page.
+/// - symbol-ctx (dictionary): The package-doc symbol context.
+/// - source-path (str): The module source path.
+#let index-source-tokens(symbol-ctx, source-path) = {
+  let db = symbol-ctx.at("index", default: none)
+  if db == none or source-path == none {
+    return ()
+  }
+
+  let result = query(db, "source_tokens", str(source-path))
+  if result == none {
+    ()
+  } else {
+    result
+  }
+}
+
 #let index-symbol-kind-matches(index-kind, info-kind) = {
   if index-kind == info-kind {
     return true
