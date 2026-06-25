@@ -42,6 +42,7 @@ fn test_help() {
       preview     Run preview server
       compile     Run compile command like `typst-cli compile`
       lint        Run Tinymist lint checks
+      package     Run package tools
       completion  Generate completion script to stdout
       test        Test a document and give summary
       help        Print this message or the help of the given subcommand(s)
