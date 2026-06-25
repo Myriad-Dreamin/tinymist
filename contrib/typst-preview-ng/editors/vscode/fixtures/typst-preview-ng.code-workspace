@@ -1,0 +1,11 @@
+{
+  "folders": [
+    {
+      "path": ".",
+    },
+  ],
+  "settings": {
+    "tinymist.previewFeature": "enable",
+    "tinymist.previewer": "myriad-dreamin.typst-preview-ng",
+  },
+}

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typst Preview NG</title>
+  </head>
+  <body>
+    <div id="typst-preview-ng">
+      <header id="typst-container-top" class="toolbar">
+        <div class="toolbar-start">
+          <span class="title">Typst Preview NG</span>
+          <span id="socket-state" class="pill" data-state="idle">idle</span>
+          <span id="preview-mode" class="pill">Doc</span>
+        </div>
+        <div class="toolbar-center">
+          <button
+            id="typst-page-prev-selector"
+            class="icon-button typst-page-button"
+            type="button"
+            title="Previous page"
+            aria-label="Previous page"
+          >
+            &lt;
+          </button>
+          <label class="typst-page-selector-content" aria-label="Page selector">
+            <input
+              id="typst-page-selector"
+              type="number"
+              min="1"
+              value="1"
+              inputmode="numeric"
+              aria-label="Current page"
+            />
+            <span class="typst-page-selector-divider">/</span>
+            <span id="typst-page-total" class="typst-page-number-indicator">0</span>
+          </label>
+          <button
+            id="typst-page-next-selector"
+            class="icon-button typst-page-button"
+            type="button"
+            title="Next page"
+            aria-label="Next page"
+          >
+            &gt;
+          </button>
+        </div>
+        <div class="toolbar-end">
+          <button
+            id="typst-top-help-button"
+            class="icon-button"
+            type="button"
+            title="Help"
+            aria-label="Help"
+          >
+            ?
+          </button>
+        </div>
+      </header>
+      <main id="preview-viewport">
+        <section id="preview-pages">
+          <nav id="outline-panel" class="hidden" aria-label="Outline"></nav>
+          <div id="empty-state">
+            <div id="frame-kind">waiting</div>
+            <div id="frame-size">0 frames</div>
+          </div>
+        </section>
+      </main>
+      <aside id="typst-help-panel" class="typst-panel hidden mode-doc" aria-label="Help">
+        <div class="panel-title">Typst Preview NG</div>
+        <div class="key-binding-row slide-specific">
+          <span class="key-binding-box">Arrow</span>
+          <span class="key-binding-desc">Change slide page</span>
+        </div>
+        <div class="key-binding-row">
+          <span class="key-binding-box">j/k</span>
+          <span class="key-binding-desc">Scroll vertically</span>
+        </div>
+        <div class="key-binding-row">
+          <span class="key-binding-box">h/l</span>
+          <span class="key-binding-desc">Scroll by larger steps</span>
+        </div>
+        <div class="key-binding-row">
+          <span class="key-binding-box">g</span>
+          <span class="key-binding-desc">Focus page selector</span>
+        </div>
+        <div class="key-binding-row">
+          <span class="key-binding-box">t</span>
+          <span class="key-binding-desc">Toggle colors</span>
+        </div>
+        <div class="key-binding-row">
+          <span class="key-binding-box">Ctrl+Wheel</span>
+          <span class="key-binding-desc">Zoom</span>
+        </div>
+      </aside>
+      <footer class="statusbar">
+        <span id="frame-count">frames: 0</span>
+        <span id="byte-count">bytes: 0</span>
+        <span id="render-count">renders: 0</span>
+        <span id="last-message">ready</span>
+      </footer>
+    </div>
+    <script>
+      window.__TYPST_PREVIEW_NG_ARGS__ = {
+        ws: "ws://127.0.0.1:23625",
+        mode: "preview-arg:previewMode:Doc",
+        state: "preview-arg:state:",
+      };
+    </script>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

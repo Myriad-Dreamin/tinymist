@@ -173,11 +173,11 @@ masonry_winit = { git = "https://github.com/Myriad-dreamin/xilem", rev = "abe7da
 
 
 # Typst
-reflexo = { version = "0.7.0", default-features = false, features = [
+reflexo = { version = "0.8.0-rc2", default-features = false, features = [
     "flat-vector",
 ] }
-reflexo-typst = { version = "0.7.0", default-features = false }
-reflexo-vec2svg = { version = "0.7.0" }
+reflexo-typst = { version = "0.8.0-rc2", default-features = false }
+reflexo-vec2svg = { version = "0.8.0-rc2" }
 
 typst = "0.15.0"
 typst-bundle = "0.15.0"
@@ -363,9 +363,9 @@ typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = 
 # These patches use a different version of `reflexo`.
 #
 # A regular build MUST use `tag` or `rev` to specify the version of the patched crate to ensure stability.
-reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
-reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
-reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "5904247a0eca4938b4861223cb24431e530e429c" }
+reflexo = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "638d38838396cf553eb07d6c671ba4f7cdbad3f7" }
+reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "638d38838396cf553eb07d6c671ba4f7cdbad3f7" }
+reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "638d38838396cf553eb07d6c671ba4f7cdbad3f7" }
 
 # These patches use local `reflexo` for development.
 # reflexo = { path = "../typst.ts/crates/reflexo/" }

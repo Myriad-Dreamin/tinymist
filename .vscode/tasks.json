@@ -32,6 +32,14 @@
 			"dependsOrder": "sequence",
 		},
 		{
+			"label": "VS Code Extension Prelaunch [Typst Preview NG]",
+			"dependsOn": [
+				"VS Code Extension Prelaunch [Release]",
+				"Compile Typst Preview NG Extension"
+			],
+			"dependsOrder": "sequence",
+		},
+		{
 			"label": "VS Code Extension Prelaunch [Release]",
 			"dependsOn": [
 				"Compile VS Code Extension",
@@ -79,6 +87,13 @@
 			"type": "npm",
 			"script": "compile",
 			"path": "contrib/typst-preview/editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Compile Typst Preview NG Extension",
+			"type": "npm",
+			"script": "compile",
+			"path": "contrib/typst-preview-ng/editors/vscode",
 			"group": "build",
 		},
 		{

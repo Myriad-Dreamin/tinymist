@@ -1,0 +1,44 @@
+{
+  "name": "typst-preview-ng",
+  "displayName": "Typst Preview NG",
+  "description": "Experimental worker-owned Typst preview client for Tinymist.",
+  "publisher": "myriad-dreamin",
+  "version": "0.0.1",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
+  "keywords": [
+    "typst",
+    "tinymist",
+    "preview",
+    "previewer",
+    "worker",
+    "canvas"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "extensionDependencies": [
+    "myriad-dreamin.tinymist"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "scripts": {
+    "build:previewer": "yarn workspace typst-preview-frontend-ng build",
+    "compile": "tsc -p . && yarn run build:previewer",
+    "vscode:prepublish": "yarn run compile",
+    "package": "npx @vscode/vsce package --yarn",
+    "type-check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/vscode": "^1.97.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.2.2"
+  }
+}
