@@ -38,17 +38,13 @@ pub struct PackageDocsArgs {
     #[clap(long)]
     pub namespace: Option<String>,
 
-    /// Package root containing typst.toml.
-    #[clap(value_hint = ValueHint::DirPath)]
-    pub package: PathBuf,
-
-    /// Output directory for generated bundle docs.
-    #[clap(value_hint = ValueHint::DirPath)]
-    pub dist: PathBuf,
-
     /// Specify compile related arguments.
     #[clap(flatten)]
     pub compile: CompileOnceArgs,
+
+    /// Output directory for generated bundle docs.
+    #[clap(value_name = "OUTPUT", value_hint = ValueHint::DirPath)]
+    pub output: Option<PathBuf>,
 }
 
 /// Main entry point for package commands.
@@ -126,13 +122,13 @@ struct PackageDocsContext {
 
 impl PackageDocsContext {
     fn new(args: PackageDocsArgs) -> Result<Self> {
-        if args.compile.input.is_some() {
-            bail!("package docs does not accept an INPUT positional; use PACKAGE instead");
-        }
-
         let repo_root = find_repo_root()?;
-        let package_root = absolutize(&args.package)?;
-        let dist = absolutize(&args.dist)?;
+        let package_input = args
+            .compile
+            .input
+            .as_deref()
+            .context("package docs requires INPUT package path")?;
+        let package_root = absolutize(Path::new(package_input))?;
         let manifest_path = package_root.join("typst.toml");
         let manifest_data = std::fs::read_to_string(&manifest_path)
             .context_ut("failed to read package manifest")?;
@@ -150,6 +146,12 @@ impl PackageDocsContext {
         let work_root = repo_root.join("target/package-docs").join(&base);
         let staging_root = work_root.join("packages");
         let source_root = work_root.join("bundle");
+        let dist = args
+            .output
+            .as_deref()
+            .map(absolutize)
+            .transpose()?
+            .unwrap_or_else(|| work_root.join("dist"));
 
         let package_info = PackageInfo {
             path: package_root.clone(),
