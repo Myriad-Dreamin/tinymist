@@ -1373,6 +1373,7 @@ mod tests {
             frame,
             size: Axes::new(Scalar(4.), Scalar(5.)),
             spacing: Axes::new(Scalar(1.), Scalar(2.)),
+            offset: Axes::new(Scalar(0.), Scalar(0.)),
         }))
     }
 

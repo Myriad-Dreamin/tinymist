@@ -73,6 +73,8 @@ const UNSUPPORTED_REF_CASES: &[&str] = &[
     "query-within",
     // Requires a math font that is not available in the Linux CI image.
     "math-font-fallback-class",
+    // Triggers a Vello 0.7 WorkgroupCounts underflow while rendering.
+    "tiling-text-fill",
 ];
 
 #[test]
