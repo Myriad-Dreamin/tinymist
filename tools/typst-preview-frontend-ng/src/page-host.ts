@@ -15,14 +15,12 @@ import { clamp } from "./utils";
 interface PageHostOptions {
   elements: PreviewElements;
   postWorker: (message: unknown, transfer?: Transferable[]) => void;
-  setLastMessage: (message: string) => void;
 }
 
 /** Owns preview page DOM and controls, handling render-worker page requests and routed preview protocol messages. */
 export class PageHost {
   private readonly elements: PreviewElements;
   private readonly postWorker: PageHostOptions["postWorker"];
-  private readonly setLastMessage: PageHostOptions["setLastMessage"];
   private previewMode: PreviewMode = "Doc";
   private contentPreview = false;
   private currentSlidePage = 1;
@@ -35,10 +33,9 @@ export class PageHost {
   private autoInvertDecision: boolean | undefined;
   private readonly pageRecords = new Map<number, PageRecord>();
 
-  constructor({ elements, postWorker, setLastMessage }: PageHostOptions) {
+  constructor({ elements, postWorker }: PageHostOptions) {
     this.elements = elements;
     this.postWorker = postWorker;
-    this.setLastMessage = setLastMessage;
   }
 
   get mode() {
@@ -59,29 +56,6 @@ export class PageHost {
 
   goToNextSlide() {
     this.setCurrentSlidePage(this.currentSlidePage + 1);
-  }
-
-  setSlidePageFromInput(value: string) {
-    if (value.trim().length === 0) {
-      return;
-    }
-    this.setCurrentSlidePage(Number.parseInt(value, 10));
-  }
-
-  focusPageSelector() {
-    this.elements.pageSelector.focus();
-  }
-
-  blurPageSelector() {
-    this.elements.pageSelector.blur();
-  }
-
-  hideHelp() {
-    this.elements.helpPanel.classList.add("hidden");
-  }
-
-  toggleHelp() {
-    this.elements.helpPanel.classList.toggle("hidden");
   }
 
   toggleInvertColors() {
@@ -111,12 +85,8 @@ export class PageHost {
 
   setPreviewMode(mode: PreviewMode) {
     this.previewMode = mode;
-    this.elements.previewMode.textContent = mode;
     this.elements.root.classList.toggle("mode-slide", mode === "Slide");
     this.elements.root.classList.toggle("mode-doc", mode === "Doc");
-    this.elements.helpPanel.classList.toggle("mode-slide", mode === "Slide");
-    this.elements.helpPanel.classList.toggle("mode-doc", mode === "Doc");
-    this.updatePageControls();
     this.applyAllPageLayouts();
   }
 
@@ -131,12 +101,6 @@ export class PageHost {
     this.renderOutline();
   }
 
-  resetCounters() {
-    this.elements.frameCount.textContent = "frames: 0";
-    this.elements.byteCount.textContent = "bytes: 0";
-    this.elements.renderCount.textContent = "renders: 0";
-  }
-
   ensurePages(generation: number, pages: PageSpec[]) {
     if (!("transferControlToOffscreen" in HTMLCanvasElement.prototype)) {
       throw new Error("OffscreenCanvas transfer is not supported in this browser");
@@ -144,7 +108,6 @@ export class PageHost {
 
     this.lastPages = pages;
     this.updatePageCount(pages.length);
-    this.elements.emptyState.classList.toggle("hidden", pages.length > 0);
 
     const livePages = new Set<number>();
     const transferred: Array<{
@@ -269,10 +232,8 @@ export class PageHost {
         this.handleCursorMessage(text);
         break;
       case "cursor-paths":
-        this.setLastMessage("cursor paths ignored");
         break;
       case "partial-rendering":
-        this.setLastMessage("partial rendering enabled");
         break;
       case "invert-colors":
         this.ensureInvertColors(parseInvertColorStrategy(text));
@@ -281,9 +242,7 @@ export class PageHost {
         try {
           this.outlineData = JSON.parse(text);
           this.renderOutline();
-        } catch (_error) {
-          this.setLastMessage("outline received");
-        }
+        } catch (_error) {}
         break;
     }
   }
@@ -296,7 +255,6 @@ export class PageHost {
     this.lastPages = [];
     this.pendingCursor = undefined;
     this.updatePageCount(0);
-    this.elements.emptyState.classList.remove("hidden");
   }
 
   private createPageRecord(
@@ -380,8 +338,8 @@ export class PageHost {
   }
 
   private computePageScale(page: PageSpec): number {
-    const availableWidth = Math.max(1, this.elements.viewport.clientWidth - 48);
-    const availableHeight = Math.max(1, this.elements.viewport.clientHeight - 48);
+    const availableWidth = Math.max(1, this.elements.viewport.clientWidth);
+    const availableHeight = Math.max(1, this.elements.viewport.clientHeight);
     const fitWidth = availableWidth / page.width;
     const baseScale =
       this.previewMode === "Slide"
@@ -499,7 +457,6 @@ export class PageHost {
       return;
     }
     this.currentSlidePage = clamp(Math.trunc(page), 1, this.pageCount);
-    this.updatePageControls();
     this.applyAllPageLayouts();
     this.renderCursor();
     this.elements.viewport.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -509,16 +466,6 @@ export class PageHost {
   private updatePageCount(nextPageCount: number) {
     this.pageCount = nextPageCount;
     this.currentSlidePage = clamp(this.currentSlidePage, 1, Math.max(1, this.pageCount));
-    this.updatePageControls();
-  }
-
-  private updatePageControls() {
-    this.elements.pageSelector.value = String(this.currentSlidePage);
-    this.elements.pageTotal.textContent = String(this.pageCount);
-    this.elements.pageSelector.style.setProperty(
-      "--page-length-digits",
-      String(String(this.pageCount).length),
-    );
   }
 
   private applyAllPageLayouts() {

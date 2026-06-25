@@ -52,24 +52,6 @@ export function resolveWebSocketUrl(value: string | undefined) {
   return url.href;
 }
 
-export function formatBytes(bytes: number) {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  const kib = bytes / 1024;
-  if (kib < 1024) {
-    return `${kib.toFixed(1)} KiB`;
-  }
-  return `${(kib / 1024).toFixed(1)} MiB`;
-}
-
-export function formatMs(value: number | undefined) {
-  if (typeof value !== "number") {
-    return "-";
-  }
-  return `${value.toFixed(1)} ms`;
-}
-
 export function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }

@@ -15,29 +15,13 @@
   align-items: center;
   gap: 10px;
   min-height: 100%;
-  padding: 24px;
+  padding: 0;
 }
 
 .content-preview #preview-pages {
   align-items: stretch;
   gap: 5px;
-  padding: 5px;
-}
-
-#empty-state {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  margin: auto;
-  color: var(--muted);
-}
-
-#empty-state.hidden {
-  display: none;
-}
-
-#frame-kind {
-  color: var(--fg);
+  padding: 0;
 }
 
 .typst-page {
