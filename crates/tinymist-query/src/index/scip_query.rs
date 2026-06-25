@@ -20,6 +20,7 @@ use super::scip_utils::{ScipParamGroup, merge_symbol_information};
 #[derive(Default)]
 pub struct ScipQueryCtx {
     documents_by_uri: FxHashMap<Url, ScipDocumentQuery>,
+    documents_by_path: FxHashMap<String, Url>,
     definitions: FxHashMap<String, Vec<ScipDefinition>>,
     public_symbols_by_path: FxHashMap<String, Vec<ScipPublicSymbol>>,
     symbol_hovers: FxHashMap<String, Hover>,
@@ -34,6 +35,20 @@ pub struct ScipPublicSymbol {
     pub name: String,
     /// Package docs definition kind.
     pub kind: String,
+}
+
+/// A token on a source page that has index-backed interactions.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScipSourceToken {
+    /// Token range in LSP UTF-16 positions.
+    pub range: Range,
+    /// Hover information for the token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hover: Option<Hover>,
+    /// First definition target for the token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<LocationLink>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +129,7 @@ impl ScipQueryCtx {
                 this.public_symbols_by_path
                     .insert(relative_path.clone(), public_symbols);
             }
+            this.documents_by_path.insert(relative_path, uri.clone());
             this.documents_by_uri
                 .insert(uri.clone(), ScipDocumentQuery { uri, occurrences });
         }
@@ -165,37 +181,85 @@ impl ScipQueryCtx {
             .unwrap_or_default()
     }
 
+    /// Requests source-page tokens that have hover or definition information.
+    pub fn source_tokens(&self, path: &str) -> Vec<ScipSourceToken> {
+        let Some(uri) = self.documents_by_path.get(path) else {
+            return Vec::new();
+        };
+        let Some(document) = self.documents_by_uri.get(uri) else {
+            return Vec::new();
+        };
+
+        document
+            .occurrences
+            .iter()
+            .filter(|occurrence| !occurrence.symbol.is_empty())
+            .filter_map(|occurrence| {
+                let mut hover = occurrence
+                    .hover
+                    .clone()
+                    .or_else(|| self.symbol_hovers.get(&occurrence.symbol).cloned());
+                if let Some(hover) = &mut hover {
+                    hover.range.get_or_insert(occurrence.range);
+                }
+
+                let definition = self
+                    .definition_links_for_occurrence(document, occurrence)
+                    .into_iter()
+                    .next();
+
+                if hover.is_none() && definition.is_none() {
+                    return None;
+                }
+
+                Some(ScipSourceToken {
+                    range: occurrence.range,
+                    hover,
+                    definition,
+                })
+            })
+            .collect()
+    }
+
     fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<GotoDefinitionResponse> {
         let uri = path_to_url(&request.path).ok()?;
         let document = self.documents_by_uri.get(&uri)?;
         let occurrence = find_scip_occurrence(document, request.position)?;
-        let origin_selection_range = occurrence.range;
-
-        let links = if occurrence.is_definition {
-            vec![LocationLink {
-                origin_selection_range: Some(origin_selection_range),
-                target_uri: document.uri.clone(),
-                target_range: occurrence.range,
-                target_selection_range: occurrence.range,
-            }]
-        } else {
-            self.definitions
-                .get(&occurrence.symbol)?
-                .iter()
-                .map(|definition| LocationLink {
-                    origin_selection_range: Some(origin_selection_range),
-                    target_uri: definition.uri.clone(),
-                    target_range: definition.range,
-                    target_selection_range: definition.range,
-                })
-                .collect()
-        };
+        let links = self.definition_links_for_occurrence(document, occurrence);
 
         if links.is_empty() {
             None
         } else {
             Some(GotoDefinitionResponse::Link(links))
         }
+    }
+
+    fn definition_links_for_occurrence(
+        &self,
+        document: &ScipDocumentQuery,
+        occurrence: &ScipOccurrence,
+    ) -> Vec<LocationLink> {
+        let origin_selection_range = occurrence.range;
+        if occurrence.is_definition {
+            return vec![LocationLink {
+                origin_selection_range: Some(origin_selection_range),
+                target_uri: document.uri.clone(),
+                target_range: occurrence.range,
+                target_selection_range: occurrence.range,
+            }];
+        }
+
+        self.definitions
+            .get(&occurrence.symbol)
+            .into_iter()
+            .flatten()
+            .map(|definition| LocationLink {
+                origin_selection_range: Some(origin_selection_range),
+                target_uri: definition.uri.clone(),
+                target_range: definition.range,
+                target_selection_range: definition.range,
+            })
+            .collect()
     }
 
     /// Requests the definition for a SCIP symbol.
@@ -710,6 +774,60 @@ mod tests {
         assert_eq!(symbols[0].symbol, function_symbol.to_owned());
         assert_eq!(symbols[0].name, "foo");
         assert_eq!(symbols[0].kind, "function");
+    }
+
+    #[test]
+    fn scip_source_tokens_include_hover_and_definition() {
+        let symbol = "local value";
+        let bytes = test_index(vec![main_document(
+            vec![
+                definition_occurrence(vec![0, 0, 4], symbol),
+                occurrence(vec![1, 0, 4], symbol),
+            ],
+            vec![symbol_info(symbol, "value", &["hello"])],
+        )]);
+        let index = ScipQueryCtx::read(&bytes).unwrap();
+
+        let tokens = index.source_tokens("main.typ");
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(
+            tokens[0]
+                .definition
+                .as_ref()
+                .unwrap()
+                .target_selection_range,
+            Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 4,
+                },
+            }
+        );
+        assert_eq!(
+            tokens[1].hover.as_ref().unwrap().contents,
+            HoverContents::Scalar(MarkedString::String("hello".to_owned()))
+        );
+        assert_eq!(
+            tokens[1]
+                .definition
+                .as_ref()
+                .unwrap()
+                .target_selection_range,
+            Range {
+                start: Position {
+                    line: 0,
+                    character: 0,
+                },
+                end: Position {
+                    line: 0,
+                    character: 4,
+                },
+            }
+        );
     }
 
     fn test_index(documents: Vec<ScipDocument>) -> Vec<u8> {

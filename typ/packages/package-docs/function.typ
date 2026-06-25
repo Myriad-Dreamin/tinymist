@@ -424,8 +424,7 @@
 #let function-param-source-dest(symbol-ctx, info, data, param) = {
   let source = info.at("source", default: none)
   if source != none {
-    let line = source.position.line + 1 + function-hover-signature-param-line-offset(data.signature, param.name)
-    return source-query-line-dest(symbol-ctx, source, line)
+    return source-query-line-dest(symbol-ctx, source, source.position.line + 1)
   }
 
   let definition = index-definition(symbol-ctx, info)
@@ -442,8 +441,7 @@
     file: file.index,
     position: definition.targetSelectionRange.start,
   )
-  let line = definition.targetSelectionRange.start.line + 1 + function-hover-signature-param-line-offset(data.signature, param.name)
-  source-query-line-dest(symbol-ctx, source, line)
+  source-query-line-dest(symbol-ctx, source, definition.targetSelectionRange.start.line + 1)
 }
 
 #let function-param-heading(symbol-ctx, info, data, group, param, meta, ty) = {

@@ -19,6 +19,12 @@ main {
   --source-border-color: #d0d7de;
   --source-line-number-color: #6e7781;
   --source-shadow-color: rgba(27, 31, 36, 0.08);
+  --source-hover-underline-color: rgba(101, 117, 133, 0.62);
+  --source-hover-popup-bg: #ffffff;
+  --source-hover-popup-fg: #24292f;
+  --source-hover-popup-muted: #57606a;
+  --source-hover-popup-border: #d0d7de;
+  --source-hover-popup-shadow: rgba(27, 31, 36, 0.12);
   --scrollbar-thumb-color: rgba(101, 117, 133, 0.34);
   --scrollbar-thumb-hover-color: rgba(101, 117, 133, 0.58);
 }
@@ -40,6 +46,12 @@ main {
   --source-border-color: #30363d;
   --source-line-number-color: #8b949e;
   --source-shadow-color: rgba(0, 0, 0, 0.28);
+  --source-hover-underline-color: rgba(147, 157, 163, 0.68);
+  --source-hover-popup-bg: #161b22;
+  --source-hover-popup-fg: #c9d1d9;
+  --source-hover-popup-muted: #8b949e;
+  --source-hover-popup-border: #30363d;
+  --source-hover-popup-shadow: rgba(0, 0, 0, 0.34);
   --scrollbar-thumb-color: rgba(147, 157, 163, 0.34);
   --scrollbar-thumb-hover-color: rgba(147, 157, 163, 0.6);
   --source-code-font-size: 0.875rem;
@@ -805,6 +817,122 @@ body {
   line-height: inherit;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.package-source-token {
+  border-bottom: 1px dotted transparent;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+
+.package-source-token.has-definition {
+  cursor: pointer;
+}
+
+.package-source-code.has-source-interactions:hover .package-source-token.has-hover,
+.package-source-token.has-hover:hover,
+.package-source-token.has-hover:focus-visible {
+  border-bottom-color: var(--source-hover-underline-color);
+}
+
+.package-source-token.has-definition:hover,
+.package-source-token.has-definition:focus-visible {
+  color: var(--main-hover-color);
+  text-decoration: none;
+}
+
+.package-source-token:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.package-source-floating-hover {
+  position: fixed;
+  z-index: 100;
+  box-sizing: border-box;
+  max-width: min(700px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--source-hover-popup-border);
+  border-radius: 6px;
+  background: var(--source-hover-popup-bg);
+  color: var(--source-hover-popup-fg);
+  box-shadow: 0 12px 32px var(--source-hover-popup-shadow);
+  text-align: left;
+}
+
+.package-source-floating-hover[hidden] {
+  display: none;
+}
+
+.package-source-hover-content {
+  max-height: min(520px, calc(100vh - 48px));
+  overflow: auto;
+  font-family: var(--vp-font-family-base);
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.package-source-hover-content p {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  color: var(--source-hover-popup-fg);
+  white-space: pre-wrap;
+}
+
+.package-source-hover-content p + p,
+.package-source-hover-content p + pre,
+.package-source-hover-content pre + p,
+.package-source-hover-content pre + pre,
+.package-source-hover-content .package-source-hover-heading + p,
+.package-source-hover-content .package-source-hover-heading + pre {
+  border-top: 1px solid var(--source-hover-popup-border);
+}
+
+.package-source-hover-content pre {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: min(32rem, calc(100vw - 48px));
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  overflow: auto;
+  border-radius: 0;
+  background: var(--source-bg-color);
+  color: var(--source-fg-color);
+  box-shadow: none;
+  white-space: pre;
+}
+
+.package-source-hover-content pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.package-source-hover-content hr {
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--source-hover-popup-border);
+}
+
+.package-source-hover-heading {
+  padding: 0.58rem 0.85rem 0.35rem;
+  color: var(--source-hover-popup-muted);
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.package-source-hover-heading.level-1 {
+  color: var(--source-hover-popup-fg);
+  font-size: 0.82rem;
 }
 
 .package-source-scroll::-webkit-scrollbar {

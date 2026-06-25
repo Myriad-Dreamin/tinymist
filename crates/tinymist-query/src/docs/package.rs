@@ -495,7 +495,7 @@ pub fn package_docs_bundle_typ(doc: &PackageDoc) -> StrResult<Vec<PackageDocTypF
     }
     for path in &module_paths {
         if path.source_text.is_some() {
-            let _ = writeln!(entry, "#{}(package-info)", path.source_func);
+            let _ = writeln!(entry, "#{}(package-info, package-index)", path.source_func);
         }
     }
     files.push(PackageDocTypFile {
@@ -563,7 +563,7 @@ pub fn package_docs_bundle_typ(doc: &PackageDoc) -> StrResult<Vec<PackageDocTypF
             );
             let _ = writeln!(
                 content,
-                "#let {func}(package-info) = package-source-document(package-info, module-index: {idx}, path: {}, source-path: {}, source: {})",
+                "#let {func}(package-info, package-index) = package-source-document(package-info, package-index, module-index: {idx}, path: {}, source-path: {}, source: {})",
                 typst_string(&source_output),
                 typst_string(&source_path),
                 typst_string(source_text.as_str()),

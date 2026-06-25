@@ -16,7 +16,7 @@ use std::sync::{Mutex, OnceLock};
 use lsp_types::{GotoDefinitionParams, HoverParams};
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, GotoDefinitionRequest, HoverRequest,
-    index::scip_query::{ScipPublicSymbol, ScipQueryCtx},
+    index::scip_query::{ScipPublicSymbol, ScipQueryCtx, ScipSourceToken},
     url_to_path,
 };
 #[cfg(all(feature = "typst-plugin", target_arch = "wasm32"))]
@@ -37,11 +37,13 @@ struct IndexCtx {
 enum IndexRequest {
     Compiler(CompilerQueryRequest),
     PublicSymbols(String),
+    SourceTokens(String),
 }
 
 enum IndexResponse {
     Compiler(Option<CompilerQueryResponse>),
     PublicSymbols(Vec<ScipPublicSymbol>),
+    SourceTokens(Vec<ScipSourceToken>),
 }
 
 impl IndexCtx {
@@ -50,6 +52,9 @@ impl IndexCtx {
             IndexRequest::Compiler(request) => IndexResponse::Compiler(self.index.request(request)),
             IndexRequest::PublicSymbols(path) => {
                 IndexResponse::PublicSymbols(self.index.public_symbols(&path))
+            }
+            IndexRequest::SourceTokens(path) => {
+                IndexResponse::SourceTokens(self.index.source_tokens(&path))
             }
         }
     }
@@ -60,6 +65,7 @@ impl IndexResponse {
         match self {
             Self::Compiler(response) => serde_json::to_vec(response).map_err(to_string),
             Self::PublicSymbols(response) => serde_json::to_vec(response).map_err(to_string),
+            Self::SourceTokens(response) => serde_json::to_vec(response).map_err(to_string),
         }
     }
 }
@@ -90,6 +96,9 @@ fn parse_request(kind: &str, request: &[u8]) -> StrResult<IndexRequest> {
         }
         "public_symbols" => {
             IndexRequest::PublicSymbols(serde_json::from_slice(request).map_err(to_string)?)
+        }
+        "source_tokens" => {
+            IndexRequest::SourceTokens(serde_json::from_slice(request).map_err(to_string)?)
         }
         kind => Err(format!("unknown request kind: {kind}"))?,
     })
