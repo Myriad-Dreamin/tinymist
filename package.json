@@ -10,11 +10,13 @@
     "contrib/typst-preview/editors/vscode",
     "contrib/html/editors/vscode",
     "contrib/tinymist-gpu-viewer/editors/vscode",
+    "contrib/typst-preview-ng/editors/vscode",
     "contrib/previewer-provider/editors/vscode",
     "contrib/renderer-diff",
     "tools/editor-tools",
     "tools/typst-dom",
-    "tools/typst-preview-frontend"
+    "tools/typst-preview-frontend",
+    "tools/typst-preview-frontend-ng"
   ],
   "scripts": {
     "fmt": "cargo fmt --all && npx prettier --write tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",

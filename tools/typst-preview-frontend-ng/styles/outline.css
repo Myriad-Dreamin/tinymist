@@ -1,0 +1,45 @@
+#outline-panel {
+  width: min(100%, 960px);
+  color: var(--fg);
+}
+
+.typst-outline {
+  display: grid;
+  gap: 2px;
+}
+
+.typst-outline .typst-outline {
+  margin-left: 14px;
+}
+
+.typst-outline-title {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.typst-outline-title:hover {
+  background: var(--vscode-editor-selectionHighlightBackground, rgba(127, 185, 222, 0.25));
+}
+
+.level-1 > .typst-outline-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.level-2 > .typst-outline-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+}
+
+.level-3 > .typst-outline-title {
+  font-weight: 500;
+  font-size: 0.76rem;
+}

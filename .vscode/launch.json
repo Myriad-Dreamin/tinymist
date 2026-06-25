@@ -71,6 +71,23 @@
             "preLaunchTask": "VS Code Extension Prelaunch Preview"
         },
         {
+            "name": "Run Extension [Typst Preview NG]",
+            "type": "extensionHost",
+            "request": "launch",
+            "runtimeExecutable": "${execPath}",
+            "args": [
+                "--extensionDevelopmentPath=${workspaceFolder}/editors/vscode",
+                "--extensionDevelopmentPath=${workspaceFolder}/contrib/typst-preview-ng/editors/vscode",
+                "${workspaceFolder}/contrib/typst-preview-ng/editors/vscode/fixtures/typst-preview-ng.code-workspace",
+                "${workspaceFolder}/contrib/typst-preview-ng/editors/vscode/fixtures/main.typ"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/editors/vscode/out/**/*.js",
+                "${workspaceFolder}/contrib/typst-preview-ng/editors/vscode/out/**/*.js"
+            ],
+            "preLaunchTask": "VS Code Extension Prelaunch [Typst Preview NG]"
+        },
+        {
             "type": "lldb",
             "request": "launch",
             "name": "Debug unit tests in executable 'tinymist'",

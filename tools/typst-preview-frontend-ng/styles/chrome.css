@@ -1,0 +1,123 @@
+.toolbar,
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-color: var(--border);
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+.toolbar {
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar-start,
+.toolbar-center,
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.toolbar-start {
+  flex: 1 1 auto;
+}
+
+.toolbar-center {
+  display: none;
+  flex: 0 0 auto;
+}
+
+.toolbar-end {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+}
+
+.mode-slide .toolbar-center {
+  display: flex;
+}
+
+.statusbar {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 78px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+}
+
+.pill[data-state="open"] {
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+  color: var(--fg);
+}
+
+.icon-button,
+.typst-page-button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--button-fg);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.icon-button:hover,
+.typst-page-button:hover {
+  background: var(--surface-hover);
+}
+
+.icon-button:focus-visible,
+.typst-page-button:focus-visible,
+#typst-page-selector:focus-visible,
+.typst-outline-title:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.typst-page-selector-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  color: var(--muted);
+}
+
+#typst-page-selector {
+  width: calc(max(2, var(--page-length-digits, 1)) * 1ch + 14px);
+  height: 22px;
+  min-width: 34px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--input-fg);
+  font: inherit;
+  text-align: center;
+}
+
+#typst-page-selector::-webkit-inner-spin-button,
+#typst-page-selector::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
