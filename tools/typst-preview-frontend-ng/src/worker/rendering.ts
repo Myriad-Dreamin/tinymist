@@ -105,6 +105,21 @@ export class WorkerRenderer {
     x: number;
     y: number;
   }) {
+    this.renderQueue = this.renderQueue
+      .then(() => this.hitBoundExclusive(request))
+      .catch((error) => {
+        this.postError(error);
+      });
+    await this.renderQueue;
+  }
+
+  private async hitBoundExclusive(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+  }) {
     try {
       if (request.generation !== this.generation) {
         return;
