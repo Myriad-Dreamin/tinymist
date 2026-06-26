@@ -20,6 +20,7 @@ export interface PageLayout {
   index: number;
   top: number;
   bottom: number;
+  width: number;
   height: number;
   scale: number;
 }
@@ -44,6 +45,7 @@ export interface PendingCanvasAck {
 export interface WorkerConfig {
   rendererWasmUrl?: string;
   viewport?: any;
+  previewMode?: string;
   isContentPreview?: boolean;
 }
 

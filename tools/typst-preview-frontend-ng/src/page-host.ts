@@ -211,12 +211,14 @@ export class PageHost {
         }
         const rect = record.container.getBoundingClientRect();
         const top = rect.top - viewportRect.top + scrollTop;
+        const width = rect.width;
         const height = rect.height;
         return [
           {
             index,
             top,
             bottom: top + height,
+            width,
             height,
             scale: height / Math.max(record.height, 1),
           },
