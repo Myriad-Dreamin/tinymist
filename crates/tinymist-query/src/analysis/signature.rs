@@ -1,19 +1,24 @@
 //! Analysis of function signatures.
 
+use std::cell::RefCell;
+
 use itertools::Either;
 use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
 use tinymist_derive::BindTyCtx;
+use tinymist_std::hash::FxHashSet;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
-use crate::syntax::classify_def_loosely;
+use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs, sanitize_doc_ty};
+use crate::syntax::{DeclExpr, classify_def_loosely};
 use crate::ty::{
-    BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigWithTy, TyCtx, TypeInfo,
-    TypeVar,
+    BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigTy, SigWithTy, TyCtx, TyCtxMut,
+    TypeInfo, TypeVar,
 };
 
 pub use tinymist_analysis::{PrimarySignature, Signature};
+
+const SIG_OF_TYPE_BOUNDS_BUDGET: usize = 128;
 
 /// The language object that the signature is being analyzed for.
 #[derive(Debug, Clone)]
@@ -96,9 +101,13 @@ pub(crate) fn sig_of_type(
     let type_var = srcs.into_iter().next()?;
     match type_var {
         DocSource::Var(v) => {
-            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), type_info);
+            let mut ty_ctx =
+                SignatureTypeContext::new(PostTypeChecker::new(ctx.clone(), type_info));
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
-            let sig_ty = type_info.simplify(sig_ty, false);
+            if ty_ctx.exhausted() {
+                return None;
+            }
+            let sig_ty = sanitize_signature_type(sig_ty);
             let Ty::Func(sig_ty) = sig_ty else {
                 static WARN_ONCE: std::sync::Once = std::sync::Once::new();
                 WARN_ONCE.call_once(|| {
@@ -109,6 +118,7 @@ pub(crate) fn sig_of_type(
             };
 
             // todo: this will affect inlay hint: _var_with
+            ty_ctx.reset_bounds_guard();
             let (var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
                 Some(UntypedDefDocs::Variable(docs)) => find_alias_stack(&mut ty_ctx, &v, docs)?,
@@ -200,6 +210,117 @@ pub(crate) fn sig_of_type(
     }
 }
 
+fn sanitize_signature_type(ty: Ty) -> Ty {
+    match ty {
+        Ty::Func(sig) => {
+            let mut sig = sig.as_ref().clone();
+            sig.inputs = sig
+                .inputs
+                .iter()
+                .map(sanitize_doc_ty)
+                .collect::<Vec<_>>()
+                .into();
+            sig.body = sig.body.as_ref().map(sanitize_doc_ty);
+            Ty::Func(sig.into())
+        }
+        ty => sanitize_doc_ty(&ty),
+    }
+}
+
+/// A type context for docs/signature rendering.
+///
+/// It intentionally bounds global variable expansion: recursive package-level
+/// types should degrade to incomplete docs, not dominate hover or SCIP output.
+struct SignatureTypeContext<'a> {
+    inner: PostTypeChecker<'a>,
+    bounds: RefCell<SignatureBoundsGuard>,
+}
+
+impl<'a> SignatureTypeContext<'a> {
+    fn new(inner: PostTypeChecker<'a>) -> Self {
+        Self {
+            inner,
+            bounds: RefCell::new(SignatureBoundsGuard {
+                remaining: SIG_OF_TYPE_BOUNDS_BUDGET,
+                visited: FxHashSet::default(),
+                exhausted: false,
+            }),
+        }
+    }
+
+    fn exhausted(&self) -> bool {
+        self.bounds.borrow().exhausted
+    }
+
+    fn reset_bounds_guard(&self) {
+        *self.bounds.borrow_mut() = SignatureBoundsGuard {
+            remaining: SIG_OF_TYPE_BOUNDS_BUDGET,
+            visited: FxHashSet::default(),
+            exhausted: false,
+        };
+    }
+}
+
+struct SignatureBoundsGuard {
+    remaining: usize,
+    visited: FxHashSet<(DeclExpr, bool)>,
+    exhausted: bool,
+}
+
+impl TyCtx for SignatureTypeContext<'_> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
+        let mut bounds = self.bounds.borrow_mut();
+        if bounds.exhausted {
+            return None;
+        }
+
+        if !bounds.visited.insert((var.def.clone(), pol)) {
+            return None;
+        }
+
+        if bounds.remaining == 0 {
+            bounds.exhausted = true;
+            return None;
+        }
+        bounds.remaining -= 1;
+        drop(bounds);
+
+        self.inner.global_bounds(var, pol)
+    }
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.inner.local_bind_of(var)
+    }
+}
+
+impl TyCtxMut for SignatureTypeContext<'_> {
+    type Snap = <TypeInfo as TyCtxMut>::Snap;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.inner.start_scope()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.inner.end_scope(snap)
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.inner.bind_local(var, ty);
+    }
+
+    fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
+        self.inner.type_of_func(func)
+    }
+
+    fn type_of_value(&mut self, val: &Value) -> Ty {
+        self.inner.type_of_value(val)
+    }
+
+    fn check_module_item(&mut self, module: TypstFileId, key: &StrRef) -> Option<Ty> {
+        self.inner.check_module_item(module, key)
+    }
+}
+
 fn wind_stack(var_with: Vec<WithElem>, sig: Signature) -> Signature {
     if var_with.is_empty() {
         return sig;
@@ -241,7 +362,7 @@ fn wind_stack(var_with: Vec<WithElem>, sig: Signature) -> Signature {
 type WithElem<'a> = (&'a UntypedVarDocs, Option<Interned<SigWithTy>>);
 
 fn find_alias_stack<'a>(
-    ctx: &'a mut PostTypeChecker,
+    ctx: &'a mut SignatureTypeContext,
     var: &Interned<TypeVar>,
     docs: &'a UntypedVarDocs,
 ) -> Option<(Vec<WithElem<'a>>, Either<&'a UntypedSignatureDocs, Func>)> {
@@ -252,6 +373,9 @@ fn find_alias_stack<'a>(
         checking_with: true,
     };
     Ty::Var(var.clone()).bounds(true, &mut checker);
+    if checker.ctx.exhausted() {
+        return None;
+    }
 
     checker.res.map(|res| (checker.stack, res))
 }
@@ -259,7 +383,7 @@ fn find_alias_stack<'a>(
 #[derive(BindTyCtx)]
 #[bind(ctx)]
 struct AliasStackChecker<'a, 'b> {
-    ctx: &'a mut PostTypeChecker<'b>,
+    ctx: &'a mut SignatureTypeContext<'b>,
     stack: Vec<WithElem<'a>>,
     res: Option<Either<&'a UntypedSignatureDocs, Func>>,
     checking_with: bool,
@@ -277,13 +401,14 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
             return;
         }
 
-        let docs = self.ctx.info.var_docs.get(&u.def).map(|x| x.as_ref());
+        let docs: Option<&UntypedDefDocs> =
+            self.ctx.inner.info.var_docs.get(&u.def).map(|x| x.as_ref());
 
         crate::log_debug_ct!("collecting var {u:?} {pol:?} => {docs:?}");
         // todo: bind builtin functions
         match docs {
             Some(UntypedDefDocs::Function(sig)) => {
-                self.res = Some(Either::Left(sig));
+                self.res = Some(Either::Left(sig.as_ref()));
             }
             Some(UntypedDefDocs::Variable(docs)) => {
                 self.checking_with = true;

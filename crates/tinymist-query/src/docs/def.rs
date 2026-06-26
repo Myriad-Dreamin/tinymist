@@ -6,7 +6,7 @@ use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_analysis::docs::{
     DocText, DocTextResolver, ParamDocs, SignatureDocs, VarDocs, format_ty,
 };
-use tinymist_analysis::ty::DocSource;
+use tinymist_analysis::ty::{DocSource, Ty};
 use typst::syntax::Span;
 
 use crate::LocalContext;
@@ -27,9 +27,10 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     // todo people can easily forget to simplify the type which is not good. we
     // might find a way to ensure them at compile time.
     //
-    // Must be simplified before formatting, to expand type aliases.
-    let simplified_ty = type_info.simplify(ty, false);
-    let return_ty = format_ty(Some(&simplified_ty));
+    // Avoid canonicalizing here: recursive package types can make hover/docs
+    // formatting dominate SCIP generation.
+    let display_ty = sanitize_doc_ty(&ty);
+    let return_ty = format_ty(Some(&display_ty));
     match doc_source {
         DocSource::Var(var) => {
             let docs = type_info
@@ -51,6 +52,25 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
             }
         }),
         _ => None,
+    }
+}
+
+pub(crate) fn sanitize_doc_ty(ty: &Ty) -> Ty {
+    match ty {
+        Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => ty.clone(),
+        Ty::Array(elem) => Ty::Array(sanitize_doc_ty(elem).into()),
+        Ty::Tuple(elems) if elems.len() <= 4 => {
+            Ty::Tuple(elems.iter().map(sanitize_doc_ty).collect::<Vec<_>>().into())
+        }
+        Ty::Union(types) if types.len() <= 4 => {
+            let types = types
+                .iter()
+                .map(sanitize_doc_ty)
+                .filter(|ty| !matches!(ty, Ty::Any))
+                .collect::<Vec<_>>();
+            Ty::from_types(types.into_iter())
+        }
+        _ => Ty::Any,
     }
 }
 
