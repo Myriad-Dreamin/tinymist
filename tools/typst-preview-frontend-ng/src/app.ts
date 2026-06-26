@@ -96,6 +96,10 @@ class PreviewApp {
         this.handleEnsurePages(message);
         break;
       case "render-complete":
+        this.pageHost.updateInteractions(message.generation, message.interactions || []);
+        break;
+      case "bound-hit":
+        this.pageHost.handleBoundHit(message);
         break;
       case "error":
         console.error("[typst-preview-ng]", message.message, message);
