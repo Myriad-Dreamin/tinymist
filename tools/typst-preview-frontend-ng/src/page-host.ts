@@ -32,6 +32,25 @@ interface PageLayoutMetrics {
   availableHeight: number;
 }
 
+interface PageLayoutRecord {
+  index: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  scale: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+interface ZoomAnchor {
+  pageIndex: number;
+  pageX: number;
+  pageY: number;
+  viewportX: number;
+  viewportY: number;
+}
+
 /** Owns preview page DOM and controls, handling render-worker page requests and routed preview protocol messages. */
 export class PageHost {
   private readonly elements: PreviewElements;
@@ -115,13 +134,10 @@ export class PageHost {
       return;
     }
 
-    const rect = this.elements.viewport.getBoundingClientRect();
-    const anchorX = this.elements.viewport.scrollLeft + event.clientX - rect.left;
-    const anchorY = this.elements.viewport.scrollTop + event.clientY - rect.top;
     const metrics = this.readPageLayoutMetrics();
+    const anchor = this.zoomAnchorFromEvent(event, metrics, this.collectPageLayouts());
     this.applyAllPageLayouts(metrics);
-    const ratio = this.zoomRatio / previousZoom;
-    this.elements.viewport.scrollBy(anchorX * (ratio - 1), anchorY * (ratio - 1));
+    this.restoreZoomAnchor(anchor, metrics, this.collectPageLayouts());
     this.scheduleViewportSnapshot();
   }
 
@@ -207,8 +223,8 @@ export class PageHost {
     );
   }
 
-  collectPageLayouts() {
-    const layouts = [];
+  collectPageLayouts(): PageLayoutRecord[] {
+    const layouts: PageLayoutRecord[] = [];
     let top = 0;
     let visibleCount = 0;
     const gap = this.pageGap();
@@ -223,14 +239,19 @@ export class PageHost {
         if (visibleCount > 0) {
           top += gap;
         }
+        const width = record.cssWidth;
         const height = record.cssHeight;
+        const scaleX = width / Math.max(record.width, 1);
+        const scaleY = height / Math.max(record.height, 1);
         layouts.push({
           index: record.index,
           top,
           bottom: top + height,
-          width: record.cssWidth,
+          width,
           height,
-          scale: height / Math.max(record.height, 1),
+          scale: scaleY,
+          scaleX,
+          scaleY,
         });
         top += height;
         visibleCount += 1;
@@ -738,6 +759,89 @@ export class PageHost {
 
   private pageGap() {
     return this.contentPreview ? 5 : 10;
+  }
+
+  private zoomAnchorFromEvent(
+    event: WheelEvent,
+    metrics: PageLayoutMetrics,
+    layouts: PageLayoutRecord[],
+  ): ZoomAnchor | undefined {
+    const viewportRect = this.elements.viewport.getBoundingClientRect();
+    const viewportX = event.clientX - viewportRect.left;
+    const viewportY = event.clientY - viewportRect.top;
+    const contentX = this.elements.viewport.scrollLeft + viewportX;
+    const contentY = this.elements.viewport.scrollTop + viewportY;
+    const layout =
+      this.findPageLayoutAt(layouts, contentY) || this.nearestPageLayout(layouts, contentY);
+    if (!layout) {
+      return undefined;
+    }
+
+    const record = this.pageRecords.get(layout.index);
+    if (!record) {
+      return undefined;
+    }
+
+    const pageLeft = this.pageLeft(record, metrics);
+    return {
+      pageIndex: layout.index,
+      pageX: clamp((contentX - pageLeft) / Math.max(layout.scaleX, 1e-6), 0, record.width),
+      pageY: clamp((contentY - layout.top) / Math.max(layout.scaleY, 1e-6), 0, record.height),
+      viewportX,
+      viewportY,
+    };
+  }
+
+  private restoreZoomAnchor(
+    anchor: ZoomAnchor | undefined,
+    metrics: PageLayoutMetrics,
+    layouts: PageLayoutRecord[],
+  ) {
+    if (!anchor) {
+      return;
+    }
+
+    const record = this.pageRecords.get(anchor.pageIndex);
+    const layout = layouts.find((candidate) => candidate.index === anchor.pageIndex);
+    if (!record || !layout) {
+      return;
+    }
+
+    const pageLeft = this.pageLeft(record, metrics);
+    this.elements.viewport.scrollTo({
+      left: pageLeft + anchor.pageX * layout.scaleX - anchor.viewportX,
+      top: layout.top + anchor.pageY * layout.scaleY - anchor.viewportY,
+      behavior: "auto",
+    });
+  }
+
+  private findPageLayoutAt(layouts: PageLayoutRecord[], contentY: number) {
+    return layouts.find((layout) => contentY >= layout.top && contentY <= layout.bottom);
+  }
+
+  private nearestPageLayout(layouts: PageLayoutRecord[], contentY: number) {
+    let nearest: PageLayoutRecord | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const layout of layouts) {
+      const distance =
+        contentY < layout.top
+          ? layout.top - contentY
+          : contentY > layout.bottom
+            ? contentY - layout.bottom
+            : 0;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = layout;
+      }
+    }
+    return nearest;
+  }
+
+  private pageLeft(record: PageRecord, metrics: PageLayoutMetrics) {
+    if (this.contentPreview) {
+      return 0;
+    }
+    return (metrics.availableWidth - record.cssWidth) / 2;
   }
 
   private handleJumpMessage(text: string) {
