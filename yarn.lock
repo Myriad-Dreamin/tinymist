@@ -491,10 +491,22 @@
   resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.7.0-rc1.tgz#9b08082f816c40591100f40d6a7e777399ea7192"
   integrity sha512-Dd0xP0THKiUwYVTX+2FW4gzBl4i3BNWLAO/ZAReSCkbaPiFb6py5heSvXX0vtH8sXsFQOB3qhxz68sEcq9oRKg==
 
+"@myriaddreamin/typst-ts-renderer@=0.8.0-rc2":
+  version "0.8.0-rc2"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst-ts-renderer/-/typst-ts-renderer-0.8.0-rc2.tgz#3a5cb0f822586d5771882f3665e9b90949286212"
+  integrity sha512-OLDLWcGEDNMiWu0hiNOYT+RMMMp7lPoVZoNNIjRXzZXUh/iYhoDsbd6mnbwDgSN4Ud5SE6wkb+lGUCg06phyJA==
+
 "@myriaddreamin/typst.ts@=0.7.0-rc1":
   version "0.7.0-rc1"
   resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.7.0-rc1.tgz#8542a77ff6ac8ff12a6de06a57ce6da544fcb03b"
   integrity sha512-IZ78l1iLTMM61pf1SmqtojkgM2aloQVSzlNvStKtYu+qleOEzh/ph7zTNmfM8j5vlflCkos85E+UKQvLdC9C7Q==
+  dependencies:
+    idb "^7.1.1"
+
+"@myriaddreamin/typst.ts@=0.8.0-rc2":
+  version "0.8.0-rc2"
+  resolved "https://registry.yarnpkg.com/@myriaddreamin/typst.ts/-/typst.ts-0.8.0-rc2.tgz#b46088204077fe7fd348ba25a578de9f4defabc7"
+  integrity sha512-TNZmxuJCMxEIjcMnXsV6mQfnNd1Ap29QCaYNY2jjiqDL//o7atZG8i28XbwxIScdKADMITPA/29hII1GiCswGw==
   dependencies:
     idb "^7.1.1"
 
@@ -4370,7 +4382,7 @@ tinyglobby@^0.2.13, tinyglobby@^0.2.14, tinyglobby@^0.2.15:
     picomatch "^4.0.3"
 
 "tinymist-web@link:crates/tinymist":
-  version "0.14.18"
+  version "0.15.2"
 
 tinypool@^1.1.1:
   version "1.1.1"
