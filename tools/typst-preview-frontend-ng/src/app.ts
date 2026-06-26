@@ -70,7 +70,9 @@ class PreviewApp {
     });
 
     this.vscode?.postMessage?.({ type: "started" });
-    window.addEventListener("resize", () => this.pageHost.scheduleViewportSnapshot());
+    window.addEventListener("resize", () =>
+      this.pageHost.scheduleViewportSnapshot({ applyLayouts: true }),
+    );
     this.elements.viewport.addEventListener(
       "scroll",
       () => this.pageHost.scheduleViewportSnapshot(),
