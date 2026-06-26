@@ -39,6 +39,8 @@ web-sys = { workspace = true, optional = true, features = ["console"] }
 
 [dev-dependencies]
 insta.workspace = true
+temp-env.workspace = true
+tempfile.workspace = true
 
 [features]
 
