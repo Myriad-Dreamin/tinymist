@@ -176,7 +176,7 @@ export class WorkerRenderer {
       if (this.isViewportScrolling()) {
         await this.renderScrollVisiblePage(session, frameVersion, handledViewportVersion);
       } else {
-        await this.renderProgressiveStages({
+        await this.renderVisiblePages({
           session,
           pages: this.latestPages,
           generation: this.generation,
@@ -700,7 +700,7 @@ export class WorkerRenderer {
     if (canvasAck?.layouts) {
       this.latestPageLayouts = canvasAck.layouts;
     }
-    await this.renderProgressiveStages({
+    await this.renderVisiblePages({
       session,
       pages,
       generation: nextGeneration,
@@ -712,7 +712,7 @@ export class WorkerRenderer {
     this.scheduleIdlePrefetch(frameVersion, nextGeneration, this.viewportVersion);
   }
 
-  private async renderProgressiveStages(options: {
+  private async renderVisiblePages(options: {
     session: RenderSession;
     pages: PageSpec[];
     generation: number;
@@ -721,41 +721,24 @@ export class WorkerRenderer {
     frameVersion: number;
     viewportVersion: number;
   }) {
-    const stages = [
-      {
-        phase: "visible",
-        layer: "full" as const,
-        quality: "full" as const,
-        screens: visibleRenderScreens,
-        useCacheKey: true,
-        updateCacheKey: true,
-        collectInteractions: true,
-        prioritizeViewport: true,
-        cancelOnViewportChange: true,
-        pauseWhenDragging: true,
-      },
-    ];
-
-    for (const stage of stages) {
-      if (this.isRenderInterrupted(options.frameVersion)) {
-        return;
-      }
-
-      await this.renderAndPostComplete({
-        ...options,
-        pages: this.selectStagePages(options.pages, stage.screens, { windowed: false }),
-        phase: stage.phase,
-        layer: stage.layer,
-        quality: stage.quality,
-        useCacheKey: stage.useCacheKey,
-        updateCacheKey: stage.updateCacheKey,
-        collectInteractions: stage.collectInteractions,
-        prioritizeViewport: stage.prioritizeViewport,
-        cancelOnViewportChange: stage.cancelOnViewportChange,
-        pauseWhenDragging: stage.pauseWhenDragging,
-        viewportVersion: options.viewportVersion,
-      });
+    if (this.isRenderInterrupted(options.frameVersion)) {
+      return;
     }
+
+    await this.renderAndPostComplete({
+      ...options,
+      pages: this.selectStagePages(options.pages, visibleRenderScreens, { windowed: false }),
+      phase: "visible",
+      layer: "full",
+      quality: "full",
+      useCacheKey: true,
+      updateCacheKey: true,
+      collectInteractions: true,
+      prioritizeViewport: true,
+      cancelOnViewportChange: true,
+      pauseWhenDragging: true,
+      viewportVersion: options.viewportVersion,
+    });
   }
 
   private async renderAndPostComplete(options: RenderAndPostOptions) {
