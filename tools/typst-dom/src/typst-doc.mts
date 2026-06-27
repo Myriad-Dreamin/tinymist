@@ -12,6 +12,8 @@ export interface ContainerDOMState {
     left: number;
     top: number;
   };
+  /// cached `hookedElem.firstElement.getBoundingClientRect()`
+  scrollPosition?: DOMRect;
 }
 
 export type RenderMode = "svg" | "canvas";
@@ -150,7 +152,7 @@ export class TypstDocumentContext<O = any> {
       this.renderMode = renderMode ?? this.renderMode;
       this.previewMode = previewMode ?? this.previewMode;
       this.isContentPreview = isContentPreview || false;
-      this.retrieveDOMState =
+      const retrieveDOMStateBase: () => ContainerDOMState =
         retrieveDOMState ??
         (() => {
           return {
@@ -159,6 +161,16 @@ export class TypstDocumentContext<O = any> {
             boundingRect: this.hookedElem.getBoundingClientRect(),
           };
         });
+      /// If configured retrieveDOMState does not provide scrollPosition, get it by ourselves.
+      this.retrieveDOMState = () => {
+        const base = retrieveDOMStateBase();
+        if (base.scrollPosition) {
+          return base;
+        }
+        const bbox = this.hookedElem.firstElementChild?.getBoundingClientRect();
+        base.scrollPosition = bbox;
+        return base;
+      };
       this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
         "--typst-preview-background-color",
       );
@@ -431,6 +443,7 @@ export class TypstDocumentContext<O = any> {
           await this.r.rerender();
           this.r.rescale();
         }
+
         let t2 = performance.now();
 
         /// perf event
