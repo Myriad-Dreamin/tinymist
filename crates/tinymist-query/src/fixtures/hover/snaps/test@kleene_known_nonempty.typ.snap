@@ -1,0 +1,35 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/kleene_known_nonempty.typ
+---
+Range: 40:24:40:38
+
+```typc
+let known-nonempty(
+  pat: any | dictionary,
+  known: any,
+) = any;
+```
+
+
+======
+
+
+
+
+# Positional Parameters
+
+## pat
+
+```typc
+type: any | dictionary
+```
+
+
+
+## known (positional)
+
+```typc
+type: 
+```

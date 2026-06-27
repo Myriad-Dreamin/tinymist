@@ -9,7 +9,7 @@ use tinymist_std::hash::FxHashSet;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs, sanitize_doc_ty};
+use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::{DeclExpr, classify_def_loosely};
 use crate::ty::{
     BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigTy, SigWithTy, TyCtx, TyCtxMut,
@@ -17,8 +17,6 @@ use crate::ty::{
 };
 
 pub use tinymist_analysis::{PrimarySignature, Signature};
-
-const SIG_OF_TYPE_BOUNDS_BUDGET: usize = 128;
 
 /// The language object that the signature is being analyzed for.
 #[derive(Debug, Clone)]
@@ -104,10 +102,7 @@ pub(crate) fn sig_of_type(
             let mut ty_ctx =
                 SignatureTypeContext::new(PostTypeChecker::new(ctx.clone(), type_info));
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
-            if ty_ctx.exhausted() {
-                return None;
-            }
-            let sig_ty = sanitize_signature_type(sig_ty);
+            let sig_ty = type_info.simplify(sig_ty, false);
             let Ty::Func(sig_ty) = sig_ty else {
                 static WARN_ONCE: std::sync::Once = std::sync::Once::new();
                 WARN_ONCE.call_once(|| {
@@ -118,7 +113,7 @@ pub(crate) fn sig_of_type(
             };
 
             // todo: this will affect inlay hint: _var_with
-            ty_ctx.reset_bounds_guard();
+            ty_ctx.reset_cycle_guard();
             let (var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
                 Some(UntypedDefDocs::Variable(docs)) => find_alias_stack(&mut ty_ctx, &v, docs)?,
@@ -210,80 +205,31 @@ pub(crate) fn sig_of_type(
     }
 }
 
-fn sanitize_signature_type(ty: Ty) -> Ty {
-    match ty {
-        Ty::Func(sig) => {
-            let mut sig = sig.as_ref().clone();
-            sig.inputs = sig
-                .inputs
-                .iter()
-                .map(sanitize_doc_ty)
-                .collect::<Vec<_>>()
-                .into();
-            sig.body = sig.body.as_ref().map(sanitize_doc_ty);
-            Ty::Func(sig.into())
-        }
-        ty => sanitize_doc_ty(&ty),
-    }
-}
-
-/// A type context for docs/signature rendering.
-///
-/// It intentionally bounds global variable expansion: recursive package-level
-/// types should degrade to incomplete docs, not dominate hover or SCIP output.
+/// A type context for signature rendering that memoizes `(TypeVar, polarity)`
+/// visits within a single traversal so recursive bounds are only expanded once.
 struct SignatureTypeContext<'a> {
     inner: PostTypeChecker<'a>,
-    bounds: RefCell<SignatureBoundsGuard>,
+    visited: RefCell<FxHashSet<(DeclExpr, bool)>>,
 }
 
 impl<'a> SignatureTypeContext<'a> {
     fn new(inner: PostTypeChecker<'a>) -> Self {
         Self {
             inner,
-            bounds: RefCell::new(SignatureBoundsGuard {
-                remaining: SIG_OF_TYPE_BOUNDS_BUDGET,
-                visited: FxHashSet::default(),
-                exhausted: false,
-            }),
+            visited: RefCell::new(FxHashSet::default()),
         }
     }
 
-    fn exhausted(&self) -> bool {
-        self.bounds.borrow().exhausted
+    fn reset_cycle_guard(&self) {
+        self.visited.borrow_mut().clear();
     }
-
-    fn reset_bounds_guard(&self) {
-        *self.bounds.borrow_mut() = SignatureBoundsGuard {
-            remaining: SIG_OF_TYPE_BOUNDS_BUDGET,
-            visited: FxHashSet::default(),
-            exhausted: false,
-        };
-    }
-}
-
-struct SignatureBoundsGuard {
-    remaining: usize,
-    visited: FxHashSet<(DeclExpr, bool)>,
-    exhausted: bool,
 }
 
 impl TyCtx for SignatureTypeContext<'_> {
     fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
-        let mut bounds = self.bounds.borrow_mut();
-        if bounds.exhausted {
+        if !self.visited.borrow_mut().insert((var.def.clone(), pol)) {
             return None;
         }
-
-        if !bounds.visited.insert((var.def.clone(), pol)) {
-            return None;
-        }
-
-        if bounds.remaining == 0 {
-            bounds.exhausted = true;
-            return None;
-        }
-        bounds.remaining -= 1;
-        drop(bounds);
 
         self.inner.global_bounds(var, pol)
     }
@@ -373,9 +319,6 @@ fn find_alias_stack<'a>(
         checking_with: true,
     };
     Ty::Var(var.clone()).bounds(true, &mut checker);
-    if checker.ctx.exhausted() {
-        return None;
-    }
 
     checker.res.map(|res| (checker.stack, res))
 }
@@ -401,14 +344,13 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
             return;
         }
 
-        let docs: Option<&UntypedDefDocs> =
-            self.ctx.inner.info.var_docs.get(&u.def).map(|x| x.as_ref());
+        let docs = self.ctx.inner.info.var_docs.get(&u.def).map(|x| x.as_ref());
 
         crate::log_debug_ct!("collecting var {u:?} {pol:?} => {docs:?}");
         // todo: bind builtin functions
         match docs {
             Some(UntypedDefDocs::Function(sig)) => {
-                self.res = Some(Either::Left(sig.as_ref()));
+                self.res = Some(Either::Left(sig));
             }
             Some(UntypedDefDocs::Variable(docs)) => {
                 self.checking_with = true;
