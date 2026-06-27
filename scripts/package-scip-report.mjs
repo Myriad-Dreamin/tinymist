@@ -6,6 +6,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { gzipSync } from "node:zlib";
+import { pathToFileURL } from "node:url";
 
 function parseArgs(argv) {
   const args = {
@@ -17,6 +19,11 @@ function parseArgs(argv) {
     githubRunId: process.env.GITHUB_RUN_ID || "",
     jobs: Number(process.env.TINYMIST_PACKAGE_SCIP_JOBS || 2),
     limit: undefined,
+    apiSnapshot: undefined,
+    apiSnapshotInclude: parsePackageSpecArray(
+      process.env.TINYMIST_API_SNAPSHOT_INCLUDE || "[]",
+      "TINYMIST_API_SNAPSHOT_INCLUDE",
+    ),
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -62,6 +69,14 @@ function parseArgs(argv) {
       case "--limit":
         args.limit = Number.parseInt(next(), 10);
         break;
+      case "--api-snapshot":
+        args.apiSnapshot = next();
+        break;
+      case "--api-snapshot-include":
+        args.apiSnapshotInclude.push(
+          ...parsePackageSpecArray(next(), "--api-snapshot-include"),
+        );
+        break;
       default:
         throw new Error(`Unknown argument: ${arg}`);
     }
@@ -80,11 +95,26 @@ function parseArgs(argv) {
   }
   args.out = path.resolve(args.out);
   args.previewOut = path.resolve(args.previewOut || args.out);
+  args.apiSnapshot = path.resolve(args.apiSnapshot || path.join(args.out, "api-snapshot.jsonl.gz"));
   args.packageCachePath = path.resolve(args.packageCachePath);
   args.tinymist = resolveCommand(args.tinymist);
   args.jobs = Math.min(args.jobs, Math.max(1, os.availableParallelism?.() || args.jobs));
+  args.apiSnapshotInclude = Array.from(new Set(args.apiSnapshotInclude)).sort((left, right) => left.localeCompare(right, "en"));
 
   return args;
+}
+
+function parsePackageSpecArray(value, label) {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`${label} must be a JSON array of package specs: ${error.message}`);
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    throw new Error(`${label} must be a JSON array of package specs`);
+  }
+  return parsed;
 }
 
 function resolveCommand(value) {
@@ -110,6 +140,8 @@ Options:
   --github-run-id <id>          GitHub Actions run id
   --jobs <n>                    Parallel SCIP jobs (default: 2)
   --limit <n>                   Process only the first n packages, for local smoke tests
+  --api-snapshot <path>         Gzipped JSONL API snapshot path (default: <out>/api-snapshot.jsonl.gz)
+  --api-snapshot-include <json> JSON array of package specs whose full packageDocs output is included
 `);
 }
 
@@ -136,6 +168,10 @@ function scipName(pkg) {
 
 function scipStatsName(pkg) {
   return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.json`;
+}
+
+function apiDocsName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.md`;
 }
 
 function safeFileName(value) {
@@ -304,6 +340,7 @@ async function generateScip(args, pkg) {
 
   const details = await inspectScip(scipPath, scipStatsPath);
   const analysis = await inspectAnalysisStats(statsPath);
+  const apiSnapshot = await generateApiSnapshotEntry(args, pkg, { workspace, input });
   return {
     ...pkg,
     status: "ok",
@@ -322,22 +359,165 @@ async function generateScip(args, pkg) {
     maxRssKiB: measured.maxRssKiB,
     exprMs: analysis.exprMs,
     typeMs: analysis.typeMs,
+    apiSnapshot,
+    apiSize: apiSnapshot.bytes,
+    apiHash: apiSnapshot.sha256,
+    apiIncluded: apiSnapshot.included,
   };
 }
 
-async function inspectScip(filePath, statsPath) {
+async function generateApiSnapshotEntry(args, pkg, context) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "tinymist-api-docs-"));
+  const output = path.join(tempDir, apiDocsName(pkg));
+  const includeContent = args.apiSnapshotInclude.includes(pkg.spec);
+
+  try {
+    await run(args.tinymist, [
+      "query",
+      "packageDocs",
+      "--root",
+      context.workspace,
+      "--package-path",
+      args.packageCachePath,
+      "--package-cache-path",
+      args.packageCachePath,
+      "--id",
+      pkg.spec,
+      "--path",
+      packageDir(args.packageCachePath, pkg),
+      "--output",
+      output,
+      context.input,
+    ]);
+
+    const content = await normalizedPackageDocsOutput(output, args);
+    const contentHash = hashBuffer(Buffer.from(content, "utf8"));
+    const entry = {
+      kind: "package",
+      package: pkg.spec,
+      displayId: pkg.displayId,
+      bytes: contentHash.size,
+      sha256: contentHash.hash,
+      included: includeContent,
+    };
+    if (includeContent) {
+      entry.content = content;
+    }
+    return entry;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function normalizedPackageDocsOutput(filePath, args) {
+  const content = await fs.readFile(filePath, "utf8");
+  return normalizePackageDocsOutput(content, args);
+}
+
+function normalizePackageDocsOutput(content, args) {
+  const replacements = packageDocsReplacements(args);
+  const normalizedComments = content.replace(/<!--[\s\S]*?-->/g, (comment) => {
+    return comment.replace(/(^|[^A-Za-z0-9+/=])([A-Za-z0-9+/]{16,}={0,2})(?=$|[^A-Za-z0-9+/=])/g, (match, prefix, token) => {
+      let decoded;
+      try {
+        decoded = Buffer.from(token, "base64").toString("utf8");
+      } catch {
+        return match;
+      }
+      if (!decoded.startsWith("{") && !decoded.startsWith("[")) {
+        return match;
+      }
+
+      let value;
+      try {
+        value = JSON.parse(decoded);
+      } catch {
+        return match;
+      }
+      const normalized = normalizeJsonStrings(value, replacements);
+      return prefix + Buffer.from(JSON.stringify(normalized), "utf8").toString("base64");
+    });
+  });
+  return replaceKnownPaths(normalizedComments, replacements);
+}
+
+function packageDocsReplacements(args) {
+  const packageCachePath = path.resolve(args.packageCachePath);
+  const slashPath = packageCachePath.split(path.sep).join("/");
+  const fileUrl = pathToFileURL(packageCachePath).href;
+  return uniqueReplacements([
+    [fileUrl, "file:///$TYPST_PACKAGE_CACHE"],
+    [packageCachePath, "$TYPST_PACKAGE_CACHE"],
+    [slashPath, "$TYPST_PACKAGE_CACHE"],
+  ]);
+}
+
+function uniqueReplacements(entries) {
+  const seen = new Set();
+  return entries
+    .filter(([from]) => {
+      if (!from || seen.has(from)) {
+        return false;
+      }
+      seen.add(from);
+      return true;
+    })
+    .sort(([left], [right]) => right.length - left.length)
+    .map(([from, to]) => ({ from, to }));
+}
+
+function normalizeJsonStrings(value, replacements) {
+  if (typeof value === "string") {
+    return replaceKnownPaths(value, replacements);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonStrings(item, replacements));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        normalizeJsonStrings(item, replacements),
+      ]),
+    );
+  }
+  return value;
+}
+
+function replaceKnownPaths(value, replacements) {
+  return replacements.reduce(
+    (current, replacement) => current.split(replacement.from).join(replacement.to),
+    value,
+  );
+}
+
+function hashBuffer(buffer) {
+  return {
+    size: buffer.byteLength,
+    hash: createHash("sha256").update(buffer).digest("hex"),
+  };
+}
+
+async function hashFile(filePath) {
   const stat = await fs.stat(filePath);
   const hash = createHash("sha256");
-
   const input = createReadStream(filePath);
   for await (const chunk of input) {
     hash.update(chunk);
   }
-  const stats = JSON.parse(await fs.readFile(statsPath, "utf8"));
-
   return {
     size: stat.size,
     hash: hash.digest("hex"),
+  };
+}
+
+async function inspectScip(filePath, statsPath) {
+  const fileHash = await hashFile(filePath);
+  const stats = JSON.parse(await fs.readFile(statsPath, "utf8"));
+
+  return {
+    size: fileHash.size,
+    hash: fileHash.hash,
     documents: stats.documents,
     occurrences: stats.occurrences,
     documentSymbols: stats.documentSymbols,
@@ -390,8 +570,48 @@ function hashOfHashes(rows) {
   return createHash("sha256").update(input).digest("hex");
 }
 
+function hashOfApiHashes(rows) {
+  if (rows.some((row) => row.status !== "ok" || !row.apiHash)) {
+    return null;
+  }
+  const input = rows.map((row) => `${row.spec} ${row.apiHash}`).join("\n") + "\n";
+  return createHash("sha256").update(input).digest("hex");
+}
+
 function sumDefined(rows, key) {
   return rows.reduce((sum, row) => sum + (Number.isFinite(row[key]) ? row[key] : 0), 0);
+}
+
+async function writeApiSnapshot(args, rows) {
+  const metadata = {
+    schema: 1,
+    kind: "metadata",
+    format: "tinymist query packageDocs markdown",
+    contentEncoding: "utf8",
+    hashAlgorithm: "sha256",
+    normalization: ["packageCachePath"],
+    fullContentPackages: args.apiSnapshotInclude,
+  };
+  const entries = [
+    metadata,
+    ...rows
+      .filter((row) => row.apiSnapshot)
+      .map((row) => row.apiSnapshot),
+  ];
+  const jsonl = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
+  const compressed = gzipSync(Buffer.from(jsonl, "utf8"), { level: 9 });
+
+  await fs.mkdir(path.dirname(args.apiSnapshot), { recursive: true });
+  await fs.writeFile(args.apiSnapshot, compressed);
+
+  return {
+    path: args.apiSnapshot,
+    relativePath: path.relative(args.out, args.apiSnapshot),
+    hash: hashOfApiHashes(rows),
+    packageCount: entries.length - 1,
+    includedPackages: args.apiSnapshotInclude,
+    bytes: compressed.byteLength,
+  };
 }
 
 function formatBytes(bytes) {
@@ -525,7 +745,7 @@ function renderDurationChart(rows) {
 </section>`;
 }
 
-async function writeReport(args, rows) {
+async function writeReport(args, rows, apiSnapshotInfo) {
   const overallHash = hashOfHashes(rows);
   const failed = rows.filter((row) => row.status !== "ok");
   const successful = rows.filter((row) => row.status === "ok");
@@ -801,15 +1021,18 @@ async function writeReport(args, rows) {
     <h1>Tinymist Typst Knowledge Report</h1>
     <section class="summary">
       <div class="metric"><span>Overall SCIP hash</span><code>${escapeHtml(overallHash ?? "unavailable because one or more packages failed")}</code></div>
+      <div class="metric"><span>Overall API hash</span><code>${escapeHtml(apiSnapshotInfo.hash ?? "unavailable because one or more packages failed")}</code></div>
       <div class="metric"><span>Packages</span><strong>${rows.length}</strong></div>
       <div class="metric"><span>Failures</span><strong>${failed.length}</strong></div>
       <div class="metric"><span>SCIP documents</span><strong>${totalDocuments}</strong></div>
       <div class="metric"><span>SCIP occurrences</span><strong>${totalOccurrences}</strong></div>
       <div class="metric"><span>SCIP document symbols</span><strong>${totalDocumentSymbols}</strong></div>
       <div class="metric"><span>Public symbols</span><strong>${totalPublicSymbols}</strong></div>
+      <div class="metric"><span>API snapshot</span><code>${escapeHtml(apiSnapshotInfo.relativePath)}</code></div>
+      <div class="metric"><span>Included API outputs</span><strong>${apiSnapshotInfo.includedPackages.length}</strong></div>
       <div class="metric"><span>Generated at</span><code>${escapeHtml(generatedAt)}</code></div>
     </section>
-    <p>The overall hash is SHA-256 over the newline-separated per-package SCIP hashes in package id order. Occurrence count is the number of SCIP symbol occurrences.</p>
+    <p>The overall SCIP hash is SHA-256 over the newline-separated per-package SCIP hashes in package id order. The overall API hash is SHA-256 over package spec and normalized <code>tinymist query packageDocs</code> output hashes; package-cache absolute paths and file URIs are replaced before hashing. Occurrence count is the number of SCIP symbol occurrences.</p>
     ${durationChart}
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter packages" autocomplete="off">
@@ -1091,9 +1314,19 @@ ${htmlRows}
       maxRssKiB: row.maxRssKiB,
       exprMs: row.exprMs,
       typeMs: row.typeMs,
+      apiSize: row.apiSize,
+      apiHash: row.apiHash,
+      apiIncluded: row.apiIncluded,
       href: row.href,
       error: row.error,
     })),
+    apiSnapshot: {
+      path: apiSnapshotInfo.relativePath,
+      hash: apiSnapshotInfo.hash,
+      packageCount: apiSnapshotInfo.packageCount,
+      bytes: apiSnapshotInfo.bytes,
+      includedPackages: apiSnapshotInfo.includedPackages,
+    },
     artifact: artifactConfig,
   };
 
@@ -1103,6 +1336,9 @@ ${htmlRows}
     `- Packages: ${rows.length}`,
     `- Failures: ${failed.length}`,
     `- Overall SCIP hash: \`${overallHash ?? "unavailable"}\``,
+    `- Overall API hash: \`${apiSnapshotInfo.hash ?? "unavailable"}\``,
+    `- API snapshot: \`${apiSnapshotInfo.relativePath}\` (${formatBytes(apiSnapshotInfo.bytes)})`,
+    `- Included API outputs: ${apiSnapshotInfo.includedPackages.length}`,
     `- SCIP documents: ${totalDocuments}`,
     `- SCIP occurrences: ${totalOccurrences}`,
     `- SCIP document symbols: ${totalDocumentSymbols}`,
@@ -1147,7 +1383,8 @@ async function main() {
     }
   });
 
-  await writeReport(args, rows);
+  const apiSnapshotInfo = await writeApiSnapshot(args, rows);
+  await writeReport(args, rows, apiSnapshotInfo);
 
   const failed = rows.filter((row) => row.status !== "ok");
   if (failed.length > 0) {

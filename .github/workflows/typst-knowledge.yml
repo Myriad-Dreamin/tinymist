@@ -2,6 +2,11 @@ name: tinymist::typst_knowledge
 
 on:
   workflow_dispatch:
+    inputs:
+      api_snapshot_include:
+        description: 'JSON array of package specs whose full packageDocs output is stored in api-snapshot.jsonl.gz'
+        required: false
+        default: '[]'
   push:
     tags:
       - "*"
@@ -24,6 +29,7 @@ jobs:
     env:
       TINYMIST_PACKAGE_SCIP_JOBS: "2"
       TINYMIST_KNOWLEDGE_DATA_ARTIFACT: typst-knowledge-data
+      TINYMIST_API_SNAPSHOT_INCLUDE: ${{ github.event.inputs.api_snapshot_include || '[]' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
