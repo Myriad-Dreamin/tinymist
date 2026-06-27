@@ -92,6 +92,10 @@ impl InstrumentWorker {
                     }
                     return;
                 }
+                ast::Expr::FuncReturn(ret) => {
+                    self.instrument_return(node, ret);
+                    return;
+                }
                 ast::Expr::Text(..)
                 | ast::Expr::Space(..)
                 | ast::Expr::Linebreak(..)
@@ -145,8 +149,7 @@ impl InstrumentWorker {
                 | ast::Expr::ModuleImport(..)
                 | ast::Expr::ModuleInclude(..)
                 | ast::Expr::LoopBreak(..)
-                | ast::Expr::LoopContinue(..)
-                | ast::Expr::FuncReturn(..) => {}
+                | ast::Expr::LoopContinue(..) => {}
             }
         }
 
@@ -227,6 +230,24 @@ impl InstrumentWorker {
         self.instrumented.push_str("__bp_functor(__it); } }\n");
     }
 
+    fn instrument_return(&mut self, node: &SyntaxNode, ret: ast::FuncReturn) {
+        self.instrumented.push_str("{\n");
+
+        if let Some(body) = ret.body() {
+            self.instrumented.push_str("let __tinymist_return_value = ");
+            self.visit_node(body.to_untyped());
+            self.instrumented.push_str(";\n");
+            self.make_cov(node.span(), BreakpointKind::Return);
+            self.instrumented
+                .push_str("return __tinymist_return_value\n");
+        } else {
+            self.make_cov(node.span(), BreakpointKind::Return);
+            self.instrumented.push_str("return\n");
+        }
+
+        self.instrumented.push_str("}\n");
+    }
+
     fn instrument_closure(&mut self, node: &SyntaxNode, closure: ast::Closure) {
         let body = closure.body().span();
         let name = closure.name();
@@ -243,7 +264,17 @@ impl InstrumentWorker {
                     &scope,
                     function_name.clone(),
                 );
-                self.visit_node(child);
+                let body_is_code_block = is_code_block(child);
+                if body_is_code_block {
+                    self.visit_node(child);
+                    self.instrumented.push('\n');
+                } else {
+                    self.instrumented.push('(');
+                    self.visit_node(child);
+                    self.instrumented.push(')');
+                    self.instrumented.push_str(";\n");
+                }
+                self.make_cov(body, BreakpointKind::Return);
                 self.instrumented.push_str("\n}\n");
             } else {
                 self.visit_node(child);
@@ -294,6 +325,10 @@ impl InstrumentWorker {
             bindings.push(binding.to_owned());
         }
     }
+}
+
+fn is_code_block(node: &SyntaxNode) -> bool {
+    matches!(node.cast::<ast::Expr>(), Some(ast::Expr::CodeBlock(_)))
 }
 
 #[cfg(test)]
@@ -350,16 +385,20 @@ mod tests {
         if __breakpoint_block_end(8) {__breakpoint_block_end_handle(8, (:)); };
         }
 
+        if __breakpoint_return(9) {__breakpoint_return_handle(9, (:)); };
+
         }
 
-        __it => {if __breakpoint_show_start(9) {__breakpoint_show_start_handle(9, (:)); };
+        __it => {if __breakpoint_show_start(10) {__breakpoint_show_start_handle(10, (:)); };
         __bp_functor(__it); } }
 
 
           document
         }
-        if __breakpoint_block_end(10) {__breakpoint_block_end_handle(10, (:)); };
+        if __breakpoint_block_end(11) {__breakpoint_block_end_handle(11, (:)); };
         }
+
+        if __breakpoint_return(12) {__breakpoint_return_handle(12, (:)); };
 
         }
         "#);
@@ -400,17 +439,69 @@ mod tests {
         );
         let (new, _meta) = instrument_breakpoints(source).unwrap();
         assert!(new.root().errors_and_warnings().0.is_empty());
-        insta::assert_snapshot!(new.text(), @r###"
+        insta::assert_snapshot!(new.text(), @r"
         #let add(x, y: 1, ..rest) = {
         if __breakpoint_function(0) {__breakpoint_function_handle(0, (x: x, y: y, rest: rest)); };
-        x + y
+        (x + y);
+        if __breakpoint_return(1) {__breakpoint_return_handle(1, (:)); };
+
         }
 
         #let inc = value => {
-        if __breakpoint_function(1) {__breakpoint_function_handle(1, (value: value)); };
-        value + 1
+        if __breakpoint_function(2) {__breakpoint_function_handle(2, (value: value)); };
+        (value + 1);
+        if __breakpoint_return(3) {__breakpoint_return_handle(3, (:)); };
+
         }
-        "###);
+        ");
+    }
+
+    #[test]
+    fn test_instrument_breakpoint_return() {
+        let source = Source::detached(
+            r#"#let f(x) = {
+  if x == 1 {
+    return x + 1
+  }
+  g(return)
+}
+"#,
+        );
+        let (new, _meta) = instrument_breakpoints(source).unwrap();
+        let errors = new.root().errors_and_warnings().0;
+        assert!(errors.is_empty(), "{errors:#?}\n{}", new.text());
+        insta::assert_snapshot!(new.text(), @r"
+        #let f(x) = {
+        if __breakpoint_function(0) {__breakpoint_function_handle(0, (x: x)); };
+        {
+        if __breakpoint_block_start(1) {__breakpoint_block_start_handle(1, (:)); };
+        {
+          if x == 1 {
+        if __breakpoint_block_start(2) {__breakpoint_block_start_handle(2, (:)); };
+        {
+            {
+        let __tinymist_return_value = x + 1;
+        if __breakpoint_return(3) {__breakpoint_return_handle(3, (:)); };
+        return __tinymist_return_value
+        }
+
+          }
+        if __breakpoint_block_end(4) {__breakpoint_block_end_handle(4, (:)); };
+        }
+
+          g({
+        if __breakpoint_return(5) {__breakpoint_return_handle(5, (:)); };
+        return
+        }
+        )
+        }
+        if __breakpoint_block_end(6) {__breakpoint_block_end_handle(6, (:)); };
+        }
+
+        if __breakpoint_return(7) {__breakpoint_return_handle(7, (:)); };
+
+        }
+        ");
     }
 
     #[test]
@@ -435,6 +526,7 @@ mod tests {
             _scopes: Scopes,
             _span: Span,
             _kind: BreakpointKind,
+            _function_name: Option<String>,
         ) {
         }
     }

@@ -383,7 +383,9 @@ impl ServerState {
             .with_request::<request::SetFunctionBreakpoints>(Self::set_function_breakpoints)
             .with_request_::<request::Evaluate>(Self::evaluate_repl)
             .with_request::<request::Completions>(Self::complete_repl)
-            .with_request::<request::StackTrace>(Self::debug_stack_trace)
+            .with_request_::<request::StackTrace>(Self::debug_stack_trace)
+            .with_request_::<request::Scopes>(Self::debug_scopes)
+            .with_request_::<request::Variables>(Self::debug_variables)
             .with_request::<request::Threads>(Self::debug_threads)
     }
 

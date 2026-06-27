@@ -11,7 +11,10 @@ use serde::Deserialize;
 use sync_ls::{
     internal_error, invalid_request, just_ok, RequestId, SchedulableResponse, ScheduledResult,
 };
-use tinymist_dap::DebugRequest;
+use tinymist_dap::{
+    DebugRequest, DebugScopesArguments, DebugStackTraceArguments, DebugVariablesArguments,
+    DebugVariablesFilter,
+};
 use tinymist_std::error::prelude::*;
 use typst::{World, WorldExt};
 
@@ -145,7 +148,10 @@ impl ServerState {
         let (adaptor_tx, adaptor_rx) = std::sync::mpsc::channel();
         let adaptor = Arc::new(Debuggee {
             tx: adaptor_tx,
-            current_span: Default::default(),
+            config: self.config.const_dap_config.clone(),
+            snapshot: snapshot.clone(),
+            source: source.clone(),
+            position: main_eof,
             stop_on_entry: args.stop_on_entry.unwrap_or_default(),
             thread_id: 1,
             client: self.client.clone().to_untyped(),
@@ -486,8 +492,9 @@ impl ServerState {
 
     pub(crate) fn debug_stack_trace(
         &mut self,
+        req_id: RequestId,
         args: dapts::StackTraceArguments,
-    ) -> SchedulableResponse<dapts::StackTraceResponse> {
+    ) -> ScheduledResult {
         let session = self.debug.session()?;
         if args.thread_id != session.adaptor.thread_id {
             return Err(invalid_request(format!(
@@ -496,46 +503,67 @@ impl ServerState {
             )));
         }
 
-        let current_span = *session.adaptor.current_span.lock();
-        let current_location = current_span.and_then(|span| {
-            let source = session.snapshot.world.source(span.id()?).ok()?;
-            Some((session.snapshot.world.range(span)?, source))
-        });
-        let (source, position, line_count) = if let Some((range, source)) = current_location {
-            (
-                session.to_dap_source(source.id()),
-                session.to_dap_position(range.start, &source),
-                source.text().lines().count().max(1) as u64,
-            )
-        } else {
-            (
-                session.to_dap_source(session.source.id()),
-                session.to_dap_position(session.position, &session.source),
-                session.source.text().lines().count().max(1) as u64,
-            )
-        };
-        let line = if session.config.lines_start_at1 {
-            position.line.clamp(1, line_count)
-        } else {
-            position.line.min(line_count.saturating_sub(1))
-        };
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::StackTrace(
+                RequestId::dap(req_id),
+                DebugStackTraceArguments {
+                    start_frame: args.start_frame,
+                    levels: args.levels,
+                },
+            ))
+            .map_err(|_| internal_error("debug session is closed"))?;
 
-        just_ok(dapts::StackTraceResponse {
-            stack_frames: vec![dapts::StackFrame {
-                can_restart: None,
-                column: position.character.min(u32::MAX as u64) as u32,
-                end_column: None,
-                end_line: None,
-                id: 1,
-                instruction_pointer_reference: None,
-                line: line.min(u32::MAX as u64) as u32,
-                module_id: None,
-                name: "main".into(),
-                presentation_hint: None,
-                source: Some(source),
-            }],
-            total_frames: Some(1),
-        })
+        Ok(Some(()))
+    }
+
+    pub(crate) fn debug_scopes(
+        &mut self,
+        req_id: RequestId,
+        args: dapts::ScopesArguments,
+    ) -> ScheduledResult {
+        let session = self.debug.session()?;
+
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Scopes(
+                RequestId::dap(req_id),
+                DebugScopesArguments {
+                    frame_id: args.frame_id,
+                },
+            ))
+            .map_err(|_| internal_error("debug session is closed"))?;
+
+        Ok(Some(()))
+    }
+
+    pub(crate) fn debug_variables(
+        &mut self,
+        req_id: RequestId,
+        args: dapts::VariablesArguments,
+    ) -> ScheduledResult {
+        let session = self.debug.session()?;
+
+        session
+            .adaptor
+            .tx
+            .send(DebugRequest::Variables(
+                RequestId::dap(req_id),
+                DebugVariablesArguments {
+                    variables_reference: args.variables_reference,
+                    start: args.start,
+                    count: args.count,
+                    filter: args.filter.map(|filter| match filter {
+                        dapts::VariablesArgumentsFilter::Indexed => DebugVariablesFilter::Indexed,
+                        dapts::VariablesArgumentsFilter::Named => DebugVariablesFilter::Named,
+                    }),
+                },
+            ))
+            .map_err(|_| internal_error("debug session is closed"))?;
+
+        Ok(Some(()))
     }
 }
 
