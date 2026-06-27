@@ -141,7 +141,7 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 
     let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
-    ctx.shared_().preload_package(entry_point);
+    ctx.preload_package(entry_point);
     Ok(())
 }
 
