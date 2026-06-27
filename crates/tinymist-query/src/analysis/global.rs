@@ -1166,7 +1166,9 @@ impl SharedContext {
         impl Preloader {
             fn work(&self, fid: TypstFileId) {
                 crate::log_debug_ct!("preload package {fid:?}");
-                let source = self.shared.source_by_id(fid).ok().unwrap();
+                let Some(source) = self.shared.source_by_id(fid).ok() else {
+                    return;
+                };
                 let exprs = self.shared.expr_stage(&source);
                 self.shared.type_check(&source);
                 exprs.imports.iter().for_each(|(fid, _)| {
