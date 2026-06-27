@@ -5,13 +5,14 @@ export interface PageControlHost {
   readonly mode: PreviewMode;
   goToPreviousSlide(): void;
   goToNextSlide(): void;
+  setDragging(active: boolean): void;
   toggleInvertColors(): void;
   applyWheelZoom(event: WheelEvent): void;
 }
 
 export function installPageControls(elements: PreviewElements, host: PageControlHost) {
   installKeyboardShortcuts(elements, host);
-  installDragPan(elements);
+  installDragPan(elements, host);
   installWheelZoom(elements, host);
 }
 
@@ -69,22 +70,45 @@ function installKeyboardShortcuts(elements: PreviewElements, host: PageControlHo
   });
 }
 
-function installDragPan(elements: PreviewElements) {
+function installDragPan(elements: PreviewElements, host: PageControlHost) {
   let lastX = 0;
   let lastY = 0;
+  let pendingX = 0;
+  let pendingY = 0;
+  let animationFrame = 0;
   let moved = false;
+  let dragging = false;
 
-  const onMouseMove = (event: MouseEvent) => {
-    elements.viewport.scrollBy(lastX - event.clientX, lastY - event.clientY);
-    lastX = event.clientX;
-    lastY = event.clientY;
+  const flushMouseMove = () => {
+    animationFrame = 0;
+    elements.viewport.scrollBy(lastX - pendingX, lastY - pendingY);
+    lastX = pendingX;
+    lastY = pendingY;
     moved = true;
   };
 
-  const onMouseUp = () => {
+  const onMouseMove = (event: MouseEvent) => {
+    event.preventDefault();
+    pendingX = event.clientX;
+    pendingY = event.clientY;
+    if (!animationFrame) {
+      animationFrame = window.requestAnimationFrame(flushMouseMove);
+    }
+  };
+
+  const finishDrag = () => {
+    if (!dragging) {
+      return;
+    }
+    dragging = false;
+    if (animationFrame) {
+      window.cancelAnimationFrame(animationFrame);
+      flushMouseMove();
+    }
     document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-    elements.root.classList.remove("dragging");
+    document.removeEventListener("mouseup", finishDrag);
+    window.removeEventListener("blur", finishDrag);
+    host.setDragging(false);
     if (!moved) {
       document.getSelection()?.removeAllRanges();
     }
@@ -95,12 +119,17 @@ function installDragPan(elements: PreviewElements) {
       return;
     }
     event.preventDefault();
+    finishDrag();
+    dragging = true;
     lastX = event.clientX;
     lastY = event.clientY;
+    pendingX = event.clientX;
+    pendingY = event.clientY;
     moved = false;
-    elements.root.classList.add("dragging");
+    host.setDragging(true);
     document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
+    document.addEventListener("mouseup", finishDrag);
+    window.addEventListener("blur", finishDrag);
   });
 }
 

@@ -75,7 +75,7 @@ class PreviewApp {
     );
     this.elements.viewport.addEventListener(
       "scroll",
-      () => this.pageHost.scheduleViewportSnapshot(),
+      () => this.pageHost.scheduleViewportSnapshot({ scrolling: true }),
       { passive: true },
     );
     window.addEventListener("beforeunload", () => this.disposeWorker());
@@ -98,7 +98,30 @@ class PreviewApp {
         this.handleEnsurePages(message);
         break;
       case "render-complete":
+        this.pageHost.markRendered(
+          message.generation,
+          message.layer,
+          message.quality,
+          message.pageIndices || [],
+          message.fullPageIndices || [],
+        );
+        this.pageHost.updateInteractions(
+          message.generation,
+          message.interactions || [],
+          message.invalidatedInteractions || [],
+        );
+        break;
+      case "render-evicted":
+        this.pageHost.markEvicted(message.generation, message.pageIndices || []);
+        break;
+      case "interactions":
         this.pageHost.updateInteractions(message.generation, message.interactions || []);
+        break;
+      case "text-hit":
+        this.pageHost.handleTextHit(message);
+        break;
+      case "text-rect":
+        this.pageHost.handleTextRect(message);
         break;
       case "bound-hit":
         this.pageHost.handleBoundHit(message);

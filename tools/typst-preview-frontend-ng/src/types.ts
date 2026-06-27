@@ -31,6 +31,8 @@ export interface PageRecord {
   transferred: boolean;
   width: number;
   height: number;
+  fullWidthPx: number;
+  fullHeightPx: number;
   cssWidth: number;
   cssHeight: number;
   pixelPerPt: number;
@@ -54,6 +56,9 @@ export interface ViewportSnapshot {
   scrollLeft: number;
   scrollTop: number;
   devicePixelRatio: number;
+  dragging?: boolean;
+  scrolling?: boolean;
+  renderDuringDrag?: boolean;
   window: {
     innerWidth: number;
     innerHeight: number;

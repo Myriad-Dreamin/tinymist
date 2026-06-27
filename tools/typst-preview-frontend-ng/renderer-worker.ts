@@ -74,6 +74,12 @@ self.addEventListener("message", (event) => {
         ),
       );
       break;
+    case "request-interactions":
+      void renderer.requestInteractions({
+        generation: message.generation,
+        pageIndices: message.pageIndices || [],
+      });
+      break;
     case "hit-bound":
       void renderer.hitBound({
         requestId: message.requestId,
@@ -81,6 +87,25 @@ self.addEventListener("message", (event) => {
         pageIndex: message.pageIndex,
         x: message.x,
         y: message.y,
+      });
+      break;
+    case "hit-text":
+      void renderer.hitText({
+        requestId: message.requestId,
+        generation: message.generation,
+        pageIndex: message.pageIndex,
+        x: message.x,
+        y: message.y,
+        rect: message.rect,
+      });
+      break;
+    case "resolve-text-rect":
+      void renderer.resolveTextRect({
+        requestId: message.requestId,
+        generation: message.generation,
+        pageIndex: message.pageIndex,
+        textId: message.textId,
+        rect: message.rect,
       });
       break;
     case "dispose":
