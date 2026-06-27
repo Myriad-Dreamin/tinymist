@@ -4,11 +4,13 @@ import {
   type TypstRenderer,
 } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import * as rendererWrapper from "@myriaddreamin/typst-ts-renderer";
+import { parsePageInteractions, type BoundInteraction } from "../interactions";
 import type {
   CanvasAck,
   CanvasEntry,
   PageLayout,
   PageRenderSpec,
+  PageRenderResult,
   PageSpec,
   PendingCanvasAck,
   WorkerConfig,
@@ -31,6 +33,8 @@ export class WorkerRenderer {
   private renderQueue = Promise.resolve();
   private readonly pageCanvases = new Map<number, CanvasEntry>();
   private readonly pageCacheKeys = new Map<number, string>();
+  private readonly pageLatestCacheKeys = new Map<number, string>();
+  private readonly pageInteractionCacheKeys = new Map<number, string>();
   private readonly pendingCanvasAcks = new Map<number, PendingCanvasAck>();
   private latestPageLayouts: PageLayout[] = [];
 
@@ -92,12 +96,50 @@ export class WorkerRenderer {
     this.rejectCanvasAck(generation, error);
   }
 
+  async hitBound(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+  }) {
+    try {
+      if (request.generation !== this.generation) {
+        return;
+      }
+
+      const session = await this.ensureSessionReady();
+      if (request.generation !== this.generation) {
+        return;
+      }
+
+      const bound = this.hitCanvasBound(session, request.pageIndex, request.x, request.y);
+      if (request.generation !== this.generation) {
+        return;
+      }
+
+      this.post({
+        type: "bound-hit",
+        requestId: request.requestId,
+        generation: request.generation,
+        pageIndex: request.pageIndex,
+        x: request.x,
+        y: request.y,
+        bound,
+      });
+    } catch (error) {
+      this.postError(error);
+    }
+  }
+
   resetDocumentState() {
     this.initializedDocument = false;
     this.generation = 0;
     this.documentVersion += 1;
     this.pageCanvases.clear();
     this.pageCacheKeys.clear();
+    this.pageLatestCacheKeys.clear();
+    this.pageInteractionCacheKeys.clear();
     this.latestPageLayouts = [];
     for (const ack of this.pendingCanvasAcks.values()) {
       clearTimeout(ack.timeout);
@@ -111,6 +153,33 @@ export class WorkerRenderer {
     this.resetDocumentState();
     this.releaseSession?.();
     this.sessionReady = undefined;
+  }
+
+  private hitCanvasBound(
+    session: RenderSession,
+    pageIndex: number,
+    x: number,
+    y: number,
+  ): BoundInteraction | undefined {
+    const hitCanvasPageBound = (session as any).hitCanvasPageBound;
+    if (typeof hitCanvasPageBound !== "function") {
+      return undefined;
+    }
+
+    const bound = hitCanvasPageBound.call(session, {
+      pageOffset: pageIndex,
+      x,
+      y,
+    });
+    if (!bound?.rect) {
+      return undefined;
+    }
+
+    return {
+      id: 0,
+      kind: typeof bound.kind === "string" ? bound.kind : "bound",
+      rect: bound.rect,
+    };
   }
 
   private async initializeRenderer(wasmUrl: string): Promise<RenderSession> {
@@ -168,6 +237,7 @@ export class WorkerRenderer {
     if (kind === "new" || !this.initializedDocument) {
       session.reset();
       this.pageCacheKeys.clear();
+      this.pageInteractionCacheKeys.clear();
       this.initializedDocument = true;
     }
     session.manipulateData({ action: "merge", data: payload });
@@ -253,6 +323,7 @@ export class WorkerRenderer {
       phase: options.phase,
       pageCount: options.pages.length,
       renderedPages: results.length,
+      interactions: results.flatMap((result) => result.interactions || []),
     });
   }
 
@@ -262,6 +333,8 @@ export class WorkerRenderer {
       if (!livePages.has(index)) {
         this.pageCanvases.delete(index);
         this.pageCacheKeys.delete(index);
+        this.pageLatestCacheKeys.delete(index);
+        this.pageInteractionCacheKeys.delete(index);
       }
     }
 
@@ -291,7 +364,7 @@ export class WorkerRenderer {
     pages: PageRenderSpec[],
     options: { useCacheKey: boolean; updateCacheKey: boolean; frameVersion: number },
   ) {
-    const results = [];
+    const results: PageRenderResult[] = [];
     let batchRendered = 0;
     for (const page of pages) {
       if (this.isRenderInterrupted(options.frameVersion)) {
@@ -335,10 +408,29 @@ export class WorkerRenderer {
         },
       } as any;
       const result = await session.renderCanvas(renderOptions);
+      if (result.cacheKey) {
+        this.pageLatestCacheKeys.set(page.index, result.cacheKey);
+      }
       if (options.updateCacheKey && result.cacheKey) {
         this.pageCacheKeys.set(page.index, result.cacheKey);
       }
-      results.push(result);
+
+      if (result.cacheKey && this.pageInteractionCacheKeys.get(page.index) !== result.cacheKey) {
+        const metadata = await session.renderCanvas({
+          pageOffset: page.index,
+          pixelPerPt: page.pixelPerPt,
+          dataSelection: {
+            body: false,
+            semantics: true,
+          },
+        } as any);
+        this.pageInteractionCacheKeys.set(page.index, result.cacheKey);
+        results.push({
+          interactions: parsePageInteractions(page.index, metadata.htmlSemantics?.[0] || ""),
+        });
+      } else {
+        results.push({});
+      }
 
       batchRendered += 1;
       if (batchRendered >= 8) {

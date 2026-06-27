@@ -1,3 +1,5 @@
+import type { PageInteractions } from "../interactions";
+
 export interface PageSpec {
   index: number;
   width: number;
@@ -46,3 +48,7 @@ export interface WorkerConfig {
 }
 
 export type WorkerPost = (message: unknown) => void;
+
+export interface PageRenderResult {
+  interactions?: PageInteractions;
+}

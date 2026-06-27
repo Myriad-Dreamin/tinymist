@@ -1,3 +1,5 @@
+import type { PageInteractions } from "./interactions";
+
 export type PreviewMode = "Doc" | "Slide";
 export type InvertColorStrategy = "never" | "auto" | "always";
 export type InvertColorStrategyMap = Partial<Record<"rest" | "image", InvertColorStrategy>>;
@@ -16,12 +18,16 @@ export interface PageSpec {
 }
 
 export interface PageRecord {
+  index: number;
   key: string;
   container: HTMLDivElement;
   shell: HTMLDivElement;
   canvas: HTMLCanvasElement;
+  linkLayer: HTMLDivElement;
+  interactionLayer: HTMLDivElement;
   cursor: HTMLDivElement;
   jumpMarker: HTMLDivElement;
+  interactions?: PageInteractions;
   transferred: boolean;
   width: number;
   height: number;
