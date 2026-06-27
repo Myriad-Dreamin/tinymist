@@ -20,6 +20,11 @@ export interface LinkInteraction {
   target: LinkTarget;
 }
 
+export interface LinkTextHighlight {
+  text: TextInteraction;
+  rect: PageRect;
+}
+
 export interface TextInteraction {
   id: number;
   rect: PageRect;
@@ -37,8 +42,11 @@ export interface PageInteractions {
   texts: TextInteraction[];
 }
 
-const interactionTagPattern =
-  /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g;
+const textHighlightEnabled = false;
+
+const interactionTagPattern = textHighlightEnabled
+  ? /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g
+  : /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-link\b[^"]*"[^>]*)>/g;
 
 /** Extracts lightweight page-space hit-test metadata from renderer semantics HTML. */
 export function parsePageInteractions(pageIndex: number, html: string): PageInteractions {
@@ -49,17 +57,22 @@ export function parsePageInteractions(pageIndex: number, html: string): PageInte
     const tagName = match[1];
     const attrs = match[2];
     const className = readAttribute(attrs, "class") || "";
-    const rect = readPageRect(attrs);
-    if (!rect) {
-      continue;
-    }
 
     if (tagName === "a" || hasClass(className, "typst-content-link")) {
+      const rect = readPageRect(attrs);
+      if (!rect) {
+        continue;
+      }
       links.push({ rect, target: parseLinkTarget(attrs) });
       continue;
     }
 
-    if (hasClass(className, "typst-content-text")) {
+    if (textHighlightEnabled && hasClass(className, "typst-content-text")) {
+      const contentStart = (match.index || 0) + match[0].length;
+      const rect = readTextRect(attrs, () => readTagContent(html, tagName, contentStart));
+      if (!rect) {
+        continue;
+      }
       const id = Number.parseInt(readAttribute(attrs, "data-text-id") || "", 10);
       if (Number.isFinite(id)) {
         texts.push({ id, rect });
@@ -86,6 +99,9 @@ export function hitTestText(
   x: number,
   y: number,
 ): TextInteraction | undefined {
+  if (!textHighlightEnabled) {
+    return undefined;
+  }
   if (!interactions) {
     return undefined;
   }
@@ -108,11 +124,21 @@ export function textRectsForLink(
   interactions: PageInteractions | undefined,
   link: LinkInteraction,
 ): PageRect[] {
+  return textHighlightsForLink(interactions, link).map((highlight) => highlight.rect);
+}
+
+export function textHighlightsForLink(
+  interactions: PageInteractions | undefined,
+  link: LinkInteraction,
+): LinkTextHighlight[] {
+  if (!textHighlightEnabled) {
+    return [];
+  }
   if (!interactions) {
     return [];
   }
 
-  const rects: PageRect[] = [];
+  const highlights: LinkTextHighlight[] = [];
   const linkRects = interactions.links
     .filter((candidate) => sameLinkTarget(candidate.target, link.target))
     .map((candidate) => visualLinkRect(candidate.rect));
@@ -121,12 +147,12 @@ export function textRectsForLink(
     for (const text of interactions.texts) {
       const clipped = intersectRects(text.rect, linkRect);
       if (clipped && isMeaningfulTextClip(text.rect, clipped)) {
-        rects.push(clipped);
+        highlights.push({ text, rect: clipped });
       }
     }
   }
 
-  return dedupeRects(rects);
+  return dedupeLinkTextHighlights(highlights);
 }
 
 function findTopmost<T extends { rect: PageRect }>(
@@ -195,6 +221,19 @@ function dedupeRects(rects: PageRect[]) {
   });
 }
 
+function dedupeLinkTextHighlights(highlights: LinkTextHighlight[]) {
+  const seen = new Set<string>();
+  return highlights.filter((highlight) => {
+    const rect = highlight.rect;
+    const key = `${highlight.text.id}:${rect.x.toFixed(3)}:${rect.y.toFixed(3)}:${rect.width.toFixed(3)}:${rect.height.toFixed(3)}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function sameLinkTarget(a: LinkTarget, b: LinkTarget) {
   if (a.kind !== b.kind || a.href !== b.href) {
     return false;
@@ -232,6 +271,36 @@ function readPageRect(attrs: string): PageRect | undefined {
     height: readStyleCoordinate(style, "height"),
   };
   return isValidRect(fromStyle) ? fromStyle : undefined;
+}
+
+function readTextRect(attrs: string, readContent: () => string): PageRect | undefined {
+  const rect = readPageRect(attrs);
+  if (rect) {
+    return rect;
+  }
+
+  const style = readAttribute(attrs, "style");
+  if (!style) {
+    return undefined;
+  }
+
+  const x = readStyleCoordinate(style, "left");
+  const y = readStyleCoordinate(style, "top");
+  const height =
+    readStyleCoordinate(style, "line-height") ||
+    readStyleCoordinate(style, "font-size") ||
+    readPixelStyleCoordinate(style, "font-size");
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(height) || height <= 0) {
+    return undefined;
+  }
+
+  const scaleX = readScaleX(style) ?? 1;
+  const width = estimateHtmlTextWidth(readContent(), height, scaleX);
+  if (!Number.isFinite(width) || width <= 0) {
+    return undefined;
+  }
+
+  return { x, y, width, height };
 }
 
 function isValidRect(rect: {
@@ -312,7 +381,122 @@ function readStyleCoordinate(style: string, property: string): number | undefine
   return Number.isFinite(value) ? value : undefined;
 }
 
+function readPixelStyleCoordinate(style: string, property: string): number | undefined {
+  const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = style.match(new RegExp(`${escapedProperty}\\s*:\\s*([0-9.]+)px`, "i"));
+  if (!match) {
+    return undefined;
+  }
+  const value = Number.parseFloat(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function readScaleX(style: string): number | undefined {
+  const match = style.match(/transform\s*:\s*scaleX\(([^)]+)\)/i);
+  if (!match) {
+    return undefined;
+  }
+  const value = Number.parseFloat(match[1]);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+let cachedFontMetric: { semi: number; full: number; emoji: number } | undefined;
+
+function estimateHtmlTextWidth(html: string, fontSize: number, scaleX: number) {
+  const metric = (cachedFontMetric ??= measureBrowserMonospaceMetric());
+  let units = 0;
+  for (let index = 0; index < html.length; index += 1) {
+    const char = html[index];
+    if (char === "<") {
+      const end = html.indexOf(">", index + 1);
+      if (end < 0) {
+        break;
+      }
+      index = end;
+      continue;
+    }
+    if (char === "&") {
+      const end = html.indexOf(";", index + 1);
+      if (end >= 0) {
+        index = end;
+      }
+      units += metric.semi;
+      continue;
+    }
+
+    const codePoint = html.codePointAt(index) || 0;
+    if (codePoint > 0xffff) {
+      index += 1;
+    }
+    if (isZeroWidthCodePoint(codePoint)) {
+      continue;
+    }
+    units += isEmojiCodePoint(codePoint)
+      ? metric.emoji
+      : isFullWidthCodePoint(codePoint)
+        ? metric.full
+        : metric.semi;
+  }
+  return units * fontSize * scaleX;
+}
+
+function measureBrowserMonospaceMetric() {
+  try {
+    const canvas = new OffscreenCanvas(0, 0);
+    const context = canvas.getContext("2d");
+    if (context) {
+      context.font = "128px monospace";
+      return {
+        semi: context.measureText("A").width / 128,
+        full: context.measureText("\u55b5").width / 128,
+        emoji: context.measureText(String.fromCodePoint(0x1f984)).width / 128,
+      };
+    }
+  } catch (_error) {}
+  return { semi: 0.6, full: 1, emoji: 1 };
+}
+
+function isZeroWidthCodePoint(codePoint: number) {
+  return (
+    (codePoint >= 0x0300 && codePoint <= 0x036f) ||
+    (codePoint >= 0x1ab0 && codePoint <= 0x1aff) ||
+    (codePoint >= 0x1dc0 && codePoint <= 0x1dff) ||
+    (codePoint >= 0xfe20 && codePoint <= 0xfe2f) ||
+    codePoint === 0x200b ||
+    codePoint === 0x200c ||
+    codePoint === 0x200d ||
+    codePoint === 0xfe0e ||
+    codePoint === 0xfe0f
+  );
+}
+
+function isEmojiCodePoint(codePoint: number) {
+  return codePoint > 0xffff;
+}
+
+function isFullWidthCodePoint(codePoint: number) {
+  return (
+    (codePoint >= 0x1100 && codePoint <= 0x11ff) ||
+    (codePoint >= 0x2e80 && codePoint <= 0xa4cf) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+    (codePoint >= 0xfe10 && codePoint <= 0xfe19) ||
+    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
+    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+    (codePoint >= 0xffe0 && codePoint <= 0xffe6)
+  );
+}
+
 function decodeHtmlAttribute(value: string) {
+  return decodeHtmlText(value);
+}
+
+function readTagContent(html: string, tagName: string, contentStart: number) {
+  const close = html.indexOf(`</${tagName}>`, contentStart);
+  return close < 0 ? "" : html.slice(contentStart, close);
+}
+
+function decodeHtmlText(value: string) {
   return value
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")

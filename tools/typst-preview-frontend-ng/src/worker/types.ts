@@ -28,8 +28,15 @@ export interface PageLayout {
 export interface CanvasEntry {
   canvas: OffscreenCanvas;
   context?: OffscreenCanvasRenderingContext2D;
+  scratch?: OffscreenCanvas;
+  scratchContext?: OffscreenCanvasRenderingContext2D;
   widthPx: number;
   heightPx: number;
+  hasContent?: boolean;
+  quality?: "preview" | "full";
+  renderedGeneration?: number;
+  renderedPixelPerPt?: number;
+  renderedWindowKey?: string;
 }
 
 export interface CanvasAck {
@@ -52,5 +59,9 @@ export interface WorkerConfig {
 export type WorkerPost = (message: unknown) => void;
 
 export interface PageRenderResult {
+  pageIndex: number;
+  quality?: "preview" | "full";
+  fullPage?: boolean;
   interactions?: PageInteractions;
+  invalidatedInteractions?: number[];
 }
