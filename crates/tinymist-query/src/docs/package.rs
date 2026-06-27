@@ -118,8 +118,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
         .expect("package manifest must be in a package");
     let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
-    ctx.preload_package(entry_point);
-
     let PackageDefInfo { root, module_uses } = module_docs(ctx, entry_point)?;
 
     crate::log_debug_ct!("module_uses: {module_uses:#?}");
