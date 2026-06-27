@@ -6,10 +6,6 @@
   --border: var(--vscode-panel-border, #3c3c3c);
   --accent: var(--vscode-focusBorder, #0078d4);
   --surface: var(--vscode-sideBar-background, #252526);
-  --surface-hover: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.08));
-  --button-fg: var(--vscode-button-secondaryForeground, var(--fg));
-  --input-bg: var(--vscode-input-background, rgba(0, 0, 0, 0.35));
-  --input-fg: var(--vscode-input-foreground, var(--fg));
   --page-shadow: color-mix(in srgb, #000000 30%, transparent);
   --cursor-color: var(--vscode-editorCursor-foreground, #aeafad);
   --jump-color: #66bab7;
@@ -39,7 +35,7 @@ body {
 #typst-preview-ng {
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: 1fr;
   width: 100%;
   height: 100%;
 }

@@ -5,23 +5,11 @@ export interface PageControlHost {
   readonly mode: PreviewMode;
   goToPreviousSlide(): void;
   goToNextSlide(): void;
-  setSlidePageFromInput(value: string): void;
-  focusPageSelector(): void;
-  blurPageSelector(): void;
-  hideHelp(): void;
-  toggleHelp(): void;
   toggleInvertColors(): void;
   applyWheelZoom(event: WheelEvent): void;
 }
 
 export function installPageControls(elements: PreviewElements, host: PageControlHost) {
-  elements.helpButton.addEventListener("click", () => host.toggleHelp());
-  elements.pagePrev.addEventListener("click", () => host.goToPreviousSlide());
-  elements.pageNext.addEventListener("click", () => host.goToNextSlide());
-  elements.pageSelector.addEventListener("input", () => {
-    host.setSlidePageFromInput(elements.pageSelector.value);
-  });
-
   installKeyboardShortcuts(elements, host);
   installDragPan(elements);
   installWheelZoom(elements, host);
@@ -39,8 +27,6 @@ function installKeyboardShortcuts(elements: PreviewElements, host: PageControlHo
       case "ArrowLeft":
       case "ArrowUp":
         if (host.mode === "Slide") {
-          host.blurPageSelector();
-          host.hideHelp();
           host.goToPreviousSlide();
         } else {
           handled = false;
@@ -50,8 +36,6 @@ function installKeyboardShortcuts(elements: PreviewElements, host: PageControlHo
       case "ArrowRight":
       case "ArrowDown":
         if (host.mode === "Slide") {
-          host.blurPageSelector();
-          host.hideHelp();
           host.goToNextSlide();
         } else {
           handled = false;
@@ -69,17 +53,7 @@ function installKeyboardShortcuts(elements: PreviewElements, host: PageControlHo
       case "l":
         elements.viewport.scrollBy({ top: scrollDelta * 10, behavior: "smooth" });
         break;
-      case "?":
-        host.blurPageSelector();
-        host.toggleHelp();
-        break;
-      case "g":
-        host.hideHelp();
-        host.focusPageSelector();
-        break;
       case "Escape":
-        host.hideHelp();
-        host.blurPageSelector();
         handled = false;
         break;
       case "t":
@@ -146,6 +120,6 @@ function installWheelZoom(elements: PreviewElements, host: PageControlHost) {
 
 function isInteractiveElement(target: EventTarget | null) {
   return target instanceof HTMLElement
-    ? !!target.closest("button, input, select, textarea, a, #typst-container-top")
+    ? !!target.closest("button, input, select, textarea, a")
     : false;
 }

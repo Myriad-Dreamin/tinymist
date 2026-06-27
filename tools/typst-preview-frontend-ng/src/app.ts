@@ -4,8 +4,6 @@ import { PageHost } from "./page-host";
 import type { PreviewArgs, PreviewMode, VscodeApi } from "./types";
 import {
   acquireVscodeApi,
-  formatBytes,
-  formatMs,
   parsePreviewMode,
   parsePreviewState,
   resolveWebSocketUrl,
@@ -32,9 +30,6 @@ class PreviewApp {
   private readonly initialPreviewState: unknown;
   private readonly pageHost: PageHost;
   private worker: Worker | undefined;
-  private frameCount = 0;
-  private byteCount = 0;
-  private renderCount = 0;
   private currentPreviewMode: PreviewMode;
 
   constructor(
@@ -46,7 +41,6 @@ class PreviewApp {
     this.pageHost = new PageHost({
       elements: this.elements,
       postWorker: (message, transfer) => this.postWorker(message, transfer),
-      setLastMessage: (message) => this.setLastMessage(message),
     });
   }
 
@@ -62,8 +56,7 @@ class PreviewApp {
     this.worker = new RendererWorker({ name: "typst-preview-ng-worker" });
     this.worker.addEventListener("message", (event) => this.handleWorkerMessage(event));
     this.worker.addEventListener("error", (event) => {
-      this.setSocketState("error");
-      this.setLastMessage(event.message || "worker error");
+      console.error("[typst-preview-ng]", event.message || "worker error", event);
     });
 
     this.postWorker({
@@ -91,28 +84,10 @@ class PreviewApp {
     const message = event.data || {};
     switch (message.type) {
       case "status":
-        this.setSocketState(message.state || "idle");
-        this.setLastMessage(message.message || message.state || "");
-        break;
       case "renderer-ready":
-        this.setLastMessage("renderer ready");
-        break;
       case "socket-open":
-        this.setSocketState("open");
-        this.setLastMessage("connected");
-        break;
       case "socket-close":
-        this.setSocketState("closed");
-        this.setLastMessage(`closed ${message.code ?? ""}`.trim());
-        break;
       case "frame":
-        this.frameCount += 1;
-        this.byteCount += message.byteLength || 0;
-        this.elements.frameKind.textContent = message.kind || "frame";
-        this.elements.frameSize.textContent = formatBytes(message.byteLength || 0);
-        this.elements.frameCount.textContent = `frames: ${this.frameCount}`;
-        this.elements.byteCount.textContent = `bytes: ${formatBytes(this.byteCount)}`;
-        this.setLastMessage(`${message.kind || "frame"} @ ${formatMs(message.elapsedMs)}`);
         break;
       case "preview-message":
         this.pageHost.handlePreviewProtocolMessage(message.kind, message.text || "");
@@ -121,13 +96,8 @@ class PreviewApp {
         this.handleEnsurePages(message);
         break;
       case "render-complete":
-        this.renderCount += 1;
-        this.elements.renderCount.textContent = `renders: ${this.renderCount}`;
-        this.setLastMessage(`rendered ${message.pageCount || 0} pages (${message.phase || "all"})`);
         break;
       case "error":
-        this.setSocketState("error");
-        this.setLastMessage(message.message || "worker error");
         console.error("[typst-preview-ng]", message.message, message);
         break;
     }
@@ -143,8 +113,6 @@ class PreviewApp {
         generation: message.generation,
         message: detail,
       });
-      this.setSocketState("error");
-      this.setLastMessage(detail);
       console.error("[typst-preview-ng] failed to prepare pages", error);
     }
   }
@@ -157,7 +125,6 @@ class PreviewApp {
         this.currentPreviewMode = nextMode;
         this.pageHost.setPreviewMode(nextMode);
         this.pageHost.setContentPreview(!!message.isContentPreview);
-        this.resetCounters();
         this.postWorker({
           type: "reconnect",
           wsUrl: resolveWebSocketUrl(message.url || ""),
@@ -167,8 +134,6 @@ class PreviewApp {
         });
         if (!message.url) {
           this.pageHost.clearPages();
-          this.setSocketState("idle");
-          this.setLastMessage("waiting");
         }
         break;
       }
@@ -179,13 +144,6 @@ class PreviewApp {
         this.pageHost.setOutlineData(message.outline);
         break;
     }
-  }
-
-  private resetCounters() {
-    this.frameCount = 0;
-    this.byteCount = 0;
-    this.renderCount = 0;
-    this.pageHost.resetCounters();
   }
 
   private postWorker(message: unknown, transfer?: Transferable[]) {
@@ -200,14 +158,5 @@ class PreviewApp {
     this.postWorker({ type: "dispose" });
     this.worker?.terminate();
     this.worker = undefined;
-  }
-
-  private setSocketState(state: string) {
-    this.elements.socketState.textContent = state;
-    this.elements.socketState.dataset.state = state;
-  }
-
-  private setLastMessage(message: string) {
-    this.elements.lastMessage.textContent = message || "";
   }
 }

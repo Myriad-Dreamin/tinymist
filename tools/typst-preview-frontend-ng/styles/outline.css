@@ -29,6 +29,11 @@
   background: var(--vscode-editor-selectionHighlightBackground, rgba(127, 185, 222, 0.25));
 }
 
+.typst-outline-title:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .level-1 > .typst-outline-title {
   font-weight: 700;
   font-size: 0.9rem;
