@@ -4,7 +4,7 @@ use ecow::EcoString;
 use tinymist_analysis::Signature;
 use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_analysis::docs::{
-    DocText, DocTextResolver, ParamDocs, SignatureDocs, VarDocs, format_ty,
+    DocText, DocTextResolver, ParamDocs, SignatureDocs, VarDocs, format_ty_short,
 };
 use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
@@ -29,7 +29,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     //
     // Must be simplified before formatting, to expand type aliases.
     let simplified_ty = type_info.simplify(ty, false);
-    let return_ty = format_ty(Some(&simplified_ty));
+    let return_ty = format_ty_short(Some(&simplified_ty));
     match doc_source {
         DocSource::Var(var) => {
             let docs = type_info
@@ -80,7 +80,7 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
         .collect::<std::collections::BTreeMap<_, _>>();
     let rest = rest_in.map(|(param, ty)| ParamDocs::new(ctx, param, ty));
 
-    let ret_ty = format_ty(ret_in);
+    let ret_ty = format_ty_short(ret_in);
 
     let docs = sig
         .primary()

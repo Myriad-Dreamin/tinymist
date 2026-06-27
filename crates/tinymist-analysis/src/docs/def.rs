@@ -449,3 +449,10 @@ pub fn format_ty(ty: Option<&Ty>) -> TypeRepr {
 
     Some((short, long, value))
 }
+
+/// Formats the type when only the short display form is needed.
+pub fn format_ty_short(ty: Option<&Ty>) -> TypeRepr {
+    let ty = ty?;
+    let short = ty.repr().unwrap_or_else(|| "any".into());
+    Some((short.clone(), short.clone(), short))
+}

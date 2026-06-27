@@ -21,6 +21,7 @@ impl TypeInfo {
         let mut cache = self.cano_cache.lock();
         let cache = &mut *cache;
 
+        cache.transform_cache.clear();
         cache.cano_local_cache.clear();
         cache.positives.clear();
         cache.negatives.clear();
@@ -29,6 +30,7 @@ impl TypeInfo {
             principal,
             vars: &self.vars,
             cano_cache: &mut cache.cano_cache,
+            transform_cache: &mut cache.transform_cache,
             cano_local_cache: &mut cache.cano_local_cache,
 
             positives: &mut cache.positives,
@@ -46,6 +48,7 @@ struct TypeSimplifier<'a, 'b> {
     vars: &'a FxHashMap<DeclExpr, TypeVarBounds>,
 
     cano_cache: &'b mut FxHashMap<(Ty, bool), Ty>,
+    transform_cache: &'b mut FxHashMap<(Ty, bool), Ty>,
     cano_local_cache: &'b mut FxHashMap<(DeclExpr, bool), Ty>,
     negatives: &'b mut FxHashSet<DeclExpr>,
     positives: &'b mut FxHashSet<DeclExpr>,
@@ -59,8 +62,9 @@ impl TypeSimplifier<'_, '_> {
         }
 
         self.analyze(&ty, true);
-
-        self.transform(&ty, true)
+        let cano = self.transform(&ty, true);
+        self.cano_cache.insert((ty, principal), cano.clone());
+        cano
     }
 
     /// Analyzes the given type.
@@ -168,7 +172,11 @@ impl TypeSimplifier<'_, '_> {
 
     /// Transforms the given type.
     fn transform(&mut self, ty: &Ty, pol: bool) -> Ty {
-        match ty {
+        if let Some(cano) = self.transform_cache.get(&(ty.clone(), pol)) {
+            return cano.clone();
+        }
+
+        let cano = match ty {
             Ty::Let(bounds) => self.transform_let(bounds.lbs.iter(), bounds.ubs.iter(), None, pol),
             Ty::Var(var) => {
                 if let Some(cano) = self
@@ -252,7 +260,10 @@ impl TypeSimplifier<'_, '_> {
             Ty::Any => Ty::Any,
             Ty::Boolean(truthiness) => Ty::Boolean(*truthiness),
             Ty::Builtin(ty) => Ty::Builtin(ty.clone()),
-        }
+        };
+
+        self.transform_cache.insert((ty.clone(), pol), cano.clone());
+        cano
     }
 
     /// Transforms the given sequence of types.
@@ -322,6 +333,7 @@ impl TypeSimplifier<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::syntax::Decl;
 
     /// See https://github.com/typst/typst/issues/6285
     #[test]
@@ -347,5 +359,87 @@ mod tests {
         res.extend(vec![ch("c"), val(Value::None), ch("a")]);
 
         test_sort_ty(res);
+    }
+
+    fn var(name: &str) -> TypeVarBounds {
+        TypeVarBounds::new(
+            TypeVar {
+                name: name.into(),
+                def: Decl::lit(name).into(),
+            },
+            DynTypeBounds::default(),
+        )
+    }
+
+    fn recursive_fun(root: &Interned<TypeVar>, depth: usize) -> Ty {
+        let mut body = Ty::Var(root.clone());
+        for _ in 0..depth {
+            body = Ty::Func(SigTy::unary(Ty::Any, body));
+        }
+        body
+    }
+
+    #[test]
+    fn test_recursive_cycle_union_is_not_aligned_like_simple_sub() {
+        let mut info = TypeInfo::default();
+
+        let one = var("one");
+        let two = var("two");
+
+        let one_ty = one.as_type();
+        let two_ty = two.as_type();
+
+        info.vars.insert(one.var.def.clone(), one.clone());
+        info.vars.insert(two.var.def.clone(), two.clone());
+
+        info.vars
+            .get(&one.var.def)
+            .unwrap()
+            .bounds
+            .bounds()
+            .write()
+            .lbs
+            .insert_mut(recursive_fun(&one.var, 1));
+        info.vars
+            .get(&two.var.def)
+            .unwrap()
+            .bounds
+            .bounds()
+            .write()
+            .lbs
+            .insert_mut(recursive_fun(&two.var, 2));
+
+        let merged = Ty::from_types([one_ty, two_ty].into_iter());
+        let simplified = info.simplify(merged, true);
+        assert_eq!(
+            format!("{simplified:?}"),
+            "((Any) => Any | (Any) => (Any) => Any)"
+        );
+    }
+
+    #[test]
+    fn test_simplify_populates_top_level_cache() {
+        let mut info = TypeInfo::default();
+        let one = var("one");
+        let one_ty = one.as_type();
+        info.vars.insert(one.var.def.clone(), one.clone());
+        info.vars
+            .get(&one.var.def)
+            .unwrap()
+            .bounds
+            .bounds()
+            .write()
+            .lbs
+            .insert_mut(recursive_fun(&one.var, 1));
+
+        let _ = info.simplify(one_ty.clone(), true);
+        let first_cache_len = info.cano_cache.lock().cano_cache.len();
+        let _ = info.simplify(one_ty, true);
+        let second_cache_len = info.cano_cache.lock().cano_cache.len();
+        assert!(
+            first_cache_len > 0,
+            "simplify should memoize the top-level result"
+        );
+        assert_eq!(first_cache_len, second_cache_len);
     }
 }

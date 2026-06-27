@@ -1604,6 +1604,8 @@ impl FlowVarKind {
 pub(super) struct TypeCanoStore {
     /// Maps a type to its canonical form.
     pub cano_cache: FxHashMap<(Ty, bool), Ty>,
+    /// Memoizes sub-type transforms within one simplify call.
+    pub transform_cache: FxHashMap<(Ty, bool), Ty>,
     /// Maps a local type to its canonical form.
     pub cano_local_cache: FxHashMap<(DeclExpr, bool), Ty>,
     /// The negative bounds of a type variable.
