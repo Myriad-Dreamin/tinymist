@@ -22,7 +22,7 @@ jobs:
       image: quay.io/pypa/manylinux_2_28_x86_64
     timeout-minutes: 360
     env:
-      TINYMIST_PACKAGE_LSIF_JOBS: "2"
+      TINYMIST_PACKAGE_SCIP_JOBS: "2"
       TINYMIST_KNOWLEDGE_DATA_ARTIFACT: typst-knowledge-data
     steps:
       - name: Checkout
@@ -59,16 +59,16 @@ jobs:
           fetch-depth: 1
           sparse-checkout: packages
 
-      - name: Generate LSIF report
+      - name: Generate SCIP report
         run: |
-          node scripts/package-lsif-report.mjs \
+          node scripts/package-scip-report.mjs \
             --tinymist target/release/tinymist \
             --package-cache-path typst-packages/packages \
             --out target/typst-knowledge-data \
             --preview-out target/typst-knowledge-preview
 
-      - name: Upload LSIF data artifact
-        id: lsif_data
+      - name: Upload SCIP data artifact
+        id: scip_data
         if: always()
         uses: actions/upload-artifact@v4
         with:

@@ -6,7 +6,6 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
 
 function parseArgs(argv) {
   const args = {
@@ -16,7 +15,7 @@ function parseArgs(argv) {
     dataArtifactName: process.env.TINYMIST_KNOWLEDGE_DATA_ARTIFACT || "typst-knowledge-data",
     githubRepository: process.env.GITHUB_REPOSITORY || "",
     githubRunId: process.env.GITHUB_RUN_ID || "",
-    jobs: Number(process.env.TINYMIST_PACKAGE_LSIF_JOBS || 2),
+    jobs: Number(process.env.TINYMIST_PACKAGE_SCIP_JOBS || 2),
     limit: undefined,
   };
 
@@ -96,20 +95,20 @@ function resolveCommand(value) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/package-lsif-report.mjs [options]
+  console.log(`Usage: node scripts/package-scip-report.mjs [options]
 
-Scans a local typst/packages checkout, runs tinymist LSIF for each package
+Scans a local typst/packages checkout, runs tinymist SCIP for each package
 version, and writes an HTML report.
 
 Options:
   --tinymist <path>              Path to the tinymist binary
-  --out <dir>                   LSIF data output directory
+  --out <dir>                   SCIP data output directory
   --preview-out <dir>           Single-file HTML preview output directory
   --package-cache-path <dir>    Local typst/packages "packages" directory
   --data-artifact-name <name>   GitHub Actions artifact name used by the HTML viewer
   --github-repository <repo>    GitHub repository in owner/name form
   --github-run-id <id>          GitHub Actions run id
-  --jobs <n>                    Parallel LSIF jobs (default: 2)
+  --jobs <n>                    Parallel SCIP jobs (default: 2)
   --limit <n>                   Process only the first n packages, for local smoke tests
 `);
 }
@@ -131,8 +130,12 @@ function packageDir(cacheRoot, pkg) {
   return path.join(cacheRoot, pkg.namespace, pkg.name, pkg.version);
 }
 
-function lsifName(pkg) {
-  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.lsif.jsonl`;
+function scipName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.scip`;
+}
+
+function scipStatsName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.json`;
 }
 
 function safeFileName(value) {
@@ -259,7 +262,7 @@ function parseMeasuredStderr(stderr, marker) {
   };
 }
 
-async function generateLsif(args, pkg) {
+async function generateScip(args, pkg) {
   const workspace = path.join(args.out, "workspace");
   const input = path.join(workspace, "main.typ");
   await fs.mkdir(workspace, { recursive: true });
@@ -267,16 +270,19 @@ async function generateLsif(args, pkg) {
     await fs.writeFile(input, "\n");
   }
 
-  const lsifPath = path.join(args.out, "lsif", lsifName(pkg));
-  const statsPath = path.join(args.out, "stats", `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.json`);
-  await fs.mkdir(path.dirname(lsifPath), { recursive: true });
+  const scipPath = path.join(args.out, "scip", scipName(pkg));
+  const statsPath = path.join(args.out, "stats", scipStatsName(pkg));
+  const scipStatsPath = path.join(args.out, "scip-stats", scipStatsName(pkg));
+  await fs.mkdir(path.dirname(scipPath), { recursive: true });
   await fs.mkdir(path.dirname(statsPath), { recursive: true });
-  await fs.rm(lsifPath, { force: true });
+  await fs.mkdir(path.dirname(scipStatsPath), { recursive: true });
+  await fs.rm(scipPath, { force: true });
   await fs.rm(statsPath, { force: true });
+  await fs.rm(scipStatsPath, { force: true });
 
   const measured = await runMeasured(args.tinymist, [
     "query",
-    "lsif",
+    "scip",
     "--root",
     workspace,
     "--package-path",
@@ -288,22 +294,30 @@ async function generateLsif(args, pkg) {
     "--path",
     packageDir(args.packageCachePath, pkg),
     "--output",
-    lsifPath,
+    scipPath,
     "--stats-output",
     statsPath,
+    "--index-summary-output",
+    scipStatsPath,
     input,
   ]);
 
-  const details = await inspectLsif(lsifPath);
+  const details = await inspectScip(scipPath, scipStatsPath);
   const analysis = await inspectAnalysisStats(statsPath);
   return {
     ...pkg,
     status: "ok",
-    lsifPath,
-    href: `lsif/${lsifName(pkg)}`,
+    scipPath,
+    href: `scip-stats/${scipStatsName(pkg)}`,
     size: details.size,
     hash: details.hash,
-    queries: details.queries,
+    documents: details.documents,
+    occurrences: details.occurrences,
+    documentSymbols: details.documentSymbols,
+    externalSymbols: details.externalSymbols,
+    relationships: details.relationships,
+    publicModules: details.publicModules,
+    publicSymbols: details.publicSymbols,
     totalMs: measured.elapsedMs,
     maxRssKiB: measured.maxRssKiB,
     exprMs: analysis.exprMs,
@@ -311,30 +325,26 @@ async function generateLsif(args, pkg) {
   };
 }
 
-async function inspectLsif(filePath) {
+async function inspectScip(filePath, statsPath) {
   const stat = await fs.stat(filePath);
   const hash = createHash("sha256");
-  let queries = 0;
 
   const input = createReadStream(filePath);
-  input.on("data", (chunk) => hash.update(chunk));
-  const lines = createInterface({ input, crlfDelay: Infinity });
-
-  for await (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-    const entry = JSON.parse(line);
-    if (entry.type === "edge" && entry.label === "next") {
-      queries += 1;
-    }
+  for await (const chunk of input) {
+    hash.update(chunk);
   }
+  const stats = JSON.parse(await fs.readFile(statsPath, "utf8"));
 
   return {
     size: stat.size,
     hash: hash.digest("hex"),
-    queries,
+    documents: stats.documents,
+    occurrences: stats.occurrences,
+    documentSymbols: stats.documentSymbols,
+    externalSymbols: stats.externalSymbols,
+    relationships: stats.relationships,
+    publicModules: stats.publicModules,
+    publicSymbols: stats.publicSymbols,
   };
 }
 
@@ -378,6 +388,10 @@ function hashOfHashes(rows) {
   }
   const input = rows.map((row) => row.hash).join("\n") + "\n";
   return createHash("sha256").update(input).digest("hex");
+}
+
+function sumDefined(rows, key) {
+  return rows.reduce((sum, row) => sum + (Number.isFinite(row[key]) ? row[key] : 0), 0);
 }
 
 function formatBytes(bytes) {
@@ -514,6 +528,11 @@ function renderDurationChart(rows) {
 async function writeReport(args, rows) {
   const overallHash = hashOfHashes(rows);
   const failed = rows.filter((row) => row.status !== "ok");
+  const successful = rows.filter((row) => row.status === "ok");
+  const totalDocuments = sumDefined(successful, "documents");
+  const totalOccurrences = sumDefined(successful, "occurrences");
+  const totalDocumentSymbols = sumDefined(successful, "documentSymbols");
+  const totalPublicSymbols = sumDefined(successful, "publicSymbols");
   const generatedAt = new Date().toISOString();
   const durationChart = renderDurationChart(rows);
   const artifactConfig = {
@@ -525,13 +544,17 @@ async function writeReport(args, rows) {
   const htmlRows = rows.map((row) => {
     const statusClass = row.status === "ok" ? "ok" : "failed";
     const detail = row.status === "ok"
-      ? `<a href="#viewer" data-lsif="${attr(row.href)}" data-package="${attr(row.displayId)}">View LSIF</a>`
+      ? `<a href="#viewer" data-scip-stats="${attr(row.href)}" data-package="${attr(row.displayId)}">View SCIP stats</a>`
       : `<span class="error">${escapeHtml(row.error)}</span>`;
     return `<tr class="${statusClass}">
   <td data-sort="${attr(row.displayId)}"><code>${escapeHtml(row.displayId)}</code></td>
   <td class="num" data-sort="${row.size ?? -1}">${row.size === undefined ? "" : escapeHtml(formatBytes(row.size))}</td>
   <td class="hash">${row.hash ? `<code>${escapeHtml(row.hash)}</code>` : ""}</td>
-  <td class="num" data-sort="${row.queries ?? -1}">${row.queries ?? ""}</td>
+  <td class="num" data-sort="${row.documents ?? -1}">${row.documents ?? ""}</td>
+  <td class="num" data-sort="${row.occurrences ?? -1}">${row.occurrences ?? ""}</td>
+  <td class="num" data-sort="${row.documentSymbols ?? -1}">${row.documentSymbols ?? ""}</td>
+  <td class="num" data-sort="${row.externalSymbols ?? -1}">${row.externalSymbols ?? ""}</td>
+  <td class="num" data-sort="${row.publicSymbols ?? -1}">${row.publicSymbols ?? ""}</td>
   <td class="num" data-sort="${row.totalMs ?? -1}">${escapeHtml(formatMs(row.totalMs))}</td>
   <td class="num" data-sort="${row.maxRssKiB ?? -1}">${escapeHtml(formatMemory(row.maxRssKiB))}</td>
   <td class="num" data-sort="${row.exprMs ?? -1}">${escapeHtml(formatMs(row.exprMs))}</td>
@@ -777,12 +800,16 @@ async function writeReport(args, rows) {
   <main>
     <h1>Tinymist Typst Knowledge Report</h1>
     <section class="summary">
-      <div class="metric"><span>Overall LSIF hash</span><code>${escapeHtml(overallHash ?? "unavailable because one or more packages failed")}</code></div>
+      <div class="metric"><span>Overall SCIP hash</span><code>${escapeHtml(overallHash ?? "unavailable because one or more packages failed")}</code></div>
       <div class="metric"><span>Packages</span><strong>${rows.length}</strong></div>
       <div class="metric"><span>Failures</span><strong>${failed.length}</strong></div>
+      <div class="metric"><span>SCIP documents</span><strong>${totalDocuments}</strong></div>
+      <div class="metric"><span>SCIP occurrences</span><strong>${totalOccurrences}</strong></div>
+      <div class="metric"><span>SCIP document symbols</span><strong>${totalDocumentSymbols}</strong></div>
+      <div class="metric"><span>Public symbols</span><strong>${totalPublicSymbols}</strong></div>
       <div class="metric"><span>Generated at</span><code>${escapeHtml(generatedAt)}</code></div>
     </section>
-    <p>The overall hash is SHA-256 over the newline-separated per-package LSIF hashes in package id order. Query count is the number of LSIF <code>next</code> edges.</p>
+    <p>The overall hash is SHA-256 over the newline-separated per-package SCIP hashes in package id order. Occurrence count is the number of SCIP symbol occurrences.</p>
     ${durationChart}
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter packages" autocomplete="off">
@@ -791,13 +818,17 @@ async function writeReport(args, rows) {
       <thead>
         <tr>
           <th aria-sort="ascending"><button type="button" data-sort-column="0" data-sort-type="string">Package ID</button></th>
-          <th><button type="button" data-sort-column="1" data-sort-type="number">LSIF Size</button></th>
-          <th>LSIF Hash</th>
-          <th><button type="button" data-sort-column="3" data-sort-type="number">Queries</button></th>
-          <th><button type="button" data-sort-column="4" data-sort-type="number">Total Time</button></th>
-          <th><button type="button" data-sort-column="5" data-sort-type="number">Max RSS</button></th>
-          <th><button type="button" data-sort-column="6" data-sort-type="number">Expr Time</button></th>
-          <th><button type="button" data-sort-column="7" data-sort-type="number">Type Time</button></th>
+          <th><button type="button" data-sort-column="1" data-sort-type="number">SCIP Size</button></th>
+          <th>SCIP Hash</th>
+          <th><button type="button" data-sort-column="3" data-sort-type="number">Documents</button></th>
+          <th><button type="button" data-sort-column="4" data-sort-type="number">Occurrences</button></th>
+          <th><button type="button" data-sort-column="5" data-sort-type="number">Doc Symbols</button></th>
+          <th><button type="button" data-sort-column="6" data-sort-type="number">External Symbols</button></th>
+          <th><button type="button" data-sort-column="7" data-sort-type="number">Public Symbols</button></th>
+          <th><button type="button" data-sort-column="8" data-sort-type="number">Total Time</button></th>
+          <th><button type="button" data-sort-column="9" data-sort-type="number">Max RSS</button></th>
+          <th><button type="button" data-sort-column="10" data-sort-type="number">Expr Time</button></th>
+          <th><button type="button" data-sort-column="11" data-sort-type="number">Type Time</button></th>
           <th>Detail</th>
         </tr>
       </thead>
@@ -1011,18 +1042,19 @@ ${htmlRows}
       return new TextDecoder().decode(content);
     }
 
-    for (const link of document.querySelectorAll("[data-lsif]")) {
+    for (const link of document.querySelectorAll("[data-scip-stats]")) {
       link.addEventListener("click", async (event) => {
         event.preventDefault();
         viewer.hidden = false;
         viewerTitle.textContent = link.dataset.package;
-        viewerContent.textContent = "Loading " + link.dataset.lsif + " ...";
+        viewerContent.textContent = "Loading " + link.dataset.scipStats + " ...";
         viewer.scrollIntoView({ block: "start" });
         try {
           const zip = await loadArtifactZip();
-          viewerContent.textContent = await readZipText(zip, link.dataset.lsif);
+          const text = await readZipText(zip, link.dataset.scipStats);
+          viewerContent.textContent = JSON.stringify(JSON.parse(text), null, 2);
         } catch (error) {
-          viewerContent.textContent = "Could not load LSIF into this page: " + error + "\\nUse the data artifact link above.";
+          viewerContent.textContent = "Could not load SCIP stats into this page: " + error + "\\nUse the data artifact link above.";
         }
       });
     }
@@ -1036,13 +1068,25 @@ ${htmlRows}
     overallHash,
     packageCount: rows.length,
     failureCount: failed.length,
+    scip: {
+      documents: totalDocuments,
+      occurrences: totalOccurrences,
+      documentSymbols: totalDocumentSymbols,
+      publicSymbols: totalPublicSymbols,
+    },
     rows: rows.map((row) => ({
       id: row.displayId,
       spec: row.spec,
       status: row.status,
       size: row.size,
       hash: row.hash,
-      queries: row.queries,
+      documents: row.documents,
+      occurrences: row.occurrences,
+      documentSymbols: row.documentSymbols,
+      externalSymbols: row.externalSymbols,
+      relationships: row.relationships,
+      publicModules: row.publicModules,
+      publicSymbols: row.publicSymbols,
       totalMs: row.totalMs,
       maxRssKiB: row.maxRssKiB,
       exprMs: row.exprMs,
@@ -1054,11 +1098,15 @@ ${htmlRows}
   };
 
   const summaryMd = [
-    "### Typst knowledge report",
+    "### Typst knowledge SCIP report",
     "",
     `- Packages: ${rows.length}`,
     `- Failures: ${failed.length}`,
-    `- Overall LSIF hash: \`${overallHash ?? "unavailable"}\``,
+    `- Overall SCIP hash: \`${overallHash ?? "unavailable"}\``,
+    `- SCIP documents: ${totalDocuments}`,
+    `- SCIP occurrences: ${totalOccurrences}`,
+    `- SCIP document symbols: ${totalDocumentSymbols}`,
+    `- Public symbols: ${totalPublicSymbols}`,
     `- Preview entry: \`${path.relative(process.cwd(), path.join(args.previewOut, "index.html"))}\``,
     `- Data artifact: \`${args.dataArtifactName}\``,
     "",
@@ -1085,11 +1133,11 @@ async function main() {
   }
   console.log(`Found ${packages.length} package versions`);
 
-  console.log(`Generating LSIF with ${args.jobs} parallel job(s)`);
+  console.log(`Generating SCIP with ${args.jobs} parallel job(s)`);
   const rows = await mapLimit(packages, args.jobs, async (pkg, index) => {
-    process.stdout.write(`[lsif ${index + 1}/${packages.length}] ${pkg.displayId}\n`);
+    process.stdout.write(`[scip ${index + 1}/${packages.length}] ${pkg.displayId}\n`);
     try {
-      return await generateLsif(args, pkg);
+      return await generateScip(args, pkg);
     } catch (error) {
       return {
         ...pkg,
@@ -1103,7 +1151,7 @@ async function main() {
 
   const failed = rows.filter((row) => row.status !== "ok");
   if (failed.length > 0) {
-    console.error(`${failed.length} package(s) failed to generate LSIF`);
+    console.error(`${failed.length} package(s) failed to generate SCIP`);
     for (const row of failed) {
       console.error(`- ${row.displayId}: ${row.error}`);
     }
