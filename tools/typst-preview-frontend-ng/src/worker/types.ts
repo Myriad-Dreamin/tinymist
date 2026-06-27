@@ -25,6 +25,9 @@ export interface PageLayout {
   scale: number;
 }
 
+export type CanvasLayer = "full";
+export type RenderQuality = "preview" | "full";
+
 export interface CanvasEntry {
   canvas: OffscreenCanvas;
   context?: OffscreenCanvasRenderingContext2D;
@@ -33,7 +36,7 @@ export interface CanvasEntry {
   widthPx: number;
   heightPx: number;
   hasContent?: boolean;
-  quality?: "preview" | "full";
+  quality?: RenderQuality;
   renderedGeneration?: number;
   renderedPixelPerPt?: number;
   renderedWindowKey?: string;
@@ -60,7 +63,7 @@ export type WorkerPost = (message: unknown) => void;
 
 export interface PageRenderResult {
   pageIndex: number;
-  quality?: "preview" | "full";
+  quality?: RenderQuality;
   fullPage?: boolean;
   interactions?: PageInteractions;
   invalidatedInteractions?: number[];
