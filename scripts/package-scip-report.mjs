@@ -6,7 +6,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { createInterface } from "node:readline";
+import { gzipSync } from "node:zlib";
+import { pathToFileURL } from "node:url";
 
 function parseArgs(argv) {
   const args = {
@@ -16,8 +17,14 @@ function parseArgs(argv) {
     dataArtifactName: process.env.TINYMIST_KNOWLEDGE_DATA_ARTIFACT || "typst-knowledge-data",
     githubRepository: process.env.GITHUB_REPOSITORY || "",
     githubRunId: process.env.GITHUB_RUN_ID || "",
-    jobs: Number(process.env.TINYMIST_PACKAGE_LSIF_JOBS || 2),
+    jobs: Number(process.env.TINYMIST_PACKAGE_SCIP_JOBS || 2),
     limit: undefined,
+    commandTimeoutMs: Number(process.env.TINYMIST_PACKAGE_COMMAND_TIMEOUT_MS || 10 * 60 * 1000),
+    apiSnapshot: undefined,
+    apiSnapshotInclude: parsePackageSpecArray(
+      process.env.TINYMIST_API_SNAPSHOT_INCLUDE || "[]",
+      "TINYMIST_API_SNAPSHOT_INCLUDE",
+    ),
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -63,6 +70,17 @@ function parseArgs(argv) {
       case "--limit":
         args.limit = Number.parseInt(next(), 10);
         break;
+      case "--command-timeout-ms":
+        args.commandTimeoutMs = Number.parseInt(next(), 10);
+        break;
+      case "--api-snapshot":
+        args.apiSnapshot = next();
+        break;
+      case "--api-snapshot-include":
+        args.apiSnapshotInclude.push(
+          ...parsePackageSpecArray(next(), "--api-snapshot-include"),
+        );
+        break;
       default:
         throw new Error(`Unknown argument: ${arg}`);
     }
@@ -79,13 +97,31 @@ function parseArgs(argv) {
   if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
     throw new Error("--limit must be a positive integer");
   }
+  if (!Number.isInteger(args.commandTimeoutMs) || args.commandTimeoutMs < 1) {
+    throw new Error("--command-timeout-ms must be a positive integer");
+  }
   args.out = path.resolve(args.out);
   args.previewOut = path.resolve(args.previewOut || args.out);
+  args.apiSnapshot = path.resolve(args.apiSnapshot || path.join(args.out, "api-snapshot.jsonl.gz"));
   args.packageCachePath = path.resolve(args.packageCachePath);
   args.tinymist = resolveCommand(args.tinymist);
   args.jobs = Math.min(args.jobs, Math.max(1, os.availableParallelism?.() || args.jobs));
+  args.apiSnapshotInclude = Array.from(new Set(args.apiSnapshotInclude)).sort((left, right) => left.localeCompare(right, "en"));
 
   return args;
+}
+
+function parsePackageSpecArray(value, label) {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch (error) {
+    throw new Error(`${label} must be a JSON array of package specs: ${error.message}`);
+  }
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    throw new Error(`${label} must be a JSON array of package specs`);
+  }
+  return parsed;
 }
 
 function resolveCommand(value) {
@@ -96,21 +132,24 @@ function resolveCommand(value) {
 }
 
 function printHelp() {
-  console.log(`Usage: node scripts/package-lsif-report.mjs [options]
+  console.log(`Usage: node scripts/package-scip-report.mjs [options]
 
-Scans a local typst/packages checkout, runs tinymist LSIF for each package
+Scans a local typst/packages checkout, runs tinymist SCIP for each package
 version, and writes an HTML report.
 
 Options:
   --tinymist <path>              Path to the tinymist binary
-  --out <dir>                   LSIF data output directory
+  --out <dir>                   SCIP data output directory
   --preview-out <dir>           Single-file HTML preview output directory
   --package-cache-path <dir>    Local typst/packages "packages" directory
   --data-artifact-name <name>   GitHub Actions artifact name used by the HTML viewer
   --github-repository <repo>    GitHub repository in owner/name form
   --github-run-id <id>          GitHub Actions run id
-  --jobs <n>                    Parallel LSIF jobs (default: 2)
+  --jobs <n>                    Parallel SCIP jobs (default: 2)
   --limit <n>                   Process only the first n packages, for local smoke tests
+  --command-timeout-ms <n>      Per tinymist child command timeout in milliseconds (default: 600000)
+  --api-snapshot <path>         Gzipped JSONL API snapshot path (default: <out>/api-snapshot.jsonl.gz)
+  --api-snapshot-include <json> JSON array of package specs whose full packageDocs output is included
 `);
 }
 
@@ -131,8 +170,16 @@ function packageDir(cacheRoot, pkg) {
   return path.join(cacheRoot, pkg.namespace, pkg.name, pkg.version);
 }
 
-function lsifName(pkg) {
-  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.lsif.jsonl`;
+function scipName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.scip`;
+}
+
+function scipStatsName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.json`;
+}
+
+function apiDocsName(pkg) {
+  return `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.md`;
 }
 
 function safeFileName(value) {
@@ -184,10 +231,45 @@ async function run(command, commandArgs, options = {}) {
       cwd: options.cwd,
       env: options.env || process.env,
       stdio: options.stdio || ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
 
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    let timeout;
+    let forceKillTimeout;
+
+    const finish = (error, result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      if (forceKillTimeout) {
+        clearTimeout(forceKillTimeout);
+      }
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    };
+
+    if (Number.isFinite(options.timeoutMs) && options.timeoutMs > 0) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        terminateChild(child, "SIGTERM");
+        forceKillTimeout = setTimeout(() => {
+          terminateChild(child, "SIGKILL");
+        }, 5000);
+        forceKillTimeout.unref?.();
+      }, options.timeoutMs);
+      timeout.unref?.();
+    }
 
     child.stdout?.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -195,20 +277,47 @@ async function run(command, commandArgs, options = {}) {
     child.stderr?.on("data", (chunk) => {
       stderr += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", (error) => finish(error));
     child.on("close", (code) => {
+      if (timedOut) {
+        finish(new Error([
+          `${command} ${commandArgs.join(" ")} timed out after ${formatMs(options.timeoutMs)}`,
+          stdout.trim() && `stdout:\n${stdout.trim()}`,
+          stderr.trim() && `stderr:\n${stderr.trim()}`,
+        ].filter(Boolean).join("\n\n")));
+        return;
+      }
       if (code === 0) {
-        resolve({ stdout, stderr });
+        finish(null, { stdout, stderr });
       } else {
         const rendered = [
           `${command} ${commandArgs.join(" ")} failed with exit code ${code}`,
           stdout.trim() && `stdout:\n${stdout.trim()}`,
           stderr.trim() && `stderr:\n${stderr.trim()}`,
         ].filter(Boolean).join("\n\n");
-        reject(new Error(rendered));
+        finish(new Error(rendered));
       }
     });
   });
+}
+
+function terminateChild(child, signal) {
+  if (!child.pid) {
+    return;
+  }
+  try {
+    if (process.platform !== "win32") {
+      process.kill(-child.pid, signal);
+    } else {
+      child.kill(signal);
+    }
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      // The process may have already exited.
+    }
+  }
 }
 
 async function runMeasured(command, commandArgs, options = {}) {
@@ -259,24 +368,23 @@ function parseMeasuredStderr(stderr, marker) {
   };
 }
 
-async function generateLsif(args, pkg) {
-  const workspace = path.join(args.out, "workspace");
-  const input = path.join(workspace, "main.typ");
-  await fs.mkdir(workspace, { recursive: true });
-  if (!(await exists(input))) {
-    await fs.writeFile(input, "\n");
-  }
+async function generateScip(args, pkg, progress) {
+  const { workspace, input } = await prepareWorkspace(args);
 
-  const lsifPath = path.join(args.out, "lsif", lsifName(pkg));
-  const statsPath = path.join(args.out, "stats", `${safeFileName(pkg.namespace)}-${safeFileName(pkg.name)}-${safeFileName(pkg.version)}.json`);
-  await fs.mkdir(path.dirname(lsifPath), { recursive: true });
+  const scipPath = path.join(args.out, "scip", scipName(pkg));
+  const statsPath = path.join(args.out, "stats", scipStatsName(pkg));
+  const scipStatsPath = path.join(args.out, "scip-stats", scipStatsName(pkg));
+  await fs.mkdir(path.dirname(scipPath), { recursive: true });
   await fs.mkdir(path.dirname(statsPath), { recursive: true });
-  await fs.rm(lsifPath, { force: true });
+  await fs.mkdir(path.dirname(scipStatsPath), { recursive: true });
+  await fs.rm(scipPath, { force: true });
   await fs.rm(statsPath, { force: true });
+  await fs.rm(scipStatsPath, { force: true });
 
+  logProgress(`[scip ${progress}] ${pkg.displayId} start`);
   const measured = await runMeasured(args.tinymist, [
     "query",
-    "lsif",
+    "scip",
     "--root",
     workspace,
     "--package-path",
@@ -288,53 +396,216 @@ async function generateLsif(args, pkg) {
     "--path",
     packageDir(args.packageCachePath, pkg),
     "--output",
-    lsifPath,
+    scipPath,
     "--stats-output",
     statsPath,
+    "--index-summary-output",
+    scipStatsPath,
     input,
-  ]);
+  ], { timeoutMs: args.commandTimeoutMs });
+  logProgress(`[scip ${progress}] ${pkg.displayId} done ${formatMs(measured.elapsedMs)}`);
 
-  const details = await inspectLsif(lsifPath);
+  const details = await inspectScip(scipPath, scipStatsPath);
   const analysis = await inspectAnalysisStats(statsPath);
+  const apiSnapshot = await generateApiSnapshotEntry(args, pkg, { workspace, input }, progress);
   return {
     ...pkg,
     status: "ok",
-    lsifPath,
-    href: `lsif/${lsifName(pkg)}`,
+    scipPath,
+    href: `scip-stats/${scipStatsName(pkg)}`,
     size: details.size,
     hash: details.hash,
-    queries: details.queries,
+    documents: details.documents,
+    occurrences: details.occurrences,
+    documentSymbols: details.documentSymbols,
+    externalSymbols: details.externalSymbols,
+    relationships: details.relationships,
+    publicModules: details.publicModules,
+    publicSymbols: details.publicSymbols,
     totalMs: measured.elapsedMs,
     maxRssKiB: measured.maxRssKiB,
     exprMs: analysis.exprMs,
     typeMs: analysis.typeMs,
+    apiSnapshot,
+    apiSize: apiSnapshot.bytes,
+    apiHash: apiSnapshot.sha256,
+    apiIncluded: apiSnapshot.included,
   };
 }
 
-async function inspectLsif(filePath) {
+async function prepareWorkspace(args) {
+  const workspace = path.join(args.out, "workspace");
+  const input = path.join(workspace, "main.typ");
+  await fs.mkdir(workspace, { recursive: true });
+  if (!(await exists(input))) {
+    await fs.writeFile(input, "\n");
+  }
+  return { workspace, input };
+}
+
+async function generateApiSnapshotEntry(args, pkg, context, progress) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "tinymist-api-docs-"));
+  const output = path.join(tempDir, apiDocsName(pkg));
+  const includeContent = args.apiSnapshotInclude.includes(pkg.spec);
+  const started = process.hrtime.bigint();
+
+  try {
+    logProgress(`[api ${progress}] ${pkg.displayId} start`);
+    await run(args.tinymist, [
+      "query",
+      "packageDocs",
+      "--root",
+      context.workspace,
+      "--package-path",
+      args.packageCachePath,
+      "--package-cache-path",
+      args.packageCachePath,
+      "--id",
+      pkg.spec,
+      "--path",
+      packageDir(args.packageCachePath, pkg),
+      "--output",
+      output,
+      context.input,
+    ], { timeoutMs: args.commandTimeoutMs });
+
+    const content = await normalizedPackageDocsOutput(output, args);
+    const contentHash = hashBuffer(Buffer.from(content, "utf8"));
+    const entry = {
+      kind: "package",
+      package: pkg.spec,
+      displayId: pkg.displayId,
+      bytes: contentHash.size,
+      sha256: contentHash.hash,
+      included: includeContent,
+    };
+    if (includeContent) {
+      entry.content = content;
+    }
+    const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    logProgress(`[api ${progress}] ${pkg.displayId} done ${formatMs(elapsedMs)}`);
+    return entry;
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+async function normalizedPackageDocsOutput(filePath, args) {
+  const content = await fs.readFile(filePath, "utf8");
+  return normalizePackageDocsOutput(content, args);
+}
+
+function normalizePackageDocsOutput(content, args) {
+  const replacements = packageDocsReplacements(args);
+  const normalizedComments = content.replace(/<!--[\s\S]*?-->/g, (comment) => {
+    return comment.replace(/(^|[^A-Za-z0-9+/=])([A-Za-z0-9+/]{16,}={0,2})(?=$|[^A-Za-z0-9+/=])/g, (match, prefix, token) => {
+      let decoded;
+      try {
+        decoded = Buffer.from(token, "base64").toString("utf8");
+      } catch {
+        return match;
+      }
+      if (!decoded.startsWith("{") && !decoded.startsWith("[")) {
+        return match;
+      }
+
+      let value;
+      try {
+        value = JSON.parse(decoded);
+      } catch {
+        return match;
+      }
+      const normalized = normalizeJsonStrings(value, replacements);
+      return prefix + Buffer.from(JSON.stringify(normalized), "utf8").toString("base64");
+    });
+  });
+  return replaceKnownPaths(normalizedComments, replacements);
+}
+
+function packageDocsReplacements(args) {
+  const packageCachePath = path.resolve(args.packageCachePath);
+  const slashPath = packageCachePath.split(path.sep).join("/");
+  const fileUrl = pathToFileURL(packageCachePath).href;
+  return uniqueReplacements([
+    [fileUrl, "file:///$TYPST_PACKAGE_CACHE"],
+    [packageCachePath, "$TYPST_PACKAGE_CACHE"],
+    [slashPath, "$TYPST_PACKAGE_CACHE"],
+  ]);
+}
+
+function uniqueReplacements(entries) {
+  const seen = new Set();
+  return entries
+    .filter(([from]) => {
+      if (!from || seen.has(from)) {
+        return false;
+      }
+      seen.add(from);
+      return true;
+    })
+    .sort(([left], [right]) => right.length - left.length)
+    .map(([from, to]) => ({ from, to }));
+}
+
+function normalizeJsonStrings(value, replacements) {
+  if (typeof value === "string") {
+    return replaceKnownPaths(value, replacements);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonStrings(item, replacements));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        normalizeJsonStrings(item, replacements),
+      ]),
+    );
+  }
+  return value;
+}
+
+function replaceKnownPaths(value, replacements) {
+  return replacements.reduce(
+    (current, replacement) => current.split(replacement.from).join(replacement.to),
+    value,
+  );
+}
+
+function hashBuffer(buffer) {
+  return {
+    size: buffer.byteLength,
+    hash: createHash("sha256").update(buffer).digest("hex"),
+  };
+}
+
+async function hashFile(filePath) {
   const stat = await fs.stat(filePath);
   const hash = createHash("sha256");
-  let queries = 0;
-
   const input = createReadStream(filePath);
-  input.on("data", (chunk) => hash.update(chunk));
-  const lines = createInterface({ input, crlfDelay: Infinity });
-
-  for await (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      continue;
-    }
-    const entry = JSON.parse(line);
-    if (entry.type === "edge" && entry.label === "next") {
-      queries += 1;
-    }
+  for await (const chunk of input) {
+    hash.update(chunk);
   }
-
   return {
     size: stat.size,
     hash: hash.digest("hex"),
-    queries,
+  };
+}
+
+async function inspectScip(filePath, statsPath) {
+  const fileHash = await hashFile(filePath);
+  const stats = JSON.parse(await fs.readFile(statsPath, "utf8"));
+
+  return {
+    size: fileHash.size,
+    hash: fileHash.hash,
+    documents: stats.documents,
+    occurrences: stats.occurrences,
+    documentSymbols: stats.documentSymbols,
+    externalSymbols: stats.externalSymbols,
+    relationships: stats.relationships,
+    publicModules: stats.publicModules,
+    publicSymbols: stats.publicSymbols,
   };
 }
 
@@ -378,6 +649,54 @@ function hashOfHashes(rows) {
   }
   const input = rows.map((row) => row.hash).join("\n") + "\n";
   return createHash("sha256").update(input).digest("hex");
+}
+
+function hashOfApiHashes(rows) {
+  if (rows.some((row) => !row.apiHash)) {
+    return null;
+  }
+  const input = rows.map((row) => `${row.spec} ${row.apiHash}`).join("\n") + "\n";
+  return createHash("sha256").update(input).digest("hex");
+}
+
+function sumDefined(rows, key) {
+  return rows.reduce((sum, row) => sum + (Number.isFinite(row[key]) ? row[key] : 0), 0);
+}
+
+function logProgress(message) {
+  process.stdout.write(`${message}\n`);
+}
+
+async function writeApiSnapshot(args, rows) {
+  const metadata = {
+    schema: 1,
+    kind: "metadata",
+    format: "tinymist query packageDocs markdown",
+    contentEncoding: "utf8",
+    hashAlgorithm: "sha256",
+    normalization: ["packageCachePath"],
+    fullContentPackages: args.apiSnapshotInclude,
+  };
+  const entries = [
+    metadata,
+    ...rows
+      .filter((row) => row.apiSnapshot)
+      .map((row) => row.apiSnapshot),
+  ];
+  const jsonl = entries.map((entry) => JSON.stringify(entry)).join("\n") + "\n";
+  const compressed = gzipSync(Buffer.from(jsonl, "utf8"), { level: 9 });
+
+  await fs.mkdir(path.dirname(args.apiSnapshot), { recursive: true });
+  await fs.writeFile(args.apiSnapshot, compressed);
+
+  return {
+    path: args.apiSnapshot,
+    relativePath: path.relative(args.out, args.apiSnapshot),
+    hash: hashOfApiHashes(rows),
+    packageCount: entries.length - 1,
+    includedPackages: args.apiSnapshotInclude,
+    bytes: compressed.byteLength,
+  };
 }
 
 function formatBytes(bytes) {
@@ -511,9 +830,14 @@ function renderDurationChart(rows) {
 </section>`;
 }
 
-async function writeReport(args, rows) {
+async function writeReport(args, rows, apiSnapshotInfo) {
   const overallHash = hashOfHashes(rows);
   const failed = rows.filter((row) => row.status !== "ok");
+  const successful = rows.filter((row) => row.status === "ok");
+  const totalDocuments = sumDefined(successful, "documents");
+  const totalOccurrences = sumDefined(successful, "occurrences");
+  const totalDocumentSymbols = sumDefined(successful, "documentSymbols");
+  const totalPublicSymbols = sumDefined(successful, "publicSymbols");
   const generatedAt = new Date().toISOString();
   const durationChart = renderDurationChart(rows);
   const artifactConfig = {
@@ -525,13 +849,17 @@ async function writeReport(args, rows) {
   const htmlRows = rows.map((row) => {
     const statusClass = row.status === "ok" ? "ok" : "failed";
     const detail = row.status === "ok"
-      ? `<a href="#viewer" data-lsif="${attr(row.href)}" data-package="${attr(row.displayId)}">View LSIF</a>`
+      ? `<a href="#viewer" data-scip-stats="${attr(row.href)}" data-package="${attr(row.displayId)}">View SCIP stats</a>`
       : `<span class="error">${escapeHtml(row.error)}</span>`;
     return `<tr class="${statusClass}">
   <td data-sort="${attr(row.displayId)}"><code>${escapeHtml(row.displayId)}</code></td>
   <td class="num" data-sort="${row.size ?? -1}">${row.size === undefined ? "" : escapeHtml(formatBytes(row.size))}</td>
   <td class="hash">${row.hash ? `<code>${escapeHtml(row.hash)}</code>` : ""}</td>
-  <td class="num" data-sort="${row.queries ?? -1}">${row.queries ?? ""}</td>
+  <td class="num" data-sort="${row.documents ?? -1}">${row.documents ?? ""}</td>
+  <td class="num" data-sort="${row.occurrences ?? -1}">${row.occurrences ?? ""}</td>
+  <td class="num" data-sort="${row.documentSymbols ?? -1}">${row.documentSymbols ?? ""}</td>
+  <td class="num" data-sort="${row.externalSymbols ?? -1}">${row.externalSymbols ?? ""}</td>
+  <td class="num" data-sort="${row.publicSymbols ?? -1}">${row.publicSymbols ?? ""}</td>
   <td class="num" data-sort="${row.totalMs ?? -1}">${escapeHtml(formatMs(row.totalMs))}</td>
   <td class="num" data-sort="${row.maxRssKiB ?? -1}">${escapeHtml(formatMemory(row.maxRssKiB))}</td>
   <td class="num" data-sort="${row.exprMs ?? -1}">${escapeHtml(formatMs(row.exprMs))}</td>
@@ -777,12 +1105,19 @@ async function writeReport(args, rows) {
   <main>
     <h1>Tinymist Typst Knowledge Report</h1>
     <section class="summary">
-      <div class="metric"><span>Overall LSIF hash</span><code>${escapeHtml(overallHash ?? "unavailable because one or more packages failed")}</code></div>
+      <div class="metric"><span>Overall SCIP hash</span><code>${escapeHtml(overallHash ?? "unavailable because one or more packages failed")}</code></div>
+      <div class="metric"><span>Overall API hash</span><code>${escapeHtml(apiSnapshotInfo.hash ?? "unavailable because one or more packages failed")}</code></div>
       <div class="metric"><span>Packages</span><strong>${rows.length}</strong></div>
       <div class="metric"><span>Failures</span><strong>${failed.length}</strong></div>
+      <div class="metric"><span>SCIP documents</span><strong>${totalDocuments}</strong></div>
+      <div class="metric"><span>SCIP occurrences</span><strong>${totalOccurrences}</strong></div>
+      <div class="metric"><span>SCIP document symbols</span><strong>${totalDocumentSymbols}</strong></div>
+      <div class="metric"><span>Public symbols</span><strong>${totalPublicSymbols}</strong></div>
+      <div class="metric"><span>API snapshot</span><code>${escapeHtml(apiSnapshotInfo.relativePath)}</code></div>
+      <div class="metric"><span>Included API outputs</span><strong>${apiSnapshotInfo.includedPackages.length}</strong></div>
       <div class="metric"><span>Generated at</span><code>${escapeHtml(generatedAt)}</code></div>
     </section>
-    <p>The overall hash is SHA-256 over the newline-separated per-package LSIF hashes in package id order. Query count is the number of LSIF <code>next</code> edges.</p>
+    <p>The overall SCIP hash is SHA-256 over the newline-separated per-package SCIP hashes in package id order. The overall API hash is SHA-256 over package spec and normalized <code>tinymist query packageDocs</code> output hashes; package-cache absolute paths and file URIs are replaced before hashing. Occurrence count is the number of SCIP symbol occurrences.</p>
     ${durationChart}
     <div class="toolbar">
       <input id="filter" type="search" placeholder="Filter packages" autocomplete="off">
@@ -791,13 +1126,17 @@ async function writeReport(args, rows) {
       <thead>
         <tr>
           <th aria-sort="ascending"><button type="button" data-sort-column="0" data-sort-type="string">Package ID</button></th>
-          <th><button type="button" data-sort-column="1" data-sort-type="number">LSIF Size</button></th>
-          <th>LSIF Hash</th>
-          <th><button type="button" data-sort-column="3" data-sort-type="number">Queries</button></th>
-          <th><button type="button" data-sort-column="4" data-sort-type="number">Total Time</button></th>
-          <th><button type="button" data-sort-column="5" data-sort-type="number">Max RSS</button></th>
-          <th><button type="button" data-sort-column="6" data-sort-type="number">Expr Time</button></th>
-          <th><button type="button" data-sort-column="7" data-sort-type="number">Type Time</button></th>
+          <th><button type="button" data-sort-column="1" data-sort-type="number">SCIP Size</button></th>
+          <th>SCIP Hash</th>
+          <th><button type="button" data-sort-column="3" data-sort-type="number">Documents</button></th>
+          <th><button type="button" data-sort-column="4" data-sort-type="number">Occurrences</button></th>
+          <th><button type="button" data-sort-column="5" data-sort-type="number">Doc Symbols</button></th>
+          <th><button type="button" data-sort-column="6" data-sort-type="number">External Symbols</button></th>
+          <th><button type="button" data-sort-column="7" data-sort-type="number">Public Symbols</button></th>
+          <th><button type="button" data-sort-column="8" data-sort-type="number">Total Time</button></th>
+          <th><button type="button" data-sort-column="9" data-sort-type="number">Max RSS</button></th>
+          <th><button type="button" data-sort-column="10" data-sort-type="number">Expr Time</button></th>
+          <th><button type="button" data-sort-column="11" data-sort-type="number">Type Time</button></th>
           <th>Detail</th>
         </tr>
       </thead>
@@ -1011,18 +1350,19 @@ ${htmlRows}
       return new TextDecoder().decode(content);
     }
 
-    for (const link of document.querySelectorAll("[data-lsif]")) {
+    for (const link of document.querySelectorAll("[data-scip-stats]")) {
       link.addEventListener("click", async (event) => {
         event.preventDefault();
         viewer.hidden = false;
         viewerTitle.textContent = link.dataset.package;
-        viewerContent.textContent = "Loading " + link.dataset.lsif + " ...";
+        viewerContent.textContent = "Loading " + link.dataset.scipStats + " ...";
         viewer.scrollIntoView({ block: "start" });
         try {
           const zip = await loadArtifactZip();
-          viewerContent.textContent = await readZipText(zip, link.dataset.lsif);
+          const text = await readZipText(zip, link.dataset.scipStats);
+          viewerContent.textContent = JSON.stringify(JSON.parse(text), null, 2);
         } catch (error) {
-          viewerContent.textContent = "Could not load LSIF into this page: " + error + "\\nUse the data artifact link above.";
+          viewerContent.textContent = "Could not load SCIP stats into this page: " + error + "\\nUse the data artifact link above.";
         }
       });
     }
@@ -1036,29 +1376,58 @@ ${htmlRows}
     overallHash,
     packageCount: rows.length,
     failureCount: failed.length,
+    scip: {
+      documents: totalDocuments,
+      occurrences: totalOccurrences,
+      documentSymbols: totalDocumentSymbols,
+      publicSymbols: totalPublicSymbols,
+    },
     rows: rows.map((row) => ({
       id: row.displayId,
       spec: row.spec,
       status: row.status,
       size: row.size,
       hash: row.hash,
-      queries: row.queries,
+      documents: row.documents,
+      occurrences: row.occurrences,
+      documentSymbols: row.documentSymbols,
+      externalSymbols: row.externalSymbols,
+      relationships: row.relationships,
+      publicModules: row.publicModules,
+      publicSymbols: row.publicSymbols,
       totalMs: row.totalMs,
       maxRssKiB: row.maxRssKiB,
       exprMs: row.exprMs,
       typeMs: row.typeMs,
+      apiSize: row.apiSize,
+      apiHash: row.apiHash,
+      apiIncluded: row.apiIncluded,
       href: row.href,
       error: row.error,
     })),
+    apiSnapshot: {
+      path: apiSnapshotInfo.relativePath,
+      hash: apiSnapshotInfo.hash,
+      packageCount: apiSnapshotInfo.packageCount,
+      bytes: apiSnapshotInfo.bytes,
+      includedPackages: apiSnapshotInfo.includedPackages,
+    },
     artifact: artifactConfig,
   };
 
   const summaryMd = [
-    "### Typst knowledge report",
+    "### Typst knowledge SCIP report",
     "",
     `- Packages: ${rows.length}`,
     `- Failures: ${failed.length}`,
-    `- Overall LSIF hash: \`${overallHash ?? "unavailable"}\``,
+    `- Overall SCIP hash: \`${overallHash ?? "unavailable"}\``,
+    `- Overall API hash: \`${apiSnapshotInfo.hash ?? "unavailable"}\``,
+    `- API snapshot: \`${apiSnapshotInfo.relativePath}\` (${formatBytes(apiSnapshotInfo.bytes)})`,
+    `- Included API outputs: ${apiSnapshotInfo.includedPackages.length}`,
+    `- SCIP documents: ${totalDocuments}`,
+    `- SCIP occurrences: ${totalOccurrences}`,
+    `- SCIP document symbols: ${totalDocumentSymbols}`,
+    `- Public symbols: ${totalPublicSymbols}`,
     `- Preview entry: \`${path.relative(process.cwd(), path.join(args.previewOut, "index.html"))}\``,
     `- Data artifact: \`${args.dataArtifactName}\``,
     "",
@@ -1085,29 +1454,51 @@ async function main() {
   }
   console.log(`Found ${packages.length} package versions`);
 
-  console.log(`Generating LSIF with ${args.jobs} parallel job(s)`);
+  console.log(`Generating SCIP with ${args.jobs} parallel job(s)`);
   const rows = await mapLimit(packages, args.jobs, async (pkg, index) => {
-    process.stdout.write(`[lsif ${index + 1}/${packages.length}] ${pkg.displayId}\n`);
+    const progress = `${index + 1}/${packages.length}`;
+    logProgress(`[pkg ${progress}] ${pkg.displayId} start`);
     try {
-      return await generateLsif(args, pkg);
+      const row = await generateScip(args, pkg, progress);
+      logProgress(`[pkg ${progress}] ${pkg.displayId} done`);
+      return row;
     } catch (error) {
+      logProgress(`[pkg ${progress}] ${pkg.displayId} failed`);
+      let apiSnapshot;
+      let apiError;
+      try {
+        apiSnapshot = await generateApiSnapshotEntry(
+          args,
+          pkg,
+          await prepareWorkspace(args),
+          progress,
+        );
+      } catch (snapshotError) {
+        apiError = snapshotError instanceof Error ? snapshotError.message : String(snapshotError);
+        logProgress(`[api ${progress}] ${pkg.displayId} failed`);
+      }
       return {
         ...pkg,
         status: "failed",
         error: error instanceof Error ? error.message : String(error),
+        apiSnapshot,
+        apiSize: apiSnapshot?.bytes,
+        apiHash: apiSnapshot?.sha256,
+        apiIncluded: apiSnapshot?.included,
+        apiError,
       };
     }
   });
 
-  await writeReport(args, rows);
+  const apiSnapshotInfo = await writeApiSnapshot(args, rows);
+  await writeReport(args, rows, apiSnapshotInfo);
 
   const failed = rows.filter((row) => row.status !== "ok");
   if (failed.length > 0) {
-    console.error(`${failed.length} package(s) failed to generate LSIF`);
+    console.error(`${failed.length} package(s) failed to generate SCIP`);
     for (const row of failed) {
       console.error(`- ${row.displayId}: ${row.error}`);
     }
-    process.exit(1);
   }
 
   console.log(`Report written to ${path.join(args.previewOut, "index.html")}`);
