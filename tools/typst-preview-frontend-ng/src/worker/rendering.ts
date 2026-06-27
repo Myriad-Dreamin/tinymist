@@ -163,7 +163,7 @@ export class WorkerRenderer {
   ): BoundInteraction | undefined {
     const hitCanvasPageBound = (session as any).hitCanvasPageBound;
     if (typeof hitCanvasPageBound !== "function") {
-      throw new Error("typst.ts renderer does not provide canvas bound hit testing");
+      return undefined;
     }
 
     const bound = hitCanvasPageBound.call(session, {
