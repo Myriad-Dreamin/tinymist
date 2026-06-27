@@ -19,6 +19,7 @@ function parseArgs(argv) {
     githubRunId: process.env.GITHUB_RUN_ID || "",
     jobs: Number(process.env.TINYMIST_PACKAGE_SCIP_JOBS || 2),
     limit: undefined,
+    commandTimeoutMs: Number(process.env.TINYMIST_PACKAGE_COMMAND_TIMEOUT_MS || 10 * 60 * 1000),
     apiSnapshot: undefined,
     apiSnapshotInclude: parsePackageSpecArray(
       process.env.TINYMIST_API_SNAPSHOT_INCLUDE || "[]",
@@ -69,6 +70,9 @@ function parseArgs(argv) {
       case "--limit":
         args.limit = Number.parseInt(next(), 10);
         break;
+      case "--command-timeout-ms":
+        args.commandTimeoutMs = Number.parseInt(next(), 10);
+        break;
       case "--api-snapshot":
         args.apiSnapshot = next();
         break;
@@ -92,6 +96,9 @@ function parseArgs(argv) {
   }
   if (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1)) {
     throw new Error("--limit must be a positive integer");
+  }
+  if (!Number.isInteger(args.commandTimeoutMs) || args.commandTimeoutMs < 1) {
+    throw new Error("--command-timeout-ms must be a positive integer");
   }
   args.out = path.resolve(args.out);
   args.previewOut = path.resolve(args.previewOut || args.out);
@@ -140,6 +147,7 @@ Options:
   --github-run-id <id>          GitHub Actions run id
   --jobs <n>                    Parallel SCIP jobs (default: 2)
   --limit <n>                   Process only the first n packages, for local smoke tests
+  --command-timeout-ms <n>      Per tinymist child command timeout in milliseconds (default: 600000)
   --api-snapshot <path>         Gzipped JSONL API snapshot path (default: <out>/api-snapshot.jsonl.gz)
   --api-snapshot-include <json> JSON array of package specs whose full packageDocs output is included
 `);
@@ -223,10 +231,45 @@ async function run(command, commandArgs, options = {}) {
       cwd: options.cwd,
       env: options.env || process.env,
       stdio: options.stdio || ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
 
     let stdout = "";
     let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    let timeout;
+    let forceKillTimeout;
+
+    const finish = (error, result) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      if (forceKillTimeout) {
+        clearTimeout(forceKillTimeout);
+      }
+      if (error) {
+        reject(error);
+      } else {
+        resolve(result);
+      }
+    };
+
+    if (Number.isFinite(options.timeoutMs) && options.timeoutMs > 0) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        terminateChild(child, "SIGTERM");
+        forceKillTimeout = setTimeout(() => {
+          terminateChild(child, "SIGKILL");
+        }, 5000);
+        forceKillTimeout.unref?.();
+      }, options.timeoutMs);
+      timeout.unref?.();
+    }
 
     child.stdout?.on("data", (chunk) => {
       stdout += chunk.toString();
@@ -234,20 +277,47 @@ async function run(command, commandArgs, options = {}) {
     child.stderr?.on("data", (chunk) => {
       stderr += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", (error) => finish(error));
     child.on("close", (code) => {
+      if (timedOut) {
+        finish(new Error([
+          `${command} ${commandArgs.join(" ")} timed out after ${formatMs(options.timeoutMs)}`,
+          stdout.trim() && `stdout:\n${stdout.trim()}`,
+          stderr.trim() && `stderr:\n${stderr.trim()}`,
+        ].filter(Boolean).join("\n\n")));
+        return;
+      }
       if (code === 0) {
-        resolve({ stdout, stderr });
+        finish(null, { stdout, stderr });
       } else {
         const rendered = [
           `${command} ${commandArgs.join(" ")} failed with exit code ${code}`,
           stdout.trim() && `stdout:\n${stdout.trim()}`,
           stderr.trim() && `stderr:\n${stderr.trim()}`,
         ].filter(Boolean).join("\n\n");
-        reject(new Error(rendered));
+        finish(new Error(rendered));
       }
     });
   });
+}
+
+function terminateChild(child, signal) {
+  if (!child.pid) {
+    return;
+  }
+  try {
+    if (process.platform !== "win32") {
+      process.kill(-child.pid, signal);
+    } else {
+      child.kill(signal);
+    }
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {
+      // The process may have already exited.
+    }
+  }
 }
 
 async function runMeasured(command, commandArgs, options = {}) {
@@ -298,7 +368,7 @@ function parseMeasuredStderr(stderr, marker) {
   };
 }
 
-async function generateScip(args, pkg) {
+async function generateScip(args, pkg, progress) {
   const workspace = path.join(args.out, "workspace");
   const input = path.join(workspace, "main.typ");
   await fs.mkdir(workspace, { recursive: true });
@@ -316,6 +386,7 @@ async function generateScip(args, pkg) {
   await fs.rm(statsPath, { force: true });
   await fs.rm(scipStatsPath, { force: true });
 
+  logProgress(`[scip ${progress}] ${pkg.displayId} start`);
   const measured = await runMeasured(args.tinymist, [
     "query",
     "scip",
@@ -336,11 +407,12 @@ async function generateScip(args, pkg) {
     "--index-summary-output",
     scipStatsPath,
     input,
-  ]);
+  ], { timeoutMs: args.commandTimeoutMs });
+  logProgress(`[scip ${progress}] ${pkg.displayId} done ${formatMs(measured.elapsedMs)}`);
 
   const details = await inspectScip(scipPath, scipStatsPath);
   const analysis = await inspectAnalysisStats(statsPath);
-  const apiSnapshot = await generateApiSnapshotEntry(args, pkg, { workspace, input });
+  const apiSnapshot = await generateApiSnapshotEntry(args, pkg, { workspace, input }, progress);
   return {
     ...pkg,
     status: "ok",
@@ -366,12 +438,14 @@ async function generateScip(args, pkg) {
   };
 }
 
-async function generateApiSnapshotEntry(args, pkg, context) {
+async function generateApiSnapshotEntry(args, pkg, context, progress) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "tinymist-api-docs-"));
   const output = path.join(tempDir, apiDocsName(pkg));
   const includeContent = args.apiSnapshotInclude.includes(pkg.spec);
+  const started = process.hrtime.bigint();
 
   try {
+    logProgress(`[api ${progress}] ${pkg.displayId} start`);
     await run(args.tinymist, [
       "query",
       "packageDocs",
@@ -388,7 +462,7 @@ async function generateApiSnapshotEntry(args, pkg, context) {
       "--output",
       output,
       context.input,
-    ]);
+    ], { timeoutMs: args.commandTimeoutMs });
 
     const content = await normalizedPackageDocsOutput(output, args);
     const contentHash = hashBuffer(Buffer.from(content, "utf8"));
@@ -403,6 +477,8 @@ async function generateApiSnapshotEntry(args, pkg, context) {
     if (includeContent) {
       entry.content = content;
     }
+    const elapsedMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+    logProgress(`[api ${progress}] ${pkg.displayId} done ${formatMs(elapsedMs)}`);
     return entry;
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -580,6 +656,10 @@ function hashOfApiHashes(rows) {
 
 function sumDefined(rows, key) {
   return rows.reduce((sum, row) => sum + (Number.isFinite(row[key]) ? row[key] : 0), 0);
+}
+
+function logProgress(message) {
+  process.stdout.write(`${message}\n`);
 }
 
 async function writeApiSnapshot(args, rows) {
@@ -1371,10 +1451,14 @@ async function main() {
 
   console.log(`Generating SCIP with ${args.jobs} parallel job(s)`);
   const rows = await mapLimit(packages, args.jobs, async (pkg, index) => {
-    process.stdout.write(`[scip ${index + 1}/${packages.length}] ${pkg.displayId}\n`);
+    const progress = `${index + 1}/${packages.length}`;
+    logProgress(`[pkg ${progress}] ${pkg.displayId} start`);
     try {
-      return await generateScip(args, pkg);
+      const row = await generateScip(args, pkg, progress);
+      logProgress(`[pkg ${progress}] ${pkg.displayId} done`);
+      return row;
     } catch (error) {
+      logProgress(`[pkg ${progress}] ${pkg.displayId} failed`);
       return {
         ...pkg,
         status: "failed",
