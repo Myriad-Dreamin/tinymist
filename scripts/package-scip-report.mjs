@@ -369,12 +369,7 @@ function parseMeasuredStderr(stderr, marker) {
 }
 
 async function generateScip(args, pkg, progress) {
-  const workspace = path.join(args.out, "workspace");
-  const input = path.join(workspace, "main.typ");
-  await fs.mkdir(workspace, { recursive: true });
-  if (!(await exists(input))) {
-    await fs.writeFile(input, "\n");
-  }
+  const { workspace, input } = await prepareWorkspace(args);
 
   const scipPath = path.join(args.out, "scip", scipName(pkg));
   const statsPath = path.join(args.out, "stats", scipStatsName(pkg));
@@ -436,6 +431,16 @@ async function generateScip(args, pkg, progress) {
     apiHash: apiSnapshot.sha256,
     apiIncluded: apiSnapshot.included,
   };
+}
+
+async function prepareWorkspace(args) {
+  const workspace = path.join(args.out, "workspace");
+  const input = path.join(workspace, "main.typ");
+  await fs.mkdir(workspace, { recursive: true });
+  if (!(await exists(input))) {
+    await fs.writeFile(input, "\n");
+  }
+  return { workspace, input };
 }
 
 async function generateApiSnapshotEntry(args, pkg, context, progress) {
@@ -647,7 +652,7 @@ function hashOfHashes(rows) {
 }
 
 function hashOfApiHashes(rows) {
-  if (rows.some((row) => row.status !== "ok" || !row.apiHash)) {
+  if (rows.some((row) => !row.apiHash)) {
     return null;
   }
   const input = rows.map((row) => `${row.spec} ${row.apiHash}`).join("\n") + "\n";
@@ -1459,10 +1464,28 @@ async function main() {
       return row;
     } catch (error) {
       logProgress(`[pkg ${progress}] ${pkg.displayId} failed`);
+      let apiSnapshot;
+      let apiError;
+      try {
+        apiSnapshot = await generateApiSnapshotEntry(
+          args,
+          pkg,
+          await prepareWorkspace(args),
+          progress,
+        );
+      } catch (snapshotError) {
+        apiError = snapshotError instanceof Error ? snapshotError.message : String(snapshotError);
+        logProgress(`[api ${progress}] ${pkg.displayId} failed`);
+      }
       return {
         ...pkg,
         status: "failed",
         error: error instanceof Error ? error.message : String(error),
+        apiSnapshot,
+        apiSize: apiSnapshot?.bytes,
+        apiHash: apiSnapshot?.sha256,
+        apiIncluded: apiSnapshot?.included,
+        apiError,
       };
     }
   });
@@ -1476,7 +1499,6 @@ async function main() {
     for (const row of failed) {
       console.error(`- ${row.displayId}: ${row.error}`);
     }
-    process.exit(1);
   }
 
   console.log(`Report written to ${path.join(args.previewOut, "index.html")}`);

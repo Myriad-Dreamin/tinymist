@@ -28,7 +28,7 @@ jobs:
     timeout-minutes: 360
     env:
       TINYMIST_PACKAGE_SCIP_JOBS: "2"
-      TINYMIST_PACKAGE_COMMAND_TIMEOUT_MS: "600000"
+      TINYMIST_PACKAGE_COMMAND_TIMEOUT_MS: "120000"
       TINYMIST_KNOWLEDGE_DATA_ARTIFACT: typst-knowledge-data
       TINYMIST_API_SNAPSHOT_INCLUDE: ${{ github.event.inputs.api_snapshot_include || '[]' }}
     steps:
