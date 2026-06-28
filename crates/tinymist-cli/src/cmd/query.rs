@@ -135,6 +135,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
     let verse = compile.resolve()?;
     let snap = verse.computation();
     let snap = analysis.clone().query_snapshot(snap, None);
+
     let (id, path) = match &cmds {
         QueryCommands::Lsif(args) => (&args.id, &args.path),
         QueryCommands::Scip(args) => (&args.id, &args.path),
@@ -157,8 +158,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
             let res = snap.run_within_package(&info, move |a| {
                 let knowledge = tinymist_query::index::knowledge(a)
                     .map_err(map_string_err("failed to generate index"))?;
-                let encoded = knowledge.bind(a.shared()).to_string();
-                Ok(encoded)
+                Ok(knowledge.bind(a.shared()).to_string())
             })?;
 
             write_output(Path::new(&args.output), res, "failed to write lsif output")?;
