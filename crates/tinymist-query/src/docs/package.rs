@@ -1,5 +1,6 @@
 use core::fmt::Write;
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
 use ecow::{EcoString, EcoVec};
@@ -10,7 +11,7 @@ use tinymist_std::path::unix_slash;
 use tinymist_world::package::PackageSpec;
 use typst::diag::{StrResult, eco_format};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, Span, VirtualRoot};
+use typst::syntax::{FileId, Source, Span, SyntaxNode, VirtualRoot};
 use typst_shim::syntax::{RootedPathExt, source_range};
 
 use crate::LocalContext;
@@ -106,6 +107,67 @@ impl BundleSection {
     }
 }
 
+#[derive(Default)]
+struct PackageDocSpanIndex {
+    by_file: HashMap<FileId, SourceSpanIndex>,
+}
+
+struct SourceSpanIndex {
+    source: Source,
+    ranges: HashMap<Span, Range<usize>>,
+}
+
+impl PackageDocSpanIndex {
+    fn source(&mut self, ctx: &LocalContext, fid: FileId) -> Option<Source> {
+        Some(self.entry(ctx, fid)?.source.clone())
+    }
+
+    fn source_range(&mut self, ctx: &LocalContext, span: Span) -> Option<(Source, Range<usize>)> {
+        let fid = span.id()?;
+        let entry = self.entry(ctx, fid)?;
+        let range = entry
+            .ranges
+            .get(&span)
+            .cloned()
+            .or_else(|| source_range(&entry.source, span))?;
+        Some((entry.source.clone(), range))
+    }
+
+    fn entry(&mut self, ctx: &LocalContext, fid: FileId) -> Option<&SourceSpanIndex> {
+        if !self.by_file.contains_key(&fid) {
+            let source = ctx.source_by_id(fid).ok()?;
+            self.by_file.insert(fid, SourceSpanIndex::new(source));
+        }
+
+        self.by_file.get(&fid)
+    }
+}
+
+impl SourceSpanIndex {
+    fn new(source: Source) -> Self {
+        let mut ranges = HashMap::new();
+        collect_source_spans(source.root(), 0, &mut ranges);
+        Self { source, ranges }
+    }
+}
+
+fn collect_source_spans(
+    node: &SyntaxNode,
+    offset: usize,
+    ranges: &mut HashMap<Span, Range<usize>>,
+) {
+    let span = node.span();
+    if span.id().is_some() {
+        ranges.entry(span).or_insert(offset..offset + node.len());
+    }
+
+    let mut child_offset = offset;
+    for child in node.children() {
+        collect_source_spans(child, child_offset, ranges);
+        child_offset += child.len();
+    }
+}
+
 /// Generate full documents in markdown format
 pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<PackageDoc> {
     log::info!("generate_md_docs {spec:?}");
@@ -151,12 +213,13 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     };
 
     let mut modules = vec![];
+    let mut span_index = PackageDocSpanIndex::default();
 
     while !modules_to_generate.is_empty() {
         for (parent_ident, mut def) in std::mem::take(&mut modules_to_generate) {
             // parent_ident, symbols
 
-            set_scip_symbol(ctx, &mut def);
+            set_scip_symbol(ctx, &mut span_index, &mut def);
             let module_val = def.decl.as_ref().unwrap();
             let fid = module_val.file_id();
             let aka = fid.map(&mut akas).unwrap_or_default();
@@ -175,24 +238,23 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
                 parent_ident: parent_ident.clone(),
                 aka,
                 path: fid.map(|fid| fid.vpath().get_without_slash().to_owned().into()),
-                source: fid.and_then(|fid| ctx.source_by_id(fid).ok().map(|src| src.text().into())),
+                source: fid
+                    .and_then(|fid| span_index.source(ctx, fid).map(|src| src.text().into())),
             };
 
             for child in def.children.iter_mut() {
-                set_scip_symbol(ctx, child);
+                set_scip_symbol(ctx, &mut span_index, child);
                 let span = child.decl.as_ref().map(|decl| decl.span());
                 let fid_range = span.and_then(|v| {
-                    v.id().and_then(|fid| {
-                        let allocated = file_ids.insert_full(fid).0;
-                        let src = ctx.source_by_id(fid).ok()?;
-                        let rng = source_range(&src, v)?;
-                        let start = ctx.to_lsp_range(rng.clone(), &src).start;
-                        child.source = Some(SourceQuery {
-                            file: allocated,
-                            position: start,
-                        });
-                        Some((allocated, rng.start, rng.end))
-                    })
+                    let fid = v.id()?;
+                    let allocated = file_ids.insert_full(fid).0;
+                    let (src, rng) = span_index.source_range(ctx, v)?;
+                    let start = ctx.to_lsp_range(rng.clone(), &src).start;
+                    child.source = Some(SourceQuery {
+                        file: allocated,
+                        position: start,
+                    });
+                    Some((allocated, rng.start, rng.end))
                 });
                 let child_fid = child.decl.as_ref().and_then(|decl| decl.file_id());
                 let child_fid = child_fid.or_else(|| span.and_then(Span::id)).or(fid);
@@ -349,12 +411,24 @@ fn is_public_api_symbol(def: &crate::docs::DefInfo) -> bool {
     !def.name.as_ref().starts_with('_')
 }
 
-fn set_scip_symbol(ctx: &LocalContext, def: &mut crate::docs::DefInfo) {
+fn set_scip_symbol(
+    ctx: &LocalContext,
+    span_index: &mut PackageDocSpanIndex,
+    def: &mut crate::docs::DefInfo,
+) {
     let Some(decl) = def.decl.as_ref() else {
         return;
     };
     let definition = Definition::new(decl.clone(), None);
-    def.symbol = crate::index::scip::scip_symbol(ctx.shared(), &definition).ok();
+    let disambiguator = span_index
+        .source_range(ctx, decl.span())
+        .map(|(source, range)| {
+            let start = ctx.to_lsp_range(range, &source).start;
+            format!("L{}_C{}", start.line, start.character)
+        })
+        .unwrap_or_else(|| format!("{:x}", decl.span().into_raw()));
+    def.symbol =
+        crate::index::scip::scip_symbol_with_disambiguator(&definition, disambiguator).ok();
 }
 
 /// Generate full documents in markdown format
