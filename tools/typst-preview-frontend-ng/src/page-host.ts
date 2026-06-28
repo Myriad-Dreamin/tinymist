@@ -263,7 +263,13 @@ export class PageHost {
         record.fullHeightPx = heightPx;
         const offscreen = record.canvas.transferControlToOffscreen();
         record.transferred = true;
-        transferred.push({ index: page.index, layer: "full", canvas: offscreen, widthPx, heightPx });
+        transferred.push({
+          index: page.index,
+          layer: "full",
+          canvas: offscreen,
+          widthPx,
+          heightPx,
+        });
       }
     }
 
@@ -379,21 +385,26 @@ export class PageHost {
     if (this.lastViewportTimer) {
       clearTimeout(this.lastViewportTimer);
     }
-    this.lastViewportTimer = window.setTimeout(() => {
-      this.lastViewportTimer = 0;
-      this.postViewportSnapshot({
-        applyLayouts: options.applyLayouts,
-        requestInteractions: !this.dragging,
-      });
-    }, options.scrolling ? 0 : 16);
+    this.lastViewportTimer = window.setTimeout(
+      () => {
+        this.lastViewportTimer = 0;
+        this.postViewportSnapshot({
+          applyLayouts: options.applyLayouts,
+          requestInteractions: !this.dragging,
+        });
+      },
+      options.scrolling ? 0 : 16,
+    );
   }
 
-  private postViewportSnapshot(options: {
-    applyLayouts?: boolean;
-    force?: boolean;
-    requestInteractions?: boolean;
-    renderDuringDrag?: boolean;
-  } = {}) {
+  private postViewportSnapshot(
+    options: {
+      applyLayouts?: boolean;
+      force?: boolean;
+      requestInteractions?: boolean;
+      renderDuringDrag?: boolean;
+    } = {},
+  ) {
     const metrics = this.readPageLayoutMetrics();
     if (options.applyLayouts) {
       this.applyAllPageLayouts(metrics);
@@ -621,10 +632,7 @@ export class PageHost {
       return;
     }
 
-    if (
-      message.hit &&
-      this.textHitContains(pending.text, message.rect, message.x, message.y)
-    ) {
+    if (message.hit && this.textHitContains(pending.text, message.rect, message.x, message.y)) {
       this.showTextHover(record, pending.text, message.rect);
       return;
     }
@@ -955,7 +963,9 @@ export class PageHost {
 
     const textRects = textHighlightsForLink(record.interactions, link).map((highlight) => {
       this.requestTextVisualRect(record, highlight.text);
-      const visualRect = this.textHoverRects.get(this.textHoverKey(record.index, highlight.text.id));
+      const visualRect = this.textHoverRects.get(
+        this.textHoverKey(record.index, highlight.text.id),
+      );
       return visualRect ? alignTextClipToVisualRect(highlight.rect, visualRect) : highlight.rect;
     });
     this.renderInteractionHighlights(record, textRects, "link");
@@ -1137,7 +1147,12 @@ export class PageHost {
     return `${this.interactionGeneration}:${pageIndex}:${textId}`;
   }
 
-  private textHitContains(text: TextInteraction, hitRect: PageRect | undefined, x: number, y: number) {
+  private textHitContains(
+    text: TextInteraction,
+    hitRect: PageRect | undefined,
+    x: number,
+    y: number,
+  ) {
     return rectContainsPage(textHoverRect(text, hitRect), x, y);
   }
 
