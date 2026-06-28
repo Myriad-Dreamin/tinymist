@@ -16,8 +16,9 @@ use tinymist_std::ImmutPath;
 use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 
 use crate::{
-    LocalContext, LspPosition, PositionEncoding,
+    LspPosition, PositionEncoding,
     adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot},
+    analysis::SharedContext,
     syntax::{Expr, ExprInfo},
     ty::Ty,
 };
@@ -27,7 +28,7 @@ pub type SemanticTokens = Arc<Vec<SemanticToken>>;
 
 /// Get the semantic tokens for a source.
 #[typst_macros::time(span = source.root().span())]
-pub(crate) fn get_semantic_tokens(ctx: &mut LocalContext, source: &Source) -> SemanticTokens {
+pub(crate) fn get_semantic_tokens(ctx: &Arc<SharedContext>, source: &Source) -> SemanticTokens {
     let mut tokenizer = Tokenizer::new(
         source.clone(),
         ctx.expr_stage(source),

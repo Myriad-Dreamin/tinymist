@@ -369,6 +369,14 @@ pub(crate) fn scip_symbol(
     ctx: &SharedContext,
     definition: &Definition,
 ) -> tinymist_std::Result<String> {
+    let disambiguator = definition_disambiguator(ctx, definition);
+    scip_symbol_with_disambiguator(definition, disambiguator)
+}
+
+pub(crate) fn scip_symbol_with_disambiguator(
+    definition: &Definition,
+    disambiguator: String,
+) -> tinymist_std::Result<String> {
     let mut descriptors = Vec::new();
     if let Some(fid) = definition.file_id() {
         let path = fid.vpath().get_without_slash();
@@ -386,7 +394,7 @@ pub(crate) fn scip_symbol(
     }
 
     descriptors.push(scip_descriptor(
-        &definition_disambiguator(ctx, definition),
+        &disambiguator,
         descriptor::Suffix::Meta,
         "",
     ));

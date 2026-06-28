@@ -40,7 +40,7 @@ impl SemanticRequest for SemanticTokensFullRequest {
 impl SemanticTokensFullRequest {
     /// Computes the semantic tokens for a given source code.
     pub fn compute(ctx: &mut LocalContext, source: &Source) -> crate::analysis::SemanticTokens {
-        crate::analysis::semantic_tokens::get_semantic_tokens(ctx, source)
+        crate::analysis::semantic_tokens::get_semantic_tokens(ctx.shared(), source)
     }
 }
 

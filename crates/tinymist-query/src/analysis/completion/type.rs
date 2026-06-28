@@ -98,10 +98,9 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                 let docs = if docs.is_some() {
                     docs
                 } else {
-                    resolved_docs = param
-                        .docs
-                        .as_ref()
-                        .map(|docs| crate::docs::resolve_doc_text(self.base.worker.ctx, docs));
+                    resolved_docs = param.docs.as_ref().map(|docs| {
+                        crate::docs::resolve_doc_text(self.base.worker.ctx.shared(), docs)
+                    });
                     resolved_docs.as_deref()
                 };
                 if param.attrs.positional {

@@ -436,7 +436,7 @@ impl DumpWorker<'_> {
             return hover.clone();
         }
 
-        let hover = crate::hover::hover_from_definition(self.ctx, definition, None);
+        let hover = crate::hover::hover_from_definition_shared(self.ctx.shared(), definition, None);
         self.hovers.insert(definition.clone(), hover.clone());
         hover
     }
