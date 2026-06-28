@@ -97,6 +97,9 @@ class PreviewApp {
       case "ensure-pages":
         this.handleEnsurePages(message);
         break;
+      case "load-svg":
+        void this.handleLoadSvg(message);
+        break;
       case "render-complete":
         this.pageHost.markRendered(
           message.generation,
@@ -146,6 +149,46 @@ class PreviewApp {
     }
   }
 
+  private async handleLoadSvg(message: any) {
+    try {
+      const bitmap = await decodeSvgImage(
+        message.data,
+        message.format,
+        message.width,
+        message.height,
+      );
+      this.postWorker(
+        {
+          type: "load-svg-result",
+          requestId: message.requestId,
+          bitmap,
+        },
+        [bitmap],
+      );
+    } catch (error) {
+      console.warn("[typst-preview-ng] failed to decode SVG image", error);
+      try {
+        const bitmap = createFallbackImageBitmap(message.width, message.height);
+        this.postWorker(
+          {
+            type: "load-svg-result",
+            requestId: message.requestId,
+            bitmap,
+          },
+          [bitmap],
+        );
+      } catch (fallbackError) {
+        const detail =
+          fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+        this.postWorker({
+          type: "load-svg-error",
+          requestId: message.requestId,
+          message: detail,
+        });
+      }
+    }
+  }
+
   private handleExtensionMessage(event: MessageEvent) {
     const message = event.data || {};
     switch (message.type) {
@@ -188,4 +231,52 @@ class PreviewApp {
     this.worker?.terminate();
     this.worker = undefined;
   }
+}
+
+function normalizeSvgMimeType(format: string | undefined) {
+  if (!format || format === "svg" || format === "svg+xml" || format === "image/svg") {
+    return "image/svg+xml";
+  }
+  return format.includes("/") ? format : `image/${format}`;
+}
+
+function loadImageElement(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("the source image could not be decoded"));
+    image.src = url;
+  });
+}
+
+async function decodeSvgImage(
+  data: BufferSource,
+  format?: string,
+  width?: number,
+  height?: number,
+) {
+  const blob = new Blob([data], { type: normalizeSvgMimeType(format) });
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = await loadImageElement(url);
+    const bitmapWidth = width || image.naturalWidth || image.width;
+    const bitmapHeight = height || image.naturalHeight || image.height;
+    if (!bitmapWidth || !bitmapHeight) {
+      throw new Error("decoded SVG image has no dimensions");
+    }
+    const canvas = new OffscreenCanvas(bitmapWidth, bitmapHeight);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("failed to create SVG decode canvas context");
+    }
+    context.drawImage(image, 0, 0, bitmapWidth, bitmapHeight);
+    return canvas.transferToImageBitmap();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function createFallbackImageBitmap(width?: number, height?: number) {
+  const canvas = new OffscreenCanvas(Math.max(1, width || 1), Math.max(1, height || 1));
+  return canvas.transferToImageBitmap();
 }
