@@ -26,9 +26,14 @@
   "extensionDependencies": [
     "myriad-dreamin.tinymist"
   ],
-    "extensionKind": [
-      "ui"
-    ],
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.provideTinymistPreviewer",
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.handleTinymistPreview",
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.disposeTinymistPreview"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "configuration": {
@@ -55,17 +60,10 @@
       }
     }
   },
-  "files": [
-    "out",
-    "bin",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE"
-  ],
   "scripts": {
     "compile": "tsc -p .",
     "vscode:prepublish": "yarn run compile",
-    "package": "npx @vscode/vsce package --yarn",
+    "package": "npx @vscode/vsce package --yarn --no-dependencies",
     "type-check": "tsc --noEmit -p ."
   },
   "devDependencies": {
