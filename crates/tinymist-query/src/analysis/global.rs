@@ -535,11 +535,11 @@ impl LocalContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(self, &sig)?;
+                let docs = crate::docs::sig_docs(self.shared(), &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
-                let docs = crate::docs::var_docs(self, def.decl.span())?;
+                let docs = crate::docs::var_docs(self.shared(), def.decl.span())?;
                 Some(DefDocs::Variable(docs))
             }
             DefKind::Module => {
@@ -1037,11 +1037,11 @@ impl SharedContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs_shared(self, &sig)?;
+                let docs = crate::docs::sig_docs(self, &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
-                let docs = crate::docs::var_docs_shared(self, def.decl.span())?;
+                let docs = crate::docs::var_docs(self, def.decl.span())?;
                 Some(DefDocs::Variable(docs))
             }
             DefKind::Module => {

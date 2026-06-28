@@ -9,18 +9,9 @@ use tinymist_analysis::docs::{
 use tinymist_analysis::ty::DocSource;
 use typst::syntax::Span;
 
-use crate::LocalContext;
 use crate::analysis::SharedContext;
 
-pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
-    var_docs_shared(ctx.shared(), pos)
-}
-
-pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<SignatureDocs> {
-    sig_docs_shared(ctx.shared(), sig)
-}
-
-pub(crate) fn var_docs_shared(ctx: &Arc<SharedContext>, pos: Span) -> Option<VarDocs> {
+pub(crate) fn var_docs(ctx: &Arc<SharedContext>, pos: Span) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.id()?).ok()?;
     let type_info = ctx.type_check(&source);
     let ty = type_info.type_of_span(pos)?;
@@ -62,9 +53,9 @@ pub(crate) fn var_docs_shared(ctx: &Arc<SharedContext>, pos: Span) -> Option<Var
     }
 }
 
-pub(crate) fn sig_docs_shared(ctx: &Arc<SharedContext>, sig: &Signature) -> Option<SignatureDocs> {
+pub(crate) fn sig_docs(ctx: &Arc<SharedContext>, sig: &Signature) -> Option<SignatureDocs> {
     let type_sig = sig.type_sig().clone();
-    let mut resolver = SharedDocTextResolver(ctx.as_ref());
+    let mut resolver = ctx.as_ref();
 
     let pos_in = sig
         .primary()
@@ -95,7 +86,7 @@ pub(crate) fn sig_docs_shared(ctx: &Arc<SharedContext>, sig: &Signature) -> Opti
         .primary()
         .docs
         .as_ref()
-        .map(|docs| resolve_doc_text_shared(ctx, docs))
+        .map(|docs| resolve_doc_text(ctx, docs))
         .unwrap_or_default();
 
     Some(SignatureDocs {
@@ -108,26 +99,14 @@ pub(crate) fn sig_docs_shared(ctx: &Arc<SharedContext>, sig: &Signature) -> Opti
     })
 }
 
-pub(crate) fn resolve_doc_text(ctx: &mut LocalContext, docs: &DocText) -> EcoString {
-    resolve_doc_text_shared(ctx.shared().as_ref(), docs)
-}
-
-pub(crate) fn resolve_doc_text_shared(ctx: &SharedContext, docs: &DocText) -> EcoString {
+pub(crate) fn resolve_doc_text(ctx: &SharedContext, docs: &DocText) -> EcoString {
     docs.get_or_init(|raw| convert_official_doc(ctx, raw.clone()))
         .clone()
 }
 
-impl DocTextResolver for LocalContext {
+impl DocTextResolver for &SharedContext {
     fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString {
         resolve_doc_text(self, docs)
-    }
-}
-
-struct SharedDocTextResolver<'a>(&'a SharedContext);
-
-impl DocTextResolver for SharedDocTextResolver<'_> {
-    fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString {
-        resolve_doc_text_shared(self.0, docs)
     }
 }
 

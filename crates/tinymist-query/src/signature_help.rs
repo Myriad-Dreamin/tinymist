@@ -127,7 +127,7 @@ impl SemanticRequest for SignatureHelpRequest {
 }
 
 fn markdown_docs(ctx: &mut LocalContext, docs: &crate::docs::DocText) -> Documentation {
-    let docs = crate::docs::resolve_doc_text(ctx, docs);
+    let docs = crate::docs::resolve_doc_text(ctx.shared(), docs);
     Documentation::MarkupContent(MarkupContent {
         kind: MarkupKind::Markdown,
         value: docs.into(),
