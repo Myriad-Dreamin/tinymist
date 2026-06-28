@@ -3,6 +3,7 @@
 result*
 .direnv
 .envrc
+.nvimlog
 node_modules/
 /local/
 editors/vscode/out/

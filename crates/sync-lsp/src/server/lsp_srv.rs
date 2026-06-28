@@ -61,7 +61,8 @@ where
         cmd: &'static str,
         handler: RawHandler<Args::S, Vec<JsonValue>>,
     ) -> Self {
-        self.command_handlers.insert(cmd, Box::new(handler));
+        self.command_handlers
+            .insert(cmd, Box::new(move |s, _req_id, args| handler(s, args)));
         self
     }
 
@@ -73,7 +74,7 @@ where
     ) -> Self {
         self.command_handlers.insert(
             cmd,
-            Box::new(move |s, req| erased_response(handler(s, req))),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, req))),
         );
         self
     }
@@ -99,7 +100,8 @@ where
     /// Registers a raw request handler that handlers a kind of untyped lsp
     /// request.
     pub fn with_raw_request<R: Req>(mut self, handler: RawHandler<Args::S, JsonValue>) -> Self {
-        self.req_handlers.insert(R::METHOD, Box::new(handler));
+        self.req_handlers
+            .insert(R::METHOD, Box::new(move |s, _req_id, req| handler(s, req)));
         self
     }
 
@@ -112,7 +114,7 @@ where
     ) -> Self {
         self.req_handlers.insert(
             R::METHOD,
-            Box::new(move |s, req| handler(s, from_json(req)?)),
+            Box::new(move |s, _req_id, req| handler(s, from_json(req)?)),
         );
         self
     }
@@ -124,7 +126,7 @@ where
     ) -> Self {
         self.req_handlers.insert(
             R::METHOD,
-            Box::new(move |s, req| erased_response(handler(s, from_json(req)?))),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, from_json(req)?))),
         );
         self
     }
@@ -223,8 +225,10 @@ where
                     let client = self.client.clone();
                     let req_id = req.id.clone();
                     client.register_request(&req.method, &req_id, loop_start);
-                    let fut =
-                        client.schedule_tail(req_id, self.on_lsp_request(&req.method, req.params));
+                    let fut = client.schedule_tail(
+                        req_id.clone(),
+                        self.on_lsp_request(&req.method, req_id, req.params),
+                    );
                     self.client.handle.spawn(fut);
                 }
                 Msg(LspMessage::Notification(not)) => {
@@ -293,7 +297,12 @@ where
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    pub fn on_lsp_request(&mut self, method: &str, params: JsonValue) -> ScheduleResult {
+    pub fn on_lsp_request(
+        &mut self,
+        method: &str,
+        req_id: RequestId,
+        params: JsonValue,
+    ) -> ScheduleResult {
         match (&mut self.state, method) {
             (State::Uninitialized(args), request::Initialize::METHOD) => {
                 // todo: what will happen if the request cannot be deserialized?
@@ -315,7 +324,9 @@ where
                 just_result(Err(invalid_request("server is already initialized")))
             }
             // todo: generalize this
-            (State::Ready(..), request::ExecuteCommand::METHOD) => self.on_execute_command(params),
+            (State::Ready(..), request::ExecuteCommand::METHOD) => {
+                self.on_execute_command(req_id, params)
+            }
             (State::Ready(s), method) => 'serve_req: {
                 let is_shutdown = method == request::Shutdown::METHOD;
 
@@ -324,7 +335,7 @@ where
                     break 'serve_req just_result(Err(method_not_found()));
                 };
 
-                let resp = handler(s, params);
+                let resp = handler(s, req_id, params);
 
                 if is_shutdown {
                     self.state = State::ShuttingDown;
@@ -339,7 +350,7 @@ where
     }
 
     /// The entry point for the `workspace/executeCommand` request.
-    fn on_execute_command(&mut self, params: JsonValue) -> ScheduleResult {
+    fn on_execute_command(&mut self, req_id: RequestId, params: JsonValue) -> ScheduleResult {
         let s = self.state.opt_mut().ok_or_else(not_initialized)?;
 
         let params = from_value::<ExecuteCommandParams>(params)
@@ -351,13 +362,13 @@ where
 
         // todo: generalize this
         if command == "tinymist.getResources" {
-            self.get_resources(arguments)
+            self.get_resources(req_id, arguments)
         } else {
             let Some(handler) = self.commands.get(command.as_str()) else {
                 log::error!("asked to execute unknown command: {command}");
                 return Err(method_not_found());
             };
-            handler(s, arguments)
+            handler(s, req_id, arguments)
         }
     }
 

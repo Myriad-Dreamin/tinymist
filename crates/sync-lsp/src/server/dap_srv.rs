@@ -5,7 +5,7 @@ use dapts::IRequest;
 
 use super::*;
 
-impl<S: 'static> TypedLspClient<S> {
+impl LspClient {
     /// Sends a dap event to the client.
     pub fn send_dap_event<E: dapts::IEvent>(&self, body: E::Body) {
         let req_id = self.req_queue.lock().outgoing.alloc_request_id();
@@ -31,7 +31,7 @@ where
     ) -> Self {
         self.command_handlers.insert(
             cmd,
-            Box::new(move |s, req| erased_response(handler(s, req))),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, req))),
         );
         self
     }
@@ -42,7 +42,8 @@ where
         mut self,
         handler: RawHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.req_handlers.insert(R::COMMAND, Box::new(handler));
+        self.req_handlers
+            .insert(R::COMMAND, Box::new(move |s, _req_id, req| handler(s, req)));
         self
     }
 
@@ -51,11 +52,11 @@ where
     /// request.
     pub fn with_request_<R: IRequest>(
         mut self,
-        handler: fn(&mut Args::S, R::Arguments) -> ScheduleResult,
+        handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, req| handler(s, from_json(req)?)),
+            Box::new(move |s, req_id, req| scheduled_response(handler(s, req_id, from_json(req)?))),
         );
         self
     }
@@ -67,7 +68,7 @@ where
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, req| erased_response(handler(s, from_json(req)?))),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, from_json(req)?))),
         );
         self
     }
@@ -145,13 +146,19 @@ where
                     let client = self.client.clone();
                     let req_id = (req.seq as i32).into();
                     client.register_request(&req.command, &req_id, loop_start);
-                    let fut = client.schedule_tail(req_id, self.on_request(req));
+                    let fut = client.schedule_tail(req_id.clone(), self.on_request(req_id, req));
                     self.client.handle.spawn(fut);
                 }
                 Msg(DapMessage::Event(not)) => {
                     self.on_event(loop_start, not)?;
                 }
-                Msg(DapMessage::Response(resp)) => {
+                Msg(
+                    DapMessage::Response(resp)
+                    | DapMessage::ResponseWithCommand(dap::ResponseWithCommand {
+                        response: resp,
+                        ..
+                    }),
+                ) => {
                     let s = match &mut self.state {
                         State::Ready(s) => s,
                         _ => {
@@ -171,7 +178,7 @@ where
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_request(&mut self, req: dap::Request) -> ScheduleResult {
+    fn on_request(&mut self, req_id: RequestId, req: dap::Request) -> ScheduleResult {
         match (&mut self.state, &*req.command) {
             (State::Uninitialized(args), dapts::request::Initialize::COMMAND) => {
                 // todo: what will happen if the request cannot be deserialized?
@@ -227,7 +234,7 @@ where
                     break 'serve_req just_result(Err(method_not_found()));
                 };
 
-                let resp = handler(s, req.arguments);
+                let resp = handler(s, req_id, req.arguments);
 
                 if is_disconnect {
                     self.state = State::ShuttingDown;

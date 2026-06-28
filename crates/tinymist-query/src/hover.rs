@@ -28,6 +28,76 @@ pub struct HoverRequest {
     pub position: LspPosition,
 }
 
+pub(crate) fn hover_from_definition(
+    ctx: &mut LocalContext,
+    def: &Definition,
+    range: Option<LspRange>,
+) -> Option<Hover> {
+    let mut contents = vec![];
+
+    use Decl::*;
+    match def.decl.as_ref() {
+        Label(..) => {
+            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                contents.push(format!("Ref: `{}`\n", def.name()));
+                contents.push(format!("```typc\n{}\n```", truncated_repr(&val)));
+            } else {
+                contents.push(format!("Label: `{}`\n", def.name()));
+            }
+        }
+        BibEntry(..) => {
+            contents.push(format!("Bibliography: `{}`", def.name()));
+        }
+        _ => {
+            let sym_docs = ctx.def_docs(def);
+
+            if matches!(
+                def.decl.kind(),
+                DefKind::Function | DefKind::Variable | DefKind::Constant
+            ) && !def.name().is_empty()
+            {
+                let mut type_doc = String::new();
+                type_doc.push_str("let ");
+                type_doc.push_str(def.name());
+
+                match &sym_docs {
+                    Some(DefDocs::Variable(docs)) => {
+                        push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
+                    }
+                    Some(DefDocs::Function(docs)) => {
+                        let _ = docs.print(&mut type_doc);
+                        push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
+                    }
+                    _ => {}
+                }
+
+                contents.push(format!("```typc\n{type_doc};\n```"));
+            }
+
+            if let Some(doc) = sym_docs {
+                let hover_docs = doc.hover_docs();
+
+                if !hover_docs.trim().is_empty() {
+                    contents.push(hover_docs.into());
+                }
+            }
+
+            if let Some(link) = ExternalDocLink::get(def) {
+                contents.push(link.to_string());
+            }
+        }
+    }
+
+    if contents.is_empty() {
+        return None;
+    }
+
+    Some(Hover {
+        contents: HoverContents::Scalar(MarkedString::String(contents.join("\n\n---\n\n"))),
+        range,
+    })
+}
+
 impl SemanticRequest for HoverRequest {
     type Response = Hover;
 

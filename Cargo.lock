@@ -1436,7 +1436,7 @@ dependencies = [
 
 [[package]]
 name = "crityp"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -1670,7 +1670,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1911,7 +1911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2934,7 +2934,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3288,7 +3288,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3888,6 +3888,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "mini-internal"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "560f32b6891d8d9bade8942c45a27694f16d789d3b4b8e6b7135a5240de0a8af"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
+name = "miniserde"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac79f4123c070de643a7a93b9339abf18c30005c622bf4b1c29c2c0960f52d39"
+dependencies = [
+ "itoa",
+ "mini-internal",
+ "ryu",
+]
+
+[[package]]
 name = "miniz_oxide"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4038,7 +4060,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4953,6 +4975,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
+name = "protobuf"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d65a1d4ddae7d8b5de68153b48f6aa3bba8cb002b243dbdbc55a5afbc98f99f4"
+dependencies = [
+ "once_cell",
+ "protobuf-support",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "protobuf-support"
+version = "3.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e36c2f31e0a47f9280fb347ef5e461ffcd2c52dd520d8e216b52f93b0b0d7d6"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5066,7 +5108,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5284,8 +5326,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo"
-version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=5904247a0eca4938b4861223cb24431e530e429c#5904247a0eca4938b4861223cb24431e530e429c"
+version = "0.8.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=bd58ec034584828c272fac1b842acad5b1d79e61#bd58ec034584828c272fac1b842acad5b1d79e61"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5310,8 +5352,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo-typst"
-version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=5904247a0eca4938b4861223cb24431e530e429c#5904247a0eca4938b4861223cb24431e530e429c"
+version = "0.8.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=bd58ec034584828c272fac1b842acad5b1d79e61#bd58ec034584828c272fac1b842acad5b1d79e61"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5342,8 +5384,8 @@ dependencies = [
 
 [[package]]
 name = "reflexo-typst2vec"
-version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=5904247a0eca4938b4861223cb24431e530e429c#5904247a0eca4938b4861223cb24431e530e429c"
+version = "0.8.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=bd58ec034584828c272fac1b842acad5b1d79e61#bd58ec034584828c272fac1b842acad5b1d79e61"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5358,6 +5400,7 @@ dependencies = [
  "rustc-hash 2.1.2",
  "serde",
  "serde_json",
+ "skrifa 0.42.1",
  "svgtypes 0.15.3",
  "tiny-skia 0.11.4",
  "tiny-skia-path 0.11.4",
@@ -5370,14 +5413,16 @@ dependencies = [
 
 [[package]]
 name = "reflexo-vec2svg"
-version = "0.7.0"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=5904247a0eca4938b4861223cb24431e530e429c#5904247a0eca4938b4861223cb24431e530e429c"
+version = "0.8.0-rc2"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=bd58ec034584828c272fac1b842acad5b1d79e61#bd58ec034584828c272fac1b842acad5b1d79e61"
 dependencies = [
  "base64 0.22.1",
  "comemo",
  "log",
  "reflexo",
  "reflexo-typst2vec",
+ "svgtypes 0.15.3",
+ "tiny-skia-path 0.11.4",
  "typst",
 ]
 
@@ -5662,7 +5707,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5761,6 +5806,15 @@ dependencies = [
  "ref-cast",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "scip"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e46becf967b98a434bf7f19c8be30ca74bff57702ea7ef6af3628cbf52f57be0"
+dependencies = [
+ "protobuf",
 ]
 
 [[package]]
@@ -6304,7 +6358,7 @@ version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0811b01ca2c4e8718760713911feaf4675c24f94e50530a015ec646cfb622f7c"
 dependencies = [
- "skrifa 0.37.0",
+ "skrifa 0.42.1",
  "yazi",
  "zeno",
 ]
@@ -6333,7 +6387,7 @@ dependencies = [
 
 [[package]]
 name = "sync-ls"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -6430,7 +6484,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6460,12 +6514,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
 name = "tests"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "insta",
  "insta-cmd",
@@ -6623,7 +6677,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6669,7 +6723,8 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tempfile",
- "tinymist-assets 0.15.2-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-dap",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6703,7 +6758,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-analysis"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "comemo",
  "dashmap",
@@ -6735,17 +6790,17 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.15.2-rc2"
+version = "0.15.2"
 
 [[package]]
 name = "tinymist-assets"
-version = "0.15.2-rc2"
+version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d74c0cf95630fa83264f3fa397244ad9c3fd0e7d929bcafbdca1363a55ee8f29"
+checksum = "622c13ea683278225c21aaf38215e6f7c581ad12d241a2dfd3f683f31dcb560f"
 
 [[package]]
 name = "tinymist-bench-font-load"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "divan",
  "tinymist",
@@ -6753,7 +6808,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-cli"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6784,11 +6839,13 @@ dependencies = [
  "open",
  "parking_lot",
  "paste",
+ "protobuf",
  "rayon",
  "reflexo",
  "reflexo-typst",
  "reflexo-vec2svg",
  "rpds",
+ "scip",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -6796,7 +6853,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.15.2-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -6827,7 +6884,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-dap"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6848,7 +6905,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-debug"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -6876,7 +6933,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-docs-tool"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -6885,6 +6942,21 @@ dependencies = [
  "serde",
  "serde_json",
  "ttf-parser",
+]
+
+[[package]]
+name = "tinymist-index"
+version = "0.15.2"
+dependencies = [
+ "comemo",
+ "lsp-types",
+ "miniserde",
+ "serde_json",
+ "tinymist-analysis",
+ "tinymist-project",
+ "tinymist-query",
+ "tinymist-std",
+ "wasm-minimal-protocol",
 ]
 
 [[package]]
@@ -6903,7 +6975,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-lint"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "comemo",
  "insta",
@@ -6945,7 +7017,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-preview"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "bytes",
  "clap",
@@ -6959,7 +7031,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.15.2-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
  "tinymist-tests",
  "tokio",
@@ -7002,7 +7074,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-query"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -7020,12 +7092,14 @@ dependencies = [
  "lsp-types",
  "parking_lot",
  "percent-encoding",
+ "protobuf",
  "rayon",
  "regex",
  "rpds",
  "rust_iso3166",
  "rust_iso639",
  "rustc-hash 2.1.2",
+ "scip",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -7058,7 +7132,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-render"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "base64 0.22.1",
  "log",
@@ -7145,7 +7219,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-tests"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "comemo",
  "insta",
@@ -7178,7 +7252,7 @@ dependencies = [
 
 [[package]]
 name = "tinymist-viewer"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "accesskit_consumer",
  "anyhow",
@@ -7212,7 +7286,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "svgtypes 0.15.3",
- "tinymist-assets 0.15.2-rc2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-preview",
  "tinymist-std",
  "tinymist-tests",
@@ -7706,7 +7780,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "typlite"
-version = "0.15.2-rc2"
+version = "0.15.2"
 dependencies = [
  "base64 0.22.1",
  "clap",
@@ -8549,6 +8623,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "venial"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61584a325b16f97b5b25fcc852eb9550843a251057a5e3e5992d2376f3df4bb2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "vergen"
 version = "8.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8696,6 +8780,16 @@ dependencies = [
  "indexmap 2.14.0",
  "wasm-encoder",
  "wasmparser 0.244.0",
+]
+
+[[package]]
+name = "wasm-minimal-protocol"
+version = "0.1.0"
+source = "git+https://github.com/astrale-sharp/wasm-minimal-protocol#c51acd43095fe9da8fa943e064618e486fd2b58d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "venial",
 ]
 
 [[package]]
@@ -9113,7 +9207,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

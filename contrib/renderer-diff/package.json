@@ -1,7 +1,13 @@
 {
   "name": "@tinymist/renderer-diff",
+  "description": "Web viewer for Tinymist renderer diff artifacts.",
   "private": true,
   "version": "0.0.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

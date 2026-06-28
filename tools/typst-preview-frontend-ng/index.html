@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Typst Preview NG</title>
+  </head>
+  <body>
+    <div id="typst-preview-ng">
+      <main id="preview-viewport">
+        <section id="preview-pages">
+          <nav id="outline-panel" class="hidden" aria-label="Outline"></nav>
+        </section>
+      </main>
+    </div>
+    <script>
+      window.__TYPST_PREVIEW_NG_ARGS__ = {
+        ws: "ws://127.0.0.1:23625",
+        mode: "preview-arg:previewMode:Doc",
+        state: "preview-arg:state:",
+      };
+    </script>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

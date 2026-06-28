@@ -895,10 +895,8 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
 function rewritePreviewAssetRoot(previewer: ResolvedPreviewer, webview: vscode.Webview): string {
   const resourceRoot =
     previewer.localResourceRoots[0] ?? vscode.Uri.file(path.dirname(previewer.htmlUri.fsPath));
-  return previewer.html.replace(
-    /\/typst-webview-assets/g,
-    `${webview.asWebviewUri(resourceRoot).toString()}/typst-webview-assets`,
-  );
+  const webviewAssetRoot = `${webview.asWebviewUri(resourceRoot).toString()}/typst-webview-assets`;
+  return previewer.html.replace(/(?:\.\/|\/)typst-webview-assets/g, webviewAssetRoot);
 }
 
 // todo: useful content security policy but we don't set

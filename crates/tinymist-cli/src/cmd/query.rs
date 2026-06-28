@@ -2,12 +2,16 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use protobuf::Message;
 use reflexo_typst::package::PackageSpec;
+use serde::Serialize;
 use tinymist::Config;
 use tinymist_project::WorldProvider;
 use tinymist_query::analysis::Analysis;
+use tinymist_query::index::ScipPublicApi;
 use tinymist_query::package::PackageInfo;
 use tinymist_std::error::prelude::*;
+use tinymist_std::fs::paths::write_atomic;
 use typlite::CompileOnceArgs;
 
 /// The commands for language server queries.
@@ -16,6 +20,8 @@ use typlite::CompileOnceArgs;
 pub enum QueryCommands {
     /// Get the lsif for a specific package.
     Lsif(QueryLsifArgs),
+    /// Get the SCIP index for a specific package.
+    Scip(QueryScipArgs),
     /// Get the documentation for a specific package.
     PackageDocs(PackageDocsArgs),
     /// Check a specific package.
@@ -40,6 +46,29 @@ pub struct QueryLsifArgs {
     // /// The format of requested lsif.
     // #[clap(long)]
     // pub format: Option<QueryDocsFormat>,
+}
+
+#[derive(Debug, Clone, clap::Parser)]
+pub struct QueryScipArgs {
+    /// Compile a document once before querying.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// The path of the package to request SCIP for.
+    #[clap(long)]
+    pub path: Option<String>,
+    /// The package to request SCIP for.
+    #[clap(long)]
+    pub id: String,
+    /// The output path for the requested SCIP protobuf.
+    #[clap(short, long)]
+    pub output: String,
+    /// The output path for structured analysis statistics.
+    #[clap(long, hide(true))]
+    pub stats_output: Option<String>,
+    /// The output path for structured SCIP index statistics.
+    #[clap(long, hide(true))]
+    pub index_summary_output: Option<String>,
 }
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -96,6 +125,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
 
     let compile = match &mut cmds {
         QueryCommands::Lsif(args) => &mut args.compile,
+        QueryCommands::Scip(args) => &mut args.compile,
         QueryCommands::PackageDocs(args) => &mut args.compile,
         QueryCommands::CheckPackage(args) => &mut args.compile,
     };
@@ -104,10 +134,11 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
     }
     let verse = compile.resolve()?;
     let snap = verse.computation();
-    let snap = analysis.query_snapshot(snap, None);
+    let snap = analysis.clone().query_snapshot(snap, None);
 
     let (id, path) = match &cmds {
         QueryCommands::Lsif(args) => (&args.id, &args.path),
+        QueryCommands::Scip(args) => (&args.id, &args.path),
         QueryCommands::PackageDocs(args) => (&args.id, &args.path),
         QueryCommands::CheckPackage(args) => (&args.id, &args.path),
     };
@@ -130,8 +161,42 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
                 Ok(knowledge.bind(a.shared()).to_string())
             })?;
 
-            let output_path = Path::new(&args.output);
-            std::fs::write(output_path, res).context_ut("failed to write lsif output")?;
+            write_output(Path::new(&args.output), res, "failed to write lsif output")?;
+        }
+        QueryCommands::Scip(args) => {
+            let (bytes, summary) = snap.run_within_package(&info, |a| {
+                let docs = tinymist_query::docs::package_docs(a, &info)
+                    .map_err(map_string_err("failed to generate docs"))?;
+                let public_api = docs.scip_public_api();
+                let knowledge = tinymist_query::index::knowledge(a)
+                    .map_err(map_string_err("failed to generate index"))?;
+                let index = knowledge
+                    .bind(a.shared())
+                    .to_scip_index_with_public_api(&public_api)?;
+                let summary = ScipIndexSummary::from_index(&info, &index, &public_api);
+                let bytes = index
+                    .write_to_bytes()
+                    .context_ut("failed to serialize SCIP index")?;
+                Ok((bytes, summary))
+            })?;
+
+            write_output(
+                Path::new(&args.output),
+                bytes,
+                "failed to write SCIP output",
+            )?;
+            if let Some(stats_output) = args.stats_output {
+                write_analysis_stats(&analysis, Path::new(&stats_output))?;
+            }
+            if let Some(index_summary_output) = args.index_summary_output {
+                let summary = serde_json::to_vec_pretty(&summary)
+                    .context_ut("failed to serialize SCIP summary")?;
+                write_output(
+                    Path::new(&index_summary_output),
+                    summary,
+                    "failed to write SCIP summary",
+                )?;
+            }
         }
         QueryCommands::PackageDocs(args) => {
             let res = snap.run_within_package(&info, |a| {
@@ -141,8 +206,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
                     .map_err(map_string_err("failed to generate docs"))
             })?;
 
-            let output_path = Path::new(&args.output);
-            std::fs::write(output_path, res).context_ut("failed to write package docs")?;
+            write_output(Path::new(&args.output), res, "failed to write package docs")?;
         }
         QueryCommands::CheckPackage(_args) => {
             snap.run_within_package(&info, |a| {
@@ -153,6 +217,88 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
     };
 
     Ok(())
+}
+
+fn write_output(path: &Path, data: impl AsRef<[u8]>, message: &'static str) -> Result<()> {
+    let path = if path
+        .parent()
+        .is_some_and(|parent| parent.as_os_str().is_empty())
+    {
+        Path::new(".").join(path)
+    } else {
+        path.to_path_buf()
+    };
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).context_ut("failed to create output directory")?;
+    }
+    write_atomic(path, data).context_ut(message)
+}
+
+fn write_analysis_stats(analysis: &Analysis, path: &Path) -> Result<()> {
+    let stats = serde_json::to_vec_pretty(&analysis.report_query_stats_json())
+        .context_ut("failed to serialize analysis stats")?;
+    write_output(path, stats, "failed to write stats output")
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScipIndexSummary {
+    schema: u32,
+    package: String,
+    documents: usize,
+    occurrences: usize,
+    document_symbols: usize,
+    external_symbols: usize,
+    relationships: usize,
+    public_modules: usize,
+    public_symbols: usize,
+}
+
+impl ScipIndexSummary {
+    fn from_index(
+        info: &PackageInfo,
+        index: &scip::types::Index,
+        public_api: &ScipPublicApi,
+    ) -> Self {
+        let document_symbols = index
+            .documents
+            .iter()
+            .map(|document| document.symbols.len())
+            .sum();
+        let document_relationships = index
+            .documents
+            .iter()
+            .flat_map(|document| document.symbols.iter())
+            .map(|symbol| symbol.relationships.len())
+            .sum::<usize>();
+        let external_relationships = index
+            .external_symbols
+            .iter()
+            .map(|symbol| symbol.relationships.len())
+            .sum::<usize>();
+
+        Self {
+            schema: 1,
+            package: format!("@{}/{}:{}", info.namespace, info.name, info.version),
+            documents: index.documents.len(),
+            occurrences: index
+                .documents
+                .iter()
+                .map(|document| document.occurrences.len())
+                .sum(),
+            document_symbols,
+            external_symbols: index.external_symbols.len(),
+            relationships: document_relationships + external_relationships,
+            public_modules: public_api.modules.len(),
+            public_symbols: public_api
+                .modules
+                .iter()
+                .map(|module| module.public_symbols.len())
+                .sum(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, clap::ValueEnum)]

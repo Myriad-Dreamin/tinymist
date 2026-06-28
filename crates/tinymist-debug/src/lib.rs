@@ -2,7 +2,9 @@
 
 pub use cov::CoverageResult;
 pub use debugger::{
-    BreakpointKind, DebugSession, DebugSessionHandler, set_debug_session, with_debug_session,
+    BreakpointKind, DebugSession, DebugSessionHandler, ResolvedSourceBreakpoint, SourceBreakpoint,
+    SourceBreakpointResolution, set_debug_function_breakpoints, set_debug_session,
+    set_debug_source_breakpoints, with_debug_session,
 };
 
 mod cov;

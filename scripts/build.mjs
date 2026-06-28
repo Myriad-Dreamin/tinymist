@@ -8,6 +8,7 @@ const vector = {
   "build:editor-tools": build.buildEditorTools,
   "build:vscode:web": build.buildTinymistVscodeWeb,
   "build:vscode:system": build.buildTinymistVscodeSystem,
+  "build:index": build.buildIndexWasm,
   "build:lsp:debug": () => build.buildLspBinary("debug"),
   "prelaunch:vscode": () => build.prelaunchVscode("debug"),
   "prelaunch:vscode-release": () => build.prelaunchVscode("release"),

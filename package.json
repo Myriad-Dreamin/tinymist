@@ -10,11 +10,13 @@
     "contrib/typst-preview/editors/vscode",
     "contrib/html/editors/vscode",
     "contrib/tinymist-gpu-viewer/editors/vscode",
+    "contrib/typst-preview-ng/editors/vscode",
     "contrib/previewer-provider/editors/vscode",
     "contrib/renderer-diff",
     "tools/editor-tools",
     "tools/typst-dom",
-    "tools/typst-preview-frontend"
+    "tools/typst-preview-frontend",
+    "tools/typst-preview-frontend-ng"
   ],
   "scripts": {
     "fmt": "cargo fmt --all && npx prettier --write tools/**/*.{js,mjs,cjs,ts,mts,cts} editors/vscode/**/*.{js,mjs,cjs,ts,mts,cts}",
@@ -28,6 +30,8 @@
     "build:renderer-diff": "yarn workspace @tinymist/renderer-diff build",
     "build:syntax": "node scripts/build.mjs build:syntax",
     "build:l10n": "node scripts/build.mjs build:l10n",
+    "build:index": "node scripts/build.mjs build:index",
+    "watch:index": "watchexec -e rs -w crates -- node scripts/build.mjs build:index",
     "build:docker": "docker build -t myriaddreamin/tinymist:0.14.10 .",
     "build:web": "node scripts/build.mjs build:web",
     "test:vsc": "node scripts/build.mjs test:vsc",

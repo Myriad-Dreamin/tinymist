@@ -2,7 +2,10 @@ use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use clap::Parser;
+use clap::{
+    error::{ContextKind, ContextValue, ErrorKind},
+    Parser,
+};
 use itertools::Itertools;
 use lsp_types::*;
 use reflexo::error::IgnoreLogging;
@@ -448,22 +451,13 @@ impl Config {
             }
         }
 
-        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> CowStr {
-            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
-            tinymist_l10n::t!(
-                "tinymist.config.badTypstExtraArgs",
-                "failed to parse typstExtraArgs: {err}, args: {args}",
-                err = err.debug_l10n(),
-                args = args.debug_l10n(),
-            )
-        }
-
         {
-            let raw_args = || update.get("typstExtraArgs");
-            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+            let raw_args = update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args.cloned().map(serde_json::from_value) {
                 Some(Ok(args)) => args,
                 Some(Err(err)) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, None));
                     None
                 }
                 // Even if the list is none, it should be parsed since we have env vars to
@@ -474,11 +468,15 @@ impl Config {
             let empty_typst_args = typst_args.is_empty();
 
             let args = match CompileOnceArgs::try_parse_from(
-                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+                Some("typst-cli".to_owned())
+                    .into_iter()
+                    .chain(typst_args.iter().cloned()),
             ) {
                 Ok(args) => args,
                 Err(err) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    let hint = typst_extra_args_parse_hint(&typst_args, &err);
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, hint));
 
                     if empty_typst_args {
                         CompileOnceArgs::default()
@@ -857,6 +855,71 @@ impl Config {
     }
 }
 
+fn typst_extra_args_parse_hint(args: &[String], err: &clap::Error) -> Option<CowStr> {
+    if err.kind() != ErrorKind::UnknownArgument {
+        return None;
+    }
+
+    let Some(ContextValue::String(invalid_arg)) = err.get(ContextKind::InvalidArg) else {
+        return None;
+    };
+    let Some(ContextValue::String(option)) = err.get(ContextKind::SuggestedArg) else {
+        return None;
+    };
+
+    let value = invalid_arg.strip_prefix(option)?;
+    if !value.chars().next().is_some_and(char::is_whitespace) {
+        return None;
+    }
+
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let (arg, value) = args
+        .iter()
+        .map(|arg| arg.trim())
+        .filter(|arg| arg.starts_with(invalid_arg.as_str()))
+        .find_map(|arg| {
+            let value = arg.strip_prefix(option.as_str())?;
+            value
+                .chars()
+                .next()
+                .is_some_and(char::is_whitespace)
+                .then_some((arg, value.trim()))
+        })
+        .filter(|(_, value)| !value.is_empty())
+        .unwrap_or((invalid_arg.as_str(), value));
+
+    Some(tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs.joinedOptionValueHint",
+        "`tinymist.typstExtraArgs` is an argv array, so `\"{arg}\"` is treated as one argument. Split the option and value into two entries like `\"{option}\", \"{value}\"`, or use `\"{option}={value}\"` when the option accepts the `--flag=value` form.",
+        arg = arg.into(),
+        option = option.as_str().into(),
+        value = value.into(),
+    ))
+}
+
+fn format_typst_extra_args_error(
+    args: &impl fmt::Debug,
+    err: &impl std::error::Error,
+    hint: Option<CowStr>,
+) -> CowStr {
+    log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+    let message = tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs",
+        "failed to parse typstExtraArgs: {err}, args: {args}",
+        err = err.debug_l10n(),
+        args = args.debug_l10n(),
+    );
+
+    match hint {
+        Some(hint) => format!("{message}\n{hint}").into(),
+        None => message,
+    }
+}
+
 /// Configuration set at initialization that won't change within a single
 /// session.
 #[derive(Debug, Clone)]
@@ -1151,6 +1214,15 @@ mod tests {
         assert!(config.warnings.is_empty(), "{:?}", config.warnings);
     }
 
+    fn warning_text(config: &Config) -> String {
+        config
+            .warnings
+            .iter()
+            .map(|warning| warning.as_ref())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     #[test]
     fn test_default_encoding() {
         let cc = ConstConfig::default();
@@ -1336,6 +1408,55 @@ mod tests {
         //     });
 
         //     assert_eq!(args_timestamp, env_timestamp);
+    }
+
+    #[test]
+    fn test_typst_extra_args_hint_for_joined_option_value() {
+        for (joined, option, value) in [
+            ("--input foo=bar", "--input", "foo=bar"),
+            ("--pdf-standard ua-1", "--pdf-standard", "ua-1"),
+            ("--root /workspace", "--root", "/workspace"),
+        ] {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": [joined]
+            });
+
+            update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+            let warnings = warning_text(&config);
+            let split_form = format!(r#""{option}", "{value}""#);
+            let equal_form = format!(r#""{option}={value}""#);
+            for expected in [
+                "argv array",
+                joined,
+                split_form.as_str(),
+                equal_form.as_str(),
+            ] {
+                assert!(
+                    warnings.contains(expected),
+                    "warnings for {joined}: {warnings}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_typst_extra_args_no_joined_option_value_hint_for_equal_form_with_spaces() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": ["--input=a=x y", "--unknown"]
+        });
+
+        update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+        let warnings = warning_text(&config);
+
+        assert!(!warnings.contains("argv array"), "warnings: {warnings}");
+        assert!(
+            warnings.contains("--unknown"),
+            "unexpected warnings: {warnings}"
+        );
     }
 
     #[test]

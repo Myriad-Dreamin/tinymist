@@ -373,13 +373,19 @@ impl ServerState {
         // todo: .on_sync_mut::<notifs::Cancel>(handlers::handle_cancel)?
         provider
             .with_request::<request::ConfigurationDone>(Self::configuration_done)
+            .with_request::<request::Continue>(Self::continue_debug)
             .with_request::<request::Disconnect>(Self::disconnect)
             .with_request::<request::Terminate>(Self::terminate_debug)
             .with_request::<request::TerminateThreads>(Self::terminate_debug_thread)
             .with_request::<request::Attach>(Self::attach_debug)
             .with_request::<request::Launch>(Self::launch_debug)
-            .with_request::<request::Evaluate>(Self::evaluate_repl)
+            .with_request::<request::SetBreakpoints>(Self::set_breakpoints)
+            .with_request::<request::SetFunctionBreakpoints>(Self::set_function_breakpoints)
+            .with_request_::<request::Evaluate>(Self::evaluate_repl)
             .with_request::<request::Completions>(Self::complete_repl)
+            .with_request_::<request::StackTrace>(Self::debug_stack_trace)
+            .with_request_::<request::Scopes>(Self::debug_scopes)
+            .with_request_::<request::Variables>(Self::debug_variables)
             .with_request::<request::Threads>(Self::debug_threads)
     }
 
