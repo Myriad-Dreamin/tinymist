@@ -1,11 +1,7 @@
 import type { PageInteractions } from "../interactions";
+import type { PageLayout, PageSpec } from "../types";
 
-export interface PageSpec {
-  index: number;
-  width: number;
-  height: number;
-  pixelPerPt: number;
-}
+export type { PageLayout, PageSpec } from "../types";
 
 export interface RenderRect {
   lo: { x: number; y: number };
@@ -14,15 +10,6 @@ export interface RenderRect {
 
 export interface PageRenderSpec extends PageSpec {
   window?: RenderRect;
-}
-
-export interface PageLayout {
-  index: number;
-  top: number;
-  bottom: number;
-  width: number;
-  height: number;
-  scale: number;
 }
 
 export type CanvasLayer = "full";

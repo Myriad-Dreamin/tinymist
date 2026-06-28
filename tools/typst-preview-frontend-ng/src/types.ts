@@ -17,6 +17,15 @@ export interface PageSpec {
   pixelPerPt: number;
 }
 
+export interface PageLayout {
+  index: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
 export interface PageRecord {
   index: number;
   key: string;
