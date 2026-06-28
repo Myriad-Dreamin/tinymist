@@ -111,7 +111,7 @@ fn enrich_def_docs_parallel(
 
 fn definition_for_docs(decl: &Interned<Decl>) -> Option<Definition> {
     match decl.as_ref() {
-        Decl::Func(..) => Some(Definition::new(decl.clone().into(), None)),
+        Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
         _ => None,
     }
 }

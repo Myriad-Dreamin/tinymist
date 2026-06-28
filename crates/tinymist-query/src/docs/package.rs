@@ -147,9 +147,9 @@ impl PackageDocSpanIndex {
     }
 
     fn entry(&mut self, ctx: &LocalContext, fid: FileId) -> Option<&SourceSpanIndex> {
-        if !self.by_file.contains_key(&fid) {
+        if let std::collections::hash_map::Entry::Vacant(entry) = self.by_file.entry(fid) {
             let source = ctx.source_by_id(fid).ok()?;
-            self.by_file.insert(fid, SourceSpanIndex::new(source));
+            entry.insert(SourceSpanIndex::new(source));
         }
 
         self.by_file.get(&fid)

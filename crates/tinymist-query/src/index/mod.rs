@@ -8,13 +8,12 @@
 use core::fmt;
 use std::sync::Arc;
 
-use crate::analysis::{SemanticTokens, SharedContext, SharedQueryCache};
+use crate::analysis::{SemanticTokens, SharedContext};
 use crate::index::protocol::ResultSet;
 use crate::prelude::Definition;
 use crate::{LocalContext, path_to_url};
 use ecow::EcoString;
 use lsp_types::{Hover, Url};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use tinymist_analysis::docs::DefDocs;
 use tinymist_analysis::syntax::classify_syntax;
 use tinymist_std::error::WithContextUntyped;
@@ -334,14 +333,16 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
         }
     }
 
-    let shared = ctx.shared().clone();
-    let hovers = SharedQueryCache::<Definition, Option<Hover>>::default();
-    let def_docs = SharedQueryCache::<Definition, Option<DefDocs>>::default();
+    let mut worker = DumpWorker {
+        ctx,
+        strings: FxHashMap::default(),
+        references: FxHashMap::default(),
+        hovers: FxHashMap::default(),
+        def_docs: FxHashMap::default(),
+    };
     let files = files
-        .par_iter()
-        .map(move |fid| {
-            DumpWorker::new(shared.clone(), hovers.clone(), def_docs.clone()).file(*fid)
-        })
+        .iter()
+        .map(move |fid| worker.file(fid))
         .collect::<tinymist_std::Result<Vec<FileIndex>>>()?;
 
     Ok(Knowledge {
@@ -359,46 +360,43 @@ pub fn knowledge(ctx: &mut LocalContext) -> tinymist_std::Result<Knowledge> {
     })
 }
 
-struct DumpWorker {
-    /// The shared context.
-    ctx: Arc<SharedContext>,
+struct DumpWorker<'a> {
+    /// The context.
+    ctx: &'a mut LocalContext,
+    /// A string interner.
+    strings: FxHashMap<EcoString, EcoString>,
     /// The references collected so far.
     references: FxHashMap<Span, ReferenceIndex>,
-    /// Shared static hover results.
-    hovers: SharedQueryCache<Definition, Option<Hover>>,
-    /// Shared typed documentation.
-    def_docs: SharedQueryCache<Definition, Option<DefDocs>>,
+    /// The static hover results collected so far.
+    hovers: FxHashMap<Definition, Option<Hover>>,
+    /// The typed documentation collected so far.
+    def_docs: FxHashMap<Definition, Option<DefDocs>>,
 }
 
-impl DumpWorker {
-    fn new(
-        ctx: Arc<SharedContext>,
-        hovers: SharedQueryCache<Definition, Option<Hover>>,
-        def_docs: SharedQueryCache<Definition, Option<DefDocs>>,
-    ) -> Self {
-        Self {
-            ctx,
-            references: FxHashMap::default(),
-            hovers,
-            def_docs,
-        }
-    }
-
-    fn file(&mut self, fid: FileId) -> tinymist_std::Result<FileIndex> {
-        let source = self.ctx.source_by_id(fid).context_ut("cannot parse")?;
-        let semantic_tokens =
-            crate::analysis::semantic_tokens::get_semantic_tokens(&self.ctx, &source);
+impl DumpWorker<'_> {
+    fn file(&mut self, fid: &FileId) -> tinymist_std::Result<FileIndex> {
+        let source = self.ctx.source_by_id(*fid).context_ut("cannot parse")?;
+        let semantic_tokens = crate::SemanticTokensFullRequest::compute(self.ctx, &source);
 
         let root = LinkedNode::new(source.root());
         self.walk(&source, &root);
         let references = std::mem::take(&mut self.references);
 
         Ok(FileIndex {
-            fid,
+            fid: *fid,
             semantic_tokens,
-            documentation: Some(EcoString::from("File documentation.")), // todo
+            documentation: Some(self.intern("File documentation.")), // todo
             references,
         })
+    }
+
+    fn intern(&mut self, s: &str) -> EcoString {
+        if let Some(v) = self.strings.get(s) {
+            return v.clone();
+        }
+        let v = EcoString::from(s);
+        self.strings.insert(v.clone(), v.clone());
+        v
     }
 
     fn walk(&mut self, source: &Source, node: &LinkedNode) {
@@ -434,13 +432,22 @@ impl DumpWorker {
     }
 
     fn hover(&mut self, definition: &Definition) -> Option<Hover> {
-        self.hovers.get_or_init(definition.clone(), || {
-            crate::hover::hover_from_definition_shared(&self.ctx, definition, None)
-        })
+        if let Some(hover) = self.hovers.get(definition) {
+            return hover.clone();
+        }
+
+        let hover = crate::hover::hover_from_definition_shared(self.ctx.shared(), definition, None);
+        self.hovers.insert(definition.clone(), hover.clone());
+        hover
     }
 
     fn def_docs(&mut self, definition: &Definition) -> Option<DefDocs> {
-        self.def_docs
-            .get_or_init(definition.clone(), || self.ctx.def_docs(definition))
+        if let Some(docs) = self.def_docs.get(definition) {
+            return docs.clone();
+        }
+
+        let docs = self.ctx.def_docs(definition);
+        self.def_docs.insert(definition.clone(), docs.clone());
+        docs
     }
 }
