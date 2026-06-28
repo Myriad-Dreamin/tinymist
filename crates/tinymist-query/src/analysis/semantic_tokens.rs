@@ -18,6 +18,7 @@ use typst::syntax::{LinkedNode, Source, SyntaxKind, ast};
 use crate::{
     LocalContext, LspPosition, PositionEncoding,
     adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot},
+    analysis::SharedContext,
     syntax::{Expr, ExprInfo},
     ty::Ty,
 };
@@ -28,11 +29,38 @@ pub type SemanticTokens = Arc<Vec<SemanticToken>>;
 /// Get the semantic tokens for a source.
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn get_semantic_tokens(ctx: &mut LocalContext, source: &Source) -> SemanticTokens {
-    let mut tokenizer = Tokenizer::new(
-        source.clone(),
+    get_semantic_tokens_inner(
+        source,
         ctx.expr_stage(source),
         ctx.analysis.allow_multiline_token,
         ctx.analysis.position_encoding,
+    )
+}
+
+#[typst_macros::time(span = source.root().span())]
+pub(crate) fn get_semantic_tokens_shared(
+    ctx: &Arc<SharedContext>,
+    source: &Source,
+) -> SemanticTokens {
+    get_semantic_tokens_inner(
+        source,
+        ctx.expr_stage(source),
+        ctx.analysis.allow_multiline_token,
+        ctx.analysis.position_encoding,
+    )
+}
+
+fn get_semantic_tokens_inner(
+    source: &Source,
+    expr_stage: ExprInfo,
+    allow_multiline_token: bool,
+    position_encoding: PositionEncoding,
+) -> SemanticTokens {
+    let mut tokenizer = Tokenizer::new(
+        source.clone(),
+        expr_stage,
+        allow_multiline_token,
+        position_encoding,
     );
     tokenizer.tokenize_tree(&LinkedNode::new(source.root()), ModifierSet::empty());
     SemanticTokens::new(tokenizer.output)

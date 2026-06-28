@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::OnceLock;
@@ -8,6 +9,7 @@ use comemo::{Track, Tracked};
 use ecow::EcoString;
 use lsp_types::Url;
 use parking_lot::Mutex;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
 use tinymist_analysis::stats::{AllocStats, QueryStatReportEntry};
@@ -446,6 +448,13 @@ impl LocalContext {
         self.shared_().preload_package(entry_point);
     }
 
+    pub(crate) fn preload_expr_stages<I>(&self, files: I)
+    where
+        I: IntoIterator<Item = TypstFileId>,
+    {
+        self.shared_().preload_expr_stages(files);
+    }
+
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst_shim::eval::Vm) -> T) -> T {
         crate::upstream::with_vm((self.world() as &dyn World).track(), f)
     }
@@ -541,6 +550,39 @@ impl LocalContext {
             }
             DefKind::Reference => None,
         }
+    }
+}
+
+/// A concurrent per-request cache for expensive shared computations.
+#[derive(Clone)]
+pub struct SharedQueryCache<K, V> {
+    slots: Arc<FxDashMap<K, Arc<OnceLock<V>>>>,
+}
+
+impl<K, V> Default for SharedQueryCache<K, V>
+where
+    K: Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            slots: Arc::new(FxDashMap::default()),
+        }
+    }
+}
+
+impl<K, V> SharedQueryCache<K, V>
+where
+    K: Eq + Hash,
+    V: Clone,
+{
+    /// Gets a cached value for `key`, initializing it once if absent.
+    pub fn get_or_init(&self, key: K, init: impl FnOnce() -> V) -> V {
+        let slot = self
+            .slots
+            .entry(key)
+            .or_insert_with(|| Arc::new(OnceLock::new()))
+            .clone();
+        slot.get_or_init(init).clone()
     }
 }
 
@@ -893,15 +935,6 @@ impl SharedContext {
         definition(self, source, syntax)
     }
 
-    /// Gets the definition from a declaration.
-    pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
-        match decl.as_ref() {
-            Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
-            Decl::Module(..) => None,
-            _ => None,
-        }
-    }
-
     /// Gets the definition from static analysis.
     ///
     /// Passing a `doc` (compiled result) can help resolve dynamic things, e.g.
@@ -998,6 +1031,27 @@ impl SharedContext {
         crate::log_debug_ct!("check definition func {def:?}");
         let source = def.decl.file_id().and_then(|id| self.source_by_id(id).ok());
         analyze_signature(self, SignatureTarget::Def(source, def))
+    }
+
+    pub(crate) fn def_docs(self: &Arc<Self>, def: &Definition) -> Option<DefDocs> {
+        match def.decl.kind() {
+            DefKind::Function => {
+                let sig = self.sig_of_def(def.clone())?;
+                let docs = crate::docs::sig_docs_shared(self, &sig)?;
+                Some(DefDocs::Function(Box::new(docs)))
+            }
+            DefKind::Struct | DefKind::Constant | DefKind::Variable => {
+                let docs = crate::docs::var_docs_shared(self, def.decl.span())?;
+                Some(DefDocs::Variable(docs))
+            }
+            DefKind::Module => {
+                let ei = self.expr_stage_by_id(def.decl.file_id()?)?;
+                Some(DefDocs::Module(TidyModuleDocs {
+                    docs: ei.module_docstring.docs.clone().unwrap_or_default(),
+                }))
+            }
+            DefKind::Reference => None,
+        }
     }
 
     pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeInfo, ty: Ty) -> Option<Signature> {
@@ -1152,6 +1206,20 @@ impl SharedContext {
         //     this.type_check(&source);
         //     // crate::log_debug_ct!("prefetch type check end {fid:?}");
         // });
+    }
+
+    pub(crate) fn preload_expr_stages<I>(self: Arc<Self>, files: I)
+    where
+        I: IntoIterator<Item = TypstFileId>,
+    {
+        let files: Vec<_> = files.into_iter().collect();
+        files.par_iter().for_each(|fid| {
+            crate::log_debug_ct!("preload expr_stage {fid:?}");
+            let Some(source) = self.source_by_id(*fid).ok() else {
+                return;
+            };
+            self.expr_stage(&source);
+        });
     }
 
     pub(crate) fn preload_package(self: Arc<Self>, entry_point: TypstFileId) {

@@ -28,10 +28,18 @@ pub struct HoverRequest {
     pub position: LspPosition,
 }
 
-pub(crate) fn hover_from_definition(
-    ctx: &mut LocalContext,
+pub(crate) fn hover_from_definition_shared(
+    ctx: &Arc<crate::analysis::SharedContext>,
     def: &Definition,
     range: Option<LspRange>,
+) -> Option<Hover> {
+    hover_from_docs(def, range, ctx.def_docs(def))
+}
+
+fn hover_from_docs(
+    def: &Definition,
+    range: Option<LspRange>,
+    sym_docs: Option<DefDocs>,
 ) -> Option<Hover> {
     let mut contents = vec![];
 
@@ -49,8 +57,6 @@ pub(crate) fn hover_from_definition(
             contents.push(format!("Bibliography: `{}`", def.name()));
         }
         _ => {
-            let sym_docs = ctx.def_docs(def);
-
             if matches!(
                 def.decl.kind(),
                 DefKind::Function | DefKind::Variable | DefKind::Constant

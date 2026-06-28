@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use ecow::{EcoString, EcoVec};
 use indexmap::IndexSet;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use tinymist_analysis::docs::tidy::remove_list_annotations;
 use tinymist_std::path::unix_slash;
@@ -118,6 +119,18 @@ struct SourceSpanIndex {
 }
 
 impl PackageDocSpanIndex {
+    fn preload(ctx: &LocalContext, fids: &[FileId]) -> Self {
+        let shared = ctx.shared().clone();
+        let by_file = fids
+            .par_iter()
+            .filter_map(|fid| {
+                let source = shared.source_by_id(*fid).ok()?;
+                Some((*fid, SourceSpanIndex::new(source)))
+            })
+            .collect();
+        Self { by_file }
+    }
+
     fn source(&mut self, ctx: &LocalContext, fid: FileId) -> Option<Source> {
         Some(self.entry(ctx, fid)?.source.clone())
     }
@@ -180,6 +193,10 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
         .expect("package manifest must be in a package");
     let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
+    let depended: Vec<_> = ctx.depended_source_files().into_iter().collect();
+    ctx.preload_expr_stages(depended.iter().copied());
+    let mut span_index = PackageDocSpanIndex::preload(ctx, &depended);
+
     let PackageDefInfo { root, module_uses } = module_docs(ctx, entry_point)?;
 
     crate::log_debug_ct!("module_uses: {module_uses:#?}");
@@ -213,7 +230,6 @@ pub fn package_docs(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<Pac
     };
 
     let mut modules = vec![];
-    let mut span_index = PackageDocSpanIndex::default();
 
     while !modules_to_generate.is_empty() {
         for (parent_ident, mut def) in std::mem::take(&mut modules_to_generate) {

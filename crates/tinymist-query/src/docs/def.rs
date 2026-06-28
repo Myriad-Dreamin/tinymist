@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use ecow::EcoString;
 use tinymist_analysis::Signature;
@@ -13,21 +13,23 @@ use crate::LocalContext;
 use crate::analysis::SharedContext;
 
 pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
+    var_docs_shared(ctx.shared(), pos)
+}
+
+pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<SignatureDocs> {
+    sig_docs_shared(ctx.shared(), sig)
+}
+
+pub(crate) fn var_docs_shared(ctx: &Arc<SharedContext>, pos: Span) -> Option<VarDocs> {
     let source = ctx.source_by_id(pos.id()?).ok()?;
     let type_info = ctx.type_check(&source);
     let ty = type_info.type_of_span(pos)?;
 
-    // todo multiple sources
-    // Must use raw result as type aliases contain the source information.
     let mut srcs = ty.sources();
     srcs.sort();
     log::debug!("check variable docs of ty: {ty:?} => {srcs:?}");
     let doc_source = srcs.into_iter().next()?;
 
-    // todo people can easily forget to simplify the type which is not good. we
-    // might find a way to ensure them at compile time.
-    //
-    // Must be simplified before formatting, to expand type aliases.
     let simplified_ty = type_info.simplify(ty, false);
     let return_ty = format_ty_short(Some(&simplified_ty));
     match doc_source {
@@ -35,7 +37,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
             let docs = type_info
                 .var_docs
                 .get(&var.def)
-                .map(|docs| docs.docs().clone());
+                .map(|docstring| docstring.docs().clone());
             Some(VarDocs {
                 docs: docs.unwrap_or_default(),
                 return_ty,
@@ -43,7 +45,7 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
             })
         }
         DocSource::Ins(ins) => ins.syntax.as_ref().map(|src| {
-            let docs = convert_typst_docs(ctx, src.doc.as_ref().into());
+            let docs = convert_typst_docs_shared(ctx, src.doc.as_ref().into());
             VarDocs {
                 docs,
                 return_ty,
@@ -54,8 +56,9 @@ pub(crate) fn var_docs(ctx: &mut LocalContext, pos: Span) -> Option<VarDocs> {
     }
 }
 
-pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<SignatureDocs> {
+pub(crate) fn sig_docs_shared(ctx: &Arc<SharedContext>, sig: &Signature) -> Option<SignatureDocs> {
     let type_sig = sig.type_sig().clone();
+    let mut resolver = SharedDocTextResolver(ctx.as_ref());
 
     let pos_in = sig
         .primary()
@@ -73,12 +76,12 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
     let ret_in = type_sig.body.as_ref();
 
     let pos = pos_in
-        .map(|(param, ty)| ParamDocs::new(ctx, param, ty))
+        .map(|(param, ty)| ParamDocs::new(&mut resolver, param, ty))
         .collect::<Vec<_>>();
     let named = named_in
-        .map(|(param, ty)| (param.name.clone(), ParamDocs::new(ctx, param, ty)))
+        .map(|(param, ty)| (param.name.clone(), ParamDocs::new(&mut resolver, param, ty)))
         .collect::<std::collections::BTreeMap<_, _>>();
-    let rest = rest_in.map(|(param, ty)| ParamDocs::new(ctx, param, ty));
+    let rest = rest_in.map(|(param, ty)| ParamDocs::new(&mut resolver, param, ty));
 
     let ret_ty = format_ty_short(ret_in);
 
@@ -86,7 +89,7 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
         .primary()
         .docs
         .as_ref()
-        .map(|docs| resolve_doc_text(ctx, docs))
+        .map(|docs| resolve_doc_text_shared(ctx, docs))
         .unwrap_or_default();
 
     Some(SignatureDocs {
@@ -100,14 +103,25 @@ pub(crate) fn sig_docs(ctx: &mut LocalContext, sig: &Signature) -> Option<Signat
 }
 
 pub(crate) fn resolve_doc_text(ctx: &mut LocalContext, docs: &DocText) -> EcoString {
-    let shared = ctx.shared();
-    docs.get_or_init(|raw| convert_official_doc(shared, raw.clone()))
+    resolve_doc_text_shared(ctx.shared().as_ref(), docs)
+}
+
+pub(crate) fn resolve_doc_text_shared(ctx: &SharedContext, docs: &DocText) -> EcoString {
+    docs.get_or_init(|raw| convert_official_doc(ctx, raw.clone()))
         .clone()
 }
 
 impl DocTextResolver for LocalContext {
     fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString {
         resolve_doc_text(self, docs)
+    }
+}
+
+struct SharedDocTextResolver<'a>(&'a SharedContext);
+
+impl DocTextResolver for SharedDocTextResolver<'_> {
+    fn resolve_doc_text(&mut self, docs: &DocText) -> EcoString {
+        resolve_doc_text_shared(self.0, docs)
     }
 }
 
@@ -129,14 +143,13 @@ fn convert_official_doc(ctx: &SharedContext, docs: EcoString) -> EcoString {
     }
 }
 
-pub(crate) fn convert_typst_docs(ctx: &mut LocalContext, docs: EcoString) -> EcoString {
+pub(crate) fn convert_typst_docs_shared(ctx: &SharedContext, docs: EcoString) -> EcoString {
     if docs.trim().is_empty() {
         return docs;
     }
 
-    let shared = ctx.shared_();
     let docs_text = DocText::plain(docs.clone());
-    match crate::docs::convert_docs(&shared, &docs_text, None) {
+    match crate::docs::convert_docs(ctx, &docs_text, None) {
         Ok(converted) => {
             let converted = remove_list_annotations(&converted);
             ctx.remove_html(converted.trim().into())
