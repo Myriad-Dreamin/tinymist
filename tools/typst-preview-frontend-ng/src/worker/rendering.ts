@@ -17,7 +17,8 @@ import type {
   WorkerPost,
 } from "./types";
 
-const pixelPerPt = 3;
+const minPixelPerPt = 0.5;
+const maxPixelPerPt = 4;
 
 /** Owns Typst rendering in the worker, handling document frames, canvas acknowledgements, and viewport updates. */
 export class WorkerRenderer {
@@ -34,6 +35,7 @@ export class WorkerRenderer {
   private readonly pageCanvases = new Map<number, CanvasEntry>();
   private readonly pageCacheKeys = new Map<number, string>();
   private readonly pageLatestCacheKeys = new Map<number, string>();
+  private readonly pagePixelPerPt = new Map<number, number>();
   private readonly pageInteractionCacheKeys = new Map<number, string>();
   private readonly pendingCanvasAcks = new Map<number, PendingCanvasAck>();
   private latestPageLayouts: PageLayout[] = [];
@@ -103,6 +105,21 @@ export class WorkerRenderer {
     x: number;
     y: number;
   }) {
+    this.renderQueue = this.renderQueue
+      .then(() => this.hitBoundExclusive(request))
+      .catch((error) => {
+        this.postError(error);
+      });
+    await this.renderQueue;
+  }
+
+  private async hitBoundExclusive(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+  }) {
     try {
       if (request.generation !== this.generation) {
         return;
@@ -139,6 +156,7 @@ export class WorkerRenderer {
     this.pageCanvases.clear();
     this.pageCacheKeys.clear();
     this.pageLatestCacheKeys.clear();
+    this.pagePixelPerPt.clear();
     this.pageInteractionCacheKeys.clear();
     this.latestPageLayouts = [];
     for (const ack of this.pendingCanvasAcks.values()) {
@@ -180,6 +198,26 @@ export class WorkerRenderer {
       kind: typeof bound.kind === "string" ? bound.kind : "bound",
       rect: bound.rect,
     };
+  }
+
+  private computePagePixelPerPt(index: number, width: number, height: number) {
+    const devicePixelRatio = clamp(this.config.viewport?.devicePixelRatio || 1, 1, 4);
+    const layout = this.latestPageLayouts.find((candidate) => candidate.index === index);
+    if (layout?.width && layout.width > 0) {
+      return clampPixelPerPt((layout.width * devicePixelRatio) / Math.max(width, 1));
+    }
+
+    const viewport = this.config.viewport || {};
+    const viewportWidth = Math.max(1, viewport.width || viewport.window?.innerWidth || width);
+    const viewportHeight = Math.max(1, viewport.height || viewport.window?.innerHeight || height);
+    const fitWidth = viewportWidth / Math.max(width, 1);
+    const fitHeight = viewportHeight / Math.max(height, 1);
+    const scale =
+      this.config.previewMode === "Slide"
+        ? Math.max(0.1, Math.min(fitWidth, fitHeight))
+        : Math.max(0.1, fitWidth);
+    const cssWidth = Math.ceil(width * scale);
+    return clampPixelPerPt((cssWidth * devicePixelRatio) / Math.max(width, 1));
   }
 
   private async initializeRenderer(wasmUrl: string): Promise<RenderSession> {
@@ -241,12 +279,16 @@ export class WorkerRenderer {
       this.initializedDocument = true;
     }
     session.manipulateData({ action: "merge", data: payload });
-    const pages = session.retrievePagesInfo().map((page, index) => ({
-      index,
-      width: page.width,
-      height: page.height,
-      pixelPerPt,
-    }));
+    const pages = session.retrievePagesInfo().map((page, index) => {
+      const pixelPerPt = this.computePagePixelPerPt(index, page.width, page.height);
+      this.pagePixelPerPt.set(index, pixelPerPt);
+      return {
+        index,
+        width: page.width,
+        height: page.height,
+        pixelPerPt,
+      };
+    });
     const nextGeneration = ++this.generation;
     const canvasAck = await this.ensureCanvases(nextGeneration, pages);
     if (canvasAck?.layouts) {
@@ -334,6 +376,7 @@ export class WorkerRenderer {
         this.pageCanvases.delete(index);
         this.pageCacheKeys.delete(index);
         this.pageLatestCacheKeys.delete(index);
+        this.pagePixelPerPt.delete(index);
         this.pageInteractionCacheKeys.delete(index);
       }
     }
@@ -550,4 +593,12 @@ function distanceToViewport(
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function clampPixelPerPt(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return minPixelPerPt;
+  }
+  const bucketed = Math.ceil((value - 1e-3) * 4) / 4;
+  return clamp(bucketed, minPixelPerPt, maxPixelPerPt);
 }

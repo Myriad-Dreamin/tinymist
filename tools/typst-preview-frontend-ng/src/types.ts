@@ -31,6 +31,8 @@ export interface PageRecord {
   transferred: boolean;
   width: number;
   height: number;
+  cssWidth: number;
+  cssHeight: number;
   pixelPerPt: number;
 }
 

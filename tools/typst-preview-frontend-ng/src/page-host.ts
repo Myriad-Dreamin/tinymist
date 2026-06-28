@@ -27,6 +27,30 @@ interface PageHostOptions {
   postWorker: (message: unknown, transfer?: Transferable[]) => void;
 }
 
+interface PageLayoutMetrics {
+  availableWidth: number;
+  availableHeight: number;
+}
+
+interface PageLayoutRecord {
+  index: number;
+  top: number;
+  bottom: number;
+  width: number;
+  height: number;
+  scale: number;
+  scaleX: number;
+  scaleY: number;
+}
+
+interface ZoomAnchor {
+  pageIndex: number;
+  pageX: number;
+  pageY: number;
+  viewportX: number;
+  viewportY: number;
+}
+
 /** Owns preview page DOM and controls, handling render-worker page requests and routed preview protocol messages. */
 export class PageHost {
   private readonly elements: PreviewElements;
@@ -110,12 +134,10 @@ export class PageHost {
       return;
     }
 
-    const rect = this.elements.viewport.getBoundingClientRect();
-    const anchorX = this.elements.viewport.scrollLeft + event.clientX - rect.left;
-    const anchorY = this.elements.viewport.scrollTop + event.clientY - rect.top;
-    this.applyAllPageLayouts();
-    const ratio = this.zoomRatio / previousZoom;
-    this.elements.viewport.scrollBy(anchorX * (ratio - 1), anchorY * (ratio - 1));
+    const metrics = this.readPageLayoutMetrics();
+    const anchor = this.zoomAnchorFromEvent(event, metrics, this.collectPageLayouts());
+    this.applyAllPageLayouts(metrics);
+    this.restoreZoomAnchor(anchor, metrics, this.collectPageLayouts());
     this.scheduleViewportSnapshot();
   }
 
@@ -123,7 +145,7 @@ export class PageHost {
     this.previewMode = mode;
     this.elements.root.classList.toggle("mode-slide", mode === "Slide");
     this.elements.root.classList.toggle("mode-doc", mode === "Doc");
-    this.applyAllPageLayouts();
+    this.applyAllPageLayouts(this.readPageLayoutMetrics());
   }
 
   setContentPreview(enabled: boolean) {
@@ -149,6 +171,7 @@ export class PageHost {
     }
 
     const livePages = new Set<number>();
+    const metrics = this.readPageLayoutMetrics();
     const transferred: Array<{
       index: number;
       canvas: OffscreenCanvas;
@@ -170,7 +193,7 @@ export class PageHost {
         this.insertPage(record, page.index);
       }
 
-      this.applyPageLayout(record, page);
+      this.applyPageLayout(record, page, metrics);
       if (!record.transferred) {
         record.canvas.width = widthPx;
         record.canvas.height = heightPx;
@@ -200,36 +223,52 @@ export class PageHost {
     );
   }
 
-  collectPageLayouts() {
-    const viewportRect = this.elements.viewport.getBoundingClientRect();
-    const scrollTop = this.elements.viewport.scrollTop;
-    return [...this.pageRecords.entries()]
-      .sort(([a], [b]) => a - b)
-      .flatMap(([index, record]) => {
-        if (record.container.hidden) {
-          return [];
+  collectPageLayouts(): PageLayoutRecord[] {
+    const layouts: PageLayoutRecord[] = [];
+    let top = 0;
+    let visibleCount = 0;
+    const gap = this.pageGap();
+
+    for (const page of this.lastPages) {
+      const record = this.pageRecords.get(page.index);
+      if (!record) {
+        continue;
+      }
+
+      if (!record.container.hidden) {
+        if (visibleCount > 0) {
+          top += gap;
         }
-        const rect = record.container.getBoundingClientRect();
-        const top = rect.top - viewportRect.top + scrollTop;
-        const height = rect.height;
-        return [
-          {
-            index,
-            top,
-            bottom: top + height,
-            height,
-            scale: height / Math.max(record.height, 1),
-          },
-        ];
-      });
+        const width = record.cssWidth;
+        const height = record.cssHeight;
+        const scaleX = width / Math.max(record.width, 1);
+        const scaleY = height / Math.max(record.height, 1);
+        layouts.push({
+          index: record.index,
+          top,
+          bottom: top + height,
+          width,
+          height,
+          scale: scaleY,
+          scaleX,
+          scaleY,
+        });
+        top += height;
+        visibleCount += 1;
+        continue;
+      }
+    }
+
+    return layouts;
   }
 
-  readViewportSnapshot(): ViewportSnapshot {
+  readViewportSnapshot(metrics = this.readPageLayoutMetrics()): ViewportSnapshot {
     const viewport = this.elements.viewport;
-    const rect = viewport.getBoundingClientRect();
+    const width = metrics.availableWidth;
+    const height = metrics.availableHeight;
     return {
-      width: viewport.clientWidth,
-      height: viewport.clientHeight,
+      width,
+      height,
       scrollLeft: viewport.scrollLeft,
       scrollTop: viewport.scrollTop,
       devicePixelRatio: window.devicePixelRatio || 1,
@@ -238,28 +277,31 @@ export class PageHost {
         innerHeight: window.innerHeight,
       },
       boundingRect: {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
-        top: rect.top,
-        right: rect.right,
-        bottom: rect.bottom,
-        left: rect.left,
+        x: 0,
+        y: 0,
+        width,
+        height,
+        top: 0,
+        right: width,
+        bottom: height,
+        left: 0,
       },
     };
   }
 
-  scheduleViewportSnapshot() {
+  scheduleViewportSnapshot(options: { applyLayouts?: boolean } = {}) {
     if (this.lastViewportTimer) {
       clearTimeout(this.lastViewportTimer);
     }
     this.lastViewportTimer = window.setTimeout(() => {
       this.lastViewportTimer = 0;
-      this.applyAllPageLayouts();
+      const metrics = this.readPageLayoutMetrics();
+      if (options.applyLayouts) {
+        this.applyAllPageLayouts(metrics);
+      }
       this.postWorker({
         type: "viewport",
-        viewport: this.readViewportSnapshot(),
+        viewport: this.readViewportSnapshot(metrics),
         layouts: this.collectPageLayouts(),
       });
     }, 50);
@@ -413,6 +455,8 @@ export class PageHost {
       transferred: false,
       width: page.width,
       height: page.height,
+      cssWidth: widthPx,
+      cssHeight: heightPx,
       pixelPerPt: page.pixelPerPt,
     };
     this.installPageInteractionHandlers(record);
@@ -679,15 +723,17 @@ export class PageHost {
     this.elements.pages.append(record.container);
   }
 
-  private applyPageLayout(record: PageRecord, page: PageSpec) {
+  private applyPageLayout(record: PageRecord, page: PageSpec, metrics: PageLayoutMetrics) {
     record.width = page.width;
     record.height = page.height;
     record.pixelPerPt = page.pixelPerPt;
     record.container.hidden =
       this.previewMode === "Slide" && page.index !== this.currentSlidePage - 1;
-    const scale = this.computePageScale(page);
+    const scale = this.computePageScale(page, metrics);
     const cssWidth = Math.ceil(page.width * scale);
     const cssHeight = Math.ceil(page.height * scale);
+    record.cssWidth = cssWidth;
+    record.cssHeight = cssHeight;
     record.container.style.width = `${cssWidth}px`;
     record.container.style.height = `${cssHeight}px`;
     record.shell.style.width = `${cssWidth}px`;
@@ -695,15 +741,107 @@ export class PageHost {
     record.shell.dataset.appliedScale = String(scale);
   }
 
-  private computePageScale(page: PageSpec): number {
-    const availableWidth = Math.max(1, this.elements.viewport.clientWidth);
-    const availableHeight = Math.max(1, this.elements.viewport.clientHeight);
-    const fitWidth = availableWidth / page.width;
+  private computePageScale(page: PageSpec, metrics: PageLayoutMetrics): number {
+    const fitWidth = metrics.availableWidth / page.width;
     const baseScale =
       this.previewMode === "Slide"
-        ? Math.max(0.1, Math.min(fitWidth, availableHeight / page.height))
+        ? Math.max(0.1, Math.min(fitWidth, metrics.availableHeight / page.height))
         : Math.max(0.1, fitWidth);
     return baseScale * this.zoomRatio;
+  }
+
+  private readPageLayoutMetrics(): PageLayoutMetrics {
+    return {
+      availableWidth: Math.max(1, this.elements.viewport.clientWidth),
+      availableHeight: Math.max(1, this.elements.viewport.clientHeight),
+    };
+  }
+
+  private pageGap() {
+    return this.contentPreview ? 5 : 10;
+  }
+
+  private zoomAnchorFromEvent(
+    event: WheelEvent,
+    metrics: PageLayoutMetrics,
+    layouts: PageLayoutRecord[],
+  ): ZoomAnchor | undefined {
+    const viewportRect = this.elements.viewport.getBoundingClientRect();
+    const viewportX = event.clientX - viewportRect.left;
+    const viewportY = event.clientY - viewportRect.top;
+    const contentX = this.elements.viewport.scrollLeft + viewportX;
+    const contentY = this.elements.viewport.scrollTop + viewportY;
+    const layout =
+      this.findPageLayoutAt(layouts, contentY) || this.nearestPageLayout(layouts, contentY);
+    if (!layout) {
+      return undefined;
+    }
+
+    const record = this.pageRecords.get(layout.index);
+    if (!record) {
+      return undefined;
+    }
+
+    const pageLeft = this.pageLeft(record, metrics);
+    return {
+      pageIndex: layout.index,
+      pageX: clamp((contentX - pageLeft) / Math.max(layout.scaleX, 1e-6), 0, record.width),
+      pageY: clamp((contentY - layout.top) / Math.max(layout.scaleY, 1e-6), 0, record.height),
+      viewportX,
+      viewportY,
+    };
+  }
+
+  private restoreZoomAnchor(
+    anchor: ZoomAnchor | undefined,
+    metrics: PageLayoutMetrics,
+    layouts: PageLayoutRecord[],
+  ) {
+    if (!anchor) {
+      return;
+    }
+
+    const record = this.pageRecords.get(anchor.pageIndex);
+    const layout = layouts.find((candidate) => candidate.index === anchor.pageIndex);
+    if (!record || !layout) {
+      return;
+    }
+
+    const pageLeft = this.pageLeft(record, metrics);
+    this.elements.viewport.scrollTo({
+      left: pageLeft + anchor.pageX * layout.scaleX - anchor.viewportX,
+      top: layout.top + anchor.pageY * layout.scaleY - anchor.viewportY,
+      behavior: "auto",
+    });
+  }
+
+  private findPageLayoutAt(layouts: PageLayoutRecord[], contentY: number) {
+    return layouts.find((layout) => contentY >= layout.top && contentY <= layout.bottom);
+  }
+
+  private nearestPageLayout(layouts: PageLayoutRecord[], contentY: number) {
+    let nearest: PageLayoutRecord | undefined;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const layout of layouts) {
+      const distance =
+        contentY < layout.top
+          ? layout.top - contentY
+          : contentY > layout.bottom
+            ? contentY - layout.bottom
+            : 0;
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = layout;
+      }
+    }
+    return nearest;
+  }
+
+  private pageLeft(record: PageRecord, metrics: PageLayoutMetrics) {
+    if (this.contentPreview) {
+      return 0;
+    }
+    return (metrics.availableWidth - record.cssWidth) / 2;
   }
 
   private handleJumpMessage(text: string) {
@@ -796,15 +934,12 @@ export class PageHost {
       this.elements.viewport.scrollTop + this.elements.viewport.clientHeight / 2;
     let bestPage = 1;
     let bestDistance = Number.POSITIVE_INFINITY;
-    for (const [index, record] of this.pageRecords) {
-      if (record.container.hidden) {
-        continue;
-      }
-      const center = record.container.offsetTop + record.container.offsetHeight / 2;
+    for (const layout of this.collectPageLayouts()) {
+      const center = (layout.top + layout.bottom) / 2;
       const distance = Math.abs(center - viewportCenter);
       if (distance < bestDistance) {
         bestDistance = distance;
-        bestPage = index + 1;
+        bestPage = layout.index + 1;
       }
     }
     return bestPage;
@@ -815,7 +950,7 @@ export class PageHost {
       return;
     }
     this.currentSlidePage = clamp(Math.trunc(page), 1, this.pageCount);
-    this.applyAllPageLayouts();
+    this.applyAllPageLayouts(this.readPageLayoutMetrics());
     this.renderCursor();
     this.elements.viewport.scrollTo({ top: 0, left: 0, behavior: "auto" });
     this.scheduleViewportSnapshot();
@@ -826,11 +961,11 @@ export class PageHost {
     this.currentSlidePage = clamp(this.currentSlidePage, 1, Math.max(1, this.pageCount));
   }
 
-  private applyAllPageLayouts() {
+  private applyAllPageLayouts(metrics = this.readPageLayoutMetrics()) {
     for (const page of this.lastPages) {
       const record = this.pageRecords.get(page.index);
       if (record) {
-        this.applyPageLayout(record, page);
+        this.applyPageLayout(record, page, metrics);
       }
     }
     this.renderCursor();
