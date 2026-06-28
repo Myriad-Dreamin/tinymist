@@ -50,6 +50,46 @@
   height: 100%;
 }
 
+.dragging .typst-page {
+  cursor: grabbing !important;
+}
+
+.typst-link-layer,
+.typst-interaction-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.typst-link-layer a {
+  position: absolute;
+  display: block;
+  pointer-events: auto;
+  color: inherit;
+  text-decoration: none;
+}
+
+.typst-interaction-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 1px;
+}
+
+.typst-interaction-highlight.link {
+  background: #66bab7;
+  mix-blend-mode: lighten;
+}
+
+.typst-interaction-highlight.text {
+  background: #f75c2f;
+  mix-blend-mode: lighten;
+}
+
+.typst-interaction-highlight.bound {
+  box-shadow: inset 0 0 0 1px #66bab7;
+}
+
 .invert-colors .typst-page-canvas {
   filter: invert(0.933333) hue-rotate(180deg);
 }

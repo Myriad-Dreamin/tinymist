@@ -1,5 +1,15 @@
 import type { PreviewElements } from "./dom";
 import { installPageControls } from "./controls";
+import {
+  hitTestLink,
+  hitTestText,
+  textRectsForLink,
+  type BoundInteraction,
+  type LinkInteraction,
+  type PageInteractions,
+  type PageRect,
+  type TextInteraction,
+} from "./interactions";
 import { parseInvertColorStrategy, parsePreviewPositions } from "./protocol";
 import type {
   InvertColorStrategy,
@@ -31,6 +41,32 @@ export class PageHost {
   private pendingCursor: PreviewPosition | undefined;
   private outlineData: any;
   private autoInvertDecision: boolean | undefined;
+  private interactionGeneration = 0;
+  private pointerDown:
+    | {
+        pageIndex: number;
+        x: number;
+        y: number;
+      }
+    | undefined;
+  private lastPointer:
+    | {
+        pageIndex: number;
+        x: number;
+        y: number;
+      }
+    | undefined;
+  private activeHoverKey = "";
+  private nextBoundRequestId = 0;
+  private pendingBoundHover:
+    | {
+        requestId: number;
+        generation: number;
+        pageIndex: number;
+        x: number;
+        y: number;
+      }
+    | undefined;
   private readonly pageRecords = new Map<number, PageRecord>();
 
   constructor({ elements, postWorker }: PageHostOptions) {
@@ -108,6 +144,9 @@ export class PageHost {
 
     this.lastPages = pages;
     this.updatePageCount(pages.length);
+    if (this.interactionGeneration !== generation) {
+      this.interactionGeneration = generation;
+    }
 
     const livePages = new Set<number>();
     const transferred: Array<{
@@ -143,6 +182,10 @@ export class PageHost {
 
     for (const [index, record] of this.pageRecords) {
       if (!livePages.has(index)) {
+        if (this.lastPointer?.pageIndex === index) {
+          this.lastPointer = undefined;
+          this.activeHoverKey = "";
+        }
         record.container.remove();
         this.pageRecords.delete(index);
       }
@@ -247,6 +290,66 @@ export class PageHost {
     }
   }
 
+  updateInteractions(generation: number, interactions: PageInteractions[]) {
+    if (generation !== this.interactionGeneration) {
+      return;
+    }
+    let refreshHover = false;
+    for (const pageInteractions of interactions) {
+      const record = this.pageRecords.get(pageInteractions.pageIndex);
+      if (record) {
+        record.interactions = pageInteractions;
+        this.renderLinkAnchors(record);
+        refreshHover ||= this.lastPointer?.pageIndex === record.index;
+      }
+    }
+    if (refreshHover) {
+      this.activeHoverKey = "";
+      this.restoreInteractionHover();
+    }
+  }
+
+  handleBoundHit(message: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+    bound?: BoundInteraction;
+  }) {
+    const pending = this.pendingBoundHover;
+    if (
+      !pending ||
+      pending.requestId !== message.requestId ||
+      pending.generation !== message.generation ||
+      pending.pageIndex !== message.pageIndex ||
+      this.interactionGeneration !== message.generation
+    ) {
+      return;
+    }
+
+    if (
+      !this.lastPointer ||
+      this.lastPointer.pageIndex !== message.pageIndex ||
+      Math.hypot(this.lastPointer.x - message.x, this.lastPointer.y - message.y) > 0.5
+    ) {
+      return;
+    }
+
+    const record = this.pageRecords.get(message.pageIndex);
+    if (!record) {
+      return;
+    }
+
+    if (!message.bound) {
+      this.clearInteractionHighlight(record);
+      this.activeHoverKey = "";
+      return;
+    }
+
+    this.showBoundHover(record, message.bound);
+  }
+
   clearPages() {
     for (const record of this.pageRecords.values()) {
       record.container.remove();
@@ -254,6 +357,11 @@ export class PageHost {
     this.pageRecords.clear();
     this.lastPages = [];
     this.pendingCursor = undefined;
+    this.interactionGeneration = 0;
+    this.pointerDown = undefined;
+    this.lastPointer = undefined;
+    this.activeHoverKey = "";
+    this.pendingBoundHover = undefined;
     this.updatePageCount(0);
   }
 
@@ -277,26 +385,29 @@ export class PageHost {
     canvas.width = widthPx;
     canvas.height = heightPx;
 
+    const interactionLayer = document.createElement("div");
+    interactionLayer.className = "typst-interaction-layer";
+
+    const linkLayer = document.createElement("div");
+    linkLayer.className = "typst-link-layer";
+
     const cursor = document.createElement("div");
     cursor.className = "typst-cursor";
 
     const jumpMarker = document.createElement("div");
     jumpMarker.className = "typst-jump-marker";
 
-    container.addEventListener("click", () => {
-      if (this.contentPreview) {
-        this.postWorker({ type: "send", text: `outline-sync,${page.index + 1}` });
-      }
-    });
-
     shell.appendChild(canvas);
-    container.append(shell, cursor, jumpMarker);
+    container.append(shell, linkLayer, interactionLayer, cursor, jumpMarker);
 
-    return {
+    const record = {
+      index: page.index,
       key,
       container,
       shell,
       canvas,
+      linkLayer,
+      interactionLayer,
       cursor,
       jumpMarker,
       transferred: false,
@@ -304,6 +415,253 @@ export class PageHost {
       height: page.height,
       pixelPerPt: page.pixelPerPt,
     };
+    this.installPageInteractionHandlers(record);
+    return record;
+  }
+
+  private installPageInteractionHandlers(record: PageRecord) {
+    record.container.addEventListener("mousedown", (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+      this.pointerDown = {
+        pageIndex: record.index,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    });
+
+    record.container.addEventListener("mousemove", (event) => {
+      this.handlePagePointerMove(record, event);
+    });
+
+    record.container.addEventListener("mouseleave", () => {
+      this.clearInteractionHighlight(record);
+      this.activeHoverKey = "";
+      if (this.lastPointer?.pageIndex === record.index) {
+        this.lastPointer = undefined;
+      }
+    });
+
+    record.container.addEventListener("click", (event) => {
+      this.handlePageClick(record, event);
+    });
+  }
+
+  private handlePagePointerMove(record: PageRecord, event: MouseEvent) {
+    const point = this.pagePointFromEvent(record, event);
+    if (!point) {
+      this.clearInteractionHighlight(record);
+      this.activeHoverKey = "";
+      this.lastPointer = undefined;
+      return;
+    }
+
+    this.lastPointer = { pageIndex: record.index, x: point.x, y: point.y };
+    this.updateInteractionHover(record, point);
+  }
+
+  private updateInteractionHover(record: PageRecord, point: { x: number; y: number }) {
+    if (!record.interactions) {
+      this.clearInteractionHighlight(record);
+      this.activeHoverKey = "";
+      return;
+    }
+
+    const link = hitTestLink(record.interactions, point.x, point.y);
+    if (link) {
+      this.showLinkHover(record, link);
+      return;
+    }
+
+    const text = hitTestText(record.interactions, point.x, point.y);
+    if (text) {
+      this.showTextHover(record, text);
+      return;
+    }
+
+    this.requestBoundHover(record, point);
+  }
+
+  private restoreInteractionHover() {
+    if (!this.lastPointer) {
+      return;
+    }
+    const record = this.pageRecords.get(this.lastPointer.pageIndex);
+    if (!record) {
+      return;
+    }
+    this.updateInteractionHover(record, this.lastPointer);
+  }
+
+  private handlePageClick(record: PageRecord, event: MouseEvent) {
+    if (this.isDragClick(record, event)) {
+      return;
+    }
+
+    const point = this.pagePointFromEvent(record, event);
+    if (!point) {
+      return;
+    }
+    this.lastPointer = { pageIndex: record.index, x: point.x, y: point.y };
+
+    const link = hitTestLink(record.interactions, point.x, point.y);
+    if (link?.target.kind === "internal" && link.target.position) {
+      event.preventDefault();
+      this.scrollToTypstLocation(link.target.position);
+      return;
+    }
+
+    if (this.contentPreview) {
+      this.postWorker({ type: "send", text: `outline-sync,${record.index + 1}` });
+      return;
+    }
+
+    this.postWorker({
+      type: "send",
+      text: `src-point ${JSON.stringify({
+        page_no: record.index + 1,
+        x: point.x,
+        y: point.y,
+      })}`,
+    });
+  }
+
+  private pagePointFromEvent(
+    record: PageRecord,
+    event: MouseEvent,
+  ): { x: number; y: number } | undefined {
+    const rect = record.shell.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return undefined;
+    }
+
+    return {
+      x: clamp(((event.clientX - rect.left) / rect.width) * record.width, 0, record.width),
+      y: clamp(((event.clientY - rect.top) / rect.height) * record.height, 0, record.height),
+    };
+  }
+
+  private isDragClick(record: PageRecord, event: MouseEvent) {
+    const start = this.pointerDown;
+    this.pointerDown = undefined;
+    if (!start || start.pageIndex !== record.index) {
+      return false;
+    }
+
+    const distance = Math.hypot(event.clientX - start.x, event.clientY - start.y);
+    return distance > 4;
+  }
+
+  private showLinkHover(record: PageRecord, link: LinkInteraction) {
+    const key = `link:${record.index}:${link.target.kind}:${link.target.href}:${link.rect.x}:${link.rect.y}`;
+    if (this.activeHoverKey === key) {
+      return;
+    }
+    this.activeHoverKey = key;
+    record.container.style.cursor = "pointer";
+
+    const textRects = textRectsForLink(record.interactions, link);
+    this.renderInteractionHighlights(record, textRects, "link");
+  }
+
+  private showTextHover(record: PageRecord, text: TextInteraction) {
+    const key = `text:${record.index}:${text.id}`;
+    if (this.activeHoverKey === key) {
+      return;
+    }
+    this.activeHoverKey = key;
+    record.container.style.cursor = "text";
+    this.renderInteractionHighlights(record, [text.rect], "text");
+  }
+
+  private showBoundHover(record: PageRecord, bound: BoundInteraction) {
+    const key = `bound:${record.index}:${bound.kind}:${bound.rect.x}:${bound.rect.y}:${bound.rect.width}:${bound.rect.height}`;
+    if (this.activeHoverKey === key) {
+      return;
+    }
+    this.activeHoverKey = key;
+    record.container.style.cursor = "";
+    this.renderInteractionHighlights(record, [bound.rect], "bound");
+  }
+
+  private requestBoundHover(record: PageRecord, point: { x: number; y: number }) {
+    const key = `bound-query:${record.index}:${point.x.toFixed(1)}:${point.y.toFixed(1)}`;
+    if (this.activeHoverKey === key) {
+      return;
+    }
+
+    const request = {
+      requestId: ++this.nextBoundRequestId,
+      generation: this.interactionGeneration,
+      pageIndex: record.index,
+      x: point.x,
+      y: point.y,
+    };
+    this.activeHoverKey = key;
+    this.pendingBoundHover = request;
+    record.container.style.cursor = "";
+    this.postWorker({
+      type: "hit-bound",
+      ...request,
+    });
+  }
+
+  private renderLinkAnchors(record: PageRecord) {
+    const interactions = record.interactions;
+    if (!interactions) {
+      record.linkLayer.replaceChildren();
+      return;
+    }
+
+    const anchors = interactions.links.flatMap((link) => {
+      if (link.target.kind !== "external") {
+        return [];
+      }
+
+      const anchor = document.createElement("a");
+      anchor.href = link.target.href;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      anchor.title = link.target.href;
+      anchor.setAttribute("aria-label", link.target.href);
+      anchor.addEventListener("click", (event) => event.stopPropagation());
+      this.applyRectStyle(record, anchor, link.rect);
+      return [anchor];
+    });
+
+    record.linkLayer.replaceChildren(...anchors);
+  }
+
+  private renderInteractionHighlights(
+    record: PageRecord,
+    rects: PageRect[],
+    kind: "link" | "text" | "bound",
+  ) {
+    record.interactionLayer.replaceChildren(
+      ...rects.slice(0, 64).map((rect) => {
+        const highlight = document.createElement("div");
+        highlight.className = `typst-interaction-highlight ${kind}`;
+        this.applyRectStyle(record, highlight, rect);
+        return highlight;
+      }),
+    );
+  }
+
+  private clearInteractionHighlight(record: PageRecord) {
+    record.container.style.cursor = "";
+    record.interactionLayer.replaceChildren();
+  }
+
+  private applyRectStyle(record: PageRecord, element: HTMLElement, rect: PageRect) {
+    const x = clamp(rect.x / Math.max(record.width, 1), 0, 1);
+    const y = clamp(rect.y / Math.max(record.height, 1), 0, 1);
+    const right = clamp((rect.x + rect.width) / Math.max(record.width, 1), 0, 1);
+    const bottom = clamp((rect.y + rect.height) / Math.max(record.height, 1), 0, 1);
+    element.style.left = `${x * 100}%`;
+    element.style.top = `${y * 100}%`;
+    element.style.width = `${Math.max(0, right - x) * 100}%`;
+    element.style.height = `${Math.max(0, bottom - y) * 100}%`;
   }
 
   private insertPage(record: PageRecord, index: number) {

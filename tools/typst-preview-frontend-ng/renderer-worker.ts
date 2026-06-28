@@ -74,6 +74,15 @@ self.addEventListener("message", (event) => {
         ),
       );
       break;
+    case "hit-bound":
+      void renderer.hitBound({
+        requestId: message.requestId,
+        generation: message.generation,
+        pageIndex: message.pageIndex,
+        x: message.x,
+        y: message.y,
+      });
+      break;
     case "dispose":
       socket.dispose();
       renderer.dispose();
