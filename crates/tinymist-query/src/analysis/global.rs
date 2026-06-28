@@ -469,7 +469,7 @@ impl LocalContext {
     }
 
     pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {
-        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self, source);
+        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self.shared(), source);
 
         let result_id = self.tokens.as_ref().map(|t| {
             let id = t.next.revision;

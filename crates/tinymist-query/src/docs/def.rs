@@ -25,11 +25,17 @@ pub(crate) fn var_docs_shared(ctx: &Arc<SharedContext>, pos: Span) -> Option<Var
     let type_info = ctx.type_check(&source);
     let ty = type_info.type_of_span(pos)?;
 
+    // todo multiple sources
+    // Must use raw result as type aliases contain the source information.
     let mut srcs = ty.sources();
     srcs.sort();
     log::debug!("check variable docs of ty: {ty:?} => {srcs:?}");
     let doc_source = srcs.into_iter().next()?;
 
+    // todo people can easily forget to simplify the type which is not good. we
+    // might find a way to ensure them at compile time.
+    //
+    // Must be simplified before formatting, to expand type aliases.
     let simplified_ty = type_info.simplify(ty, false);
     let return_ty = format_ty_short(Some(&simplified_ty));
     match doc_source {

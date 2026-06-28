@@ -387,7 +387,7 @@ impl DumpWorker {
     fn file(&mut self, fid: FileId) -> tinymist_std::Result<FileIndex> {
         let source = self.ctx.source_by_id(fid).context_ut("cannot parse")?;
         let semantic_tokens =
-            crate::analysis::semantic_tokens::get_semantic_tokens_shared(&self.ctx, &source);
+            crate::analysis::semantic_tokens::get_semantic_tokens(&self.ctx, &source);
 
         let root = LinkedNode::new(source.root());
         self.walk(&source, &root);

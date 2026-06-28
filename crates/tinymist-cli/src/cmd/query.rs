@@ -154,55 +154,29 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
 
     match cmds {
         QueryCommands::Lsif(args) => {
-            let _scope = typst_timing::TimingScope::new("query.lsif");
             let res = snap.run_within_package(&info, move |a| {
-                let knowledge = {
-                    let _scope = typst_timing::TimingScope::new("query.lsif.knowledge");
-                    tinymist_query::index::knowledge(a)
-                        .map_err(map_string_err("failed to generate index"))?
-                };
-                let encoded = {
-                    let _scope = typst_timing::TimingScope::new("query.lsif.encode");
-                    knowledge.bind(a.shared()).to_string()
-                };
+                let knowledge = tinymist_query::index::knowledge(a)
+                    .map_err(map_string_err("failed to generate index"))?;
+                let encoded = knowledge.bind(a.shared()).to_string();
                 Ok(encoded)
             })?;
 
             write_output(Path::new(&args.output), res, "failed to write lsif output")?;
         }
         QueryCommands::Scip(args) => {
-            let _scope = typst_timing::TimingScope::new("query.scip");
             let (bytes, summary) = snap.run_within_package(&info, |a| {
-                let docs = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.package_docs");
-                    tinymist_query::docs::package_docs(a, &info)
-                        .map_err(map_string_err("failed to generate docs"))?
-                };
-                let public_api = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.public_api");
-                    docs.scip_public_api()
-                };
-                let knowledge = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.knowledge");
-                    tinymist_query::index::knowledge(a)
-                        .map_err(map_string_err("failed to generate index"))?
-                };
-                let index = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.to_index");
-                    knowledge
-                        .bind(a.shared())
-                        .to_scip_index_with_public_api(&public_api)?
-                };
-                let summary = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.summary");
-                    ScipIndexSummary::from_index(&info, &index, &public_api)
-                };
-                let bytes = {
-                    let _scope = typst_timing::TimingScope::new("query.scip.serialize");
-                    index
-                        .write_to_bytes()
-                        .context_ut("failed to serialize SCIP index")?
-                };
+                let docs = tinymist_query::docs::package_docs(a, &info)
+                    .map_err(map_string_err("failed to generate docs"))?;
+                let public_api = docs.scip_public_api();
+                let knowledge = tinymist_query::index::knowledge(a)
+                    .map_err(map_string_err("failed to generate index"))?;
+                let index = knowledge
+                    .bind(a.shared())
+                    .to_scip_index_with_public_api(&public_api)?;
+                let summary = ScipIndexSummary::from_index(&info, &index, &public_api);
+                let bytes = index
+                    .write_to_bytes()
+                    .context_ut("failed to serialize SCIP index")?;
                 Ok((bytes, summary))
             })?;
 
@@ -225,24 +199,16 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
             }
         }
         QueryCommands::PackageDocs(args) => {
-            let _scope = typst_timing::TimingScope::new("query.package_docs");
             let res = snap.run_within_package(&info, |a| {
-                let doc = {
-                    let _scope = typst_timing::TimingScope::new("query.package_docs.render");
-                    tinymist_query::docs::package_docs(a, &info)
-                        .map_err(map_string_err("failed to generate docs"))?
-                };
-                {
-                    let _scope = typst_timing::TimingScope::new("query.package_docs.markdown");
-                    tinymist_query::docs::package_docs_md(&doc)
-                        .map_err(map_string_err("failed to generate docs"))
-                }
+                let doc = tinymist_query::docs::package_docs(a, &info)
+                    .map_err(map_string_err("failed to generate docs"))?;
+                tinymist_query::docs::package_docs_md(&doc)
+                    .map_err(map_string_err("failed to generate docs"))
             })?;
 
             write_output(Path::new(&args.output), res, "failed to write package docs")?;
         }
         QueryCommands::CheckPackage(_args) => {
-            let _scope = typst_timing::TimingScope::new("query.check_package");
             snap.run_within_package(&info, |a| {
                 tinymist_query::package::check_package(a, &info)
                     .map_err(map_string_err("failed to check package"))
