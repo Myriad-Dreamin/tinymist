@@ -73,11 +73,8 @@ interface PendingBoundHover extends PagePointer {
 
 type InteractionHighlightKind = "link" | "text" | "bound";
 
-const textHighlightEnabled = false;
-
-const interactionTagPattern = textHighlightEnabled
-  ? /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g
-  : /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-link\b[^"]*"[^>]*)>/g;
+const interactionTagPattern =
+  /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g;
 
 /** Extracts lightweight page-space hit-test metadata from renderer semantics HTML. */
 export function parsePageInteractions(pageIndex: number, html: string): PageInteractions {
@@ -98,7 +95,7 @@ export function parsePageInteractions(pageIndex: number, html: string): PageInte
       continue;
     }
 
-    if (textHighlightEnabled && hasClass(className, "typst-content-text")) {
+    if (hasClass(className, "typst-content-text")) {
       const rect = readPageRect(attrs);
       if (!rect) {
         continue;
@@ -129,9 +126,6 @@ export function hitTestText(
   x: number,
   y: number,
 ): TextInteraction | undefined {
-  if (!textHighlightEnabled) {
-    return undefined;
-  }
   if (!interactions) {
     return undefined;
   }
@@ -161,9 +155,6 @@ export function textHighlightsForLink(
   interactions: PageInteractions | undefined,
   link: LinkInteraction,
 ): LinkTextHighlight[] {
-  if (!textHighlightEnabled) {
-    return [];
-  }
   if (!interactions) {
     return [];
   }
@@ -287,6 +278,7 @@ export interface PageInteractionControllerOptions {
   isDragging: () => boolean;
   isContentPreview: () => boolean;
   scrollToTypstLocation: (position: LinkPosition) => void;
+  onSourceSyncRequest: () => void;
 }
 
 export class PageInteractionController {
@@ -687,10 +679,12 @@ export class PageInteractionController {
     }
 
     if (this.options.isContentPreview()) {
+      this.options.onSourceSyncRequest();
       this.options.postWorker({ type: "send", text: `outline-sync,${record.index + 1}` });
       return;
     }
 
+    this.options.onSourceSyncRequest();
     this.options.postWorker({
       type: "send",
       text: `src-point ${JSON.stringify({

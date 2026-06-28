@@ -24,7 +24,7 @@ export function scrollViewportToTypstLocation(
   viewport.scrollTo({
     left: Math.max(0, left - viewport.clientWidth / 2),
     top: Math.max(0, top - viewport.clientHeight / 2),
-    behavior: "auto",
+    behavior: "smooth",
   });
   return { xRatio, yRatio };
 }
