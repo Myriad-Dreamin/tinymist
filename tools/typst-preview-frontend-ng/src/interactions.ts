@@ -20,6 +20,11 @@ export interface LinkInteraction {
   target: LinkTarget;
 }
 
+export interface LinkTextHighlight {
+  text: TextInteraction;
+  rect: PageRect;
+}
+
 export interface TextInteraction {
   id: number;
   rect: PageRect;
@@ -37,8 +42,11 @@ export interface PageInteractions {
   texts: TextInteraction[];
 }
 
-const interactionTagPattern =
-  /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g;
+const textHighlightEnabled = false;
+
+const interactionTagPattern = textHighlightEnabled
+  ? /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-(?:text|link)\b[^"]*"[^>]*)>/g
+  : /<(span|a)\b([^>]*\bclass="[^"]*\btypst-content-link\b[^"]*"[^>]*)>/g;
 
 /** Extracts lightweight page-space hit-test metadata from renderer semantics HTML. */
 export function parsePageInteractions(pageIndex: number, html: string): PageInteractions {
@@ -49,17 +57,21 @@ export function parsePageInteractions(pageIndex: number, html: string): PageInte
     const tagName = match[1];
     const attrs = match[2];
     const className = readAttribute(attrs, "class") || "";
-    const rect = readPageRect(attrs);
-    if (!rect) {
-      continue;
-    }
 
     if (tagName === "a" || hasClass(className, "typst-content-link")) {
+      const rect = readPageRect(attrs);
+      if (!rect) {
+        continue;
+      }
       links.push({ rect, target: parseLinkTarget(attrs) });
       continue;
     }
 
-    if (hasClass(className, "typst-content-text")) {
+    if (textHighlightEnabled && hasClass(className, "typst-content-text")) {
+      const rect = readPageRect(attrs);
+      if (!rect) {
+        continue;
+      }
       const id = Number.parseInt(readAttribute(attrs, "data-text-id") || "", 10);
       if (Number.isFinite(id)) {
         texts.push({ id, rect });
@@ -86,6 +98,9 @@ export function hitTestText(
   x: number,
   y: number,
 ): TextInteraction | undefined {
+  if (!textHighlightEnabled) {
+    return undefined;
+  }
   if (!interactions) {
     return undefined;
   }
@@ -108,11 +123,21 @@ export function textRectsForLink(
   interactions: PageInteractions | undefined,
   link: LinkInteraction,
 ): PageRect[] {
+  return textHighlightsForLink(interactions, link).map((highlight) => highlight.rect);
+}
+
+export function textHighlightsForLink(
+  interactions: PageInteractions | undefined,
+  link: LinkInteraction,
+): LinkTextHighlight[] {
+  if (!textHighlightEnabled) {
+    return [];
+  }
   if (!interactions) {
     return [];
   }
 
-  const rects: PageRect[] = [];
+  const highlights: LinkTextHighlight[] = [];
   const linkRects = interactions.links
     .filter((candidate) => sameLinkTarget(candidate.target, link.target))
     .map((candidate) => visualLinkRect(candidate.rect));
@@ -121,12 +146,12 @@ export function textRectsForLink(
     for (const text of interactions.texts) {
       const clipped = intersectRects(text.rect, linkRect);
       if (clipped && isMeaningfulTextClip(text.rect, clipped)) {
-        rects.push(clipped);
+        highlights.push({ text, rect: clipped });
       }
     }
   }
 
-  return dedupeRects(rects);
+  return dedupeLinkTextHighlights(highlights);
 }
 
 function findTopmost<T extends { rect: PageRect }>(
@@ -183,10 +208,11 @@ function isMeaningfulTextClip(text: PageRect, clipped: PageRect) {
   return clipped.width >= 0.25 && clipped.height / Math.max(text.height, 1) >= 0.45;
 }
 
-function dedupeRects(rects: PageRect[]) {
+function dedupeLinkTextHighlights(highlights: LinkTextHighlight[]) {
   const seen = new Set<string>();
-  return rects.filter((rect) => {
-    const key = `${rect.x.toFixed(3)}:${rect.y.toFixed(3)}:${rect.width.toFixed(3)}:${rect.height.toFixed(3)}`;
+  return highlights.filter((highlight) => {
+    const rect = highlight.rect;
+    const key = `${highlight.text.id}:${rect.x.toFixed(3)}:${rect.y.toFixed(3)}:${rect.width.toFixed(3)}:${rect.height.toFixed(3)}`;
     if (seen.has(key)) {
       return false;
     }
@@ -313,6 +339,10 @@ function readStyleCoordinate(style: string, property: string): number | undefine
 }
 
 function decodeHtmlAttribute(value: string) {
+  return decodeHtmlText(value);
+}
+
+function decodeHtmlText(value: string) {
   return value
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")

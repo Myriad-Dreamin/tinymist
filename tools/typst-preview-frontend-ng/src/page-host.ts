@@ -3,7 +3,7 @@ import { installPageControls } from "./controls";
 import {
   hitTestLink,
   hitTestText,
-  textRectsForLink,
+  textHighlightsForLink,
   type BoundInteraction,
   type LinkInteraction,
   type PageInteractions,
@@ -60,7 +60,11 @@ export class PageHost {
   private currentSlidePage = 1;
   private pageCount = 0;
   private zoomRatio = 1;
+  private dragging = false;
+  private scrolling = false;
+  private lastViewportPostKey = "";
   private lastViewportTimer = 0;
+  private scrollIdleTimer = 0;
   private lastPages: PageSpec[] = [];
   private pendingCursor: PreviewPosition | undefined;
   private outlineData: any;
@@ -81,7 +85,27 @@ export class PageHost {
       }
     | undefined;
   private activeHoverKey = "";
-  private nextBoundRequestId = 0;
+  private activeTextHover:
+    | {
+        generation: number;
+        pageIndex: number;
+        rect: PageRect;
+      }
+    | undefined;
+  private readonly textHoverRects = new Map<string, PageRect>();
+  private readonly pendingTextRectRequests = new Set<string>();
+  private readonly pendingInteractionRequests = new Set<number>();
+  private nextHitRequestId = 0;
+  private pendingTextHover:
+    | {
+        requestId: number;
+        generation: number;
+        pageIndex: number;
+        x: number;
+        y: number;
+        text: TextInteraction;
+      }
+    | undefined;
   private pendingBoundHover:
     | {
         requestId: number;
@@ -120,6 +144,31 @@ export class PageHost {
 
   toggleInvertColors() {
     this.elements.root.classList.toggle("invert-colors");
+  }
+
+  setDragging(active: boolean) {
+    if (this.dragging === active) {
+      return;
+    }
+    this.dragging = active;
+    this.elements.root.classList.toggle("dragging", active);
+    if (active) {
+      this.activeHoverKey = "";
+      this.activeTextHover = undefined;
+      this.pendingTextHover = undefined;
+      this.pendingBoundHover = undefined;
+    } else {
+      this.scrolling = false;
+      if (this.scrollIdleTimer) {
+        window.clearTimeout(this.scrollIdleTimer);
+        this.scrollIdleTimer = 0;
+      }
+    }
+    this.postViewportSnapshot({
+      requestInteractions: !active,
+      renderDuringDrag: !active,
+      force: true,
+    });
   }
 
   applyWheelZoom(event: WheelEvent) {
@@ -168,12 +217,25 @@ export class PageHost {
     this.updatePageCount(pages.length);
     if (this.interactionGeneration !== generation) {
       this.interactionGeneration = generation;
+      this.textHoverRects.clear();
+      this.pendingTextRectRequests.clear();
+      this.pendingInteractionRequests.clear();
+      this.activeTextHover = undefined;
+      this.pendingTextHover = undefined;
+      this.pendingBoundHover = undefined;
+      for (const record of this.pageRecords.values()) {
+        record.interactions = undefined;
+        this.renderLinkAnchors(record);
+        record.container.classList.remove("canvas-ready");
+        record.container.classList.remove("full-ready");
+      }
     }
 
     const livePages = new Set<number>();
     const metrics = this.readPageLayoutMetrics();
     const transferred: Array<{
       index: number;
+      layer: "preview" | "full";
       canvas: OffscreenCanvas;
       widthPx: number;
       heightPx: number;
@@ -183,7 +245,7 @@ export class PageHost {
       livePages.add(page.index);
       const widthPx = Math.max(1, Math.ceil(page.width * page.pixelPerPt));
       const heightPx = Math.max(1, Math.ceil(page.height * page.pixelPerPt));
-      const key = `${page.width.toFixed(3)}:${page.height.toFixed(3)}:${page.pixelPerPt}`;
+      const key = [page.width.toFixed(3), page.height.toFixed(3), page.pixelPerPt].join(":");
       let record = this.pageRecords.get(page.index);
 
       if (!record || record.key !== key) {
@@ -195,11 +257,19 @@ export class PageHost {
 
       this.applyPageLayout(record, page, metrics);
       if (!record.transferred) {
-        record.canvas.width = widthPx;
-        record.canvas.height = heightPx;
+        record.canvas.width = 1;
+        record.canvas.height = 1;
+        record.fullWidthPx = widthPx;
+        record.fullHeightPx = heightPx;
         const offscreen = record.canvas.transferControlToOffscreen();
         record.transferred = true;
-        transferred.push({ index: page.index, canvas: offscreen, widthPx, heightPx });
+        transferred.push({
+          index: page.index,
+          layer: "full",
+          canvas: offscreen,
+          widthPx,
+          heightPx,
+        });
       }
     }
 
@@ -272,6 +342,8 @@ export class PageHost {
       scrollLeft: viewport.scrollLeft,
       scrollTop: viewport.scrollTop,
       devicePixelRatio: window.devicePixelRatio || 1,
+      dragging: this.dragging,
+      scrolling: this.scrolling,
       window: {
         innerWidth: window.innerWidth,
         innerHeight: window.innerHeight,
@@ -289,22 +361,85 @@ export class PageHost {
     };
   }
 
-  scheduleViewportSnapshot(options: { applyLayouts?: boolean } = {}) {
+  scheduleViewportSnapshot(options: { applyLayouts?: boolean; scrolling?: boolean } = {}) {
+    if (options.scrolling) {
+      this.scrolling = true;
+      if (this.scrollIdleTimer) {
+        window.clearTimeout(this.scrollIdleTimer);
+      }
+      this.scrollIdleTimer = window.setTimeout(() => {
+        this.scrollIdleTimer = 0;
+        this.scrolling = false;
+        this.postViewportSnapshot({ requestInteractions: !this.dragging, force: true });
+      }, 120);
+      if (this.lastViewportTimer) {
+        clearTimeout(this.lastViewportTimer);
+        this.lastViewportTimer = 0;
+      }
+      this.postViewportSnapshot({
+        applyLayouts: options.applyLayouts,
+        requestInteractions: false,
+      });
+      return;
+    }
     if (this.lastViewportTimer) {
       clearTimeout(this.lastViewportTimer);
     }
-    this.lastViewportTimer = window.setTimeout(() => {
-      this.lastViewportTimer = 0;
-      const metrics = this.readPageLayoutMetrics();
-      if (options.applyLayouts) {
-        this.applyAllPageLayouts(metrics);
-      }
-      this.postWorker({
-        type: "viewport",
-        viewport: this.readViewportSnapshot(metrics),
-        layouts: this.collectPageLayouts(),
-      });
-    }, 50);
+    this.lastViewportTimer = window.setTimeout(
+      () => {
+        this.lastViewportTimer = 0;
+        this.postViewportSnapshot({
+          applyLayouts: options.applyLayouts,
+          requestInteractions: !this.dragging,
+        });
+      },
+      options.scrolling ? 0 : 16,
+    );
+  }
+
+  private postViewportSnapshot(
+    options: {
+      applyLayouts?: boolean;
+      force?: boolean;
+      requestInteractions?: boolean;
+      renderDuringDrag?: boolean;
+    } = {},
+  ) {
+    const metrics = this.readPageLayoutMetrics();
+    if (options.applyLayouts) {
+      this.applyAllPageLayouts(metrics);
+    }
+    const layouts = this.collectPageLayouts();
+    const viewport = this.readViewportSnapshot(metrics);
+    if (options.renderDuringDrag !== undefined) {
+      viewport.renderDuringDrag = options.renderDuringDrag;
+    }
+    const key = this.viewportPostKey(viewport);
+    if (!options.force && key === this.lastViewportPostKey) {
+      return;
+    }
+    this.lastViewportPostKey = key;
+    this.postWorker({
+      type: "viewport",
+      viewport,
+      layouts,
+    });
+    if (options.requestInteractions ?? !this.dragging) {
+      this.requestViewportInteractions(layouts);
+    }
+  }
+
+  private viewportPostKey(viewport: ViewportSnapshot) {
+    return [
+      viewport.width,
+      viewport.height,
+      viewport.scrollLeft,
+      viewport.scrollTop,
+      viewport.devicePixelRatio,
+      viewport.dragging ? 1 : 0,
+      viewport.scrolling ? 1 : 0,
+      viewport.renderDuringDrag === false ? 0 : 1,
+    ].join(":");
   }
 
   handlePreviewProtocolMessage(kind: string, text: string) {
@@ -332,11 +467,24 @@ export class PageHost {
     }
   }
 
-  updateInteractions(generation: number, interactions: PageInteractions[]) {
+  updateInteractions(
+    generation: number,
+    interactions: PageInteractions[],
+    invalidatedPageIndices: number[] = [],
+  ) {
     if (generation !== this.interactionGeneration) {
       return;
     }
     let refreshHover = false;
+    for (const pageIndex of invalidatedPageIndices) {
+      const record = this.pageRecords.get(pageIndex);
+      if (record) {
+        record.interactions = undefined;
+        this.renderLinkAnchors(record);
+        refreshHover ||= this.lastPointer?.pageIndex === record.index;
+      }
+      this.pendingInteractionRequests.delete(pageIndex);
+    }
     for (const pageInteractions of interactions) {
       const record = this.pageRecords.get(pageInteractions.pageIndex);
       if (record) {
@@ -344,9 +492,68 @@ export class PageHost {
         this.renderLinkAnchors(record);
         refreshHover ||= this.lastPointer?.pageIndex === record.index;
       }
+      this.pendingInteractionRequests.delete(pageInteractions.pageIndex);
     }
     if (refreshHover) {
       this.activeHoverKey = "";
+      this.restoreInteractionHover();
+    }
+  }
+
+  markRendered(
+    generation: number,
+    layer: "full" | undefined,
+    quality: "preview" | "full" | undefined,
+    pageIndices: number[],
+    fullPageIndices: number[] = [],
+  ) {
+    if (generation !== this.interactionGeneration) {
+      return;
+    }
+    if (layer !== "full") {
+      return;
+    }
+
+    for (const pageIndex of pageIndices) {
+      const record = this.pageRecords.get(pageIndex);
+      if (!record) {
+        continue;
+      }
+      record.container.classList.add("canvas-ready");
+    }
+
+    if (quality !== "full") {
+      return;
+    }
+
+    for (const pageIndex of fullPageIndices) {
+      const record = this.pageRecords.get(pageIndex);
+      if (record) {
+        record.container.classList.add("full-ready");
+      }
+    }
+  }
+
+  markEvicted(generation: number, pageIndices: number[]) {
+    if (generation !== this.interactionGeneration) {
+      return;
+    }
+    let refreshHover = false;
+    for (const pageIndex of pageIndices) {
+      const record = this.pageRecords.get(pageIndex);
+      if (!record) {
+        continue;
+      }
+      record.container.classList.remove("canvas-ready");
+      record.container.classList.remove("full-ready");
+      record.interactions = undefined;
+      this.renderLinkAnchors(record);
+      this.pendingInteractionRequests.delete(pageIndex);
+      refreshHover ||= this.lastPointer?.pageIndex === pageIndex;
+    }
+    if (refreshHover) {
+      this.activeHoverKey = "";
+      this.activeTextHover = undefined;
       this.restoreInteractionHover();
     }
   }
@@ -392,17 +599,88 @@ export class PageHost {
     this.showBoundHover(record, message.bound);
   }
 
+  handleTextHit(message: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+    hit: boolean;
+    rect?: PageRect;
+  }) {
+    const pending = this.pendingTextHover;
+    if (
+      !pending ||
+      pending.requestId !== message.requestId ||
+      pending.generation !== message.generation ||
+      pending.pageIndex !== message.pageIndex ||
+      this.interactionGeneration !== message.generation
+    ) {
+      return;
+    }
+
+    if (
+      !this.lastPointer ||
+      this.lastPointer.pageIndex !== message.pageIndex ||
+      Math.hypot(this.lastPointer.x - message.x, this.lastPointer.y - message.y) > 0.5
+    ) {
+      return;
+    }
+
+    const record = this.pageRecords.get(message.pageIndex);
+    if (!record) {
+      return;
+    }
+
+    if (message.hit && this.textHitContains(pending.text, message.rect, message.x, message.y)) {
+      this.showTextHover(record, pending.text, message.rect);
+      return;
+    }
+
+    this.clearInteractionHighlight(record);
+    this.activeHoverKey = "";
+    this.requestBoundHover(record, { x: message.x, y: message.y });
+  }
+
+  handleTextRect(message: {
+    generation: number;
+    pageIndex: number;
+    textId: number;
+    rect?: PageRect;
+  }) {
+    if (message.generation !== this.interactionGeneration) {
+      return;
+    }
+
+    const key = this.textHoverKey(message.pageIndex, message.textId);
+    this.pendingTextRectRequests.delete(key);
+    if (message.rect) {
+      this.textHoverRects.set(key, message.rect);
+    }
+
+    if (this.lastPointer?.pageIndex === message.pageIndex) {
+      this.activeHoverKey = "";
+      this.restoreInteractionHover();
+    }
+  }
+
   clearPages() {
     for (const record of this.pageRecords.values()) {
       record.container.remove();
     }
     this.pageRecords.clear();
     this.lastPages = [];
+    this.lastViewportPostKey = "";
     this.pendingCursor = undefined;
     this.interactionGeneration = 0;
     this.pointerDown = undefined;
     this.lastPointer = undefined;
     this.activeHoverKey = "";
+    this.activeTextHover = undefined;
+    this.textHoverRects.clear();
+    this.pendingTextRectRequests.clear();
+    this.pendingInteractionRequests.clear();
+    this.pendingTextHover = undefined;
     this.pendingBoundHover = undefined;
     this.updatePageCount(0);
   }
@@ -424,8 +702,9 @@ export class PageHost {
     shell.dataset.pageHeight = page.height.toFixed(3);
 
     const canvas = document.createElement("canvas");
-    canvas.width = widthPx;
-    canvas.height = heightPx;
+    canvas.className = "typst-full-canvas";
+    canvas.width = 1;
+    canvas.height = 1;
 
     const interactionLayer = document.createElement("div");
     interactionLayer.className = "typst-interaction-layer";
@@ -439,7 +718,7 @@ export class PageHost {
     const jumpMarker = document.createElement("div");
     jumpMarker.className = "typst-jump-marker";
 
-    shell.appendChild(canvas);
+    shell.append(canvas);
     container.append(shell, linkLayer, interactionLayer, cursor, jumpMarker);
 
     const record = {
@@ -455,6 +734,8 @@ export class PageHost {
       transferred: false,
       width: page.width,
       height: page.height,
+      fullWidthPx: widthPx,
+      fullHeightPx: heightPx,
       cssWidth: widthPx,
       cssHeight: heightPx,
       pixelPerPt: page.pixelPerPt,
@@ -493,6 +774,15 @@ export class PageHost {
   }
 
   private handlePagePointerMove(record: PageRecord, event: MouseEvent) {
+    if (this.isDragging()) {
+      if (this.activeHoverKey || record.interactionLayer.childElementCount > 0) {
+        this.clearInteractionHighlight(record);
+        this.activeHoverKey = "";
+      }
+      this.lastPointer = undefined;
+      return;
+    }
+
     const point = this.pagePointFromEvent(record, event);
     if (!point) {
       this.clearInteractionHighlight(record);
@@ -507,6 +797,7 @@ export class PageHost {
 
   private updateInteractionHover(record: PageRecord, point: { x: number; y: number }) {
     if (!record.interactions) {
+      this.requestPageInteractions([record.index]);
       this.clearInteractionHighlight(record);
       this.activeHoverKey = "";
       return;
@@ -518,9 +809,20 @@ export class PageHost {
       return;
     }
 
+    if (this.activeTextHoverContains(record, point)) {
+      record.container.style.cursor = "text";
+      return;
+    }
+
+    const cachedText = this.cachedTextHoverAt(record, point);
+    if (cachedText) {
+      this.showTextHoverRect(record, cachedText.text, cachedText.rect);
+      return;
+    }
+
     const text = hitTestText(record.interactions, point.x, point.y);
     if (text) {
-      this.showTextHover(record, text);
+      this.requestTextHover(record, text, point);
       return;
     }
 
@@ -538,6 +840,55 @@ export class PageHost {
     this.updateInteractionHover(record, this.lastPointer);
   }
 
+  private requestViewportInteractions(layouts: PageLayoutRecord[]) {
+    if (this.interactionGeneration <= 0) {
+      return;
+    }
+    if (this.isDragging()) {
+      return;
+    }
+
+    const viewportTop = this.elements.viewport.scrollTop;
+    const viewportBottom = viewportTop + this.elements.viewport.clientHeight;
+    const pageIndices = layouts
+      .filter((layout) => layout.bottom >= viewportTop && layout.top <= viewportBottom)
+      .map((layout) => layout.index);
+    this.requestPageInteractions(pageIndices);
+  }
+
+  private requestPageInteractions(pageIndices: number[]) {
+    const missing: number[] = [];
+    const seen = new Set<number>();
+    for (const pageIndex of pageIndices) {
+      if (seen.has(pageIndex) || this.pendingInteractionRequests.has(pageIndex)) {
+        continue;
+      }
+      seen.add(pageIndex);
+
+      const record = this.pageRecords.get(pageIndex);
+      if (!record || record.interactions) {
+        continue;
+      }
+
+      this.pendingInteractionRequests.add(pageIndex);
+      missing.push(pageIndex);
+    }
+
+    if (missing.length === 0) {
+      return;
+    }
+
+    this.postWorker({
+      type: "request-interactions",
+      generation: this.interactionGeneration,
+      pageIndices: missing,
+    });
+  }
+
+  private isDragging() {
+    return this.dragging;
+  }
+
   private handlePageClick(record: PageRecord, event: MouseEvent) {
     if (this.isDragClick(record, event)) {
       return;
@@ -548,6 +899,10 @@ export class PageHost {
       return;
     }
     this.lastPointer = { pageIndex: record.index, x: point.x, y: point.y };
+
+    if (!record.interactions) {
+      this.requestPageInteractions([record.index]);
+    }
 
     const link = hitTestLink(record.interactions, point.x, point.y);
     if (link?.target.kind === "internal" && link.target.position) {
@@ -603,20 +958,86 @@ export class PageHost {
       return;
     }
     this.activeHoverKey = key;
+    this.activeTextHover = undefined;
     record.container.style.cursor = "pointer";
 
-    const textRects = textRectsForLink(record.interactions, link);
+    const textRects = textHighlightsForLink(record.interactions, link).map((highlight) => {
+      this.requestTextVisualRect(record, highlight.text);
+      const visualRect = this.textHoverRects.get(
+        this.textHoverKey(record.index, highlight.text.id),
+      );
+      return visualRect ? alignTextClipToVisualRect(highlight.rect, visualRect) : highlight.rect;
+    });
     this.renderInteractionHighlights(record, textRects, "link");
   }
 
-  private showTextHover(record: PageRecord, text: TextInteraction) {
-    const key = `text:${record.index}:${text.id}`;
+  private showTextHover(record: PageRecord, text: TextInteraction, hitRect?: PageRect) {
+    const visualRect = textHoverRect(text, hitRect);
+    this.textHoverRects.set(this.textHoverKey(record.index, text.id), visualRect);
+    this.showTextHoverRect(record, text, visualRect);
+  }
+
+  private showTextHoverRect(record: PageRecord, text: TextInteraction, visualRect: PageRect) {
+    const key = `text:${record.index}:${text.id}:${visualRect.x}:${visualRect.y}:${visualRect.width}:${visualRect.height}`;
     if (this.activeHoverKey === key) {
       return;
     }
     this.activeHoverKey = key;
+    this.activeTextHover = {
+      generation: this.interactionGeneration,
+      pageIndex: record.index,
+      rect: visualRect,
+    };
     record.container.style.cursor = "text";
-    this.renderInteractionHighlights(record, [text.rect], "text");
+    this.renderInteractionHighlights(record, [visualRect], "text");
+  }
+
+  private requestTextHover(
+    record: PageRecord,
+    text: TextInteraction,
+    point: { x: number; y: number },
+  ) {
+    const key = `text-query:${record.index}:${text.id}:${point.x.toFixed(1)}:${point.y.toFixed(1)}`;
+    if (this.activeHoverKey === key) {
+      return;
+    }
+
+    const request = {
+      requestId: ++this.nextHitRequestId,
+      generation: this.interactionGeneration,
+      pageIndex: record.index,
+      x: point.x,
+      y: point.y,
+      text,
+    };
+    this.activeHoverKey = key;
+    this.pendingTextHover = request;
+    record.container.style.cursor = "";
+    this.postWorker({
+      type: "hit-text",
+      requestId: request.requestId,
+      generation: request.generation,
+      pageIndex: request.pageIndex,
+      x: request.x,
+      y: request.y,
+      rect: text.rect,
+    });
+  }
+
+  private requestTextVisualRect(record: PageRecord, text: TextInteraction) {
+    const key = this.textHoverKey(record.index, text.id);
+    if (this.textHoverRects.has(key) || this.pendingTextRectRequests.has(key)) {
+      return;
+    }
+    this.pendingTextRectRequests.add(key);
+    this.postWorker({
+      type: "resolve-text-rect",
+      requestId: ++this.nextHitRequestId,
+      generation: this.interactionGeneration,
+      pageIndex: record.index,
+      textId: text.id,
+      rect: text.rect,
+    });
   }
 
   private showBoundHover(record: PageRecord, bound: BoundInteraction) {
@@ -625,6 +1046,7 @@ export class PageHost {
       return;
     }
     this.activeHoverKey = key;
+    this.activeTextHover = undefined;
     record.container.style.cursor = "";
     this.renderInteractionHighlights(record, [bound.rect], "bound");
   }
@@ -636,7 +1058,7 @@ export class PageHost {
     }
 
     const request = {
-      requestId: ++this.nextBoundRequestId,
+      requestId: ++this.nextHitRequestId,
       generation: this.interactionGeneration,
       pageIndex: record.index,
       x: point.x,
@@ -694,7 +1116,44 @@ export class PageHost {
 
   private clearInteractionHighlight(record: PageRecord) {
     record.container.style.cursor = "";
+    this.activeTextHover = undefined;
     record.interactionLayer.replaceChildren();
+  }
+
+  private activeTextHoverContains(record: PageRecord, point: { x: number; y: number }) {
+    return (
+      this.activeTextHover?.generation === this.interactionGeneration &&
+      this.activeTextHover.pageIndex === record.index &&
+      rectContainsPage(this.activeTextHover.rect, point.x, point.y)
+    );
+  }
+
+  private cachedTextHoverAt(record: PageRecord, point: { x: number; y: number }) {
+    const texts = record.interactions?.texts;
+    if (!texts) {
+      return undefined;
+    }
+    for (let index = texts.length - 1; index >= 0; index -= 1) {
+      const text = texts[index];
+      const rect = this.textHoverRects.get(this.textHoverKey(record.index, text.id));
+      if (rect && rectContainsPage(rect, point.x, point.y)) {
+        return { text, rect };
+      }
+    }
+    return undefined;
+  }
+
+  private textHoverKey(pageIndex: number, textId: number) {
+    return `${this.interactionGeneration}:${pageIndex}:${textId}`;
+  }
+
+  private textHitContains(
+    text: TextInteraction,
+    hitRect: PageRect | undefined,
+    x: number,
+    y: number,
+  ) {
+    return rectContainsPage(textHoverRect(text, hitRect), x, y);
   }
 
   private applyRectStyle(record: PageRecord, element: HTMLElement, rect: PageRect) {
@@ -739,6 +1198,16 @@ export class PageHost {
     record.shell.style.width = `${cssWidth}px`;
     record.shell.style.height = `${cssHeight}px`;
     record.shell.dataset.appliedScale = String(scale);
+    this.alignCanvasBackingStore(record, page);
+  }
+
+  private alignCanvasBackingStore(record: PageRecord, page: PageSpec) {
+    const drawnWidthPx = page.width * page.pixelPerPt;
+    const drawnHeightPx = page.height * page.pixelPerPt;
+    const widthScale = record.fullWidthPx / Math.max(drawnWidthPx, 1);
+    const heightScale = record.fullHeightPx / Math.max(drawnHeightPx, 1);
+    record.canvas.style.width = `${widthScale * 100}%`;
+    record.canvas.style.height = `${heightScale * 100}%`;
   }
 
   private computePageScale(page: PageSpec, metrics: PageLayoutMetrics): number {
@@ -1037,6 +1506,23 @@ function determineInvertColor() {
     (cls.contains("vscode-dark") || cls.contains("vscode-high-contrast")) &&
     !cls.contains("vscode-light")
   );
+}
+
+function textHoverRect(text: TextInteraction, hitRect: PageRect | undefined) {
+  return hitRect || text.rect;
+}
+
+function rectContainsPage(rect: PageRect, x: number, y: number) {
+  return x >= rect.x && y >= rect.y && x <= rect.x + rect.width && y <= rect.y + rect.height;
+}
+
+function alignTextClipToVisualRect(clippedRect: PageRect, visualRect: PageRect): PageRect {
+  return {
+    x: clippedRect.x,
+    y: visualRect.y,
+    width: clippedRect.width,
+    height: visualRect.height,
+  };
 }
 
 const zoomFactors = [

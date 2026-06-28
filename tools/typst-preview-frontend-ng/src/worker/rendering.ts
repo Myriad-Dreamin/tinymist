@@ -4,21 +4,73 @@ import {
   type TypstRenderer,
 } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import * as rendererWrapper from "@myriaddreamin/typst-ts-renderer";
-import { parsePageInteractions, type BoundInteraction } from "../interactions";
+import { type BoundInteraction, type PageInteractions, type PageRect } from "../interactions";
+import { CanvasStore } from "./canvas-store";
+import { InteractionStore } from "./interaction-store";
+import {
+  clamp,
+  clampPixelPerPt,
+  computeInteractivePixelPerPt,
+  isFullPageRender,
+  pageDistanceToViewport,
+  renderWindowKey,
+  selectStagePagesAt,
+  yieldToEventLoop,
+} from "./render-utils";
+import { hitRenderedTextBox, resolveRenderedTextRect } from "./text-hit";
 import type {
   CanvasAck,
-  CanvasEntry,
+  CanvasLayer,
   PageLayout,
   PageRenderSpec,
   PageRenderResult,
   PageSpec,
   PendingCanvasAck,
+  RenderQuality,
   WorkerConfig,
   WorkerPost,
 } from "./types";
 
-const minPixelPerPt = 0.5;
-const maxPixelPerPt = 4;
+const visibleRenderScreens = 1;
+const scrollRenderScreens = 1;
+const prefetchRenderScreens = 5;
+const idlePrefetchDelayMs = 120;
+const maxCanvasBufferPages = 18;
+
+interface RenderAndPostOptions {
+  session: RenderSession;
+  pages: PageRenderSpec[];
+  generation: number;
+  kind: string;
+  frameBytes: number;
+  phase: string;
+  layer: CanvasLayer;
+  quality: RenderQuality;
+  useCacheKey: boolean;
+  updateCacheKey: boolean;
+  collectInteractions: boolean;
+  prioritizeViewport: boolean;
+  cancelOnViewportChange: boolean;
+  pauseWhenDragging: boolean;
+  viewportVersion: number;
+  frameVersion: number;
+  flushResults?: boolean;
+}
+
+interface RenderPagesOptions {
+  useCacheKey: boolean;
+  updateCacheKey: boolean;
+  collectInteractions: boolean;
+  prioritizeViewport: boolean;
+  cancelOnViewportChange: boolean;
+  pauseWhenDragging: boolean;
+  viewportVersion: number;
+  frameVersion: number;
+  layer: CanvasLayer;
+  quality: RenderQuality;
+  generation: number;
+  onResult?: (result: PageRenderResult) => void;
+}
 
 /** Owns Typst rendering in the worker, handling document frames, canvas acknowledgements, and viewport updates. */
 export class WorkerRenderer {
@@ -32,11 +84,13 @@ export class WorkerRenderer {
   private rendererWasmUrl = "";
   private sessionReady: Promise<RenderSession> | undefined;
   private renderQueue = Promise.resolve();
-  private readonly pageCanvases = new Map<number, CanvasEntry>();
-  private readonly pageCacheKeys = new Map<number, string>();
-  private readonly pageLatestCacheKeys = new Map<number, string>();
+  private viewportVersion = 0;
+  private viewportRenderQueued = false;
+  private idlePrefetchTimer = 0;
+  private latestPages: PageSpec[] = [];
+  private readonly canvasStore = new CanvasStore(maxCanvasBufferPages);
+  private readonly interactionStore = new InteractionStore();
   private readonly pagePixelPerPt = new Map<number, number>();
-  private readonly pageInteractionCacheKeys = new Map<number, string>();
   private readonly pendingCanvasAcks = new Map<number, PendingCanvasAck>();
   private latestPageLayouts: PageLayout[] = [];
 
@@ -49,9 +103,14 @@ export class WorkerRenderer {
   }
 
   setViewport(viewport: any, layouts?: PageLayout[]) {
+    this.clearIdlePrefetchTimer();
     this.config = { ...this.config, viewport };
     if (layouts) {
       this.latestPageLayouts = layouts;
+    }
+    this.viewportVersion += 1;
+    if (!this.isViewportDragging() || this.isViewportScrolling()) {
+      this.scheduleViewportRender();
     }
   }
 
@@ -79,17 +138,202 @@ export class WorkerRenderer {
     await this.renderQueue;
   }
 
+  private scheduleViewportRender() {
+    if (
+      this.disposed ||
+      this.viewportRenderQueued ||
+      this.generation <= 0 ||
+      this.latestPages.length === 0
+    ) {
+      return;
+    }
+
+    this.viewportRenderQueued = true;
+    const frameVersion = this.documentVersion;
+    this.renderQueue = this.renderQueue
+      .then(() => this.renderViewportUpdate(frameVersion))
+      .catch((error) => {
+        this.postError(error);
+      });
+  }
+
+  private async renderViewportUpdate(frameVersion: number) {
+    const handledViewportVersion = this.viewportVersion;
+    try {
+      if (this.isRenderInterrupted(frameVersion) || this.latestPages.length === 0) {
+        return;
+      }
+
+      const session = await this.ensureSessionReady();
+      if (this.isRenderInterrupted(frameVersion)) {
+        return;
+      }
+
+      if (this.isViewportDragging() && !this.isViewportScrolling()) {
+        return;
+      }
+
+      if (this.isViewportScrolling()) {
+        await this.renderScrollVisiblePage(session, frameVersion, handledViewportVersion);
+      } else {
+        await this.renderVisiblePages({
+          session,
+          pages: this.latestPages,
+          generation: this.generation,
+          kind: "viewport",
+          frameBytes: 0,
+          frameVersion,
+          viewportVersion: handledViewportVersion,
+        });
+        this.scheduleIdlePrefetch(frameVersion, this.generation, handledViewportVersion);
+      }
+    } finally {
+      this.viewportRenderQueued = false;
+      if (
+        !this.disposed &&
+        (!this.isViewportDragging() || this.isViewportScrolling()) &&
+        this.viewportVersion !== handledViewportVersion
+      ) {
+        this.scheduleViewportRender();
+      }
+    }
+  }
+
+  private async renderScrollVisiblePage(
+    session: RenderSession,
+    frameVersion: number,
+    viewportVersion: number,
+  ) {
+    if (this.latestPages.length === 0 || this.isRenderInterrupted(frameVersion)) {
+      return;
+    }
+
+    await this.renderAndPostComplete({
+      session,
+      pages: this.selectStagePages(this.latestPages, scrollRenderScreens, { windowed: true }),
+      generation: this.generation,
+      kind: "scroll",
+      frameBytes: 0,
+      phase: "scroll-visible",
+      layer: "full",
+      quality: "full",
+      useCacheKey: true,
+      updateCacheKey: true,
+      collectInteractions: false,
+      prioritizeViewport: false,
+      cancelOnViewportChange: true,
+      pauseWhenDragging: false,
+      viewportVersion,
+      frameVersion,
+      flushResults: true,
+    });
+  }
+
+  private scheduleIdlePrefetch(frameVersion: number, generation: number, viewportVersion: number) {
+    this.clearIdlePrefetchTimer();
+    if (
+      this.disposed ||
+      this.isViewportInteractive() ||
+      this.latestPages.length === 0 ||
+      generation !== this.generation ||
+      frameVersion !== this.documentVersion ||
+      viewportVersion !== this.viewportVersion
+    ) {
+      return;
+    }
+
+    this.idlePrefetchTimer = setTimeout(() => {
+      this.idlePrefetchTimer = 0;
+      if (
+        this.disposed ||
+        this.isViewportInteractive() ||
+        generation !== this.generation ||
+        frameVersion !== this.documentVersion ||
+        viewportVersion !== this.viewportVersion
+      ) {
+        return;
+      }
+
+      this.renderQueue = this.renderQueue
+        .then(() => this.renderIdlePrefetch(frameVersion, generation, viewportVersion))
+        .catch((error) => {
+          this.postError(error);
+        });
+    }, idlePrefetchDelayMs) as unknown as number;
+  }
+
+  private clearIdlePrefetchTimer() {
+    if (!this.idlePrefetchTimer) {
+      return;
+    }
+    clearTimeout(this.idlePrefetchTimer);
+    this.idlePrefetchTimer = 0;
+  }
+
+  private async renderIdlePrefetch(
+    frameVersion: number,
+    generation: number,
+    viewportVersion: number,
+  ) {
+    if (
+      this.shouldStopRender({
+        frameVersion,
+        viewportVersion,
+        cancelOnViewportChange: true,
+        pauseWhenDragging: true,
+      }) ||
+      generation !== this.generation ||
+      this.latestPages.length === 0
+    ) {
+      return;
+    }
+
+    const session = await this.ensureSessionReady();
+    if (
+      this.shouldStopRender({
+        frameVersion,
+        viewportVersion,
+        cancelOnViewportChange: true,
+        pauseWhenDragging: true,
+      }) ||
+      generation !== this.generation
+    ) {
+      return;
+    }
+
+    await this.renderAndPostComplete({
+      session,
+      pages: this.selectStagePages(this.latestPages, prefetchRenderScreens, { windowed: false }),
+      generation,
+      kind: "prefetch",
+      frameBytes: 0,
+      phase: "prefetch",
+      layer: "full",
+      quality: "full",
+      useCacheKey: true,
+      updateCacheKey: true,
+      collectInteractions: false,
+      prioritizeViewport: true,
+      cancelOnViewportChange: true,
+      pauseWhenDragging: true,
+      viewportVersion,
+      frameVersion,
+    });
+  }
+
   acceptCanvases(
     generation: number,
-    canvases: Array<{ index: number; canvas: OffscreenCanvas; widthPx: number; heightPx: number }>,
+    canvases: Array<{
+      index: number;
+      layer?: CanvasLayer;
+      canvas: OffscreenCanvas;
+      widthPx: number;
+      heightPx: number;
+    }>,
     ack?: CanvasAck,
   ) {
     for (const page of canvases) {
-      this.pageCanvases.set(page.index, {
-        canvas: page.canvas,
-        widthPx: page.widthPx,
-        heightPx: page.heightPx,
-      });
+      this.canvasStore.setCanvas(page.index, page.canvas, page.widthPx, page.heightPx);
     }
     this.resolveCanvasAck(generation, ack);
   }
@@ -111,6 +355,100 @@ export class WorkerRenderer {
         this.postError(error);
       });
     await this.renderQueue;
+  }
+
+  async requestInteractions(request: { generation: number; pageIndices: number[] }) {
+    const viewportVersion = this.viewportVersion;
+    this.renderQueue = this.renderQueue
+      .then(() => this.requestInteractionsExclusive({ ...request, viewportVersion }))
+      .catch((error) => {
+        this.postError(error);
+      });
+    await this.renderQueue;
+  }
+
+  hitText(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+    rect?: PageRect;
+  }) {
+    try {
+      this.hitTextExclusive(request);
+    } catch (error) {
+      this.postError(error);
+    }
+  }
+
+  private hitTextExclusive(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    x: number;
+    y: number;
+    rect?: PageRect;
+  }) {
+    if (request.generation !== this.generation) {
+      return;
+    }
+
+    const result = hitRenderedTextBox(
+      this.canvasStore.get(request.pageIndex),
+      this.pagePixelPerPt.get(request.pageIndex),
+      request.x,
+      request.y,
+      request.rect,
+    );
+    if (request.generation !== this.generation) {
+      return;
+    }
+
+    this.post({
+      type: "text-hit",
+      requestId: request.requestId,
+      generation: request.generation,
+      pageIndex: request.pageIndex,
+      x: request.x,
+      y: request.y,
+      hit: result.hit,
+      rect: result.rect,
+    });
+  }
+
+  resolveTextRect(request: {
+    requestId: number;
+    generation: number;
+    pageIndex: number;
+    textId: number;
+    rect: PageRect;
+  }) {
+    try {
+      if (request.generation !== this.generation) {
+        return;
+      }
+
+      const rect = resolveRenderedTextRect(
+        this.canvasStore.get(request.pageIndex),
+        this.pagePixelPerPt.get(request.pageIndex),
+        request.rect,
+      );
+      if (request.generation !== this.generation) {
+        return;
+      }
+
+      this.post({
+        type: "text-rect",
+        requestId: request.requestId,
+        generation: request.generation,
+        pageIndex: request.pageIndex,
+        textId: request.textId,
+        rect,
+      });
+    } catch (error) {
+      this.postError(error);
+    }
   }
 
   private async hitBoundExclusive(request: {
@@ -153,11 +491,13 @@ export class WorkerRenderer {
     this.initializedDocument = false;
     this.generation = 0;
     this.documentVersion += 1;
-    this.pageCanvases.clear();
-    this.pageCacheKeys.clear();
-    this.pageLatestCacheKeys.clear();
+    this.viewportVersion += 1;
+    this.viewportRenderQueued = false;
+    this.clearIdlePrefetchTimer();
+    this.latestPages = [];
+    this.canvasStore.clear();
+    this.interactionStore.clear();
     this.pagePixelPerPt.clear();
-    this.pageInteractionCacheKeys.clear();
     this.latestPageLayouts = [];
     for (const ack of this.pendingCanvasAcks.values()) {
       clearTimeout(ack.timeout);
@@ -198,6 +538,69 @@ export class WorkerRenderer {
       kind: typeof bound.kind === "string" ? bound.kind : "bound",
       rect: bound.rect,
     };
+  }
+
+  private async requestInteractionsExclusive(request: {
+    generation: number;
+    pageIndices: number[];
+    viewportVersion: number;
+  }) {
+    if (
+      request.generation !== this.generation ||
+      request.viewportVersion !== this.viewportVersion ||
+      this.isViewportInteractive()
+    ) {
+      return;
+    }
+
+    const session = await this.ensureSessionReady();
+    if (
+      request.generation !== this.generation ||
+      request.viewportVersion !== this.viewportVersion ||
+      this.isViewportInteractive()
+    ) {
+      return;
+    }
+
+    const interactions: PageInteractions[] = [];
+    for (const pageIndex of request.pageIndices) {
+      if (
+        request.generation !== this.generation ||
+        request.viewportVersion !== this.viewportVersion ||
+        this.isViewportInteractive()
+      ) {
+        return;
+      }
+
+      const pixelPerPt = this.pagePixelPerPt.get(pageIndex);
+      if (!pixelPerPt) {
+        continue;
+      }
+
+      interactions.push(
+        await this.interactionStore.renderPage(
+          session,
+          pageIndex,
+          pixelPerPt,
+          this.interactionCacheKey(pageIndex),
+        ),
+      );
+    }
+
+    if (
+      request.generation !== this.generation ||
+      request.viewportVersion !== this.viewportVersion ||
+      this.isViewportInteractive() ||
+      interactions.length === 0
+    ) {
+      return;
+    }
+
+    this.post({
+      type: "interactions",
+      generation: request.generation,
+      interactions,
+    });
   }
 
   private computePagePixelPerPt(index: number, width: number, height: number) {
@@ -274,8 +677,10 @@ export class WorkerRenderer {
 
     if (kind === "new" || !this.initializedDocument) {
       session.reset();
-      this.pageCacheKeys.clear();
-      this.pageInteractionCacheKeys.clear();
+      for (const index of this.canvasStore.indices()) {
+        this.canvasStore.deleteRenderCacheKey(index);
+      }
+      this.interactionStore.clear();
       this.initializedDocument = true;
     }
     session.manipulateData({ action: "merge", data: payload });
@@ -289,95 +694,116 @@ export class WorkerRenderer {
         pixelPerPt,
       };
     });
+    this.latestPages = pages;
     const nextGeneration = ++this.generation;
     const canvasAck = await this.ensureCanvases(nextGeneration, pages);
     if (canvasAck?.layouts) {
       this.latestPageLayouts = canvasAck.layouts;
     }
-    await this.renderProgressiveStages({
+    await this.renderVisiblePages({
       session,
       pages,
       generation: nextGeneration,
       kind,
       frameBytes,
       frameVersion,
+      viewportVersion: this.viewportVersion,
     });
+    this.scheduleIdlePrefetch(frameVersion, nextGeneration, this.viewportVersion);
   }
 
-  private async renderProgressiveStages(options: {
+  private async renderVisiblePages(options: {
     session: RenderSession;
     pages: PageSpec[];
     generation: number;
     kind: string;
     frameBytes: number;
     frameVersion: number;
-  }) {
-    const stages = [
-      { phase: "near-3", screens: 3, useCacheKey: true, updateCacheKey: false },
-      { phase: "near-27", screens: 27, useCacheKey: true, updateCacheKey: false },
-      { phase: "all", screens: Number.POSITIVE_INFINITY, useCacheKey: true, updateCacheKey: true },
-    ];
-
-    for (const stage of stages) {
-      if (this.isRenderInterrupted(options.frameVersion)) {
-        return;
-      }
-
-      await this.renderAndPostComplete({
-        ...options,
-        pages: this.selectStagePages(options.pages, stage.screens),
-        phase: stage.phase,
-        useCacheKey: stage.useCacheKey,
-        updateCacheKey: stage.updateCacheKey,
-      });
-    }
-  }
-
-  private async renderAndPostComplete(options: {
-    session: RenderSession;
-    pages: PageRenderSpec[];
-    generation: number;
-    kind: string;
-    frameBytes: number;
-    phase: string;
-    useCacheKey: boolean;
-    updateCacheKey: boolean;
-    frameVersion: number;
+    viewportVersion: number;
   }) {
     if (this.isRenderInterrupted(options.frameVersion)) {
+      return;
+    }
+
+    await this.renderAndPostComplete({
+      ...options,
+      pages: this.selectStagePages(options.pages, visibleRenderScreens, { windowed: false }),
+      phase: "visible",
+      layer: "full",
+      quality: "full",
+      useCacheKey: true,
+      updateCacheKey: true,
+      collectInteractions: true,
+      prioritizeViewport: true,
+      cancelOnViewportChange: true,
+      pauseWhenDragging: true,
+      viewportVersion: options.viewportVersion,
+    });
+  }
+
+  private async renderAndPostComplete(options: RenderAndPostOptions) {
+    if (this.shouldStopRender(options)) {
       return;
     }
 
     const results = await this.renderPages(options.session, options.pages, {
       useCacheKey: options.useCacheKey,
       updateCacheKey: options.updateCacheKey,
+      collectInteractions: options.collectInteractions,
+      prioritizeViewport: options.prioritizeViewport,
+      cancelOnViewportChange: options.cancelOnViewportChange,
+      pauseWhenDragging: options.pauseWhenDragging,
+      viewportVersion: options.viewportVersion,
       frameVersion: options.frameVersion,
+      layer: options.layer,
+      quality: options.quality,
+      generation: options.generation,
+      onResult: options.flushResults
+        ? (result) => this.postRenderComplete(options, [result])
+        : undefined,
     });
     if (this.isRenderInterrupted(options.frameVersion)) {
       return;
     }
+    if (results.length === 0 && this.shouldStopRender(options)) {
+      return;
+    }
+    this.enforceCanvasBuffer(options.generation);
 
+    if (options.flushResults) {
+      return;
+    }
+
+    this.postRenderComplete(options, results);
+  }
+
+  private postRenderComplete(options: RenderAndPostOptions, results: PageRenderResult[]) {
     this.post({
       type: "render-complete",
       generation: options.generation,
       kind: options.kind,
       frameBytes: options.frameBytes,
       phase: options.phase,
+      layer: options.layer,
+      quality: options.quality,
       pageCount: options.pages.length,
       renderedPages: results.length,
+      pageIndices: results.map((result) => result.pageIndex),
+      fullPageIndices: results
+        .filter((result) => result.fullPage)
+        .map((result) => result.pageIndex),
       interactions: results.flatMap((result) => result.interactions || []),
+      invalidatedInteractions: results.flatMap((result) => result.invalidatedInteractions || []),
     });
   }
 
   private ensureCanvases(nextGeneration: number, pages: PageSpec[]): Promise<CanvasAck | null> {
     const livePages = new Set(pages.map((page) => page.index));
-    for (const index of this.pageCanvases.keys()) {
+    for (const index of this.canvasStore.indices()) {
       if (!livePages.has(index)) {
-        this.pageCanvases.delete(index);
-        this.pageCacheKeys.delete(index);
-        this.pageLatestCacheKeys.delete(index);
+        this.canvasStore.deletePage(index);
         this.pagePixelPerPt.delete(index);
-        this.pageInteractionCacheKeys.delete(index);
+        this.interactionStore.deletePage(index);
       }
     }
 
@@ -405,74 +831,164 @@ export class WorkerRenderer {
   private async renderPages(
     session: RenderSession,
     pages: PageRenderSpec[],
-    options: { useCacheKey: boolean; updateCacheKey: boolean; frameVersion: number },
+    options: RenderPagesOptions,
   ) {
     const results: PageRenderResult[] = [];
+    const pushResult = (result: PageRenderResult) => {
+      results.push(result);
+      options.onResult?.(result);
+    };
     let batchRendered = 0;
-    for (const page of pages) {
-      if (this.isRenderInterrupted(options.frameVersion)) {
+    const pendingPages = options.prioritizeViewport ? [...pages] : undefined;
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      if (this.shouldStopRender(options)) {
         break;
       }
 
-      const entry = this.pageCanvases.get(page.index);
+      const page = pendingPages ? this.takeNextViewportPage(pendingPages) : pages[pageIndex];
+      if (!page) {
+        break;
+      }
+
+      const entry = this.canvasStore.get(page.index);
       if (!entry) {
-        throw new Error(`missing offscreen canvas for page ${page.index}`);
+        throw new Error(`missing ${options.layer} offscreen canvas for page ${page.index}`);
       }
 
-      const widthPx = Math.max(1, Math.ceil(page.width * page.pixelPerPt));
-      const heightPx = Math.max(1, Math.ceil(page.height * page.pixelPerPt));
-      if (entry.canvas.width !== widthPx) {
-        entry.canvas.width = widthPx;
-      }
-      if (entry.canvas.height !== heightPx) {
-        entry.canvas.height = heightPx;
-      }
-
-      const context =
-        entry.context ||
-        entry.canvas.getContext("2d", {
-          alpha: false,
-          desynchronized: true,
+      const pixelPerPt =
+        options.quality === "preview"
+          ? computeInteractivePixelPerPt(page.pixelPerPt)
+          : page.pixelPerPt;
+      const windowKey = renderWindowKey(page);
+      if (
+        options.quality === "full" &&
+        entry.hasContent &&
+        entry.quality === "full" &&
+        entry.renderedGeneration === options.generation &&
+        entry.renderedPixelPerPt === pixelPerPt &&
+        (entry.renderedWindowKey === "full" || entry.renderedWindowKey === windowKey)
+      ) {
+        this.canvasStore.touch(page.index);
+        pushResult({
+          pageIndex: page.index,
+          quality: entry.quality,
+          fullPage: entry.renderedWindowKey === "full",
         });
-      if (!context) {
-        throw new Error(`cannot create 2d context for page ${page.index}`);
+        continue;
       }
-      entry.context = context;
+
+      if (
+        options.quality === "preview" &&
+        entry.hasContent &&
+        entry.renderedGeneration === options.generation &&
+        (entry.quality === "full" ||
+          (entry.quality === "preview" &&
+            entry.renderedPixelPerPt === pixelPerPt &&
+            entry.renderedWindowKey === windowKey))
+      ) {
+        this.canvasStore.touch(page.index);
+        pushResult({ pageIndex: page.index, quality: entry.quality });
+        continue;
+      }
+
+      const widthPx = Math.max(1, Math.ceil(page.width * pixelPerPt));
+      const heightPx = Math.max(1, Math.ceil(page.height * pixelPerPt));
+      const resized = this.canvasStore.resizeEntry(entry, page.index, widthPx, heightPx);
+      const context = this.canvasStore.ensureContext(entry, page.index);
+      const fullPageRender = isFullPageRender(page);
+      const fullPageResult = options.quality === "full" && fullPageRender;
+      if (!fullPageRender && (resized || !entry.hasContent)) {
+        this.canvasStore.initializeTargetCanvas(context, entry);
+      }
+      const cacheKey =
+        options.useCacheKey && fullPageRender && entry.hasContent && entry.quality === "full"
+          ? this.canvasStore.getRenderCacheKey(page.index)
+          : undefined;
+      const renderContext = fullPageRender
+        ? context
+        : this.canvasStore.ensureScratchContext(entry, page.index, options.layer);
 
       const renderOptions = {
-        canvas: context,
+        canvas: renderContext,
         pageOffset: page.index,
         backgroundColor: "#ffffff",
-        pixelPerPt: page.pixelPerPt,
+        pixelPerPt,
         window: page.window,
-        cacheKey: options.useCacheKey ? this.pageCacheKeys.get(page.index) : undefined,
+        cacheKey,
         dataSelection: {
           body: true,
         },
       } as any;
       const result = await session.renderCanvas(renderOptions);
-      if (result.cacheKey) {
-        this.pageLatestCacheKeys.set(page.index, result.cacheKey);
+      if (this.isRenderInterrupted(options.frameVersion)) {
+        if (!fullPageRender) {
+          this.canvasStore.releaseScratch(entry);
+        }
+        break;
       }
-      if (options.updateCacheKey && result.cacheKey) {
-        this.pageCacheKeys.set(page.index, result.cacheKey);
+      const stopAfterCommit = this.shouldStopRender(options);
+
+      const cacheHit = !!cacheKey && result.cacheKey === cacheKey;
+      if (!cacheHit && fullPageRender) {
+        entry.hasContent = true;
+      } else if (!cacheHit) {
+        this.canvasStore.commitScratchToTarget(entry, context, renderContext, page, pixelPerPt);
+        entry.hasContent = true;
+      }
+      entry.quality = options.quality;
+      entry.renderedGeneration = options.generation;
+      entry.renderedPixelPerPt = pixelPerPt;
+      entry.renderedWindowKey = windowKey;
+      if (!fullPageRender) {
+        this.canvasStore.releaseScratch(entry);
+      }
+      if (entry.hasContent) {
+        this.canvasStore.touch(page.index);
       }
 
-      if (result.cacheKey && this.pageInteractionCacheKeys.get(page.index) !== result.cacheKey) {
-        const metadata = await session.renderCanvas({
-          pageOffset: page.index,
-          pixelPerPt: page.pixelPerPt,
-          dataSelection: {
-            body: false,
-            semantics: true,
-          },
-        } as any);
-        this.pageInteractionCacheKeys.set(page.index, result.cacheKey);
-        results.push({
-          interactions: parsePageInteractions(page.index, metadata.htmlSemantics?.[0] || ""),
+      if (options.quality === "full" && result.cacheKey) {
+        this.canvasStore.setLatestCacheKey(page.index, result.cacheKey);
+      }
+      if (
+        options.quality === "full" &&
+        options.updateCacheKey &&
+        fullPageRender &&
+        result.cacheKey
+      ) {
+        this.canvasStore.setRenderCacheKey(page.index, result.cacheKey);
+      }
+
+      if (stopAfterCommit) {
+        pushResult({ pageIndex: page.index, quality: options.quality, fullPage: fullPageResult });
+      } else if (options.quality === "full" && options.collectInteractions) {
+        pushResult({
+          pageIndex: page.index,
+          quality: options.quality,
+          fullPage: fullPageResult,
+          interactions: await this.interactionStore.renderPage(
+            session,
+            page.index,
+            pixelPerPt,
+            this.interactionCacheKey(page.index),
+          ),
         });
+      } else if (options.quality === "full" && result.cacheKey) {
+        const hadInteractions = this.interactionStore.invalidateIfCacheKeyChanged(
+          page.index,
+          result.cacheKey,
+        );
+        pushResult(
+          hadInteractions
+            ? {
+                pageIndex: page.index,
+                quality: options.quality,
+                fullPage: fullPageResult,
+                invalidatedInteractions: [page.index],
+              }
+            : { pageIndex: page.index, quality: options.quality, fullPage: fullPageResult },
+        );
       } else {
-        results.push({});
+        pushResult({ pageIndex: page.index, quality: options.quality, fullPage: fullPageResult });
       }
 
       batchRendered += 1;
@@ -480,56 +996,105 @@ export class WorkerRenderer {
         batchRendered = 0;
         await yieldToEventLoop();
       }
+      if (stopAfterCommit) {
+        break;
+      }
     }
     return results;
   }
 
-  private selectStagePages(pages: PageSpec[], screens: number): PageRenderSpec[] {
-    if (!Number.isFinite(screens)) {
-      return pages.map((page) => ({ ...page }));
+  private enforceCanvasBuffer(generation: number) {
+    const protectedPages = new Set(
+      this.selectStagePages(this.latestPages, prefetchRenderScreens, { windowed: false }).map(
+        (page) => page.index,
+      ),
+    );
+    const evicted = this.canvasStore.enforceLimit(protectedPages);
+    for (const pageIndex of evicted) {
+      this.interactionStore.deletePage(pageIndex);
     }
 
+    if (evicted.length > 0) {
+      this.post({
+        type: "render-evicted",
+        generation,
+        pageIndices: evicted,
+      });
+    }
+  }
+
+  private takeNextViewportPage(pages: PageRenderSpec[]) {
+    if (pages.length === 0) {
+      return undefined;
+    }
+
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < pages.length; index += 1) {
+      const distance = pageDistanceToViewport(
+        pages[index],
+        this.latestPageLayouts,
+        this.config.viewport || {},
+      );
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+
+    return pages.splice(bestIndex, 1)[0];
+  }
+
+  private interactionCacheKey(pageIndex: number) {
+    return (
+      this.canvasStore.getLatestCacheKey(pageIndex) || this.canvasStore.getRenderCacheKey(pageIndex)
+    );
+  }
+
+  private selectStagePages(
+    pages: PageSpec[],
+    screens: number,
+    options: { windowed?: boolean } = {},
+  ): PageRenderSpec[] {
     const viewport = this.config.viewport || {};
-    const viewportHeight = Math.max(1, viewport.height || viewport.window?.innerHeight || 1);
     const viewportTop = Math.max(0, viewport.scrollTop || 0);
-    const viewportBottom = viewportTop + viewportHeight;
-    const sideScreens = Math.max(0, (screens - 1) / 2);
-    const rangeTop = Math.max(0, viewportTop - viewportHeight * sideScreens);
-    const rangeBottom = viewportBottom + viewportHeight * sideScreens;
-    const viewportCenter = (viewportTop + viewportBottom) / 2;
-    const layouts = new Map(this.latestPageLayouts.map((layout) => [layout.index, layout]));
-
-    return pages
-      .flatMap((page) => {
-        const layout = layouts.get(page.index);
-        if (!layout || layout.bottom < rangeTop || layout.top > rangeBottom) {
-          return [];
-        }
-
-        const scale = layout.scale || layout.height / Math.max(page.height, 1) || 1;
-        const loY = clamp((rangeTop - layout.top) / scale, 0, page.height);
-        const hiY = clamp((rangeBottom - layout.top) / scale, 0, page.height);
-        if (hiY <= loY) {
-          return [];
-        }
-
-        return [
-          {
-            ...page,
-            window: {
-              lo: { x: -1, y: Math.max(0, loY - 1) },
-              hi: { x: page.width + 1, y: Math.min(page.height, hiY + 1) },
-            },
-            distance: distanceToViewport(layout, viewportCenter, viewportTop, viewportBottom),
-          },
-        ];
-      })
-      .sort((a, b) => a.distance - b.distance || a.index - b.index)
-      .map(({ distance: _distance, ...page }) => page);
+    return selectStagePagesAt(
+      pages,
+      this.latestPageLayouts,
+      viewport,
+      screens,
+      viewportTop,
+      options,
+    );
   }
 
   private isRenderInterrupted(frameVersion: number) {
     return this.disposed || frameVersion !== this.documentVersion;
+  }
+
+  private shouldStopRender(options: {
+    frameVersion: number;
+    cancelOnViewportChange?: boolean;
+    pauseWhenDragging?: boolean;
+    viewportVersion?: number;
+  }) {
+    return (
+      this.isRenderInterrupted(options.frameVersion) ||
+      (!!options.pauseWhenDragging && this.isViewportInteractive()) ||
+      (!!options.cancelOnViewportChange && options.viewportVersion !== this.viewportVersion)
+    );
+  }
+
+  private isViewportDragging() {
+    return !!this.config.viewport?.dragging;
+  }
+
+  private isViewportScrolling() {
+    return !!this.config.viewport?.scrolling;
+  }
+
+  private isViewportInteractive() {
+    return this.isViewportDragging() || this.isViewportScrolling();
   }
 
   private resolveCanvasAck(generation: number, canvasAck?: CanvasAck) {
@@ -566,39 +1131,4 @@ export class WorkerRenderer {
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
-}
-
-function yieldToEventLoop(): Promise<void> {
-  const scheduler = (globalThis as any).scheduler;
-  if (typeof scheduler?.yield === "function") {
-    return scheduler.yield();
-  }
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function distanceToViewport(
-  layout: PageLayout,
-  viewportCenter: number,
-  viewportTop: number,
-  viewportBottom: number,
-) {
-  if (layout.top <= viewportBottom && layout.bottom >= viewportTop) {
-    return Math.abs((layout.top + layout.bottom) / 2 - viewportCenter) * 0.001;
-  }
-  if (layout.bottom < viewportTop) {
-    return viewportTop - layout.bottom;
-  }
-  return layout.top - viewportBottom;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function clampPixelPerPt(value: number) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return minPixelPerPt;
-  }
-  const bucketed = Math.ceil((value - 1e-3) * 4) / 4;
-  return clamp(bucketed, minPixelPerPt, maxPixelPerPt);
 }

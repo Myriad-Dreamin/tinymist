@@ -45,9 +45,16 @@
 }
 
 .typst-page-canvas canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
+  opacity: 0;
+}
+
+.typst-page.canvas-ready .typst-full-canvas {
+  opacity: 1;
 }
 
 .dragging .typst-page {
