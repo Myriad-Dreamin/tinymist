@@ -1,8 +1,14 @@
 {
   "name": "tinymist-previewer-fixture",
   "displayName": "Tinymist Previewer Provider Fixture",
+  "description": "Fixture extension for Tinymist previewer-provider integration tests.",
   "publisher": "myriad-dreamin",
   "version": "0.0.1",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
   "engines": {
     "vscode": "^1.97.0"
   },
