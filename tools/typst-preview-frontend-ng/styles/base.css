@@ -6,6 +6,8 @@
   --border: var(--vscode-panel-border, #3c3c3c);
   --accent: var(--vscode-focusBorder, #0078d4);
   --surface: var(--vscode-sideBar-background, #252526);
+  --page-bg: #ffffff;
+  --inverted-page-bg: #111111;
   --page-shadow: color-mix(in srgb, #000000 30%, transparent);
   --cursor-color: var(--vscode-editorCursor-foreground, #aeafad);
   --jump-color: #66bab7;

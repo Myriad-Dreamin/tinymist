@@ -57,6 +57,8 @@ export class PageHost {
   private lastViewportPostKey = "";
   private lastViewportTimer = 0;
   private scrollIdleTimer = 0;
+  private sourceSyncEchoIgnoreUntil = 0;
+  private sourceSyncEchoIgnoreCount = 0;
   private lastPages: PageSpec[] = [];
   private pendingCursor: PreviewPosition | undefined;
   private outlineData: any;
@@ -75,6 +77,7 @@ export class PageHost {
       isDragging: () => this.dragging,
       isContentPreview: () => this.contentPreview,
       scrollToTypstLocation: (position) => this.scrollToTypstLocation(position),
+      onSourceSyncRequest: () => this.markSourceSyncEchoSuppression(),
     });
   }
 
@@ -178,7 +181,6 @@ export class PageHost {
     this.updatePageCount(pages.length);
     if (this.interactions.startGeneration(generation)) {
       for (const record of this.pageRecords.values()) {
-        record.container.classList.remove("canvas-ready");
         record.container.classList.remove("full-ready");
       }
     }
@@ -330,6 +332,9 @@ export class PageHost {
     switch (kind) {
       case "jump":
       case "viewport":
+        if (this.shouldIgnoreSourceSyncEcho()) {
+          return;
+        }
         this.handleJumpMessage(text);
         break;
       case "cursor":
@@ -348,6 +353,23 @@ export class PageHost {
         } catch (_error) {}
         break;
     }
+  }
+
+  private markSourceSyncEchoSuppression() {
+    this.sourceSyncEchoIgnoreUntil = performance.now() + 1_200;
+    this.sourceSyncEchoIgnoreCount = 2;
+  }
+
+  private shouldIgnoreSourceSyncEcho() {
+    if (this.sourceSyncEchoIgnoreCount <= 0) {
+      return false;
+    }
+    if (performance.now() > this.sourceSyncEchoIgnoreUntil) {
+      this.sourceSyncEchoIgnoreCount = 0;
+      return false;
+    }
+    this.sourceSyncEchoIgnoreCount -= 1;
+    return true;
   }
 
   updateInteractions(
@@ -447,6 +469,8 @@ export class PageHost {
     this.lastPages = [];
     this.lastViewportPostKey = "";
     this.pendingCursor = undefined;
+    this.sourceSyncEchoIgnoreUntil = 0;
+    this.sourceSyncEchoIgnoreCount = 0;
     this.interactions.resetAll();
     this.updatePageCount(0);
   }

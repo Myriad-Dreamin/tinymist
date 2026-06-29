@@ -7,15 +7,59 @@ declare const self: DedicatedWorkerGlobalScope & {
   loadSvg?: (
     data: BufferSource,
     format: string,
-    width: number,
-    height: number,
+    width?: number,
+    height?: number,
   ) => Promise<ImageBitmap>;
 };
 
-self.loadSvg = async (data, format) => {
-  const type = format.includes("/") ? format : "image/svg+xml";
-  const blob = new Blob([data], { type });
-  return createImageBitmap(blob);
+interface PendingSvgLoad {
+  resolve: (bitmap: ImageBitmap) => void;
+  reject: (error: Error) => void;
+  timeout: number;
+}
+
+let nextSvgLoadRequestId = 0;
+const pendingSvgLoads = new Map<number, PendingSvgLoad>();
+
+function copyBufferSource(data: BufferSource): ArrayBuffer {
+  const source =
+    data instanceof ArrayBuffer
+      ? new Uint8Array(data)
+      : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  const copy = new Uint8Array(source.byteLength);
+  copy.set(source);
+  return copy.buffer;
+}
+
+self.loadSvg = (data, format, width, height) => {
+  const requestId = ++nextSvgLoadRequestId;
+  const bytes = copyBufferSource(data);
+
+  return new Promise<ImageBitmap>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      pendingSvgLoads.delete(requestId);
+      reject(new Error(`timed out decoding SVG image ${requestId}`));
+    }, 30_000) as unknown as number;
+
+    pendingSvgLoads.set(requestId, { resolve, reject, timeout });
+    try {
+      postMessage(
+        {
+          type: "load-svg",
+          requestId,
+          data: bytes,
+          format,
+          width,
+          height,
+        },
+        [bytes],
+      );
+    } catch (error) {
+      clearTimeout(timeout);
+      pendingSvgLoads.delete(requestId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 };
 
 let currentConfig: any;
@@ -74,6 +118,24 @@ self.addEventListener("message", (event) => {
         ),
       );
       break;
+    case "load-svg-result": {
+      const pending = pendingSvgLoads.get(message.requestId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pendingSvgLoads.delete(message.requestId);
+        pending.resolve(message.bitmap);
+      }
+      break;
+    }
+    case "load-svg-error": {
+      const pending = pendingSvgLoads.get(message.requestId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pendingSvgLoads.delete(message.requestId);
+        pending.reject(new Error(message.message || "failed to decode SVG image"));
+      }
+      break;
+    }
     case "request-interactions":
       void renderer.requestInteractions({
         generation: message.generation,

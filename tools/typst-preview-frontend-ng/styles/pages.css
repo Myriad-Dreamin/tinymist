@@ -28,8 +28,12 @@
   position: relative;
   flex: 0 0 auto;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--page-bg);
   box-shadow: 0 2px 8px var(--page-shadow);
+}
+
+.invert-colors .typst-page {
+  background: var(--inverted-page-bg);
 }
 
 .content-preview .typst-page {
