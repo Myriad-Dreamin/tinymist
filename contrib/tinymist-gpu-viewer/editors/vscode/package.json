@@ -23,9 +23,6 @@
   "engines": {
     "vscode": "^1.97.0"
   },
-  "extensionDependencies": [
-    "myriad-dreamin.tinymist"
-  ],
   "extensionKind": [
     "ui"
   ],
