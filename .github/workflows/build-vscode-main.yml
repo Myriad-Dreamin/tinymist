@@ -84,6 +84,14 @@ jobs:
           tar -xvf prebuilts/tinymist-${{ matrix.rust-target }}.tar.gz -C prebuilts
           mv prebuilts/tinymist-${{ matrix.rust-target }}/tinymist prebuilts/tinymist
         if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Unzip tinymist-viewer binary artifact (Windows)
+        run: 7z x -y -oprebuilts prebuilts/tinymist-viewer-${{ matrix.rust-target }}.zip
+        if: matrix.platform == 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+      - name: Unzip tinymist-viewer binary artifact (Linux)
+        run: |
+          tar -xvf prebuilts/tinymist-viewer-${{ matrix.rust-target }}.tar.gz -C prebuilts
+          mv prebuilts/tinymist-viewer-${{ matrix.rust-target }}/tinymist-viewer prebuilts/tinymist-viewer
+        if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
 
       - name: Download VSC Assets
         uses: actions/download-artifact@v4
@@ -110,11 +118,20 @@ jobs:
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "editors/vscode/out/"
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "contrib/typst-preview/editors/vscode/out/"
           cp "prebuilts/tinymist${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "tinymist-${{ env.target }}${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}"
+          node -e "require('fs').mkdirSync('contrib/tinymist-gpu-viewer/editors/vscode/bin', { recursive: true })"
+          cp "prebuilts/tinymist-viewer${{ ( matrix.platform == 'win32' ) && '.exe' || '' }}" "contrib/tinymist-gpu-viewer/editors/vscode/bin/"
+      - name: Make tinymist-viewer executable
+        if: matrix.platform != 'win32' && (fromJson(env.isRelease) || fromJson(env.isNightly))
+        run: chmod +x contrib/tinymist-gpu-viewer/editors/vscode/bin/tinymist-viewer
 
       - name: Package typst-preview extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix
         working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package tinymist-gpu-viewer extension
+        if: fromJson(env.isRelease)
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-gpu-viewer-${{ env.target }}.vsix
+        working-directory: ./contrib/tinymist-gpu-viewer/editors/vscode
       - name: Package tinymist extension
         if: fromJson(env.isRelease)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix
@@ -123,6 +140,10 @@ jobs:
         if: fromJson(env.isNightly)
         run: yarn run package -- --target ${{ env.target }} -o typst-preview-${{ env.target }}.vsix --pre-release
         working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Package tinymist-gpu-viewer extension (Nightly)
+        if: fromJson(env.isNightly)
+        run: yarn run package -- --target ${{ env.target }} -o tinymist-gpu-viewer-${{ env.target }}.vsix --pre-release
+        working-directory: ./contrib/tinymist-gpu-viewer/editors/vscode
       - name: Package tinymist extension (Nightly)
         if: fromJson(env.isNightly)
         run: yarn run package -- --target ${{ env.target }} -o tinymist-${{ env.target }}.vsix --pre-release
@@ -140,6 +161,12 @@ jobs:
         with:
           name: typst-preview-${{ env.target }}.vsix
           path: contrib/typst-preview/editors/vscode/typst-preview-${{ env.target }}.vsix
+      - name: Upload tinymist-gpu-viewer VSIX artifact
+        if: (fromJson(env.isRelease) || fromJson(env.isNightly))
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinymist-gpu-viewer-${{ env.target }}.vsix
+          path: contrib/tinymist-gpu-viewer/editors/vscode/tinymist-gpu-viewer-${{ env.target }}.vsix
       - name: Upload VSIX artifact
         if: (fromJson(env.isRelease) || fromJson(env.isNightly))
         uses: actions/upload-artifact@v4

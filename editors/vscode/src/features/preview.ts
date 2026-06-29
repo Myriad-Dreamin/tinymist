@@ -441,9 +441,7 @@ export async function openPreviewInWebView({
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
   // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
   // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
-  let wsURI = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
-  let wsURIString = wsURI.toString().replace(/^http/, "ws");
-  html = html.replace("ws://127.0.0.1:23625", wsURIString);
+  html = html.replace("ws://127.0.0.1:23625", await externalDataPlaneHost(dataPlanePort));
 
   // Sets the HTML content to the webview panel.
   // This will reload the webview panel if it's already opened.
@@ -529,13 +527,16 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     case "webview": {
       if (resolvedPreviewer?.handlePreview) {
         try {
+          const dataPlaneHost = resolvedPreviewer.preferExternalDataPlaneHost
+            ? await externalDataPlaneHost(dataPlanePort)
+            : localDataPlaneHost(dataPlanePort);
           const previewHandle = await resolvedPreviewer.handlePreview({
             taskId,
             documentUri: bindDocument.uri.toString(),
             documentPath: filePath,
             mode: task.mode,
             target: resolvedPreviewer.source.target ?? "paged",
-            dataPlaneHost: `ws://127.0.0.1:${dataPlanePort}`,
+            dataPlaneHost,
             dataPlanePort,
             staticServerPort,
             initialWindowState: loadStoredViewerWindowState(context),
@@ -705,6 +706,15 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     };
     scrollPreviewPanel(taskId, scrollRequest);
   }
+}
+
+function localDataPlaneHost(dataPlanePort: string | number): string {
+  return `ws://127.0.0.1:${dataPlanePort}`;
+}
+
+async function externalDataPlaneHost(dataPlanePort: string | number): Promise<string> {
+  const uri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+  return uri.toString().replace(/^http/, "ws");
 }
 
 function addPreviewHandleDispose(disposes: DisposeList, previewHandle: unknown) {

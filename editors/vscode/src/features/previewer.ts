@@ -43,6 +43,7 @@ export interface ResolvedPreviewer {
   html: string;
   htmlUri: vscode.Uri;
   localResourceRoots: vscode.Uri[];
+  preferExternalDataPlaneHost?: boolean;
   handlePreview?: (
     task: TinymistPreviewTask,
   ) => Promise<TinymistPreviewHandle> | TinymistPreviewHandle;
@@ -61,6 +62,19 @@ export interface TinymistPreviewerProvider {
   providePreviewer(): Promise<TinymistPreviewer> | TinymistPreviewer;
 }
 
+interface CommandBackedPreviewer {
+  compatibleTinymistVersion: string;
+  supportedTargets?: PreviewTarget[];
+  hasHandlePreview?: boolean;
+  htmlPath?: string;
+}
+
+interface PreviewerCommandApi {
+  providePreviewer: string;
+  handlePreview: string;
+  disposePreview: string;
+}
+
 interface PreviewerExtension {
   extensionUri: vscode.Uri;
   activate(): Thenable<unknown>;
@@ -75,6 +89,7 @@ export interface PreviewerResolverEnvironment {
   builtinPreviewer: () => Promise<ResolvedPreviewer>;
   readHtmlFile?: (uri: vscode.Uri) => Promise<string>;
   getExtension?: (id: string) => PreviewerExtension | undefined;
+  executeCommand?: <T>(command: string, ...args: unknown[]) => Thenable<T>;
   showWarning?: (message: string) => void;
 }
 
@@ -201,6 +216,7 @@ export async function resolvePreviewer(
       void vscode.window.showWarningMessage(message);
     },
     getExtension: (extensionId) => vscode.extensions.getExtension(extensionId),
+    executeCommand: (command, ...args) => vscode.commands.executeCommand(command, ...args),
   });
 
   cachedPreviewer = { key: cacheKey, previewer };
@@ -292,6 +308,15 @@ async function resolveExtensionPreviewer(
 ): Promise<ResolvedPreviewer> {
   const extension = environment.getExtension?.(extensionId);
   if (!extension) {
+    const commandBackedPreviewer = await resolveCommandBackedExtensionPreviewer(
+      environment,
+      provider,
+      extensionId,
+    );
+    if (commandBackedPreviewer) {
+      return commandBackedPreviewer;
+    }
+
     throw previewerResolutionError(
       provider,
       `could not find previewer provider extension \`${extensionId}\``,
@@ -309,6 +334,15 @@ async function resolveExtensionPreviewer(
   }
 
   if (!isPreviewerProvider(providerExports)) {
+    const commandBackedPreviewer = await resolveCommandBackedExtensionPreviewer(
+      environment,
+      provider,
+      extensionId,
+    );
+    if (commandBackedPreviewer) {
+      return commandBackedPreviewer;
+    }
+
     throw previewerResolutionError(
       provider,
       `extension \`${extensionId}\` does not export a \`providePreviewer()\` previewer provider`,
@@ -412,6 +446,110 @@ async function resolveExtensionPreviewer(
       compatibleTinymistVersion: previewer.compatibleTinymistVersion,
     },
   });
+}
+
+async function resolveCommandBackedExtensionPreviewer(
+  environment: PreviewerResolverEnvironment,
+  provider: string | undefined,
+  extensionId: string,
+): Promise<ResolvedPreviewer | undefined> {
+  const executeCommand = environment.executeCommand;
+  if (!executeCommand) {
+    return undefined;
+  }
+
+  const commands = previewerCommandApi(extensionId);
+  let previewer: CommandBackedPreviewer | undefined;
+  try {
+    previewer = await executeCommand<CommandBackedPreviewer>(commands.providePreviewer);
+  } catch (error) {
+    if (isCommandMissingError(error, commands.providePreviewer)) {
+      return undefined;
+    }
+
+    throw previewerResolutionError(
+      provider,
+      `failed to activate previewer provider command \`${commands.providePreviewer}\`: ${errorMessage(error)}`,
+    );
+  }
+
+  if (
+    !previewer ||
+    typeof previewer.compatibleTinymistVersion !== "string" ||
+    previewer.compatibleTinymistVersion.trim() === ""
+  ) {
+    throw previewerResolutionError(
+      provider,
+      `extension \`${extensionId}\` did not declare \`compatibleTinymistVersion\``,
+    );
+  }
+
+  if (previewer.compatibleTinymistVersion !== environment.tinymistVersion) {
+    throw previewerResolutionError(
+      provider,
+      `extension \`${extensionId}\` is not compatible with Tinymist ${environment.tinymistVersion}`,
+    );
+  }
+
+  const previewTarget = getPreviewTarget(environment);
+  const supportedTargets = normalizeSupportedTargets(previewer.supportedTargets);
+  if (!supportsPreviewTarget(supportedTargets, previewTarget)) {
+    return fallbackToBuiltin(
+      environment,
+      provider,
+      `does not support the \`${previewTarget}\` preview target`,
+    );
+  }
+
+  if (previewer.hasHandlePreview) {
+    return {
+      html: "",
+      htmlUri: vscode.Uri.parse(`command:${commands.providePreviewer}`),
+      localResourceRoots: [],
+      preferExternalDataPlaneHost: true,
+      handlePreview: async (task) => {
+        await executeCommand<void>(commands.handlePreview, task);
+        return () => {
+          void executeCommand<void>(commands.disposePreview, { taskId: task.taskId });
+        };
+      },
+      source: {
+        kind: "extension",
+        trusted: environment.workspaceTrusted,
+        target: previewTarget,
+        configuredProvider: provider,
+        extensionId,
+        handler: "documentPreview",
+        supportedTargets,
+        compatibleTinymistVersion: previewer.compatibleTinymistVersion,
+      },
+    };
+  }
+
+  if (typeof previewer.htmlPath === "string" && previewer.htmlPath.trim() !== "") {
+    throw previewerResolutionError(
+      provider,
+      `extension \`${extensionId}\` returned an HTML previewer through a command bridge, which is not supported`,
+    );
+  }
+
+  throw previewerResolutionError(
+    provider,
+    `extension \`${extensionId}\` did not export a \`handlePreview()\` handler or return an HTML path`,
+  );
+}
+
+function previewerCommandApi(extensionId: string): PreviewerCommandApi {
+  return {
+    providePreviewer: `${extensionId}.provideTinymistPreviewer`,
+    handlePreview: `${extensionId}.handleTinymistPreview`,
+    disposePreview: `${extensionId}.disposeTinymistPreview`,
+  };
+}
+
+function isCommandMissingError(error: unknown, command: string): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return message.includes(command.toLowerCase()) && message.includes("not found");
 }
 
 async function resolveHtmlFilePreviewer(

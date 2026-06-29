@@ -15,6 +15,10 @@ const WINDOW_LAYOUT_TIMEOUT_MS = 10_000;
 const WINDOW_LAYOUT_POLL_MS = 250;
 const MIN_VIEWER_INNER_WIDTH = 800;
 const MIN_VIEWER_INNER_HEIGHT = 844;
+const COMMAND_PREFIX = "myriad-dreamin.tinymist-gpu-viewer";
+const PROVIDE_PREVIEWER_COMMAND = `${COMMAND_PREFIX}.provideTinymistPreviewer`;
+const HANDLE_PREVIEW_COMMAND = `${COMMAND_PREFIX}.handleTinymistPreview`;
+const DISPOSE_PREVIEW_COMMAND = `${COMMAND_PREFIX}.disposeTinymistPreview`;
 
 type WindowLayoutMode = "disabled" | "sideBySide";
 type PreviewTarget = "paged" | "html";
@@ -36,6 +40,12 @@ interface TinymistPreviewTask {
 
 interface TinymistPreviewerProvider {
   providePreviewer(): Promise<TinymistPreviewer> | TinymistPreviewer;
+}
+
+interface CommandBackedPreviewer {
+  compatibleTinymistVersion: string;
+  supportedTargets: PreviewTarget[];
+  hasHandlePreview: boolean;
 }
 
 interface ViewerWindowState {
@@ -72,18 +82,25 @@ export function activate(context: vscode.ExtensionContext): TinymistPreviewerPro
     },
   });
 
+  const previewer = createPreviewer(context, compatibleTinymistVersion);
+  context.subscriptions.push(
+    vscode.commands.registerCommand(PROVIDE_PREVIEWER_COMMAND, () =>
+      commandBackedPreviewerMetadata(compatibleTinymistVersion),
+    ),
+    vscode.commands.registerCommand(HANDLE_PREVIEW_COMMAND, (task: unknown) =>
+      launchViewer(context, normalizePreviewTask(task)),
+    ),
+    vscode.commands.registerCommand(DISPOSE_PREVIEW_COMMAND, (task: unknown) => {
+      const taskId = taskIdFromCommandArg(task);
+      if (taskId) {
+        disposeViewer(taskId);
+      }
+    }),
+  );
+
   return {
     providePreviewer() {
-      return {
-        compatibleTinymistVersion,
-        supportedTargets: ["paged"],
-        isCompatible(tinymistVersion: string) {
-          return tinymistVersion === compatibleTinymistVersion;
-        },
-        handlePreview(task: TinymistPreviewTask) {
-          return launchViewer(context, task);
-        },
-      };
+      return previewer;
     },
   };
 }
@@ -94,7 +111,7 @@ async function launchViewer(
   context: vscode.ExtensionContext,
   task: TinymistPreviewTask,
 ): Promise<vscode.Disposable> {
-  activeViewers.get(task.taskId)?.kill();
+  disposeViewer(task.taskId);
 
   const executable = resolveViewerExecutable(context);
   const documentTitle = documentTitleForPath(task.documentPath);
@@ -103,7 +120,7 @@ async function launchViewer(
   const args = ["--data-plane-host", task.dataPlaneHost, "--document-title", documentTitle];
   const windowPlan = await windowLaunchPlanForTask(task, layoutMode);
   appendInitialWindowArgs(args, windowPlan.initialWindowState);
-  const cwd = path.dirname(task.documentPath);
+  const cwd = workingDirectoryForDocument(context, task.documentPath);
   appendLog(`Starting ${executable} ${args.join(" ")}`);
 
   const viewer = spawn(executable, args, {
@@ -135,18 +152,87 @@ async function launchViewer(
 
   return {
     dispose() {
-      deleteActiveViewer(task.taskId, viewer);
-      if (!viewer.killed) {
-        viewer.kill();
-      }
+      disposeViewer(task.taskId, viewer);
     },
   };
+}
+
+function createPreviewer(
+  context: vscode.ExtensionContext,
+  compatibleTinymistVersion: string,
+): TinymistPreviewer {
+  return {
+    compatibleTinymistVersion,
+    supportedTargets: ["paged"],
+    isCompatible(tinymistVersion: string) {
+      return tinymistVersion === compatibleTinymistVersion;
+    },
+    handlePreview(task: TinymistPreviewTask) {
+      return launchViewer(context, task);
+    },
+  };
+}
+
+function commandBackedPreviewerMetadata(compatibleTinymistVersion: string): CommandBackedPreviewer {
+  return {
+    compatibleTinymistVersion,
+    supportedTargets: ["paged"],
+    hasHandlePreview: true,
+  };
+}
+
+function disposeViewer(taskId: string, expectedViewer?: ChildProcessWithoutNullStreams) {
+  const viewer = activeViewers.get(taskId);
+  if (!viewer || (expectedViewer && viewer !== expectedViewer)) {
+    return;
+  }
+
+  activeViewers.delete(taskId);
+  if (!viewer.killed) {
+    viewer.kill();
+  }
 }
 
 function deleteActiveViewer(taskId: string, viewer: ChildProcessWithoutNullStreams) {
   if (activeViewers.get(taskId) === viewer) {
     activeViewers.delete(taskId);
   }
+}
+
+function normalizePreviewTask(value: unknown): TinymistPreviewTask {
+  if (!isObject(value)) {
+    throw new Error("Tinymist GPU Viewer preview task must be an object.");
+  }
+
+  const taskId = requiredString(value.taskId, "taskId");
+  const documentPath = requiredString(value.documentPath, "documentPath");
+  const dataPlaneHost = requiredString(value.dataPlaneHost, "dataPlaneHost");
+  const target = value.target === "html" ? "html" : "paged";
+  const initialWindowState = normalizeStoredWindowState(value.initialWindowState);
+
+  return {
+    taskId,
+    documentPath,
+    target,
+    dataPlaneHost,
+    initialWindowState,
+  };
+}
+
+function taskIdFromCommandArg(value: unknown): string | undefined {
+  if (!isObject(value) || typeof value.taskId !== "string" || value.taskId.trim() === "") {
+    return undefined;
+  }
+
+  return value.taskId;
+}
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`Tinymist GPU Viewer preview task is missing ${field}.`);
+  }
+
+  return value;
 }
 
 async function windowLaunchPlanForTask(
@@ -291,8 +377,23 @@ function resolveViewerExecutable(context: vscode.ExtensionContext): string {
 }
 
 function documentTitleForPath(documentPath: string): string {
-  const title = path.basename(documentPath).trim();
+  const title = documentPath.split(/[\\/]/).pop()?.trim() || path.basename(documentPath).trim();
   return title || documentPath.trim() || VIEWER_WINDOW_TITLE;
+}
+
+function workingDirectoryForDocument(
+  context: vscode.ExtensionContext,
+  documentPath: string,
+): string {
+  const documentDir = path.dirname(documentPath);
+  if (documentDir && fs.existsSync(documentDir)) {
+    return documentDir;
+  }
+
+  appendLog(
+    `Document directory is not available on this extension host; using GPU viewer extension directory as cwd.`,
+  );
+  return context.extensionUri.fsPath;
 }
 
 function viewerWindowTitle(documentTitle: string): string {
@@ -508,13 +609,7 @@ async function prepareSideBySideLayoutBeforeSpawnLinux(): Promise<WindowRect> {
   }
 
   const rects = splitSideBySideWorkArea(await getLinuxWorkArea());
-  await moveLinuxWindow(
-    code.id,
-    rects.code.x,
-    rects.code.y,
-    rects.code.width,
-    rects.code.height,
-  );
+  await moveLinuxWindow(code.id, rects.code.x, rects.code.y, rects.code.width, rects.code.height);
   return rects.viewer;
 }
 

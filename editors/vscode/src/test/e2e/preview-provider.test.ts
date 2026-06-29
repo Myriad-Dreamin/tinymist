@@ -107,6 +107,63 @@ export async function getTests(ctx: Context) {
     });
 
     suite.addTest(
+      "uses command-backed extension previewers from another extension host",
+      async () => {
+        const provider = "myriad-dreamin.tinymist-command-previewer";
+        const tinymistVersion = "1.2.3";
+        const commands: { command: string; args: unknown[] }[] = [];
+
+        const result = await resolveConfiguredPreviewer({
+          provider,
+          workspaceTrusted: true,
+          tinymistVersion,
+          builtinPreviewer: async () => builtinPreviewer(),
+          getExtension: () => undefined,
+          executeCommand: async <T>(command: string, ...args: unknown[]): Promise<T> => {
+            commands.push({ command, args });
+            if (command === `${provider}.provideTinymistPreviewer`) {
+              return {
+                compatibleTinymistVersion: tinymistVersion,
+                supportedTargets: ["paged"],
+                hasHandlePreview: true,
+              } as T;
+            }
+            return undefined as T;
+          },
+        });
+
+        workspaceCtx.expect(result.source.kind).to.be.equal("extension");
+        workspaceCtx.expect(result.source.extensionId).to.be.equal(provider);
+        workspaceCtx.expect(result.source.handler).to.be.equal("documentPreview");
+        workspaceCtx.expect(result.preferExternalDataPlaneHost).to.be.equal(true);
+        workspaceCtx.expect(result.handlePreview).to.be.a("function");
+
+        const previewHandle = await result.handlePreview?.({
+          taskId: "preview-task",
+          documentUri: "file:///workspace/main.typ",
+          documentPath: "/workspace/main.typ",
+          mode: "doc",
+          target: "paged",
+          dataPlaneHost: "ws://forwarded.example",
+          dataPlanePort: 1234,
+          staticServerPort: 5678,
+          isBrowsing: false,
+          isPrimary: true,
+        });
+        workspaceCtx
+          .expect(commands.some((entry) => entry.command === `${provider}.handleTinymistPreview`))
+          .to.be.equal(true);
+
+        if (typeof previewHandle === "function") {
+          previewHandle();
+        }
+        workspaceCtx
+          .expect(commands.some((entry) => entry.command === `${provider}.disposeTinymistPreview`))
+          .to.be.equal(true);
+      },
+    );
+
+    suite.addTest(
       "treats previewers without target declarations as supporting every target",
       async () => {
         const provider = "myriad-dreamin.tinymist-default-target-previewer";
