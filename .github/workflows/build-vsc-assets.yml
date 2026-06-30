@@ -69,6 +69,9 @@ jobs:
           yarn
           yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Build typst-preview-ng vscode extension
+        run: yarn run compile
+        working-directory: ./contrib/typst-preview-ng/editors/vscode
       - name: Build tinymist vscode extension
         run: |
           yarn
@@ -93,4 +96,10 @@ jobs:
         with:
           name: vscode-artifacts-typst-preview
           path: contrib/typst-preview/editors/vscode/out
-
+      - name: Pre-bundle typst-preview-ng vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-artifacts-typst-preview-ng
+          path: |
+            contrib/typst-preview-ng/editors/vscode/out
+            contrib/typst-preview-ng/editors/vscode/previewer
