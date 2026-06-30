@@ -3,20 +3,20 @@ use std::sync::Arc;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 
-use super::{render::RenderActorRequest, webview::PreviewFrame};
+use super::render::RenderActorRequest;
 use crate::CompileView;
 
 pub struct HtmlRenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
     view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
-    frame_sender: mpsc::UnboundedSender<PreviewFrame>,
+    frame_sender: mpsc::UnboundedSender<Vec<u8>>,
 }
 
 impl HtmlRenderActor {
     pub fn new(
         mailbox: broadcast::Receiver<RenderActorRequest>,
         view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
-        frame_sender: mpsc::UnboundedSender<PreviewFrame>,
+        frame_sender: mpsc::UnboundedSender<Vec<u8>>,
     ) -> Self {
         Self {
             mailbox,
@@ -59,15 +59,19 @@ impl HtmlRenderActor {
                 continue;
             };
 
-            let frame = match typst_html::html(document, &typst_html::HtmlOptions::default()) {
-                Ok(html) => PreviewFrame::Html(html.into_bytes()),
+            let html = match typst_html::html(document, &typst_html::HtmlOptions::default()) {
+                Ok(html) => html,
                 Err(err) => {
                     log::warn!("failed to encode HTML preview document: {err:?}");
-                    PreviewFrame::HtmlError(b"failed to encode HTML preview document".to_vec())
+                    continue;
                 }
             };
 
-            if self.frame_sender.send(frame).is_err() {
+            if self
+                .frame_sender
+                .send(prefixed_frame(b"html,", html.into_bytes()))
+                .is_err()
+            {
                 log::info!("HtmlRenderActor: frame_sender is dropped");
                 break;
             }
@@ -75,4 +79,11 @@ impl HtmlRenderActor {
 
         log::info!("HtmlRenderActor: exiting");
     }
+}
+
+fn prefixed_frame(prefix: &[u8], payload: Vec<u8>) -> Vec<u8> {
+    let mut frame = Vec::with_capacity(prefix.len() + payload.len());
+    frame.extend_from_slice(prefix);
+    frame.extend_from_slice(&payload);
+    frame
 }

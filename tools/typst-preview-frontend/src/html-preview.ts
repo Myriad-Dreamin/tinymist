@@ -1,21 +1,17 @@
 const HTML_PREVIEW_SCROLL_KEY = "tinymist-html-preview-scroll";
 
-export type PreviewFrameHandler = (payload: Uint8Array) => boolean;
-
-export function createHtmlPreviewFrameHandlers(
+export function handleHtmlPreviewFrame(
+  kind: string,
+  payload: Uint8Array,
   url: string,
   decoder = new TextDecoder(),
-): Record<string, PreviewFrameHandler> {
-  return {
-    html(payload) {
-      replaceWithHtmlPreviewDocument(decoder.decode(payload), url);
-      return true;
-    },
-    "html-error"(payload) {
-      replaceWithHtmlPreviewDocument(createHtmlPreviewErrorDocument(decoder.decode(payload)), url);
-      return true;
-    },
-  };
+): boolean {
+  if (kind === "html") {
+    replaceWithHtmlPreviewDocument(decoder.decode(payload), url);
+    return true;
+  }
+
+  return false;
 }
 
 function storeHtmlPreviewScroll() {
@@ -78,22 +74,6 @@ function htmlPreviewClientScript(url: string): string {
     return doctype + "\\n" + doc.documentElement.outerHTML;
   }
 
-  function createErrorDocument(message) {
-    const doc = document.implementation.createHTMLDocument("Typst HTML Preview Error");
-    const meta = doc.createElement("meta");
-    meta.name = "viewport";
-    meta.content = "width=device-width, initial-scale=1";
-    doc.head.appendChild(meta);
-
-    const pre = doc.createElement("pre");
-    pre.style.whiteSpace = "pre-wrap";
-    pre.style.margin = "1rem";
-    pre.style.color = "#b00020";
-    pre.textContent = message;
-    doc.body.appendChild(pre);
-    return serializeHtmlDocument(doc);
-  }
-
   function injectClient(html) {
     const current = document.currentScript;
     const source = current && current.textContent ? current.textContent : "";
@@ -113,10 +93,6 @@ function htmlPreviewClientScript(url: string): string {
     document.open();
     document.write(injectClient(html));
     document.close();
-  }
-
-  function renderError(message) {
-    replaceDocument(createErrorDocument(message));
   }
 
   function splitFrame(data) {
@@ -139,8 +115,6 @@ function htmlPreviewClientScript(url: string): string {
       const text = decoder.decode(payload);
       if (kind === "html") {
         replaceDocument(text);
-      } else if (kind === "html-error") {
-        renderError(text);
       }
     };
     ws.onclose = () => {
@@ -165,22 +139,6 @@ function injectHtmlPreviewClient(html: string, url: string): string {
   script.dataset.tinymistHtmlPreviewClient = "";
   script.text = htmlPreviewClientScript(url);
   (doc.body || doc.documentElement).appendChild(script);
-  return serializeHtmlDocument(doc);
-}
-
-function createHtmlPreviewErrorDocument(message: string): string {
-  const doc = document.implementation.createHTMLDocument("Typst HTML Preview Error");
-  const meta = doc.createElement("meta");
-  meta.name = "viewport";
-  meta.content = "width=device-width, initial-scale=1";
-  doc.head.appendChild(meta);
-
-  const pre = doc.createElement("pre");
-  pre.style.whiteSpace = "pre-wrap";
-  pre.style.margin = "1rem";
-  pre.style.color = "#b00020";
-  pre.textContent = message;
-  doc.body.appendChild(pre);
   return serializeHtmlDocument(doc);
 }
 

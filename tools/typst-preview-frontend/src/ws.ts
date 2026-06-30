@@ -14,7 +14,7 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
-import { createHtmlPreviewFrameHandlers } from "./html-preview";
+import { handleHtmlPreviewFrame } from "./html-preview";
 export { PreviewMode } from "typst-dom/typst-doc.mjs";
 
 // for debug propose
@@ -22,10 +22,10 @@ export { PreviewMode } from "typst-dom/typst-doc.mjs";
 (window as any).TypstRenderSession = RenderSession;
 // (window as any).TypstRenderSessionKernel = RenderSession2;
 
+const enc = new TextEncoder();
 const dec = new TextDecoder();
 const NOT_AVAILABLE = "current not available";
-const COMMA = ",".charCodeAt(0);
-
+const COMMA = enc.encode(",");
 export interface WsArgs {
   url: string;
   previewMode: PreviewMode;
@@ -254,7 +254,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
   function setupSocket(svgDoc: TypstDocument): () => void {
     windowElem.documents.push(svgDoc);
-    const frameHandlers = createHtmlPreviewFrameHandlers(url, dec);
 
     // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
     $ws = webSocket<ArrayBuffer>({
@@ -331,29 +330,17 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       const buffer = data;
       const messageData = new Uint8Array(buffer);
 
-      const message_idx = messageData.indexOf(COMMA);
-      if (message_idx < 0) {
-        console.error("WebSocket data has no message kind delimiter", data);
-        return;
-      }
-
+      const message_idx = messageData.indexOf(COMMA[0]);
       const message = [
-        dec.decode(messageData.slice(0, message_idx).buffer).trim(),
+        dec.decode(messageData.slice(0, message_idx).buffer),
         messageData.slice(message_idx + 1),
-      ] as const;
-      const [kind, payload] = message;
-      console.log("recv", kind, messageData.length);
-      // console.log(kind, payload.length);
-
-      const handled = frameHandlers[kind]?.(payload);
-      if (handled) {
-        return;
-      }
-
+      ];
+      console.log("recv", message[0], messageData.length);
+      // console.log(message[0], message[1].length);
       if (isContentPreview) {
         // whether to scroll to the content preview when user updates document
         const autoScrollContentPreview = true;
-        if (!autoScrollContentPreview && kind === "jump") {
+        if (!autoScrollContentPreview && message[0] === "jump") {
           return;
         }
 
@@ -361,15 +348,15 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         // "partial-rendering": content previe always render partially
         // "cursor": currently not supported
         if (
-          kind === "viewport" ||
-          kind === "partial-rendering" ||
-          kind === "cursor"
+          message[0] === "viewport" ||
+          message[0] === "partial-rendering" ||
+          message[0] === "cursor"
         ) {
           return;
         }
       }
 
-      if (kind === "jump" || kind === "viewport") {
+      if (message[0] === "jump" || message[0] === "viewport") {
         const rootElem = document.getElementById("typst-app")?.firstElementChild;
 
         // todo: aware height padding
@@ -381,7 +368,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
 
         let positions = dec
-          .decode(payload)
+          .decode((message[1] as any).buffer)
           .split(",")
           .map((t: string) => t.trim())
           .filter((t: string) => t.length > 0);
@@ -428,36 +415,40 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           windowElem.handleTypstLocation(rootElem, pageToJump, x, y);
         }
         return;
-      } else if (kind === "cursor") {
+      } else if (message[0] === "cursor") {
         // todo: aware height padding
         const [page, x, y] = dec
-          .decode(payload)
+          .decode((message[1] as any).buffer)
           .split(" ")
           .map(Number);
         console.log("cursor", page, x, y);
         svgDoc.setCursor(page, x, y);
         svgDoc.addViewportChange(); // todo: synthesizing cursor event
         return;
-      } else if (kind === "cursor-paths") {
+      } else if (message[0] === "cursor-paths") {
         // todo: aware height padding
-        const paths = JSON.parse(dec.decode(payload));
+        const paths = JSON.parse(dec.decode((message[1] as any).buffer));
         console.log("cursor-paths", paths);
         svgDoc.impl.setCursorPaths(paths);
         return;
-      } else if (kind === "partial-rendering") {
+      } else if (message[0] === "partial-rendering") {
         console.log("Experimental feature: partial rendering enabled");
         svgDoc.setPartialRendering(true);
         return;
-      } else if (kind === "invert-colors") {
-        const rawStrategy = dec.decode(payload).trim();
+      } else if (message[0] === "invert-colors") {
+        const rawStrategy = dec.decode((message[1] as any).buffer).trim();
         const strategy =
           INVERT_COLORS_STRATEGY.find((t) => t === rawStrategy) ||
           (JSON.parse(rawStrategy) as StrategyMap);
         console.log("Experimental feature: invert colors strategy taken:", strategy);
         ensureInvertColors(document.getElementById("typst-app"), strategy);
         return;
-      } else if (kind === "outline") {
+      } else if (message[0] === "outline") {
         console.log("Experimental feature: outline rendering");
+        return;
+      }
+
+      if (handleHtmlPreviewFrame(message[0] as string, message[1] as Uint8Array, url, dec)) {
         return;
       }
 

@@ -179,11 +179,11 @@ impl Previewer {
                     .await
                     .log_error("SendInvertColor");
                 }
-                let actor::webview::Channels { frame } =
+                let actor::webview::Channels { svg } =
                     actor::webview::WebviewActor::<'_, C>::set_up_channels();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
-                    frame.1,
+                    svg.1,
                     h.webview_tx.clone(),
                     h.webview_tx.subscribe(),
                     h.editor_tx.clone(),
@@ -195,7 +195,7 @@ impl Previewer {
                             h.renderer_tx.subscribe(),
                             h.doc_sender.clone(),
                             h.editor_tx.clone(),
-                            frame.0,
+                            svg.0,
                             h.webview_tx,
                         );
                         tokio::spawn(render_actor.run());
@@ -211,7 +211,7 @@ impl Previewer {
                         let html_render_actor = HtmlRenderActor::new(
                             h.renderer_tx.subscribe(),
                             h.doc_sender.clone(),
-                            frame.0,
+                            svg.0,
                         );
                         tokio::spawn(html_render_actor.run());
                     }
