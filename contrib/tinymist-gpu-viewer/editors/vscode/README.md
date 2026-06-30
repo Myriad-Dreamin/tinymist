@@ -4,10 +4,11 @@ Tinymist GPU Viewer is a previewer-provider extension for Tinymist. It launches 
 
 ## Usage
 
-Install both extensions:
+Install both extensions. In VS Code Remote windows, install them into different
+extension hosts:
 
-- `myriad-dreamin.tinymist`
-- `myriad-dreamin.tinymist-gpu-viewer`
+- `myriad-dreamin.tinymist` in the workspace/remote extension host
+- `myriad-dreamin.tinymist-gpu-viewer` in the local/UI extension host
 
 Then configure Tinymist:
 
@@ -19,7 +20,7 @@ Then configure Tinymist:
 
 Tinymist will activate this extension, start the regular preview server, and pass the preview data-plane websocket address to the native `tinymist-viewer` process. No VS Code webview preview panel is created for this provider.
 
-In VS Code Remote windows, Tinymist may run in the remote extension host while Tinymist GPU Viewer runs in the local UI extension host. The provider uses a command bridge in that case, and Tinymist passes a VS Code-forwarded websocket URL to the local native viewer. Install Tinymist in the remote workspace and Tinymist GPU Viewer in the local/UI side.
+In VS Code Remote windows, Tinymist may run in the remote extension host while Tinymist GPU Viewer runs in the local UI extension host. The provider uses a command bridge in that case, and Tinymist passes a VS Code-forwarded websocket URL to the local native viewer. The GPU Viewer extension intentionally has no hard VS Code extension dependency on Tinymist because Tinymist may be loaded in a different extension host.
 
 For local development, the repository debug task builds the native viewer and copies the debug binary into this extension's `bin/` directory before launching the Extension Development Host:
 
