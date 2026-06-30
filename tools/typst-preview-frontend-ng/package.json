@@ -11,7 +11,7 @@
     "unlink:local": "yarn unlink @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
   },
   "dependencies": {
-    "@myriaddreamin/typst-ts-renderer": "=0.8.0-rc2",
-    "@myriaddreamin/typst.ts": "=0.8.0-rc2"
+    "@myriaddreamin/typst-ts-renderer": "=0.8.0-rc3",
+    "@myriaddreamin/typst.ts": "=0.8.0-rc3"
   }
 }
