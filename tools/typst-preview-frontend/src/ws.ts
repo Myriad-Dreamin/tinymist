@@ -14,6 +14,7 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
+import { createHtmlPreviewFrameHandlers } from "./html-preview";
 export { PreviewMode } from "typst-dom/typst-doc.mjs";
 
 // for debug propose
@@ -21,194 +22,9 @@ export { PreviewMode } from "typst-dom/typst-doc.mjs";
 (window as any).TypstRenderSession = RenderSession;
 // (window as any).TypstRenderSessionKernel = RenderSession2;
 
-const enc = new TextEncoder();
 const dec = new TextDecoder();
 const NOT_AVAILABLE = "current not available";
-const COMMA = enc.encode(",");
-const HTML_PREVIEW_SCROLL_KEY = "tinymist-html-preview-scroll";
-
-function escapeHtml(text: string): string {
-  return text.replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
-}
-
-function storeHtmlPreviewScroll() {
-  const root = document.documentElement;
-  const maxX = Math.max(1, root.scrollWidth - window.innerWidth);
-  const maxY = Math.max(1, root.scrollHeight - window.innerHeight);
-  sessionStorage.setItem(
-    HTML_PREVIEW_SCROLL_KEY,
-    JSON.stringify({
-      x: window.scrollX,
-      y: window.scrollY,
-      rx: window.scrollX / maxX,
-      ry: window.scrollY / maxY,
-    }),
-  );
-}
-
-function htmlPreviewClientScript(url: string): string {
-  return `
-(() => {
-  const wsUrl = ${JSON.stringify(url)};
-  const scrollKey = ${JSON.stringify(HTML_PREVIEW_SCROLL_KEY)};
-  const decoder = new TextDecoder();
-  const comma = ",".charCodeAt(0);
-
-  function escapeHtml(text) {
-    return text.replace(/[&<>"']/g, (ch) => {
-      switch (ch) {
-        case "&":
-          return "&amp;";
-        case "<":
-          return "&lt;";
-        case ">":
-          return "&gt;";
-        case '"':
-          return "&quot;";
-        default:
-          return "&#39;";
-      }
-    });
-  }
-
-  function storeScroll() {
-    const root = document.documentElement;
-    const maxX = Math.max(1, root.scrollWidth - window.innerWidth);
-    const maxY = Math.max(1, root.scrollHeight - window.innerHeight);
-    sessionStorage.setItem(scrollKey, JSON.stringify({
-      x: window.scrollX,
-      y: window.scrollY,
-      rx: window.scrollX / maxX,
-      ry: window.scrollY / maxY,
-    }));
-  }
-
-  function restoreScroll() {
-    const raw = sessionStorage.getItem(scrollKey);
-    if (!raw) {
-      return;
-    }
-    sessionStorage.removeItem(scrollKey);
-    try {
-      const pos = JSON.parse(raw);
-      const root = document.documentElement;
-      const maxX = Math.max(0, root.scrollWidth - window.innerWidth);
-      const maxY = Math.max(0, root.scrollHeight - window.innerHeight);
-      window.scrollTo(
-        Number.isFinite(pos.rx) ? pos.rx * maxX : pos.x || 0,
-        Number.isFinite(pos.ry) ? pos.ry * maxY : pos.y || 0,
-      );
-    } catch (err) {
-      console.warn("failed to restore Typst HTML preview scroll", err);
-    }
-  }
-
-  function injectClient(html) {
-    const current = document.currentScript;
-    const source = current && current.textContent ? current.textContent : "";
-    if (!source) {
-      return html;
-    }
-    const script = '<script data-tinymist-html-preview-client>' +
-      source.replace(/<\\/script/gi, "<\\\\/script") +
-      '</scr' + 'ipt>';
-    if (/<\\/body\\s*>/i.test(html)) {
-      return html.replace(/<\\/body\\s*>/i, script + "$&");
-    }
-    if (/<\\/html\\s*>/i.test(html)) {
-      return html.replace(/<\\/html\\s*>/i, script + "$&");
-    }
-    return html + script;
-  }
-
-  function replaceDocument(html) {
-    storeScroll();
-    document.open();
-    document.write(injectClient(html));
-    document.close();
-  }
-
-  function renderError(message) {
-    replaceDocument(
-      '<!doctype html><html><head><meta charset="utf-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-      '<title>Typst HTML Preview Error</title></head>' +
-      '<body><pre style="white-space: pre-wrap; margin: 1rem; color: #b00020">' +
-      escapeHtml(message) +
-      '</pre></body></html>'
-    );
-  }
-
-  function splitFrame(data) {
-    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array();
-    const idx = bytes.indexOf(comma);
-    if (idx < 0) {
-      return [decoder.decode(bytes), new Uint8Array()];
-    }
-    return [decoder.decode(bytes.slice(0, idx)).trim(), bytes.slice(idx + 1)];
-  }
-
-  function connect() {
-    const ws = new WebSocket(wsUrl);
-    ws.binaryType = "arraybuffer";
-    ws.onmessage = (event) => {
-      if (!(event.data instanceof ArrayBuffer)) {
-        return;
-      }
-      const [kind, payload] = splitFrame(event.data);
-      const text = decoder.decode(payload);
-      if (kind === "html") {
-        replaceDocument(text);
-      } else if (kind === "html-error") {
-        renderError(text);
-      }
-    };
-    ws.onclose = () => {
-      setTimeout(connect, 1000);
-    };
-  }
-
-  requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
-  connect();
-})();
-`;
-}
-
-function injectHtmlPreviewClient(html: string, url: string): string {
-  const script =
-    `<script data-tinymist-html-preview-client>${htmlPreviewClientScript(url).replace(
-      /<\/script/gi,
-      "<\\/script",
-    )}</scr` + "ipt>";
-
-  if (/<\/body\s*>/i.test(html)) {
-    return html.replace(/<\/body\s*>/i, script + "$&");
-  }
-  if (/<\/html\s*>/i.test(html)) {
-    return html.replace(/<\/html\s*>/i, script + "$&");
-  }
-  return html + script;
-}
-
-function replaceWithHtmlPreviewDocument(html: string, url: string) {
-  storeHtmlPreviewScroll();
-  document.open();
-  document.write(injectHtmlPreviewClient(html, url));
-  document.close();
-}
+const COMMA = ",".charCodeAt(0);
 
 export interface WsArgs {
   url: string;
@@ -438,6 +254,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
   function setupSocket(svgDoc: TypstDocument): () => void {
     windowElem.documents.push(svgDoc);
+    const frameHandlers = createHtmlPreviewFrameHandlers(url, dec);
 
     // todo: reconnect setTimeout(() => setupSocket(svgDoc), 1000);
     $ws = webSocket<ArrayBuffer>({
@@ -514,29 +331,29 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       const buffer = data;
       const messageData = new Uint8Array(buffer);
 
-      const message_idx = messageData.indexOf(COMMA[0]);
+      const message_idx = messageData.indexOf(COMMA);
+      if (message_idx < 0) {
+        console.error("WebSocket data has no message kind delimiter", data);
+        return;
+      }
+
       const message = [
         dec.decode(messageData.slice(0, message_idx).buffer).trim(),
         messageData.slice(message_idx + 1),
-      ];
-      console.log("recv", message[0], messageData.length);
-      // console.log(message[0], message[1].length);
-      if (message[0] === "html") {
-        replaceWithHtmlPreviewDocument(dec.decode((message[1] as any).buffer), url);
-        return;
-      }
-      if (message[0] === "html-error") {
-        replaceWithHtmlPreviewDocument(
-          `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Typst HTML Preview Error</title></head><body><pre style="white-space: pre-wrap; margin: 1rem; color: #b00020">${escapeHtml(dec.decode((message[1] as any).buffer))}</pre></body></html>`,
-          url,
-        );
+      ] as const;
+      const [kind, payload] = message;
+      console.log("recv", kind, messageData.length);
+      // console.log(kind, payload.length);
+
+      const handled = frameHandlers[kind]?.(payload);
+      if (handled) {
         return;
       }
 
       if (isContentPreview) {
         // whether to scroll to the content preview when user updates document
         const autoScrollContentPreview = true;
-        if (!autoScrollContentPreview && message[0] === "jump") {
+        if (!autoScrollContentPreview && kind === "jump") {
           return;
         }
 
@@ -544,15 +361,15 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         // "partial-rendering": content previe always render partially
         // "cursor": currently not supported
         if (
-          message[0] === "viewport" ||
-          message[0] === "partial-rendering" ||
-          message[0] === "cursor"
+          kind === "viewport" ||
+          kind === "partial-rendering" ||
+          kind === "cursor"
         ) {
           return;
         }
       }
 
-      if (message[0] === "jump" || message[0] === "viewport") {
+      if (kind === "jump" || kind === "viewport") {
         const rootElem = document.getElementById("typst-app")?.firstElementChild;
 
         // todo: aware height padding
@@ -564,7 +381,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         }
 
         let positions = dec
-          .decode((message[1] as any).buffer)
+          .decode(payload)
           .split(",")
           .map((t: string) => t.trim())
           .filter((t: string) => t.length > 0);
@@ -611,35 +428,35 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           windowElem.handleTypstLocation(rootElem, pageToJump, x, y);
         }
         return;
-      } else if (message[0] === "cursor") {
+      } else if (kind === "cursor") {
         // todo: aware height padding
         const [page, x, y] = dec
-          .decode((message[1] as any).buffer)
+          .decode(payload)
           .split(" ")
           .map(Number);
         console.log("cursor", page, x, y);
         svgDoc.setCursor(page, x, y);
         svgDoc.addViewportChange(); // todo: synthesizing cursor event
         return;
-      } else if (message[0] === "cursor-paths") {
+      } else if (kind === "cursor-paths") {
         // todo: aware height padding
-        const paths = JSON.parse(dec.decode((message[1] as any).buffer));
+        const paths = JSON.parse(dec.decode(payload));
         console.log("cursor-paths", paths);
         svgDoc.impl.setCursorPaths(paths);
         return;
-      } else if (message[0] === "partial-rendering") {
+      } else if (kind === "partial-rendering") {
         console.log("Experimental feature: partial rendering enabled");
         svgDoc.setPartialRendering(true);
         return;
-      } else if (message[0] === "invert-colors") {
-        const rawStrategy = dec.decode((message[1] as any).buffer).trim();
+      } else if (kind === "invert-colors") {
+        const rawStrategy = dec.decode(payload).trim();
         const strategy =
           INVERT_COLORS_STRATEGY.find((t) => t === rawStrategy) ||
           (JSON.parse(rawStrategy) as StrategyMap);
         console.log("Experimental feature: invert colors strategy taken:", strategy);
         ensureInvertColors(document.getElementById("typst-app"), strategy);
         return;
-      } else if (message[0] === "outline") {
+      } else if (kind === "outline") {
         console.log("Experimental feature: outline rendering");
         return;
       }
