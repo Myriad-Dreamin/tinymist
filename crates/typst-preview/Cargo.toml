@@ -26,8 +26,10 @@ serde_json.workspace = true
 serde.workspace = true
 tinymist-assets.workspace = true
 tinymist-std.workspace = true
+tinymist-task.workspace = true
 tokio = { workspace = true, features = ["time", "rt-multi-thread"] }
 typst.workspace = true
+typst-html.workspace = true
 typst-macros.workspace = true
 typst-timing.workspace = true
 typst-assets.workspace = true

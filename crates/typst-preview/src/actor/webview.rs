@@ -16,6 +16,30 @@ pub enum WebviewActorRequest {
     // CursorPosition(CursorPosition),
 }
 
+#[derive(Debug)]
+pub enum PreviewFrame {
+    Paged(Vec<u8>),
+    Html(Vec<u8>),
+    HtmlError(Vec<u8>),
+}
+
+impl PreviewFrame {
+    fn into_message(self) -> Vec<u8> {
+        match self {
+            PreviewFrame::Paged(frame) => frame,
+            PreviewFrame::Html(html) => prefixed_frame(b"html,", html),
+            PreviewFrame::HtmlError(error) => prefixed_frame(b"html-error,", error),
+        }
+    }
+}
+
+fn prefixed_frame(prefix: &[u8], payload: Vec<u8>) -> Vec<u8> {
+    let mut frame = Vec::with_capacity(prefix.len() + payload.len());
+    frame.extend_from_slice(prefix);
+    frame.extend_from_slice(&payload);
+    frame
+}
+
 fn position_req(
     event: &'static str,
     DocumentPosition { page_no, x, y }: DocumentPosition,
@@ -34,7 +58,7 @@ fn positions_req(event: &'static str, positions: Vec<DocumentPosition>) -> Strin
 
 pub struct WebviewActor<'a, C> {
     webview_websocket_conn: std::pin::Pin<&'a mut C>,
-    svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+    frame_receiver: mpsc::UnboundedReceiver<PreviewFrame>,
     mailbox: broadcast::Receiver<WebviewActorRequest>,
 
     broadcast_sender: broadcast::Sender<WebviewActorRequest>,
@@ -43,9 +67,9 @@ pub struct WebviewActor<'a, C> {
 }
 
 pub struct Channels {
-    pub svg: (
-        mpsc::UnboundedSender<Vec<u8>>,
-        mpsc::UnboundedReceiver<Vec<u8>>,
+    pub frame: (
+        mpsc::UnboundedSender<PreviewFrame>,
+        mpsc::UnboundedReceiver<PreviewFrame>,
     ),
 }
 
@@ -56,12 +80,12 @@ where
 {
     pub fn set_up_channels() -> Channels {
         Channels {
-            svg: mpsc::unbounded_channel(),
+            frame: mpsc::unbounded_channel(),
         }
     }
     pub fn new(
         websocket_conn: std::pin::Pin<&'a mut C>,
-        svg_receiver: mpsc::UnboundedReceiver<Vec<u8>>,
+        frame_receiver: mpsc::UnboundedReceiver<PreviewFrame>,
         broadcast_sender: broadcast::Sender<WebviewActorRequest>,
         mailbox: broadcast::Receiver<WebviewActorRequest>,
         editor_sender: mpsc::UnboundedSender<EditorActorRequest>,
@@ -69,7 +93,7 @@ where
     ) -> Self {
         Self {
             webview_websocket_conn: websocket_conn,
-            svg_receiver,
+            frame_receiver,
             mailbox,
             broadcast_sender,
             editor_sender,
@@ -95,10 +119,10 @@ where
                         }
                     }
                 }
-                Some(svg) = self.svg_receiver.recv() => {
-                    log::trace!("WebviewActor: received svg from renderer");
-                    let _scope = typst_timing::TimingScope::new("webview_actor_send_svg");
-                    self.webview_websocket_conn.send(WsMessage::Binary(svg.into()))
+                Some(frame) = self.frame_receiver.recv() => {
+                    log::trace!("WebviewActor: received preview frame from renderer");
+                    let _scope = typst_timing::TimingScope::new("webview_actor_send_frame");
+                    self.webview_websocket_conn.send(WsMessage::Binary(frame.into_message().into()))
                     .await.log_error("WebViewActor");
                 }
                 Some(msg) = self.webview_websocket_conn.next() => {

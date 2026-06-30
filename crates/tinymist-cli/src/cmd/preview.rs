@@ -16,6 +16,7 @@ use tinymist_preview::{
 };
 use tinymist_project::WorldProvider;
 use tinymist_std::error::prelude::*;
+use tinymist_task::ExportTarget;
 use tokio::sync::mpsc;
 
 use crate::utils::exit_on_ctrl_c;
@@ -37,6 +38,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     exit_on_ctrl_c();
 
+    let preview_target = args.preview.format;
+    if matches!(preview_target, ExportTarget::Bundle) {
+        bail!("bundle export target is not supported by preview");
+    }
     let verse = args.compile.resolve()?;
     let previewer = PreviewBuilder::new(config);
 
@@ -45,6 +50,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         let opts = ProjectOpts {
             handle: Some(handle),
             preview: preview_state.clone(),
+            export_target: preview_target,
             ..ProjectOpts::default()
         };
 

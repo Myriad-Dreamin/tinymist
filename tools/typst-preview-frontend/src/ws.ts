@@ -336,6 +336,15 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       ];
       console.log("recv", message[0], messageData.length);
       // console.log(message[0], message[1].length);
+      if (message[0] === "html") {
+        renderHtmlPreview(dec.decode((message[1] as any).buffer));
+        return;
+      }
+      if (message[0] === "html-error") {
+        console.error(dec.decode((message[1] as any).buffer));
+        return;
+      }
+
       if (isContentPreview) {
         // whether to scroll to the content preview when user updates document
         const autoScrollContentPreview = true;
@@ -448,6 +457,53 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       }
 
       svgDoc.addChangement(message as any);
+    }
+
+    function renderHtmlPreview(html: string) {
+      const hookedElem = document.getElementById("typst-app");
+      if (!hookedElem) {
+        return;
+      }
+
+      const existing = hookedElem.querySelector<HTMLIFrameElement>(
+        "iframe[data-typst-html-preview]",
+      );
+      const existingDocument = existing?.contentDocument;
+      const existingWindow = existing?.contentWindow;
+      const previousScrollRatio =
+        existingDocument && existingWindow
+          ? existingWindow.scrollY / Math.max(1, existingDocument.documentElement.scrollHeight)
+          : 0;
+
+      const frame = existing ?? document.createElement("iframe");
+      frame.dataset.typstHtmlPreview = "true";
+      frame.style.display = "block";
+      frame.style.border = "0";
+      frame.style.width = "100%";
+      frame.style.minHeight = "100vh";
+      frame.style.background = "white";
+
+      if (!existing) {
+        hookedElem.innerHTML = "";
+        hookedElem.appendChild(frame);
+      }
+
+      frame.onload = () => {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        if (!doc || !win) {
+          return;
+        }
+
+        const height = Math.max(
+          doc.body?.scrollHeight ?? 0,
+          doc.documentElement.scrollHeight,
+          window.innerHeight,
+        );
+        frame.style.height = `${height}px`;
+        win.scrollTo(0, previousScrollRatio * Math.max(1, height));
+      };
+      frame.srcdoc = html;
     }
 
     return dispose;

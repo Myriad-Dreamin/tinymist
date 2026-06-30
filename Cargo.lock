@@ -7037,10 +7037,12 @@ dependencies = [
  "serde_json",
  "tinymist-assets 0.15.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
+ "tinymist-task",
  "tinymist-tests",
  "tokio",
  "typst",
  "typst-assets",
+ "typst-html",
  "typst-macros",
  "typst-timing 0.15.0",
 ]

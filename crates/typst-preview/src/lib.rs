@@ -23,10 +23,12 @@ use reflexo_typst::debug_loc::{DocumentPosition, SourceSpanOffset};
 use serde::{Deserialize, Serialize};
 use tinymist_std::error::IgnoreLogging;
 use tinymist_std::typst::TypstDocument;
+use tinymist_task::ExportTarget;
 use tokio::sync::{broadcast, mpsc};
 use typst::{introspection::PagedPosition, syntax::Span};
 
 use crate::actor::editor::{EditorActor, EditorActorRequest};
+use crate::actor::html::HtmlRenderActor;
 use crate::actor::render::RenderActorRequest;
 use crate::actor::webview::WebviewActorRequest;
 use crate::debug_loc::SpanInterner;
@@ -49,6 +51,8 @@ pub enum PreviewMode {
 /// Configure the preview service.
 #[derive(Debug, Clone, Default)]
 pub struct PreviewConfig {
+    /// Configure the preview output format.
+    pub format: ExportTarget,
     /// Enable partial rendering.
     pub enable_partial_rendering: bool,
     /// Configure the refresh style of the preview.
@@ -175,31 +179,46 @@ impl Previewer {
                     .await
                     .log_error("SendInvertColor");
                 }
-                let actor::webview::Channels { svg } =
+                let actor::webview::Channels { frame } =
                     actor::webview::WebviewActor::<'_, C>::set_up_channels();
                 let webview_actor = actor::webview::WebviewActor::new(
                     conn,
-                    svg.1,
+                    frame.1,
                     h.webview_tx.clone(),
                     h.webview_tx.subscribe(),
                     h.editor_tx.clone(),
                     h.renderer_tx.clone(),
                 );
-                let render_actor = actor::render::RenderActor::new(
-                    h.renderer_tx.subscribe(),
-                    h.doc_sender.clone(),
-                    h.editor_tx.clone(),
-                    svg.0,
-                    h.webview_tx,
-                );
-                tokio::spawn(render_actor.run());
-                let outline_render_actor = actor::render::OutlineRenderActor::new(
-                    h.renderer_tx.subscribe(),
-                    h.doc_sender.clone(),
-                    h.editor_tx.clone(),
-                    h.span_interner,
-                );
-                tokio::spawn(outline_render_actor.run());
+                match h.format {
+                    ExportTarget::Paged => {
+                        let render_actor = actor::render::RenderActor::new(
+                            h.renderer_tx.subscribe(),
+                            h.doc_sender.clone(),
+                            h.editor_tx.clone(),
+                            frame.0,
+                            h.webview_tx,
+                        );
+                        tokio::spawn(render_actor.run());
+                        let outline_render_actor = actor::render::OutlineRenderActor::new(
+                            h.renderer_tx.subscribe(),
+                            h.doc_sender.clone(),
+                            h.editor_tx.clone(),
+                            h.span_interner,
+                        );
+                        tokio::spawn(outline_render_actor.run());
+                    }
+                    ExportTarget::Html => {
+                        let html_render_actor = HtmlRenderActor::new(
+                            h.renderer_tx.subscribe(),
+                            h.doc_sender.clone(),
+                            frame.0,
+                        );
+                        tokio::spawn(html_render_actor.run());
+                    }
+                    ExportTarget::Bundle => {
+                        log::warn!("bundle export target is not supported by preview");
+                    }
+                }
 
                 struct FinallySend(mpsc::UnboundedSender<()>);
                 impl Drop for FinallySend {
@@ -322,6 +341,7 @@ impl PreviewBuilder {
 
         // Delayed data plane binding
         let data_plane = DataPlane {
+            format: config.format,
             span_interner: span_interner.clone(),
             webview_tx: webview_tx.clone(),
             editor_tx: editor_tx.clone(),
@@ -578,6 +598,7 @@ impl CompileWatcher {
 
 #[derive(Clone)]
 struct DataPlane {
+    format: ExportTarget,
     span_interner: SpanInterner,
     webview_tx: broadcast::Sender<WebviewActorRequest>,
     editor_tx: mpsc::UnboundedSender<EditorActorRequest>,

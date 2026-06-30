@@ -6,7 +6,10 @@ use reflexo_vec2svg::IncrSvgDocServer;
 use tinymist_std::typst::TypstDocument;
 use tokio::sync::{broadcast, mpsc};
 
-use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
+use super::{
+    editor::EditorActorRequest,
+    webview::{PreviewFrame, WebviewActorRequest},
+};
 use crate::debug_loc::SpanInterner;
 use crate::outline::Outline;
 use crate::protocol;
@@ -38,7 +41,7 @@ pub struct RenderActor {
     view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     renderer: IncrSvgDocServer,
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
-    svg_sender: mpsc::UnboundedSender<Vec<u8>>,
+    frame_sender: mpsc::UnboundedSender<PreviewFrame>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
 }
 
@@ -47,7 +50,7 @@ impl RenderActor {
         mailbox: broadcast::Receiver<RenderActorRequest>,
         view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
         editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
-        svg_sender: mpsc::UnboundedSender<Vec<u8>>,
+        frame_sender: mpsc::UnboundedSender<PreviewFrame>,
         webview_sender: broadcast::Sender<WebviewActorRequest>,
     ) -> Self {
         Self {
@@ -55,7 +58,7 @@ impl RenderActor {
             view,
             renderer: Self::new_renderer(),
             editor_conn_sender,
-            svg_sender,
+            frame_sender,
             webview_sender,
         }
     }
@@ -125,8 +128,8 @@ impl RenderActor {
             };
 
             let data = self.render(has_full_render, &document);
-            let Ok(_) = self.svg_sender.send(data) else {
-                log::info!("RenderActor: svg_sender is dropped");
+            let Ok(_) = self.frame_sender.send(PreviewFrame::Paged(data)) else {
+                log::info!("RenderActor: frame_sender is dropped");
                 break;
             };
         }
