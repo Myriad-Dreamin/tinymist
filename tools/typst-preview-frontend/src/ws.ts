@@ -25,6 +25,191 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 const NOT_AVAILABLE = "current not available";
 const COMMA = enc.encode(",");
+const HTML_PREVIEW_SCROLL_KEY = "tinymist-html-preview-scroll";
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
+function storeHtmlPreviewScroll() {
+  const root = document.documentElement;
+  const maxX = Math.max(1, root.scrollWidth - window.innerWidth);
+  const maxY = Math.max(1, root.scrollHeight - window.innerHeight);
+  sessionStorage.setItem(
+    HTML_PREVIEW_SCROLL_KEY,
+    JSON.stringify({
+      x: window.scrollX,
+      y: window.scrollY,
+      rx: window.scrollX / maxX,
+      ry: window.scrollY / maxY,
+    }),
+  );
+}
+
+function htmlPreviewClientScript(url: string): string {
+  return `
+(() => {
+  const wsUrl = ${JSON.stringify(url)};
+  const scrollKey = ${JSON.stringify(HTML_PREVIEW_SCROLL_KEY)};
+  const decoder = new TextDecoder();
+  const comma = ",".charCodeAt(0);
+
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, (ch) => {
+      switch (ch) {
+        case "&":
+          return "&amp;";
+        case "<":
+          return "&lt;";
+        case ">":
+          return "&gt;";
+        case '"':
+          return "&quot;";
+        default:
+          return "&#39;";
+      }
+    });
+  }
+
+  function storeScroll() {
+    const root = document.documentElement;
+    const maxX = Math.max(1, root.scrollWidth - window.innerWidth);
+    const maxY = Math.max(1, root.scrollHeight - window.innerHeight);
+    sessionStorage.setItem(scrollKey, JSON.stringify({
+      x: window.scrollX,
+      y: window.scrollY,
+      rx: window.scrollX / maxX,
+      ry: window.scrollY / maxY,
+    }));
+  }
+
+  function restoreScroll() {
+    const raw = sessionStorage.getItem(scrollKey);
+    if (!raw) {
+      return;
+    }
+    sessionStorage.removeItem(scrollKey);
+    try {
+      const pos = JSON.parse(raw);
+      const root = document.documentElement;
+      const maxX = Math.max(0, root.scrollWidth - window.innerWidth);
+      const maxY = Math.max(0, root.scrollHeight - window.innerHeight);
+      window.scrollTo(
+        Number.isFinite(pos.rx) ? pos.rx * maxX : pos.x || 0,
+        Number.isFinite(pos.ry) ? pos.ry * maxY : pos.y || 0,
+      );
+    } catch (err) {
+      console.warn("failed to restore Typst HTML preview scroll", err);
+    }
+  }
+
+  function injectClient(html) {
+    const current = document.currentScript;
+    const source = current && current.textContent ? current.textContent : "";
+    if (!source) {
+      return html;
+    }
+    const script = '<script data-tinymist-html-preview-client>' +
+      source.replace(/<\\/script/gi, "<\\\\/script") +
+      '</scr' + 'ipt>';
+    if (/<\\/body\\s*>/i.test(html)) {
+      return html.replace(/<\\/body\\s*>/i, script + "$&");
+    }
+    if (/<\\/html\\s*>/i.test(html)) {
+      return html.replace(/<\\/html\\s*>/i, script + "$&");
+    }
+    return html + script;
+  }
+
+  function replaceDocument(html) {
+    storeScroll();
+    document.open();
+    document.write(injectClient(html));
+    document.close();
+  }
+
+  function renderError(message) {
+    replaceDocument(
+      '<!doctype html><html><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<title>Typst HTML Preview Error</title></head>' +
+      '<body><pre style="white-space: pre-wrap; margin: 1rem; color: #b00020">' +
+      escapeHtml(message) +
+      '</pre></body></html>'
+    );
+  }
+
+  function splitFrame(data) {
+    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array();
+    const idx = bytes.indexOf(comma);
+    if (idx < 0) {
+      return [decoder.decode(bytes), new Uint8Array()];
+    }
+    return [decoder.decode(bytes.slice(0, idx)).trim(), bytes.slice(idx + 1)];
+  }
+
+  function connect() {
+    const ws = new WebSocket(wsUrl);
+    ws.binaryType = "arraybuffer";
+    ws.onmessage = (event) => {
+      if (!(event.data instanceof ArrayBuffer)) {
+        return;
+      }
+      const [kind, payload] = splitFrame(event.data);
+      const text = decoder.decode(payload);
+      if (kind === "html") {
+        replaceDocument(text);
+      } else if (kind === "html-error") {
+        renderError(text);
+      }
+    };
+    ws.onclose = () => {
+      setTimeout(connect, 1000);
+    };
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
+  connect();
+})();
+`;
+}
+
+function injectHtmlPreviewClient(html: string, url: string): string {
+  const script =
+    `<script data-tinymist-html-preview-client>${htmlPreviewClientScript(url).replace(
+      /<\/script/gi,
+      "<\\/script",
+    )}</scr` + "ipt>";
+
+  if (/<\/body\s*>/i.test(html)) {
+    return html.replace(/<\/body\s*>/i, script + "$&");
+  }
+  if (/<\/html\s*>/i.test(html)) {
+    return html.replace(/<\/html\s*>/i, script + "$&");
+  }
+  return html + script;
+}
+
+function replaceWithHtmlPreviewDocument(html: string, url: string) {
+  storeHtmlPreviewScroll();
+  document.open();
+  document.write(injectHtmlPreviewClient(html, url));
+  document.close();
+}
+
 export interface WsArgs {
   url: string;
   previewMode: PreviewMode;
@@ -331,17 +516,20 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
 
       const message_idx = messageData.indexOf(COMMA[0]);
       const message = [
-        dec.decode(messageData.slice(0, message_idx).buffer),
+        dec.decode(messageData.slice(0, message_idx).buffer).trim(),
         messageData.slice(message_idx + 1),
       ];
       console.log("recv", message[0], messageData.length);
       // console.log(message[0], message[1].length);
       if (message[0] === "html") {
-        renderHtmlPreview(dec.decode((message[1] as any).buffer));
+        replaceWithHtmlPreviewDocument(dec.decode((message[1] as any).buffer), url);
         return;
       }
       if (message[0] === "html-error") {
-        console.error(dec.decode((message[1] as any).buffer));
+        replaceWithHtmlPreviewDocument(
+          `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Typst HTML Preview Error</title></head><body><pre style="white-space: pre-wrap; margin: 1rem; color: #b00020">${escapeHtml(dec.decode((message[1] as any).buffer))}</pre></body></html>`,
+          url,
+        );
         return;
       }
 
@@ -457,53 +645,6 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
       }
 
       svgDoc.addChangement(message as any);
-    }
-
-    function renderHtmlPreview(html: string) {
-      const hookedElem = document.getElementById("typst-app");
-      if (!hookedElem) {
-        return;
-      }
-
-      const existing = hookedElem.querySelector<HTMLIFrameElement>(
-        "iframe[data-typst-html-preview]",
-      );
-      const existingDocument = existing?.contentDocument;
-      const existingWindow = existing?.contentWindow;
-      const previousScrollRatio =
-        existingDocument && existingWindow
-          ? existingWindow.scrollY / Math.max(1, existingDocument.documentElement.scrollHeight)
-          : 0;
-
-      const frame = existing ?? document.createElement("iframe");
-      frame.dataset.typstHtmlPreview = "true";
-      frame.style.display = "block";
-      frame.style.border = "0";
-      frame.style.width = "100%";
-      frame.style.minHeight = "100vh";
-      frame.style.background = "white";
-
-      if (!existing) {
-        hookedElem.innerHTML = "";
-        hookedElem.appendChild(frame);
-      }
-
-      frame.onload = () => {
-        const doc = frame.contentDocument;
-        const win = frame.contentWindow;
-        if (!doc || !win) {
-          return;
-        }
-
-        const height = Math.max(
-          doc.body?.scrollHeight ?? 0,
-          doc.documentElement.scrollHeight,
-          window.innerHeight,
-        );
-        frame.style.height = `${height}px`;
-        win.scrollTo(0, previousScrollRatio * Math.max(1, height));
-      };
-      frame.srcdoc = html;
     }
 
     return dispose;
