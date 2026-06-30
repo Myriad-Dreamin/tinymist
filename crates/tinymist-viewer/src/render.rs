@@ -111,14 +111,14 @@ impl<'m> GlyphFactory for Renderer<'m> {
         font: &FontItem,
         glyph: u32,
         style: &DrawStyle,
-        pos: Vec2,
+        _pos: Vec2,
     ) -> Option<Arc<VecScene>> {
         let glyph_data = font.get_glyph(glyph)?;
 
         match glyph_data.as_ref() {
             ir::FlatGlyphItem::Outline(path) => {
                 let path = svg_path(&path.d)?;
-                let style = style.translated_for_glyph(pos);
+                let style = style.clone();
                 if !style.has_draw() {
                     return None;
                 }
@@ -387,8 +387,14 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
 
     fn render_glyph(&mut self, ctx: &mut C, pos: Axes<Scalar>, font: &FontItem, glyph: u32) {
         let pos = Vec2::new(pos.x.0 as f64, pos.y.0 as f64);
+        let glyph_transform = self.ts.pre_translate(pos);
         if let Some(style) = &self.glyph_style
-            && let Some(glyph) = ctx.get_glyph(font, glyph, style, pos)
+            && let Some(glyph) = ctx.get_glyph(
+                font,
+                glyph,
+                &style.translated_for_glyph(pos, glyph_transform),
+                pos,
+            )
         {
             self.items.push(GroupSceneItem::Scene { pos, scene: glyph });
         }
@@ -667,15 +673,18 @@ impl DrawStyle {
         self.fill.is_some() || self.stroke.is_some()
     }
 
-    fn translated_for_glyph(&self, pos: Vec2) -> Self {
+    fn translated_for_glyph(&self, pos: Vec2, glyph_transform: Affine) -> Self {
         Self {
             fill: self
                 .fill
                 .clone()
-                .map(|paint| paint.translated_for_glyph(pos)),
+                .map(|paint| paint.translated_for_glyph(pos, glyph_transform)),
             fill_rule: self.fill_rule,
             stroke: self.stroke.as_ref().map(|stroke| StrokeStyle {
-                brush: stroke.brush.clone().translated_for_glyph(pos),
+                brush: stroke
+                    .brush
+                    .clone()
+                    .translated_for_glyph(pos, glyph_transform),
                 stroke: stroke.stroke.clone(),
             }),
         }
@@ -813,15 +822,19 @@ impl PaintBrush {
         }
     }
 
-    fn translated_for_glyph(self, pos: Vec2) -> Self {
+    fn translated_for_glyph(self, pos: Vec2, glyph_transform: Affine) -> Self {
         match self {
             Self::Brush {
                 brush,
                 mut transform,
             } => {
-                if let peniko::Brush::Gradient(_) = brush {
+                if let peniko::Brush::Gradient(gradient) = &brush {
                     let matrix = transform.unwrap_or(Affine::IDENTITY);
-                    transform = Some(matrix.then_translate(-pos));
+                    transform = Some(if matches!(gradient.kind, peniko::GradientKind::Sweep(_)) {
+                        glyph_transform.inverse() * matrix
+                    } else {
+                        matrix.then_translate(-pos)
+                    });
                 }
 
                 Self::Brush { brush, transform }
@@ -967,10 +980,13 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
     let id = paint.strip_prefix("@g")?;
     let mut fingerprint = parse_fingerprint(id)?;
     let mut transform = None;
+    let mut conic_geometry = ConicGradientGeometry::default();
 
     if let Some(ir::VecItem::ColorTransform(color_transform)) = module.get_item(&fingerprint) {
         fingerprint = color_transform.item;
-        transform = Some(convert_transform(&color_transform.transform));
+        let converted = convert_transform(&color_transform.transform);
+        transform = Some(converted);
+        conic_geometry = ConicGradientGeometry::from_paint_transform(converted);
     }
 
     let gradient = match module.get_item(&fingerprint) {
@@ -978,8 +994,10 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
         _ => return None,
     };
 
-    let converted = convert_gradient(gradient)?;
-    if let Some(gradient_transform) = converted.transform {
+    let converted = convert_gradient(gradient, conic_geometry)?;
+    if converted.uses_paint_transform {
+        transform = converted.transform;
+    } else if let Some(gradient_transform) = converted.transform {
         transform = Some(match transform {
             Some(transform) => transform * gradient_transform,
             None => gradient_transform,
@@ -1032,11 +1050,28 @@ fn convert_transform(m: &ir::Transform) -> Affine {
 struct ConvertedGradient {
     gradient: peniko::Gradient,
     transform: Option<Affine>,
+    uses_paint_transform: bool,
 }
 
 const VELLO_GRADIENT_SAMPLES: usize = 512;
 
-fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
+#[derive(Clone, Copy, Debug, Default)]
+struct ConicGradientGeometry {
+    bake_transform: Option<Affine>,
+}
+
+impl ConicGradientGeometry {
+    fn from_paint_transform(transform: Affine) -> Self {
+        Self {
+            bake_transform: can_bake_conic_transform(transform).then_some(transform),
+        }
+    }
+}
+
+fn convert_gradient(
+    gradient: &GradientItem,
+    conic_geometry: ConicGradientGeometry,
+) -> Option<ConvertedGradient> {
     if gradient.stops.is_empty() {
         return None;
     }
@@ -1077,7 +1112,13 @@ fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
                 }
             }
 
-            transform = Some(conic_gradient_transform(center, *angle));
+            if let Some(paint_transform) = conic_geometry.bake_transform {
+                center = transform_point(paint_transform, center);
+                transform = Some(conic_gradient_transform(center, *angle));
+            } else {
+                transform = Some(conic_gradient_transform(center, *angle));
+            }
+
             peniko::Gradient::new_sweep(
                 (center.x.0 as f64, center.y.0 as f64),
                 0.,
@@ -1092,6 +1133,8 @@ fn convert_gradient(gradient: &GradientItem) -> Option<ConvertedGradient> {
     Some(ConvertedGradient {
         gradient: peniko_gradient,
         transform,
+        uses_paint_transform: matches!(gradient.kind, GradientKind::Conic(_))
+            && conic_geometry.bake_transform.is_some(),
     })
 }
 
@@ -1218,14 +1261,27 @@ fn dynamic_color_from_typst(color: TypstColor) -> peniko::color::DynamicColor {
 
 fn conic_gradient_transform(center: Axes<Scalar>, angle: Scalar) -> Affine {
     let center = Vec2::new(center.x.0 as f64, center.y.0 as f64);
-    scale_non_uniform_about(-1., 1., center)
-        * Affine::rotate_about(-(angle.0 as f64), (center.x, center.y))
+    Affine::rotate_about(angle.0 as f64 + std::f64::consts::PI, (center.x, center.y))
 }
 
-fn scale_non_uniform_about(scale_x: f64, scale_y: f64, center: Vec2) -> Affine {
-    Affine::translate(-center)
-        .then_scale_non_uniform(scale_x, scale_y)
-        .then_translate(center)
+fn can_bake_conic_transform(transform: Affine) -> bool {
+    let [xx, yx, xy, yy, dx, dy] = transform.as_coeffs();
+    xx > f64::EPSILON
+        && yy > f64::EPSILON
+        && yx.abs() <= f64::EPSILON
+        && xy.abs() <= f64::EPSILON
+        && dx.is_finite()
+        && dy.is_finite()
+}
+
+fn transform_point(transform: Affine, point: Axes<Scalar>) -> Axes<Scalar> {
+    let [xx, yx, xy, yy, dx, dy] = transform.as_coeffs();
+    let x = point.x.0 as f64;
+    let y = point.y.0 as f64;
+    Axes::new(
+        Scalar((xx * x + xy * y + dx) as f32),
+        Scalar((yx * x + yy * y + dy) as f32),
+    )
 }
 
 fn linear_gradient_points(angle: f32) -> ((f64, f64), (f64, f64)) {
@@ -1471,10 +1527,11 @@ mod tests {
             panic!("expected gradient item");
         };
 
-        let converted = convert_gradient(&gradient).expect("gradient should convert");
-        assert_eq!(
-            converted.transform,
-            Some(Affine::new([-1., 0., 0., 1., 1., 0.]))
+        let converted = convert_gradient(&gradient, ConicGradientGeometry::default())
+            .expect("gradient should convert");
+        assert_affine_approx_eq(
+            converted.transform.expect("expected conic transform"),
+            Affine::new([-1., 0., 0., -1., 1., 1.]),
         );
 
         let peniko_gradient = converted.gradient;
@@ -1484,6 +1541,128 @@ mod tests {
 
         assert_eq!(sweep.start_angle, 0.);
         assert_eq!(sweep.end_angle, std::f32::consts::TAU);
+    }
+
+    #[test]
+    fn resolves_conic_gradient_without_aspect_ratio_distortion() {
+        let mut module = Module::default();
+        let gradient_id = Fingerprint::from_pair(1, 0);
+        let transform_id = Fingerprint::from_pair(2, 0);
+        let transform = ir::Transform::from_scale(Scalar(70.), Scalar(25.));
+
+        let mut gradient = sample_gradient(GradientKind::Conic(Scalar(135f32.to_radians())));
+        let ir::VecItem::Gradient(gradient_item) = &mut gradient else {
+            panic!("expected gradient item");
+        };
+        Arc::make_mut(gradient_item)
+            .styles
+            .push(GradientStyle::Center(Axes::new(Scalar(0.7), Scalar(0.3))));
+
+        module.items.insert(gradient_id, gradient);
+        module.items.insert(
+            transform_id,
+            ir::VecItem::ColorTransform(Arc::new(ir::ColorTransform {
+                transform,
+                item: gradient_id,
+            })),
+        );
+
+        let paint = resolve_paint(&module, &format!("@{}", transform_id.as_svg_id("g")).into());
+
+        let PaintBrush::Brush {
+            brush,
+            transform: paint_transform,
+        } = paint
+        else {
+            panic!("expected brush paint");
+        };
+
+        assert_affine_approx_eq(
+            paint_transform.expect("expected conic transform"),
+            conic_gradient_transform(
+                Axes::new(Scalar(49.), Scalar(7.5)),
+                Scalar(135f32.to_radians()),
+            ),
+        );
+
+        let peniko::Brush::Gradient(gradient) = brush else {
+            panic!("expected gradient brush");
+        };
+        let peniko::GradientKind::Sweep(sweep) = gradient.kind else {
+            panic!("expected sweep gradient");
+        };
+
+        assert!((sweep.center.x - 49.).abs() <= 1e-6);
+        assert!((sweep.center.y - 7.5).abs() <= 1e-6);
+    }
+
+    #[test]
+    fn resolves_translated_conic_gradient_without_aspect_ratio_distortion() {
+        let mut module = Module::default();
+        let gradient_id = Fingerprint::from_pair(1, 0);
+        let transform_id = Fingerprint::from_pair(2, 0);
+        let transform = ir::Transform {
+            sx: Scalar(200.),
+            ky: Scalar(0.),
+            kx: Scalar(0.),
+            sy: Scalar(80.),
+            tx: Scalar(-10.),
+            ty: Scalar(-20.),
+        };
+
+        let mut gradient = sample_gradient(GradientKind::Conic(Scalar(45f32.to_radians())));
+        let ir::VecItem::Gradient(gradient_item) = &mut gradient else {
+            panic!("expected gradient item");
+        };
+        Arc::make_mut(gradient_item)
+            .styles
+            .push(GradientStyle::Center(Axes::new(Scalar(0.5), Scalar(0.5))));
+
+        module.items.insert(gradient_id, gradient);
+        module.items.insert(
+            transform_id,
+            ir::VecItem::ColorTransform(Arc::new(ir::ColorTransform {
+                transform,
+                item: gradient_id,
+            })),
+        );
+
+        let paint = resolve_paint(&module, &format!("@{}", transform_id.as_svg_id("g")).into());
+
+        let PaintBrush::Brush {
+            brush,
+            transform: paint_transform,
+        } = paint
+        else {
+            panic!("expected brush paint");
+        };
+
+        assert_affine_approx_eq(
+            paint_transform.expect("expected conic transform"),
+            conic_gradient_transform(
+                Axes::new(Scalar(90.), Scalar(20.)),
+                Scalar(45f32.to_radians()),
+            ),
+        );
+
+        let peniko::Brush::Gradient(gradient) = brush else {
+            panic!("expected gradient brush");
+        };
+        let peniko::GradientKind::Sweep(sweep) = gradient.kind else {
+            panic!("expected sweep gradient");
+        };
+
+        assert!((sweep.center.x - 90.).abs() <= 1e-6);
+        assert!((sweep.center.y - 20.).abs() <= 1e-6);
+    }
+
+    fn assert_affine_approx_eq(actual: Affine, expected: Affine) {
+        for (actual, expected) in actual.as_coeffs().into_iter().zip(expected.as_coeffs()) {
+            assert!(
+                (actual - expected).abs() <= 1e-6,
+                "expected affine coefficient {expected}, got {actual}"
+            );
+        }
     }
 
     #[test]
