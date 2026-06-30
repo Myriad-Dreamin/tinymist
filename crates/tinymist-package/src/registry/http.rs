@@ -320,3 +320,198 @@ pub(crate) fn threaded_http<T: Send + Sync>(
         .ok()
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+    use std::str::FromStr;
+
+    use super::*;
+
+    fn drawmatrix_spec() -> PackageSpec {
+        PackageSpec::from_str("@local/drawmatrix:0.1.0").expect("valid package spec")
+    }
+
+    fn write_package_dir(root: &Path) -> PathBuf {
+        let package_dir = root.join("local/drawmatrix/0.1.0");
+        std::fs::create_dir_all(&package_dir).expect("package directory should be created");
+        package_dir
+    }
+
+    fn storage(data_root: &Path, cache_root: &Path) -> PackageStorage {
+        PackageStorage::new(
+            Some(cache_root.into()),
+            Some(data_root.into()),
+            None,
+            Arc::new(Mutex::<DummyNotifier>::default()),
+        )
+    }
+
+    #[test]
+    fn package_storage_resolves_data_then_cache_for_local_packages() {
+        struct Case {
+            name: &'static str,
+            data_package_exists: bool,
+            cache_package_exists: bool,
+            expected_root: Option<&'static str>,
+        }
+
+        let temp = tempfile::tempdir().expect("tempdir should be created");
+        let spec = drawmatrix_spec();
+
+        for (idx, case) in [
+            Case {
+                name: "data only",
+                data_package_exists: true,
+                cache_package_exists: false,
+                expected_root: Some("data"),
+            },
+            Case {
+                name: "cache only",
+                data_package_exists: false,
+                cache_package_exists: true,
+                expected_root: Some("cache"),
+            },
+            Case {
+                name: "data and cache",
+                data_package_exists: true,
+                cache_package_exists: true,
+                expected_root: Some("data"),
+            },
+            Case {
+                name: "neither data nor cache",
+                data_package_exists: false,
+                cache_package_exists: false,
+                expected_root: None,
+            },
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let case_root = temp.path().join(format!("case-{idx}"));
+            let data_root = case_root.join("data");
+            let cache_root = case_root.join("cache");
+
+            if case.data_package_exists {
+                write_package_dir(&data_root);
+            }
+
+            if case.cache_package_exists {
+                write_package_dir(&cache_root);
+            }
+
+            let storage = storage(&data_root, &cache_root);
+            let result = storage.prepare_package(&spec);
+
+            match case.expected_root {
+                Some("data") => {
+                    let resolved = result.unwrap_or_else(|err| {
+                        panic!(
+                            "expected data package to resolve for {}, got {err:?}",
+                            case.name
+                        )
+                    });
+                    assert_eq!(resolved.as_ref(), data_root.join("local/drawmatrix/0.1.0"));
+                }
+                Some("cache") => {
+                    let resolved = result.unwrap_or_else(|err| {
+                        panic!(
+                            "expected cache package to resolve for {}, got {err:?}",
+                            case.name
+                        )
+                    });
+                    assert_eq!(resolved.as_ref(), cache_root.join("local/drawmatrix/0.1.0"));
+                }
+                None => {
+                    assert!(
+                        matches!(result, Err(PackageError::NotFound(_))),
+                        "expected missing package for {}, got {result:?}",
+                        case.name
+                    );
+                }
+                Some(other) => unreachable!("unexpected expected root {other}"),
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn default_linux_package_dirs_follow_process_xdg_environment() {
+        use std::ffi::OsStr;
+
+        let temp = tempfile::tempdir().expect("tempdir should be created");
+        let fallback_home = temp.path().join("fallback-home");
+        std::fs::create_dir_all(&fallback_home).expect("fallback home directory should be created");
+
+        let env: [(&str, Option<&OsStr>); 5] = [
+            ("HOME", Some(fallback_home.as_os_str())),
+            ("XDG_DATA_HOME", None),
+            ("XDG_CACHE_HOME", None),
+            ("TYPST_PACKAGE_PATH", None),
+            ("TYPST_PACKAGE_CACHE_PATH", None),
+        ];
+
+        temp_env::with_vars(env, || {
+            let registry = HttpRegistry::default();
+            let storage = registry.storage();
+
+            let expected_data = fallback_home.join(".local/share/typst/packages");
+            let expected_cache = fallback_home.join(".cache/typst/packages");
+            assert_eq!(
+                storage.package_path().map(|path| path.as_ref()),
+                Some(expected_data.as_path())
+            );
+            assert_eq!(
+                storage.package_cache_path().map(|path| path.as_ref()),
+                Some(expected_cache.as_path())
+            );
+
+            let expected = write_package_dir(&expected_data);
+            let resolved = storage
+                .prepare_package(&drawmatrix_spec())
+                .expect("package under HOME fallback should resolve");
+            assert_eq!(resolved.as_ref(), expected);
+        });
+
+        let home = temp.path().join("xdg-home");
+        let xdg_data_home = temp.path().join("xdg-data");
+        let xdg_cache_home = temp.path().join("xdg-cache");
+        std::fs::create_dir_all(&home).expect("XDG home directory should be created");
+
+        let env: [(&str, Option<&OsStr>); 5] = [
+            ("HOME", Some(home.as_os_str())),
+            ("XDG_DATA_HOME", Some(xdg_data_home.as_os_str())),
+            ("XDG_CACHE_HOME", Some(xdg_cache_home.as_os_str())),
+            ("TYPST_PACKAGE_PATH", None),
+            ("TYPST_PACKAGE_CACHE_PATH", None),
+        ];
+
+        temp_env::with_vars(env, || {
+            let registry = HttpRegistry::default();
+            let storage = registry.storage();
+
+            assert_eq!(
+                storage.package_path().map(|path| path.as_ref()),
+                Some(xdg_data_home.join(DEFAULT_PACKAGES_SUBDIR).as_path())
+            );
+            assert_eq!(
+                storage.package_cache_path().map(|path| path.as_ref()),
+                Some(xdg_cache_home.join(DEFAULT_PACKAGES_SUBDIR).as_path())
+            );
+
+            let spec = drawmatrix_spec();
+            write_package_dir(&home.join(".local/share/typst/packages"));
+            let result = storage.prepare_package(&spec);
+            assert!(
+                matches!(result, Err(PackageError::NotFound(_))),
+                "HOME fallback should not be searched while XDG_DATA_HOME is set, got {result:?}"
+            );
+
+            let expected = write_package_dir(&xdg_data_home.join(DEFAULT_PACKAGES_SUBDIR));
+            let resolved = storage
+                .prepare_package(&spec)
+                .expect("package under XDG_DATA_HOME should resolve");
+            assert_eq!(resolved.as_ref(), expected);
+        });
+    }
+}
