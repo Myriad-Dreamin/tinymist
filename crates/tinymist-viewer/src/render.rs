@@ -12,6 +12,7 @@ use image::codecs::jpeg::JpegDecoder;
 use image::codecs::png::PngDecoder;
 use image::codecs::webp::WebPDecoder;
 use image::imageops::FilterType;
+use image::metadata::Orientation;
 use image::{ImageDecoder, ImageResult, Limits};
 use reflexo::{
     hash::Fingerprint,
@@ -562,11 +563,14 @@ fn decode_raster_image(
     target_size: Axes<Abs>,
     pixelated: bool,
 ) -> Option<(peniko::ImageData, u32, u32)> {
+    let png_orientation = (format == "png")
+        .then(|| png_exif_orientation(data))
+        .flatten();
     let data = std::io::Cursor::new(data);
 
     let decoded = match format {
         "jpeg" | "jpg" => decode(JpegDecoder::new(data)),
-        "png" => decode(PngDecoder::new(data)),
+        "png" => decode_with_orientation(PngDecoder::new(data), png_orientation),
         "webp" => decode(WebPDecoder::new(data)),
         "gif" => decode(GifDecoder::new(data)),
         _ => return None,
@@ -626,9 +630,56 @@ fn decode<T: ImageDecoder>(decoder: ImageResult<T>) -> ImageResult<image::Dynami
     let mut decoder = decoder?;
     decoder.set_limits(Limits::default())?;
     let orientation = decoder.orientation()?;
+    decode_with_loaded_orientation(decoder, orientation)
+}
+
+fn decode_with_orientation<T: ImageDecoder>(
+    decoder: ImageResult<T>,
+    orientation: Option<Orientation>,
+) -> ImageResult<image::DynamicImage> {
+    let mut decoder = decoder?;
+    decoder.set_limits(Limits::default())?;
+    let orientation = match orientation {
+        Some(orientation) => orientation,
+        None => decoder.orientation()?,
+    };
+    decode_with_loaded_orientation(decoder, orientation)
+}
+
+fn decode_with_loaded_orientation<T: ImageDecoder>(
+    decoder: T,
+    orientation: Orientation,
+) -> ImageResult<image::DynamicImage> {
     let mut dynamic = image::DynamicImage::from_decoder(decoder)?;
     dynamic.apply_orientation(orientation);
     Ok(dynamic)
+}
+
+fn png_exif_orientation(data: &[u8]) -> Option<Orientation> {
+    const PNG_SIGNATURE: &[u8; 8] = b"\x89PNG\r\n\x1a\n";
+    if !data.starts_with(PNG_SIGNATURE) {
+        return None;
+    }
+
+    let mut offset = PNG_SIGNATURE.len();
+    while offset.checked_add(8)? <= data.len() {
+        let length = u32::from_be_bytes(data[offset..offset + 4].try_into().ok()?) as usize;
+        let chunk_type = &data[offset + 4..offset + 8];
+        let data_start = offset + 8;
+        let data_end = data_start.checked_add(length)?;
+        let next = data_end.checked_add(4)?;
+        if next > data.len() {
+            return None;
+        }
+
+        if chunk_type == b"eXIf" {
+            return Orientation::from_exif_chunk(&data[data_start..data_end]);
+        }
+
+        offset = next;
+    }
+
+    None
 }
 
 trait GlyphFactory {
@@ -828,13 +879,9 @@ impl PaintBrush {
                 brush,
                 mut transform,
             } => {
-                if let peniko::Brush::Gradient(gradient) = &brush {
+                if matches!(brush, peniko::Brush::Gradient(_)) {
                     let matrix = transform.unwrap_or(Affine::IDENTITY);
-                    transform = Some(if matches!(gradient.kind, peniko::GradientKind::Sweep(_)) {
-                        glyph_transform.inverse() * matrix
-                    } else {
-                        matrix.then_translate(-pos)
-                    });
+                    transform = Some(glyph_transform.inverse() * matrix);
                 }
 
                 Self::Brush { brush, transform }
@@ -947,7 +994,10 @@ where
 
     for y in start_y..=end_y {
         for x in start_x..=end_x {
-            let tile_origin = Vec2::new(f64::from(x) * tile_width, f64::from(y) * tile_height);
+            let tile_origin = Vec2::new(
+                f64::from(x) * tile_width + f64::from(pattern.pattern.offset.x.0),
+                f64::from(y) * tile_height + f64::from(pattern.pattern.offset.y.0),
+            );
             scene.append(
                 &tile_scene,
                 Some(pattern.transform.pre_translate(tile_origin)),
@@ -980,13 +1030,13 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
     let id = paint.strip_prefix("@g")?;
     let mut fingerprint = parse_fingerprint(id)?;
     let mut transform = None;
-    let mut conic_geometry = ConicGradientGeometry::default();
+    let mut gradient_geometry = GradientGeometry::default();
 
     if let Some(ir::VecItem::ColorTransform(color_transform)) = module.get_item(&fingerprint) {
         fingerprint = color_transform.item;
         let converted = convert_transform(&color_transform.transform);
         transform = Some(converted);
-        conic_geometry = ConicGradientGeometry::from_paint_transform(converted);
+        gradient_geometry = GradientGeometry::from_paint_transform(converted);
     }
 
     let gradient = match module.get_item(&fingerprint) {
@@ -994,7 +1044,7 @@ fn resolve_gradient(module: &Module, paint: &str) -> Option<PaintBrush> {
         _ => return None,
     };
 
-    let converted = convert_gradient(gradient, conic_geometry)?;
+    let converted = convert_gradient(gradient, gradient_geometry)?;
     if converted.uses_paint_transform {
         transform = converted.transform;
     } else if let Some(gradient_transform) = converted.transform {
@@ -1056,21 +1106,21 @@ struct ConvertedGradient {
 const VELLO_GRADIENT_SAMPLES: usize = 512;
 
 #[derive(Clone, Copy, Debug, Default)]
-struct ConicGradientGeometry {
+struct GradientGeometry {
     bake_transform: Option<Affine>,
 }
 
-impl ConicGradientGeometry {
+impl GradientGeometry {
     fn from_paint_transform(transform: Affine) -> Self {
         Self {
-            bake_transform: can_bake_conic_transform(transform).then_some(transform),
+            bake_transform: can_bake_gradient_transform(transform).then_some(transform),
         }
     }
 }
 
 fn convert_gradient(
     gradient: &GradientItem,
-    conic_geometry: ConicGradientGeometry,
+    geometry: GradientGeometry,
 ) -> Option<ConvertedGradient> {
     if gradient.stops.is_empty() {
         return None;
@@ -1081,7 +1131,11 @@ fn convert_gradient(
 
     let mut peniko_gradient = match &gradient.kind {
         GradientKind::Linear(angle) => {
-            let (start, end) = linear_gradient_points(angle.0);
+            let (start, end) = if let Some(paint_transform) = geometry.bake_transform {
+                linear_gradient_points_for_vello(angle.0, paint_transform)
+            } else {
+                linear_gradient_points(angle.0)
+            };
             peniko::Gradient::new_linear(start, end)
         }
         GradientKind::Radial(radius) => {
@@ -1112,7 +1166,7 @@ fn convert_gradient(
                 }
             }
 
-            if let Some(paint_transform) = conic_geometry.bake_transform {
+            if let Some(paint_transform) = geometry.bake_transform {
                 center = transform_point(paint_transform, center);
                 transform = Some(conic_gradient_transform(center, *angle));
             } else {
@@ -1133,8 +1187,10 @@ fn convert_gradient(
     Some(ConvertedGradient {
         gradient: peniko_gradient,
         transform,
-        uses_paint_transform: matches!(gradient.kind, GradientKind::Conic(_))
-            && conic_geometry.bake_transform.is_some(),
+        uses_paint_transform: matches!(
+            gradient.kind,
+            GradientKind::Linear(_) | GradientKind::Conic(_)
+        ) && geometry.bake_transform.is_some(),
     })
 }
 
@@ -1264,7 +1320,7 @@ fn conic_gradient_transform(center: Axes<Scalar>, angle: Scalar) -> Affine {
     Affine::rotate_about(angle.0 as f64 + std::f64::consts::PI, (center.x, center.y))
 }
 
-fn can_bake_conic_transform(transform: Affine) -> bool {
+fn can_bake_gradient_transform(transform: Affine) -> bool {
     let [xx, yx, xy, yy, dx, dy] = transform.as_coeffs();
     xx > f64::EPSILON
         && yy > f64::EPSILON
@@ -1272,6 +1328,49 @@ fn can_bake_conic_transform(transform: Affine) -> bool {
         && xy.abs() <= f64::EPSILON
         && dx.is_finite()
         && dy.is_finite()
+}
+
+fn corrected_linear_angle(angle: f32, transform: Affine) -> f32 {
+    let [xx, _, _, yy, _, _] = transform.as_coeffs();
+    let aspect = (xx / yy).abs() as f32;
+    let angle = angle.rem_euclid(std::f32::consts::TAU);
+    (angle.sin() / aspect)
+        .atan2(angle.cos())
+        .rem_euclid(std::f32::consts::TAU)
+}
+
+fn linear_gradient_points_for_vello(angle: f32, transform: Affine) -> ((f64, f64), (f64, f64)) {
+    let angle = corrected_linear_angle(angle, transform);
+    let (sin, cos) = angle.sin_cos();
+    let factor = sin.abs() + cos.abs();
+    let start = linear_gradient_start(angle);
+    let start = transform_tuple(transform, start);
+
+    let [xx, _, _, yy, _, _] = transform.as_coeffs();
+    let line_x = f64::from(cos / factor) / xx;
+    let line_y = f64::from(sin / factor) / yy;
+    let scale = line_x * line_x + line_y * line_y;
+    if scale <= f64::EPSILON {
+        return (start, start);
+    }
+
+    let end = (start.0 + line_x / scale, start.1 + line_y / scale);
+    (start, end)
+}
+
+fn linear_gradient_start(angle: f32) -> (f64, f64) {
+    match angle.rem_euclid(std::f32::consts::TAU) {
+        angle if angle < std::f32::consts::FRAC_PI_2 => (0., 0.),
+        angle if angle < std::f32::consts::PI => (1., 0.),
+        angle if angle < 3. * std::f32::consts::FRAC_PI_2 => (1., 1.),
+        _ => (0., 1.),
+    }
+}
+
+fn transform_tuple(transform: Affine, point: (f64, f64)) -> (f64, f64) {
+    let [xx, yx, xy, yy, dx, dy] = transform.as_coeffs();
+    let (x, y) = point;
+    (xx * x + xy * y + dx, yx * x + yy * y + dy)
 }
 
 fn transform_point(transform: Affine, point: Axes<Scalar>) -> Axes<Scalar> {
@@ -1527,7 +1626,7 @@ mod tests {
             panic!("expected gradient item");
         };
 
-        let converted = convert_gradient(&gradient, ConicGradientGeometry::default())
+        let converted = convert_gradient(&gradient, GradientGeometry::default())
             .expect("gradient should convert");
         assert_affine_approx_eq(
             converted.transform.expect("expected conic transform"),
