@@ -77,6 +77,10 @@ pub struct TestConfigArgs {
     /// Style of printing coverage.
     #[clap(long, default_value = "short")]
     pub print_coverage: PrintCovStyle,
+
+    /// Whether to pretty-print HTML snapshots.
+    #[clap(long, num_args = 0..=1, default_missing_value = "true")]
+    pub pretty: Option<bool>,
 }
 
 /// Style of printing coverage.
@@ -489,7 +493,12 @@ impl<'a> TestRunner<'a> {
             return false;
         };
 
-        let output = match typst_html::html(doc, &typst_html::HtmlOptions::default()) {
+        let output = match typst_html::html(
+            doc,
+            &typst_html::HtmlOptions {
+                pretty: self.ctx.args.pretty.unwrap_or(true),
+            },
+        ) {
             Ok(output) => self.update_example(example, output.as_bytes(), "html"),
             Err(err) => {
                 self.diagnostics.lock().push(err);
