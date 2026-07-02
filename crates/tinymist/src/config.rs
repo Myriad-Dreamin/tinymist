@@ -591,6 +591,7 @@ impl Config {
     #[cfg(feature = "preview")]
     pub fn preview(&self) -> PreviewConfig {
         PreviewConfig {
+            format: ExportTarget::Paged,
             enable_partial_rendering: self.preview.partial_rendering,
             refresh_style: self.preview.refresh.clone().unwrap_or(TaskWhen::OnType),
             invert_colors: serde_json::to_string(&self.preview.invert_colors)

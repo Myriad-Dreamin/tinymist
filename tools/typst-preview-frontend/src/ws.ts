@@ -14,6 +14,7 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
+import { handleHtmlPreviewFrame } from "./html-preview";
 export { PreviewMode } from "typst-dom/typst-doc.mjs";
 
 // for debug propose
@@ -444,6 +445,10 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return;
       } else if (message[0] === "outline") {
         console.log("Experimental feature: outline rendering");
+        return;
+      }
+
+      if (handleHtmlPreviewFrame(message[0] as string, message[1] as Uint8Array, url, dec)) {
         return;
       }
 

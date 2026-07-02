@@ -24,6 +24,7 @@ use tinymist_preview::{
 };
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
+use tinymist_task::ExportTarget;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -66,6 +67,13 @@ impl From<RefreshStyle> for TaskWhen {
 /// Specify arguments related to the preview service.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewArgs {
+    /// Configure the preview output format.
+    ///
+    /// `tinymist preview` does not write an output file, so this selects the
+    /// Typst compilation target used by the live preview.
+    #[clap(long = "format", default_value = "paged", value_name = "FORMAT")]
+    pub format: ExportTarget,
+
     /// Configure the preview mode.
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
@@ -138,6 +146,7 @@ impl PreviewArgs {
     /// Get the configuration for the preview.
     pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
         PreviewConfig {
+            format: self.format,
             enable_partial_rendering: self
                 .enable_partial_rendering
                 .unwrap_or(config.enable_partial_rendering),
