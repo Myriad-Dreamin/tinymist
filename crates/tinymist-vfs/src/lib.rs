@@ -81,6 +81,11 @@ pub trait PathAccessModel {
 
     /// Returns the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
+
+    /// Whether this access model reads from the host file system.
+    fn is_system(&self) -> bool {
+        false
+    }
 }
 
 /// A trait for accessing underlying file system.
@@ -96,6 +101,11 @@ pub trait AccessModel {
 
     /// Returns the content of a file entry.
     fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>);
+
+    /// Whether this access model reads from the host file system.
+    fn is_system(&self) -> bool {
+        false
+    }
 }
 
 type VfsPathAccessModel<M> = OverlayAccessModel<ImmutPath, NotifyAccessModel<M>>;
@@ -272,6 +282,11 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
     /// Resets access model.
     pub fn reset_access_model(&mut self) {
         self.access_model.reset();
+    }
+
+    /// Whether the underlying access model reads from the host file system.
+    pub fn is_system(&self) -> bool {
+        self.access_model.is_system()
     }
 
     /// Resets all read caches. This can happen when:

@@ -69,16 +69,26 @@ impl CompletionPair<'_, '_, '_> {
         };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
 
-        // List folders in the current completion directory.
-        let folder_entries = self.folder_entries(compl_path)?;
+        // List entries in the current completion directory.
+        let dir_entries = self.directory_entries(compl_path)?;
         let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
-        for entry_path in folder_entries {
-            let label = completion_label(&entry_path, has_root, true, base_dir)?;
+        let base_path = normalize_rootless_path(base.vpath().as_rootless_path_compat());
+        for (entry_path, entry_kind) in dir_entries {
+            if entry_path == base_path {
+                continue;
+            }
+
+            let is_folder = matches!(entry_kind, CompletionKind::Folder);
+            let label = completion_label(&entry_path, has_root, is_folder, base_dir)?;
             if seen_entries.insert(label.clone()) {
-                crate::log_debug_ct!("compl_folder_label: {label:?}");
-                folder_completions.push((label, CompletionKind::Folder));
+                crate::log_debug_ct!("compl_dir_label: {label:?}");
+                if is_folder {
+                    folder_completions.push((label, entry_kind));
+                } else {
+                    module_completions.push((label, entry_kind));
+                }
             }
         }
 
@@ -90,11 +100,15 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            let file_path = file.vpath().as_rootless_path_compat();
+            let file_path = normalize_rootless_path(file.vpath().as_rootless_path_compat());
+            if file_path == base_path {
+                continue;
+            }
+
             if file_path.parent().unwrap_or(Path::new("")) != compl_path {
                 continue;
             }
-            let label = completion_label(file_path, has_root, false, base_dir)?;
+            let label = completion_label(&file_path, has_root, false, base_dir)?;
             if !seen_entries.insert(label.clone()) {
                 continue;
             }
@@ -161,29 +175,35 @@ impl CompletionPair<'_, '_, '_> {
         )
     }
 
-    fn folder_entries(&self, dir: &Path) -> Option<Vec<PathBuf>> {
+    fn directory_entries(&self, dir: &Path) -> Option<Vec<(PathBuf, CompletionKind)>> {
         let root = self.worker.ctx.world().entry_state().workspace_root()?;
-        let physical_dir = root.join(dir);
+        let dir = normalize_rootless_path(dir);
+        let physical_dir = root.join(&dir);
         let mut entries = vec![];
 
-        if let Ok(read_dir) = std::fs::read_dir(&physical_dir) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.worker.world().is_system_access()
+            && let Ok(read_dir) = std::fs::read_dir(&physical_dir)
+        {
             for entry in read_dir.flatten() {
                 let Ok(file_type) = entry.file_type() else {
                     continue;
                 };
                 let path = entry.path();
-                let rootless = path.strip_prefix(root.as_ref()).ok()?.to_owned();
+                let rootless = normalize_rootless_path(path.strip_prefix(root.as_ref()).ok()?);
                 if file_type.is_dir() {
-                    entries.push(rootless);
+                    entries.push((rootless, CompletionKind::Folder));
+                } else if file_type.is_file() {
+                    entries.push((rootless, CompletionKind::File));
                 }
             }
         }
 
         for shadow_path in self.worker.world().shadow_paths() {
-            if let Some(entry_path) =
-                shadow_file_to_child_dir(shadow_path.strip_prefix(root.as_ref()).ok()?, dir)
+            if let Some(entry) =
+                shadow_file_to_dir_entry(shadow_path.strip_prefix(root.as_ref()).ok()?, &dir)
             {
-                entries.push(entry_path);
+                entries.push(entry);
             }
         }
 
@@ -226,15 +246,20 @@ fn string_prefix_lossy(raw: &str) -> EcoString {
     decoded
 }
 
-fn shadow_file_to_child_dir(file_path: &Path, current_dir: &Path) -> Option<PathBuf> {
+fn shadow_file_to_dir_entry(
+    file_path: &Path,
+    current_dir: &Path,
+) -> Option<(PathBuf, CompletionKind)> {
+    let file_path = normalize_rootless_path(file_path);
+    let current_dir = normalize_rootless_path(current_dir);
     if file_path.parent().unwrap_or(Path::new("")) == current_dir {
-        return None;
+        return Some((file_path, CompletionKind::File));
     }
 
     let relative = if current_dir.as_os_str().is_empty() {
-        file_path
+        file_path.as_path()
     } else {
-        file_path.strip_prefix(current_dir).ok()?
+        file_path.strip_prefix(&current_dir).ok()?
     };
     let mut components = relative.components();
     let Component::Normal(first) = components.next()? else {
@@ -242,7 +267,7 @@ fn shadow_file_to_child_dir(file_path: &Path, current_dir: &Path) -> Option<Path
     };
     components.next()?;
 
-    Some(current_dir.join(first))
+    Some((current_dir.join(first), CompletionKind::Folder))
 }
 
 fn completion_label(
@@ -262,4 +287,19 @@ fn completion_label(
         label.push('/');
     }
     Some(label)
+}
+
+fn normalize_rootless_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::Normal(component) => normalized.push(component),
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Prefix(_) | Component::RootDir => {}
+        }
+    }
+    normalized
 }

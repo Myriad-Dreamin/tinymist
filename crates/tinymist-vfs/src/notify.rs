@@ -165,6 +165,10 @@ impl<M: PathAccessModel> PathAccessModel for NotifyAccessModel<M> {
         self.inner.reset();
     }
 
+    fn is_system(&self) -> bool {
+        self.inner.is_system()
+    }
+
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(entry) = self.files.get(src) {
             return entry.content().cloned();

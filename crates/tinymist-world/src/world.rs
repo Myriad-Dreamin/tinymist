@@ -556,6 +556,11 @@ pub struct TaskInputs {
 }
 
 impl<F: CompilerFeat> CompilerWorld<F> {
+    /// Whether the underlying access model reads from the host file system.
+    pub fn is_system_access(&self) -> bool {
+        self.vfs.is_system()
+    }
+
     /// Creates a new world from the current world with the given inputs.
     pub fn task(&self, mutant: TaskInputs) -> CompilerWorld<F> {
         // Fetch to avoid inconsistent state.
