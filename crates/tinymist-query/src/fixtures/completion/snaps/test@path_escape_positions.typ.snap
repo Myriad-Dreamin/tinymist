@@ -25,13 +25,18 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
       }
      }
     }
-   },
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
    {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
+    "kind": 19,
+    "label": "assets/",
+    "sortText": "000",
     "textEdit": {
-     "newText": "assets/logo.png",
+     "newText": "assets/",
      "range": {
       "end": {
        "character": 17,
@@ -66,13 +71,18 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
       }
      }
     }
-   },
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
    {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
+    "kind": 19,
+    "label": "assets/",
+    "sortText": "000",
     "textEdit": {
-     "newText": "assets/logo.png",
+     "newText": "assets/",
      "range": {
       "end": {
        "character": 17,
@@ -107,13 +117,18 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
       }
      }
     }
-   },
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
    {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
+    "kind": 19,
+    "label": "assets/",
+    "sortText": "000",
     "textEdit": {
-     "newText": "assets/logo.png",
+     "newText": "assets/",
      "range": {
       "end": {
        "character": 17,
@@ -148,24 +163,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
       }
      }
     }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
    }
   ]
  },
@@ -189,11 +186,16 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
       }
      }
     }
-   },
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
    {
     "kind": 17,
     "label": "assets/logo.png",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "assets/logo.png",
      "range": {
@@ -214,27 +216,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "assets/logo.png",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "assets/logo.png",
      "range": {
@@ -255,191 +239,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
- },
- {
-  "isIncomplete": false,
-  "items": [
-   {
-    "kind": 19,
-    "label": "assets/",
     "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
- },
- {
-  "isIncomplete": false,
-  "items": [
-   {
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
- },
- {
-  "isIncomplete": false,
-  "items": [
-   {
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
- },
- {
-  "isIncomplete": false,
-  "items": [
-   {
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
     "textEdit": {
      "newText": "assets/logo.png",
      "range": {

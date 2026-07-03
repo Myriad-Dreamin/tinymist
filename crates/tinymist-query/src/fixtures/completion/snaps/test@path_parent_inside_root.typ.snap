@@ -9,27 +9,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "../",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "../",
-     "range": {
-      "end": {
-       "character": 10,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {
@@ -50,27 +32,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "../",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "../",
-     "range": {
-      "end": {
-       "character": 10,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {
@@ -91,27 +55,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "../",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "../",
-     "range": {
-      "end": {
-       "character": 10,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {
@@ -132,27 +78,9 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
   "isIncomplete": false,
   "items": [
    {
-    "kind": 19,
-    "label": "../",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "../",
-     "range": {
-      "end": {
-       "character": 10,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {

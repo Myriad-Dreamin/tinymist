@@ -1,6 +1,7 @@
 //! Completion of paths (string literal).
 
 use std::collections::HashSet;
+use std::path::{Component, PathBuf};
 
 use tinymist_world::vfs::WorkspaceResolver;
 
@@ -39,13 +40,12 @@ impl CompletionPair<'_, '_, '_> {
             is_in_text = false;
         }
         crate::log_debug_ct!("complete_path: is_in_text: {is_in_text:?}");
-        let path = Path::new(text.as_str());
         let full_path = Path::new(full_text.as_str());
+        let path_text = text.as_str();
+        let path = Path::new(path_text);
         let has_root = path.has_root();
 
-        let src_path = id.vpath();
         let base = id;
-        let dst_path = src_path.join(path.to_str()?).ok()?;
         let base_dir = base
             .vpath()
             .as_rooted_path_compat()
@@ -53,50 +53,50 @@ impl CompletionPair<'_, '_, '_> {
             .unwrap_or(Path::new("/"));
         // Reuse Typst's path semantics for root escape checks. Parent dirs are
         // fine while Typst resolves them within the workspace root.
-        if resolve_path_from_id(id, full_path.to_str()?).is_err()
-            || resolve_path_from_id(id, path.to_str()?).is_err()
-        {
+        let Ok(resolved_path) = resolve_path_from_id(id, path.to_str()?) else {
+            return Some(vec![]);
+        };
+        if resolve_path_from_id(id, full_path.to_str()?).is_err() {
             return Some(vec![]);
         }
 
-        let mut compl_path = dst_path.as_rootless_path_compat();
-        if !compl_path.is_dir() {
-            compl_path = compl_path.parent().unwrap_or(Path::new(""));
-        }
-        crate::log_debug_ct!("compl_path: {src_path:?} + {path:?} -> {compl_path:?}");
+        let resolved_path = resolved_path.vpath().as_rootless_path_compat();
+        let compl_path = if path_text.ends_with('/') {
+            resolved_path
+        } else {
+            resolved_path.parent().unwrap_or(Path::new(""))
+        };
+        crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
 
-        if compl_path.is_absolute() {
-            log::warn!(
-                "absolute path completion is not supported for security consideration {path:?}"
-            );
-            return None;
-        }
-
-        // find directory or files in the path
+        // Find immediate files/folders around the current completion directory.
         let mut seen_folders = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
-        // todo: test it correctly
-        for path in self.worker.ctx.completion_files(preference) {
-            crate::log_debug_ct!("compl_check_path: {path:?}");
+        for file in self.worker.ctx.completion_files(preference) {
+            crate::log_debug_ct!("compl_check_path: {file:?}");
 
             // Skip self smartly
-            if *path == base {
+            if *file == base {
                 continue;
             }
 
-            let label: EcoString = if has_root {
-                // diff with root
-                unix_slash(path.vpath().as_rooted_path_compat()).into()
-            } else {
-                let path = path.vpath().as_rooted_path_compat();
-                let w = tinymist_std::path::diff(path, base_dir)?;
-                unix_slash(&w).into()
-            };
-            crate::log_debug_ct!("compl_label: {label:?}");
+            let file_path = file.vpath().as_rootless_path_compat();
+            if file_path.parent().unwrap_or(Path::new("")) == compl_path {
+                let label = completion_label(file_path, has_root, false, base_dir)?;
+                crate::log_debug_ct!("compl_label: {label:?}");
+                module_completions.push((label, CompletionKind::File));
+                continue;
+            }
 
-            module_completions.push((label.clone(), CompletionKind::File));
-            push_parent_folder_completions(&mut folder_completions, &mut seen_folders, &label);
+            let Some(folder_path) = immediate_child_folder(file_path, compl_path) else {
+                continue;
+            };
+
+            let folder_label = completion_label(&folder_path, has_root, true, base_dir)?;
+            if seen_folders.insert(folder_label.clone()) {
+                crate::log_debug_ct!("compl_folder_label: {folder_label:?}");
+                folder_completions.push((folder_label, CompletionKind::Folder));
+            }
         }
 
         let replace_range = self.cursor.lsp_range_of(rng);
@@ -194,25 +194,36 @@ fn string_prefix_lossy(raw: &str) -> EcoString {
     decoded
 }
 
-fn push_parent_folder_completions(
-    folder_completions: &mut Vec<(EcoString, CompletionKind)>,
-    seen_folders: &mut HashSet<EcoString>,
-    label: &EcoString,
-) {
-    let mut end = 0;
-    for (idx, ch) in label.char_indices() {
-        if ch != '/' {
-            continue;
-        }
+fn immediate_child_folder(file_path: &Path, dir: &Path) -> Option<PathBuf> {
+    let relative = if dir.as_os_str().is_empty() {
+        file_path
+    } else {
+        file_path.strip_prefix(dir).ok()?
+    };
+    let mut components = relative.components();
+    let Component::Normal(first) = components.next()? else {
+        return None;
+    };
+    components.next()?;
 
-        end = idx + ch.len_utf8();
-        let folder: EcoString = label[..end].into();
-        if seen_folders.insert(folder.clone()) {
-            folder_completions.push((folder, CompletionKind::Folder));
-        }
-    }
+    Some(dir.join(first))
+}
 
-    if end == label.len() && seen_folders.insert(label.clone()) {
-        folder_completions.push((label.clone(), CompletionKind::Folder));
+fn completion_label(
+    rootless_path: &Path,
+    has_root: bool,
+    is_folder: bool,
+    base_dir: &Path,
+) -> Option<EcoString> {
+    let rooted_path = Path::new("/").join(rootless_path);
+    let label_path = if has_root {
+        rooted_path
+    } else {
+        tinymist_std::path::diff(&rooted_path, base_dir)?
+    };
+    let mut label: EcoString = unix_slash(&label_path).into();
+    if is_folder && !label.ends_with('/') {
+        label.push('/');
     }
+    Some(label)
 }

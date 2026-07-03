@@ -3,5 +3,5 @@
 
 -----
 /// path: nested/main.typ
-/// contains: ../, ../base.typ
+/// contains: ../base.typ
 #read("../"/* range -4..0 */)

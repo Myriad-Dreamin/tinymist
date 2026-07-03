@@ -43,42 +43,6 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_positions.typ
       }
      }
     }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "002",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 7,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "chapters/intro.typ",
-    "sortText": "003",
-    "textEdit": {
-     "newText": "chapters/intro.typ",
-     "range": {
-      "end": {
-       "character": 7,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
    }
   ]
  }
