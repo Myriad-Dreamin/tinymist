@@ -81,21 +81,20 @@ impl CompletionPair<'_, '_, '_> {
             }
 
             let file_path = file.vpath().as_rootless_path_compat();
-            if file_path.parent().unwrap_or(Path::new("")) == compl_path {
-                let label = completion_label(file_path, has_root, false, base_dir)?;
-                crate::log_debug_ct!("compl_label: {label:?}");
-                module_completions.push((label, CompletionKind::File));
-                continue;
-            }
-
-            let Some(folder_path) = immediate_child_folder(file_path, compl_path) else {
+            let Some((entry_path, entry_kind)) = workspace_file_to_dir_entry(file_path, compl_path)
+            else {
                 continue;
             };
+            let is_folder = matches!(entry_kind, CompletionKind::Folder);
+            let label = completion_label(&entry_path, has_root, is_folder, base_dir)?;
+            crate::log_debug_ct!("compl_label: {label:?}");
 
-            let folder_label = completion_label(&folder_path, has_root, true, base_dir)?;
-            if seen_folders.insert(folder_label.clone()) {
-                crate::log_debug_ct!("compl_folder_label: {folder_label:?}");
-                folder_completions.push((folder_label, CompletionKind::Folder));
+            if is_folder {
+                if seen_folders.insert(label.clone()) {
+                    folder_completions.push((label, entry_kind));
+                }
+            } else {
+                module_completions.push((label, entry_kind));
             }
         }
 
@@ -194,11 +193,23 @@ fn string_prefix_lossy(raw: &str) -> EcoString {
     decoded
 }
 
-fn immediate_child_folder(file_path: &Path, dir: &Path) -> Option<PathBuf> {
-    let relative = if dir.as_os_str().is_empty() {
+/// Projects a workspace file into one entry visible from `current_dir`.
+///
+/// The completion cache stores files, not directory entries. A file directly
+/// under `current_dir` becomes a file entry; a deeper file contributes its
+/// first child directory.
+fn workspace_file_to_dir_entry(
+    file_path: &Path,
+    current_dir: &Path,
+) -> Option<(PathBuf, CompletionKind)> {
+    if file_path.parent().unwrap_or(Path::new("")) == current_dir {
+        return Some((file_path.into(), CompletionKind::File));
+    }
+
+    let relative = if current_dir.as_os_str().is_empty() {
         file_path
     } else {
-        file_path.strip_prefix(dir).ok()?
+        file_path.strip_prefix(current_dir).ok()?
     };
     let mut components = relative.components();
     let Component::Normal(first) = components.next()? else {
@@ -206,7 +217,7 @@ fn immediate_child_folder(file_path: &Path, dir: &Path) -> Option<PathBuf> {
     };
     components.next()?;
 
-    Some(dir.join(first))
+    Some((current_dir.join(first), CompletionKind::Folder))
 }
 
 fn completion_label(

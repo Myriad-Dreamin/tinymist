@@ -221,13 +221,20 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::TextLang => return None,
             #[cfg(feature = "lsp")]
             BuiltinTy::TextLang => {
+                let apply_range = self.base.string_content_completion_range();
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
+                    let apply = key.to_lowercase();
                     let detail =
                         eco_format!("An ISO 639-1/2/3 language code, {}.", desc.get_name());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
-                        label: key.to_lowercase().into(),
-                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                        label: apply.clone().into(),
+                        apply: Some(if apply_range.is_some() {
+                            apply.into()
+                        } else {
+                            eco_format!("\"{apply}\"")
+                        }),
+                        apply_range: apply_range.clone(),
                         detail: Some(detail),
                         label_details: Some(desc.get_name()),
                         ..Completion::default()
@@ -238,13 +245,20 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::TextRegion => return None,
             #[cfg(feature = "lsp")]
             BuiltinTy::TextRegion => {
+                let apply_range = self.base.string_content_completion_range();
                 for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
+                    let apply = key.to_lowercase();
                     let detail =
                         eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.get_name());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
-                        label: key.to_lowercase().into(),
-                        apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
+                        label: apply.clone().into(),
+                        apply: Some(if apply_range.is_some() {
+                            apply.into()
+                        } else {
+                            eco_format!("\"{apply}\"")
+                        }),
+                        apply_range: apply_range.clone(),
                         detail: Some(detail),
                         label_details: Some(desc.get_name()),
                         ..Completion::default()

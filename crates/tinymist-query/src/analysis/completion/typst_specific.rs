@@ -7,6 +7,24 @@ use typst::syntax::is_valid_label_literal_id;
 
 use super::*;
 impl CompletionPair<'_, '_, '_> {
+    pub(super) fn string_content_completion_range(&self) -> Option<Range<usize>> {
+        if !self.cursor.leaf.is::<ast::Str>() {
+            return None;
+        }
+
+        let str_range = self.cursor.leaf.range();
+        if str_range.end <= str_range.start + 1 {
+            return None;
+        }
+
+        let content_range = str_range.start + 1..str_range.end - 1;
+        if self.cursor.cursor == content_range.end || content_range.contains(&self.cursor.cursor) {
+            Some(content_range)
+        } else {
+            None
+        }
+    }
+
     /// Add completions for all font families.
     pub fn font_completions(&mut self) {
         let equation = self.cursor.before_window(25).contains("equation");
@@ -283,6 +301,7 @@ impl CompletionPair<'_, '_, '_> {
         });
 
         let mut apply = None;
+        let mut apply_range = None;
         if parens && matches!(value, Value::Func(_)) {
             let mode = self.cursor.leaf_mode();
             let ty = Ty::Value(InsTy::new(value.clone()));
@@ -298,6 +317,18 @@ impl CompletionPair<'_, '_, '_> {
             return;
         } else if at {
             apply = Some(eco_format!("at(\"{label}\")"));
+        } else if matches!(value, Value::Str(_))
+            && let Some(content_range) = self.string_content_completion_range()
+        {
+            let mut apply_label = label.as_str();
+            if let Some(trimmed) = apply_label.strip_prefix('"') {
+                apply_label = trimmed;
+            }
+            if let Some(trimmed) = apply_label.strip_suffix('"') {
+                apply_label = trimmed;
+            }
+            apply = Some(apply_label.into());
+            apply_range = Some(content_range);
         } else {
             let apply_label = &mut label.as_str();
             if apply_label.ends_with('"')
@@ -323,6 +354,7 @@ impl CompletionPair<'_, '_, '_> {
             kind: value_to_completion_kind(value),
             label,
             apply,
+            apply_range,
             detail,
             label_details,
             ..Completion::default()

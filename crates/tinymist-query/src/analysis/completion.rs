@@ -354,37 +354,11 @@ impl<'a> CompletionCursor<'a> {
         fill_first_empty_placeholder(snippet, suffix)
     }
 
-    fn string_content_range(&self) -> Option<Range<usize>> {
-        if !self.leaf.is::<ast::Str>() {
-            return None;
-        }
-
-        let vr = self.leaf.range();
-        if vr.end <= vr.start + 1 {
-            return None;
-        }
-
-        let rng = vr.start + 1..vr.end - 1;
-        if self.cursor == vr.start || self.cursor == rng.end || rng.contains(&self.cursor) {
-            Some(rng)
-        } else {
-            None
-        }
-    }
-
     /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
-        let replace_range = if let Some(rng) = self.string_content_range() {
-            if let Some(trimmed) = snippet.strip_prefix('"') {
-                snippet = trimmed.into();
-            }
-            if let Some(trimmed) = snippet.strip_suffix('"') {
-                snippet = trimmed.into();
-            }
-            rng
-        } else {
+        let replace_range = item.apply_range.clone().unwrap_or_else(|| {
             match self.selected_node() {
                 Some(SelectedNode::Ident(from_ident)) => {
                     let mut rng = from_ident.range();
@@ -431,7 +405,7 @@ impl<'a> CompletionCursor<'a> {
                 }
                 None => self.from..self.cursor,
             }
-        };
+        });
 
         let text_edit = if item.capture_suffix
             && self.capture_suffix_as_first_arg(&mut snippet, replace_range.clone())
