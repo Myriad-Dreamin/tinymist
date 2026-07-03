@@ -52,6 +52,9 @@ impl CompletionPair<'_, '_, '_> {
             .as_rooted_path_compat()
             .parent()
             .unwrap_or(Path::new("/"));
+        // Check both the complete string and the cursor prefix: parent dirs are fine
+        // while they remain within the workspace root, but completion must not offer
+        // filesystem paths once either form walks past that root.
         if path_leaves_root(base_dir, full_path) || path_leaves_root(base_dir, path) {
             return Some(vec![]);
         }
