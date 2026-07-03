@@ -1,7 +1,6 @@
 //! Completion of paths (string literal).
 
 use std::collections::HashSet;
-use std::path::Component;
 
 use tinymist_world::vfs::WorkspaceResolver;
 
@@ -19,7 +18,7 @@ impl CompletionPair<'_, '_, '_> {
         let rng;
         // todo: the non-str case
         if self.cursor.leaf.is::<ast::Str>() {
-            let Some(ast::Expr::Str(str)) = self.cursor.leaf.cast() else {
+            let Some(ast::Expr::Str(_)) = self.cursor.leaf.cast() else {
                 return None;
             };
             let vr = self.cursor.leaf.range();
@@ -31,7 +30,7 @@ impl CompletionPair<'_, '_, '_> {
             }
 
             text = string_prefix_lossy(&self.cursor.text[rng.start..self.cursor.cursor]);
-            full_text = str.get();
+            full_text = string_prefix_lossy(&self.cursor.text[rng.clone()]);
             is_in_text = true;
         } else {
             text = EcoString::default();
@@ -52,10 +51,11 @@ impl CompletionPair<'_, '_, '_> {
             .as_rooted_path_compat()
             .parent()
             .unwrap_or(Path::new("/"));
-        // Check both the complete string and the cursor prefix: parent dirs are fine
-        // while they remain within the workspace root, but completion must not offer
-        // filesystem paths once either form walks past that root.
-        if path_leaves_root(base_dir, full_path) || path_leaves_root(base_dir, path) {
+        // Reuse Typst's path semantics for root escape checks. Parent dirs are
+        // fine while Typst resolves them within the workspace root.
+        if resolve_path_from_id(id, full_path.to_str()?).is_err()
+            || resolve_path_from_id(id, path.to_str()?).is_err()
+        {
             return Some(vec![]);
         }
 
@@ -160,13 +160,15 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn string_prefix_lossy(raw: &str) -> EcoString {
-    let mut w = EcoString::new();
-    w.push('"');
-    w.push_str(raw);
-    w.push('"');
-    let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
-    if let Some(text) = partial_str.cast::<ast::Str>().map(|s| s.get()) {
-        return text;
+    if !raw.contains('\\') {
+        let mut w = EcoString::new();
+        w.push('"');
+        w.push_str(raw);
+        w.push('"');
+        let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
+        if let Some(text) = partial_str.cast::<ast::Str>().map(|s| s.get()) {
+            return text;
+        }
     }
 
     let mut decoded = EcoString::new();
@@ -213,26 +215,4 @@ fn push_parent_folder_completions(
     if end == label.len() && seen_folders.insert(label.clone()) {
         folder_completions.push((label.clone(), CompletionKind::Folder));
     }
-}
-
-fn path_leaves_root(base_dir: &Path, typed: &Path) -> bool {
-    let mut depth = if typed.has_root() {
-        0
-    } else {
-        base_dir
-            .components()
-            .filter(|component| matches!(component, Component::Normal(_)))
-            .count()
-    };
-
-    for component in typed.components() {
-        match component {
-            Component::ParentDir if depth == 0 => return true,
-            Component::ParentDir => depth -= 1,
-            Component::Normal(_) => depth += 1,
-            Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
-        }
-    }
-
-    false
 }
