@@ -69,28 +69,37 @@ impl CompletionPair<'_, '_, '_> {
         };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
 
-        // List the entries in the current completion directory.
-        let entries = self.directory_entries(compl_path, preference)?;
+        // List folders in the current completion directory.
+        let folder_entries = self.folder_entries(compl_path)?;
         let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
-        for (entry_path, entry_kind) in entries {
-            if entry_path == base.vpath().as_rootless_path_compat() {
+        for entry_path in folder_entries {
+            let label = completion_label(&entry_path, has_root, true, base_dir)?;
+            if seen_entries.insert(label.clone()) {
+                crate::log_debug_ct!("compl_folder_label: {label:?}");
+                folder_completions.push((label, CompletionKind::Folder));
+            }
+        }
+
+        for file in self.worker.ctx.completion_files(preference) {
+            crate::log_debug_ct!("compl_check_path: {file:?}");
+
+            // Skip self smartly
+            if *file == base {
                 continue;
             }
 
-            let is_folder = matches!(entry_kind, CompletionKind::Folder);
-            let label = completion_label(&entry_path, has_root, is_folder, base_dir)?;
+            let file_path = file.vpath().as_rootless_path_compat();
+            if file_path.parent().unwrap_or(Path::new("")) != compl_path {
+                continue;
+            }
+            let label = completion_label(file_path, has_root, false, base_dir)?;
             if !seen_entries.insert(label.clone()) {
                 continue;
             }
             crate::log_debug_ct!("compl_label: {label:?}");
-
-            if is_folder {
-                folder_completions.push((label, entry_kind));
-            } else {
-                module_completions.push((label, entry_kind));
-            }
+            module_completions.push((label, CompletionKind::File));
         }
 
         let replace_range = self.cursor.lsp_range_of(rng);
@@ -152,14 +161,9 @@ impl CompletionPair<'_, '_, '_> {
         )
     }
 
-    fn directory_entries(
-        &self,
-        dir: &Path,
-        preference: &PathKind,
-    ) -> Option<Vec<(PathBuf, CompletionKind)>> {
+    fn folder_entries(&self, dir: &Path) -> Option<Vec<PathBuf>> {
         let root = self.worker.ctx.world().entry_state().workspace_root()?;
         let physical_dir = root.join(dir);
-        let regexes = preference.ext_matcher();
         let mut entries = vec![];
 
         if let Ok(read_dir) = std::fs::read_dir(&physical_dir) {
@@ -170,31 +174,16 @@ impl CompletionPair<'_, '_, '_> {
                 let path = entry.path();
                 let rootless = path.strip_prefix(root.as_ref()).ok()?.to_owned();
                 if file_type.is_dir() {
-                    entries.push((rootless, CompletionKind::Folder));
-                } else if file_type.is_file()
-                    && path
-                        .extension()
-                        .and_then(|ext| ext.to_str())
-                        .is_some_and(|ext| regexes.is_match(ext))
-                {
-                    entries.push((rootless, CompletionKind::File));
+                    entries.push(rootless);
                 }
             }
         }
 
         for shadow_path in self.worker.world().shadow_paths() {
-            let Some((entry_path, entry_kind)) =
-                shadow_file_to_dir_entry(shadow_path.strip_prefix(root.as_ref()).ok()?, dir)
-            else {
-                continue;
-            };
-            if matches!(entry_kind, CompletionKind::Folder)
-                || entry_path
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| regexes.is_match(ext))
+            if let Some(entry_path) =
+                shadow_file_to_child_dir(shadow_path.strip_prefix(root.as_ref()).ok()?, dir)
             {
-                entries.push((entry_path, entry_kind));
+                entries.push(entry_path);
             }
         }
 
@@ -237,12 +226,9 @@ fn string_prefix_lossy(raw: &str) -> EcoString {
     decoded
 }
 
-fn shadow_file_to_dir_entry(
-    file_path: &Path,
-    current_dir: &Path,
-) -> Option<(PathBuf, CompletionKind)> {
+fn shadow_file_to_child_dir(file_path: &Path, current_dir: &Path) -> Option<PathBuf> {
     if file_path.parent().unwrap_or(Path::new("")) == current_dir {
-        return Some((file_path.into(), CompletionKind::File));
+        return None;
     }
 
     let relative = if current_dir.as_os_str().is_empty() {
@@ -256,7 +242,7 @@ fn shadow_file_to_dir_entry(
     };
     components.next()?;
 
-    Some((current_dir.join(first), CompletionKind::Folder))
+    Some(current_dir.join(first))
 }
 
 fn completion_label(
