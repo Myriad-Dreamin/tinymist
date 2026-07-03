@@ -354,11 +354,6 @@ impl LspUniverseBuilder {
 pub trait LspAccessModel: Send + Sync {
     /// Returns the content of a file entry.
     fn content(&self, src: &Path) -> FileResult<Bytes>;
-
-    /// Whether this access model reads from the host file system.
-    fn is_system(&self) -> bool {
-        false
-    }
 }
 
 impl<T> LspAccessModel for T
@@ -367,10 +362,6 @@ where
 {
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         self.content(src)
-    }
-
-    fn is_system(&self) -> bool {
-        tinymist_world::vfs::PathAccessModel::is_system(self)
     }
 }
 
@@ -386,10 +377,6 @@ impl DynAccessModel {
 }
 
 impl tinymist_world::vfs::PathAccessModel for DynAccessModel {
-    fn is_system(&self) -> bool {
-        self.0.is_system()
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         self.0.content(src)
     }

@@ -20,10 +20,6 @@ impl SystemAccessModel {
 }
 
 impl PathAccessModel for SystemAccessModel {
-    fn is_system(&self) -> bool {
-        true
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         let f = |e| FileError::from_io(e, src);
         let mut buf = Vec::<u8>::new();

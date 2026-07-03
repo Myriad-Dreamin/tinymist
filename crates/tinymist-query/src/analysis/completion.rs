@@ -82,6 +82,9 @@ pub struct CompletionFeat {
     /// Whether the client supports LSP insert/replace completion text edits.
     #[serde(skip)]
     pub insert_replace_edit: bool,
+    /// Whether path completion may read directories from the host file system.
+    #[serde(skip)]
+    pub path_completion_by_filesystem: bool,
 
     /// The Way to complete symbols.
     pub symbol: Option<SymbolCompletionWay>,

@@ -109,10 +109,6 @@ impl<M> OverlayAccessModel<FileId, M, RawFileId> {
 }
 
 impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
-    fn is_system(&self) -> bool {
-        self.inner.is_system()
-    }
-
     fn content(&self, src: &Path) -> FileResult<Bytes> {
         if let Some(content) = self.files.get(src) {
             return content.content().cloned();
@@ -125,10 +121,6 @@ impl<M: PathAccessModel> PathAccessModel for OverlayAccessModel<ImmutPath, M> {
 impl<M: AccessModel> AccessModel for OverlayAccessModel<FileId, M, RawFileId> {
     fn reset(&mut self) {
         self.inner.reset();
-    }
-
-    fn is_system(&self) -> bool {
-        self.inner.is_system()
     }
 
     fn content(&self, src: FileId) -> (Option<ImmutPath>, FileResult<Bytes>) {

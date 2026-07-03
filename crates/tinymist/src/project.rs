@@ -152,6 +152,10 @@ impl ServerState {
         let const_config = &config.const_config;
         let mut completion_feat = config.completion.clone();
         completion_feat.insert_replace_edit = const_config.completion_insert_replace_support;
+        #[cfg(feature = "system")]
+        {
+            completion_feat.path_completion_by_filesystem = !config.delegate_fs_requests;
+        }
 
         // Run Export actors before preparing cluster to avoid loss of events
         #[cfg(feature = "export")]

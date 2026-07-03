@@ -182,7 +182,12 @@ impl CompletionPair<'_, '_, '_> {
         let mut entries = vec![];
 
         #[cfg(not(target_arch = "wasm32"))]
-        if self.worker.world().is_system_access()
+        if self
+            .worker
+            .ctx
+            .analysis
+            .completion_feat
+            .path_completion_by_filesystem
             && let Ok(read_dir) = std::fs::read_dir(&physical_dir)
         {
             for entry in read_dir.flatten() {

@@ -26,10 +26,6 @@ impl<M: PathAccessModel> AccessModel for ResolveAccessModel<M> {
         self.inner.reset();
     }
 
-    fn is_system(&self) -> bool {
-        self.inner.is_system()
-    }
-
     fn content(&self, fid: FileId) -> (Option<ImmutPath>, FileResult<Bytes>) {
         let resolved = Ok(()).and_then(|_| self.resolver.path_for_id(fid)?.to_err());
 
