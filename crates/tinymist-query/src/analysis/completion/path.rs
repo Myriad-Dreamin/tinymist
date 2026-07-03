@@ -1,9 +1,10 @@
 //! Completion of paths (string literal).
 
 use std::collections::HashSet;
-use std::path::{Component, PathBuf};
+use std::path::Component;
 
-use tinymist_world::vfs::WorkspaceResolver;
+use tinymist_project::EntryReader;
+use tinymist_world::{ShadowApi, vfs::WorkspaceResolver};
 
 use super::*;
 impl CompletionPair<'_, '_, '_> {
@@ -68,31 +69,25 @@ impl CompletionPair<'_, '_, '_> {
         };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
 
-        // Find immediate files/folders around the current completion directory.
-        let mut seen_folders = HashSet::new();
+        // List the entries in the current completion directory.
+        let entries = self.directory_entries(compl_path, preference)?;
+        let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
-        for file in self.worker.ctx.completion_files(preference) {
-            crate::log_debug_ct!("compl_check_path: {file:?}");
-
-            // Skip self smartly
-            if *file == base {
+        for (entry_path, entry_kind) in entries {
+            if entry_path == base.vpath().as_rootless_path_compat() {
                 continue;
             }
 
-            let file_path = file.vpath().as_rootless_path_compat();
-            let Some((entry_path, entry_kind)) = workspace_file_to_dir_entry(file_path, compl_path)
-            else {
-                continue;
-            };
             let is_folder = matches!(entry_kind, CompletionKind::Folder);
             let label = completion_label(&entry_path, has_root, is_folder, base_dir)?;
+            if !seen_entries.insert(label.clone()) {
+                continue;
+            }
             crate::log_debug_ct!("compl_label: {label:?}");
 
             if is_folder {
-                if seen_folders.insert(label.clone()) {
-                    folder_completions.push((label, entry_kind));
-                }
+                folder_completions.push((label, entry_kind));
             } else {
                 module_completions.push((label, entry_kind));
             }
@@ -156,6 +151,55 @@ impl CompletionPair<'_, '_, '_> {
                 .collect_vec(),
         )
     }
+
+    fn directory_entries(
+        &self,
+        dir: &Path,
+        preference: &PathKind,
+    ) -> Option<Vec<(PathBuf, CompletionKind)>> {
+        let root = self.worker.ctx.world().entry_state().workspace_root()?;
+        let physical_dir = root.join(dir);
+        let regexes = preference.ext_matcher();
+        let mut entries = vec![];
+
+        if let Ok(read_dir) = std::fs::read_dir(&physical_dir) {
+            for entry in read_dir.flatten() {
+                let Ok(file_type) = entry.file_type() else {
+                    continue;
+                };
+                let path = entry.path();
+                let rootless = path.strip_prefix(root.as_ref()).ok()?.to_owned();
+                if file_type.is_dir() {
+                    entries.push((rootless, CompletionKind::Folder));
+                } else if file_type.is_file()
+                    && path
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .is_some_and(|ext| regexes.is_match(ext))
+                {
+                    entries.push((rootless, CompletionKind::File));
+                }
+            }
+        }
+
+        for shadow_path in self.worker.world().shadow_paths() {
+            let Some((entry_path, entry_kind)) =
+                shadow_file_to_dir_entry(shadow_path.strip_prefix(root.as_ref()).ok()?, dir)
+            else {
+                continue;
+            };
+            if matches!(entry_kind, CompletionKind::Folder)
+                || entry_path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| regexes.is_match(ext))
+            {
+                entries.push((entry_path, entry_kind));
+            }
+        }
+
+        Some(entries)
+    }
 }
 
 fn string_prefix_lossy(raw: &str) -> EcoString {
@@ -193,12 +237,7 @@ fn string_prefix_lossy(raw: &str) -> EcoString {
     decoded
 }
 
-/// Projects a workspace file into one entry visible from `current_dir`.
-///
-/// The completion cache stores files, not directory entries. A file directly
-/// under `current_dir` becomes a file entry; a deeper file contributes its
-/// first child directory.
-fn workspace_file_to_dir_entry(
+fn shadow_file_to_dir_entry(
     file_path: &Path,
     current_dir: &Path,
 ) -> Option<(PathBuf, CompletionKind)> {
