@@ -12,14 +12,14 @@ input_file: crates/tinymist-query/src/fixtures/completion/import_package_path.ty
     "kind": 6,
     "label": "\"@preview/example:0.1.1\"",
     "textEdit": {
-     "newText": "\"@preview/example:0.1.1",
+     "newText": "@preview/example:0.1.1",
      "range": {
       "end": {
        "character": 10,
        "line": 2
       },
       "start": {
-       "character": 8,
+       "character": 9,
        "line": 2
       }
      }

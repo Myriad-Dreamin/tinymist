@@ -354,52 +354,83 @@ impl<'a> CompletionCursor<'a> {
         fill_first_empty_placeholder(snippet, suffix)
     }
 
+    fn string_content_range(&self) -> Option<Range<usize>> {
+        if !self.leaf.is::<ast::Str>() {
+            return None;
+        }
+
+        let vr = self.leaf.range();
+        if vr.end <= vr.start + 1 {
+            return None;
+        }
+
+        let rng = vr.start + 1..vr.end - 1;
+        if self.cursor == vr.start || self.cursor == rng.end || rng.contains(&self.cursor) {
+            Some(rng)
+        } else {
+            None
+        }
+    }
+
     /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
-        let replace_range = match self.selected_node() {
-            Some(SelectedNode::Ident(from_ident)) => {
-                let mut rng = from_ident.range();
+        let replace_range = if let Some(rng) = self.string_content_range() {
+            if let Some(trimmed) = snippet.strip_prefix('"') {
+                snippet = trimmed.into();
+            }
+            if let Some(trimmed) = snippet.strip_suffix('"') {
+                snippet = trimmed.into();
+            }
+            rng
+        } else {
+            match self.selected_node() {
+                Some(SelectedNode::Ident(from_ident)) => {
+                    let mut rng = from_ident.range();
 
-                // if modifying some arguments, we need to truncate and add a comma
-                if !self.is_callee() && self.cursor != rng.end && is_arg_like_context(from_ident) {
-                    // extend comma
-                    if !snippet.trim_end().ends_with(',') {
-                        snippet.push_str(", ");
+                    // if modifying some arguments, we need to truncate and add a comma
+                    if !self.is_callee()
+                        && self.cursor != rng.end
+                        && is_arg_like_context(from_ident)
+                    {
+                        // extend comma
+                        if !snippet.trim_end().ends_with(',') {
+                            snippet.push_str(", ");
+                        }
+
+                        // Truncate
+                        rng.end = self.cursor;
                     }
 
-                    // Truncate
-                    rng.end = self.cursor;
+                    rng
                 }
+                Some(SelectedNode::Label(from_label)) => {
+                    let mut rng = from_label.range();
+                    if from_label.leaf_text().starts_with('<') && !snippet.starts_with('<') {
+                        rng.start += 1;
+                    }
+                    if from_label.leaf_text().ends_with('>') && !snippet.ends_with('>') {
+                        rng.end -= 1;
+                    }
 
-                rng
-            }
-            Some(SelectedNode::Label(from_label)) => {
-                let mut rng = from_label.range();
-                if from_label.leaf_text().starts_with('<') && !snippet.starts_with('<') {
-                    rng.start += 1;
+                    rng
                 }
-                if from_label.leaf_text().ends_with('>') && !snippet.ends_with('>') {
-                    rng.end -= 1;
-                }
+                Some(node @ (SelectedNode::At(from_ref) | SelectedNode::Ref(from_ref))) => {
+                    let mut rng = if matches!(node, SelectedNode::At(..)) {
+                        let offset = from_ref.offset();
+                        offset..offset + 1
+                    } else {
+                        from_ref.range()
+                    };
+                    if from_ref.leaf_text().starts_with('@') && !snippet.starts_with('@') {
+                        rng.start += 1;
+                    }
 
-                rng
-            }
-            Some(node @ (SelectedNode::At(from_ref) | SelectedNode::Ref(from_ref))) => {
-                let mut rng = if matches!(node, SelectedNode::At(..)) {
-                    let offset = from_ref.offset();
-                    offset..offset + 1
-                } else {
-                    from_ref.range()
-                };
-                if from_ref.leaf_text().starts_with('@') && !snippet.starts_with('@') {
-                    rng.start += 1;
+                    rng
                 }
-
-                rng
+                None => self.from..self.cursor,
             }
-            None => self.from..self.cursor,
         };
 
         let text_edit = if item.capture_suffix

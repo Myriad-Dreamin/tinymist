@@ -9,9 +9,45 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_positions.typ
   "isIncomplete": false,
   "items": [
    {
+    "kind": 19,
+    "label": "assets/",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 19,
+    "label": "chapters/",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "chapters/",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
     "kind": 17,
     "label": "assets/logo.png",
-    "sortText": "000",
+    "sortText": "002",
     "textEdit": {
      "newText": "assets/logo.png",
      "range": {
@@ -29,7 +65,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_positions.typ
    {
     "kind": 17,
     "label": "chapters/intro.typ",
-    "sortText": "001",
+    "sortText": "003",
     "textEdit": {
      "newText": "chapters/intro.typ",
      "range": {
