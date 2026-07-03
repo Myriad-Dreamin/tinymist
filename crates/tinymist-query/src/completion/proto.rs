@@ -1,7 +1,6 @@
 use ecow::EcoString;
 use lsp_types::InsertTextFormat;
 use serde::{Deserialize, Serialize};
-use std::ops::Range;
 
 use crate::StrRef;
 
@@ -105,9 +104,6 @@ pub struct Completion {
     ///
     /// Should default to the `label` if `None`.
     pub apply: Option<EcoString>,
-    /// The source range this completion should replace.
-    #[serde(skip)]
-    pub apply_range: Option<Range<usize>>,
     /// Whether the completion may capture the right-side identifier suffix as
     /// the first snippet argument.
     #[serde(skip)]
