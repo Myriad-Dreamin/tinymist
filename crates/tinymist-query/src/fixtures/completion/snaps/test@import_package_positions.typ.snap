@@ -1,0 +1,206 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on @preview\" (48..57)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/import_package_positions.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 9,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 12,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 13,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 14,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 15,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1\"",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"@preview/example:0.1.1\"",
+    "textEdit": {
+     "newText": "\"@preview/example:0.1.1",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 8,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

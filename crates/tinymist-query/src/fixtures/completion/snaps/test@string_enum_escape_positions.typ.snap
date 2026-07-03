@@ -1,0 +1,146 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on New\\n\" (54..60)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/string_enum_escape_positions.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "New Computer Modern\"",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 2
+      },
+      "start": {
+       "character": 17,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "\"New Computer Modern\"",
+     "range": {
+      "end": {
+       "character": 18,
+       "line": 2
+      },
+      "start": {
+       "character": 18,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "\"New Computer Modern\"",
+     "range": {
+      "end": {
+       "character": 19,
+       "line": 2
+      },
+      "start": {
+       "character": 19,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "\"New Computer Modern\"",
+     "range": {
+      "end": {
+       "character": 20,
+       "line": 2
+      },
+      "start": {
+       "character": 20,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "\"New Computer Modern\"",
+     "range": {
+      "end": {
+       "character": 21,
+       "line": 2
+      },
+      "start": {
+       "character": 21,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 6,
+    "label": "\"New Computer Modern\"",
+    "sortText": "003",
+    "textEdit": {
+     "newText": "\"New Computer Modern",
+     "range": {
+      "end": {
+       "character": 22,
+       "line": 2
+      },
+      "start": {
+       "character": 22,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]
