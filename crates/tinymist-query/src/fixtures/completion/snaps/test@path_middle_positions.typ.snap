@@ -1,0 +1,418 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on assets/lo\" (68..78)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo-dark.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo-dark.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 16,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

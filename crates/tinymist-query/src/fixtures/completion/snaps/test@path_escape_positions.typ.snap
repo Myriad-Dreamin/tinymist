@@ -1,0 +1,185 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on assets\\/lo\" (46..57)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 17,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ }
+]
