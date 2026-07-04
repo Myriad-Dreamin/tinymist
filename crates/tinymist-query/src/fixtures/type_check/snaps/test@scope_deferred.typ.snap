@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred.typ
+---
+"f" = () => 1
+"g" = () => 1
+"h" = () => 0
+"g" = () => 1
+=====
+5..6 -> @f
+19..20 -> @g
+53..54 -> @g
+53..56 -> 1
+65..66 -> @h
+79..80 -> @g

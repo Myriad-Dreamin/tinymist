@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/method_split.typ
+---
+"resolve-key" = (Type(str)) => Type(array)
+"" = (Type(str)) => Type(array)
+"key" = Any
+"split-literal" = Type(array)
+=====
+5..16 -> @resolve-key
+19..22 -> @key
+19..40 -> @
+26..29 -> @key
+26..35 -> (Func(split) | @v"key".split)
+26..40 -> Type(array)
+46..59 -> @split-literal
+62..73 -> (Func(split) | "a.b".split)
+62..78 -> Type(array)

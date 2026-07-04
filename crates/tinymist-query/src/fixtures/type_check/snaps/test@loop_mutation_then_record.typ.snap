@@ -1,0 +1,60 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/loop_mutation_then_record.typ
+---
+"bucket-by" = (Any, Any) => {"buckets": {}, "order": ()}
+"data" = Any
+"key-col" = Any
+"buckets" = {}
+"order" = ()
+"row" = Any
+"key" = Type(str)
+"bucket" = Any
+=====
+5..14 -> @bucket-by
+15..19 -> @data
+21..28 -> @key-col
+40..47 -> @buckets
+50..53 -> {}
+60..65 -> @order
+68..70 -> ()
+77..80 -> @row
+84..88 -> @data
+99..102 -> @key
+105..108 -> Type(string)
+105..138 -> Type(str)
+109..112 -> @row
+109..115 -> @v"row".at
+109..137 -> ("" | Apply(@v"row".at, (@key-col, "default": "") => any))
+116..123 -> @key-col
+146..149 -> @key
+176..179 -> @key
+183..190 -> @buckets
+203..209 -> @bucket
+212..219 -> @buckets
+212..222 -> (Func(at) | @v"buckets".at)
+212..227 -> Any
+223..226 -> @key
+234..240 -> @bucket
+234..245 -> @v"bucket".push
+234..250 -> Apply(@v"bucket".push, (@row) => any)
+246..249 -> @row
+257..264 -> @buckets
+257..271 -> (Func(insert) | @v"buckets".insert)
+257..284 -> None
+272..275 -> @key
+277..283 -> @bucket
+304..311 -> @buckets
+304..318 -> (Func(insert) | @v"buckets".insert)
+304..331 -> None
+319..322 -> @key
+324..330 -> (@row, )
+325..328 -> @row
+338..343 -> @order
+338..348 -> (Func(push) | @v"order".push)
+338..353 -> None
+349..352 -> @key
+366..398 -> {"buckets": @buckets, "order": @order}
+376..383 -> @buckets
+392..397 -> @order

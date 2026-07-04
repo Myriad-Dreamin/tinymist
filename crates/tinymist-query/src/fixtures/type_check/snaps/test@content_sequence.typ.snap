@@ -1,0 +1,41 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/content_sequence.typ
+---
+"joined-context" = () => TypeUnary { lhs: Content, op: Context }
+"mixed-context" = (Any) => TypeUnary { lhs: Content, op: Context }
+"x" = Any
+"return-or-content" = (Any) => (Content | TypeUnary { lhs: Content, op: Context })
+"cond" = Any
+"repeated-content-loops" = (Any) => Content
+"items" = Any
+"item" = Any
+"item" = Any
+"conditional-content-loop" = (Any, Any) => Content
+"items" = Any
+"cond" = Any
+"item" = Any
+=====
+5..19 -> @joined-context
+61..74 -> @mixed-context
+75..76 -> @x
+92..93 -> @x
+113..130 -> @return-or-content
+131..135 -> @cond
+154..158 -> @cond
+198..220 -> @repeated-content-loops
+221..226 -> @items
+238..242 -> @item
+246..251 -> @items
+260..264 -> @item
+276..280 -> @item
+284..289 -> @items
+298..302 -> @item
+316..340 -> @conditional-content-loop
+341..346 -> @items
+348..352 -> @cond
+363..367 -> @cond
+378..382 -> @item
+386..391 -> @items
+402..406 -> @item
