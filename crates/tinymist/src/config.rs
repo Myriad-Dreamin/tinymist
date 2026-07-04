@@ -206,6 +206,13 @@ impl Config {
         config
     }
 
+    fn configure_completion_access(&mut self) {
+        #[cfg(feature = "system")]
+        {
+            self.completion.path_completion_by_filesystem = !self.delegate_fs_requests;
+        }
+    }
+
     /// Creates a new configuration from the LSP initialization parameters.
     ///
     /// The function has side effects:
@@ -538,6 +545,7 @@ impl Config {
             Arc::new(LazyHash::new(dict))
         };
 
+        self.configure_completion_access();
         self.validate()
     }
 
@@ -1767,6 +1775,25 @@ mod tests {
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
         assert!(!conf.const_config.completion_insert_replace_support);
+    }
+
+    #[cfg(feature = "system")]
+    #[test]
+    fn test_system_lsp_config_enables_filesystem_path_completion() {
+        let (conf, err) =
+            Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.completion.path_completion_by_filesystem);
+
+        let params = InitializeParams {
+            initialization_options: Some(json!({
+                "delegateFsRequests": true,
+            })),
+            ..InitializeParams::default()
+        };
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(!conf.completion.path_completion_by_filesystem);
     }
 
     #[test]
