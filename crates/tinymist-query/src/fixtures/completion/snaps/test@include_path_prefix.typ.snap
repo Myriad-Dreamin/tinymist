@@ -10,6 +10,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/include_path_prefix.ty
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "parts/",
     "sortText": "0",

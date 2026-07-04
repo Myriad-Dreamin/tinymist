@@ -1,5 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
+assertion_line: 194
 description: "Completion on assets/lo\" (68..78)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.typ
@@ -9,6 +10,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -32,6 +37,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -55,6 +64,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -78,6 +91,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -101,6 +118,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -124,6 +145,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",
@@ -147,6 +172,10 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_middle_positions.
   "isIncomplete": false,
   "items": [
    {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
     "kind": 19,
     "label": "assets/",
     "sortText": "000",

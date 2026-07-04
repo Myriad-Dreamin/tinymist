@@ -185,6 +185,7 @@ impl CompletionPair<'_, '_, '_> {
             completions
                 .map(|typst_completion| {
                     let lsp_snippet = &typst_completion.0;
+                    let is_folder = matches!(typst_completion.1, CompletionKind::Folder);
                     let text_edit = EcoTextEdit::new(
                         replace_range,
                         if is_in_text {
@@ -206,6 +207,12 @@ impl CompletionPair<'_, '_, '_> {
                         // don't sort me
                         sort_text: Some(sort_text),
                         insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                        command: self
+                            .worker
+                            .ctx
+                            .analysis
+                            .trigger_suggest(is_folder)
+                            .map(From::from),
                         ..Default::default()
                     }
                 })
