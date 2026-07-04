@@ -336,7 +336,7 @@ display_possible_values!(OutputFormat);
 /// The design of this configuration is not yet finalized and for this reason it
 /// is guarded behind the html feature. Visit the HTML documentation page for
 /// more details.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExportTarget {
     /// The current export target is for PDF, PNG, and SVG export.
