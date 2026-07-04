@@ -3,6 +3,7 @@
 result*
 .direnv
 .envrc
+.nvimlog
 node_modules/
 /local/
 editors/vscode/out/
@@ -12,7 +13,7 @@ editors/lapce/out/
 /build
 
 *.pdf
-refs/
-
 .vscode/*.code-workspace
+refs/
+.playwright-mcp/
 .gradle
