@@ -242,8 +242,14 @@ impl CompletionPair<'_, '_, '_> {
                             continue;
                         };
                         let path = entry.path();
-                        let rootless =
-                            normalize_rootless_path(path.strip_prefix(root.as_ref()).ok()?);
+                        let Ok(rootless) = path.strip_prefix(root.as_ref()) else {
+                            log::info!(
+                                "completion.path.directory_entries.fs_skip_outside_root: path={path:?}, root={:?}",
+                                root.as_ref()
+                            );
+                            continue;
+                        };
+                        let rootless = normalize_rootless_path(rootless);
                         if file_type.is_dir() {
                             entries.push((rootless, CompletionKind::Folder));
                         } else if file_type.is_file() {
@@ -265,9 +271,15 @@ impl CompletionPair<'_, '_, '_> {
 
         let before_shadow = entries.len();
         for shadow_path in self.worker.world().shadow_paths() {
-            if let Some(entry) =
-                shadow_file_to_dir_entry(shadow_path.strip_prefix(root.as_ref()).ok()?, &dir)
-            {
+            let Ok(rootless_shadow_path) = shadow_path.strip_prefix(root.as_ref()) else {
+                log::info!(
+                    "completion.path.directory_entries.shadow_skip_outside_root: path={:?}, root={:?}",
+                    shadow_path.as_ref(),
+                    root.as_ref()
+                );
+                continue;
+            };
+            if let Some(entry) = shadow_file_to_dir_entry(rootless_shadow_path, &dir) {
                 entries.push(entry);
             }
         }
