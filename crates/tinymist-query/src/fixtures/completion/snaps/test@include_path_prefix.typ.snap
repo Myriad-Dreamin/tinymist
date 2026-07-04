@@ -1,7 +1,7 @@
 ---
 source: crates/tinymist-query/src/completion.rs
 assertion_line: 194
-description: "Completion on \" (42..43)"
+description: "Completion on \" (61..62)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/include_path_prefix.typ
 ---
@@ -37,6 +37,24 @@ input_file: crates/tinymist-query/src/fixtures/completion/include_path_prefix.ty
     "sortText": "1",
     "textEdit": {
      "newText": "page.typ",
+     "range": {
+      "end": {
+       "character": 11,
+       "line": 1
+      },
+      "start": {
+       "character": 10,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "kind": 17,
+    "label": "parts/section.typ",
+    "sortText": "2",
+    "textEdit": {
+     "newText": "parts/section.typ",
      "range": {
       "end": {
        "character": 11,

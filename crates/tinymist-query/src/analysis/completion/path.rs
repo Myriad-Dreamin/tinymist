@@ -127,9 +127,6 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
 
-            if file_path.parent().unwrap_or(Path::new("")) != compl_path {
-                continue;
-            }
             let Some(label) = completion_label(&file_path, has_root, false, base_dir) else {
                 log::info!(
                     "completion.path.label_failed: file_path={file_path:?}, has_root={has_root}, is_folder=false, base_dir={base_dir:?}"

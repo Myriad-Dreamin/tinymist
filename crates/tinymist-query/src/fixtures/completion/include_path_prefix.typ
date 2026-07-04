@@ -6,5 +6,5 @@
 #let page = 1
 
 -----
-/// contains: page.typ, parts/
+/// contains: page.typ, parts/, parts/section.typ
 #include "p"/* range -1..0 */
