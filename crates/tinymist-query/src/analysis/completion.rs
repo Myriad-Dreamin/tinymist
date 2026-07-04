@@ -713,28 +713,14 @@ impl CompletionPair<'_, '_, '_> {
                 };
                 self.cursor.from = path.offset();
                 let value = str.get();
-                log::info!(
-                    "completion.path.context: kind={:?}, value={value:?}, cursor={}, leaf={:?}",
-                    path.kind(),
-                    self.cursor.cursor,
-                    self.cursor.leaf.kind()
-                );
                 if value.starts_with('@') {
                     let all_versions = value.contains(':');
                     self.package_completions(all_versions);
-                    log::info!(
-                        "completion.path.package: all_versions={all_versions}, items={}",
-                        self.worker.completions.len()
-                    );
                     return Some(());
                 } else {
                     let paths = self.complete_path(&crate::analysis::PathKind::Source {
                         allow_package: true,
                     });
-                    log::info!(
-                        "completion.path.source: returned_items={}",
-                        paths.as_ref().map(|items| items.len()).unwrap_or(0)
-                    );
                     // todo: remove ctx.completions
                     self.worker.completions.extend(paths.unwrap_or_default());
                 }

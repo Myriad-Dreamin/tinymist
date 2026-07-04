@@ -198,25 +198,25 @@ impl CompletionPair<'_, '_, '_> {
         let mut entries = vec![];
 
         #[cfg(not(target_arch = "wasm32"))]
-        if self
+        if let Some(read_dir) = self
             .worker
             .ctx
             .analysis
             .completion_feat
             .path_completion_by_filesystem
+            .then(|| std::fs::read_dir(root.join(&dir)))
+            .and_then(Result::ok)
         {
-            if let Ok(read_dir) = std::fs::read_dir(root.join(&dir)) {
-                entries.extend(read_dir.flatten().filter_map(|entry| {
-                    let path = entry.path();
-                    let rootless = path.strip_prefix(root.as_ref()).ok()?;
-                    let kind = if entry.file_type().ok()?.is_dir() {
-                        CompletionKind::Folder
-                    } else {
-                        CompletionKind::File
-                    };
-                    Some((normalize_rootless_path(rootless), kind))
-                }));
-            }
+            entries.extend(read_dir.flatten().filter_map(|entry| {
+                let path = entry.path();
+                let rootless = path.strip_prefix(root.as_ref()).ok()?;
+                let kind = if entry.file_type().ok()?.is_dir() {
+                    CompletionKind::Folder
+                } else {
+                    CompletionKind::File
+                };
+                Some((normalize_rootless_path(rootless), kind))
+            }));
         }
 
         for shadow_path in self.worker.world().shadow_paths() {
