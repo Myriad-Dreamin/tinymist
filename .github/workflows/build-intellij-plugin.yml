@@ -15,6 +15,7 @@
 name: tinymist::build::intellij-plugin
 on:
   workflow_call:
+  workflow_dispatch:
 
 jobs:
   # Prepare the environment and build the plugin
