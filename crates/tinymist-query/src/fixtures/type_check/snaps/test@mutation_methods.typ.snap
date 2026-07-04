@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 ---
-"array-push" = () => None
+"array-push" = () => Type(none)
 "a" = ()
 "dict-insert" = () => None
 "d" = {}
@@ -14,28 +14,28 @@ input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 "guides" = ()
 "grp" = {"members": (1, )}
 "g" = {"kind": "x"}
-"" = (Any) => @v"g".kind
+"" = (Any) => Any.kind
 "g" = Any
 "push-dict-loop-if" = () => Type(array)
 "guides" = ()
 "first" = true
-"g" = ({"kind": "other"} | {"kind": "swatch", "levels": ( ⪰ Type(array) | ())})
+"g" = IfTy { cond: true, then: Undef, else_: {"kind": "other"} }
 "levels" = ( ⪰ Type(array) | ())
-"" = (Any) => @v"g".kind
+"" = (Any) => Any.kind
 "g" = Any
 =====
 5..15 -> @array-push
 28..29 -> @a
 32..34 -> ()
 37..38 -> @a
-37..43 -> (Func(push) | @v"a".push)
-37..46 -> None
+37..43 -> (Func(push) | (Func(push) | @v"a".push))
+37..46 -> Type(none)
 55..66 -> @dict-insert
 79..80 -> @d
 83..86 -> {}
 89..90 -> @d
-89..97 -> (Func(insert) | @v"d".insert)
-89..105 -> None
+89..97 -> @v"d".insert
+89..105 -> Any
 114..123 -> @push-loop
 136..137 -> @a
 140..142 -> ()
@@ -43,8 +43,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 154..159 -> Func(range)
 154..162 -> Type(array)
 169..170 -> @a
-169..175 -> (Func(push) | @v"a".push)
-169..178 -> None
+169..175 -> (Func(push) | (Func(push) | @v"a".push))
+169..178 -> Type(none)
 176..177 -> @i
 185..186 -> @a
 195..209 -> @push-dict-loop
@@ -57,14 +57,14 @@ input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 277..278 -> @g
 281..292 -> {"kind": "x"}
 297..298 -> @g
-297..305 -> (Func(insert) | Func(insert) | @v"g".insert)
-297..317 -> None
+297..305 -> @v"g".insert
+297..317 -> Any
 322..328 -> @guides
-322..333 -> (Func(push) | @v"guides".push)
-322..336 -> None
+322..333 -> (Func(push) | (Func(push) | @v"guides".push))
+322..336 -> Type(none)
 334..335 -> @g
 343..349 -> @guides
-343..356 -> (Func(sorted) | @v"guides".sorted)
+343..356 -> (Func(sorted) | (Func(sorted) | @v"guides".sorted))
 343..374 -> Type(array)
 362..363 -> @g
 362..373 -> @
@@ -82,20 +82,20 @@ input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 504..509 -> @first
 512..518 -> @levels
 521..527 -> @levels
-521..531 -> (Func(rev) | @v"levels".rev)
+521..531 -> (Func(rev) | (Func(rev) | @v"levels".rev))
 521..533 -> Type(array)
 542..574 -> {"kind": "swatch", "levels": @levels}
 567..573 -> @levels
 594..609 -> {"kind": "other"}
 620..621 -> @g
-620..628 -> (Func(insert) | Func(insert) | @v"g".insert)
-620..640 -> None
+620..628 -> @v"g".insert
+620..640 -> Any
 645..651 -> @guides
-645..656 -> (Func(push) | @v"guides".push)
-645..659 -> None
+645..656 -> (Func(push) | (Func(push) | @v"guides".push))
+645..659 -> Type(none)
 657..658 -> @g
 666..672 -> @guides
-666..679 -> (Func(sorted) | @v"guides".sorted)
+666..679 -> (Func(sorted) | (Func(sorted) | @v"guides".sorted))
 666..697 -> Type(array)
 685..686 -> @g
 685..696 -> @

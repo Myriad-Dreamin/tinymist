@@ -3,16 +3,16 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/binary_union.typ
 ---
-"f" = (Any) => (Type(int) | Type(str))
+"f" = (Any) => TypeBinary { operands: (IfTy { cond: Any, then: 1, else_: "s" }, IfTy { cond: Any, then: 1, else_: "s" }), op: Add }
 "flag" = Any
-"x" = ("s" | 1)
+"x" = IfTy { cond: Any, then: 1, else_: "s" }
 "sub-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Sub }
 "a" = Any
 "b" = Any
 "mul-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Mul }
 "a" = Any
 "b" = Any
-"cross" = (Any, Any, Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }), op: Mul }), op: Sub }
+"cross" = (Any, Any, Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }), op: Sub }
 "o" = Any
 "a" = Any
 "b" = Any
@@ -42,28 +42,28 @@ input_file: crates/tinymist-query/src/fixtures/type_check/binary_union.typ
 138..139 -> @b
 144..145 -> @a
 144..148 -> @v"a".at
-144..151 -> Apply(@v"a".at, (0) => any)
+144..151 -> Any
 154..155 -> @o
 154..158 -> @v"o".at
-154..161 -> Apply(@v"o".at, (0) => any)
+154..161 -> Any
 166..167 -> @b
 166..170 -> @v"b".at
-166..173 -> Apply(@v"b".at, (1) => any)
+166..173 -> Any
 176..177 -> @o
 176..180 -> @v"o".at
-176..183 -> Apply(@v"o".at, (1) => any)
+176..183 -> Any
 188..189 -> @a
 188..192 -> @v"a".at
-188..195 -> Apply(@v"a".at, (1) => any)
+188..195 -> Any
 198..199 -> @o
 198..202 -> @v"o".at
-198..205 -> Apply(@v"o".at, (1) => any)
+198..205 -> Any
 210..211 -> @b
 210..214 -> @v"b".at
-210..217 -> Apply(@v"b".at, (0) => any)
+210..217 -> Any
 220..221 -> @o
 220..224 -> @v"o".at
-220..227 -> Apply(@v"o".at, (0) => any)
+220..227 -> Any
 235..243 -> @call-sub
 244..245 -> @a
 247..248 -> @b

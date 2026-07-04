@@ -6,19 +6,19 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 "loop-none" = () => None
 "i" = Any
 "x" = Any
-"loop-tuple" = (("size": Any) => (None | Array<({"degrees": 90, "type": "turn"} | {"steps": Any, "type": "move"})>)).with(..("size": 50) => any)
+"loop-tuple" = (("size": Any) => None).with(..("size": 50) => any)
 "size" = 50
 "i" = Any
-"loop-command" = () => (None | Array<(Any) => Any>)
+"loop-command" = () => None
 "i" = Any
 "" = (Any) => Any
 "ctx" = Any
-"loop-continue-command" = () => (None | Array<(Any) => Any>)
-"i" = Any
+"loop-continue-command" = () => None
+"i" = 0
 "" = (Any) => Any
 "ctx" = Any
-"loop-conditional-break" = () => (None | Array<(Any) => Any>)
-"i" = Any
+"loop-conditional-break" = () => None
+"i" = 1
 "" = (Any) => Any
 "ctx" = Any
 "loop-break" = () => 3
@@ -44,7 +44,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 216..217 -> @i
 221..226 -> Func(range)
 221..229 -> Type(array)
-236..249 -> ((@ctx) => @, )
+236..249 -> ((@ctx) => @ctx, )
 237..240 -> @ctx
 237..247 -> @
 244..247 -> @ctx
@@ -53,7 +53,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 301..306 -> Func(range)
 301..309 -> Type(array)
 319..320 -> @i
-343..356 -> ((@ctx) => @, )
+343..356 -> ((@ctx) => @ctx, )
 344..347 -> @ctx
 344..354 -> @
 351..354 -> @ctx
@@ -62,7 +62,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 409..414 -> Func(range)
 409..417 -> Type(array)
 427..428 -> @i
-448..461 -> ((@ctx) => @, )
+448..461 -> ((@ctx) => @ctx, )
 449..452 -> @ctx
 449..459 -> @
 456..459 -> @ctx
