@@ -1,5 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
+assertion_line: 194
 description: "Completion on ../\" (33..37)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_root.typ
@@ -34,7 +35,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
    {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {
@@ -57,7 +58,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
    {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {
@@ -80,7 +81,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_parent_inside_roo
    {
     "kind": 17,
     "label": "../base.typ",
-    "sortText": "001",
+    "sortText": "000",
     "textEdit": {
      "newText": "../base.typ",
      "range": {

@@ -71,15 +71,19 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let resolved_path = resolved_path.vpath().as_rootless_path_compat();
-        let compl_path =
-            if (path_text.is_empty() && full_text.is_empty()) || path_text.ends_with('/') {
-                resolved_path
-            } else {
-                resolved_path.parent().unwrap_or(Path::new(""))
-            };
+        let path_is_dir_like = (path_text.is_empty() && full_text.is_empty())
+            || path_text.ends_with('/')
+            || matches!(path.components().next_back(), Some(Component::CurDir));
+        let filter_prefix =
+            completion_filter_prefix(resolved_path, has_root, path_is_dir_like, base_dir)?;
+        let compl_path = if path_is_dir_like {
+            resolved_path
+        } else {
+            resolved_path.parent().unwrap_or(Path::new(""))
+        };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
         log::info!(
-            "completion.path.resolved: path={path:?}, full_path={full_path:?}, resolved={resolved_path:?}, compl_path={compl_path:?}, has_root={has_root}, base_dir={base_dir:?}"
+            "completion.path.resolved: path={path:?}, full_path={full_path:?}, resolved={resolved_path:?}, compl_path={compl_path:?}, has_root={has_root}, base_dir={base_dir:?}, filter_prefix={filter_prefix:?}"
         );
 
         // List entries in the current completion directory.
@@ -104,6 +108,9 @@ impl CompletionPair<'_, '_, '_> {
                 );
                 continue;
             };
+            if !path_label_matches_prefix(&label, &filter_prefix) {
+                continue;
+            }
             if seen_entries.insert(label.clone()) {
                 crate::log_debug_ct!("compl_dir_label: {label:?}");
                 if is_folder {
@@ -133,6 +140,9 @@ impl CompletionPair<'_, '_, '_> {
                 );
                 continue;
             };
+            if !path_label_matches_prefix(&label, &filter_prefix) {
+                continue;
+            }
             if !seen_entries.insert(label.clone()) {
                 continue;
             }
@@ -372,6 +382,32 @@ fn completion_label(
         label.push('/');
     }
     Some(label)
+}
+
+fn completion_filter_prefix(
+    rootless_path: &Path,
+    has_root: bool,
+    is_dir_like: bool,
+    base_dir: &Path,
+) -> Option<EcoString> {
+    let rooted_path = Path::new("/").join(rootless_path);
+    let prefix_path = if has_root {
+        rooted_path
+    } else {
+        tinymist_std::path::diff(&rooted_path, base_dir)?
+    };
+    let mut prefix: EcoString = unix_slash(&prefix_path).into();
+    if prefix == "." {
+        prefix.clear();
+    }
+    if is_dir_like && !prefix.is_empty() && !prefix.ends_with('/') {
+        prefix.push('/');
+    }
+    Some(prefix)
+}
+
+fn path_label_matches_prefix(label: &str, prefix: &str) -> bool {
+    prefix.is_empty() || label.starts_with(prefix)
 }
 
 fn normalize_rootless_path(path: &Path) -> PathBuf {
