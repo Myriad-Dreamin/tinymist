@@ -233,38 +233,15 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn string_prefix_lossy(raw: &str) -> EcoString {
-    if !raw.contains('\\') {
-        let mut w = EcoString::new();
-        w.push('"');
-        w.push_str(raw);
-        w.push('"');
-        let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
-        if let Some(text) = partial_str.cast::<ast::Str>().map(|s| s.get()) {
-            return text;
-        }
-    }
-
-    let mut decoded = EcoString::new();
-    let mut chars = raw.chars();
-    while let Some(ch) = chars.next() {
-        if ch != '\\' {
-            decoded.push(ch);
-            continue;
-        }
-
-        match chars.next() {
-            Some('"') => decoded.push('"'),
-            Some('\\') => decoded.push('\\'),
-            Some('/') => decoded.push('/'),
-            Some('n') => decoded.push('\n'),
-            Some('r') => decoded.push('\r'),
-            Some('t') => decoded.push('\t'),
-            Some(ch) => decoded.push(ch),
-            None => break,
-        }
-    }
-
-    decoded
+    let mut w = EcoString::new();
+    w.push('"');
+    w.push_str(raw);
+    w.push('"');
+    let partial_str = SyntaxNode::leaf(SyntaxKind::Str, w);
+    partial_str
+        .cast::<ast::Str>()
+        .map(|s| s.get())
+        .unwrap_or_default()
 }
 
 fn shadow_file_to_dir_entry(

@@ -1,7 +1,6 @@
 ---
 source: crates/tinymist-query/src/completion.rs
-assertion_line: 194
-description: "Completion on assets\\/lo\" (46..57)"
+description: "Completion on assets/\\u{6c}o\" (46..61)"
 expression: "JsonRepr::new_pure(results)"
 input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.typ
 ---
@@ -21,7 +20,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -39,7 +38,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -66,7 +65,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -84,7 +83,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -111,7 +110,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -129,7 +128,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -156,7 +155,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -174,7 +173,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -201,7 +200,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -219,7 +218,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -246,7 +245,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -264,7 +263,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -291,7 +290,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -309,52 +308,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   }
-  ]
- },
- {
-  "isIncomplete": false,
-  "items": [
-   {
-    "command": {
-     "command": "editor.action.triggerSuggest",
-     "title": ""
-    },
-    "kind": 19,
-    "label": "assets/",
-    "sortText": "000",
-    "textEdit": {
-     "newText": "assets/",
-     "range": {
-      "end": {
-       "character": 17,
-       "line": 1
-      },
-      "start": {
-       "character": 7,
-       "line": 1
-      }
-     }
-    }
-   },
-   {
-    "kind": 17,
-    "label": "assets/logo.png",
-    "sortText": "001",
-    "textEdit": {
-     "newText": "assets/logo.png",
-     "range": {
-      "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -377,7 +331,46 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": []
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "assets/logo.png",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/logo.png",
+     "range": {
+      "end": {
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -400,7 +393,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {
@@ -423,7 +416,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/path_escape_positions.
      "newText": "assets/logo.png",
      "range": {
       "end": {
-       "character": 17,
+       "character": 21,
        "line": 1
       },
       "start": {

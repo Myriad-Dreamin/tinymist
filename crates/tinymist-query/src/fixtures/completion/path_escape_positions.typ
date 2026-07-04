@@ -3,4 +3,4 @@ png
 
 -----
 /// contains: assets/, assets/logo.png
-#read("assets\/lo"/* range -11..0 */)
+#read("assets/\u{6c}o"/* range -15..0 */)
