@@ -391,6 +391,19 @@ fn test_help_preview() {
               relative to the current working directory (PWD)
 
     Options:
+          --format <FORMAT>
+              Configure the preview output format.
+              
+              `tinymist preview` does not write an output file, so this selects the Typst compilation
+              target used by the live preview.
+
+              Possible values:
+              - paged:  The current export target is for PDF, PNG, and SVG export
+              - html:   The current export target is for HTML export
+              - bundle: The current export target is for bundle export
+              
+              [default: paged]
+
           --preview-mode <MODE>
               Configure the preview mode
 
