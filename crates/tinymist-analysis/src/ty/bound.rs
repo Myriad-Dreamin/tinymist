@@ -1,8 +1,15 @@
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::ops::Deref;
 
 use typst::foundations::{self, Func};
 
 use crate::ty::prelude::*;
+
+thread_local! {
+    static BOUND_VISITING: RefCell<HashSet<(Interned<TypeVar>, bool)>> =
+        RefCell::new(HashSet::new());
+}
 
 /// A trait for checking the bounds of a type.
 pub trait BoundChecker: Sized + TyCtx {
@@ -16,12 +23,25 @@ pub trait BoundChecker: Sized + TyCtx {
 
     /// Checks the bounds of a variable recursively.
     fn check_var_rec(&mut self, u: &Interned<TypeVar>, pol: bool) {
+        let inserted =
+            BOUND_VISITING.with(|visiting| visiting.borrow_mut().insert((u.clone(), pol)));
+        if !inserted {
+            return;
+        }
+
         let Some(w) = self.global_bounds(u, pol) else {
+            BOUND_VISITING.with(|visiting| {
+                visiting.borrow_mut().remove(&(u.clone(), pol));
+            });
             return;
         };
         let mut ctx = BoundCheckContext;
         ctx.tys(w.ubs.iter(), pol, self);
         ctx.tys(w.lbs.iter(), !pol, self);
+
+        BOUND_VISITING.with(|visiting| {
+            visiting.borrow_mut().remove(&(u.clone(), pol));
+        });
     }
 }
 
@@ -130,6 +150,7 @@ impl Ty {
                     results.push(DocSource::Var(ty.clone()));
                 }
                 With(ty) => collect(&ty.sig, results),
+                Apply(ty) => collect(&ty.callee, results),
                 Select(ty) => {
                     // todo: do this correctly
                     if matches!(ty.select.deref(), "with" | "where") {

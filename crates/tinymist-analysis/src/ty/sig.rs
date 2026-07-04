@@ -276,6 +276,7 @@ impl SigCheckDriver<'_> {
             }
             Ty::Select(sel) => sel.ty.bounds(pol, &mut MethodDriver(self, &sel.select)),
             // todo: calculate these operators
+            Ty::Apply(_) => {}
             Ty::Unary(_) => {}
             Ty::Binary(_) => {}
             Ty::If(_) => {}

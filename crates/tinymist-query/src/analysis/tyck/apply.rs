@@ -10,6 +10,7 @@ use crate::{analysis::ApplyChecker, ty::ArgsTy};
 pub struct ApplyTypeChecker<'a, 'b> {
     pub(super) base: &'a mut TypeChecker<'b>,
     pub call_site: Span,
+    pub allow_deferred_calls: bool,
     pub call_raw_for_with: Option<Ty>,
     pub resultant: Vec<Ty>,
 }
@@ -21,8 +22,51 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
             sig => (sig, false),
         };
 
-        if !is_partialize && let Some(ty) = sig.call(args, pol, self.base) {
-            self.resultant.push(ty);
+        let shape = sig.shape(self.base);
+
+        if !is_partialize
+            && let Some(SigShape {
+                sig: shape_sig,
+                withs,
+            }) = &shape
+        {
+            let args_have_generated = TypeChecker::sig_has_generated_var(args)
+                || withs
+                    .map(|withs| {
+                        withs
+                            .iter()
+                            .any(|with| TypeChecker::sig_has_generated_var(with))
+                    })
+                    .unwrap_or(false);
+            let can_defer = shape_sig
+                .body
+                .as_ref()
+                .is_some_and(TypeChecker::has_generated_var)
+                && self.allow_deferred_calls
+                && !args_have_generated
+                && !shape_sig
+                    .body
+                    .as_ref()
+                    .is_some_and(|body| self.base.is_inferring_return(body));
+
+            if can_defer {
+                if let Some(ty) = self.base.instantiate_sig_result(shape_sig, args, *withs)
+                    && !TypeChecker::has_generated_var(&ty)
+                {
+                    self.resultant.push(ty);
+                } else {
+                    let ret = self.base.fresh_generated_var(Interned::empty().clone());
+                    self.base.defer_call(
+                        shape_sig.clone(),
+                        args.clone(),
+                        withs.cloned(),
+                        ret.clone(),
+                    );
+                    self.resultant.push(ret);
+                }
+            } else if let Some(ty) = sig.call(args, pol, self.base) {
+                self.resultant.push(ty);
+            }
         }
 
         // todo: remove this after we implemented dependent types
@@ -31,8 +75,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                 if *val == typst::foundations::Type::of::<typst::foundations::Type>()
                     && let Some(p0) = args.pos(0)
                 {
-                    self.resultant
-                        .push(Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, p0.clone())));
+                    self.resultant.push(p0.type_of_result());
                 }
             }
             Sig::Builtin(BuiltinSig::TupleMap(this)) => {
@@ -54,6 +97,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                         let mut mapper = ApplyTypeChecker {
                                             base,
                                             call_site: Span::detached(),
+                                            allow_deferred_calls: false,
                                             call_raw_for_with: None,
                                             resultant: vec![],
                                         };
@@ -69,6 +113,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 let mut mapper = ApplyTypeChecker {
                                     base,
                                     call_site: Span::detached(),
+                                    allow_deferred_calls: false,
                                     call_raw_for_with: None,
                                     resultant: vec![],
                                 };
@@ -120,7 +165,7 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                                 self.resultant.push(res);
                             }
                             Sig::ArrayCons(elem) => {
-                                crate::log_debug_ct!("array at check on array: {elem:?} {p0:?}");
+                                crate::log_debug_ct!("tuple at check on array: {elem:?} {p0:?}");
                                 self.resultant.push(elem.as_ref().clone());
                             }
                             _ => {}
@@ -139,13 +184,13 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
 
         let callee = sig.ty();
 
-        let Some(SigShape { sig, withs }) = sig.shape(self.base) else {
+        let Some(SigShape { sig, withs }) = shape else {
             return;
         };
         self.base.constrain_sig_inputs(&sig, args, withs);
 
         if let Some(callee) = callee.clone() {
-            self.base.info.witness_at_least(self.call_site, callee);
+            self.base.witness_at_least(self.call_site, callee);
         }
 
         if is_partialize {

@@ -23,6 +23,7 @@ pub trait TyMutator {
             Param(param) => Some(Param(self.mutate_param(param, pol)?.into())),
             Select(sel) => Some(Select(self.mutate_select(sel, pol)?.into())),
             With(sig) => Some(With(self.mutate_with_sig(sig, pol)?.into())),
+            Apply(apply) => Some(Apply(self.mutate_apply(apply, pol)?.into())),
             Unary(unary) => Some(Unary(self.mutate_unary(unary, pol)?.into())),
             Binary(binary) => Some(Binary(self.mutate_binary(binary, pol)?.into())),
             If(if_expr) => Some(If(self.mutate_if(if_expr, pol)?.into())),
@@ -157,6 +158,23 @@ pub trait TyMutator {
             ty: target,
             select: ty.select.clone(),
         })
+    }
+
+    /// Mutates the given deferred apply type.
+    fn mutate_apply(&mut self, ty: &Interned<ApplyTy>, pol: bool) -> Option<ApplyTy> {
+        let callee = self.mutate(ty.callee.as_ref(), pol);
+        let args = self.mutate_func(&ty.args, pol);
+
+        if callee.is_none() && args.is_none() {
+            return None;
+        }
+
+        let callee = callee
+            .map(Interned::new)
+            .unwrap_or_else(|| ty.callee.clone());
+        let args = args.map(Interned::new).unwrap_or_else(|| ty.args.clone());
+
+        Some(ApplyTy { callee, args })
     }
 }
 

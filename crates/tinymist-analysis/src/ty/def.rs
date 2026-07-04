@@ -78,6 +78,8 @@ pub enum Ty {
     // Type operations
     /// A partially applied function type.
     With(Interned<SigWithTy>),
+    /// A deferred function call.
+    Apply(Interned<ApplyTy>),
     /// Select a field from a type.
     Select(Interned<SelectTy>),
     /// A unary operation.
@@ -106,6 +108,7 @@ impl fmt::Debug for Ty {
                 f.write_str(")")
             }
             Ty::With(with) => write!(f, "({:?}).with(..{:?})", with.sig, with.with),
+            Ty::Apply(apply) => write!(f, "{apply:?}"),
             Ty::Select(sel) => write!(f, "{sel:?}"),
             Ty::Union(types) => {
                 f.write_str("(")?;
@@ -136,6 +139,263 @@ impl fmt::Debug for Ty {
 }
 
 impl Ty {
+    /// The broad type of a Typst `type` value.
+    pub fn type_value() -> Self {
+        Ty::Builtin(BuiltinTy::Type(Type::of::<Type>()))
+    }
+
+    /// Approximates the result of Typst's `type(value)` constructor.
+    ///
+    /// This keeps dependent `type(x)` constraints for simple variables, but
+    /// avoids embedding arbitrarily large operand types into the result.
+    pub fn type_of_result(&self) -> Self {
+        const MAX_RESULTS: usize = 32;
+
+        fn push(results: &mut Vec<Ty>, ty: Ty, unknown: &mut bool) {
+            if results.len() >= MAX_RESULTS {
+                *unknown = true;
+                return;
+            }
+            if !results.contains(&ty) {
+                results.push(ty);
+            }
+        }
+
+        fn visit(ty: &Ty, results: &mut Vec<Ty>, unknown: &mut bool, depth: usize) {
+            if depth >= 8 || results.len() >= MAX_RESULTS {
+                *unknown = true;
+                return;
+            }
+
+            match ty {
+                Ty::Value(value) => {
+                    push(
+                        results,
+                        Ty::Builtin(BuiltinTy::Type(value.val.ty())),
+                        unknown,
+                    );
+                }
+                Ty::Boolean(..) => {
+                    push(
+                        results,
+                        Ty::Builtin(BuiltinTy::Type(Type::of::<bool>())),
+                        unknown,
+                    );
+                }
+                Ty::Builtin(BuiltinTy::Type(ty)) => {
+                    push(results, Ty::Builtin(BuiltinTy::Type(*ty)), unknown);
+                }
+                Ty::Builtin(BuiltinTy::TypeType(..)) => {
+                    push(results, Ty::type_value(), unknown);
+                }
+                Ty::Builtin(BuiltinTy::Content(..)) => {
+                    push(
+                        results,
+                        Ty::Builtin(BuiltinTy::Type(Type::of::<Content>())),
+                        unknown,
+                    );
+                }
+                Ty::Union(types) => {
+                    for ty in types.iter() {
+                        visit(ty, results, unknown, depth + 1);
+                    }
+                }
+                Ty::Let(bounds) => {
+                    if bounds.lbs.is_empty() {
+                        *unknown = true;
+                    }
+                    for ty in bounds.lbs.iter() {
+                        visit(ty, results, unknown, depth + 1);
+                    }
+                }
+                Ty::Param(param) => visit(&param.ty, results, unknown, depth + 1),
+                Ty::Var(var) => push(
+                    results,
+                    Ty::Unary(TypeUnary::new(UnaryOp::TypeOf, Ty::Var(var.clone()))),
+                    unknown,
+                ),
+                Ty::Any
+                | Ty::Builtin(_)
+                | Ty::Dict(_)
+                | Ty::Array(_)
+                | Ty::Tuple(_)
+                | Ty::Func(_)
+                | Ty::Args(_)
+                | Ty::Pattern(_)
+                | Ty::With(_)
+                | Ty::Apply(_)
+                | Ty::Select(_)
+                | Ty::Unary(_)
+                | Ty::Binary(_)
+                | Ty::If(_) => {
+                    *unknown = true;
+                }
+            }
+        }
+
+        let mut results = Vec::new();
+        let mut unknown = false;
+        visit(self, &mut results, &mut unknown, 0);
+        if unknown || results.is_empty() {
+            push(&mut results, Ty::type_value(), &mut false);
+        }
+
+        Ty::from_types(results.into_iter())
+    }
+
+    /// Keeps only the stable, small part of a deferred operation operand.
+    pub fn compact_deferred_operand(&self) -> Self {
+        self.compact_deferred_operand_(0)
+    }
+
+    fn compact_deferred_operand_(&self, depth: usize) -> Self {
+        const MAX_DEPTH: usize = 4;
+
+        match self {
+            Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) | Ty::Var(_) => self.clone(),
+            Ty::Param(param) => param.ty.compact_deferred_operand_(depth + 1),
+            Ty::Union(types) if types.len() <= 4 => {
+                let types = types
+                    .iter()
+                    .map(|ty| ty.compact_deferred_operand_(depth + 1))
+                    .collect::<Vec<_>>();
+                Ty::from_types(types.into_iter())
+            }
+            Ty::Let(bounds) if bounds.lbs.len() == 1 => {
+                bounds.lbs[0].compact_deferred_operand_(depth + 1)
+            }
+            Ty::Let(bounds) if bounds.lbs.is_empty() && bounds.ubs.len() == 1 => {
+                bounds.ubs[0].compact_deferred_operand_(depth + 1)
+            }
+            Ty::Dict(record) if record.types.len() <= 16 => {
+                let mut record = record.as_ref().clone();
+                record.types = record
+                    .types
+                    .iter()
+                    .map(|ty| ty.compact_deferred_operand_(depth + 1))
+                    .collect::<Vec<_>>()
+                    .into();
+                Ty::Dict(record.into())
+            }
+            Ty::Array(elem) => Ty::Array(elem.compact_deferred_operand_(depth + 1).into()),
+            Ty::Tuple(types) if types.len() <= 16 => Ty::Tuple(
+                types
+                    .iter()
+                    .map(|ty| ty.compact_deferred_operand_(depth + 1))
+                    .collect::<Vec<_>>()
+                    .into(),
+            ),
+            Ty::Select(sel) => Ty::Select(SelectTy::new(
+                sel.ty.compact_deferred_operand_(depth + 1).into(),
+                sel.select.clone(),
+            )),
+            Ty::Apply(apply) if depth < MAX_DEPTH => {
+                let args = Self::compact_deferred_args(&apply.args, depth + 1);
+                Ty::Apply(ApplyTy::new(
+                    apply.callee.compact_deferred_operand_(depth + 1).into(),
+                    args,
+                ))
+            }
+            Ty::Unary(unary) if depth < MAX_DEPTH => Ty::Unary(TypeUnary::new(
+                unary.op,
+                unary.lhs.compact_deferred_operand_(depth + 1),
+            )),
+            Ty::Binary(binary) if depth < MAX_DEPTH => {
+                let [lhs, rhs] = binary.operands();
+                Ty::Binary(TypeBinary::new(
+                    binary.op,
+                    lhs.compact_deferred_operand_(depth + 1),
+                    rhs.compact_deferred_operand_(depth + 1),
+                ))
+            }
+            Ty::Dict(_)
+            | Ty::Tuple(_)
+            | Ty::Func(_)
+            | Ty::Args(_)
+            | Ty::Pattern(_)
+            | Ty::With(_)
+            | Ty::Apply(_)
+            | Ty::Unary(_)
+            | Ty::Binary(_)
+            | Ty::If(_)
+            | Ty::Union(_)
+            | Ty::Let(_) => Ty::Any,
+        }
+    }
+
+    /// Keeps a deferred call resultant small without erasing callable results.
+    pub fn compact_deferred_resultant(&self) -> Self {
+        self.compact_deferred_resultant_(0)
+    }
+
+    fn compact_deferred_resultant_(&self, depth: usize) -> Self {
+        const MAX_DEPTH: usize = 4;
+
+        if depth >= MAX_DEPTH {
+            return self.compact_deferred_operand();
+        }
+
+        match self {
+            Ty::Func(sig) => {
+                let mut sig = sig.as_ref().clone();
+                sig.inputs = sig
+                    .inputs
+                    .iter()
+                    .map(Ty::compact_deferred_operand)
+                    .collect::<Vec<_>>()
+                    .into();
+                sig.body = sig
+                    .body
+                    .as_ref()
+                    .map(|body| body.compact_deferred_resultant_(depth + 1));
+                Ty::Func(sig.into())
+            }
+            Ty::With(with) => Ty::With(
+                SigWithTy {
+                    sig: with.sig.compact_deferred_resultant_(depth + 1).into(),
+                    with: with.with.clone(),
+                }
+                .into(),
+            ),
+            Ty::Apply(apply) => {
+                let args = Self::compact_deferred_args(&apply.args, depth + 1);
+                Ty::Apply(ApplyTy::new(
+                    apply.callee.compact_deferred_resultant_(depth + 1).into(),
+                    args,
+                ))
+            }
+            Ty::Union(types) if types.len() <= 8 => Ty::from_types(
+                types
+                    .iter()
+                    .map(|ty| ty.compact_deferred_resultant_(depth + 1))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            ),
+            Ty::Let(bounds) if bounds.lbs.len() == 1 => {
+                bounds.lbs[0].compact_deferred_resultant_(depth + 1)
+            }
+            Ty::Let(bounds) if bounds.lbs.is_empty() && bounds.ubs.len() == 1 => {
+                bounds.ubs[0].compact_deferred_resultant_(depth + 1)
+            }
+            _ => self.compact_deferred_operand(),
+        }
+    }
+
+    fn compact_deferred_args(args: &Interned<ArgsTy>, depth: usize) -> Interned<ArgsTy> {
+        let mut args = args.as_ref().clone();
+        args.inputs = args
+            .inputs
+            .iter()
+            .map(|ty| ty.compact_deferred_operand_(depth + 1))
+            .collect::<Vec<_>>()
+            .into();
+        args.body = args
+            .body
+            .as_ref()
+            .map(|body| body.compact_deferred_operand_(depth + 1));
+        args.into()
+    }
+
     /// Whether the type is a dictionary type.
     pub fn is_dict(&self) -> bool {
         matches!(self, Ty::Dict(..))
@@ -164,8 +424,30 @@ impl Ty {
 
     /// Creates a union type from an iterator of types.     
     pub fn iter_union(iter: impl IntoIterator<Item = Ty>) -> Self {
-        let mut v: Vec<Ty> = iter.into_iter().collect();
+        fn push_flattened(v: &mut Vec<Ty>, ty: Ty) {
+            match ty {
+                Ty::Union(types) if types.is_empty() => {}
+                Ty::Union(types) => {
+                    for ty in types.iter().cloned() {
+                        push_flattened(v, ty);
+                    }
+                }
+                ty => v.push(ty),
+            }
+        }
+
+        let mut v = Vec::new();
+        for ty in iter {
+            push_flattened(&mut v, ty);
+        }
         v.sort();
+        v.dedup();
+        if v.len() > 1 {
+            v.retain(|ty| !matches!(ty, Ty::Builtin(BuiltinTy::FlowNone)));
+        }
+        if v.len() == 1 {
+            return v.pop().unwrap();
+        }
         Ty::Union(Interned::new(v))
     }
 
@@ -1280,6 +1562,28 @@ impl fmt::Debug for SigWithTy {
     }
 }
 
+/// A deferred function call type.
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ApplyTy {
+    /// The called value.
+    pub callee: TyRef,
+    /// The call arguments.
+    pub args: Interned<ArgsTy>,
+}
+
+impl ApplyTy {
+    /// Creates a deferred function call type.
+    pub fn new(callee: TyRef, args: Interned<ArgsTy>) -> Interned<Self> {
+        Interned::new(Self { callee, args })
+    }
+}
+
+impl fmt::Debug for ApplyTy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Apply({:?}, {:?})", RefDebug(&self.callee), self.args)
+    }
+}
+
 /// A field selection type.
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SelectTy {
@@ -1416,12 +1720,46 @@ pub struct TypeInfo {
     pub vars: FxHashMap<DeclExpr, TypeVarBounds>,
     /// The checked documentation of definitions.
     pub var_docs: FxHashMap<DeclExpr, Arc<UntypedDefDocs>>,
+    /// Definitions whose type bounds came from explicit documentation annotations.
+    pub doc_annotated_vars: FxHashSet<DeclExpr>,
     /// The local binding of the type variable.
     pub local_binds: snapshot_map::SnapshotMap<DeclExpr, Ty>,
     /// The typing on syntax structures.
     pub mapping: FxHashMap<Span, FxHashSet<Ty>>,
     /// The cache to canonicalize types.
     pub(super) cano_cache: Mutex<TypeCanoStore>,
+}
+
+impl Clone for TypeInfo {
+    fn clone(&self) -> Self {
+        fn clone_bounds(bounds: &TypeVarBounds) -> TypeVarBounds {
+            let var = bounds.var.clone();
+            let cloned = bounds.bounds.bounds().read().clone();
+            let cloned = Arc::new(RwLock::new(cloned));
+            let bounds = match &bounds.bounds {
+                FlowVarKind::Strong(_) => FlowVarKind::Strong(cloned),
+                FlowVarKind::Weak(_) => FlowVarKind::Weak(cloned),
+            };
+            TypeVarBounds { var, bounds }
+        }
+
+        Self {
+            valid: self.valid,
+            fid: self.fid,
+            revision: self.revision,
+            exports: self.exports.clone(),
+            vars: self
+                .vars
+                .iter()
+                .map(|(decl, bounds)| (decl.clone(), clone_bounds(bounds)))
+                .collect(),
+            var_docs: self.var_docs.clone(),
+            doc_annotated_vars: self.doc_annotated_vars.clone(),
+            local_binds: self.local_binds.clone(),
+            mapping: self.mapping.clone(),
+            cano_cache: Mutex::default(),
+        }
+    }
 }
 
 impl Hash for TypeInfo {
@@ -1620,6 +1958,7 @@ impl_internable!(ParamTy,);
 impl_internable!(TypeSource,);
 impl_internable!(TypeVar,);
 impl_internable!(SigWithTy,);
+impl_internable!(ApplyTy,);
 impl_internable!(SigTy,);
 impl_internable!(RecordTy,);
 impl_internable!(SelectTy,);

@@ -89,7 +89,10 @@ impl Iface<'_> {
             Iface::Array(..) | Iface::Tuple(..) => {
                 select_scope(Some(Type::of::<typst::foundations::Array>().scope()), key)
             }
-            Iface::Dict(dict) => dict.field_by_name(key).cloned(),
+            Iface::Dict(dict) => dict
+                .field_by_name(key)
+                .cloned()
+                .or_else(|| select_scope(Some(Type::of::<Dict>().scope()), key)),
             Iface::Content { val, .. } => select_scope(Some(val.scope()), key),
             // todo: distinguish TypeType and Type
             Iface::TypeType { val, .. } | Iface::Type { val, .. } => {

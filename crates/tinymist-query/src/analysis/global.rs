@@ -534,7 +534,7 @@ impl LocalContext {
         // let plain_docs = plain_docs.or(sym.head.oneliner.as_deref());
         match def.decl.kind() {
             DefKind::Function => {
-                let sig = self.sig_of_def(def.clone())?;
+                let sig = self.precise_sig_of_def(def.clone())?;
                 let docs = crate::docs::sig_docs(self.shared(), &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
@@ -880,7 +880,7 @@ impl SharedContext {
             }
 
             guard.miss();
-            type_check(self.clone(), ei, route)
+            type_check(self, ei, route)
         })
     }
 
@@ -1027,16 +1027,16 @@ impl SharedContext {
         Some(ty_chk.simplify(ty, false))
     }
 
-    pub(crate) fn sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
+    pub(crate) fn precise_sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
         crate::log_debug_ct!("check definition func {def:?}");
         let source = def.decl.file_id().and_then(|id| self.source_by_id(id).ok());
-        analyze_signature(self, SignatureTarget::Def(source, def))
+        analyze_signature(self, SignatureTarget::PreciseDef(source, def))
     }
 
     pub(crate) fn def_docs(self: &Arc<Self>, def: &Definition) -> Option<DefDocs> {
         match def.decl.kind() {
             DefKind::Function => {
-                let sig = self.sig_of_def(def.clone())?;
+                let sig = self.precise_sig_of_def(def.clone())?;
                 let docs = crate::docs::sig_docs(self, &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
@@ -1126,7 +1126,7 @@ impl SharedContext {
         compute: impl FnOnce(&Arc<Self>) -> Option<Signature> + Send + Sync + 'static,
     ) -> Option<Signature> {
         let res = match func {
-            SignatureTarget::Def(src, def) => self
+            SignatureTarget::PreciseDef(src, def) => self
                 .analysis
                 .caches
                 .def_signatures

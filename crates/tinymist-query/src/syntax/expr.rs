@@ -1125,7 +1125,17 @@ impl ExprWorker<'_> {
     }
 
     fn check_markup(&mut self, markup: ast::Markup) -> Expr {
-        self.with_scope(|this| this.check_inline_markup(markup))
+        self.with_scope(|this| {
+            let expr = this.check_inline_markup(markup);
+            match expr {
+                Expr::Block(items) => {
+                    let mut items = items.as_ref().clone();
+                    items.push(Expr::Type(Ty::Builtin(BuiltinTy::Content(None))));
+                    Expr::Block(items.into())
+                }
+                expr => expr,
+            }
+        })
     }
 
     fn check_code(&mut self, code: ast::Code) -> Expr {

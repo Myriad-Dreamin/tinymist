@@ -227,7 +227,9 @@ impl TypeDescriber {
             Ty::Pattern(..) => {
                 return "pattern".into();
             }
-            Ty::Select(..) | Ty::Unary(..) | Ty::Binary(..) | Ty::If(..) => return "any".into(),
+            Ty::Select(..) | Ty::Apply(..) | Ty::Unary(..) | Ty::Binary(..) | Ty::If(..) => {
+                return "any".into();
+            }
         }
 
         EcoString::new()

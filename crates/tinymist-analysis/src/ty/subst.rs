@@ -1,4 +1,5 @@
 use super::{Sig, SigShape, TyMutator};
+use crate::syntax::UnaryOp;
 use crate::ty::prelude::*;
 
 impl Sig<'_> {
@@ -49,11 +50,32 @@ impl<T: TyCtxMut> TyMutator for SubstituteChecker<'_, T> {
         // todo: extrude the type into a polarized type
         let _ = pol;
 
+        if let Ty::Unary(unary) = ty
+            && unary.op == UnaryOp::TypeOf
+        {
+            let lhs = self
+                .mutate(&unary.lhs, pol)
+                .unwrap_or_else(|| unary.lhs.clone());
+            return Some(lhs.type_of_result());
+        }
+
         if let Ty::Var(v) = ty {
             self.ctx.local_bind_of(v)
         } else {
             self.mutate_rec(ty, pol)
         }
+    }
+
+    fn mutate_select(&mut self, ty: &Interned<SelectTy>, pol: bool) -> Option<SelectTy> {
+        let target = self
+            .mutate(ty.ty.as_ref(), pol)?
+            .compact_deferred_operand()
+            .into();
+
+        Some(SelectTy {
+            ty: target,
+            select: ty.select.clone(),
+        })
     }
 }
 

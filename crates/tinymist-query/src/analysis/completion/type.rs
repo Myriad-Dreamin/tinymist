@@ -32,6 +32,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             Ty::Args(_) => return None,
             Ty::Func(_) => return None,
             Ty::With(_) => return None,
+            Ty::Apply(_) => return None,
             Ty::Select(_) => return None,
             Ty::Var(_) => return None,
             Ty::Unary(_) => return None,

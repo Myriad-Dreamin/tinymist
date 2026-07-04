@@ -8,7 +8,7 @@ use tinymist_derive::BindTyCtx;
 use tinymist_std::hash::FxHashSet;
 
 use super::{Definition, SharedContext, prelude::*};
-use crate::analysis::PostTypeChecker;
+use crate::analysis::{PostTypeChecker, type_check_for_precise_signature};
 use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::{DeclExpr, classify_def_loosely};
 use crate::ty::{
@@ -21,8 +21,8 @@ pub use tinymist_analysis::{PrimarySignature, Signature};
 /// The language object that the signature is being analyzed for.
 #[derive(Debug, Clone)]
 pub enum SignatureTarget {
-    /// A static node without knowing the function at runtime.
-    Def(Option<Source>, Definition),
+    /// A static definition whose public API requires a precise signature.
+    PreciseDef(Option<Source>, Definition),
     /// A static node without knowing the function at runtime.
     SyntaxFast(Source, Span),
     /// A static node without knowing the function at runtime.
@@ -37,7 +37,7 @@ impl SignatureTarget {
     /// Returns the span of the callee node.
     pub fn span(&self) -> Span {
         match self {
-            SignatureTarget::Def(_, def) => def.decl.span(),
+            SignatureTarget::PreciseDef(_, def) => def.decl.span(),
             SignatureTarget::SyntaxFast(_, span) | SignatureTarget::Syntax(_, span) => *span,
             SignatureTarget::Runtime(func) | SignatureTarget::Convert(func) => func.span(),
         }
@@ -68,9 +68,13 @@ fn analyze_type_signature(
             let ty = type_info.type_of_span(*span)?;
             Some((type_info, ty))
         }
-        SignatureTarget::Def(source, def) => {
+        SignatureTarget::PreciseDef(source, def) => {
             let span = def.decl.span();
-            let type_info = ctx.type_check(source.as_ref()?);
+            let type_info = type_check_for_precise_signature(
+                ctx,
+                ctx.expr_stage(source.as_ref()?),
+                &def.decl,
+            )?;
             let ty = type_info.type_of_span(span)?;
             Some((type_info, ty))
         }
@@ -401,7 +405,7 @@ fn analyze_dyn_signature(
     callee_node: &SignatureTarget,
 ) -> Option<Signature> {
     let func = match callee_node {
-        SignatureTarget::Def(_source, def) => def.value()?.to_func()?,
+        SignatureTarget::PreciseDef(_source, def) => def.value()?.to_func()?,
         SignatureTarget::SyntaxFast(..) => return None,
         SignatureTarget::Syntax(source, span) => {
             let def = ctx.def_of_span(source, *span)?;

@@ -173,6 +173,17 @@ impl Ty {
             FuncInner::Native(_) => {}
         };
 
+        if let CastInfo::Type(ty) = ty
+            && *ty == Type::of::<typst::foundations::NoneValue>()
+        {
+            return Ty::Builtin(BuiltinTy::None);
+        }
+        if let CastInfo::Union(types) = ty
+            && types.is_empty()
+        {
+            return Ty::Builtin(BuiltinTy::FlowNone);
+        }
+
         Self::from_cast_info(ty)
     }
 }
