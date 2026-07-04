@@ -310,3 +310,41 @@ fn normalize_rootless_path(path: &Path) -> PathBuf {
     }
     normalized
 }
+
+#[cfg(test)]
+mod tests {
+    use super::string_prefix_lossy;
+
+    #[test]
+    fn string_prefix_lossy_normal_string() {
+        assert_eq!(
+            string_prefix_lossy("assets/logo.png").as_str(),
+            "assets/logo.png"
+        );
+        assert_eq!(
+            string_prefix_lossy(r#"assets/\u{6c}ogo.png"#).as_str(),
+            "assets/logo.png"
+        );
+    }
+
+    #[test]
+    fn string_prefix_lossy_incomplete_escape() {
+        assert_eq!(string_prefix_lossy(r#"assets\"#).as_str(), r#"assets\"#);
+        assert_eq!(
+            string_prefix_lossy(r#"assets/\u{"#).as_str(),
+            r#"assets/\u{"#
+        );
+    }
+
+    #[test]
+    fn string_prefix_lossy_syntax_error_text() {
+        assert_eq!(
+            string_prefix_lossy(r#"assets/"bad"#).as_str(),
+            r#"assets/"bad"#
+        );
+        assert_eq!(
+            string_prefix_lossy(r#"assets/\u{zz}"#).as_str(),
+            r#"assets/\u{zz}"#
+        );
+    }
+}
