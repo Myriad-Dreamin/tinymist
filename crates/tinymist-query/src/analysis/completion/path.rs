@@ -16,6 +16,8 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let is_in_text;
+        let raw_text;
+        let raw_full_text;
         let text;
         let full_text;
         let rng;
@@ -32,10 +34,14 @@ impl CompletionPair<'_, '_, '_> {
                 return None;
             }
 
-            text = string_prefix_lossy(&self.cursor.text[rng.start..self.cursor.cursor]);
-            full_text = string_prefix_lossy(&self.cursor.text[rng.clone()]);
+            raw_text = EcoString::from(&self.cursor.text[rng.start..self.cursor.cursor]);
+            raw_full_text = EcoString::from(&self.cursor.text[rng.clone()]);
+            text = string_prefix_lossy(raw_text.as_str());
+            full_text = string_prefix_lossy(raw_full_text.as_str());
             is_in_text = true;
         } else {
+            raw_text = EcoString::default();
+            raw_full_text = EcoString::default();
             text = EcoString::default();
             full_text = EcoString::default();
             rng = self.cursor.cursor..self.cursor.cursor;
@@ -45,8 +51,8 @@ impl CompletionPair<'_, '_, '_> {
         log::info!(
             "completion.path.start: id={id:?}, cursor={}, is_in_text={is_in_text}, raw_prefix={:?}, raw_full={:?}, decoded_prefix={text:?}, decoded_full={full_text:?}, range={rng:?}",
             self.cursor.cursor,
-            &self.cursor.text[rng.start..self.cursor.cursor],
-            &self.cursor.text[rng.clone()],
+            raw_text,
+            raw_full_text,
         );
         let full_path = Path::new(full_text.as_str());
         let path_text = text.as_str();
@@ -73,7 +79,8 @@ impl CompletionPair<'_, '_, '_> {
         let resolved_path = resolved_path.vpath().as_rootless_path_compat();
         let path_is_dir_like = (path_text.is_empty() && full_text.is_empty())
             || path_text.ends_with('/')
-            || matches!(path.components().next_back(), Some(Component::CurDir));
+            || path_text == "."
+            || path_text.ends_with("/.");
         let filter_prefix =
             completion_filter_prefix(resolved_path, has_root, path_is_dir_like, base_dir)?;
         let compl_path = if path_is_dir_like {
@@ -113,10 +120,19 @@ impl CompletionPair<'_, '_, '_> {
             }
             if seen_entries.insert(label.clone()) {
                 crate::log_debug_ct!("compl_dir_label: {label:?}");
+                let filter_text = completion_filter_text(&label, &filter_prefix, raw_text.as_str());
                 if is_folder {
-                    folder_completions.push((label, entry_kind));
+                    folder_completions.push(PathCompletionItem {
+                        label,
+                        filter_text,
+                        kind: entry_kind,
+                    });
                 } else {
-                    module_completions.push((label, entry_kind));
+                    module_completions.push(PathCompletionItem {
+                        label,
+                        filter_text,
+                        kind: entry_kind,
+                    });
                 }
             }
         }
@@ -147,7 +163,11 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
             crate::log_debug_ct!("compl_label: {label:?}");
-            module_completions.push((label, CompletionKind::File));
+            module_completions.push(PathCompletionItem {
+                filter_text: completion_filter_text(&label, &filter_prefix, raw_text.as_str()),
+                label,
+                kind: CompletionKind::File,
+            });
         }
 
         let replace_range = self.cursor.lsp_range_of(rng);
@@ -169,30 +189,26 @@ impl CompletionPair<'_, '_, '_> {
             lhs.cmp(rhs)
         };
 
-        module_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
-        folder_completions.sort_by(|a, b| path_priority_cmp(&a.0, &b.0));
+        module_completions.sort_by(|a, b| path_priority_cmp(&a.label, &b.label));
+        folder_completions.sort_by(|a, b| path_priority_cmp(&a.label, &b.label));
 
         let mut sorter = 0;
         let digits = (module_completions.len() + folder_completions.len())
             .to_string()
             .len();
+        let folder_len = folder_completions.len();
+        let module_len = module_completions.len();
         let completions = folder_completions.into_iter().chain(module_completions);
         log::info!(
             "completion.path.done: folders={}, files={}",
-            completions
-                .clone()
-                .filter(|(_, kind)| matches!(kind, CompletionKind::Folder))
-                .count(),
-            completions
-                .clone()
-                .filter(|(_, kind)| matches!(kind, CompletionKind::File))
-                .count()
+            folder_len,
+            module_len
         );
         Some(
             completions
                 .map(|typst_completion| {
-                    let lsp_snippet = &typst_completion.0;
-                    let is_folder = matches!(typst_completion.1, CompletionKind::Folder);
+                    let lsp_snippet = &typst_completion.label;
+                    let is_folder = matches!(typst_completion.kind, CompletionKind::Folder);
                     let text_edit = EcoTextEdit::new(
                         replace_range,
                         if is_in_text {
@@ -207,12 +223,13 @@ impl CompletionPair<'_, '_, '_> {
 
                     // todo: not all clients support label details
                     LspCompletion {
-                        label: typst_completion.0,
-                        kind: typst_completion.1,
+                        label: typst_completion.label,
+                        kind: typst_completion.kind,
                         detail: None,
                         text_edit: Some(text_edit.into()),
                         // don't sort me
                         sort_text: Some(sort_text),
+                        filter_text: typst_completion.filter_text,
                         insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                         command: self
                             .worker
@@ -304,6 +321,12 @@ impl CompletionPair<'_, '_, '_> {
 
         Some(entries)
     }
+}
+
+struct PathCompletionItem {
+    label: EcoString,
+    filter_text: Option<EcoString>,
+    kind: CompletionKind,
 }
 
 fn string_prefix_lossy(raw: &str) -> EcoString {
@@ -408,6 +431,15 @@ fn completion_filter_prefix(
 
 fn path_label_matches_prefix(label: &str, prefix: &str) -> bool {
     prefix.is_empty() || label.starts_with(prefix)
+}
+
+fn completion_filter_text(label: &str, prefix: &str, raw_prefix: &str) -> Option<EcoString> {
+    let filter_text = label
+        .strip_prefix(prefix)
+        .map(|suffix| eco_format!("{raw_prefix}{suffix}"))
+        .unwrap_or_else(|| label.into());
+
+    (filter_text.as_str() != label).then_some(filter_text)
 }
 
 fn normalize_rootless_path(path: &Path) -> PathBuf {
