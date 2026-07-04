@@ -3,6 +3,25 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.typ
 ---
+"f" = 1
+"h" = 1
+"k" = {}
+"m" = {}
+"n" = {}
+"top-complete" = {}
+"p" = {}
+"q" = {}
+"r" = {}
+"id" = Type(int)
+"" = 1
+"choose" = Type(int)
+"" = 1
+"fill" = {}
+"" = {}
+"complete" = {}
+"" = {}
+"complete" = {}
+"" = {}
 "f" = () => 1
 "id" = (Any) => Any
 "x" = Type(int)

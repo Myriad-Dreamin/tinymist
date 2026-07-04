@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 ---
+"" = Type(str)
 "a" = (1, )
 "f" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
 "" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
@@ -19,6 +20,6 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 33..34 -> @x
 42..43 -> @b
 46..47 -> @a
-46..51 -> (Func(map) | (Func(map) | @v"a".map))
-46..54 -> (Type(array) | ((Type(array) | Type(str)), ))
+46..51 -> (Func(map) | @v"a".map)
+46..54 -> (Type(array) | ((Type(array) | @), ))
 52..53 -> @f

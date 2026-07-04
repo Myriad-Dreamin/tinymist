@@ -3,6 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred.typ
 ---
+"f" = 1
+"h" = 0
+"g" = 1
+"" = 1
+"g" = 1
 "f" = () => 1
 "g" = () => 1
 "h" = () => 0

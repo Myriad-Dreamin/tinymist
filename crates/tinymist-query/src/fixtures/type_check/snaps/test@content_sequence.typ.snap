@@ -3,6 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/content_sequence.typ
 ---
+"joined-context" = TypeUnary { lhs: Content, op: Context }
+"mixed-context" = TypeUnary { lhs: Content, op: Context }
+"return-or-content" = (Content | TypeUnary { lhs: Content, op: Context })
+"repeated-content-loops" = Content
+"conditional-content-loop" = Content
 "joined-context" = () => TypeUnary { lhs: Content, op: Context }
 "mixed-context" = (Any) => TypeUnary { lhs: Content, op: Context }
 "x" = Any

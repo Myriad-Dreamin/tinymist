@@ -3,6 +3,12 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_apply.typ
 ---
+"via-method" = Apply(@v"ctx".resolve-mapping, (Any) => any)
+"" = (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
+"" = (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
+"direct-known" = (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
+"" = (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
+"" = (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
 "via-method" = (Any, Any) => Apply(@v"ctx".resolve-mapping, (Any) => any)
 "ctx" = Any
 "layer" = Any
@@ -37,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_appl
 209..214 -> @layer
 209..222 -> ({"x": "x"} | @v"layer".mapping)
 233..245 -> @known-result
-248..288 -> (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
+248..288 -> @
 249..258 -> @known-ctx
 249..274 -> ((@layer) => @ | @v"known-ctx".resolve-mapping)
 276..287 -> @known-layer

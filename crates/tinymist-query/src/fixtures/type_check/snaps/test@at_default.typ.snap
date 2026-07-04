@@ -3,6 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/at_default.typ
 ---
+"dynamic-default" = (None | Apply(@v"d".at, (Any, "default": None) => any))
+"static-param" = ( ⪰ Any | None)
 "dynamic-default" = (Any, Any) => (None | Apply(@v"d".at, (Any, "default": None) => any))
 "d" = Any
 "key" = Any

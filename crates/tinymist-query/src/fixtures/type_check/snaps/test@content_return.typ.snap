@@ -1,9 +1,10 @@
 ---
 source: crates/tinymist-query/src/analysis.rs
-assertion_line: 378
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/content_return.typ
 ---
+"interpolated" = Content
+"final-unknown" = Any
 "interpolated" = (Any, Any, Any) => Content
 "day" = Any
 "month" = Any

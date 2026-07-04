@@ -3,6 +3,16 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 ---
+"loop-none" = None
+"loop-tuple" = (None | Array<({"degrees": 90, "type": "turn"} | {"steps": 50, "type": "move"})>)
+"loop-command" = (None | Array<(Any) => Any>)
+"loop-continue-command" = (None | Array<(Any) => Any>)
+"loop-conditional-break" = (None | Array<(Any) => Any>)
+"loop-break" = 3
+"while-false" = 3
+"" = Any
+"" = Any
+"" = Any
 "loop-none" = () => None
 "i" = Any
 "x" = Any

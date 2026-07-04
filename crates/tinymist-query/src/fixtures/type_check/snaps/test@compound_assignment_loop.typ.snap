@@ -3,6 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/compound_assignment_loop.typ
 ---
+"scan-backwards" = TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }
+"assign-from-unknown" = 0
 "scan-backwards" = (Any) => TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }
 "s" = Any
 "len" = TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }

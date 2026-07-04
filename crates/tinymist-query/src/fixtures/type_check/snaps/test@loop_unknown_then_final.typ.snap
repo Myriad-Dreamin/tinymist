@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/loop_unknown_then_final.typ
 ---
+"loop-unknown-then-dict" = {}
 "loop-unknown-then-dict" = (...: Any) => {}
 "args" = Args
 "out" = {}

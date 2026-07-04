@@ -3,6 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/binary_union.typ
 ---
+"f" = (Type(int) | Type(str))
+"sub-any" = TypeBinary { operands: (Any, Any), op: Sub }
+"mul-any" = TypeBinary { operands: (Any, Any), op: Mul }
+"cross" = TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }), op: Mul }), op: Sub }
+"call-sub" = TypeBinary { operands: (Any, Any), op: Sub }
 "f" = (Any) => (Type(int) | Type(str))
 "flag" = Any
 "x" = ("s" | 1)

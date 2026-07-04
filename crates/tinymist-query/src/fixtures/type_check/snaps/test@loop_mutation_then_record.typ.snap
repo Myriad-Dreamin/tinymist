@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/loop_mutation_then_record.typ
 ---
+"bucket-by" = {"buckets": {}, "order": ()}
 "bucket-by" = (Any, Any) => {"buckets": {}, "order": ()}
 "data" = Any
 "key-col" = Any

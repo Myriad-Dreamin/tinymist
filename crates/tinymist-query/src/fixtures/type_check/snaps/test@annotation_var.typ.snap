@@ -3,10 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 ---
+"" = Apply(@v"x".map, (Any) => any)
 "x" = Any
 "y" = Any
 "mapper" = (Type(function) | (Any, Any) => Any)
-"" = (Any, Any) => Any
+"" = (Any, Any) => Apply(@v"x".map, (Any) => any)
 "x" = Any
 "f" = Any
 =====
@@ -16,5 +17,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 69..70 -> @f
 75..76 -> @x
 75..80 -> @v"x".map
-75..83 -> Any
+75..83 -> Apply(@v"x".map, (@f) => any)
 81..82 -> @f

@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive_use.typ
 ---
+"f" = Any
 "base" = Any
 "a" = Any
 "f" = () => Any

@@ -3,13 +3,14 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/op_type_of.typ
 ---
-"f" = (Any) => Type(none)
+"f" = None
+"f" = (Any) => None
 "x" = Type(integer)
 =====
 5..6 -> @f
 7..8 -> @x
 16..22 -> Func(assert)
-16..38 -> Type(none)
+16..38 -> None
 23..27 -> Type(type)
 23..30 -> (Type(type) | TypeUnary { lhs: @x, op: TypeOf })
 28..29 -> @x

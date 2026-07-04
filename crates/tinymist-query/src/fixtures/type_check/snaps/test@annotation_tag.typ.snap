@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_tag.typ
 ---
+"config-common" = None
 "config-common" = () => None
 =====
 113..126 -> @config-common

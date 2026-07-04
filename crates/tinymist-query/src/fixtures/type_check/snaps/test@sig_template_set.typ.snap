@@ -3,6 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/sig_template_set.typ
 ---
+"tmpl" = Any
 "tmpl" = ((Any, "authors": (Type(array) | Type(str)), "class": Any, "font": (TextFont | Array<TextFont>)) => Any).with(..("authors": (), "class": "article", "font": None) => any)
 "content" = Any
 "authors" = ()
@@ -18,7 +19,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/sig_template_set.typ
 71..76 -> @class
 94..99 -> @class
 118..123 -> Func(panic)
-118..127 -> ()
+118..127 -> FlowNone
 139..147 -> Func(document)
 156..163 -> @authors
 171..175 -> Func(text)

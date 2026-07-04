@@ -3,14 +3,79 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/control_flow.typ
 ---
-"x0" = IfTy { cond: true, then: 1, else_: None }
-"x1" = IfTy { cond: false, then: 2, else_: None }
-"x2" = TypeUnary { lhs: IfTy { cond: TypeBinary { operands: (Type(int), 0), op: Gt }, then: 1, else_: 2 }, op: Context }
+"x3" = (1 | 2)
+"x4" = (1 | 2)
+"x5" = (None | 1 | 2)
+"x6" = (1 | TypeUnary { lhs: 2, op: Context })
+"x7" = (Type(array) | (Any, Any, 0, ))
+"x8" = 1
+"x0" = 1
+"x1" = None
+"x2" = TypeUnary { lhs: (1 | 2), op: Context }
+"x3" = (Any) => (1 | 2)
+"cond" = Any
+"x4" = (Any) => (1 | 2)
+"cond" = Any
+"x5" = (Any) => (None | 1 | 2)
+"cond" = Any
+"i" = Any
+"x6" = (Any) => (1 | TypeUnary { lhs: 2, op: Context })
+"cond" = Any
+"x7" = (Any) => (Any, Any, 0, )
+"p" = Type(array)
+"pt" = Any
+"x8" = (Any) => 1
+"cond" = Any
 =====
 5..7 -> @x0
 31..33 -> @x1
 58..60 -> @x2
 74..78 -> Func(here)
 74..80 -> Type(location)
-74..85 -> (Func(page) | (Func(page) | Type(location).page))
+74..85 -> (Func(page) | Type(location).page)
 74..87 -> Type(int)
+119..121 -> @x3
+122..126 -> @cond
+137..141 -> @cond
+173..175 -> @x4
+176..180 -> @cond
+191..195 -> @cond
+251..253 -> @x5
+254..258 -> @cond
+270..271 -> @i
+275..280 -> Func(range)
+275..283 -> Type(array)
+293..297 -> @cond
+339..341 -> @x6
+342..346 -> @cond
+365..369 -> @cond
+401..403 -> @x7
+404..405 -> @p
+416..420 -> Type(type)
+416..423 -> (Type(type) | TypeUnary { lhs: @p, op: TypeOf })
+421..422 -> @p
+427..432 -> Type(array)
+442..443 -> @p
+442..447 -> (Func(len) | @v"p".len)
+442..449 -> Type(int)
+473..474 -> @p
+473..478 -> (Func(len) | @v"p".len)
+473..480 -> Type(int)
+496..517 -> (Any, Any, 0, )
+497..498 -> @p
+497..501 -> (Func(at) | @v"p".at)
+497..504 -> Any
+506..507 -> @p
+506..510 -> (Func(at) | @v"p".at)
+506..513 -> Any
+541..542 -> @p
+569..571 -> @pt
+575..576 -> @p
+588..590 -> @pt
+597..602 -> Func(panic)
+597..607 -> FlowNone
+616..618 -> @x8
+619..623 -> @cond
+634..638 -> @cond
+660..665 -> Func(panic)
+660..670 -> FlowNone

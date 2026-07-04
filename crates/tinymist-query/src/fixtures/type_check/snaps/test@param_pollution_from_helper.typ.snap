@@ -3,6 +3,9 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/param_pollution_from_helper.typ
 ---
+"check-free-var" = None
+"public" = Type(int)
+"" = 1
 "check-free-var" = (Any) => None
 "v" = Type(str)
 "public" = (Any, Any) => Any
@@ -24,4 +27,4 @@ input_file: crates/tinymist-query/src/fixtures/type_check/param_pollution_from_h
 132..136 -> @expr
 145..155 -> @use-public
 158..164 -> @public
-158..172 -> 1
+158..172 -> @

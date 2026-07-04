@@ -3,11 +3,13 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 ---
-"x" = (Any) => Any
+"x" = Apply(@v"date".display, () => any)
+"master-cover" = Apply(@v"x", (Type(datetime)) => any)
+"x" = (Any) => Apply(@v"date".display, () => any)
 "date" = Any
 "x" = Any
 "x" = Any
-"master-cover" = ((Any, "x": Any) => TypeBinary { operands: (Any, TypeBinary { operands: ({"submit-date": 0}, Any), op: Add }), op: Assign }).with(..("x": Any) => any)
+"master-cover" = ((Any, "x": Any) => Apply(@v"x", (Type(datetime)) => any)).with(..("x": Any) => any)
 "info" = Any
 "x" = Any
 =====
@@ -15,7 +17,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 7..11 -> @date
 15..19 -> @date
 15..27 -> @v"date".display
-15..29 -> Any
+15..29 -> Apply(@v"date".display, () => any)
 37..38 -> @x
 40..41 -> @x
 45..51 -> {"x": 1}
@@ -27,7 +29,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/confusing-name.typ
 95..111 -> {"submit-date": 0}
 114..118 -> @info
 121..122 -> @x
-121..140 -> Any
+121..140 -> Apply(@v"x", (Type(datetime)) => any)
 123..131 -> Type(datetime)
-123..137 -> (Func(today) | (Func(today) | Type(datetime).today))
+123..137 -> (Func(today) | Type(datetime).today)
 123..139 -> Type(datetime)

@@ -3,6 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named4.typ
 ---
+"foo" = (3 | {"x": 3}.x)
+"" = (3 | {"x": 3}.x)
 "dict" = {"x": 3}
 "foo" = (("c": Any) => Any).with(..("c": (3 | {"x": 3}.x)) => any)
 "c" = (3 | {"x": 3}.x)
@@ -17,4 +19,4 @@ input_file: crates/tinymist-query/src/fixtures/type_check/fn_named4.typ
 41..42 -> @c
 48..49 -> @x
 52..55 -> @foo
-52..57 -> (3 | @v"dict".x)
+52..57 -> @

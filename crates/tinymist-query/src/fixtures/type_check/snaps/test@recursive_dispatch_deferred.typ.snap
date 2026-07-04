@@ -3,6 +3,24 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive_dispatch_deferred.typ
 ---
+"done" = {"kind": "done", "value": Type(int)}
+"forward" = {"kind": "done", "value": Type(int)}
+"dispatch" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
+"" = {"kind": "done", "value": Type(int)}
 "done" = (Any) => {"kind": "done", "value": Any}
 "value" = Type(int)
 "forward" = (Any, Any) => {"kind": "done", "value": Type(int)}
@@ -25,7 +43,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/recursive_dispatch_def
 104..115 -> {"kind": "done", "value": Type(int)}
 109..114 -> @value
 131..138 -> @handler
-131..149 -> {"kind": "done", "value": Type(int)}
+131..149 -> @
 139..144 -> @value
 162..170 -> @dispatch
 171..176 -> @value
@@ -35,16 +53,16 @@ input_file: crates/tinymist-query/src/fixtures/type_check/recursive_dispatch_def
 209..214 -> @value
 228..233 -> @value
 245..252 -> @forward
-245..269 -> {"kind": "done", "value": Type(int)}
+245..269 -> @
 253..261 -> @dispatch
 263..268 -> @value
 285..292 -> @forward
-285..313 -> {"kind": "done", "value": Type(int)}
+285..313 -> @
 293..301 -> @dispatch
 303..308 -> @value
 326..334 -> @use-zero
 337..345 -> @dispatch
-337..348 -> {"kind": "done", "value": Type(int)}
+337..348 -> @
 354..361 -> @use-one
 364..372 -> @dispatch
-364..375 -> {"kind": "done", "value": Type(int)}
+364..375 -> @

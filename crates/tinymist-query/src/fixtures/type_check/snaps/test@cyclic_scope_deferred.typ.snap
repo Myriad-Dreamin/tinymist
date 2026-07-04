@@ -3,6 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/cyclic_scope_deferred.typ
 ---
+"use-f" = ("done" | 1 | Apply(@v"".f, (true) => any))
+"use-g" = ("done" | Apply(@v"".f, (true) => any))
 "a" = Any
 "b" = Any
 "f" = Any
