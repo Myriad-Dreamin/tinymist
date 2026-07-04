@@ -70,7 +70,7 @@ impl CompletionPair<'_, '_, '_> {
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
 
         // List entries in the current completion directory.
-        let dir_entries = self.directory_entries(compl_path).unwrap_or_default();
+        let dir_entries = self.directory_entries(compl_path)?;
         let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
