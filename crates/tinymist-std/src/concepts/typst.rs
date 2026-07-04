@@ -12,11 +12,11 @@ pub(crate) mod well_known {
 
     pub use typst::layout::Abs as TypstAbs;
 
-    pub use typst::Document as TypstDocumentTrait;
+    pub use typst::model::Document as TypstDocumentTrait;
 
-    pub use typst::layout::PagedDocument as TypstPagedDocument;
+    pub use typst_layout::PagedDocument as TypstPagedDocument;
 
-    pub use typst::html::HtmlDocument as TypstHtmlDocument;
+    pub use typst_html::HtmlDocument as TypstHtmlDocument;
 
     pub use typst::text::Font as TypstFont;
 
@@ -40,7 +40,7 @@ impl TypstDocument {
     /// Gets the number of pages in the document.
     pub fn num_of_pages(&self) -> u32 {
         match self {
-            Self::Paged(doc) => doc.pages.len() as u32,
+            Self::Paged(doc) => doc.pages().len() as u32,
             Self::Html(_doc) => 1u32,
         }
     }
@@ -48,17 +48,17 @@ impl TypstDocument {
     /// Gets details about the document.
     pub fn info(&self) -> &typst::model::DocumentInfo {
         match self {
-            Self::Paged(doc) => &doc.info,
-            Self::Html(doc) => &doc.info,
+            Self::Paged(doc) => doc.info(),
+            Self::Html(doc) => doc.info(),
         }
     }
 
     /// Gets the introspector that can be queried for elements and their
     /// positions.
-    pub fn introspector(&self) -> &typst::introspection::Introspector {
+    pub fn introspector(&self) -> &dyn typst::introspection::Introspector {
         match self {
-            Self::Paged(doc) => &doc.introspector,
-            Self::Html(doc) => &doc.introspector,
+            Self::Paged(doc) => doc.introspector().as_ref(),
+            Self::Html(doc) => doc.introspector().as_ref(),
         }
     }
 }
@@ -108,5 +108,5 @@ pub use well_known::*;
 /// The prelude of the Typst module.
 pub mod prelude {
     pub use comemo::Prehashed;
-    pub use ecow::{eco_format, eco_vec, EcoString, EcoVec};
+    pub use ecow::{EcoString, EcoVec, eco_format, eco_vec};
 }

@@ -17,11 +17,11 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'yarn'
       - name: Install deps
         run: yarn install
-
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Download tinymist binary artifact
         uses: actions/download-artifact@v4
         with:
@@ -42,13 +42,18 @@ jobs:
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.2/font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.0/charter-font-assets.tar.gz | tar -xvz -C assets/fonts
           curl -L https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.1.5/source-han-serif-font-assets.tar.gz | tar -xvz -C assets/fonts
+      - name: Download & install shiroa
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/Myriad-Dreamin/shiroa/releases/download/v0.3.1-rc4/shiroa-installer.sh | sh
+      - name: Build Book
+        run: |
+          shiroa build --font-path ./assets/typst-fonts/ --font-path ./assets/fonts/ --path-to-root /tinymist/ -w . docs/tinymist --mode=static-html
       - name: Build PDF Documentation
         run: |
           prebuilts/tinymist compile --font-path assets/fonts --root . docs/tinymist/ebook.typ tinymist-docs.pdf
       # todo: this is a bug
       - name: Install PDF Documentation
         run: |
-          mv docs/tinymist/ebook.pdf tinymist-docs.pdf
           mkdir -p editors/vscode/out/ contrib/html/editors/vscode/out/
           cp tinymist-docs.pdf editors/vscode/out/tinymist-docs.pdf
           cp tinymist-docs.pdf contrib/html/editors/vscode/out/tinymist-docs.pdf
@@ -64,6 +69,9 @@ jobs:
           yarn
           yarn run compile
         working-directory: ./contrib/typst-preview/editors/vscode
+      - name: Build typst-preview-ng vscode extension
+        run: yarn run compile
+        working-directory: ./contrib/typst-preview-ng/editors/vscode
       - name: Build tinymist vscode extension
         run: |
           yarn
@@ -88,4 +96,10 @@ jobs:
         with:
           name: vscode-artifacts-typst-preview
           path: contrib/typst-preview/editors/vscode/out
-
+      - name: Pre-bundle typst-preview-ng vscode extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-artifacts-typst-preview-ng
+          path: |
+            contrib/typst-preview-ng/editors/vscode/out
+            contrib/typst-preview-ng/editors/vscode/previewer

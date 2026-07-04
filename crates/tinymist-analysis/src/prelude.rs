@@ -2,11 +2,12 @@ pub use std::ops::Range;
 pub use std::path::Path;
 
 pub use ecow::EcoVec;
+pub use typst::World;
 pub use typst::diag::{EcoString, FileError};
 pub use typst::syntax::FileId as TypstFileId;
 pub use typst::syntax::{
+    LinkedNode, RootedPath, Source, SyntaxKind, SyntaxNode, VirtualPath, VirtualRoot,
     ast::{self, AstNode},
     package::{PackageManifest, PackageSpec},
-    LinkedNode, Source, SyntaxKind, SyntaxNode, VirtualPath,
 };
-pub use typst::World;
+pub use typst_shim::syntax::{VirtualPathExt, resolve_path_from_id};

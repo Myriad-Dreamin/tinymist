@@ -16,7 +16,6 @@ import {
   panelSyncScrollCompat,
   LaunchInWebViewTask,
   LaunchInBrowserTask,
-  getPreviewHtml,
   ejectPreviewPanelCompat,
 } from "./preview-compat";
 import {
@@ -28,11 +27,45 @@ import {
 import { l10nMsg } from "../l10n";
 import { IContext } from "../context";
 import { extensionState } from "../state";
+import {
+  invalidatePreviewerCache,
+  preloadPreviewer,
+  resolvePreviewer,
+  setPreviewBuiltinSourceMode,
+  type PreviewerSourceMetadata,
+  type ResolvedPreviewer,
+} from "./previewer";
+import { loadStoredViewerWindowState } from "./preview-window-state";
 
 /**
  * The launch preview implementation which depends on `isCompat` of previewActivate.
  */
 let launchImpl: typeof launchPreviewLsp;
+const previewerErrorReported = Symbol("tinymistPreviewerErrorReported");
+
+type ReportedPreviewerError = Error & {
+  [previewerErrorReported]?: true;
+};
+
+function hasReportedPreviewerError(error: unknown): boolean {
+  return (
+    error instanceof Error && (error as ReportedPreviewerError)[previewerErrorReported] === true
+  );
+}
+
+function reportPreviewerError(error: unknown, action: "load" | "open"): Error {
+  const cause = error instanceof Error ? error.message : String(error);
+  const message =
+    action === "open"
+      ? `Could not open Typst preview because the configured previewer could not be loaded: ${cause}`
+      : `Could not load the configured Typst previewer: ${cause}`;
+  console.error(message);
+  void vscode.window.showErrorMessage(message);
+
+  const reported = error instanceof Error ? error : new Error(message);
+  (reported as ReportedPreviewerError)[previewerErrorReported] = true;
+  return reported;
+}
 
 /**
  * The state corresponding to the focusing preview panel.
@@ -47,7 +80,11 @@ export interface PreviewPanelContext {
  * @param context The extension context.
  */
 export function previewPreload(context: vscode.ExtensionContext) {
-  getPreviewHtml(context);
+  void preloadPreviewer(context).catch((error) => {
+    if (!hasReportedPreviewerError(error)) {
+      reportPreviewerError(error, "load");
+    }
+  });
 }
 
 /**
@@ -58,22 +95,18 @@ export function previewPreload(context: vscode.ExtensionContext) {
  * extension.
  */
 export function previewActivate(context: vscode.ExtensionContext, isCompat: boolean) {
+  setPreviewBuiltinSourceMode(isCompat ? "compat" : "tinymist");
+
   // Provides `ContentView` (ContentPreviewProvider) at the sidebar, which is a list of thumbnail
   // images.
-  getPreviewHtml(context).then((html) => {
-    if (!html) {
-      vscode.window.showErrorMessage("Failed to load content preview content");
-      return;
-    }
-    const provider = new ContentPreviewProvider(context, context.extensionUri, html);
-    resolveContentPreviewProvider(provider);
-    context.subscriptions.push(
-      vscode.window.registerWebviewViewProvider(
-        isCompat ? "typst-preview.content-preview" : "tinymist.preview.content-preview",
-        provider,
-      ),
-    );
-  });
+  const provider = new ContentPreviewProvider(context);
+  resolveContentPreviewProvider(provider);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      isCompat ? "typst-preview.content-preview" : "tinymist.preview.content-preview",
+      provider,
+    ),
+  );
   // Provides `OutlineView` (OutlineProvider) at the sidebar, which provides same content as the
   // exported PDF outline.
   {
@@ -96,29 +129,47 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
   );
 
   const launchBrowsingPreview = launch("webview", "doc", { isBrowsing: true });
-  const launchDevPreview = launch("webview", "doc", { isDev: true });
+  const launchDevPreview = (mode: "doc" | "slide") => launch("webview", mode, { isDev: true });
   // Registers preview commands, check `package.json` for descriptions.
   context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (
+        !event.affectsConfiguration("tinymist.previewer") &&
+        !event.affectsConfiguration("tinymist.exportTarget")
+      ) {
+        return;
+      }
+      invalidatePreviewerCache();
+      void provider.reloadIfVisible();
+    }),
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      invalidatePreviewerCache();
+      void provider.reloadIfVisible();
+    }),
     vscode.commands.registerCommand("tinymist.browsingPreview", launchBrowsingPreview),
     vscode.commands.registerCommand("typst-preview.preview", launch("webview", "doc")),
     vscode.commands.registerCommand("typst-preview.browser", launch("browser", "doc")),
     vscode.commands.registerCommand("typst-preview.preview-slide", launch("webview", "slide")),
     vscode.commands.registerCommand("typst-preview.browser-slide", launch("browser", "slide")),
-    vscode.commands.registerCommand("typst-preview.eject", isCompat ? ejectPreviewPanelCompat : ejectPreviewPanelLsp),
-    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview),
-    vscode.commands.registerCommand(
-      "typst-preview.revealDocument",
-      isCompat ? revealDocumentCompat : revealDocumentLsp,
-    ),
-    vscode.commands.registerCommand(
-      "typst-preview.sync",
-      isCompat ? panelSyncScrollCompat : panelSyncScrollLsp,
-    ),
+    vscode.commands.registerCommand("tinymist.previewDev", launchDevPreview("doc")),
+    vscode.commands.registerCommand("tinymist.previewDevSlide", launchDevPreview("slide")),
+    ...(isCompat
+      ? [
+          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelCompat),
+          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentCompat),
+          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollCompat),
+        ]
+      : [
+          vscode.commands.registerCommand("typst-preview.eject", ejectPreviewPanelLsp),
+          vscode.commands.registerCommand("typst-preview.revealDocument", revealDocumentLsp),
+          vscode.commands.registerCommand("typst-preview.sync", panelSyncScrollLsp),
+        ]),
     vscode.commands.registerCommand("tinymist.doInspectPreviewState", () => {
       const tasks = Array.from(activeTask.values()).map((t) => {
         return {
           panel: !!t.panel,
           taskId: t.taskId,
+          source: t.previewSource,
         };
       });
       return {
@@ -128,7 +179,12 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
     vscode.commands.registerCommand("tinymist.doDisposePreview", ({ taskId }) => {
       for (const t of activeTask.values()) {
         if (t.taskId === taskId) {
-          t.panel?.dispose();
+          if (t.panel) {
+            t.panel.dispose();
+          } else {
+            t.dispose?.();
+            void tinymist.killPreview(t.taskId);
+          }
           return;
         }
       }
@@ -181,23 +237,31 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
         isDev: opts?.isDev || false,
         isNotPrimary: opts?.isNotPrimary || false,
       }).catch((e) => {
+        if (hasReportedPreviewerError(e)) {
+          return;
+        }
         vscode.window.showErrorMessage(`failed to launch preview: ${e}`);
       });
     };
   }
 
-  async function launchForURI(uri: vscode.Uri, kind: "browser" | "webview", mode: "doc" | "slide", opts?: LaunchOpts) {
+  async function launchForURI(
+    uri: vscode.Uri,
+    kind: "browser" | "webview",
+    mode: "doc" | "slide",
+    opts?: LaunchOpts,
+  ) {
     const doc =
       vscode.workspace.textDocuments.find((doc) => {
         return doc.uri.toString() === uri.toString();
       }) || (await vscode.workspace.openTextDocument(uri));
     const editor = await vscode.window.showTextDocument(doc, getSensibleTextEditorColumn(), true);
-  
+
     const bindDocument = editor.document;
     const isBrowsing = opts?.isBrowsing;
     const isDev = opts?.isDev;
     const isNotPrimary = opts?.isNotPrimary;
-  
+
     await launchImpl({
       kind,
       context,
@@ -209,7 +273,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       isNotPrimary,
     });
   }
-  
+
   /**
    * Ejects the preview panel to the external browser.
    */
@@ -220,10 +284,10 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       return;
     }
     const { panel, state } = focusingContext;
-  
+
     // Close the preview panel, basically kill the previous preview task.
     panel.dispose();
-  
+
     await launchForURI(vscode.Uri.parse(state.uri), "browser", state.mode, {
       isBrowsing: state.isBrowsing,
       isDev: state.isDev,
@@ -233,6 +297,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
 }
 
 export function previewDeactivate() {
+  invalidatePreviewerCache();
   previewDeactivateCompat();
 }
 
@@ -278,6 +343,15 @@ interface OpenPreviewInWebViewArgs {
    * Additional cleanup routine when the webview panel is disposed.
    */
   panelDispose: () => Promise<void>;
+  /**
+   * Resolved previewer, if the caller already needed it to decide how to launch.
+   */
+  previewer?: ResolvedPreviewer;
+}
+
+export interface OpenedPreviewWebview {
+  panel: vscode.WebviewPanel;
+  previewSource: PreviewerSourceMetadata;
 }
 
 /**
@@ -293,9 +367,21 @@ export async function openPreviewInWebView({
   dataPlanePort,
   webviewPanel,
   panelDispose,
-}: OpenPreviewInWebViewArgs) {
+  previewer: resolvedPreviewer,
+}: OpenPreviewInWebViewArgs): Promise<OpenedPreviewWebview> {
   const basename = path.basename(activeEditor.document.fileName);
-  const fontendPath = path.resolve(context.extensionPath, "out/frontend");
+  let previewer = resolvedPreviewer;
+  try {
+    previewer ??= await resolvePreviewer(context);
+  } catch (error) {
+    throw reportPreviewerError(error, "open");
+  }
+  if (previewer.handlePreview) {
+    throw reportPreviewerError(
+      new Error("the configured previewer handles document preview without a webview"),
+      "open",
+    );
+  }
   // Create and show a new WebView
   const panel =
     webviewPanel !== undefined
@@ -306,9 +392,14 @@ export async function openPreviewInWebView({
           getTargetViewColumn(activeEditor.viewColumn),
           {
             enableScripts: true,
+            localResourceRoots: previewer.localResourceRoots,
             retainContextWhenHidden: true,
           },
         );
+  panel.webview.options = {
+    enableScripts: true,
+    localResourceRoots: previewer.localResourceRoots,
+  };
 
   const previewState: PersistPreviewState = {
     mode: task.mode,
@@ -318,7 +409,7 @@ export async function openPreviewInWebView({
     uri: activeEditor.document.uri.toString(),
   };
 
-  const updateActivePanel =() => {
+  const updateActivePanel = () => {
     if (panel.active) {
       extensionState.mut.focusingPreviewPanelContext = {
         panel,
@@ -345,29 +436,20 @@ export async function openPreviewInWebView({
   const previewStateEncoded = Buffer.from(JSON.stringify(previewState), "utf-8").toString("base64");
 
   // Substitutes arguments in the HTML content.
-  let html = await getPreviewHtml(context);
-  // todo: not needed anymore, but we should test it and remove it later.
-  html = html.replace(
-    /\/typst-webview-assets/g,
-    `${panel.webview.asWebviewUri(vscode.Uri.file(fontendPath)).toString()}/typst-webview-assets`,
-  );
+  let html = rewritePreviewAssetRoot(previewer, panel.webview);
   html = html.replace("preview-arg:previewMode:Doc", `preview-arg:previewMode:${previewMode}`);
   html = html.replace("preview-arg:state:", `preview-arg:state:${previewStateEncoded}`);
-  html = html.replace(
-    "ws://127.0.0.1:23625",
-    translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`),
-  );
+  // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
+  // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
+  html = html.replace("ws://127.0.0.1:23625", await externalDataPlaneHost(dataPlanePort));
 
   // Sets the HTML content to the webview panel.
   // This will reload the webview panel if it's already opened.
   panel.webview.html = html;
-
-  // Forwards the localhost port to the external URL. Since WebSocket runs over HTTP, it should be fine.
-  // https://code.visualstudio.com/api/advanced-topics/remote-extensions#forwarding-localhost
-  await vscode.env.asExternalUri(
-    vscode.Uri.parse(translateExternalURL(`http://127.0.0.1:${dataPlanePort}`)),
-  );
-  return panel;
+  return {
+    panel,
+    previewSource: previewer.source,
+  };
 }
 
 /**
@@ -379,6 +461,10 @@ interface TaskControlBlock {
   panel?: vscode.WebviewPanel;
   /// random task id
   taskId: string;
+  /// previewer metadata
+  previewSource?: PreviewerSourceMetadata;
+  /// cleanup routine for previews that do not own a webview panel
+  dispose?: () => void;
 }
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
 
@@ -389,21 +475,20 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   /**
    * Can only open one preview for one document.
    */
-  if (activeTask.has(bindDocument)) {
-    const { panel } = activeTask.get(bindDocument)!;
+  const existingTask = activeTask.get(bindDocument);
+  if (existingTask) {
+    const { panel } = existingTask;
     if (panel) {
       panel.reveal();
+      return { message: "existed" };
     }
-    return { message: "existed" };
+
+    existingTask.dispose?.();
+    await tinymist.killPreview(existingTask.taskId);
   }
 
   const taskId = Math.random().toString(36).substring(7);
   const filePath = bindDocument.uri.fsPath;
-
-  const refreshStyle = getPreviewConfCompat<string>("refresh") || "onSave";
-  const scrollSyncMode =
-    ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
-  const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
 
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
@@ -417,7 +502,18 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   // update real primary state
   task.isNotPrimary = !isPrimary;
 
-  if (isPrimary) {
+  let resolvedPreviewer: ResolvedPreviewer | undefined = undefined;
+  if (kind === "webview") {
+    try {
+      resolvedPreviewer = await resolvePreviewer(context);
+    } catch (error) {
+      disposes.dispose();
+      throw reportPreviewerError(error, "open");
+    }
+  }
+  const isHandledByPreviewer = kind === "webview" && !!resolvedPreviewer?.handlePreview;
+
+  if (isPrimary && !isHandledByPreviewer) {
     const connectUrl = translateExternalURL(`ws://127.0.0.1:${dataPlanePort}`);
     contentPreviewProvider.then((p) => p.postActivate(connectUrl));
     disposes.add(() => {
@@ -426,19 +522,51 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   }
 
   let panel: vscode.WebviewPanel | undefined = undefined;
+  let previewSource: PreviewerSourceMetadata | undefined = undefined;
   switch (kind) {
     case "webview": {
-      panel = await openPreviewInWebView({
+      if (resolvedPreviewer?.handlePreview) {
+        try {
+          const dataPlaneHost = resolvedPreviewer.preferExternalDataPlaneHost
+            ? await externalDataPlaneHost(dataPlanePort)
+            : localDataPlaneHost(dataPlanePort);
+          const previewHandle = await resolvedPreviewer.handlePreview({
+            taskId,
+            documentUri: bindDocument.uri.toString(),
+            documentPath: filePath,
+            mode: task.mode,
+            target: resolvedPreviewer.source.target ?? "paged",
+            dataPlaneHost,
+            dataPlanePort,
+            staticServerPort,
+            initialWindowState: loadStoredViewerWindowState(context),
+            isBrowsing: !!isBrowsing,
+            isPrimary: !!isPrimary,
+          });
+          addPreviewHandleDispose(disposes, previewHandle);
+        } catch (error) {
+          disposes.dispose();
+          await tinymist.killPreview(taskId);
+          throw error;
+        }
+        previewSource = resolvedPreviewer.source;
+        break;
+      }
+
+      const openedPreview = await openPreviewInWebView({
         context,
         task,
         activeEditor: editor,
         dataPlanePort,
         webviewPanel,
+        previewer: resolvedPreviewer,
         async panelDispose() {
           disposes.dispose();
           await tinymist.killPreview(taskId);
         },
       });
+      panel = openedPreview.panel;
+      previewSource = openedPreview.previewSource;
       break;
     }
     case "browser": {
@@ -452,6 +580,8 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   activeTask.set(bindDocument, {
     panel,
     taskId,
+    previewSource,
+    dispose: () => disposes.dispose(),
   });
   disposes.add(() => {
     if (activeTask.get(bindDocument)?.taskId === taskId) {
@@ -461,23 +591,19 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
   return { message: "ok", taskId };
 
   async function invokeLspCommand() {
+    let prevSelection: EditorSelection | undefined = undefined;
+    const scrollSyncMode =
+      ScrollSyncModeEnum[getPreviewConfCompat<ScrollSyncMode>("scrollSync") || "never"];
+    const enableCursor = getPreviewConfCompat<boolean>("cursorIndicator") || false;
+
     console.log(`Preview Command ${filePath}`);
-    const partialRenderingArgs = getPreviewConfCompat<boolean>("partialRendering")
-      ? ["--partial-rendering"]
-      : [];
-    const ivArgs = getPreviewConfCompat("invertColors");
-    const invertColorsArgs = ivArgs ? ["--invert-colors", JSON.stringify(ivArgs)] : [];
     const previewInSlideModeArgs = task.mode === "slide" ? ["--preview-mode=slide"] : [];
     const dataPlaneHostArgs = !isDev ? ["--data-plane-host", "127.0.0.1:0"] : [];
 
     const previewArgs = [
       "--task-id",
       taskId,
-      "--refresh-style",
-      refreshStyle,
       ...dataPlaneHostArgs,
-      ...partialRenderingArgs,
-      ...invertColorsArgs,
       ...previewInSlideModeArgs,
       ...(isNotPrimary ? ["--not-primary"] : []),
       filePath,
@@ -495,14 +621,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     }
 
     if (scrollSyncMode !== ScrollSyncModeEnum.never) {
-      // See comment of reportPosition function to get context about multi-file project related logic.
       const src2docHandler = (e: vscode.TextEditorSelectionChangeEvent) => {
         const editor = e.textEditor;
         const kind = e.kind;
 
-        // console.log(
-        //     `selection changed, kind: ${kind && vscode.TextEditorSelectionChangeKind[kind]}`
-        // );
         const shouldScrollPanel =
           // scroll by mouse
           kind === vscode.TextEditorSelectionChangeKind.Mouse ||
@@ -511,7 +633,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
             kind === vscode.TextEditorSelectionChangeKind.Keyboard);
         if (shouldScrollPanel) {
           // console.log(`selection changed, sending src2doc jump request`);
-          reportPosition(editor, "panelScrollTo");
+          mayReportPosition(editor, "panelScrollTo");
         }
 
         if (enableCursor) {
@@ -523,6 +645,53 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     }
 
     return { staticServerPort, dataPlanePort, isPrimary };
+
+    /**
+     * Reports the position of the editor when necessary.
+     */
+    function mayReportPosition(editor: vscode.TextEditor, event: "panelScrollTo") {
+      // For multiple selections, we don't try to scroll the preview panel.
+      if (editor.selections.length > 1) {
+        return;
+      }
+      // For adjacent selections, we don't try to scroll the preview panel.
+      if (adjacentSelection(editor, prevSelection)) {
+        return;
+      }
+      // Updates selection and reports the position.
+      prevSelection = {
+        uri: editor.document.uri,
+        start: editor.selection.start,
+        end: editor.selection.end,
+      };
+      return reportPosition(editor, event);
+    }
+  }
+
+  interface EditorSelection {
+    uri: vscode.Uri;
+    start: vscode.Position;
+    end: vscode.Position;
+  }
+
+  function adjacentSelection(editor: vscode.TextEditor, prevSelection?: EditorSelection): boolean {
+    // If there is no previous position, we cannot determine if the current position is adjacent.
+    // Or if the previous position is not from the same document, we cannot determine either.
+    // It is intended to compare uri equality by reference, not by value.
+    if (!prevSelection || prevSelection.uri !== editor.document.uri) {
+      return false;
+    }
+
+    // Any of the current selection start or end shares the same position with the previous
+    // selection start or end, we consider it as adjacent.
+    const currentStart = editor.selection.start;
+    const currentEnd = editor.selection.end;
+    return (
+      currentStart.isEqual(prevSelection.start) ||
+      currentEnd.isEqual(prevSelection.end) ||
+      currentStart.isEqual(prevSelection.end) ||
+      currentEnd.isEqual(prevSelection.start)
+    );
   }
 
   async function reportPosition(
@@ -536,6 +705,31 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
       character: editorToReport.selection.active.character,
     };
     scrollPreviewPanel(taskId, scrollRequest);
+  }
+}
+
+function localDataPlaneHost(dataPlanePort: string | number): string {
+  return `ws://127.0.0.1:${dataPlanePort}`;
+}
+
+async function externalDataPlaneHost(dataPlanePort: string | number): Promise<string> {
+  const uri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${dataPlanePort}`));
+  return uri.toString().replace(/^http/, "ws");
+}
+
+function addPreviewHandleDispose(disposes: DisposeList, previewHandle: unknown) {
+  if (!previewHandle) {
+    return;
+  }
+
+  if (typeof previewHandle === "function") {
+    disposes.add(() => previewHandle());
+    return;
+  }
+
+  const disposable = previewHandle as vscode.Disposable;
+  if (typeof disposable.dispose === "function") {
+    disposes.add(disposable);
   }
 }
 
@@ -625,37 +819,14 @@ export function previewProcessOutline(outlineData: any) {
 class ContentPreviewProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly extensionUri: vscode.Uri,
-    private readonly htmlContent: string,
-  ) {}
+  constructor(private readonly context: vscode.ExtensionContext) {}
 
-  public resolveWebviewView(
+  public async resolveWebviewView(
     webviewView: vscode.WebviewView,
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ) {
-    this._view = webviewView; // 将已经准备好的 HTML 设置为 Webview 内容
-
-    const fontendPath = path.resolve(this.context.extensionPath, "out/frontend");
-    let html = this.htmlContent.replace(
-      /\/typst-webview-assets/g,
-      `${this._view.webview
-        .asWebviewUri(vscode.Uri.file(fontendPath))
-        .toString()}/typst-webview-assets`,
-    );
-
-    html = html.replace("ws://127.0.0.1:23625", ``);
-
-    webviewView.webview.options = {
-      // Allow scripts in the webview
-      enableScripts: true,
-
-      localResourceRoots: [this.extensionUri],
-    };
-
-    webviewView.webview.html = html;
+    this._view = webviewView;
 
     webviewView.webview.onDidReceiveMessage((data) => {
       switch (data.type) {
@@ -666,6 +837,26 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
         }
       }
     });
+
+    await this.reloadIfVisible();
+  }
+
+  async reloadIfVisible() {
+    if (!this._view) {
+      return;
+    }
+
+    const previewer = await resolvePreviewer(this.context);
+    const html = rewritePreviewAssetRoot(previewer, this._view.webview).replace(
+      "ws://127.0.0.1:23625",
+      ``,
+    );
+
+    this._view.webview.options = {
+      enableScripts: true,
+      localResourceRoots: previewer.localResourceRoots,
+    };
+    this._view.webview.html = html;
   }
 
   resetHost() {
@@ -709,6 +900,13 @@ class ContentPreviewProvider implements vscode.WebviewViewProvider {
       this.currentOutline = undefined;
     }
   }
+}
+
+function rewritePreviewAssetRoot(previewer: ResolvedPreviewer, webview: vscode.Webview): string {
+  const resourceRoot =
+    previewer.localResourceRoots[0] ?? vscode.Uri.file(path.dirname(previewer.htmlUri.fsPath));
+  const webviewAssetRoot = `${webview.asWebviewUri(resourceRoot).toString()}/typst-webview-assets`;
+  return previewer.html.replace(/(?:\.\/|\/)typst-webview-assets/g, webviewAssetRoot);
 }
 
 // todo: useful content security policy but we don't set

@@ -1,15 +1,28 @@
 use lsp_types::*;
 use reflexo_typst::Bytes;
-use tinymist_query::{to_typst_range, PositionEncoding};
+use serde::{Deserialize, Serialize};
+use tinymist_query::ty::PathKind;
+use tinymist_query::{is_untitled_path, to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
-use typst::{diag::FileResult, syntax::Source};
+use typst::ecow::EcoString;
+use typst::{
+    diag::{FileError, FileResult},
+    syntax::Source,
+};
 
-use crate::project::{Interrupt, ProjectResolutionKind};
-use crate::route::ProjectResolution;
-use crate::world::vfs::{notify::MemoryEvent, FileChangeSet};
+use crate::project::Interrupt;
+use crate::world::vfs::{notify::MemoryEvent, FileChangeSet, FilesystemEvent};
 use crate::world::TaskInputs;
 use crate::*;
+
+mod watch;
+pub use watch::WatchAccessModel;
+
+#[cfg(feature = "lock")]
+use crate::project::ProjectResolutionKind;
+#[cfg(feature = "lock")]
+use crate::route::ProjectResolution;
 
 /// In memory source file management.
 impl ServerState {
@@ -25,6 +38,7 @@ impl ServerState {
 
     /// Creates a new source file.
     pub fn create_source(&mut self, path: ImmutPath, content: String) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("create_source");
         log::trace!("create source: {path:?}");
         self.memory_changes
             .insert(path.clone(), Source::detached(content.clone()));
@@ -39,6 +53,7 @@ impl ServerState {
 
     /// Removes a source file.
     pub fn remove_source(&mut self, path: ImmutPath) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("remove_source");
         self.memory_changes.remove(&path);
         log::trace!("remove source: {path:?}");
 
@@ -55,6 +70,7 @@ impl ServerState {
         content: Vec<TextDocumentContentChangeEvent>,
         position_encoding: PositionEncoding,
     ) -> Result<()> {
+        let _scope = typst_timing::TimingScope::new("edit_source");
         let source = self
             .memory_changes
             .get_mut(&path)
@@ -81,16 +97,68 @@ impl ServerState {
         self.update_sources(files)
     }
 
+    /// Saves a source file.
+    pub fn save_source(&mut self, path: ImmutPath) -> Result<()> {
+        // FIXME: this is a workaround for the issue of notify, which does not fully
+        // emit fs changes.
+        //
+        // The case to fix:
+        // When editing a file, the last compilation sync deps to notify actor (rev=N-1,
+        // actual state=S). At the time, the next fs change comes, and notifier actor
+        // reads the change (notify state=S'). Next, another fs change comes (rev=N,
+        // actual state=S'). However, since the notifier actor read the state
+        // earlier (notify state=S'), the actor will not emit a change at rev N, bang...
+        self.project.interrupt(Interrupt::Save(path));
+
+        Ok(())
+    }
+
     /// Queries a source file that must be in memory.
     pub fn query_source<T>(
         &self,
         path: ImmutPath,
-        f: impl FnOnce(Source) -> Result<T>,
-    ) -> Result<T> {
+        f: impl FnOnce(Source) -> LspResult<T>,
+    ) -> LspResult<T> {
         let snapshot = self.memory_changes.get(&path);
-        let snapshot = snapshot.ok_or_else(|| anyhow::anyhow!("file missing {path:?}"))?;
+        let snapshot = snapshot.ok_or_else(|| internal_error(format!("file missing {path:?}")))?;
         let source = snapshot.clone();
         f(source)
+    }
+
+    /// Handles file system change event emitted by the client.
+    pub fn fs_change(&mut self, params: FsChangeParams) -> ScheduleResult {
+        use base64::Engine;
+        let _scope = typst_timing::TimingScope::new("fs_change");
+
+        let mut inserts = vec![];
+        let mut removes = vec![];
+
+        for change in params.inserts {
+            let path: ImmutPath =
+                tinymist_query::url_to_path(&Url::parse(&change.uri).unwrap()).into();
+            let content: FileResult<Bytes> = match change.content {
+                FileChangeResult::Ok { content } => base64::engine::general_purpose::STANDARD
+                    .decode(content)
+                    .map(Bytes::new)
+                    .map_err(|e| FileError::Other(Some(_eco_format!("base64 decode error: {e}")))),
+                FileChangeResult::Err { error } => {
+                    log::info!("file content not available: {path:?} {error}");
+                    Err(FileError::Other(Some(error)))
+                }
+            };
+            inserts.push((path, content.into()));
+        }
+
+        for path in params.removes {
+            removes.push(tinymist_query::url_to_path(&Url::parse(&path).unwrap()).into());
+        }
+
+        let update = FilesystemEvent::Update(FileChangeSet { inserts, removes }, params.is_sync);
+        log::info!("fs_change: {update:?}");
+        self.project.interrupt(Interrupt::Fs(update));
+
+        self.schedule_async();
+        just_ok(serde_json::Value::Null)
     }
 }
 
@@ -105,10 +173,14 @@ impl ServerState {
 
     /// Changes main file to the given path.
     pub fn change_main_file(&mut self, path: Option<ImmutPath>) -> Result<bool> {
-        if path
-            .as_deref()
-            .is_some_and(|p| !p.is_absolute() && !p.starts_with("/untitled"))
-        {
+        if path.as_deref().is_some_and(|p| {
+            let is_absolute = if cfg!(target_arch = "wasm32") {
+                p.has_root()
+            } else {
+                p.is_absolute()
+            };
+            !is_absolute && !p.starts_with("/untitled")
+        }) {
             return Err(error_once!("entry file must be absolute", path: path.unwrap().display()));
         }
 
@@ -182,6 +254,17 @@ impl ServerState {
 
         let new_entry = new_entry();
 
+        // Don't implicit focus non source file.
+        if new_entry.as_ref().is_some_and(|entry| {
+            !is_untitled_path(entry)
+                && !PathKind::Source {
+                    allow_package: true,
+                }
+                .is_match(entry)
+        }) {
+            return;
+        }
+
         let update_result = self.focus_main_file(new_entry.clone());
         match update_result {
             Ok(true) => {
@@ -210,6 +293,12 @@ impl ServerState {
             .unwrap_or_else(|| self.resolve_task_without_lock(path))
     }
 
+    #[cfg(not(feature = "lock"))]
+    pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
+        self.resolve_task_without_lock(Some(path))
+    }
+
+    #[cfg(feature = "lock")]
     pub(crate) fn resolve_task(&mut self, path: ImmutPath) -> TaskInputs {
         let proj_input = matches!(
             self.entry_resolver().project_resolution,
@@ -250,4 +339,51 @@ impl ServerState {
             .flatten()
             .unwrap_or_else(|| self.resolve_task_without_lock(Some(path)))
     }
+}
+
+/// The file system change request.
+pub enum FsChange {}
+
+impl lsp_types::request::Request for FsChange {
+    type Params = FsChangeParams;
+    type Result = ();
+    const METHOD: &'static str = "tinymist/fsChange";
+}
+
+/// The file system change parameters.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FsChangeParams {
+    /// The inserted files.
+    pub inserts: Vec<FileChange>,
+    /// The removed files.
+    pub removes: Vec<String>,
+    /// Whether the change is emitted by sync event.
+    pub is_sync: bool,
+}
+
+/// A file change.
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileChange {
+    /// The file URI.
+    pub uri: String,
+    /// The file content.
+    pub content: FileChangeResult,
+}
+
+/// The result of a file change.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum FileChangeResult {
+    /// The file content is available.
+    Ok {
+        /// The file content.
+        content: String,
+    },
+    /// The file content is not available.
+    Err {
+        /// The error message.
+        error: EcoString,
+    },
 }

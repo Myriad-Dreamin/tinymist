@@ -1,28 +1,50 @@
+//! The documentation models for tidy.
+
 use ecow::EcoString;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
 
+/// A parameter documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyParamDocs {
+    /// The name of the parameter.
     pub name: EcoString,
+    /// The documentation of the parameter.
     pub docs: EcoString,
+    /// The types of the parameter.
     pub types: EcoString,
+    /// The default value of the parameter.
     pub default: Option<EcoString>,
 }
 
+/// A pattern documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyPatDocs {
+    /// The documentation of the pattern.
     pub docs: EcoString,
+    /// The return type of the pattern.
     pub return_ty: Option<EcoString>,
+    /// The parameters of the pattern.
     pub params: Vec<TidyParamDocs>,
 }
 
+/// A module documentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TidyModuleDocs {
+    /// The documentation of the module.
     pub docs: EcoString,
 }
 
+/// Removes the list annotations from the string.
+pub fn remove_list_annotations(s: &str) -> String {
+    static REG: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"<!-- typlite:(?:begin|end):[\w\-]+ \d+ -->").unwrap()
+    });
+    REG.replace_all(s, "").to_string()
+}
+
+/// Identifies the pattern documentation. For example, `#let (a, b) = x`.
 pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     let lines = converted.lines().collect::<Vec<_>>();
 
@@ -120,16 +142,19 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
                 name: param_line.0,
                 types: param_line.1,
                 default: None,
-                docs: buf.into_iter().join("\n").into(),
+                docs: remove_list_annotations(&buf.into_iter().join("\n")).into(),
             });
+            break_line = Some(line_width);
 
             break;
         }
     }
 
     let docs = match break_line {
-        Some(line_no) => (lines[..line_no]).iter().copied().join("\n").into(),
-        None => converted.into(),
+        Some(line_no) => {
+            remove_list_annotations(&(lines[..line_no]).iter().copied().join("\n")).into()
+        }
+        None => remove_list_annotations(converted).into(),
     };
 
     params.reverse();
@@ -140,8 +165,11 @@ pub fn identify_pat_docs(converted: &str) -> StrResult<TidyPatDocs> {
     })
 }
 
+/// Identifies the module documentation.
 pub fn identify_tidy_module_docs(docs: EcoString) -> StrResult<TidyModuleDocs> {
-    Ok(TidyModuleDocs { docs })
+    Ok(TidyModuleDocs {
+        docs: remove_list_annotations(&docs).into(),
+    })
 }
 
 fn match_brace(trim_start: &str) -> Option<(&str, &str)> {
@@ -220,12 +248,12 @@ See show-module() for outputting the results of this function.
         in all function and parameter descriptions.<!-- typlite:end:list-item 0 --> 
 - <!-- typlite:begin:list-item 0 -->preamble (string): Code to prepend to all code snippets shown with `#example()`. 
         This can for instance be used to import something from the scope.<!-- typlite:end:list-item 0 --> 
--> string"###), @r"
+-> string"###), @"
         >> docs:
         These again are dictionaries with the keys
-        - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
-        - <!-- typlite:begin:list-item 0 -->`types` (optional): A list of accepted argument types.<!-- typlite:end:list-item 0 --> 
-        - <!-- typlite:begin:list-item 0 -->`default` (optional): Default value for this argument.<!-- typlite:end:list-item 0 -->
+        - `description` (optional): The description for the argument.
+        - `types` (optional): A list of accepted argument types. 
+        - `default` (optional): Default value for this argument.
 
         See show-module() for outputting the results of this function.
         << docs
@@ -269,10 +297,10 @@ See show-module() for outputting the results of this function.
         references. If `auto`, the label-prefix name will be the module name. 
   - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
   - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 --><!-- typlite:end:list-item 0 -->
--> string"###), @r"
+-> string"###), @"
         >> docs:
         These again are dictionaries with the keys
-        - <!-- typlite:begin:list-item 0 -->`description` (optional): The description for the argument.<!-- typlite:end:list-item 0 -->
+        - `description` (optional): The description for the argument.
 
         See show-module() for outputting the results of this function.
         << docs
@@ -285,8 +313,8 @@ See show-module() for outputting the results of this function.
         >>arg label-prefix: auto, string
         The label-prefix for internal function
                 references. If `auto`, the label-prefix name will be the module name. 
-          - <!-- typlite:begin:list-item 1 -->nested something<!-- typlite:end:list-item 1 -->
-          - <!-- typlite:begin:list-item 1 -->nested something 2<!-- typlite:end:list-item 1 -->
+          - nested something
+          - nested something 2
         << arg
         ");
     }
@@ -294,7 +322,7 @@ See show-module() for outputting the results of this function.
     #[test]
     fn test_identify_tidy_docs3() {
         insta::assert_snapshot!(var(r###"See show-module() for outputting the results of this function.
--> string"###), @r"
+-> string"###), @"
         >> docs:
         See show-module() for outputting the results of this function.
         << docs
@@ -306,16 +334,14 @@ See show-module() for outputting the results of this function.
 
     #[test]
     fn test_identify_tidy_docs4() {
-        insta::assert_snapshot!(var(r###"
-- <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
--> string"###), @r"
+        insta::assert_snapshot!(func(r###"
+- <!-- typlite:begin:list-item 0 -->fn (function, fn): The `fn`.<!-- typlite:end:list-item 0 -->"###), @"
         >> docs:
 
-        - <!-- typlite:begin:list-item 0 -->name (string): The name for the module.<!-- typlite:end:list-item 0 --> 
         << docs
-        >>return
-        string
-        <<return
+        >>arg fn: function, fn
+        The `fn`.
+        << arg
         ");
     }
 }

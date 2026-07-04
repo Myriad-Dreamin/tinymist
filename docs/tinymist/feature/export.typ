@@ -4,9 +4,11 @@
 
 You can export your documents to various formats using the `export` feature.
 
-== Export from Query Result
+Export uses the same compiler font, package, root, and certificate environment as ordinary editing and previewing. Configure that shared environment once in #cross-link("/feature/compiler-settings.typ", [Compiler Settings]).
 
-=== Hello World Example (VSCode Tasks)
+= Export from Query Result
+
+== Hello World Example (VSCode Tasks)
 
 You can export the result of a query as text using the `export` command.
 
@@ -47,9 +49,19 @@ This requires the following configuration in your `tasks.json` file:
 }
 ```
 
-See the #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/e2e-workspaces/print-state")[Sample Workspace: print-state] for more details.
+See the #github-link("/editors/vscode/e2e-workspaces/print-state/")[Sample Workspace: print-state] for more details.
 
-=== Pdfpc Example (VSCode Tasks)
+== IEEE Example (VSCode Tasks)
+
+This workspace gives an example to create and prepare IEEE papers using Typst, which exports typst documents to LaTeX.
+
+#raw(lang: "json", block: true, read("/editors/vscode/e2e-workspaces/ieee-paper/.vscode/tasks.json"))
+
+It uses #typst-func("export") to export the document to LaTeX.
+
+See the #github-link("/editors/vscode/e2e-workspaces/ieee-paper/")[Sample Workspace: IEEE Paper] for more details.
+
+== Pdfpc Example (VSCode Tasks)
 
 A more practical example is exporting the result of a query as a pdfpc file. You can use the following configuration in your `tasks.json` file to export the result of a query as a pdfpc file, which is adapted by #link("https://touying-typ.github.io/touying/")[Touying Slides].
 
@@ -82,7 +94,7 @@ To simplify configuration,
 }
 ```
 
-== VSCode: Task Configuration
+= VSCode: Task Configuration
 
 You can configure tasks in your `tasks.json` file to "persist" the arguments for exporting documents.
 
@@ -175,7 +187,7 @@ After configuring the tasks, you can run them using the command palette.
 + Type `Run Task` and select the task you want to run.
 + Select the task you want to run.
 
-== Neovim: Export Commands
+= Neovim: Export Commands
 
 You can call the following export commands.
 - `tinymist.exportSvg`
@@ -183,6 +195,7 @@ You can call the following export commands.
 - `tinymist.exportPdf`
 - `tinymist.exportHtml`
 - `tinymist.exportMarkdown`
+- `tinymist.exportTeX`
 - `tinymist.exportText`
 - `tinymist.exportQuery`
 

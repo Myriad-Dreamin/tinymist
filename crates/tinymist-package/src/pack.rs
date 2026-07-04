@@ -6,7 +6,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::sync::Arc;
 
-use ecow::{eco_format, EcoVec};
+use ecow::{EcoVec, eco_format};
 use tinymist_std::{ImmutBytes, ImmutPath};
 use typst::diag::{PackageError, PackageResult};
 use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
@@ -72,11 +72,11 @@ pub trait PackFs: fmt::Debug {
         f: &mut (dyn FnMut(&str, PackFile) -> PackageResult<()> + Send + Sync),
     ) -> PackageResult<()>;
     /// Read a file from the package.
-    fn read(&self, _path: &str) -> io::Result<PackFile> {
+    fn read(&self, _path: &str) -> io::Result<PackFile<'_>> {
         Err(unsupported())
     }
     /// Read entries from the package.
-    fn entries(&self) -> io::Result<PackEntries> {
+    fn entries(&self) -> io::Result<PackEntries<'_>> {
         Err(unsupported())
     }
 }
@@ -125,7 +125,7 @@ fn malform(e: io::Error) -> PackageError {
 }
 
 fn other_io(e: impl Display) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, e.to_string())
+    io::Error::other(e.to_string())
 }
 
 fn other(e: impl Display) -> PackageError {

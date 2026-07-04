@@ -1,12 +1,13 @@
 use std::{path::Path, sync::OnceLock};
 
-use clap::ValueHint;
+use clap::{ArgAction, ValueHint, builder::ValueParser};
 use tinymist_std::{bail, error::prelude::Result};
 
 pub use tinymist_world::args::{CompileFontArgs, CompilePackageArgs};
+use tinymist_world::args::{PdfExportArgs, PngExportArgs, parse_input_pair};
 
-use crate::model::*;
 use crate::PROJECT_ROUTE_USER_ACTION_PRIORITY;
+use crate::model::*;
 
 /// Project document commands.
 #[derive(Debug, Clone, clap::Subcommand)]
@@ -21,56 +22,66 @@ pub enum DocCommands {
 /// Declare a document (project's input).
 #[derive(Debug, Clone, clap::Parser)]
 pub struct DocNewArgs {
-    /// Argument to identify a project.
+    /// Specify the argument to identify a project.
     #[clap(flatten)]
     pub id: DocIdArgs,
-    /// Configures the project root (for absolute paths).
+    /// Configure the project root (for absolute paths). If the path is
+    /// relative, it will be resolved relative to the current working directory
+    /// (PWD).
     #[clap(long = "root", env = "TYPST_ROOT", value_name = "DIR")]
     pub root: Option<String>,
-    /// Common font arguments.
+    /// Add a string key-value pair visible through `sys.inputs`.
+    #[clap(
+        long = "input",
+        value_name = "key=value",
+        action = ArgAction::Append,
+        value_parser = ValueParser::new(parse_input_pair),
+    )]
+    pub inputs: Vec<(String, String)>,
+    /// Specify the font related arguments.
     #[clap(flatten)]
     pub font: CompileFontArgs,
-    /// Common package arguments.
+    /// Specify the package related arguments.
     #[clap(flatten)]
     pub package: CompilePackageArgs,
 }
 
 impl DocNewArgs {
     /// Converts to project input.
-    pub fn to_input(&self) -> ProjectInput {
-        let id: Id = (&self.id).into();
+    pub fn to_input(&self, ctx: CtxPath) -> ProjectInput {
+        let id: Id = self.id.id(ctx);
 
         let root = self
             .root
             .as_ref()
-            .map(|root| ResourcePath::from_user_sys(Path::new(root)));
-        let main = ResourcePath::from_user_sys(Path::new(&self.id.input));
+            .map(|root| ResourcePath::from_user_sys(Path::new(root), ctx));
+        let main = ResourcePath::from_user_sys(Path::new(&self.id.input), ctx);
 
         let font_paths = self
             .font
             .font_paths
             .iter()
-            .map(|p| ResourcePath::from_user_sys(p))
+            .map(|p| ResourcePath::from_user_sys(p, ctx))
             .collect::<Vec<_>>();
 
         let package_path = self
             .package
             .package_path
             .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
 
         let package_cache_path = self
             .package
             .package_cache_path
             .as_ref()
-            .map(|p| ResourcePath::from_user_sys(p));
+            .map(|p| ResourcePath::from_user_sys(p, ctx));
 
         ProjectInput {
             id: id.clone(),
+            lock_dir: Some(ctx.1.to_path_buf()),
             root,
             main,
-            // todo: inputs
-            inputs: vec![],
+            inputs: self.inputs.clone(),
             font_paths,
             system_fonts: !self.font.ignore_system_fonts,
             package_path,
@@ -79,25 +90,26 @@ impl DocNewArgs {
     }
 }
 
-/// The id of a document.
+/// Specify the id of a document.
 ///
 /// If an identifier is not provided, the document's path is used as the id.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct DocIdArgs {
-    /// Give a name to the document.
+    /// Give a task name to the document.
     #[clap(long = "name")]
     pub name: Option<String>,
-    /// Path to input Typst file.
+    /// Specify the path to input Typst file.
     #[clap(value_hint = ValueHint::FilePath)]
     pub input: String,
 }
 
-impl From<&DocIdArgs> for Id {
-    fn from(args: &DocIdArgs) -> Self {
-        if let Some(id) = &args.name {
+impl DocIdArgs {
+    /// Converts to a document ID.
+    pub fn id(&self, ctx: CtxPath) -> Id {
+        if let Some(id) = &self.name {
             Id::new(id.clone())
         } else {
-            (&ResourcePath::from_user_sys(Path::new(&args.input))).into()
+            (&ResourcePath::from_user_sys(Path::new(&self.input), ctx)).into()
         }
     }
 }
@@ -105,7 +117,7 @@ impl From<&DocIdArgs> for Id {
 /// Configure project's priorities.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct DocConfigureArgs {
-    /// Argument to identify a project.
+    /// Specify the argument to identify a project.
     #[clap(flatten)]
     pub id: DocIdArgs,
     /// Set the unsigned priority of these task (lower numbers are higher
@@ -117,20 +129,16 @@ pub struct DocConfigureArgs {
 /// Declare an compile task.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct TaskCompileArgs {
-    /// Argument to identify a project.
+    /// Specify the argument to identify a project.
     #[clap(flatten)]
     pub declare: DocNewArgs,
 
-    /// Name a task.
-    #[clap(long = "task")]
-    pub task_name: Option<String>,
-
-    /// When to run the task
+    /// Configure when to run the task.
     #[arg(long = "when")]
     pub when: Option<TaskWhen>,
 
-    /// Path to output file (PDF, PNG, SVG, or HTML). Use `-` to write output to
-    /// stdout.
+    /// Provide the path to output file (PDF, PNG, SVG, or HTML). Use `-` to
+    /// write output to stdout.
     ///
     /// For output formats emitting one file per page (PNG & SVG), a page number
     /// template must be present if the source document renders to multiple
@@ -140,11 +148,12 @@ pub struct TaskCompileArgs {
     #[clap(value_hint = ValueHint::FilePath)]
     pub output: Option<String>,
 
-    /// The format of the output file, inferred from the extension by default.
+    /// Specify the format of the output file, inferred from the extension by
+    /// default.
     #[arg(long = "format", short = 'f')]
     pub format: Option<OutputFormat>,
 
-    /// Which pages to export. When unspecified, all pages are exported.
+    /// Specify which pages to export. When unspecified, all pages are exported.
     ///
     /// Pages to export are separated by commas, and can be either simple page
     /// numbers (e.g. '2,5' to export only pages 2 and 5) or page ranges (e.g.
@@ -157,23 +166,23 @@ pub struct TaskCompileArgs {
     #[arg(long = "pages", value_delimiter = ',')]
     pub pages: Option<Vec<Pages>>,
 
-    /// The argument to export to PDF.
+    /// Specify the PDF export related arguments.
     #[clap(flatten)]
     pub pdf: PdfExportArgs,
 
-    /// The argument to export to PNG.
+    /// Specify the PNG export related arguments.
     #[clap(flatten)]
     pub png: PngExportArgs,
 
-    /// The output format.
+    /// Specify the output format.
     #[clap(skip)]
     pub output_format: OnceLock<Result<OutputFormat>>,
 }
 
 impl TaskCompileArgs {
-    /// Convert the arguments to a project task.
-    pub fn to_task(self, doc_id: Id) -> Result<ApplyProjectTask> {
-        let new_task_id = self.task_name.map(Id::new);
+    /// Converts the arguments to a project task.
+    pub fn to_task(self, doc_id: Id, cwd: &Path) -> Result<ApplyProjectTask> {
+        let new_task_id = self.declare.id.name.map(Id::new);
         let task_id = new_task_id.unwrap_or(doc_id.clone());
 
         let output_format = if let Some(specified) = self.format {
@@ -195,6 +204,17 @@ impl TaskCompileArgs {
             OutputFormat::Pdf
         };
 
+        let output = self.output.as_ref().map(|output| {
+            let output = Path::new(output);
+            let output = if output.is_absolute() {
+                output.to_path_buf()
+            } else {
+                cwd.join(output)
+            };
+
+            PathPattern::new(&output.with_extension("").to_string_lossy())
+        });
+
         let when = self.when.unwrap_or(TaskWhen::Never);
 
         let mut transforms = vec![];
@@ -207,23 +227,41 @@ impl TaskCompileArgs {
 
         let export = ExportTask {
             when,
-            output: None,
+            output,
             transform: transforms,
         };
 
         let config = match output_format {
             OutputFormat::Pdf => ProjectTask::ExportPdf(ExportPdfTask {
                 export,
-                pdf_standards: self.pdf.pdf_standard.clone(),
+                pages: self.pages.clone(),
+                pdf_standards: self.pdf.standard.clone(),
+                no_pdf_tags: self.pdf.no_tags,
                 creation_timestamp: None,
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
                 export,
+                pages: self.pages.clone(),
+                page_number_template: None,
+                merge: None,
                 ppi: self.png.ppi.try_into().unwrap(),
                 fill: None,
             }),
-            OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask { export }),
-            OutputFormat::Html => ProjectTask::ExportSvg(ExportSvgTask { export }),
+            OutputFormat::Svg => ProjectTask::ExportSvg(ExportSvgTask {
+                export,
+                pages: self.pages.clone(),
+                page_number_template: None,
+                merge: None,
+            }),
+            OutputFormat::Html => ProjectTask::ExportHtml(ExportHtmlTask { export }),
+            OutputFormat::Bundle => ProjectTask::ExportBundle(ExportBundleTask {
+                export,
+                pages: self.pages.clone(),
+                pdf_standards: self.pdf.standard.clone(),
+                no_pdf_tags: self.pdf.no_tags,
+                creation_timestamp: None,
+                ppi: self.png.ppi.try_into().unwrap(),
+            }),
         };
 
         Ok(ApplyProjectTask {
@@ -232,21 +270,4 @@ impl TaskCompileArgs {
             task: config,
         })
     }
-}
-
-/// Declare arguments for exporting a document to PDF.
-#[derive(Debug, Clone, clap::Parser)]
-pub struct PdfExportArgs {
-    /// One (or multiple comma-separated) PDF standards that Typst will enforce
-    /// conformance with.
-    #[arg(long = "pdf-standard", value_delimiter = ',')]
-    pub pdf_standard: Vec<PdfStandard>,
-}
-
-/// Declare arguments for exporting a document to PNG.
-#[derive(Debug, Clone, clap::Parser)]
-pub struct PngExportArgs {
-    /// The PPI (pixels per inch) to use for PNG export.
-    #[arg(long = "ppi", default_value_t = 144.0)]
-    pub ppi: f32,
 }

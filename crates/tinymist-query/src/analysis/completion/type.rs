@@ -1,6 +1,8 @@
 //! Completion by types.
 
 use super::*;
+use typst::foundations::Label;
+use typst::visualize::Color;
 
 pub(crate) struct TypeCompletionWorker<'a, 'b, 'c, 'd> {
     pub base: &'d mut CompletionPair<'a, 'b, 'c>,
@@ -92,7 +94,15 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             Ty::Param(param) => {
                 // todo: variadic
 
-                let docs = docs.or_else(|| param.docs.as_deref());
+                let resolved_docs;
+                let docs = if docs.is_some() {
+                    docs
+                } else {
+                    resolved_docs = param.docs.as_ref().map(|docs| {
+                        crate::docs::resolve_doc_text(self.base.worker.ctx.shared(), docs)
+                    });
+                    resolved_docs.as_deref()
+                };
                 if param.attrs.positional {
                     self.type_completion(&param.ty, docs);
                 }
@@ -207,28 +217,36 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                 );
             }
             BuiltinTy::TextSize => return None,
+            #[cfg(not(feature = "lsp"))]
+            BuiltinTy::TextLang => return None,
+            #[cfg(feature = "lsp")]
             BuiltinTy::TextLang => {
                 for (&key, desc) in rust_iso639::ALL_MAP.entries() {
-                    let detail = eco_format!("An ISO 639-1/2/3 language code, {}.", desc.name);
+                    let detail =
+                        eco_format!("An ISO 639-1/2/3 language code, {}.", desc.get_name());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
-                        label_details: Some(desc.name.into()),
+                        label_details: Some(desc.get_name()),
                         ..Completion::default()
                     });
                 }
             }
+            #[cfg(not(feature = "lsp"))]
+            BuiltinTy::TextRegion => return None,
+            #[cfg(feature = "lsp")]
             BuiltinTy::TextRegion => {
                 for (&key, desc) in rust_iso3166::ALPHA2_MAP.entries() {
-                    let detail = eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.name);
+                    let detail =
+                        eco_format!("An ISO 3166-1 alpha-2 region code, {}.", desc.get_name());
                     self.base.push_completion(Completion {
                         kind: CompletionKind::Syntax,
                         label: key.to_lowercase().into(),
                         apply: Some(eco_format!("\"{}\"", key.to_lowercase())),
                         detail: Some(detail),
-                        label_details: Some(desc.name.into()),
+                        label_details: Some(desc.get_name()),
                         ..Completion::default()
                     });
                 }
@@ -310,10 +328,8 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
                     );
                 } else if ty.scope().iter().any(|(_, b)| {
                     if let Value::Func(f) = b.read() {
-                        let pos = f
-                            .params()
-                            .and_then(|params| params.iter().find(|s| s.required));
-                        pos.is_none_or(|pos| pos.name != "self")
+                        let pos = f.params().find(|s| s.required());
+                        pos.is_none_or(|pos| pos.name() != Some("self"))
                     } else {
                         true
                     }
@@ -344,5 +360,44 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
         };
 
         Some(())
+    }
+}
+
+#[cfg(feature = "lsp")]
+use iso::*;
+#[cfg(feature = "lsp")]
+mod iso {
+    use ecow::EcoString;
+
+    pub trait GetName {
+        fn get_name(&self) -> EcoString;
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    impl GetName for rust_iso639::LanguageCode<'_> {
+        fn get_name(&self) -> EcoString {
+            self.name.into()
+        }
+    }
+
+    #[cfg(not(all(direct_wasm, target_arch = "wasm32")))]
+    impl GetName for rust_iso3166::CountryCode {
+        fn get_name(&self) -> EcoString {
+            self.name.into()
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    impl GetName for rust_iso639::LanguageCode {
+        fn get_name(&self) -> EcoString {
+            self.name().into()
+        }
+    }
+
+    #[cfg(all(direct_wasm, target_arch = "wasm32"))]
+    impl GetName for rust_iso3166::CountryCode {
+        fn get_name(&self) -> EcoString {
+            self.name().into()
+        }
     }
 }

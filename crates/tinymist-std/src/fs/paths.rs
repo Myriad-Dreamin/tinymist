@@ -305,6 +305,16 @@ pub fn path2bytes(path: &Path) -> Result<&[u8]> {
             )),
         }
     }
+    #[cfg(not(any(unix, windows)))]
+    {
+        match path.as_os_str().to_str() {
+            Some(s) => Ok(s.as_bytes()),
+            None => Err(anyhow::format_err!(
+                "invalid non-unicode path: {}",
+                path.display()
+            )),
+        }
+    }
 }
 
 /// Converts UTF-8 bytes to a path.
@@ -315,6 +325,14 @@ pub fn bytes2path(bytes: &[u8]) -> Result<PathBuf> {
         Ok(PathBuf::from(OsStr::from_bytes(bytes)))
     }
     #[cfg(windows)]
+    {
+        use std::str;
+        match str::from_utf8(bytes) {
+            Ok(s) => Ok(PathBuf::from(s)),
+            Err(..) => Err(anyhow::format_err!("invalid non-unicode path")),
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     {
         use std::str;
         match str::from_utf8(bytes) {
@@ -360,10 +378,10 @@ impl<'a> Iterator for PathAncestors<'a> {
         if let Some(path) = self.current {
             self.current = path.parent();
 
-            if let Some(ref stop_at) = self.stop_at {
-                if path == stop_at {
-                    self.current = None;
-                }
+            if let Some(ref stop_at) = self.stop_at
+                && path == stop_at
+            {
+                self.current = None;
             }
 
             Some(path)
@@ -550,7 +568,18 @@ fn _link_or_copy(src: &Path, dst: &Path) -> Result<()> {
         } else {
             src
         };
-        symlink(src, dst)
+        #[cfg(any(unix, windows, target_os = "redox"))]
+        {
+            symlink(src, dst)
+        }
+        #[cfg(not(any(unix, windows, target_os = "redox")))]
+        {
+            let _ = src;
+            Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "symlinks are not supported on this target",
+            ))
+        }
     } else if cfg!(target_os = "macos") {
         // There seems to be a race condition with APFS when hard-linking
         // binaries. Gatekeeper does not have signing or hash information
@@ -605,6 +634,47 @@ pub fn copy<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<u64> {
     let to = to.as_ref();
     fs::copy(from, to)
         .with_context(|| format!("failed to copy `{}` to `{}`", from.display(), to.display()))
+}
+
+/// Recursively copies a directory.
+///
+/// Symlinks are followed and copied as their target contents.
+pub fn copy_dir_all<P: AsRef<Path>, Q: AsRef<Path>>(from: P, to: Q) -> Result<()> {
+    let from = from.as_ref();
+    let to = to.as_ref();
+    _copy_dir_all(from, to)
+}
+
+fn _copy_dir_all(from: &Path, to: &Path) -> Result<()> {
+    create_dir_all(to)?;
+    let entries = from
+        .read_dir()
+        .with_context(|| format!("failed to read directory `{}`", from.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .with_context(|| format!("failed to read directory entry in `{}`", from.display()))?;
+        let source = entry.path();
+        let target = to.join(entry.file_name());
+        let file_type = entry
+            .file_type()
+            .with_context(|| format!("failed to read file type for `{}`", source.display()))?;
+
+        if file_type.is_dir() {
+            copy_dir_all(&source, &target)?;
+        } else if file_type.is_file() {
+            copy(&source, &target)?;
+        } else if file_type.is_symlink() {
+            let metadata = metadata(&source)?;
+            if metadata.is_dir() {
+                copy_dir_all(&source, &target)?;
+            } else {
+                copy(&source, &target)?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Strips `base` from `path`.
@@ -668,11 +738,11 @@ pub fn create_dir_all_excluded_from_backups_atomic(p: impl AsRef<Path>) -> Resul
     // existing behavior. If we get an error at rename() and suddenly the
     // directory (which didn't exist a moment earlier) exists we can infer from
     // it's another cargo process doing work.
-    if let Err(e) = fs::rename(tempdir.path(), path) {
-        if !path.exists() {
-            return Err(anyhow::Error::from(e))
-                .with_context(|| format!("failed to create directory `{}`", path.display()));
-        }
+    if let Err(e) = fs::rename(tempdir.path(), path)
+        && !path.exists()
+    {
+        return Err(anyhow::Error::from(e))
+            .with_context(|| format!("failed to create directory `{}`", path.display()));
     }
     Ok(())
 }
@@ -723,7 +793,7 @@ fn exclude_from_content_indexing(path: &Path) {
         use std::iter::once;
         use std::os::windows::prelude::OsStrExt;
         use windows_sys::Win32::Storage::FileSystem::{
-            GetFileAttributesW, SetFileAttributesW, FILE_ATTRIBUTE_NOT_CONTENT_INDEXED,
+            FILE_ATTRIBUTE_NOT_CONTENT_INDEXED, GetFileAttributesW, SetFileAttributesW,
         };
 
         let path: Vec<u16> = path.as_os_str().encode_wide().chain(once(0)).collect();

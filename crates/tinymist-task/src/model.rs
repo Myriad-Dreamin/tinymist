@@ -1,6 +1,6 @@
 //! Project task models.
 
-use std::hash::Hash;
+use std::{hash::Hash, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -68,10 +68,14 @@ pub enum ProjectTask {
     ExportSvg(ExportSvgTask),
     /// An export HTML task.
     ExportHtml(ExportHtmlTask),
+    /// An export bundle task.
+    ExportBundle(ExportBundleTask),
     /// An export HTML task.
     ExportSvgHtml(ExportHtmlTask),
     /// An export Markdown task.
     ExportMd(ExportMarkdownTask),
+    /// An export TeX task.
+    ExportTeX(ExportTeXTask),
     /// An export Text task.
     ExportText(ExportTextTask),
     /// An query task.
@@ -83,17 +87,19 @@ pub enum ProjectTask {
 
 impl ProjectTask {
     /// Returns the timing of executing the task.
-    pub fn when(&self) -> Option<TaskWhen> {
+    pub fn when(&self) -> Option<&TaskWhen> {
         Some(match self {
-            Self::Preview(task) => task.when,
+            Self::Preview(task) => &task.when,
             Self::ExportPdf(..)
             | Self::ExportPng(..)
             | Self::ExportSvg(..)
             | Self::ExportHtml(..)
+            | Self::ExportBundle(..)
             | Self::ExportSvgHtml(..)
             | Self::ExportMd(..)
+            | Self::ExportTeX(..)
             | Self::ExportText(..)
-            | Self::Query(..) => self.as_export()?.when,
+            | Self::Query(..) => &self.as_export()?.when,
         })
     }
 
@@ -105,10 +111,29 @@ impl ProjectTask {
             Self::ExportPng(task) => &task.export,
             Self::ExportSvg(task) => &task.export,
             Self::ExportHtml(task) => &task.export,
+            Self::ExportBundle(task) => &task.export,
             Self::ExportSvgHtml(task) => &task.export,
+            Self::ExportTeX(task) => &task.export,
             Self::ExportMd(task) => &task.export,
             Self::ExportText(task) => &task.export,
             Self::Query(task) => &task.export,
+        })
+    }
+
+    /// Returns the export configuration of a task.
+    pub fn as_export_mut(&mut self) -> Option<&mut ExportTask> {
+        Some(match self {
+            Self::Preview(..) => return None,
+            Self::ExportPdf(task) => &mut task.export,
+            Self::ExportPng(task) => &mut task.export,
+            Self::ExportSvg(task) => &mut task.export,
+            Self::ExportHtml(task) => &mut task.export,
+            Self::ExportBundle(task) => &mut task.export,
+            Self::ExportSvgHtml(task) => &mut task.export,
+            Self::ExportTeX(task) => &mut task.export,
+            Self::ExportMd(task) => &mut task.export,
+            Self::ExportText(task) => &mut task.export,
+            Self::Query(task) => &mut task.export,
         })
     }
 
@@ -117,7 +142,9 @@ impl ProjectTask {
         match self {
             Self::ExportPdf { .. } => "pdf",
             Self::Preview(..) | Self::ExportSvgHtml { .. } | Self::ExportHtml { .. } => "html",
+            Self::ExportBundle { .. } => "",
             Self::ExportMd { .. } => "md",
+            Self::ExportTeX { .. } => "tex",
             Self::ExportText { .. } => "txt",
             Self::ExportSvg { .. } => "svg",
             Self::ExportPng { .. } => "png",
@@ -169,18 +196,12 @@ impl ExportTask {
     }
 }
 
-/// The legacy page selection specifier.
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PageSelection {
-    /// Selects the first page.
-    #[default]
-    First,
-    /// Merges all pages into a single page.
-    Merged {
-        /// The gap between pages (in pt).
-        gap: Option<String>,
-    },
+/// A page merge specifier.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PageMerge {
+    /// The gap between pages (in pt).
+    pub gap: Option<String>,
 }
 
 /// A project export transform specifier.
@@ -221,10 +242,19 @@ pub struct ExportPdfTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub pdf_standards: Vec<PdfStandard>,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub no_pdf_tags: bool,
     /// The document's creation date formatted as a UNIX timestamp (in seconds).
     ///
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
@@ -239,6 +269,15 @@ pub struct ExportPngTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// The page template to use for multiple pages.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub page_number_template: Option<String>,
+    /// The page merge specifier.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub merge: Option<PageMerge>,
     /// The PPI (pixels per inch) to use for PNG export.
     pub ppi: Scalar,
     /// The expression constructing background fill color (in typst script).
@@ -257,6 +296,15 @@ pub struct ExportSvgTask {
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,
+    /// The page template to use for multiple pages.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub page_number_template: Option<String>,
+    /// Which pages to export. When unspecified, all pages are exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// The page merge specifier.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub merge: Option<PageMerge>,
 }
 
 /// An export html task specifier.
@@ -268,10 +316,52 @@ pub struct ExportHtmlTask {
     pub export: ExportTask,
 }
 
+/// An export bundle task specifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportBundleTask {
+    /// The shared export arguments.
+    #[serde(flatten)]
+    pub export: ExportTask,
+    /// Which pages to export in PDF documents. When unspecified, all pages are
+    /// exported.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pages: Option<Vec<Pages>>,
+    /// One (or multiple comma-separated) PDF standards that Typst will enforce
+    /// conformance with for PDF documents.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub pdf_standards: Vec<PdfStandard>,
+    /// Disable tagged PDF output for PDF documents.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub no_pdf_tags: bool,
+    /// The document's creation date formatted as a UNIX timestamp (in seconds).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub creation_timestamp: Option<i64>,
+    /// The PPI (pixels per inch) to use for PNG documents.
+    pub ppi: Scalar,
+}
+
 /// An export markdown task specifier.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExportMarkdownTask {
+    /// The processor to use for the markdown export.
+    pub processor: Option<String>,
+    /// The path of external assets directory.
+    pub assets_path: Option<PathBuf>,
+    /// The shared export arguments.
+    #[serde(flatten)]
+    pub export: ExportTask,
+}
+
+/// An export TeX task specifier.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExportTeXTask {
+    /// The processor to use for the TeX export.
+    pub processor: Option<String>,
+    /// The path of external assets directory.
+    pub assets_path: Option<PathBuf>,
     /// The shared export arguments.
     #[serde(flatten)]
     pub export: ExportTask,

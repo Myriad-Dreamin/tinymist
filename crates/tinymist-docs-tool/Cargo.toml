@@ -1,0 +1,37 @@
+[package]
+name = "tinymist-docs-tool"
+description = "Documentation support tools for tinymist."
+categories = ["compilers", "command-line-utilities"]
+keywords = ["typst", "documentation"]
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "tinymist-docs-tool"
+path = "src/main.rs"
+required-features = ["cli"]
+test = false
+doctest = false
+bench = false
+doc = false
+
+[dependencies]
+anyhow.workspace = true
+cargo_metadata.workspace = true
+clap = { workspace = true, optional = true }
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ttf-parser.workspace = true
+
+[features]
+default = ["cli"]
+cli = ["clap", "clap/wrap_help"]
+
+[lints]
+workspace = true

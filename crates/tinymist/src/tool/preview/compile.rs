@@ -4,14 +4,15 @@ use std::path::Path;
 
 use reflexo::debug_loc::SourceSpanOffset;
 use reflexo_typst::{error::prelude::*, Bytes, Error, TypstDocument};
-use tinymist_project::LspCompiledArtifact;
-use tinymist_query::{jump_from_click, jump_from_cursor};
-use typst::layout::{Abs, Point, Position};
-use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
-use typst::World;
-use typst_preview::{
+use tinymist_preview::{
     CompileStatus, DocToSrcJumpInfo, EditorServer, Location, MemoryFiles, MemoryFilesShort,
 };
+use tinymist_project::LspCompiledArtifact;
+use tinymist_query::{jump_from_click, jump_from_cursor};
+use typst::introspection::PagedPosition as Position;
+use typst::layout::{Abs, Point};
+use typst::syntax::{LinkedNode, Source, Span, SyntaxKind};
+use typst::World;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::project::{LspInterrupt, ProjectClient, ProjectInsId};
@@ -23,7 +24,7 @@ pub struct ProjectPreviewHandler {
     /// The project id.
     pub project_id: ProjectInsId,
     /// The connection to the compiler compiling projects (language server).
-    pub(crate) client: Box<dyn ProjectClient>,
+    pub client: Box<dyn ProjectClient>,
 }
 
 impl ProjectPreviewHandler {
@@ -91,7 +92,7 @@ pub struct PreviewCompileView {
     pub art: LspCompiledArtifact,
 }
 
-impl typst_preview::CompileView for PreviewCompileView {
+impl tinymist_preview::CompileView for PreviewCompileView {
     fn doc(&self) -> Option<TypstDocument> {
         self.art.doc.clone()
     }
@@ -118,8 +119,9 @@ impl typst_preview::CompileView for PreviewCompileView {
         let source_id = world.id_for_path(Path::new(&loc.filepath))?;
 
         let source = world.source(source_id).ok()?;
-        let cursor =
-            source.line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
+        let cursor = source
+            .lines()
+            .line_column_to_byte(loc.pos.line as usize, loc.pos.character as usize)?;
 
         let node = LinkedNode::new(source.root()).leaf_at_compat(cursor)?;
         if !matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText) {
@@ -143,7 +145,7 @@ impl typst_preview::CompileView for PreviewCompileView {
         let world = self.art.world();
 
         let page = pos.page_no.checked_sub(1)?;
-        let page = doc.pages.get(page)?;
+        let page = doc.pages().get(page)?;
 
         let click = Point::new(Abs::pt(pos.x as f64), Abs::pt(pos.y as f64));
         jump_from_click(world, &page.frame, click)
@@ -167,7 +169,7 @@ impl typst_preview::CompileView for PreviewCompileView {
         let Some(source) = world.source(source_id).ok() else {
             return vec![];
         };
-        let Some(cursor) = source.line_column_to_byte(line, column) else {
+        let Some(cursor) = source.lines().line_column_to_byte(line, column) else {
             return vec![];
         };
 
@@ -176,8 +178,11 @@ impl typst_preview::CompileView for PreviewCompileView {
 
     fn resolve_span(&self, span: Span, offset: Option<usize>) -> Option<DocToSrcJumpInfo> {
         let world = self.art.world();
-        let resolve_off =
-            |src: &Source, off: usize| src.byte_to_line(off).zip(src.byte_to_column(off));
+        let resolve_off = |src: &Source, off: usize| {
+            src.lines()
+                .byte_to_line(off)
+                .zip(src.lines().byte_to_column(off))
+        };
 
         let source = world.source(span.id()?).ok()?;
         let mut range = source.find(span)?.range();

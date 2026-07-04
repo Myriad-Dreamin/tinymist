@@ -3,8 +3,8 @@
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst
 #        ^ source.typst meta.expr.context.typst
 #         ^ source.typst meta.expr.context.typst constant.numeric.integer.typst
-#          ^ source.typst meta.brace.curly.typst
-#           ^ source.typst meta.brace.curly.typst
+#          ^ source.typst markup.content.brace.typst
+#           ^ source.typst markup.content.brace.typst
 >#context 1;{}
 #^ source.typst keyword.control.hash.typst
 # ^^^^^^^ source.typst meta.expr.context.typst keyword.control.other.typst

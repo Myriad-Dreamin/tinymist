@@ -1,9 +1,9 @@
 use crate::{
+    SemanticRequest,
     prelude::*,
     syntax::{
-        get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind,
+        LexicalHierarchy, LexicalKind, LexicalScopeKind, LexicalVarKind, get_lexical_hierarchy,
     },
-    SemanticRequest,
 };
 
 /// The `workspace/label` request resembles [`workspace/symbol`] request but is
@@ -64,7 +64,7 @@ fn filter_document_labels(
 
             Some(SymbolInformation {
                 name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().into(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {

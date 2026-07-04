@@ -7,6 +7,7 @@ interface ExtensionState {
   features: {
     web: boolean;
     lsp: boolean;
+    lspSystem: boolean;
     export: boolean;
     task: boolean;
     devKit: boolean;
@@ -27,6 +28,8 @@ interface ExtensionState {
     focusingFile: string | undefined;
     focusingDoc: vscode.TextDocument | undefined;
     focusingPreviewPanelContext: PreviewPanelContext | undefined;
+    serverHealthWarningShown: boolean;
+    serverReady: boolean;
   };
   getFocusingFile(): string | undefined;
   getFocusingDoc(): vscode.TextDocument | undefined;
@@ -37,6 +40,7 @@ export const extensionState: ExtensionState = {
   features: {
     web: false,
     lsp: true,
+    lspSystem: true,
     export: true,
     testingDebug: true,
     task: true,
@@ -57,6 +61,8 @@ export const extensionState: ExtensionState = {
     focusingFile: undefined,
     focusingDoc: undefined,
     focusingPreviewPanelContext: undefined,
+    serverHealthWarningShown: false,
+    serverReady: false,
   },
   getFocusingFile() {
     return extensionState.mut.focusingFile;

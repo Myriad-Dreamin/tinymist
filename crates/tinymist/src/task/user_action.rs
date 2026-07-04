@@ -1,20 +1,29 @@
 //! The actor that runs user actions.
 
+use std::future::Future;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 
 use anyhow::bail;
 use base64::Engine;
+use futures::FutureExt;
+use hyper::body::Bytes;
 use hyper::service::service_fn;
 use hyper_util::{rt::TokioIo, server::graceful::GracefulShutdown};
+use reflexo_typst::vfs::WorkspaceResolver;
 use reflexo_typst::{TypstDict, TypstPagedDocument};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
-use sync_ls::{just_future, LspClient, RequestId, SchedulableResponse};
+use serde_json::{json, Value as JsonValue};
+use sync_ls::{just_future, LspClient, LspResult, RequestId, SchedulableResponse};
+use tinymist_project::LspComputeGraph;
 use tinymist_std::error::IgnoreLogging;
-use typst::{syntax::Span, World};
+use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
+use typst::{syntax::Span, World, WorldExt};
 
 use crate::project::LspWorld;
-use crate::{internal_error, ServerState};
+use crate::{internal_error, AliveLock, ConnWithCancel, ServerState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,8 +41,8 @@ pub struct TraceParams {
 pub struct UserActionTask;
 
 impl UserActionTask {
-    /// Run a trace.
-    pub fn trace(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
+    /// Traces a specific document.
+    pub fn trace_document(&self, params: TraceParams) -> SchedulableResponse<JsonValue> {
         just_future(async move {
             run_trace_program(params)
                 .await
@@ -41,11 +50,76 @@ impl UserActionTask {
         })
     }
 
+    /// Traces the entire server.
+    pub fn trace_server(&self) -> (ServerTraceTask, SchedulableResponse<JsonValue>) {
+        let (stop_tx, mut stop_rx) = mpsc::unbounded_channel();
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let (addr_tx, addr_rx) = oneshot::channel();
+
+        let stop_tx2 = stop_tx.clone();
+        let task = ServerTraceTask { stop_tx, resp_rx };
+
+        typst_timing::enable();
+        typst_timing::clear();
+
+        // Empty trace array is not legal, so we add a root scope.
+        let _scope = typst_timing::TimingScope::new("server_trace");
+        let timings = async move {
+            log::info!("before generate timings");
+
+            stop_rx.recv().await;
+            drop(_scope);
+
+            typst_timing::disable();
+
+            let mut writer = std::io::BufWriter::new(Vec::new());
+            let res = typst_timing::export_json(&mut writer, |span| {
+                // todo: resolve line correctly
+                let file_id = Span::from_raw(span).id();
+                (WorkspaceResolver::display(file_id).to_string(), 0)
+            });
+
+            let timings = writer.into_inner().unwrap();
+            log::info!("after generate timings {res:?}");
+            log::info!("timings: {:?}", std::str::from_utf8(&timings));
+
+            typst_timing::clear();
+
+            resp_tx
+                .send(Ok(json!({})))
+                .ok()
+                .log_error("failed to send response");
+
+            Bytes::from_owner(timings)
+        };
+
+        log::info!("now make http server");
+        let resp = just_future(async move {
+            let static_file_addr = "127.0.0.1:0".to_owned();
+            tokio::spawn(async move {
+                make_http_server(timings, static_file_addr, addr_tx).await;
+                stop_tx2.send(()).ok();
+            });
+
+            let addr = addr_rx.await.map_err(|err| {
+                log::error!("failed to get address of trace server: {err:?}");
+                internal_error("failed to get address of trace server")
+            })?;
+
+            log::info!("trace server has started at {addr}");
+            Ok(serde_json::json!({
+                "tracingUrl": format!("http://{addr}"),  // not used
+            }))
+        });
+
+        (task, resp)
+    }
+
     /// Run a trace request in subprocess.
     pub async fn trace_main(
         client: LspClient,
         state: &mut ServerState,
-        w: &LspWorld,
+        w: LspComputeGraph,
         rpc_kind: String,
         req_id: RequestId,
     ) -> ! {
@@ -100,7 +174,7 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
 
     let stdout = child.stdout.take().expect("stdout missing");
 
-    let (msg_tx, msg_rx) = tokio::sync::oneshot::channel();
+    let (msg_tx, msg_rx) = oneshot::channel();
     std::thread::spawn(move || {
         let mut input_chan = std::io::BufReader::new(stdout);
         let mut has_response = false;
@@ -159,26 +233,26 @@ async fn run_trace_program(params: TraceParams) -> anyhow::Result<JsonValue> {
 async fn trace_main(
     client: LspClient,
     state: &mut ServerState,
-    w: &LspWorld,
+    g: LspComputeGraph,
     rpc_kind: String,
     req_id: RequestId,
 ) -> ! {
     typst_timing::enable();
-    let res = typst::compile::<TypstPagedDocument>(w);
+    let res = typst_shim::compile_opt::<TypstPagedDocument>(g.world());
     let diags = match &res.output {
         Ok(_res) => res.warnings,
         Err(errors) => errors.clone(),
     };
     let mut writer = std::io::BufWriter::new(Vec::new());
     let _ = typst_timing::export_json(&mut writer, |span| {
-        resolve_span(w, Span::from_raw(span)).unwrap_or_else(|| ("unknown".to_string(), 0))
+        resolve_span(g.world(), Span::from_raw(span)).unwrap_or_else(|| ("unknown".to_string(), 0))
     });
 
     let timings = writer.into_inner().unwrap();
 
     let handle = &state.project;
     let diagnostics =
-        tinymist_query::convert_diagnostics(w, diags.iter(), handle.analysis.position_encoding);
+        tinymist_query::convert_diagnostics(g, diags.iter(), handle.analysis.position_encoding);
 
     let rpc_kind = rpc_kind.as_str();
 
@@ -197,10 +271,12 @@ async fn trace_main(
             });
         }
         "http" => {
-            let (addr_tx, addr_rx) = tokio::sync::oneshot::channel();
+            let (addr_tx, addr_rx) = oneshot::channel();
             let t = tokio::spawn(async move {
                 let static_file_addr = "127.0.0.1:0".to_owned();
+                let timings = async { Bytes::from_owner(timings) };
                 make_http_server(timings, static_file_addr, addr_tx).await;
+                std::process::exit(0);
             });
 
             let addr = addr_rx.await.unwrap();
@@ -223,26 +299,43 @@ async fn trace_main(
     std::process::exit(0);
 }
 
+/// The server trace task.
+pub struct ServerTraceTask {
+    /// The sender to stop the trace.
+    pub stop_tx: mpsc::UnboundedSender<()>,
+    /// The receiver to get the trace result.
+    pub resp_rx: oneshot::Receiver<LspResult<JsonValue>>,
+}
+
 // todo: reuse code from tools preview
 /// Create a http server for the trace program.
-pub async fn make_http_server(
-    timings: Vec<u8>,
+async fn make_http_server(
+    timings: impl Future<Output = Bytes> + Send + Sync + 'static,
     static_file_addr: String,
-    addr_tx: tokio::sync::oneshot::Sender<std::net::SocketAddr>,
-) -> ! {
+    addr_tx: oneshot::Sender<std::net::SocketAddr>,
+) {
     use http_body_util::Full;
     use hyper::body::{Bytes, Incoming};
     type Server = hyper_util::server::conn::auto::Builder<hyper_util::rt::TokioExecutor>;
 
+    let alive_cnt = Arc::<AtomicU64>::default();
+
     let (alive_tx, mut alive_rx) = tokio::sync::mpsc::unbounded_channel();
-    let timings = hyper::body::Bytes::from(timings);
-    let make_service = move || {
+    let timings = timings.shared();
+
+    let alive_cnt2 = alive_cnt.clone();
+    let make_service = move |cancel: CancellationToken| {
+        let alive_cnt = alive_cnt2.clone();
         let timings = timings.clone();
         let alive_tx = alive_tx.clone();
+
         service_fn(move |req: hyper::Request<Incoming>| {
+            let cancel = cancel.clone();
+            let alive_cnt = alive_cnt.clone();
             let timings = timings.clone();
             let _ = alive_tx.send(());
             async move {
+                let _alive_cnt = AliveLock::hold(alive_cnt);
                 // Make sure VSCode can connect to this http server but no malicious website a
                 // user might open in a browser. We recognize VSCode by an `Origin` header that
                 // starts with `vscode-webview://`. Malicious websites can (hopefully) not trick
@@ -263,6 +356,14 @@ pub async fn make_http_server(
                 let b = hyper::Response::builder()
                     .header(hyper::header::ACCESS_CONTROL_ALLOW_ORIGIN, allowed_origin);
                 if req.uri().path() == "/" {
+                    let timings = tokio::select! {
+                        _ = cancel.cancelled() => {
+                            log::info!("client connection is dropped, exiting loop");
+                            anyhow::bail!("client connection is dropped")
+                        },
+                        timings = timings => timings,
+                    };
+
                     let res = if req.method() == hyper::Method::HEAD {
                         b.body(Full::<Bytes>::default()).unwrap()
                     } else {
@@ -291,7 +392,7 @@ pub async fn make_http_server(
     let addr = listener.local_addr().unwrap();
     log::info!("trace server listening on http://{addr}");
 
-    let (final_tx, final_rx) = tokio::sync::oneshot::channel();
+    let (final_tx, final_rx) = oneshot::channel();
 
     // the graceful watcher
     let graceful = hyper_util::server::graceful::GracefulShutdown::new();
@@ -305,7 +406,9 @@ pub async fn make_http_server(
             }
         };
 
-        let conn = server.serve_connection(TokioIo::new(stream), make_service());
+        let conn = ConnWithCancel::new(stream);
+        let cancel = conn.cancel.clone();
+        let conn = server.serve_connection(TokioIo::new(conn), make_service(cancel));
         let conn = graceful.watch(conn.into_owned());
         tokio::spawn(async move {
             conn.await.log_error("cannot serve http");
@@ -350,9 +453,14 @@ pub async fn make_http_server(
                     break;
                 },
                 _ = tokio::time::sleep(reflexo::time::Duration::from_secs(15)) => {
-                    log::info!("trace-server: No activity for 15 seconds, shutting down");
-                    final_tx.send(()).ok();
-                    break;
+                    let held = alive_cnt.load(std::sync::atomic::Ordering::SeqCst);
+                    if held == 0 {
+                        log::info!("trace-server: No activity for 15 seconds, shutting down");
+                        final_tx.send(()).ok();
+                        break;
+                    } else {
+                        log::info!("trace-server: still {held} active connections");
+                    }
                 },
                 _ = alive_rx.recv() => {
                     log::info!("trace-server: Activity detected, resetting timer");
@@ -363,14 +471,13 @@ pub async fn make_http_server(
 
     addr_tx.send(addr).ok();
     join.await.unwrap();
-    std::process::exit(0);
 }
 
 /// Turns a span into a (file, line) pair.
 fn resolve_span(world: &LspWorld, span: Span) -> Option<(String, u32)> {
     let id = span.id()?;
     let source = world.source(id).ok()?;
-    let range = source.range(span)?;
-    let line = source.byte_to_line(range.start)?;
+    let range = world.range(span)?;
+    let line = source.lines().byte_to_line(range.start)?;
     Some((format!("{id:?}"), line as u32 + 1))
 }

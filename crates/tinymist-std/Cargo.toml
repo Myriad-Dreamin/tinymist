@@ -2,7 +2,7 @@
 name = "tinymist-std"
 description = "Additional functions wrapping Rust's standard library."
 # group: world
-version = "0.13.12"
+version = "0.15.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -13,26 +13,27 @@ repository.workspace = true
 
 anyhow.workspace = true
 base64.workspace = true
+battery = { workspace = true, optional = true }
 bitvec.workspace = true
 comemo.workspace = true
 dashmap.workspace = true
 ecow = { workspace = true, features = ["serde"] }
 fxhash.workspace = true
 log.workspace = true
+lsp-types.workspace = true
 path-clean.workspace = true
 pathdiff.workspace = true
 parking_lot.workspace = true
 rustc-hash.workspace = true
+same-file = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_repr.workspace = true
 serde_json.workspace = true
 serde_with.workspace = true
 siphasher.workspace = true
-web-time = { workspace = true, optional = true }
-time.workspace = true
-lsp-types.workspace = true
 tempfile = { workspace = true, optional = true }
-same-file = { workspace = true, optional = true }
+time = { workspace = true, features = ["formatting"] }
+web-time = { workspace = true, optional = true }
 
 # feature = "web"
 js-sys = { workspace = true, optional = true }
@@ -43,6 +44,8 @@ rkyv = { workspace = true, optional = true }
 
 # feature = "typst"
 typst = { workspace = true, optional = true }
+typst-layout = { workspace = true, optional = true }
+typst-html = { workspace = true, optional = true }
 typst-shim = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -70,7 +73,7 @@ hex.workspace = true
 default = ["full"]
 full = ["web", "rkyv", "typst"]
 
-typst = ["dep:typst", "dep:typst-shim"]
+typst = ["dep:typst", "dep:typst-shim", "dep:typst-html", "dep:typst-layout"]
 
 rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]
@@ -78,6 +81,7 @@ rkyv-validation = ["rkyv/validation"]
 __web = ["wasm-bindgen", "js-sys", "web-time"]
 web = ["__web"]
 system = ["tempfile", "same-file"]
+battery = ["dep:battery"]
 bi-hash = []
 
 [lints]

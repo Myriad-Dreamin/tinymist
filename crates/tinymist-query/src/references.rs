@@ -1,14 +1,13 @@
 use std::sync::OnceLock;
 
 use tinymist_analysis::adt::interner::Interned;
-use tinymist_std::typst::TypstDocument;
 use typst::syntax::Span;
 
 use crate::{
+    StrRef,
     analysis::{Definition, SearchCtx},
     prelude::*,
-    syntax::{get_index_info, RefExpr, SyntaxClass},
-    StrRef,
+    syntax::{RefExpr, SyntaxClass, get_index_info},
 };
 
 /// The [`textDocument/references`] request is sent from the client to the
@@ -24,15 +23,14 @@ pub struct ReferencesRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for ReferencesRequest {
+impl SemanticRequest for ReferencesRequest {
     type Response = Vec<LspLocation>;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let locations = find_references(ctx, &source, doc, syntax)?;
+        let locations = find_references(ctx, &source, syntax)?;
 
         crate::log_debug_ct!("references: {locations:?}");
         Some(locations)
@@ -42,7 +40,6 @@ impl StatefulRequest for ReferencesRequest {
 pub(crate) fn find_references(
     ctx: &mut LocalContext,
     source: &Source,
-    doc: Option<&TypstDocument>,
     syntax: SyntaxClass<'_>,
 ) -> Option<Vec<LspLocation>> {
     let finding_label = match syntax {
@@ -57,12 +54,13 @@ pub(crate) fn find_references(
         | SyntaxClass::Ref {
             suffix_colon: true, ..
         }
+        | SyntaxClass::At { node: _ }
         | SyntaxClass::Normal(..) => {
             return None;
         }
     };
 
-    let def = ctx.def_of_syntax(source, doc, syntax)?;
+    let def = ctx.def_of_syntax(source, syntax)?;
 
     let worker = ReferencesWorker {
         ctx: ctx.fork_for_search(),
@@ -106,6 +104,17 @@ impl ReferencesWorker<'_> {
 
     fn file(&mut self, ref_fid: TypstFileId) -> Option<()> {
         log::debug!("references: file: {ref_fid:?}");
+
+        // todo: find references in data files
+        if ref_fid
+            .vpath()
+            .as_rooted_path_compat()
+            .extension()
+            .is_none_or(|e| e != "typ")
+        {
+            return Some(());
+        }
+
         let src = self.ctx.ctx.source_by_id(ref_fid).ok()?;
         let index = get_index_info(&src);
         match self.def.decl.kind() {
@@ -143,13 +152,35 @@ impl ReferencesWorker<'_> {
         url: &Url,
         idents: impl Iterator<Item = (&'b Span, &'b Interned<RefExpr>)>,
     ) {
-        self.push_ranges(src, url, idents.map(|(span, _)| span));
+        self.push_ranges(
+            src,
+            url,
+            idents.map(|(span, expr)| {
+                let adjust = match expr.decl.as_ref() {
+                    Decl::Label(..) => Some((1, -1)),
+                    Decl::ContentRef(..) => Some((1, 0)),
+                    _ => None,
+                };
+
+                (*span, adjust)
+            }),
+        );
     }
 
-    fn push_ranges<'b>(&mut self, src: &Source, url: &Url, spans: impl Iterator<Item = &'b Span>) {
-        self.references.extend(spans.filter_map(|span| {
+    fn push_ranges(
+        &mut self,
+        src: &Source,
+        url: &Url,
+        spans: impl Iterator<Item = (Span, Option<(isize, isize)>)>,
+    ) {
+        self.references.extend(spans.filter_map(|(span, adjust)| {
             // todo: this is not necessary a name span
-            let range = self.ctx.ctx.to_lsp_range(src.range(*span)?, src);
+            let mut range = source_range(src, span)?;
+            if let Some((start, end)) = adjust {
+                range.start = (range.start as isize + start) as usize;
+                range.end = (range.end as isize + end) as usize;
+            }
+            let range = self.ctx.ctx.to_lsp_range(range, src);
             Some(LspLocation {
                 uri: url.clone(),
                 range,
@@ -165,7 +196,7 @@ impl ReferencesWorker<'_> {
                 .file_id()
                 .and_then(|fid| {
                     fid.vpath()
-                        .as_rooted_path()
+                        .as_rooted_path_compat()
                         .file_name()?
                         .to_str()
                         .map(From::from)
@@ -178,7 +209,6 @@ impl ReferencesWorker<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::syntax::find_module_level_docs;
     use crate::tests::*;
 
     #[test]
@@ -186,20 +216,16 @@ mod tests {
         snapshot_testing("references", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-            let doc = compile_doc_for_test(ctx, &properties);
-
             let request = ReferencesRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(ctx, doc);
+            let result = request.request(ctx);
             let mut result = result.map(|v| {
                 v.into_iter()
                     .map(|loc| {
-                        let fp = file_path(loc.uri.as_str());
+                        let fp = file_uri(loc.uri.as_str());
                         format!(
                             "{fp}@{}:{}:{}:{}",
                             loc.range.start.line,

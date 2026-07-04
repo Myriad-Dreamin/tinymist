@@ -1,0 +1,36 @@
+>#{ $#calc.round(0) ...$ }
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.curly.typst
+#  ^ source.typst
+#   ^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
+#    ^ source.typst markup.math.typst variable.other.readwrite.hash.typst
+#     ^^^^ source.typst markup.math.typst variable.other.readwrite.typst
+#         ^ source.typst markup.math.typst meta.expr.call.typst keyword.operator.accessor.typst
+#          ^^^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst markup.math.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                  ^^^^ source.typst markup.math.typst
+#                      ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
+#                       ^ source.typst
+#                        ^ source.typst meta.brace.curly.typst
+>
+>#{ $#calc.round(0)...$ }
+#^ source.typst keyword.control.hash.typst
+# ^ source.typst meta.brace.curly.typst
+#  ^ source.typst
+#   ^ source.typst markup.math.typst punctuation.definition.string.begin.math.typst
+#    ^ source.typst markup.math.typst variable.other.readwrite.hash.typst
+#     ^^^^ source.typst markup.math.typst variable.other.readwrite.typst
+#         ^ source.typst markup.math.typst meta.expr.call.typst keyword.operator.accessor.typst
+#          ^^^^^ source.typst markup.math.typst meta.expr.call.typst entity.name.function.typst
+#               ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                ^ source.typst markup.math.typst meta.expr.call.typst constant.numeric.integer.typst
+#                 ^ source.typst markup.math.typst meta.expr.call.typst meta.brace.round.typst
+#                  ^ source.typst markup.math.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                   ^ source.typst markup.math.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                    ^ source.typst markup.math.typst meta.expr.call.typst keyword.operator.accessor.typst
+#                     ^ source.typst markup.math.typst punctuation.definition.string.end.math.typst
+#                      ^ source.typst
+#                       ^ source.typst meta.brace.curly.typst
+>

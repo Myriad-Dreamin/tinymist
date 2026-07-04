@@ -1,14 +1,17 @@
 use core::fmt::{self, Write};
+use std::cmp::Reverse;
 
 use tinymist_std::typst::TypstDocument;
+use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::foundations::repr::separated_list;
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::analysis::get_link_exprs_in;
-use crate::bib::{render_citation_string, RenderedBibCitation};
+use crate::bib::{RenderedBibCitation, render_citation_string};
 use crate::jump_from_cursor;
+use crate::package::parse_package_import;
 use crate::prelude::*;
-use crate::upstream::{route_of_value, truncated_repr, Tooltip};
+use crate::upstream::{Tooltip, route_of_value, truncated_repr};
 
 /// The [`textDocument/hover`] request asks the server for hover information at
 /// a given text document position.
@@ -25,11 +28,87 @@ pub struct HoverRequest {
     pub position: LspPosition,
 }
 
-impl StatefulRequest for HoverRequest {
+pub(crate) fn hover_from_definition_shared(
+    ctx: &Arc<crate::analysis::SharedContext>,
+    def: &Definition,
+    range: Option<LspRange>,
+) -> Option<Hover> {
+    hover_from_docs(def, range, ctx.def_docs(def))
+}
+
+fn hover_from_docs(
+    def: &Definition,
+    range: Option<LspRange>,
+    sym_docs: Option<DefDocs>,
+) -> Option<Hover> {
+    let mut contents = vec![];
+
+    use Decl::*;
+    match def.decl.as_ref() {
+        Label(..) => {
+            if let Some(val) = def.term.as_ref().and_then(|v| v.value()) {
+                contents.push(format!("Ref: `{}`\n", def.name()));
+                contents.push(format!("```typc\n{}\n```", truncated_repr(&val)));
+            } else {
+                contents.push(format!("Label: `{}`\n", def.name()));
+            }
+        }
+        BibEntry(..) => {
+            contents.push(format!("Bibliography: `{}`", def.name()));
+        }
+        _ => {
+            if matches!(
+                def.decl.kind(),
+                DefKind::Function | DefKind::Variable | DefKind::Constant
+            ) && !def.name().is_empty()
+            {
+                let mut type_doc = String::new();
+                type_doc.push_str("let ");
+                type_doc.push_str(def.name());
+
+                match &sym_docs {
+                    Some(DefDocs::Variable(docs)) => {
+                        push_result_ty(def.name(), docs.return_ty.as_ref(), &mut type_doc);
+                    }
+                    Some(DefDocs::Function(docs)) => {
+                        let _ = docs.print(&mut type_doc);
+                        push_result_ty(def.name(), docs.ret_ty.as_ref(), &mut type_doc);
+                    }
+                    _ => {}
+                }
+
+                contents.push(format!("```typc\n{type_doc};\n```"));
+            }
+
+            if let Some(doc) = sym_docs {
+                let hover_docs = doc.hover_docs();
+
+                if !hover_docs.trim().is_empty() {
+                    contents.push(hover_docs.into());
+                }
+            }
+
+            if let Some(link) = ExternalDocLink::get(def) {
+                contents.push(link.to_string());
+            }
+        }
+    }
+
+    if contents.is_empty() {
+        return None;
+    }
+
+    Some(Hover {
+        contents: HoverContents::Scalar(MarkedString::String(contents.join("\n\n---\n\n"))),
+        range,
+    })
+}
+
+impl SemanticRequest for HoverRequest {
     type Response = Hover;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.clone();
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
+        let doc = ctx.success_doc().cloned();
         let source = ctx.source_by_path(&self.path).ok()?;
         let offset = ctx.to_typst_pos(self.position, &source)?;
         // the typst's cursor is 1-based, so we need to add 1 to the offset
@@ -100,7 +179,8 @@ impl HoverWorker<'_> {
         let source = self.source.clone();
         let leaf = LinkedNode::new(source.root()).leaf_at_compat(self.cursor)?;
 
-        self.definition()
+        self.package_import(&leaf);
+        self.definition(&leaf)
             .or_else(|| self.star(&leaf))
             .or_else(|| self.link(&leaf))
     }
@@ -116,12 +196,11 @@ impl HoverWorker<'_> {
     }
 
     /// Definition analysis results
-    fn definition(&mut self) -> Option<()> {
-        let leaf = LinkedNode::new(self.source.root()).leaf_at_compat(self.cursor)?;
+    fn definition(&mut self, leaf: &LinkedNode) -> Option<()> {
         let syntax = classify_syntax(leaf.clone(), self.cursor)?;
         let def = self
             .ctx
-            .def_of_syntax(&self.source, self.doc.as_ref(), syntax.clone())?;
+            .def_of_syntax_or_dyn(&self.source, syntax.clone())?;
 
         use Decl::*;
         match def.decl.as_ref() {
@@ -215,12 +294,183 @@ impl HoverWorker<'_> {
         Some(())
     }
 
+    fn package_import(&mut self, node: &LinkedNode) -> Option<()> {
+        let package_spec = parse_package_import(node)?;
+        self.def
+            .push(self.get_package_hover_info(&package_spec, node));
+        Some(())
+    }
+
+    /// Get package information for hover content
+    fn get_package_hover_info(
+        &self,
+        package_spec: &PackageSpec,
+        import_str_node: &LinkedNode,
+    ) -> String {
+        let versionless_spec = package_spec.versionless();
+
+        // Get all matching packages
+        let w = self.ctx.world().clone();
+        let mut packages = vec![];
+        if package_spec.is_preview() {
+            packages.extend(
+                w.packages()
+                    .iter()
+                    .filter(|it| it.matches_versionless(&versionless_spec)),
+            );
+        }
+        // Add non-preview packages
+        #[cfg(feature = "local-registry")]
+        let local_packages = self.ctx.non_preview_packages();
+        #[cfg(feature = "local-registry")]
+        if !package_spec.is_preview() {
+            packages.extend(
+                local_packages
+                    .iter()
+                    .filter(|it| it.matches_versionless(&versionless_spec)),
+            );
+        }
+
+        // Sort by version descending
+        packages.sort_by_key(|entry| Reverse(entry.package.version));
+
+        let current_entry = packages
+            .iter()
+            .find(|entry| entry.package.version == package_spec.version);
+
+        let mut info = String::new();
+        {
+            // Add links
+            let mut links_line = Vec::new();
+
+            if package_spec.is_preview() {
+                let package_name = &package_spec.name;
+
+                // Universe page
+                let universe_url = format!("https://typst.app/universe/package/{package_name}");
+                links_line.push(format!("[Universe]({universe_url})"));
+            }
+
+            if let Some(current_entry) = current_entry {
+                // Repository URL
+                if let Some(ref repo) = current_entry.package.repository {
+                    links_line.push(format!("[Repository]({repo})"));
+                }
+
+                // Homepage URL
+                if let Some(ref homepage) = current_entry.package.homepage {
+                    links_line.push(format!("[Homepage]({homepage})"));
+                }
+            }
+
+            if !links_line.is_empty() {
+                info.push_str(&links_line.iter().join(" | "));
+                info.push_str("\n\n");
+            }
+        }
+
+        // Package header
+        if !package_spec.is_preview() {
+            info.push_str("Info: This is a local package\n\n");
+        }
+
+        info.push_str(&format!("**Package:** `{package_spec}`\n"));
+        // Check version information and show status
+        if current_entry.is_none() {
+            info.push_str(&format!(
+                "**Version {} not found**\n\n",
+                package_spec.version
+            ));
+        } else if let Some(latest) = packages.first() {
+            let latest_version = &latest.package.version;
+            if *latest_version != package_spec.version {
+                info.push_str(&format!("**Newer version available: {latest_version}**\n"));
+            } else {
+                info.push_str("**Up to date** (latest version)\n");
+            }
+        }
+        info.push('\n');
+
+        let date_format = tinymist_std::time::yyyy_mm_dd();
+
+        // Add manifest information if available
+        if let Some(current_entry) = current_entry {
+            let pkg_info = &current_entry.package;
+
+            if !pkg_info.authors.is_empty() {
+                info.push_str(&format!("**Authors:** {}\n\n", pkg_info.authors.join(", ")));
+            }
+
+            if let Some(description) = pkg_info.description.as_ref() {
+                info.push_str(&format!("**Description:** {description}\n\n"));
+            }
+
+            if let Some(license) = &pkg_info.license {
+                info.push_str(&format!("**License:** {license}\n\n"));
+            }
+
+            if let Some(updated_at) = &current_entry.updated_at {
+                info.push_str(&format!(
+                    "**Updated:** {}\n\n",
+                    updated_at
+                        .format(&date_format)
+                        .unwrap_or_else(|_| "unknown".to_string())
+                ));
+            }
+        }
+
+        // Show version history for preview packages
+        if !packages.is_empty() {
+            info.push_str(&format!(
+                "**Available Versions ({})** (click to replace):\n",
+                packages.len()
+            ));
+            for entry in &packages {
+                let version = &entry.package.version;
+                let release_date = entry
+                    .updated_at
+                    .and_then(|time| time.format(&date_format).ok())
+                    .unwrap_or_default();
+                if *version == package_spec.version {
+                    // Current version
+                    info.push_str(&format!("- **{version}** / {release_date}\n"));
+                    continue;
+                }
+                // Other versions
+                let lsp_range = self.ctx.to_lsp_range(import_str_node.range(), &self.source);
+                let args = serde_json::json!({
+                    "range": lsp_range,
+                    "replace": format!(
+                        "\"@{}/{}:{}\"",
+                        package_spec.namespace, package_spec.name, version
+                    )
+                });
+                let json_str = match serde_json::to_string(&args) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        log::error!("Failed to serialize arguments for replaceText command: {e}");
+                        continue;
+                    }
+                };
+                let encoded = percent_encoding::utf8_percent_encode(
+                    &json_str,
+                    percent_encoding::NON_ALPHANUMERIC,
+                );
+                let version_url = format!("command:tinymist.replaceText?{encoded}");
+                info.push_str(&format!("- [{version}]({version_url}) / {release_date}\n"));
+            }
+            info.push('\n');
+        }
+
+        info
+    }
+
     fn link(&mut self, mut node: &LinkedNode) -> Option<()> {
         while !matches!(node.kind(), SyntaxKind::FuncCall) {
             node = node.parent()?;
         }
 
-        let links = get_link_exprs_in(node)?;
+        let links = get_link_exprs_in(node);
         let links = links
             .objects
             .iter()
@@ -249,7 +499,7 @@ impl HoverWorker<'_> {
                     args: vec![JsonValue::String(target.to_string())],
                 }],
             });
-            if let Some(kind) = PathPreference::from_ext(target.path()) {
+            if let Some(kind) = PathKind::from_ext(target.path()) {
                 self.def.push(format!("A `{kind:?}` file."));
             }
         }
@@ -328,10 +578,10 @@ impl ExternalDocLink {
     fn get(def: &Definition) -> Option<CommandLink> {
         let value = def.value();
 
-        if matches!(value, Some(Value::Func(..))) {
-            if let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def) {
-                return Some(builtin);
-            }
+        if matches!(value, Some(Value::Func(..)))
+            && let Some(builtin) = Self::builtin_func_tooltip("https://typst.app/docs/", def)
+        {
+            return Some(builtin);
         };
 
         value.and_then(|value| Self::builtin_value_tooltip("https://typst.app/docs/", &value))
@@ -342,17 +592,17 @@ impl ExternalDocLink {
             return None;
         };
 
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         let mut func = &func;
         loop {
             match func.inner() {
-                Repr::Element(..) | Repr::Native(..) => {
+                FuncInner::Element(..) | FuncInner::Native(..) => {
                     return Self::builtin_value_tooltip(base, &Value::Func(func.clone()));
                 }
-                Repr::With(w) => {
+                FuncInner::With(w) => {
                     func = &w.0;
                 }
-                Repr::Closure(..) | Repr::Plugin(..) => {
+                FuncInner::Closure(..) | FuncInner::Plugin(..) => {
                     return None;
                 }
             }
@@ -420,17 +670,63 @@ mod tests {
         snapshot_testing("hover", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let docs = find_module_level_docs(&source).unwrap_or_default();
-            let properties = get_test_properties(&docs);
-            let graph = compile_doc_for_test(ctx, &properties);
-
             let request = HoverRequest {
                 path: path.clone(),
                 position: find_test_position(&source),
             };
 
-            let result = request.request(ctx, graph);
-            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+            let result = request.request(ctx);
+            let content = HoverDisplay(result.as_ref())
+                .to_string()
+                .replace("\n---\n", "\n\n======\n\n");
+            let content = JsonRepr::md_content(&content);
+            assert_snapshot!(content);
         });
+    }
+
+    struct HoverDisplay<'a>(Option<&'a Hover>);
+
+    impl fmt::Display for HoverDisplay<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(Hover { range, contents }) = self.0 else {
+                return write!(f, "No hover information");
+            };
+
+            // write range
+            if let Some(range) = range {
+                writeln!(f, "Range: {}\n", JsonRepr::range(range))?;
+            } else {
+                writeln!(f, "No range")?;
+            };
+
+            // write contents
+            match contents {
+                HoverContents::Markup(content) => {
+                    writeln!(f, "{}", content.value)?;
+                }
+                HoverContents::Scalar(MarkedString::String(content)) => {
+                    writeln!(f, "{content}")?;
+                }
+                HoverContents::Scalar(MarkedString::LanguageString(lang_str)) => {
+                    writeln!(f, "=== {} ===\n{}", lang_str.language, lang_str.value)?
+                }
+                HoverContents::Array(contents) => {
+                    // interperse the contents with a divider
+                    let content = contents
+                        .iter()
+                        .map(|content| match content {
+                            MarkedString::String(text) => text.to_string(),
+                            MarkedString::LanguageString(lang_str) => {
+                                format!("=== {} ===\n{}", lang_str.language, lang_str.value)
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n\n=====\n\n");
+                    writeln!(f, "{content}")?;
+                }
+            }
+
+            Ok(())
+        }
     }
 }

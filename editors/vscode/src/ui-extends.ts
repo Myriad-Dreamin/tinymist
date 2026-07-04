@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { statusBarFormatString } from "./extension";
+import { statusBarFormatString } from "./util";
 
 let statusBarItem: vscode.StatusBarItem;
 
@@ -63,6 +63,7 @@ ${cjkChars} CJK ${plural("Character", cjkChars)}
 
   const formatString = statusBarFormatString()
     .replace(/\{wordCount\}/g, `${words} ${plural("Word", words)}`)
+    .replace(/\{charCount\}/g, `${chars} ${plural("Character", chars)}`)
     .replace(/\{pageCount\}/g, `${pages} ${plural("Page", pages)}`)
     .replace(/\{fileName\}/g, fileNameWithoutExt);
 

@@ -7,7 +7,7 @@ use crate::StrRef;
 use super::LspRange;
 
 /// A kind of item that can be completed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum CompletionKind {
     /// A syntactical structure.
     Syntax,
@@ -25,7 +25,7 @@ pub enum CompletionKind {
     /// A reference.
     Reference,
     /// A symbol.
-    Symbol(char),
+    Symbol(EcoString),
     /// A variable.
     Variable,
     /// A module.
@@ -36,8 +36,8 @@ pub enum CompletionKind {
     Folder,
 }
 
-impl From<CompletionKind> for lsp_types::CompletionItemKind {
-    fn from(value: CompletionKind) -> Self {
+impl From<&CompletionKind> for lsp_types::CompletionItemKind {
+    fn from(value: &CompletionKind) -> Self {
         match value {
             CompletionKind::Syntax => Self::SNIPPET,
             CompletionKind::Func => Self::FUNCTION,
@@ -60,7 +60,7 @@ impl serde::Serialize for CompletionKind {
     where
         S: serde::Serializer,
     {
-        <Self as Into<lsp_types::CompletionItemKind>>::into(*self).serialize(serializer)
+        <&Self as Into<lsp_types::CompletionItemKind>>::into(self).serialize(serializer)
     }
 }
 
@@ -104,6 +104,10 @@ pub struct Completion {
     ///
     /// Should default to the `label` if `None`.
     pub apply: Option<EcoString>,
+    /// Whether the completion may capture the right-side identifier suffix as
+    /// the first snippet argument.
+    #[serde(skip)]
+    pub capture_suffix: bool,
     /// An optional short description, at most one sentence.
     pub detail: Option<EcoString>,
     /// An optional array of additional text edits that are applied when
@@ -175,6 +179,64 @@ pub struct EcoTextEdit {
 impl EcoTextEdit {
     pub fn new(range: LspRange, new_text: EcoString) -> EcoTextEdit {
         EcoTextEdit { range, new_text }
+    }
+}
+
+/// A textual edit with separate insert and replace ranges.
+#[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EcoInsertReplaceEdit {
+    /// The string to be inserted.
+    pub new_text: EcoString,
+    /// The range if insert mode is requested.
+    pub insert: LspRange,
+    /// The range if replace mode is requested.
+    pub replace: LspRange,
+}
+
+impl EcoInsertReplaceEdit {
+    pub fn new(insert: LspRange, replace: LspRange, new_text: EcoString) -> EcoInsertReplaceEdit {
+        EcoInsertReplaceEdit {
+            new_text,
+            insert,
+            replace,
+        }
+    }
+}
+
+/// The main edit for a completion item.
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum EcoCompletionTextEdit {
+    Edit(EcoTextEdit),
+    InsertAndReplace(EcoInsertReplaceEdit),
+}
+
+impl EcoCompletionTextEdit {
+    pub fn new_text(&self) -> &EcoString {
+        match self {
+            EcoCompletionTextEdit::Edit(edit) => &edit.new_text,
+            EcoCompletionTextEdit::InsertAndReplace(edit) => &edit.new_text,
+        }
+    }
+
+    pub fn new_text_mut(&mut self) -> &mut EcoString {
+        match self {
+            EcoCompletionTextEdit::Edit(edit) => &mut edit.new_text,
+            EcoCompletionTextEdit::InsertAndReplace(edit) => &mut edit.new_text,
+        }
+    }
+}
+
+impl From<EcoTextEdit> for EcoCompletionTextEdit {
+    fn from(edit: EcoTextEdit) -> Self {
+        EcoCompletionTextEdit::Edit(edit)
+    }
+}
+
+impl From<EcoInsertReplaceEdit> for EcoCompletionTextEdit {
+    fn from(edit: EcoInsertReplaceEdit) -> Self {
+        EcoCompletionTextEdit::InsertAndReplace(edit)
     }
 }
 
@@ -257,7 +319,7 @@ pub struct CompletionItem {
     ///
     /// @since 3.16.0 additional type `InsertReplaceEdit`
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub text_edit: Option<EcoTextEdit>,
+    pub text_edit: Option<EcoCompletionTextEdit>,
 
     /// An optional array of additional text edits that are applied when
     /// selecting this completion. Edits must not overlap with the main edit

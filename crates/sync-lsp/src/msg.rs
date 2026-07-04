@@ -17,8 +17,9 @@ use crate::lsp;
 pub struct RequestId(IdRepr);
 
 impl RequestId {
-    #[cfg(all(feature = "dap", feature = "server"))]
-    pub(crate) fn dap(id: RequestId) -> i64 {
+    /// Converts the request ID back to the original dap type.
+    #[cfg(feature = "dap")]
+    pub fn dap(id: RequestId) -> i64 {
         match id.0 {
             IdRepr::I32(it) => it as i64,
             IdRepr::String(it) => panic!("unexpected string ID in DAP: {it}"),
@@ -185,21 +186,17 @@ pub enum MessageKind {
 /// Gets the kind of the message.
 pub trait GetMessageKind {
     /// Returns the kind of the message.
-    fn get_message_kind() -> MessageKind;
+    const MESSAGE_KIND: MessageKind;
 }
 
 #[cfg(feature = "lsp")]
 impl GetMessageKind for LspMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Lsp
-    }
+    const MESSAGE_KIND: MessageKind = MessageKind::Lsp;
 }
 
 #[cfg(feature = "dap")]
 impl GetMessageKind for DapMessage {
-    fn get_message_kind() -> MessageKind {
-        MessageKind::Dap
-    }
+    const MESSAGE_KIND: MessageKind = MessageKind::Dap;
 }
 
 #[allow(unused)]

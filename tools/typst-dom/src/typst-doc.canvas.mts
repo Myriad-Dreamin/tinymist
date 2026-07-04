@@ -1,5 +1,5 @@
 import { PreviewMode } from "./typst-doc.mjs";
-import { TypstCancellationToken } from "./typst-cancel.mjs";
+import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 // import { patchOutlineEntry } from "./typst-outline.mjs";
 import { TypstPatchAttrs } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
@@ -35,9 +35,7 @@ export interface TypstCanvasDocument {
 }
 
 export function provideCanvasDoc<
-  TBase extends GConstructor<
-    TypstDocumentContext & Partial<TypstOutlineDocument>
-  >,
+  TBase extends GConstructor<TypstDocumentContext & Partial<TypstOutlineDocument>>,
 >(Base: TBase): TBase & GConstructor<TypstCanvasDocument> {
   return class CanvasDocument extends Base {
     feat$canvas = true;
@@ -62,40 +60,28 @@ export function provideCanvasDoc<
           pageInfo.elem = document.createElement("div");
           pageInfo.elem.setAttribute("class", "typst-page-canvas");
           pageInfo.elem.style.transformOrigin = "0 0";
-          pageInfo.elem.setAttribute(
-            "data-page-number",
-            pageInfo.index.toString()
-          );
+          pageInfo.elem.setAttribute("data-page-number", pageInfo.index.toString());
 
           const canvas = document.createElement("canvas");
           pageInfo.elem.appendChild(canvas);
 
           pageInfo.container = document.createElement("div");
           // todo: reuse by key
-          pageInfo.container.setAttribute(
-            TypstPatchAttrs.Tid,
-            `canvas:` + pageInfo.index
-          );
+          pageInfo.container.setAttribute(TypstPatchAttrs.Tid, `canvas:` + pageInfo.index);
           pageInfo.container.setAttribute("class", "typst-page canvas-mode");
-          pageInfo.container.setAttribute(
-            "data-page-number",
-            pageInfo.index.toString()
-          );
+          pageInfo.container.setAttribute("data-page-number", pageInfo.index.toString());
           pageInfo.container.appendChild(pageInfo.elem);
 
           // do scaling early
           this.prepareCanvas(pageInfo, canvas);
           rescale(
             pageInfo.container,
-            this.isContentPreview || this.renderMode !== "canvas" || isFirst
+            this.isContentPreview || this.renderMode !== "canvas" || isFirst,
           );
 
           if (this.isContentPreview) {
             const pageNumberIndicator = document.createElement("div");
-            pageNumberIndicator.setAttribute(
-              "class",
-              "typst-preview-canvas-page-number"
-            );
+            pageNumberIndicator.setAttribute("class", "typst-preview-canvas-page-number");
             pageNumberIndicator.textContent = `${pageInfo.index + 1}`;
             pageInfo.container.appendChild(pageNumberIndicator);
 
@@ -104,7 +90,7 @@ export function provideCanvasDoc<
             pageInfo.container.style.overflow = "hidden";
             pageInfo.container.addEventListener("click", () => {
               // console.log('click', pageInfo.index);
-              window.typstWebsocket.send(`outline-sync,${pageInfo.index + 1}`);
+              this.windowElem.typstWebsocket.send(`outline-sync,${pageInfo.index + 1}`);
             });
           }
         }
@@ -146,17 +132,9 @@ export function provideCanvasDoc<
       return cached;
     }
 
-    async updateCanvas(
-      pages: CanvasPage[],
-      opts?: UpdateCanvasOptions
-    ): Promise<void> {
+    async updateCanvas(pages: CanvasPage[], opts?: UpdateCanvasOptions): Promise<void> {
       const tok = opts?.cancel || undefined;
-      const perf = performance.now();
-      console.log("updateCanvas start");
-      // todo: priority in window
-      // await Promise.all(pagesInfo.map(async (pageInfo) => {
-      this.kModule.backgroundColor = "#ffffff";
-      this.kModule.pixelPerPt = this.pixelPerPt;
+
       const waitABit = async () => {
         return new Promise((resolve) => {
           if (opts?.lazy && "requestIdleCallback" in window) {
@@ -166,47 +144,43 @@ export function provideCanvasDoc<
           }
         });
       };
+
       for (const pageInfo of pages) {
         if (tok?.isCancelRequested()) {
           await tok.consume();
-          console.log("updateCanvas cancelled", performance.now() - perf);
           return;
         }
 
         const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
-        // const tt1 = performance.now();
 
         const pws = pageInfo.width.toFixed(3);
         const phs = pageInfo.height.toFixed(3);
 
-        let cached = this.prepareCanvas(pageInfo, canvas);
+        const cached = this.prepareCanvas(pageInfo, canvas);
 
-        const cacheKey =
-          pageInfo.elem.getAttribute("data-cache-key") || undefined;
+        const cacheKey = pageInfo.elem.getAttribute("data-cache-key") || undefined;
         const result = await this.kModule.renderCanvas({
           canvas: canvas.getContext("2d")!,
           pageOffset: pageInfo.index,
+          backgroundColor: "#ffffff",
+          pixelPerPt: this.pixelPerPt,
           cacheKey: cached ? cacheKey : undefined,
           dataSelection: {
             body: true,
           },
         });
+        const canvasUpdated = !cached || cacheKey !== result.cacheKey;
         if (cacheKey !== result.cacheKey) {
-          console.log("updateCanvas one miss", cacheKey, result.cacheKey);
-          // console.log('renderCanvas', pageInfo.index, performance.now() - tt1, result);
-          // todo: cache key changed
-          // canvas.width = pageInfo.width * this.pixelPerPt;
-          // canvas.height = pageInfo.height * this.pixelPerPt;
           pageInfo.elem.setAttribute("data-page-width", pws);
           pageInfo.elem.setAttribute("data-page-height", phs);
           canvas.setAttribute("data-cache-key", result.cacheKey);
           pageInfo.elem.setAttribute("data-cache-key", result.cacheKey);
         }
 
-        await waitABit();
+        if (canvasUpdated) {
+          await waitABit();
+        }
       }
-
-      console.log("updateCanvas done", performance.now() - perf);
       await tok?.consume();
     }
 
@@ -221,18 +195,12 @@ export function provideCanvasDoc<
         if (noSpacingFromTop) {
           canvasContainer.style.marginTop = `0px`;
         } else {
-          canvasContainer.style.marginTop = `${
-            this.isContentPreview ? 6 : 5
-          }px`;
+          canvasContainer.style.marginTop = `${this.isContentPreview ? 6 : 5}px`;
         }
         let elem = canvasContainer.firstElementChild as HTMLDivElement;
 
-        const canvasWidth = Number.parseFloat(
-          elem.getAttribute("data-page-width")!
-        );
-        const canvasHeight = Number.parseFloat(
-          elem.getAttribute("data-page-height")!
-        );
+        const canvasWidth = Number.parseFloat(elem.getAttribute("data-page-width")!);
+        const canvasHeight = Number.parseFloat(elem.getAttribute("data-page-height")!);
 
         this.currentRealScale =
           this.previewMode === PreviewMode.Slide
@@ -240,9 +208,7 @@ export function provideCanvasDoc<
             : cw / canvasWidth;
         const scale =
           // The element in svg is already scaled by svg host
-          this.renderMode === "svg"
-            ? 1
-            : this.currentRealScale * this.currentScaleRatio;
+          this.renderMode === "svg" ? 1 : this.currentRealScale * this.currentScaleRatio;
 
         // apply scale
         const appliedScale = (scale / this.pixelPerPt).toString();
@@ -309,18 +275,16 @@ export function provideCanvasDoc<
 
     async rerender$canvas() {
       // console.log('toggleCanvasViewportChange!!!!!!', this.id, this.isRendering);
-      const pages: CanvasPage[] = this.kModule
-        .retrievePagesInfo()
-        .map((x, index) => {
-          return {
-            tag: "canvas",
-            index,
-            width: x.width,
-            height: x.height,
-            container: undefined as any as HTMLDivElement,
-            elem: undefined as any as HTMLDivElement,
-          };
-        });
+      const pages: CanvasPage[] = this.kModule.retrievePagesInfo().map((x, index) => {
+        return {
+          tag: "canvas",
+          index,
+          width: x.width,
+          height: x.height,
+          container: undefined as any as HTMLDivElement,
+          elem: undefined as any as HTMLDivElement,
+        };
+      });
 
       if (!this.hookedElem.firstElementChild) {
         this.hookedElem.innerHTML = `<div class="typst-doc" data-render-mode="canvas"></div>`;
@@ -338,9 +302,7 @@ export function provideCanvasDoc<
               checkChildren(canvasContainer);
             }
             if (canvasContainer.classList.contains("typst-page")) {
-              const pageNumber = Number.parseInt(
-                ch.getAttribute("data-page-number")!
-              );
+              const pageNumber = Number.parseInt(ch.getAttribute("data-page-number")!);
               if (pageNumber >= pages.length) {
                 // todo: cache key can shifted
                 elem.removeChild(ch);
@@ -358,9 +320,7 @@ export function provideCanvasDoc<
           if (!ch.classList.contains("typst-page")) {
             continue;
           }
-          const pageNumber = Number.parseInt(
-            ch.getAttribute("data-page-number")!
-          );
+          const pageNumber = Number.parseInt(ch.getAttribute("data-page-number")!);
           if (pageNumber >= pages.length) {
             // todo: cache key shifted
             docDiv.removeChild(ch);

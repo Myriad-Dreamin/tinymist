@@ -3,7 +3,7 @@ use std::{fmt::Debug, sync::Arc};
 use tinymist_std::ImmutPath;
 use typst::diag::FileResult;
 
-use crate::{path_mapper::RootResolver, AccessModel, Bytes, FileId, PathAccessModel};
+use crate::{AccessModel, Bytes, FileId, PathAccessModel, path_mapper::RootResolver};
 
 /// Provides resolve access model.
 #[derive(Clone)]

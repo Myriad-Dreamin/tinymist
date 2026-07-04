@@ -33,12 +33,7 @@ export function startModal(...contents: Node[]) {
 
   // also shows close button and help
   // Press button/space/enter to close this window
-  const close = button(
-    {
-      class: "tinymist-button",
-    },
-    "Close"
-  );
+  const close = button({ class: "btn" }, "Close");
   const keydownHandler = (e: KeyboardEvent) => {
     if (e.key === "Escape" || e.key === " " || e.key === "Enter") {
       removeModal();
@@ -56,17 +51,14 @@ export function startModal(...contents: Node[]) {
   floatingWindow.appendChild(close);
   const help = button(
     {
-      class: "tinymist-button",
+      class: "btn",
       style: "margin-left: 0.5em",
-      title:
-        "Click the close button or press esc/space/enter to close this window",
+      title: "Click the close button or press esc/space/enter to close this window",
     },
-    "Help"
+    "Help",
   );
   help.onclick = () => {
-    alert(
-      "Click the close button or press esc/space/enter to close this window"
-    );
+    alert("Click the close button or press esc/space/enter to close this window");
   };
   floatingWindow.appendChild(help);
 

@@ -3,20 +3,39 @@
 	"tasks": [
 		{
 			"label": "VS Code Extension Prelaunch",
+			"type": "npm",
+			"script": "prelaunch:vscode",
+			"group": "build",
+		},
+		{
+			"label": "VS Code Extension Prelaunch [Web]",
+			"type": "npm",
+			"script": "build:web",
+			"group": "build"
+		},
+		{
+			"label": "VS Code Extension Prelaunch [GPU Viewer]",
 			"dependsOn": [
-				"Compile VS Code Extension",
-				"Build Debug LSP Binary",
-				"Copy Debug LSP Binary to VS Code Extension",
-				"Copy Debug LSP Debug Info to VS Code Extension",
-				"Compile Typst Preview Extension",
-				"Copy Debug LSP Binary to Typst Preview Extension"
+				"VS Code Extension Prelaunch",
+				"Compile Tinymist GPU Viewer Extension",
+				"Build Tinymist GPU Viewer Binary",
+				"Install Tinymist GPU Viewer Binary"
 			],
 			"dependsOrder": "sequence",
 		},
 		{
-			"label": "VS Code Extension Prelaunch [Web]",
+			"label": "VS Code Extension Prelaunch Preview",
 			"dependsOn": [
-				"Compile VS Code Extension [Web]",
+				  "Compile Typst Preview Extension",
+				  "Copy Debug LSP Binary to Typst Preview Extension"
+			],
+			"dependsOrder": "sequence",
+		},
+		{
+			"label": "VS Code Extension Prelaunch [Typst Preview NG]",
+			"dependsOn": [
+				"VS Code Extension Prelaunch [Release]",
+				"Compile Typst Preview NG Extension"
 			],
 			"dependsOrder": "sequence",
 		},
@@ -71,24 +90,67 @@
 			"group": "build",
 		},
 		{
-			"label": "Generate Typst Preview Extension Bundle",
+			"label": "Compile Typst Preview NG Extension",
 			"type": "npm",
-			"script": "package",
-			"path": "contrib/typst-preview/editors/vscode",
+			"script": "compile",
+			"path": "contrib/typst-preview-ng/editors/vscode",
 			"group": "build",
 		},
 		{
-			"label": "Build Debug LSP Binary",
+			"label": "Compile Tinymist GPU Viewer Extension",
+			"type": "npm",
+			"script": "compile",
+			"path": "contrib/tinymist-gpu-viewer/editors/vscode",
+			"group": "build",
+		},
+		{
+			"label": "Build Tinymist GPU Viewer Binary",
 			"type": "cargo",
 			"command": "build",
 			"args": [
 				"--bin",
-				"tinymist"
+				"tinymist-viewer"
 			],
 			"problemMatcher": [
 				"$rustc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Install Tinymist GPU Viewer Binary",
+			"type": "shell",
+			"windows": {
+				"command": "powershell",
+				"args": [
+					"-NoProfile",
+					"-ExecutionPolicy",
+					"Bypass",
+					"-Command",
+					"New-Item -ItemType Directory -Force -Path \"${workspaceFolder}\\contrib\\tinymist-gpu-viewer\\editors\\vscode\\bin\" | Out-Null; Copy-Item -Force -Path \"${workspaceFolder}\\target\\debug\\tinymist-viewer.exe\" -Destination \"${workspaceFolder}\\contrib\\tinymist-gpu-viewer\\editors\\vscode\\bin\\tinymist-viewer.exe\""
+				]
+			},
+			"linux": {
+				"command": "sh",
+				"args": [
+					"-c",
+					"mkdir -p \"${workspaceFolder}/contrib/tinymist-gpu-viewer/editors/vscode/bin\" && cp \"${workspaceFolder}/target/debug/tinymist-viewer\" \"${workspaceFolder}/contrib/tinymist-gpu-viewer/editors/vscode/bin/tinymist-viewer\""
+				]
+			},
+			"osx": {
+				"command": "sh",
+				"args": [
+					"-c",
+					"mkdir -p \"${workspaceFolder}/contrib/tinymist-gpu-viewer/editors/vscode/bin\" && cp \"${workspaceFolder}/target/debug/tinymist-viewer\" \"${workspaceFolder}/contrib/tinymist-gpu-viewer/editors/vscode/bin/tinymist-viewer\""
+				]
+			},
+			"group": "build"
+		},
+		{
+			"label": "Generate Typst Preview Extension Bundle",
+			"type": "npm",
+			"script": "package",
+			"path": "contrib/typst-preview/editors/vscode",
+			"group": "build",
 		},
 		{
 			"label": "Build Release LSP Binary",
@@ -103,50 +165,6 @@
 				"$rustc"
 			],
 			"group": "build"
-		},
-		{
-			"label": "Copy Debug LSP Binary to VS Code Extension",
-			"type": "shell",
-			"windows": {
-				"command": "cp",
-				"args": [
-					"${workspaceFolder}\\target\\debug\\tinymist.exe",
-					"${workspaceFolder}\\editors\\vscode\\out\\"
-				]
-			},
-			"linux": {
-				"command": "cp",
-				"args": [
-					"${workspaceFolder}/target/debug/tinymist",
-					"${workspaceFolder}/editors/vscode/out/"
-				]
-			},
-			"osx": {
-				"command": "cp",
-				"args": [
-					"${workspaceFolder}/target/debug/tinymist",
-					"${workspaceFolder}/editors/vscode/out/"
-				]
-			}
-		},
-		{
-			"label": "Copy Debug LSP Debug Info to VS Code Extension",
-			"type": "shell",
-			"windows": {
-				"command": "cp",
-				"args": [
-					"${workspaceFolder}\\target\\debug\\tinymist.pdb",
-					"${workspaceFolder}\\editors\\vscode\\out\\"
-				]
-			},
-			"linux": {
-				"command": "true",
-				"args": []
-			},
-			"osx": {
-				"command": "true",
-				"args": []
-			}
 		},
 		{
 			"label": "Copy Release LSP Binary to VS Code Extension",

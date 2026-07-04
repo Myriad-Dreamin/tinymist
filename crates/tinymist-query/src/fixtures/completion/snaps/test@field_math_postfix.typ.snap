@@ -9,6 +9,34 @@ input_file: crates/tinymist-query/src/fixtures/completion/field_math_postfix.typ
   "isIncomplete": false,
   "items": [
    {
+    "additionalTextEdits": [
+     {
+      "newText": "abs(",
+      "range": {
+       "end": {
+        "character": 2,
+        "line": 3
+       },
+       "start": {
+        "character": 2,
+        "line": 3
+       }
+      }
+     },
+     {
+      "newText": ")",
+      "range": {
+       "end": {
+        "character": 8,
+        "line": 3
+       },
+       "start": {
+        "character": 7,
+        "line": 3
+       }
+      }
+     }
+    ],
     "command": {
      "command": "tinymist.triggerSuggestAndParameterHints",
      "title": ""

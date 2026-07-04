@@ -5,7 +5,7 @@
 // en = "An integrated language service for Typst"
 // zh-CN = "Typst 的集成语言服务"
 
-import * as fs from "fs";
+import * as fs from "fs/promises";
 import * as path from "path";
 
 const projectRoot = path.resolve(import.meta.dirname, "..");
@@ -16,14 +16,17 @@ const projectRoot = path.resolve(import.meta.dirname, "..");
  * @param {string[]} inputs
  * @returns
  */
-function translate(output, kind, inputs) {
-  const lines = inputs.flatMap((input) =>
-    fs
-      .readFileSync(path.resolve(projectRoot, input), "utf-8")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => !line.startsWith("#") && line.length > 0),
-  );
+async function translate(output, kind, inputs) {
+  const lines = (
+    await Promise.all(
+      inputs.map(async (input) =>
+        (await fs.readFile(path.resolve(projectRoot, input), "utf-8"))
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => !line.startsWith("#") && line.length > 0),
+      ),
+    )
+  ).flat();
 
   const translations = {};
   let key = "";
@@ -53,23 +56,23 @@ function translate(output, kind, inputs) {
   const langRest = langs.filter((lang) => lang !== "en");
 
   const langDir = path.resolve(projectRoot, output);
-  fs.mkdirSync(langDir, { recursive: true });
+  await fs.mkdir(langDir, { recursive: true });
 
   const langEnPath = `${langDir}/${kind}.json`;
   const langEnData = translations["en"];
-  fs.writeFileSync(langEnPath, JSON.stringify(langEnData, null, 2));
+  await fs.writeFile(langEnPath, JSON.stringify(langEnData, null, 2));
 
   for (let lang of langRest) {
     const langPath = `${langDir}/${kind}.${lang}.json`;
     const langData = translations[lang];
     const langPack = JSON.stringify(langData, null, 2);
 
-    fs.writeFileSync(langPath, langPack);
+    await fs.writeFile(langPath, langPack);
 
     // alias zh-cn
     if (kind === "bundle.l10n" && lang === "zh") {
       const langZhCNPath = `${langDir}/${kind}.zh-cn.json`;
-      fs.writeFileSync(langZhCNPath, langPack);
+      await fs.writeFile(langZhCNPath, langPack);
     }
   }
 
@@ -77,12 +80,14 @@ function translate(output, kind, inputs) {
 }
 
 // todo: verify using rust
-function genVscodeExt() {
-  const translations = translate("editors/vscode", "package.nls", ["locales/tinymist-vscode.toml"]);
-  translate("editors/vscode/l10n", "bundle.l10n", ["locales/tinymist-vscode-rt.toml"]);
+export async function genVscodeExt() {
+  const translations = await translate("editors/vscode", "package.nls", [
+    "locales/tinymist-vscode.toml",
+  ]);
+  await translate("editors/vscode/l10n", "bundle.l10n", ["locales/tinymist-vscode-rt.toml"]);
 
   const pat = /\%(extension\.tinymist\..*?)\%/g;
-  const data = fs.readFileSync(path.resolve(projectRoot, "editors/vscode/package.json"), "utf-8");
+  const data = await fs.readFile(path.resolve(projectRoot, "editors/vscode/package.json"), "utf-8");
   const matchAll = data.matchAll(pat);
   const used = Array.from(matchAll).map((m) => m[1]);
   used.push("description");
@@ -100,5 +105,3 @@ function genVscodeExt() {
 
   return translations;
 }
-
-export const vscodeExtTranslations = genVscodeExt();

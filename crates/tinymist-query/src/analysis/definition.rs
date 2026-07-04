@@ -1,10 +1,10 @@
 //! Linked definition analysis
 
-use tinymist_std::typst::TypstDocument;
 use typst::foundations::{Label, Selector, Type};
 use typst::introspection::Introspector;
+use typst_shim::syntax::source_range;
 
-use super::{prelude::*, InsTy, SharedContext};
+use super::{InsTy, SharedContext, prelude::*};
 use crate::syntax::{Decl, DeclExpr, Expr, ExprInfo, SyntaxClass, VarClass};
 use crate::ty::DocSource;
 
@@ -52,6 +52,10 @@ impl Definition {
     pub(crate) fn value(&self) -> Option<Value> {
         self.term.as_ref()?.value()
     }
+
+    pub(crate) fn from_value(value: Value, name: impl FnOnce() -> Option<StrRef>) -> Option<Self> {
+        value_to_def(value, name)
+    }
 }
 
 trait HasNameRange {
@@ -69,22 +73,17 @@ impl HasNameRange for Decl {
             return None;
         }
 
-        let span = self.span();
-        if let Some(range) = span.range() {
-            return Some(range.clone());
-        }
-
         let src = ctx.source_by_id(self.file_id()?).ok()?;
-        src.range(span)
+        source_range(&src, self.span())
     }
 }
 
 // todo: field definition
 /// Finds the definition of a symbol.
+#[typst_macros::time(span = syntax.node().span())]
 pub fn definition(
     ctx: &Arc<SharedContext>,
     source: &Source,
-    document: Option<&TypstDocument>,
     syntax: SyntaxClass,
 ) -> Option<Definition> {
     match syntax {
@@ -109,7 +108,7 @@ pub fn definition(
                 _ => return None,
             };
 
-            let introspector = &document?.introspector();
+            let introspector = ctx.success_doc()?.introspector();
             bib_definition(ctx, introspector, name)
                 .or_else(|| ref_definition(introspector, name, ref_expr))
         }
@@ -121,6 +120,7 @@ pub fn definition(
             node: _,
             suffix_colon: true,
         }
+        | SyntaxClass::At { node: _ }
         | SyntaxClass::Normal(..) => None,
     }
 }
@@ -172,7 +172,7 @@ fn field_definition(ctx: &Arc<SharedContext>, node: ast::FieldAccess) -> Option<
 
 fn bib_definition(
     ctx: &Arc<SharedContext>,
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     key: &str,
 ) -> Option<Definition> {
     let bib_info = ctx.analyze_bib(introspector)?;
@@ -191,17 +191,15 @@ fn bib_definition(
 }
 
 fn ref_definition(
-    introspector: &Introspector,
+    introspector: &dyn Introspector,
     name: &str,
     ref_expr: ast::Expr,
 ) -> Option<Definition> {
-    let label = Label::construct(name.into());
-    let sel = Selector::Label(label);
-
     // if it is a label, we put the selection range to itself
     let (decl, ty) = match ref_expr {
         ast::Expr::Label(label) => (Decl::label(name, label.span()), None),
         ast::Expr::Ref(..) => {
+            let sel = Selector::Label(Label::construct(name.into()).ok()?);
             let elem = introspector.query_first(&sel)?;
             let span = elem.labelled_at();
             let decl = if !span.is_detached() {
@@ -257,7 +255,7 @@ impl CallConvention {
 pub fn resolve_call_target(ctx: &Arc<SharedContext>, node: &SyntaxNode) -> Option<CallConvention> {
     let callee = (|| {
         let source = ctx.source_by_id(node.span().id()?).ok()?;
-        let def = ctx.def_of_span(&source, None, node.span())?;
+        let def = ctx.def_of_span(&source, node.span())?;
         let func_ptr = match def.term.and_then(|val| val.value()) {
             Some(Value::Func(func)) => Some(func),
             Some(Value::Type(ty)) => ty.constructor().ok(),
@@ -309,10 +307,10 @@ fn is_same_native_func(x: Option<&Func>, y: &Func) -> bool {
         return false;
     };
 
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     match (x.inner(), y.inner()) {
-        (Repr::Native(x), Repr::Native(y)) => x == y,
-        (Repr::Element(x), Repr::Element(y)) => x == y,
+        (FuncInner::Native(x), FuncInner::Native(y)) => x == y,
+        (FuncInner::Element(x), FuncInner::Element(y)) => x == y,
         _ => false,
     }
 }
@@ -335,7 +333,7 @@ static WHERE_FUNC: LazyLock<Option<&'static Func>> = LazyLock::new(|| {
     Some(func)
 });
 
-fn value_to_def(value: Value, name: impl FnOnce() -> Option<Interned<str>>) -> Option<Definition> {
+fn value_to_def(value: Value, name: impl FnOnce() -> Option<StrRef>) -> Option<Definition> {
     let val = Ty::Value(InsTy::new(value.clone()));
     Some(match value {
         Value::Func(func) => {

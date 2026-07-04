@@ -1,5 +1,5 @@
-#import "@preview/shiroa:0.2.2": *
-#import "/typ/templates/page.typ": project, part-style, heading-sizes, main-color
+#import "@preview/shiroa:0.3.1": *
+#import "/typ/templates/page.typ": heading-sizes, main-color, part-style, project
 #import "tinymist-version.typ": tinymist-package
 
 #let _page-project = project
@@ -8,7 +8,7 @@
 
 #let resolve-inclusion(inc) = _resolve-inclusion-state.update(it => inc)
 
-#let project(title: "", authors: (), spec: "", content) = {
+#let project(title: "", authors: (), spec: "", body) = {
   // Set document metadata early
   set document(
     author: authors,
@@ -16,7 +16,7 @@
   )
 
   // Inherit from gh-pages
-  show: _page-project
+  show: _page-project.with(title: title)
 
   if title != "" {
     set text(size: heading-sizes.at(1))
@@ -64,7 +64,11 @@
       show link: set text(fill: main-color)
 
       if has-part == none {
-        outline-counter.step(level: it.level + 1)
+        if it.element.numbering == none {
+          outline-counter.step(level: it.level + 1)
+        } else {
+          outline-counter.step(level: it.level + 2)
+        }
         layout(shape => {
           context {
             let lnk = link(it.element.location(), [#outline-counter.display(outline-numbering) #it.element.body])
@@ -86,10 +90,10 @@
     outline(depth: 1)
   }
 
+  body
+
   context {
     let inc = _resolve-inclusion-state.final()
-    external-book(spec: inc(spec))
-
     let mt = book-meta-state.final()
     let styles = (inc: inc, part: part-style, chapter: it => it)
 
@@ -97,6 +101,4 @@
       mt.summary.map(it => visit-summary(it, styles)).sum()
     }
   }
-
-  content
 }

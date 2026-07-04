@@ -50,10 +50,7 @@ fn clone(url: &str, dst: &Path) -> io::Result<()> {
     cmd.arg("clone").arg(url).arg(dst);
     let status = cmd.status()?;
     if !status.success() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("git clone failed: {status}"),
-        ));
+        return Err(io::Error::other(format!("git clone failed: {status}")));
     }
     Ok(())
 }

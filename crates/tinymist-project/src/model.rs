@@ -1,9 +1,9 @@
 use std::hash::Hash;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use ecow::EcoVec;
 use tinymist_std::error::prelude::*;
-use tinymist_std::{bail, ImmutPath};
+use tinymist_std::{ImmutPath, bail};
 use typst::diag::EcoString;
 
 pub use task::*;
@@ -53,6 +53,9 @@ impl LockFileCompat {
 /// A lock file storing project information.
 #[derive(Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct LockFile {
+    /// The directory where stores the lock file.
+    #[serde(skip)]
+    pub lock_dir: Option<ImmutPath>,
     // The lock file version.
     // version: String,
     /// The project's document (input).
@@ -72,6 +75,9 @@ pub struct LockFile {
 pub struct ProjectInput {
     /// The project's ID.
     pub id: Id,
+    /// The cwd of the project when relative paths will be resolved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lock_dir: Option<PathBuf>,
     /// The path to the root directory of the project.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub root: Option<ResourcePath>,
@@ -91,6 +97,19 @@ pub struct ProjectInput {
     /// The project's package cache path.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package_cache_path: Option<ResourcePath>,
+}
+
+impl ProjectInput {
+    /// Returns a new project input relative to the provided lock directory.
+    pub fn relative_to(&self, that: &Path) -> Self {
+        if let Some(lock_dir) = &self.lock_dir
+            && lock_dir == that
+        {
+            return self.clone();
+        }
+
+        todo!()
+    }
 }
 
 /// A project route specifier.
@@ -154,9 +173,11 @@ mod tests {
 
     #[test]
     fn test_substitute_path() {
-        let root = Path::new("/root");
-        let entry =
-            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
+        let root = Path::new("/dummy-root");
+        let entry = EntryState::new_rooted(
+            root.into(),
+            Some(VirtualPath::new("/dir1/dir2/file.txt").unwrap()),
+        );
 
         assert_eq!(
             PathPattern::new("/substitute/$dir/$name").substitute(&entry),

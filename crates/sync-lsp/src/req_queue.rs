@@ -55,15 +55,26 @@ impl<I, O> ReqQueue<I, O> {
 }
 
 /// The incoming request queue.
-#[derive(Debug)]
 pub struct Incoming<I> {
     pending: HashMap<RequestId, I>,
+}
+
+impl<I> fmt::Debug for Incoming<I> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Incoming")?;
+        f.debug_list().entries(self.pending.keys()).finish()
+    }
 }
 
 impl<I> Incoming<I> {
     /// Registers a request with the given ID and data.
     pub fn register(&mut self, id: RequestId, data: I) {
         self.pending.insert(id, data);
+    }
+
+    /// Returns an iterator over the pending requests.
+    pub fn pending(&self) -> impl Iterator<Item = (&RequestId, &I)> {
+        self.pending.iter()
     }
 
     /// Checks if there are *any* pending requests.
@@ -103,10 +114,16 @@ impl<I> Incoming<I> {
 /// The outgoing request queue.
 ///
 /// It holds the next request ID and the pending requests.
-#[derive(Debug)]
 pub struct Outgoing<O> {
     next_id: i32,
     pending: HashMap<RequestId, O>,
+}
+
+impl<I> fmt::Debug for Outgoing<I> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Outgoing")?;
+        f.debug_list().entries(self.pending.keys()).finish()
+    }
 }
 
 impl<O> Outgoing<O> {

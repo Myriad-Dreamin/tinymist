@@ -102,10 +102,10 @@ impl Write for FileLock {
 
 impl Drop for FileLock {
     fn drop(&mut self) {
-        if let Some(f) = self.f.take() {
-            if let Err(e) = unlock(&f) {
-                log::warn!("failed to release lock: {e:?}");
-            }
+        if let Some(f) = self.f.take()
+            && let Err(e) = unlock(&f)
+        {
+            log::warn!("failed to release lock: {e:?}");
         }
     }
 }
@@ -503,7 +503,7 @@ mod sys {
     use windows_sys::Win32::Foundation::HANDLE;
     use windows_sys::Win32::Foundation::{ERROR_INVALID_FUNCTION, ERROR_LOCK_VIOLATION};
     use windows_sys::Win32::Storage::FileSystem::{
-        LockFileEx, UnlockFile, LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY,
+        LOCKFILE_EXCLUSIVE_LOCK, LOCKFILE_FAIL_IMMEDIATELY, LockFileEx, UnlockFile,
     };
 
     pub(super) fn lock_shared(file: &File) -> Result<()> {
@@ -560,5 +560,39 @@ mod sys {
                 Ok(())
             }
         }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+mod sys {
+    use std::fs::File;
+    use std::io::{Error, Result};
+
+    pub(super) fn lock_shared(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn lock_exclusive(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn try_lock_shared(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn try_lock_exclusive(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn unlock(_file: &File) -> Result<()> {
+        Ok(())
+    }
+
+    pub(super) fn error_contended(_err: &Error) -> bool {
+        false
+    }
+
+    pub(super) fn error_unsupported(_err: &Error) -> bool {
+        false
     }
 }

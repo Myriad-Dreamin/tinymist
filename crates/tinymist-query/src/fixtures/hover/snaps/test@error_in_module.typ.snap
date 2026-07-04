@@ -1,0 +1,46 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/error_in_module.typ
+---
+Range: 5:20:5:26
+
+```typc
+let my-fun(
+  note: any,
+  mode: str = "typ",
+  setting: (any) => any = Closure(..),
+) = none;
+```
+
+
+======
+
+
+Good doc
+
+# Positional Parameters
+
+## note
+
+```typc
+type: 
+```
+
+
+
+# Named Parameters
+
+## mode
+
+```typc
+type: "typ"
+```
+
+
+
+## setting (named)
+
+```typc
+type: (any) => any
+```

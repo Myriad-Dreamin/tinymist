@@ -1,3 +1,4 @@
+import * as path from "path";
 import * as vscode from "vscode";
 
 import { vscodeVariables } from "./vscode-variables";
@@ -7,6 +8,19 @@ export interface TinymistConfig {
   typingContinueCommentsOnNewline?: boolean;
   serverPath?: string;
 }
+
+export const HTML_PREVIEWER_PREFIX = "html:";
+
+const INJECTED_CLIENT_OPTION_CONFIG_KEYS = [
+  "triggerSuggest",
+  "triggerParameterHints",
+  "triggerSuggestAndParameterHints",
+  "supportHtmlInMarkdown",
+  "supportClientCodelens",
+  "supportExtendedCodeAction",
+  "customizedShowDocument",
+  "delegateFsRequests",
+];
 
 export function loadTinymistConfig(): TinymistConfig {
   let config: Record<string, any> = JSON.parse(
@@ -21,7 +35,35 @@ export function loadTinymistConfig(): TinymistConfig {
   for (let i = 0; i < keys.length; i++) {
     config[keys[i]] = values[i];
   }
+  if (typeof config.previewer === "string") {
+    config.previewer = resolvePreviewerValue(config.previewer);
+  }
   return config;
+}
+
+export function patchInjectedClientOptionsInConfig(
+  keys: (string | undefined)[],
+  values: unknown[],
+  config: TinymistConfig,
+): unknown[] {
+  return values.map((value, i) => {
+    const section = keys[i];
+    if (section === "tinymist" && isObjectRecord(value)) {
+      return patchInjectedClientOptionsObject(value, config);
+    }
+
+    const key = tinymistConfigKey(section);
+    if (
+      key &&
+      INJECTED_CLIENT_OPTION_CONFIG_KEYS.includes(key) &&
+      (value === undefined || value === null) &&
+      Object.prototype.hasOwnProperty.call(config, key)
+    ) {
+      return config[key];
+    }
+
+    return value;
+  });
 }
 
 const STR_VARIABLES = [
@@ -52,11 +94,7 @@ export function substVscodeVarsInConfig(
       return substVscodeVars(value as string);
     }
     if (STR_ARR_VARIABLES.includes(k)) {
-      const paths = value as string[];
-      if (!paths) {
-        return undefined;
-      }
-      return paths.map((path) => substVscodeVars(path));
+      return substFontPaths(value);
     }
     return value;
   });
@@ -72,6 +110,74 @@ function substVscodeVars(str: string | null | undefined): string | undefined {
     console.error("failed to substitute vscode variables", e);
     return str;
   }
+}
+
+export function resolvePreviewerValue(value: string | null | undefined): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (!trimmedValue.startsWith(HTML_PREVIEWER_PREFIX)) {
+    return trimmedValue;
+  }
+
+  const providerPath = trimmedValue.slice(HTML_PREVIEWER_PREFIX.length).trim();
+  const resolvedProviderPath = substVscodeVars(providerPath) ?? providerPath;
+  return `${HTML_PREVIEWER_PREFIX}${
+    resolvedProviderPath ? path.normalize(resolvedProviderPath) : resolvedProviderPath
+  }`;
+}
+
+function substFontPaths(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (!isStringArray(value)) {
+    const invalidFontPathsShape = Array.isArray(value)
+      ? "an array with non-string entries"
+      : typeof value;
+    void vscode.window.showErrorMessage(
+      `Tinymist ignored "tinymist.fontPaths" setting because it must be an array of strings, for example \`["fonts"]\`. Received ${invalidFontPathsShape}.`,
+    );
+    return undefined;
+  }
+  return value.map((path) => substVscodeVars(path) ?? path);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function tinymistConfigKey(section: string | undefined): string | undefined {
+  if (!section) {
+    return undefined;
+  }
+  return section.startsWith("tinymist.") ? section.slice("tinymist.".length) : section;
+}
+
+function patchInjectedClientOptionsObject(
+  value: Record<string, unknown>,
+  config: TinymistConfig,
+): Record<string, unknown> {
+  const next = { ...value };
+  for (const key of INJECTED_CLIENT_OPTION_CONFIG_KEYS) {
+    if (
+      (next[key] === undefined || next[key] === null) &&
+      Object.prototype.hasOwnProperty.call(config, key)
+    ) {
+      next[key] = config[key];
+    }
+  }
+  return next;
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function determineVscodeTheme(): any {

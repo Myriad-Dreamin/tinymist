@@ -1,15 +1,19 @@
 //! Completion by typst specific semantics, like `font`, `package`, `label`, or
 //! `typst::foundations::Value`.
 
+use tinymist_std::time::yyyy_mm_dd;
 use typst::foundations::Symbol;
+use typst::syntax::is_valid_label_literal_id;
 
 use super::*;
 impl CompletionPair<'_, '_, '_> {
     /// Add completions for all font families.
     pub fn font_completions(&mut self) {
         let equation = self.cursor.before_window(25).contains("equation");
-        for (family, iter) in self.worker.world().clone().book().families() {
-            let detail = summarize_font_family(iter);
+        let world = self.worker.world().clone();
+        let book = world.book();
+        for (family, iter) in book.families() {
+            let detail = summarize_font_family(iter.filter_map(|id| book.info(id)));
             if !equation || family.contains("Math") {
                 self.value_completion(
                     None,
@@ -29,30 +33,45 @@ impl CompletionPair<'_, '_, '_> {
     /// Add completions for all available packages.
     pub fn package_completions(&mut self, all_versions: bool) {
         let w = self.worker.world().clone();
-        let mut packages: Vec<_> = w
-            .packages()
-            .iter()
-            .map(|(spec, desc)| (spec, desc.clone()))
-            .collect();
-        // local_packages to references and add them to the packages
-        let local_packages_refs = self.worker.ctx.local_packages();
-        packages.extend(
-            local_packages_refs
-                .iter()
-                .map(|spec| (spec, Some(eco_format!("{} v{}", spec.name, spec.version)))),
-        );
+        // Finds packages that are in `@preview`
+        let mut packages = w.packages().iter().collect_vec();
 
-        packages.sort_by_key(|(spec, _)| (&spec.namespace, &spec.name, Reverse(spec.version)));
+        // Finds packages that are not in `@preview`
+        #[cfg(feature = "local-registry")]
+        let other_packages_refs = self.worker.ctx.non_preview_packages();
+        #[cfg(feature = "local-registry")]
+        packages.extend(other_packages_refs.iter());
+
+        packages.sort_by_key(|entry| {
+            (
+                &entry.namespace,
+                &entry.package.name,
+                Reverse(entry.package.version),
+            )
+        });
         if !all_versions {
-            packages.dedup_by_key(|(spec, _)| (&spec.namespace, &spec.name));
+            packages.dedup_by_key(|entry| (&entry.namespace, &entry.package.name));
         }
-        for (package, description) in packages {
-            self.value_completion(
-                None,
-                &Value::Str(format_str!("{package}")),
-                false,
-                description.as_deref(),
-            );
+        let completion_info = packages
+            .iter()
+            .map(|entry| {
+                let mut docs = String::new();
+                if let Some(desc) = &entry.package.description {
+                    docs.push_str(desc);
+                    docs.push_str("\n\n");
+                }
+                docs.push_str(&format!("Authors: {}\n", entry.package.authors.join(", ")));
+                docs.push_str(&format!("Version: {}\n", entry.package.version));
+                if let Some(updated_at) = &entry.updated_at
+                    && let Ok(formatted) = updated_at.format(&yyyy_mm_dd())
+                {
+                    docs.push_str(&format!("Updated: {formatted}\n"));
+                }
+                (format_str!("{}", entry.spec()), docs)
+            })
+            .collect_vec(); // avoid self borrow
+        for (value, docs) in completion_info {
+            self.value_completion(None, &Value::Str(value), false, Some(&docs));
         }
     }
 
@@ -89,6 +108,67 @@ impl CompletionPair<'_, '_, '_> {
         self.label_completions_(only_citation, false);
     }
 
+    fn label_completion_apply(
+        &mut self,
+        label: &EcoString,
+        open: bool,
+        close: bool,
+    ) -> (EcoString, Option<Vec<EcoTextEdit>>) {
+        if is_valid_label_literal_id(label.as_str()) {
+            return (
+                eco_format!(
+                    "{}{}{}",
+                    if open { "<" } else { "" },
+                    label.as_str(),
+                    if close { ">" } else { "" }
+                ),
+                None,
+            );
+        }
+        let mut edits = vec![];
+
+        let (remove_open, remove_close) = match self.cursor.selected_node() {
+            Some(SelectedNode::Label(node)) => {
+                let range = node.range();
+                let remove_open = node
+                    .leaf_text()
+                    .starts_with('<')
+                    .then_some(range.start..range.start + 1);
+                let remove_close = node
+                    .leaf_text()
+                    .ends_with('>')
+                    .then_some(range.end - 1..range.end);
+                (remove_open, remove_close)
+            }
+            _ => (
+                (self.cursor.from > 0 && self.cursor.text[..self.cursor.from].ends_with('<'))
+                    .then_some(self.cursor.from - 1..self.cursor.from),
+                self.cursor
+                    .after
+                    .starts_with('>')
+                    .then_some(self.cursor.cursor..self.cursor.cursor + 1),
+            ),
+        };
+
+        if let Some(range) = remove_open {
+            edits.push(EcoTextEdit::new(
+                self.cursor.lsp_range_of(range),
+                EcoString::new(),
+            ));
+        }
+        if let Some(range) = remove_close {
+            edits.push(EcoTextEdit::new(
+                self.cursor.lsp_range_of(range),
+                EcoString::new(),
+            ));
+        }
+
+        (
+            eco_format!("label({})", label.as_str().repr()),
+            (!edits.is_empty()).then_some(edits),
+        )
+    }
+
     /// Add completions for labels and references.
     pub fn label_completions_(&mut self, only_citation: bool, ref_label: bool) {
         let Some(document) = self.worker.document else {
@@ -121,14 +201,11 @@ impl CompletionPair<'_, '_, '_> {
                 continue;
             }
             let label: EcoString = label.resolve().as_str().into();
+            let (apply, additional_text_edits) = self.label_completion_apply(&label, open, close);
             let completion = Completion {
                 kind: CompletionKind::Reference,
-                apply: Some(eco_format!(
-                    "{}{}{}",
-                    if open { "<" } else { "" },
-                    label.as_str(),
-                    if close { ">" } else { "" }
-                )),
+                apply: Some(apply),
+                additional_text_edits,
                 label: label.clone(),
                 label_details: label_desc.clone(),
                 filter_text: Some(label.clone()),
@@ -223,16 +300,18 @@ impl CompletionPair<'_, '_, '_> {
             apply = Some(eco_format!("at(\"{label}\")"));
         } else {
             let apply_label = &mut label.as_str();
-            if apply_label.ends_with('"') && self.cursor.after.starts_with('"') {
-                if let Some(trimmed) = apply_label.strip_suffix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.ends_with('"')
+                && self.cursor.after.starts_with('"')
+                && let Some(trimmed) = apply_label.strip_suffix('"')
+            {
+                *apply_label = trimmed;
             }
             let from_before = slice_at(self.cursor.text, 0..self.cursor.from);
-            if apply_label.starts_with('"') && from_before.ends_with('"') {
-                if let Some(trimmed) = apply_label.strip_prefix('"') {
-                    *apply_label = trimmed;
-                }
+            if apply_label.starts_with('"')
+                && from_before.ends_with('"')
+                && let Some(trimmed) = apply_label.strip_prefix('"')
+            {
+                *apply_label = trimmed;
             }
 
             if apply_label.len() != label.len() {
@@ -251,13 +330,13 @@ impl CompletionPair<'_, '_, '_> {
     }
 
     pub fn symbol_completions(&mut self, label: EcoString, symbol: &Symbol) {
-        let ch = symbol.get();
-        let kind = CompletionKind::Symbol(ch);
+        let sym_val = symbol.get();
+        let kind = CompletionKind::Symbol(sym_val.into());
         self.push_completion(Completion {
             kind,
             label: label.clone(),
-            label_details: Some(symbol_label_detail(ch)),
-            detail: Some(symbol_detail(ch)),
+            label_details: Some(symbol_label_detail(sym_val)),
+            detail: Some(symbol_detail(sym_val)),
             ..Completion::default()
         });
 
@@ -269,7 +348,7 @@ impl CompletionPair<'_, '_, '_> {
 
     pub fn symbol_var_completions(&mut self, symbol: &Symbol, prefix: Option<&str>) {
         for modifier in symbol.modifiers() {
-            if let Ok(modified) = symbol.clone().modified(modifier) {
+            if let Ok(modified) = symbol.clone().modified((), modifier) {
                 let label = match &prefix {
                     Some(prefix) => eco_format!("{prefix}.{modifier}"),
                     None => modifier.into(),

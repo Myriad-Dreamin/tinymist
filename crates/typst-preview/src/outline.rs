@@ -4,7 +4,7 @@ use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
 use typst::foundations::{Content, NativeElement, Packed, StyleChain};
-use typst::introspection::Introspector;
+use typst::introspection::{Introspector, PagedPosition};
 use typst::model::HeadingElem;
 use typst::syntax::Span;
 
@@ -22,7 +22,7 @@ pub(crate) struct HeadingNode {
 }
 
 /// Construct the outline for the document.
-pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode>> {
+pub(crate) fn get_outline(introspector: &dyn Introspector) -> Option<Vec<HeadingNode>> {
     let mut tree: Vec<HeadingNode> = vec![];
     // Stores the level of the topmost skipped ancestor of the next bookmarked
     // heading. A skipped heading is a heading with 'bookmarked: false', that
@@ -30,7 +30,7 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
     // Therefore, its next descendant must be added at its level, which is
     // enforced in the manner shown below.
     let mut last_skipped_level = None;
-    let elements = introspector.query(&HeadingElem::elem().select());
+    let elements = introspector.query(&HeadingElem::ELEM.select());
     for elem in elements.iter() {
         let heading = elem.to_packed::<HeadingElem>().unwrap();
         let leaf = HeadingNode::leaf(introspector, heading);
@@ -97,10 +97,13 @@ pub(crate) fn get_outline(introspector: &Introspector) -> Option<Vec<HeadingNode
 }
 
 impl HeadingNode {
-    fn leaf(introspector: &Introspector, element: &Packed<HeadingElem>) -> Self {
+    fn leaf(introspector: &dyn Introspector, element: &Packed<HeadingElem>) -> Self {
         let position = {
             let loc = element.location().unwrap();
-            let pos = introspector.position(loc);
+            let pos = introspector
+                .position(loc)
+                .map(|pos| pos.as_paged_or_default())
+                .unwrap_or(PagedPosition::ORIGIN);
             DocumentPosition {
                 page_no: pos.page.into(),
                 x: pos.point.x.to_pt() as f32,
@@ -113,8 +116,9 @@ impl HeadingNode {
             position,
             // 'bookmarked' set to 'auto' falls back to the value of 'outlined'.
             bookmarked: element
-                .bookmarked(StyleChain::default())
-                .unwrap_or_else(|| element.outlined(StyleChain::default())),
+                .bookmarked
+                .get(StyleChain::default())
+                .unwrap_or_else(|| element.outlined.get(StyleChain::default())),
             body: element.body.clone(),
             span: element.span(),
             children: Vec::new(),
@@ -139,6 +143,7 @@ struct OutlineItem {
     children: Vec<OutlineItem>,
 }
 
+#[typst_macros::time]
 pub fn outline(interner: &mut SpanInternerImpl, document: &TypstDocument) -> Outline {
     let outline = get_outline(document.introspector());
     let mut items = Vec::with_capacity(outline.as_ref().map_or(0, Vec::len));

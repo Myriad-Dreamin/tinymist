@@ -1,0 +1,100 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on ../\" (7..11)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_outside_root.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "base.typ",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "base.typ",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 0
+      },
+      "start": {
+       "character": 7,
+       "line": 0
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "base.typ",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "base.typ",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 0
+      },
+      "start": {
+       "character": 7,
+       "line": 0
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "base.typ",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "base.typ",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 0
+      },
+      "start": {
+       "character": 7,
+       "line": 0
+      }
+     }
+    }
+   }
+  ]
+ },
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "kind": 17,
+    "label": "base.typ",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "base.typ",
+     "range": {
+      "end": {
+       "character": 10,
+       "line": 0
+      },
+      "start": {
+       "character": 7,
+       "line": 0
+      }
+     }
+    }
+   }
+  ]
+ }
+]

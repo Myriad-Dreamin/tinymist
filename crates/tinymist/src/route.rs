@@ -1,6 +1,6 @@
 use std::{path::Path, sync::Arc};
 
-use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, LazyHash};
+use reflexo_typst::{path::unix_slash, typst::prelude::EcoVec, EntryReader, LazyHash};
 use rpds::RedBlackTreeMapSync;
 use tinymist_std::{hash::FxHashMap, ImmutPath};
 use typst::diag::EcoString;
@@ -12,6 +12,7 @@ pub struct ProjectRouteState {
     path_routes: FxHashMap<ImmutPath, RoutePathState>,
 }
 
+#[derive(Debug)]
 pub struct ProjectResolution {
     pub lock_dir: ImmutPath,
     pub project_id: Id,
@@ -24,7 +25,8 @@ impl ProjectRouteState {
     }
 
     pub fn resolve(&mut self, leaf: &ImmutPath) -> Option<ProjectResolution> {
-        for path in std::iter::successors(Some(leaf.as_ref()), |p| p.parent()) {
+        let search_start = lock_search_start(leaf.as_ref())?;
+        for path in std::iter::successors(Some(search_start), |p| p.parent()) {
             if let Some(resolution) = self.resolve_at(path, leaf) {
                 return Some(resolution);
             }
@@ -34,7 +36,7 @@ impl ProjectRouteState {
     }
 
     fn resolve_at(&mut self, lock_dir: &Path, leaf: &Path) -> Option<ProjectResolution> {
-        log::debug!("resolve: {leaf:?} at {lock_dir:?}");
+        log::info!("resolve: {leaf:?} at {lock_dir:?}");
         let (lock_dir, project_id) = match self.path_routes.get_key_value(lock_dir) {
             Some((key, path_route)) => (key.clone(), path_route.routes.get(leaf)?.clone()),
             None => {
@@ -61,7 +63,7 @@ impl ProjectRouteState {
                 new_route.routes = calculate_routes(new_route.lock.route.clone(), &materials);
                 new_route.materials = materials;
 
-                log::debug!("loaded routes at {lock_dir:?}, {:?}", new_route.routes);
+                log::info!("loaded routes at {lock_dir:?}, {:?}", new_route.routes);
                 let project_id = new_route.routes.get(leaf)?.clone();
 
                 self.path_routes.insert(lock_dir.clone(), new_route);
@@ -95,8 +97,10 @@ impl ProjectRouteState {
         snap: &LspCompileSnapshot,
     ) -> Option<()> {
         let path_route = self.path_routes.get_mut(&lock_dir)?;
+        // todo: rootless
+        let root = snap.world.entry_state().root()?;
 
-        let id = Id::from_world(&snap.world)?;
+        let id = Id::from_world(&snap.world, (&root, &lock_dir))?;
         let deps = snap.world.depended_fs_paths();
         let material = ProjectPathMaterial::from_deps(id, deps);
 
@@ -117,7 +121,7 @@ impl ProjectRouteState {
         let lock_data = Arc::new(match LockFile::read(path) {
             Ok(lock) => lock,
             Err(e) => {
-                log::debug!("failed to load lock at {path:?}: {e:?}");
+                log::info!("failed to load lock at {path:?}: {e:?}");
                 return None;
             }
         });
@@ -164,6 +168,14 @@ impl ProjectRouteState {
     }
 }
 
+fn lock_search_start(leaf: &Path) -> Option<&Path> {
+    if leaf.is_dir() {
+        Some(leaf)
+    } else {
+        leaf.parent()
+    }
+}
+
 #[comemo::memoize]
 fn calculate_routes(
     raw_routes: EcoVec<ProjectRoute>,
@@ -192,4 +204,38 @@ struct RoutePathState {
     materials: LazyHash<rpds::RedBlackTreeMapSync<Id, ProjectPathMaterial>>,
     routes: Arc<FxHashMap<ImmutPath, Id>>,
     cache_dir: Option<ImmutPath>,
+}
+
+#[cfg(test)]
+mod tests {
+    use reflexo::path::PathClean;
+
+    use super::*;
+
+    // todo: enable me
+    #[test]
+    #[ignore]
+    fn test_resolve_chapter() {
+        let mut state = ProjectRouteState::default();
+
+        let lock_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/workspaces/book/");
+        let lock_dir = lock_dir.clean();
+
+        let leaf = lock_dir.join("chapters/chapter1.typ").into();
+
+        // Resolve the path
+        let resolution = state.resolve(&leaf);
+        assert!(resolution.is_some(), "Resolution should not be None");
+        let resolution = resolution.unwrap();
+        assert_eq!(
+            resolution.lock_dir,
+            ImmutPath::from(lock_dir),
+            "Lock directory should match"
+        );
+        assert_eq!(
+            resolution.project_id,
+            Id::new("file:main.typ".to_owned()),
+            "Project ID should match"
+        );
+    }
 }

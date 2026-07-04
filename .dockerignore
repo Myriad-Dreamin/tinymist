@@ -1,0 +1,10 @@
+# Ignored for `Dockerfile` build tinymist cli
+target
+node_modules
+editors
+tools
+refs
+local
+syntaxes
+docs
+contrib

@@ -4,42 +4,68 @@ use typst::syntax::FileId;
 use super::BoundChecker;
 use crate::{syntax::Decl, ty::prelude::*};
 
+/// A type that represents the interface of a type.
 #[derive(Debug, Clone, Copy)]
 pub enum Iface<'a> {
+    /// An array type.
     Array(&'a Interned<Ty>),
+    /// A tuple type.
     Tuple(&'a Interned<Vec<Ty>>),
+    /// A dictionary type.
     Dict(&'a Interned<RecordTy>),
+    /// A content type.
     Content {
+        /// The element type.
         val: &'a typst::foundations::Element,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A type type.
     TypeType {
+        /// The type type.
         val: &'a typst::foundations::Type,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A type.
     Type {
+        /// The type.
         val: &'a typst::foundations::Type,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A function type.
     Func {
+        /// The function.
         val: &'a typst::foundations::Func,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A value type.
     Value {
+        /// The value.
         val: &'a Dict,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A module type.
     Module {
+        /// The module.
         val: FileId,
+        /// The original type.
         at: &'a Ty,
     },
+    /// A module value type.
     ModuleVal {
+        /// The module value.
         val: &'a Module,
+        /// The original type.
         at: &'a Ty,
     },
 }
 
 impl Iface<'_> {
+    /// Converts the interface to a type.
     pub fn to_type(self) -> Ty {
         match self {
             Iface::Array(ty) => Ty::Array(ty.clone()),
@@ -55,7 +81,7 @@ impl Iface<'_> {
         }
     }
 
-    // IfaceShape { iface }
+    /// Selects the given key from the interface.
     pub fn select(self, ctx: &mut impl TyCtxMut, key: &StrRef) -> Option<Ty> {
         crate::log_debug_ct!("iface shape: {self:?}");
 
@@ -77,6 +103,7 @@ impl Iface<'_> {
     }
 }
 
+/// Selects the given key from the given scope.
 fn select_scope(scope: Option<&Scope>, key: &str) -> Option<Ty> {
     let scope = scope?;
     let sub = scope.get(key)?;
@@ -84,12 +111,14 @@ fn select_scope(scope: Option<&Scope>, key: &str) -> Option<Ty> {
     Some(Ty::Value(InsTy::new_at(sub.read().clone(), sub_span)))
 }
 
+/// A trait to check the interface of a type.
 pub trait IfaceChecker: TyCtx {
+    /// Checks the interface of the given type.
     fn check(&mut self, iface: Iface, ctx: &mut IfaceCheckContext, pol: bool) -> Option<()>;
 }
 
 impl Ty {
-    /// Iterate over the signatures of the given type.
+    /// Iterates over the signatures of the given type.
     pub fn iface_surface(
         &self,
         pol: bool,
@@ -106,10 +135,13 @@ impl Ty {
     }
 }
 
+/// A context to check the interface of a type.
 pub struct IfaceCheckContext {
+    /// The arguments of the function.
     pub args: Vec<Interned<SigTy>>,
 }
 
+/// A driver to check the interface of a type.
 #[derive(BindTyCtx)]
 #[bind(checker)]
 pub struct IfaceCheckDriver<'a> {
@@ -124,18 +156,22 @@ impl BoundChecker for IfaceCheckDriver<'_> {
 }
 
 impl IfaceCheckDriver<'_> {
+    /// Determines whether to check the array as an interface.
     fn array_as_iface(&self) -> bool {
         true
     }
 
+    /// Determines whether to check the dictionary as an interface.
     fn dict_as_iface(&self) -> bool {
         true
     }
 
+    /// Determines whether to check the value as an interface.
     fn value_as_iface(&self) -> bool {
         true
     }
 
+    /// Checks the interface of the given type.
     fn ty(&mut self, at: &Ty, pol: bool) {
         crate::log_debug_ct!("check iface ty: {at:?}");
 

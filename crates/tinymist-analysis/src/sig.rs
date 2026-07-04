@@ -4,12 +4,13 @@ use core::fmt;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use ecow::{eco_format, eco_vec, EcoString, EcoVec};
-use typst::foundations::{Closure, Func};
+use ecow::{EcoVec, eco_format, eco_vec};
+use typst::foundations::{Closure, ClosureNode, Func};
+use typst::syntax::ast;
 use typst::syntax::ast::AstNode;
-use typst::syntax::{ast, SyntaxKind};
 use typst::utils::LazyHash;
 
+use crate::docs::DocText;
 // use super::{BoundChecker, Definition};
 use crate::ty::{InsTy, ParamTy, SigTy, StrRef, Ty};
 use crate::ty::{Interned, ParamAttrs};
@@ -44,16 +45,14 @@ impl Signature {
 
     /// Returns the all parameters of the signature.
     pub fn params(&self) -> impl Iterator<Item = (&Interned<ParamTy>, Option<&Ty>)> {
-        let primary = self.primary().params();
         // todo: with stack
-        primary
+        self.primary().params()
     }
 
     /// Returns the type of the signature.
     pub fn type_sig(&self) -> Interned<SigTy> {
-        let primary = self.primary().sig_ty.clone();
         // todo: with stack
-        primary
+        self.primary().sig_ty.clone()
     }
 
     /// Returns the shift applied to the signature.
@@ -73,7 +72,7 @@ impl Signature {
 #[derive(Debug, Clone)]
 pub struct PrimarySignature {
     /// The documentation of the function
-    pub docs: Option<EcoString>,
+    pub docs: Option<DocText>,
     /// The documentation of the parameter.
     pub param_specs: Vec<Interned<ParamTy>>,
     /// Whether the function has fill, stroke, or size parameters.
@@ -166,10 +165,10 @@ pub struct PartialSignature {
 /// Gets the signature of a function.
 #[comemo::memoize]
 pub fn func_signature(func: Func) -> Signature {
-    use typst::foundations::func::Repr;
+    use typst::foundations::FuncInner;
     let mut with_stack = eco_vec![];
     let mut func = func;
-    while let Repr::With(with) = func.inner() {
+    while let FuncInner::With(with) = func.inner() {
         let (inner, args) = with.as_ref();
         with_stack.push(ArgsInfo {
             items: args
@@ -219,24 +218,30 @@ pub fn func_signature(func: Func) -> Signature {
         }
     };
 
-    let ret_ty = match func.inner() {
-        Repr::With(..) => unreachable!(),
-        Repr::Closure(closure) => {
+    let (docs, ret_ty) = match func.inner() {
+        FuncInner::With(..) => unreachable!(),
+        FuncInner::Closure(closure) => {
             analyze_closure_signature(closure.clone(), &mut add_param);
-            None
+            (func.docs().map(|docs| DocText::plain(docs.into())), None)
         }
-        Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
-            for param in func.params().unwrap_or_default() {
+        FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
+            for param in func.params() {
+                let name = param.name().unwrap_or_default();
                 add_param(Interned::new(ParamTy {
-                    name: param.name.into(),
-                    docs: Some(param.docs.into()),
-                    default: param.default.map(|default| truncated_repr(&default())),
-                    ty: Ty::from_param_site(&func, param),
-                    attrs: param.into(),
+                    name: name.into(),
+                    docs: param
+                        .to_native()
+                        .map(|native| DocText::official(native.docs.into())),
+                    default: param.default().map(|default| truncated_repr(&default)),
+                    ty: Ty::from_param_site(&func, &param),
+                    attrs: (&param).into(),
                 }));
             }
 
-            func.returns().map(|r| Ty::from_return_site(&func, r))
+            (
+                func.docs().map(|docs| DocText::official(docs.into())),
+                func.returns().map(|r| Ty::from_return_site(&func, r)),
+            )
         }
     };
 
@@ -253,7 +258,7 @@ pub fn func_signature(func: Func) -> Signature {
     }
 
     let signature = Arc::new(PrimarySignature {
-        docs: func.docs().map(From::from),
+        docs,
         param_specs,
         has_fill_or_size_or_stroke,
         sig_ty: sig_ty.into(),
@@ -276,11 +281,9 @@ fn analyze_closure_signature(
     closure: Arc<LazyHash<Closure>>,
     add_param: &mut impl FnMut(Interned<ParamTy>),
 ) {
-    log::trace!("closure signature for: {:?}", closure.node.kind());
-
     let closure = &closure.node;
-    let closure_ast = match closure.kind() {
-        SyntaxKind::Closure => closure.cast::<ast::Closure>().unwrap(),
+    let closure_ast = match closure {
+        ClosureNode::Closure(node) => node.cast::<ast::Closure>().unwrap(),
         _ => return,
     };
 
@@ -298,10 +301,10 @@ fn analyze_closure_signature(
             }
             // todo: pattern
             ast::Param::Named(named) => {
-                let default = unwrap_parens(named.expr()).to_untyped().clone().into_text();
+                let default = unwrap_parens(named.expr()).to_untyped().clone().full_text();
                 add_param(Interned::new(ParamTy {
                     name: named.name().get().into(),
-                    docs: Some(eco_format!("Default value: {default}")),
+                    docs: Some(DocText::plain(eco_format!("Default value: {default}"))),
                     default: Some(default),
                     ty: Ty::Any,
                     attrs: ParamAttrs::named(),
@@ -349,7 +352,7 @@ impl fmt::Display for PatternDisplay<'_> {
                             f,
                             "{}: {}",
                             named.name().as_str(),
-                            unwrap_parens(named.expr()).to_untyped().text()
+                            unwrap_parens(named.expr()).to_untyped().full_text()
                         )?,
                         ast::DestructuringItem::Spread(spread) => write!(
                             f,

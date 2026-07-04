@@ -2,7 +2,9 @@
 
 pub use cov::CoverageResult;
 pub use debugger::{
-    set_debug_session, with_debug_session, BreakpointKind, DebugSession, DebugSessionHandler,
+    BreakpointKind, DebugSession, DebugSessionHandler, ResolvedSourceBreakpoint, SourceBreakpoint,
+    SourceBreakpointResolution, set_debug_function_breakpoints, set_debug_session,
+    set_debug_source_breakpoints, with_debug_session,
 };
 
 mod cov;
@@ -16,21 +18,21 @@ use debugger::BreakpointInstr;
 use parking_lot::Mutex;
 use tinymist_std::{error::prelude::*, hash::FxHashMap};
 use tinymist_world::package::PackageSpec;
-use tinymist_world::{print_diagnostics, CompilerFeat, CompilerWorld};
+use tinymist_world::{CompilerFeat, CompilerWorld, print_diagnostics};
+use typst::Library;
 use typst::diag::EcoString;
 use typst::syntax::package::PackageVersion;
 use typst::utils::LazyHash;
-use typst::Library;
 
 use cov::*;
 use instrument::InstrumentWorld;
 
 /// Collects the coverage of a single execution.
-pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
+pub fn collect_coverage<D: typst::model::Document + typst::foundations::Output, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
     let (cov, result) = with_cov(base, |instr| {
-        if let Err(e) = typst::compile::<D>(&instr).output {
+        if let Err(e) = typst_shim::compile_opt::<D>(&instr).output {
             print_diagnostics(instr, e.iter(), tinymist_world::DiagnosticFormat::Human)
                 .context_ut("failed to print diagnostics")?;
             bail!("");

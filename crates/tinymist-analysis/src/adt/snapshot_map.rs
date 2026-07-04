@@ -4,7 +4,6 @@
 //!
 //! [rustc_data_structures::snapshot_map]: https://github.com/rust-lang/rust/blob/master/compiler/rustc_data_structures/src/snapshot_map/mod.rs
 
-#![allow(missing_docs)]
 #![allow(unused)]
 
 use ena::undo_log::{Rollback, Snapshots, UndoLogs, VecLog};

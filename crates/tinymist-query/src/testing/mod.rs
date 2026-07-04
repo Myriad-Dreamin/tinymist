@@ -6,12 +6,13 @@ use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::vfs::FileId;
 use typst::{
+    World,
     foundations::{Func, Label, Module, Selector, Value},
     introspection::MetadataElem,
     syntax::Source,
     utils::PicoStr,
-    World,
 };
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 use crate::LocalContext;
 
@@ -86,9 +87,9 @@ pub struct TestCase {
 }
 
 /// Extracts the test suites in the document
-pub fn test_suites(ctx: &mut LocalContext, doc: &TypstDocument) -> Result<TestSuites> {
-    let main_id = ctx.world.main();
-    let main_workspace = main_id.package();
+pub fn test_suites(ctx: &mut LocalContext) -> Result<TestSuites> {
+    let main_id = ctx.world().main();
+    let main_workspace = main_id.package_compat();
 
     crate::log_debug_ct!(
         "test workspace: {:?}, files: {:?}",
@@ -98,7 +99,7 @@ pub fn test_suites(ctx: &mut LocalContext, doc: &TypstDocument) -> Result<TestSu
     let files = ctx
         .depended_source_files()
         .par_iter()
-        .filter(|fid| fid.package() == main_workspace)
+        .filter(|fid| matches!(fid.root(), typst::syntax::VirtualRoot::Package(package) if Some(package) == main_workspace))
         .map(|fid| {
             let source = ctx
                 .source_by_id(*fid)
@@ -108,7 +109,7 @@ pub fn test_suites(ctx: &mut LocalContext, doc: &TypstDocument) -> Result<TestSu
         })
         .collect::<Result<Vec<_>>>()?;
 
-    let config = extract_test_configuration(doc)?;
+    let config = extract_test_configuration(ctx.success_doc().context("no success doc")?)?;
 
     let mut worker = TestSuitesWorker {
         files: &files,
@@ -143,7 +144,7 @@ struct UserTestConfig {
 }
 
 fn extract_test_configuration(doc: &TypstDocument) -> Result<TestConfig> {
-    let selector = Label::new(PicoStr::intern("test-config"));
+    let selector = Label::new(PicoStr::intern("test-config")).context("failed to create label")?;
     let metadata = doc.introspector().query(&Selector::Label(selector));
     if metadata.len() > 1 {
         // todo: attach source locations.
@@ -194,7 +195,8 @@ impl TestSuitesWorker<'_> {
 
     fn discover_tests(&mut self) -> Result<()> {
         for (source, module) in self.files.iter() {
-            let vpath = source.id().vpath().as_rooted_path();
+            let source_id = source.id();
+            let vpath = source_id.vpath().as_rooted_path_compat();
             let file_name = vpath.file_name().and_then(|s| s.to_str()).unwrap_or("");
             if file_name.starts_with(self.config.example_pattern.as_str()) {
                 self.examples.push(source.clone());

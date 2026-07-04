@@ -1,15 +1,15 @@
 use std::{borrow::Cow, sync::Arc};
 
-use tinymist_std::{error::prelude::*, ImmutPath};
-use tinymist_vfs::{system::SystemAccessModel, ImmutDict, Vfs};
-use typst::{utils::LazyHash, Features};
+use tinymist_std::{ImmutPath, error::prelude::*};
+use tinymist_vfs::{ImmutDict, Vfs, system::SystemAccessModel};
+use typst::{Features, utils::LazyHash};
 
 use crate::{
+    EntryState,
     args::{CompileFontArgs, CompilePackageArgs},
     config::{CompileFontOpts, CompileOpts},
-    font::{system::SystemFontSearcher, FontResolverImpl},
-    package::{registry::HttpRegistry, RegistryPathMapper},
-    EntryState,
+    font::{FontResolverImpl, system::SystemFontSearcher},
+    package::{RegistryPathMapper, registry::HttpRegistry},
 };
 
 mod diag;
@@ -43,6 +43,7 @@ impl TypstSystemUniverse {
         let registry: Arc<HttpRegistry> = Arc::default();
         let resolver = Arc::new(RegistryPathMapper::new(registry.clone()));
         let inputs = std::mem::take(&mut opts.inputs);
+        let timestamp = opts.creation_timestamp;
 
         // todo: enable html
         Ok(Self::new_raw(
@@ -52,6 +53,7 @@ impl TypstSystemUniverse {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             Arc::new(Self::resolve_fonts(opts)?),
+            timestamp,
         ))
     }
 
@@ -68,7 +70,7 @@ pub struct SystemUniverseBuilder;
 
 impl SystemUniverseBuilder {
     /// Create [`TypstSystemUniverse`] with the given options.
-    /// See [`LspCompilerFeat`] for instantiation details.
+    /// See [`SystemCompilerFeat`] for instantiation details.
     pub fn build(
         entry: EntryState,
         inputs: ImmutDict,
@@ -86,6 +88,7 @@ impl SystemUniverseBuilder {
             Vfs::new(resolver, SystemAccessModel {}),
             registry,
             font_resolver,
+            None, // creation_timestamp - not used in this context
         )
     }
 
@@ -133,7 +136,7 @@ mod tests {
             .expect("failed to resolve system universe");
 
         let world = verse.snapshot();
-        let _res = typst::compile::<TypstPagedDocument>(&world);
+        let _res = typst_shim::compile_opt::<TypstPagedDocument>(&world);
     }
 
     static FONT_COMPUTED: AtomicBool = AtomicBool::new(false);

@@ -2,11 +2,11 @@
 
 #show: book-page.with(title: [LSP Inputs])
 
-== Prefer to Using LSP Configurations
+= Prefer to Using LSP Configurations
 
 Though tinymist doesn't refuse to keep state in your disk, it actually doesn't have any data to write to disk yet. All customized behaviors (user settings) are passed to the server by LSP configurations. This is a good practice to keep the server state clean and simple.
 
-== Handling Compiler Input Events
+= Handling Compiler Input Events
 
 The compilation triggers many side effects, but the behavior of compiler actor is still easy to predicate. This is achieved by accepting all compile inputs by events.
 
@@ -16,8 +16,8 @@ Let us take reading files from physical file system as example of processing com
 #let pg-vert-sep = 0.7
 #let pg-adjust = 18pt
 
-#let sys-graph = move(
-  dx: pg-adjust,
+#let sys-graph(theme) = {
+  let (colors, node, edge) = fletcher-ctx(theme, node-shape: fletcher.shapes.rect)
   diagram(
     edge-stroke: 0.85pt,
     node-corner-radius: 3pt,
@@ -35,8 +35,7 @@ Let us take reading files from physical file system as example of processing com
       (0, -pg-vert-sep),
       "-}>",
       [didChange, \ didOpen, etc.],
-      label-anchor: "center",
-      label-pos: 0,
+      label-pos: 0.27,
     ),
     edge(
       (-0.8, pg-vert-sep),
@@ -44,7 +43,6 @@ Let us take reading files from physical file system as example of processing com
       (0, 0),
       "-}>",
       [readFile\ readDir, etc.],
-      label-anchor: "center",
       label-pos: 0,
     ),
     edge((-1, pg-vert-sep), (pg-hori-sep, pg-vert-sep), "-}>"),
@@ -64,30 +62,29 @@ Let us take reading files from physical file system as example of processing com
         (pg-hori-sep * 1.7, i * pg-vert-sep),
         "-}>",
         [source],
-        label-pos: 1,
+        label-pos: 0.7,
       )
     },
     node(
       (-1.3, 0),
-      rotate(-90deg, rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Input Sources]),
+      rotate(-90deg, rect(
+        stroke: (bottom: (paint: theme.main-color, thickness: 1pt, dash: "dashed")),
+        width: 120pt,
+      )[Input Sources]),
+      stroke: none,
     ),
     node(
       (pg-hori-sep + 1.45, 0),
-      rotate(
-        90deg,
-        move(
-          dy: pg-adjust * 2,
-          rect(stroke: (bottom: (thickness: 1pt, dash: "dashed")), width: 120pt)[Compiler World],
-        ),
-      ),
+      rotate(90deg, move(dy: pg-adjust * 2, rect(
+        stroke: (bottom: (paint: theme.main-color, thickness: 1pt, dash: "dashed")),
+        width: 120pt,
+      )[Compiler World])),
+      stroke: none,
     ),
-  ),
-);
+  )
+};
 
-#figure(
-  cond-image(sys-graph),
-  caption: [The overlay virtual file system (VFS)],
-) <fig:overlay-vfs>
+#figure(cond-image(sys-graph), caption: [The overlay virtual file system (VFS)]) <fig:overlay-vfs>
 
 The problem is to ensure that the compiler can read the content correctly from access models at the time.
 
@@ -101,6 +98,7 @@ The only bad case can happen is that: When the two input sources are both active
 
 This is handled by tinymist by some tricks.
 
-=== Record and Replay
+== Record and Replay
 
-Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU.
+#let sub = [= Debugging with input mirroring]
+Tinymist can record these input events with assigned the logic ticks. By replaying the events, tinymist can reproduce the server state for debugging. This technique is learned from the well-known LSP, clangd, and the well known emulator, QEMU. This concrete usage is documented in #cross-link("/module/lsp.typ", reference: heading-reference(sub))[Language Server: #sub.body.]

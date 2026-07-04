@@ -3,26 +3,31 @@
 use comemo::Track;
 use ecow::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+use typst::World;
 use typst::engine::{Engine, Route, Sink, Traced};
 use typst::foundations::{Context, Label, Scopes, Styles, Value};
-use typst::introspection::Introspector;
+use typst::introspection::EmptyIntrospector;
 use typst::model::BibliographyElem;
-use typst::syntax::{ast, LinkedNode, Span, SyntaxKind, SyntaxNode};
-use typst::World;
+use typst::syntax::{LinkedNode, Span, SyntaxKind, SyntaxNode, ast};
 use typst_shim::eval::Vm;
+use typst_shim::is_syntax_only;
+
+use crate::stats::GLOBAL_STATS;
 
 /// Try to determine a set of possible values for an expression.
 pub fn analyze_expr(world: &dyn World, node: &LinkedNode) -> EcoVec<(Value, Option<Styles>)> {
-    if let Some(parent) = node.parent() {
-        if parent.kind() == SyntaxKind::FieldAccess && node.index() > 0 {
-            return analyze_expr(world, parent);
-        }
+    if let Some(parent) = node.parent()
+        && parent.kind() == SyntaxKind::FieldAccess
+        && node.index() > 0
+    {
+        return analyze_expr(world, parent);
     }
 
     analyze_expr_(world, node.get())
 }
 
 /// Try to determine a set of possible values for an expression.
+#[typst_macros::time(span = node.span())]
 pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Option<Styles>)> {
     let Some(expr) = node.cast::<ast::Expr>() else {
         return eco_vec![];
@@ -37,12 +42,19 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
         ast::Expr::Numeric(v) => Value::numeric(v.get()),
         ast::Expr::Str(v) => Value::Str(v.get().into()),
         _ => {
-            if node.kind() == SyntaxKind::Contextual {
-                if let Some(child) = node.children().last() {
-                    return analyze_expr_(world, child);
-                }
+            if node.kind() == SyntaxKind::Contextual
+                && let Some(child) = node.children().last()
+            {
+                return analyze_expr_(world, child);
             }
 
+            // Only traces if not in syntax-only mode because typst::trace requires
+            // compilation information.
+            if is_syntax_only() {
+                return eco_vec![];
+            }
+
+            let _guard = GLOBAL_STATS.stat(node.span().id(), "analyze_expr");
             return typst::trace::<TypstPagedDocument>(world, node.span());
         }
     };
@@ -51,6 +63,7 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
 }
 
 /// Try to load a module from the current source file.
+#[typst_macros::time(span = source.span())]
 pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>, Option<Value>) {
     let source_span = source.span();
     let Some((source, _)) = analyze_expr_(world, source).into_iter().next() else {
@@ -60,14 +73,17 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
         return (Some(source.clone()), Some(source));
     }
 
-    let introspector = Introspector::default();
+    let _guard = GLOBAL_STATS.stat(source_span.id(), "analyze_import");
+
+    let library = world.library();
+    let introspector = EmptyIntrospector;
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
-        routines: &typst::ROUTINES,
+        library,
         world: world.track(),
         route: Route::default(),
-        introspector: introspector.track(),
+        introspector: typst::utils::Protected::new(introspector.track()),
         traced: traced.track(),
         sink: sink.track_mut(),
     };
@@ -76,7 +92,7 @@ pub fn analyze_import_(world: &dyn World, source: &SyntaxNode) -> (Option<Value>
     let mut vm = Vm::new(
         engine,
         context.track(),
-        Scopes::new(Some(world.library())),
+        Scopes::new(Some(library)),
         Span::detached(),
     );
     let module = match source.clone() {
@@ -109,11 +125,14 @@ pub struct DynLabel {
 /// - All labels and descriptions for them, if available
 /// - A split offset: All labels before this offset belong to nodes, all after
 ///   belong to a bibliography.
+#[typst_macros::time]
 pub fn analyze_labels(document: &TypstDocument) -> (Vec<DynLabel>, usize) {
     let mut output = vec![];
 
+    let _guard = GLOBAL_STATS.stat(None, "analyze_labels");
+
     // Labels in the document.
-    for elem in document.introspector().all() {
+    for elem in document.introspector().query_labelled() {
         let Some(label) = elem.label() else { continue };
         let (is_derived, details) = {
             let derived = elem

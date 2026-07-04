@@ -1,0 +1,157 @@
+#preview-viewport {
+  overflow: auto;
+  contain: layout paint size;
+  cursor: grab;
+}
+
+.dragging #preview-viewport {
+  cursor: grabbing;
+  user-select: none;
+}
+
+#preview-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 100%;
+  padding: 0;
+}
+
+.content-preview #preview-pages {
+  align-items: stretch;
+  gap: 5px;
+  padding: 0;
+}
+
+.typst-page {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: var(--page-bg);
+  box-shadow: 0 2px 8px var(--page-shadow);
+}
+
+.invert-colors .typst-page {
+  background: var(--inverted-page-bg);
+}
+
+.content-preview .typst-page {
+  width: 100% !important;
+}
+
+.typst-page-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+}
+
+.typst-page-canvas canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.typst-page.canvas-ready .typst-full-canvas {
+  opacity: 1;
+}
+
+.dragging .typst-page {
+  cursor: grabbing !important;
+}
+
+.typst-link-layer,
+.typst-interaction-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.typst-link-layer a {
+  position: absolute;
+  display: block;
+  pointer-events: auto;
+  color: inherit;
+  text-decoration: none;
+}
+
+.typst-interaction-highlight {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+  border-radius: 1px;
+}
+
+.typst-interaction-highlight.link {
+  background: #66bab7;
+  mix-blend-mode: lighten;
+}
+
+.typst-interaction-highlight.text {
+  background: #f75c2f;
+  mix-blend-mode: lighten;
+}
+
+.typst-interaction-highlight.bound {
+  box-shadow: inset 0 0 0 1px #66bab7;
+}
+
+.invert-colors .typst-page-canvas {
+  filter: invert(0.933333) hue-rotate(180deg);
+}
+
+.typst-cursor {
+  position: absolute;
+  width: 2px;
+  height: 1.2em;
+  min-height: 12px;
+  transform: translate(-1px, -0.6em);
+  border-left: 2px solid var(--cursor-color);
+  opacity: 0;
+  pointer-events: none;
+  animation: typst-cursor-blink 1.2s step-start infinite;
+}
+
+.typst-cursor.visible {
+  opacity: 1;
+}
+
+@keyframes typst-cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.typst-jump-marker {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 2px solid var(--jump-color);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.typst-jump-marker.visible {
+  animation: typst-jump-ripple 900ms ease-out;
+}
+
+@keyframes typst-jump-ripple {
+  from {
+    width: 0;
+    height: 0;
+    opacity: 0.9;
+  }
+
+  to {
+    width: 10vw;
+    height: 10vw;
+    opacity: 0;
+  }
+}

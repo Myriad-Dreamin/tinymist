@@ -1,19 +1,25 @@
 //! Module documentation.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use ecow::{eco_vec, EcoString, EcoVec};
+use ecow::{EcoString, EcoVec, eco_vec};
 use itertools::Itertools;
+use lsp_types::Position;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use typst::diag::StrResult;
-use typst::syntax::package::PackageSpec;
 use typst::syntax::FileId;
+use typst::syntax::VirtualRoot;
+use typst::syntax::package::PackageSpec;
+use typst_shim::syntax::RootedPathExt;
 
-use crate::adt::interner::Interned;
-use crate::docs::file_id_repr;
-use crate::package::{get_manifest_id, PackageInfo};
-use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 use crate::LocalContext;
+use crate::adt::interner::Interned;
+use crate::analysis::{Definition, SharedQueryCache};
+use crate::docs::file_id_repr;
+use crate::package::{PackageInfo, get_manifest_id, package_entrypoint_id};
+use crate::syntax::{Decl, DefKind, Expr, ExprInfo};
 
 use super::DefDocs;
 
@@ -22,7 +28,7 @@ pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResu
     let toml_id = get_manifest_id(pkg)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
     module_docs(ctx, entry_point)
 }
 
@@ -30,11 +36,12 @@ pub fn package_module_docs(ctx: &mut LocalContext, pkg: &PackageInfo) -> StrResu
 pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<PackageDefInfo> {
     let mut aliases = HashMap::new();
     let mut extras = vec![];
+    let shared = ctx.shared().clone();
 
     let mut scan_ctx = ScanDefCtx {
         ctx,
         root: entry_point,
-        for_spec: entry_point.package(),
+        for_spec: entry_point.package_compat(),
         aliases: &mut aliases,
         extras: &mut extras,
     };
@@ -43,7 +50,12 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
         .ctx
         .expr_stage_by_id(entry_point)
         .ok_or("entry point not found")?;
-    let mut defs = scan_ctx.defs(eco_vec![], ei);
+    let docs_cache = SharedQueryCache::<Definition, Option<DefDocs>>::default();
+    let mut defs = enrich_def_docs_parallel(
+        shared.clone(),
+        docs_cache.clone(),
+        scan_ctx.defs(eco_vec![], ei),
+    );
 
     let module_uses = aliases
         .into_iter()
@@ -55,7 +67,12 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
 
     crate::log_debug_ct!("module_uses: {module_uses:#?}",);
 
-    defs.children.extend(extras);
+    defs.children.extend(
+        extras
+            .into_par_iter()
+            .map(|extra| enrich_def_docs_parallel(shared.clone(), docs_cache.clone(), extra))
+            .collect::<Vec<_>>(),
+    );
 
     Ok(PackageDefInfo {
         root: defs,
@@ -63,24 +80,79 @@ pub fn module_docs(ctx: &mut LocalContext, entry_point: FileId) -> StrResult<Pac
     })
 }
 
+fn enrich_def_docs_parallel(
+    shared: Arc<crate::analysis::SharedContext>,
+    docs_cache: SharedQueryCache<Definition, Option<DefDocs>>,
+    mut head: DefInfo,
+) -> DefInfo {
+    head.children = head
+        .children
+        .into_par_iter()
+        .map(|child| enrich_def_docs_parallel(shared.clone(), docs_cache.clone(), child))
+        .collect();
+
+    let def_docs = head
+        .decl
+        .as_ref()
+        .and_then(definition_for_docs)
+        .and_then(|definition| {
+            docs_cache.get_or_init(definition.clone(), || shared.def_docs(&definition))
+        });
+    head.docs = def_docs.as_ref().map(|docs| docs.docs().clone());
+    head.parsed_docs = def_docs;
+
+    if head.is_external {
+        head.oneliner = head.docs.as_ref().map(|docs| oneliner(docs).to_owned());
+        head.docs = None;
+    }
+
+    head
+}
+
+fn definition_for_docs(decl: &Interned<Decl>) -> Option<Definition> {
+    match decl.as_ref() {
+        Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
+        _ => None,
+    }
+}
+
 /// Information about a definition.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DefInfo {
+    /// The raw documentation of the definition.
+    pub id: EcoString,
     /// The name of the definition.
     pub name: EcoString,
     /// The kind of the definition.
     pub kind: DefKind,
+    /// The SCIP symbol for index-backed queries.
+    #[serde(skip)]
+    pub symbol: Option<String>,
     /// The location (file, start, end) of the definition.
+    #[serde(skip)]
     pub loc: Option<(usize, usize, usize)>,
+    /// The source position for index-backed queries.
+    #[serde(skip)]
+    pub source: Option<SourceQuery>,
     /// Whether the definition external to the module.
     pub is_external: bool,
+    /// The module link to the definition
+    pub module_link: Option<String>,
+    /// The bundle-mode link to the definition.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bundle_link: Option<String>,
+    /// The symbol link to the definition
+    pub symbol_link: Option<String>,
     /// The link to the definition if it is external.
     pub external_link: Option<String>,
     /// The one-line documentation of the definition.
+    #[serde(skip_serializing)]
     pub oneliner: Option<String>,
     /// The raw documentation of the definition.
+    #[serde(skip_serializing)]
     pub docs: Option<EcoString>,
     /// The parsed documentation of the definition.
+    #[serde(skip_serializing)]
     pub parsed_docs: Option<DefDocs>,
     /// The value of the definition.
     #[serde(skip)]
@@ -90,7 +162,16 @@ pub struct DefInfo {
     #[serde(skip)]
     pub decl: Option<Interned<Decl>>,
     /// The children of the definition.
-    pub children: EcoVec<DefInfo>,
+    pub children: Vec<DefInfo>,
+}
+
+/// A source position that can be used to query a package index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceQuery {
+    /// The source file index in the package document file table.
+    pub file: usize,
+    /// The source position for a `textDocument/definition` query.
+    pub position: Position,
 }
 
 /// Information about the definitions in a package.
@@ -113,15 +194,11 @@ struct ScanDefCtx<'a> {
 
 impl ScanDefCtx<'_> {
     fn defs(&mut self, paths: EcoVec<&str>, ei: ExprInfo) -> DefInfo {
-        let name = {
-            let stem = ei.fid.vpath().as_rooted_path().file_stem();
-            stem.and_then(|s| Some(Interned::new_str(s.to_str()?)))
-                .unwrap_or_default()
-        };
-        let module_decl = Decl::module(name.clone(), ei.fid).into();
+        let module_decl = Decl::module(ei.fid);
+        let key = module_decl.name().clone();
         let site = Some(self.root);
         let paths = paths.clone();
-        self.def(&name, paths, site.as_ref(), &module_decl, None)
+        self.def(&key, paths, site.as_ref(), &module_decl.into(), None)
     }
 
     fn expr(
@@ -167,13 +244,10 @@ impl ScanDefCtx<'_> {
         decl: &Interned<Decl>,
         expr: Option<&Expr>,
     ) -> DefInfo {
-        let def = self.ctx.def_of_decl(decl);
-        let def_docs = def.and_then(|def| self.ctx.def_docs(&def));
-        let docs = def_docs.as_ref().map(|docs| docs.docs().clone());
         let children = match decl.as_ref() {
             Decl::Module(..) => decl.file_id().and_then(|fid| {
                 // only generate docs for the same package
-                if fid.package() != self.for_spec {
+                if !matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec) {
                     return None;
                 }
 
@@ -206,32 +280,36 @@ impl ScanDefCtx<'_> {
         };
 
         let mut head = DefInfo {
+            id: EcoString::new(),
             name: key.to_string().into(),
             kind: decl.kind(),
             constant: expr.map(|expr| expr.repr()),
-            docs,
-            parsed_docs: def_docs,
+            docs: None,
+            parsed_docs: None,
             decl: Some(decl.clone()),
             children: children.unwrap_or_default(),
+            symbol: None,
             loc: None,
+            source: None,
             is_external: false,
+            module_link: None,
+            bundle_link: None,
+            symbol_link: None,
             external_link: None,
             oneliner: None,
         };
 
         if let Some((span, mod_fid)) = head.decl.as_ref().and_then(|decl| decl.file_id()).zip(site)
+            && span != *mod_fid
         {
-            if span != *mod_fid {
-                head.is_external = true;
-                head.oneliner = head.docs.map(|docs| oneliner(&docs).to_owned());
-                head.docs = None;
-            }
+            head.is_external = true;
         }
 
         // Insert module that is not exported
         if let Some(fid) = head.decl.as_ref().and_then(|del| del.file_id()) {
             // only generate docs for the same package
-            if fid.package() == self.for_spec {
+            if matches!(fid.root(), VirtualRoot::Package(package) if Some(package) == self.for_spec)
+            {
                 let av = self.aliases.entry(fid).or_default();
                 if av.is_empty() {
                     let src = self.ctx.expr_stage_by_id(fid);

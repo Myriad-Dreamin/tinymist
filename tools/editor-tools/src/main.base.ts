@@ -1,3 +1,4 @@
+import "./styles/index.css";
 import "./style.css";
 import van, { ChildDom } from "vanjs-core";
 import { setupVscodeChannel } from "./vscode";
@@ -7,11 +8,13 @@ import { setupVscodeChannel } from "./vscode";
 type PageComponent =
   | "template-gallery"
   | "tracing"
+  | "profile-server"
   | "summary"
   | "diagnostics"
   | "symbol-view"
   | "font-view"
-  | "docs";
+  | "docs"
+  | "exporter";
 
 /// The frontend arguments that are passed from the backend.
 interface Arguments {
@@ -28,7 +31,7 @@ function retrieveArgs(): Arguments {
   ///   let frontend_html = frontend_html.replace(
   ///     "editor-tools-args:{}", ...);
   /// ```
-  let mode = `editor-tools-args:{"page": "font-view"}`;
+  let mode = `editor-tools-args:{"page": "exporter"}`;
   /// Remove the placeholder prefix.
   mode = mode.replace("editor-tools-args:", "");
 

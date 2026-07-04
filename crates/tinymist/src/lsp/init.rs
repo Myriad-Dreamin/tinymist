@@ -91,16 +91,18 @@ impl Initializer for SuperInit {
         } = self;
         let const_config = config.const_config.clone();
         // Bootstrap server
-        let service = ServerState::main(client, config, err.is_none());
+        let state = ServerState::main(client, config, err.is_none());
 
         if let Some(err) = err {
-            return (service, Err(err));
+            return (state, Err(err));
         }
 
         let semantic_tokens_provider = (!const_config.tokens_dynamic_registration).then(|| {
             SemanticTokensServerCapabilities::SemanticTokensOptions(get_semantic_tokens_options())
         });
         let document_formatting_provider =
+            (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
+        let document_range_formatting_provider =
             (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
 
         let file_operations = const_config.notify_will_rename_files.then(|| {
@@ -121,8 +123,7 @@ impl Initializer for SuperInit {
 
         let res = InitializeResult {
             capabilities: ServerCapabilities {
-                // todo: respect position_encoding
-                // position_encoding: Some(cc.position_encoding.into()),
+                position_encoding: Some(const_config.position_encoding.into()),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec![
@@ -194,6 +195,7 @@ impl Initializer for SuperInit {
                     file_operations,
                 }),
                 document_formatting_provider,
+                document_range_formatting_provider,
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
                 code_lens_provider: Some(CodeLensOptions {
@@ -205,10 +207,14 @@ impl Initializer for SuperInit {
                 })),
                 ..ServerCapabilities::default()
             },
+            server_info: Some(ServerInfo {
+                name: "tinymist".to_string(),
+                version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            }),
             ..InitializeResult::default()
         };
 
         let res = serde_json::to_value(res).map_err(|e| invalid_params(e.to_string()));
-        (service, just_result(res))
+        (state, just_result(res))
     }
 }

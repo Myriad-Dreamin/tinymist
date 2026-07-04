@@ -2,7 +2,8 @@
 name = "typst-shim"
 description = "A compatibility layer for Typst release and mainline versions."
 authors = ["The Typst Project Developers"]
-version = "0.13.12"
+# group: world
+version = "0.15.0"
 edition.workspace = true
 license.workspace = true
 homepage.workspace = true
@@ -14,11 +15,11 @@ default = []
 nightly = []
 
 [dependencies]
-typst-syntax.workspace = true
-typst-eval.workspace = true
-typst.workspace = true
 cfg-if.workspace = true
 comemo.workspace = true
+typst.workspace = true
+typst-syntax.workspace = true
+typst-eval.workspace = true
 
 [lints]
 workspace = true

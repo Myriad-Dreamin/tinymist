@@ -4,7 +4,7 @@ export function triggerRipple(
   top: number,
   className: string,
   animation: string,
-  color?: string
+  color?: string,
 ) {
   const ripple = document.createElement("div");
 

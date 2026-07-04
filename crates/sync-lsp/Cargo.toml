@@ -14,33 +14,33 @@ rust-version.workspace = true
 [dependencies]
 
 anyhow.workspace = true
-dapts = { workspace = true, optional = true }
+crossbeam-channel.workspace = true
+futures.workspace = true
 log.workspace = true
-lsp-types = { workspace = true, optional = true }
+parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tinymist-std.workspace = true
+
+dapts = { workspace = true, optional = true }
+lsp-types = { workspace = true, optional = true }
 
 clap = { workspace = true, optional = true }
-crossbeam-channel = { workspace = true, optional = true }
-futures = { workspace = true, optional = true }
-parking_lot = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["rt", "time"], optional = true }
+js-sys = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+tokio = { workspace = true, features = ["rt"], optional = true }
 tokio-util = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
 
 [features]
 dap = ["dapts"]
 lsp = ["lsp-types"]
-server = [
-    "crossbeam-channel",
-    "futures",
-    "tokio",
-    "tokio-util",
-    "clap",
-    "parking_lot",
-]
+server = ["tokio"]
+system = ["tokio", "tokio/time", "tokio-util", "clap", "tinymist-std/system"]
+web = ["js-sys", "wasm-bindgen", "serde-wasm-bindgen", "tinymist-std/web"]
 
 [package.metadata.docs.rs]
-features = ["dap", "lsp", "server"]
+features = ["dap", "lsp", "system", "server"]
 
 [lints]
 workspace = true

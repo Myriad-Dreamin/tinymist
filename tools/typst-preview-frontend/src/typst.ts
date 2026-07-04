@@ -1,11 +1,12 @@
-import { triggerRipple } from "typst-dom/typst-animation.mjs";
-
 // debounce https://stackoverflow.com/questions/23181243/throttling-a-mousemove-event-to-fire-no-more-than-5-times-a-second
 // ignore fast events, good for capturing double click
 // @param (callback): function to be run when done
 // @param (delay): integer in milliseconds
 // @param (id): string value of a unique event id
 // @doc (event.timeStamp): http://api.jquery.com/event.timeStamp/
+
+import { TypstDomWindowElement } from "typst-dom";
+
 // @bug (event.currentTime): https://bugzilla.mozilla.org/show_bug.cgi?id=238041
 let ignoredEvent = (function () {
   let last: Record<string, any> = {},
@@ -79,9 +80,7 @@ var searchIntersections = function (root: Element) {
 var getRelatedElements = function (event: any) {
   let relatedElements = event.target.relatedElements;
   if (relatedElements === undefined || relatedElements === null) {
-    relatedElements = event.target.relatedElements = searchIntersections(
-      event.target
-    );
+    relatedElements = event.target.relatedElements = searchIntersections(event.target);
   }
   return relatedElements;
 };
@@ -93,7 +92,9 @@ function findAncestor(el: Element, cls: string) {
   return el;
 }
 
-window.initTypstSvg = function (docRoot: SVGElement) {
+const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
+
+windowElem.initTypstSvg = function (docRoot: SVGElement) {
   /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
   for (var i = 0; i < elements.length; i++) {
@@ -127,7 +128,7 @@ window.initTypstSvg = function (docRoot: SVGElement) {
         }
       },
       200,
-      "mouse-move"
+      "mouse-move",
     );
   }
 
@@ -150,7 +151,7 @@ function layoutText(svg: SVGElement) {
   const divs = svg.querySelectorAll<HTMLDivElement>(".tsel");
   const canvas = document.createElementNS(
     "http://www.w3.org/1999/xhtml",
-    "canvas"
+    "canvas",
   ) as HTMLCanvasElement;
   const ctx = canvas.getContext("2d")!;
 
@@ -164,10 +165,8 @@ function layoutText(svg: SVGElement) {
     if (d.style.fontSize) {
       const foreignObj = d.parentElement!;
       const innerText = d.innerText;
-      const targetWidth =
-        Number.parseFloat(foreignObj.getAttribute("width") || "0") || 0;
-      const currentX =
-        Number.parseFloat(foreignObj.getAttribute("x") || "0") || 0;
+      const targetWidth = Number.parseFloat(foreignObj.getAttribute("width") || "0") || 0;
+      const currentX = Number.parseFloat(foreignObj.getAttribute("x") || "0") || 0;
       ctx.font = `${d.style.fontSize} sans-serif`;
       const selfWidth = ctx.measureText(innerText).width;
 
@@ -175,10 +174,7 @@ function layoutText(svg: SVGElement) {
 
       d.style.transform = `scaleX(${scale})`;
       foreignObj.setAttribute("width", selfWidth.toString());
-      foreignObj.setAttribute(
-        "x",
-        (currentX - (selfWidth - targetWidth) * 0.5).toString()
-      );
+      foreignObj.setAttribute("x", (currentX - (selfWidth - targetWidth) * 0.5).toString());
 
       d.setAttribute("data-typst-layout-checked", "1");
     }
@@ -187,7 +183,7 @@ function layoutText(svg: SVGElement) {
   console.log(`layoutText used time ${performance.now() - layoutBegin} ms`);
 }
 
-window.currentPosition = function (elem: Element) {
+windowElem.currentPosition = function (elem: Element) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
@@ -203,8 +199,9 @@ window.currentPosition = function (elem: Element) {
 
   let result: TypstPosition | undefined = undefined;
   // The center of the window
-  const cx = window.innerWidth * 0.5;
-  const cy = window.innerHeight * 0.5;
+  const vpRect = windowElem.getBoundingClientRect();
+  const cx = vpRect.left + vpRect.width / 2;
+  const cy = vpRect.top + vpRect.height / 2;
   type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
   const handlePage = (pageBBox: ScrollRect, page: number) => {
     const x = pageBBox.left;
@@ -222,9 +219,7 @@ window.currentPosition = function (elem: Element) {
     const pages = docRoot.querySelectorAll<HTMLDivElement>(".typst-page");
 
     for (const page of pages) {
-      const pageNumber = Number.parseInt(
-        page.getAttribute("data-page-number")!
-      );
+      const pageNumber = Number.parseInt(page.getAttribute("data-page-number")!);
 
       const bbox = page.getBoundingClientRect();
       handlePage(bbox, pageNumber);
@@ -249,98 +244,29 @@ window.currentPosition = function (elem: Element) {
   return result;
 };
 
-window.handleTypstLocation = function (
-  elem: Element,
-  pageNo: number,
-  x: number,
-  y: number
-) {
+windowElem.handleTypstLocation = function (elem: Element, pageNo: number, x: number, y: number) {
   const docRoot = findAncestor(elem, "typst-doc");
   if (!docRoot) {
     console.warn("no typst-doc found", elem);
     return;
   }
 
-  type ScrollRect = Pick<DOMRect, "left" | "top" | "width" | "height">;
-  const scrollTo = (pageRect: ScrollRect, innerLeft: number, innerTop: number) => {
+  // scrollTo(pageRect: ScrollRect, pageNo: number, innerLeft: number, innerTop: number)
 
-    const windowRoot = document.body || document.firstElementChild;
-    const basePos = windowRoot.getBoundingClientRect();
-
-    const left = innerLeft - basePos.left;
-    const top = innerTop - basePos.top;
-
-
-    // evaluate window viewport 1vw
-    const pw = window.innerWidth * 0.01;
-    const ph = window.innerHeight * 0.01;
-
-    const xOffsetInnerFix = 7 * pw;
-    const yOffsetInnerFix = 38.2 * ph;
-
-    const xOffset = left - xOffsetInnerFix;
-    const yOffset = top - yOffsetInnerFix;
-
-    const widthOccupied = 100 * 100 * pw / pageRect.width;
-
-    const pageAdjustLeft = pageRect.left - basePos.left - 5 * pw;
-    const pageAdjust = pageRect.left - basePos.left + pageRect.width - 95 * pw;
-
-    // default single-column or multi-column layout
-    if (widthOccupied >= 90 || widthOccupied < 50) {
-      window.scrollTo({ behavior: "smooth", left: xOffset, top: yOffset });
-    } else { // for double-column layout
-      // console.log('occupied adjustment', widthOccupied, page);
-
-      const xOffsetAdjsut = xOffset > pageAdjust ? pageAdjust : pageAdjustLeft;
-
-      window.scrollTo({ behavior: "smooth", left: xOffsetAdjsut, top: yOffset });
+  const scrollTo = (pageWidth: number, pageNo: number, innerLeft: number, innerTop: number) => {
+    for (const doc of windowElem.documents) {
+      doc.impl.scrollTo(pageWidth, pageNo, innerLeft, innerTop);
     }
-
-    // grid ripple for debug vw
-    // triggerRipple(
-    //   windowRoot,
-    //   svgRect.left + 50 * vw,
-    //   svgRect.top + 1 * vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "green",
-    // );
-
-    // triggerRipple(
-    //   windowRoot,
-    //   pageRect.left - basePos.left + vw,
-    //   pageRect.top - basePos.top + vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "red",
-    // );
-
-    // triggerRipple(
-    //   windowRoot,
-    //   pageAdjust,
-    //   pageRect.top - basePos.top + vh,
-    //   "typst-jump-ripple",
-    //   "typst-jump-ripple-effect .4s linear",
-    //   "red",
-    // );
-
-    triggerRipple(
-      windowRoot,
-      left,
-      top,
-      "typst-jump-ripple",
-      "typst-jump-ripple-effect .4s linear"
-    );
-  }
+  };
 
   const renderMode = docRoot.getAttribute("data-render-mode");
-  if (renderMode === 'canvas') {
-    const pages = docRoot.querySelectorAll<HTMLDivElement>('.typst-page');
+  if (renderMode === "canvas") {
+    const hookedElem = docRoot.parentElement!;
+    const pages = docRoot.querySelectorAll<HTMLDivElement>(".typst-page");
 
     const pageMapping = new Map<number, HTMLDivElement>();
     for (const page of pages) {
-      const pageNumber = Number.parseInt(page.getAttribute('data-page-number')!);
+      const pageNumber = Number.parseInt(page.getAttribute("data-page-number")!);
       if (pageMapping.has(pageNumber)) {
         continue;
       }
@@ -349,19 +275,21 @@ window.handleTypstLocation = function (
     pageNo -= 1;
 
     if (!pageMapping.has(pageNo)) {
-      console.warn('page not found in canvas mode', pageNo, pageMapping);
+      console.warn("page not found in canvas mode", pageNo, pageMapping);
       return;
     }
 
     const canvasContainer = pageMapping.get(pageNo)!.firstElementChild!;
     const canvasRectBase = canvasContainer.getBoundingClientRect();
-    const appliedScale = Number.parseFloat(canvasContainer.getAttribute("data-applied-scale") || "1") || 1;
+    const hookedElemBase = hookedElem.getBoundingClientRect();
+    const appliedScale =
+      Number.parseFloat(canvasContainer.getAttribute("data-applied-scale") || "1") || 1;
     const canvasRect = {
-      left: canvasRectBase.left,
-      top: canvasRectBase.top,
+      left: canvasRectBase.left - hookedElemBase.left,
+      top: canvasRectBase.top - hookedElemBase.top,
       width: canvasRectBase.width / appliedScale,
       height: canvasRectBase.height / appliedScale,
-    }
+    };
 
     const dataWidth =
       Number.parseFloat(canvasContainer.getAttribute("data-page-width") || "0") || 0;
@@ -371,9 +299,9 @@ window.handleTypstLocation = function (
     const left = canvasRect.left + (x / dataWidth) * canvasRect.width;
     const top = canvasRect.top + (y / dataHeight) * canvasRect.height;
 
-    console.log('canvas mode jump', left, top, canvasRect, dataWidth, dataHeight, x, y);
+    console.log("canvas mode jump", left, top, canvasRect, dataWidth, dataHeight, x, y);
 
-    scrollTo(canvasRect, left, top);
+    scrollTo(canvasRect.width, pageNo, left, top);
     return;
   }
 
@@ -385,18 +313,16 @@ window.handleTypstLocation = function (
     }
     if (nthPage == pageNo) {
       const page = children[i] as SVGGElement;
-      const dataWidth =
-        Number.parseFloat(docRoot.getAttribute("data-width") || "0") || 0;
-      const dataHeight =
-        Number.parseFloat(docRoot.getAttribute("data-height") || "0") || 0;
+      const dataWidth = Number.parseFloat(docRoot.getAttribute("data-width") || "0") || 0;
+      const dataHeight = Number.parseFloat(docRoot.getAttribute("data-height") || "0") || 0;
       // console.log(page, vw, vh, x, y, dataWidth, dataHeight, docRoot);
       const svgRectBase = docRoot.getBoundingClientRect();
       const svgRect = {
-        left: svgRectBase.left,
-        top: svgRectBase.top,
+        left: 0,
+        top: 0,
         width: svgRectBase.width,
         height: svgRectBase.height,
-      }
+      };
 
       const transform = page.transform.baseVal.consolidate()?.matrix;
       if (transform) {
@@ -410,8 +336,11 @@ window.handleTypstLocation = function (
       const left = svgRect.left + (x / dataWidth) * svgRect.width;
       const top = svgRect.top + (y / dataHeight) * svgRect.height;
 
-      scrollTo(pageRect, left, top);
+      scrollTo(pageRect.width, pageNo, left, top);
       return;
     }
   }
 };
+// This global function is hardcoded in:
+// https://github.com/Myriad-Dreamin/typst.ts/blob/crates/conversion/typst2vec/src/pass/typst2vec.rs
+window.handleTypstLocation = windowElem.handleTypstLocation;

@@ -1,60 +1,32 @@
 //! Tinymist LSP commands
 
-use std::ops::{Deref, Range};
+mod export;
+
+use std::ops::Range;
 use std::path::PathBuf;
 
 use lsp_types::TextDocumentIdentifier;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value as JsonValue;
-use sync_ls::RequestId;
+#[cfg(feature = "trace")]
 use task::TraceParams;
 use tinymist_assets::TYPST_PREVIEW_HTML;
-use tinymist_project::{
-    ExportHtmlTask, ExportMarkdownTask, ExportPdfTask, ExportPngTask, ExportSvgTask, ExportTask,
-    ExportTextTask, ExportTransform, PageSelection, Pages, ProjectTask, QueryTask,
-};
 use tinymist_query::package::PackageInfo;
 use tinymist_query::{LocalContextGuard, LspRange};
 use tinymist_std::error::prelude::*;
-use typst::diag::{eco_format, EcoString, StrResult};
-use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
 use typst::syntax::{LinkedNode, Source};
-use world::TaskInputs;
 
 use super::*;
-use crate::lsp::query::{run_query, LspClientExt};
+use crate::lsp::query::run_query;
 use crate::tool::ast::AstRepr;
+
+#[cfg(feature = "system")]
+use typst::diag::{EcoString, StrResult};
+#[cfg(feature = "system")]
+use typst::syntax::package::{PackageSpec, VersionlessPackageSpec};
+
+#[cfg(feature = "system")]
 use crate::tool::package::InitTask;
-
-/// See [`ProjectTask`].
-#[derive(Debug, Clone, Default, Deserialize)]
-struct ExportOpts {
-    fill: Option<String>,
-    ppi: Option<f32>,
-    #[serde(default)]
-    page: PageSelection,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-    /// The creation timestamp for various outputs (in seconds).
-    creation_timestamp: Option<String>,
-    /// A PDF standard that Typst can enforce conformance with.
-    pdf_standard: Option<Vec<PdfStandard>>,
-}
-
-/// See [`ProjectTask`].
-#[derive(Debug, Clone, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct QueryOpts {
-    format: String,
-    output_extension: Option<String>,
-    strict: Option<bool>,
-    pretty: Option<bool>,
-    selector: String,
-    field: Option<String>,
-    one: Option<bool>,
-    /// Whether to open the exported file(s) after the export is done.
-    open: Option<bool>,
-}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -64,153 +36,6 @@ struct ExportSyntaxRangeOpts {
 
 /// Here are implemented the handlers for each command.
 impl ServerState {
-    /// Export the current document as PDF file(s).
-    pub fn export_pdf(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let creation_timestamp = if let Some(value) = opts.creation_timestamp {
-            Some(
-                parse_source_date_epoch(&value)
-                    .map_err(|e| invalid_params(format!("Cannot parse creation timestamp: {e}")))?,
-            )
-        } else {
-            self.config.creation_timestamp()
-        };
-        let pdf_standards = opts.pdf_standard.or_else(|| self.config.pdf_standards());
-
-        let export = self.config.export_task();
-        self.export(
-            req_id,
-            ProjectTask::ExportPdf(ExportPdfTask {
-                export,
-                pdf_standards: pdf_standards.unwrap_or_default(),
-                creation_timestamp,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as HTML file(s).
-    pub fn export_html(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-        let export = self.config.export_task();
-        self.export(
-            req_id,
-            ProjectTask::ExportHtml(ExportHtmlTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Markdown file(s).
-    pub fn export_markdown(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-        let export = self.config.export_task();
-        self.export(
-            req_id,
-            ProjectTask::ExportMd(ExportMarkdownTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Text file(s).
-    pub fn export_text(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-        let export = self.config.export_task();
-        self.export(
-            req_id,
-            ProjectTask::ExportText(ExportTextTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Query the current document and export the result as JSON file(s).
-    pub fn export_query(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as QueryOpts);
-        // todo: deprecate it
-        let _ = opts.strict;
-
-        let mut export = self.config.export_task();
-        if opts.pretty.unwrap_or(true) {
-            export.apply_pretty();
-        }
-
-        self.export(
-            req_id,
-            ProjectTask::Query(QueryTask {
-                format: opts.format,
-                output_extension: opts.output_extension,
-                selector: opts.selector,
-                field: opts.field,
-                one: opts.one.unwrap_or(false),
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Svg file(s).
-    pub fn export_svg(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let mut export = self.config.export_task();
-        select_page(&mut export, opts.page).map_err(invalid_params)?;
-
-        self.export(
-            req_id,
-            ProjectTask::ExportSvg(ExportSvgTask { export }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as Png file(s).
-    pub fn export_png(&mut self, req_id: RequestId, mut args: Vec<JsonValue>) -> ScheduledResult {
-        let opts = get_arg_or_default!(args[1] as ExportOpts);
-
-        let ppi = opts.ppi.unwrap_or(144.);
-        let ppi = ppi
-            .try_into()
-            .context("cannot convert ppi")
-            .map_err(invalid_params)?;
-
-        let mut export = self.config.export_task();
-        select_page(&mut export, opts.page).map_err(invalid_params)?;
-
-        self.export(
-            req_id,
-            ProjectTask::ExportPng(ExportPngTask {
-                fill: opts.fill,
-                ppi,
-                export,
-            }),
-            opts.open.unwrap_or_default(),
-            args,
-        )
-    }
-
-    /// Export the current document as some format. The client is responsible
-    /// for passing the correct absolute path of typst document.
-    pub fn export(
-        &mut self,
-        req_id: RequestId,
-        task: ProjectTask,
-        open: bool,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        let path = get_arg!(args[0] as PathBuf);
-
-        run_query!(req_id, self.OnExport(path, open, task))
-    }
-
     /// Export a range of the current document as Ansi highlighted text.
     pub fn export_ansi_hl(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         let path = get_arg!(args[0] as PathBuf);
@@ -253,9 +78,7 @@ impl ServerState {
         range: Option<LspRange>,
         f: impl Fn(Source, Option<Range<usize>>) -> LspResult<T>,
     ) -> LspResult<T> {
-        let s = self
-            .query_source(path.into(), Ok)
-            .map_err(|e| internal_error(format!("cannot find source: {e}")))?;
+        let s = self.query_source(path.into(), Ok)?;
 
         // todo: cannot select syntax-sensitive data well
         // let node = LinkedNode::new(s.root());
@@ -369,7 +192,7 @@ impl ServerState {
     /// Scroll preview instances.
     #[cfg(feature = "preview")]
     pub fn scroll_preview(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
-        use typst_preview::ControlPlaneMessage;
+        use tinymist_preview::ControlPlaneMessage;
 
         if args.is_empty() {
             return self.preview.scroll_all(self.infer_pos()?);
@@ -382,10 +205,11 @@ impl ServerState {
     }
 
     /// Initialize a new template.
+    #[cfg(feature = "system")]
     pub fn init_template(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tool::package::{self, TemplateSource};
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct InitResult {
             entry_path: PathBuf,
@@ -432,6 +256,7 @@ impl ServerState {
     }
 
     /// Get the entry of a template.
+    #[cfg(feature = "system")]
     pub fn get_template_entry(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
         use crate::tool::package::{self, TemplateSource};
 
@@ -469,11 +294,7 @@ impl ServerState {
     }
 
     /// Interact with the code context at the source file.
-    pub fn interact_code_context(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn interact_code_context(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
         let queries = _arguments.into_iter().next().ok_or_else(|| {
             invalid_params("The first parameter is not a valid code context query array")
         })?;
@@ -490,11 +311,13 @@ impl ServerState {
         let path = as_path(params.text_document);
         let query = params.query;
 
-        run_query!(req_id, self.InteractCodeContext(path, query))
+        run_query!(self.InteractCodeContext(path, query))
     }
 
     /// Get the trace data of the document.
+    #[cfg(feature = "trace")]
     pub fn get_document_trace(&mut self, mut args: Vec<JsonValue>) -> AnySchedulableResponse {
+        use std::ops::Deref;
         let path = get_arg!(args[0] as PathBuf).into();
 
         // get path to self program
@@ -517,13 +340,16 @@ impl ServerState {
                 .map_err(internal_error)?;
             let main = entry
                 .main()
-                .and_then(|e| e.vpath().resolve(&root))
                 .ok_or_else(
                     || error_once!("main file must be resolved, got", entry: display_entry()),
                 )
                 .map_err(internal_error)?;
+            let main = main
+                .vpath()
+                .realize(&root)
+                .map_err(|err| internal_error(format!("cannot realize main path: {err}")))?;
 
-            let task = user_action.trace(TraceParams {
+            let task = user_action.trace_document(TraceParams {
                 compiler_program: self_path,
                 root: root.as_ref().to_owned(),
                 main,
@@ -538,32 +364,67 @@ impl ServerState {
         })
     }
 
+    /// Start to get the trace data of the server.
+    #[cfg(feature = "trace")]
+    pub fn start_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_cell = &mut self.server_trace;
+        if task_cell
+            .as_ref()
+            .is_some_and(|task| task.stop_tx.is_closed())
+        {
+            *task_cell = None;
+        }
+
+        if task_cell.is_some() {
+            return Err(internal_error("server trace is already started"));
+        }
+
+        let (task, resp) = self.user_action.trace_server();
+        *task_cell = Some(task);
+
+        log::info!("server trace started");
+
+        resp
+    }
+
+    /// Stop getting the trace data of the server.
+    #[cfg(feature = "trace")]
+    pub fn stop_server_trace(&mut self, _args: Vec<JsonValue>) -> AnySchedulableResponse {
+        let task_cell = &mut self.server_trace;
+        if task_cell
+            .as_ref()
+            .is_some_and(|task| task.stop_tx.is_closed())
+        {
+            log::info!("server trace is dropped");
+            *task_cell = None;
+        }
+
+        let Some(task) = task_cell.take() else {
+            return Err(internal_error("server trace is not started or stopped"));
+        };
+
+        if task.stop_tx.send(()).is_err() {
+            return Err(internal_error("cannot send stop signal to server trace"));
+        }
+
+        log::info!("server trace stopping");
+        just_future(async move { task.resp_rx.await.map_err(internal_error)? })
+    }
+
     /// Get the metrics of the document.
-    pub fn get_document_metrics(
-        &mut self,
-        req_id: RequestId,
-        mut args: Vec<JsonValue>,
-    ) -> ScheduledResult {
+    pub fn get_document_metrics(&mut self, mut args: Vec<JsonValue>) -> ScheduleResult {
         let path = get_arg!(args[0] as PathBuf);
-        run_query!(req_id, self.DocumentMetrics(path))
+        run_query!(self.DocumentMetrics(path))
     }
 
     /// Get all syntactic labels in workspace.
-    pub fn get_workspace_labels(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        run_query!(req_id, self.WorkspaceLabel())
+    pub fn get_workspace_labels(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
+        run_query!(self.WorkspaceLabel())
     }
 
     /// Get the server info.
-    pub fn get_server_info(
-        &mut self,
-        req_id: RequestId,
-        _arguments: Vec<JsonValue>,
-    ) -> ScheduledResult {
-        run_query!(req_id, self.ServerInfo())
+    pub fn get_server_info(&mut self, _arguments: Vec<JsonValue>) -> ScheduleResult {
+        run_query!(self.ServerInfo())
     }
 }
 
@@ -592,6 +453,7 @@ impl ServerState {
     }
 
     /// Get directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_package_dirs(&mut self, _arguments: Vec<JsonValue>) -> AnySchedulableResponse {
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
@@ -602,6 +464,7 @@ impl ServerState {
     }
 
     /// Get writable directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_local_package_dir(
         &mut self,
         _arguments: Vec<JsonValue>,
@@ -615,6 +478,7 @@ impl ServerState {
     }
 
     /// Get writable directory of packages
+    #[cfg(feature = "system")]
     pub fn resource_package_by_ns(
         &mut self,
         mut arguments: Vec<JsonValue>,
@@ -623,10 +487,13 @@ impl ServerState {
 
         let snap = self.snapshot().map_err(internal_error)?;
         just_future(async move {
-            let packages = tinymist_query::package::list_package_by_namespace(snap.registry(), ns)
-                .into_iter()
-                .map(PackageInfo::from)
-                .collect::<Vec<_>>();
+            let packages = tinymist_query::package::list_package(
+                snap.world(),
+                tinymist_query::package::PackageFilter::For(ns),
+            )
+            .into_iter()
+            .map(PackageInfo::from)
+            .collect::<Vec<_>>();
 
             serde_json::to_value(packages).map_err(|e| internal_error(e.to_string()))
         })
@@ -665,15 +532,28 @@ impl ServerState {
         just_future(async move { serde_json::to_value(fut.await?).map_err(internal_error) })
     }
 
+    /// Get the lsif for package
+    pub fn resource_lsif_(
+        &mut self,
+        info: PackageInfo,
+    ) -> LspResult<impl Future<Output = LspResult<String>>> {
+        self.within_package(info.clone(), move |a| {
+            let knowledge = tinymist_query::index::knowledge(a)
+                .map_err(map_string_err("failed to generate docs"))?;
+            Ok(knowledge.bind(a.shared()).to_string())
+        })
+    }
+
     /// Get the all symbol docs
     pub fn resource_package_docs_(
         &mut self,
         info: PackageInfo,
     ) -> LspResult<impl Future<Output = LspResult<String>>> {
         self.within_package(info.clone(), move |a| {
-            tinymist_query::docs::package_docs(a, &info)
+            let doc = tinymist_query::docs::package_docs(a, &info)
+                .map_err(map_string_err("failed to generate docs"))?;
+            tinymist_query::docs::package_docs_md(&doc)
                 .map_err(map_string_err("failed to generate docs"))
-                .map_err(internal_error)
         })
     }
 
@@ -685,7 +565,6 @@ impl ServerState {
         self.within_package(info.clone(), move |a| {
             tinymist_query::package::check_package(a, &info)
                 .map_err(map_string_err("failed to check package"))
-                .map_err(internal_error)
         })
     }
 
@@ -693,47 +572,9 @@ impl ServerState {
     pub fn within_package<T>(
         &mut self,
         info: PackageInfo,
-        f: impl FnOnce(&mut LocalContextGuard) -> LspResult<T> + Send + Sync,
+        f: impl FnOnce(&mut LocalContextGuard) -> Result<T> + Send + Sync,
     ) -> LspResult<impl Future<Output = LspResult<T>>> {
         let snap = self.query_snapshot().map_err(internal_error)?;
-
-        Ok(async move {
-            let world = snap.world();
-
-            let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
-                let toml_id = tinymist_query::package::get_manifest_id(&info)?;
-                let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
-                let pkg_root = toml_path.parent().ok_or_else(|| {
-                    eco_format!("cannot get package root (parent of {toml_path:?})")
-                })?;
-
-                let manifest = tinymist_query::package::get_manifest(world, toml_id)?;
-                let entry_point = toml_id.join(&manifest.package.entrypoint);
-
-                Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
-            });
-            let entry = entry.map_err(|e| internal_error(e.to_string()))?;
-
-            let snap = snap.task(TaskInputs {
-                entry: Some(entry),
-                inputs: None,
-            });
-
-            snap.run_analysis(f).map_err(internal_error)?
-        })
+        Ok(async move { snap.run_within_package(&info, f).map_err(internal_error) })
     }
-}
-
-/// Applies page selection to the export task.
-fn select_page(task: &mut ExportTask, selection: PageSelection) -> Result<()> {
-    match selection {
-        PageSelection::First => task.transform.push(ExportTransform::Pages {
-            ranges: vec![Pages::FIRST],
-        }),
-        PageSelection::Merged { gap } => {
-            task.transform.push(ExportTransform::Merge { gap });
-        }
-    }
-
-    Ok(())
 }

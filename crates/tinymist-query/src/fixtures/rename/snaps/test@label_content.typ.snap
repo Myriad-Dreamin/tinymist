@@ -1,0 +1,34 @@
+---
+source: crates/tinymist-query/src/rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/label_content.typ
+---
+{
+ "changeAnnotations": {
+  "Typst Rename Labels": {
+   "description": "The language server fuzzy searched the labels",
+   "label": "Typst Rename Labels",
+   "needsConfirmation": true
+  }
+ },
+ "documentChanges": [
+  {
+   "edits": [
+    {
+     "annotationId": "Typst Rename Labels",
+     "newText": "new_name",
+     "range": "4:22:4:31"
+    },
+    {
+     "annotationId": "Typst Rename Labels",
+     "newText": "new_name",
+     "range": "3:17:3:26"
+    }
+   ],
+   "textDocument": {
+    "uri": "s0.typ",
+    "version": null
+   }
+  }
+ ]
+}

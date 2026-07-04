@@ -318,6 +318,22 @@ impl<T, E: std::fmt::Display> IgnoreLogging<T> for Result<T, E> {
     }
 }
 
+impl<T> IgnoreLogging<T> for Option<T> {
+    fn log_error(self, msg: &str) -> Option<T> {
+        self.or_else(|| {
+            log::error!("{msg}");
+            None
+        })
+    }
+
+    fn log_error_with(self, f: impl FnOnce() -> String) -> Option<T> {
+        self.or_else(|| {
+            log::error!("{}", f());
+            None
+        })
+    }
+}
+
 /// A trait to add context to a result.
 pub trait WithContext<T>: Sized {
     /// Add a context to the result.
@@ -379,32 +395,49 @@ impl<T, E: std::fmt::Display> WithContextUntyped<T> for Result<T, E> {
     }
 }
 
+impl<T> WithContextUntyped<T> for Option<T> {
+    fn context_ut(self, loc: &'static str) -> Result<T> {
+        self.ok_or_else(|| Error::new(loc, ErrKind::None, None))
+    }
+
+    fn with_context_ut<F>(self, loc: &'static str, f: F) -> Result<T>
+    where
+        F: FnOnce() -> Option<Box<[(&'static str, String)]>>,
+    {
+        self.ok_or_else(|| Error::new(loc, ErrKind::None, f()))
+    }
+}
+
 /// The error prelude.
 pub mod prelude {
-    #![allow(missing_docs)]
 
     use super::ErrKindExt;
     use crate::Error;
 
     pub use super::{IgnoreLogging, WithContext, WithContextUntyped};
-    pub use crate::{bail, Result};
+    pub use crate::{Result, bail};
 
+    /// Maps the given string error to an error.
     pub fn map_string_err<T: ToString>(loc: &'static str) -> impl Fn(T) -> Error {
         move |e| Error::new(loc, e.to_string().to_error_kind(), None)
     }
 
+    /// Maps the given error to an error.
     pub fn map_into_err<S: ErrKindExt, T: Into<S>>(loc: &'static str) -> impl Fn(T) -> Error {
         move |e| Error::new(loc, e.into().to_error_kind(), None)
     }
 
+    /// Maps the given error to an error.
     pub fn map_err<T: ErrKindExt>(loc: &'static str) -> impl Fn(T) -> Error {
         move |e| Error::new(loc, e.to_error_kind(), None)
     }
 
+    /// Wraps the given error.
     pub fn wrap_err(loc: &'static str) -> impl Fn(Error) -> Error {
         move |e| Error::new(loc, crate::ErrKind::Inner(e), None)
     }
 
+    /// Maps the given string error to an error with arguments.
     pub fn map_string_err_with_args<
         T: ToString,
         Args: IntoIterator<Item = (&'static str, String)>,
@@ -421,6 +454,7 @@ pub mod prelude {
         }
     }
 
+    /// Maps the given error to an error with arguments.
     pub fn map_into_err_with_args<
         S: ErrKindExt,
         T: Into<S>,
@@ -438,6 +472,7 @@ pub mod prelude {
         }
     }
 
+    /// Maps the given error to an error with arguments.
     pub fn map_err_with_args<T: ErrKindExt, Args: IntoIterator<Item = (&'static str, String)>>(
         loc: &'static str,
         args: Args,
@@ -451,6 +486,7 @@ pub mod prelude {
         }
     }
 
+    /// Wraps the given error with arguments.
     pub fn wrap_err_with_args<Args: IntoIterator<Item = (&'static str, String)>>(
         loc: &'static str,
         args: Args,
@@ -464,16 +500,20 @@ pub mod prelude {
         }
     }
 
+    /// Creates an error with arguments.
     pub fn _error_once(loc: &'static str, args: Box<[(&'static str, String)]>) -> Error {
         Error::new(loc, crate::ErrKind::None, Some(args))
     }
 
+    /// Creates an error with a message.
     pub fn _msg(loc: &'static str, msg: EcoString) -> Error {
         Error::new(loc, crate::ErrKind::Msg(msg), None)
     }
 
+    /// Formats a string.
     pub use ecow::eco_format as _eco_format;
 
+    /// Bails with the given arguments.
     #[macro_export]
     macro_rules! bail {
         ($($arg:tt)+) => {{
@@ -482,6 +522,7 @@ pub mod prelude {
         }};
     }
 
+    /// Creates an error with a message.
     #[macro_export]
     macro_rules! error_once {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
@@ -492,6 +533,7 @@ pub mod prelude {
         };
     }
 
+    /// Maps the given error to an error with arguments.
     #[macro_export]
     macro_rules! error_once_map {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {
@@ -502,6 +544,7 @@ pub mod prelude {
         };
     }
 
+    /// Maps the given string error to an error with arguments.
     #[macro_export]
     macro_rules! error_once_map_string {
         ($loc:expr, $($arg_key:ident: $arg:expr),+ $(,)?) => {

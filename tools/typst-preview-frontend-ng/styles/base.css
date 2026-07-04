@@ -1,0 +1,43 @@
+:root {
+  color-scheme: light dark;
+  --bg: var(--vscode-editor-background, #1f1f1f);
+  --fg: var(--vscode-editor-foreground, #d4d4d4);
+  --muted: var(--vscode-descriptionForeground, #9a9a9a);
+  --border: var(--vscode-panel-border, #3c3c3c);
+  --accent: var(--vscode-focusBorder, #0078d4);
+  --surface: var(--vscode-sideBar-background, #252526);
+  --page-bg: #ffffff;
+  --inverted-page-bg: #111111;
+  --page-shadow: color-mix(in srgb, #000000 30%, transparent);
+  --cursor-color: var(--vscode-editorCursor-foreground, #aeafad);
+  --jump-color: #66bab7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--vscode-font-family, system-ui, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+.hidden,
+[hidden] {
+  display: none !important;
+}
+
+#typst-preview-ng {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr;
+  width: 100%;
+  height: 100%;
+}

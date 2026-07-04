@@ -95,11 +95,11 @@ pub struct DocumentMetricsRequest {
     pub path: PathBuf,
 }
 
-impl StatefulRequest for DocumentMetricsRequest {
+impl SemanticRequest for DocumentMetricsRequest {
     type Response = DocumentMetricsResponse;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref()?;
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
+        let doc = ctx.success_doc()?.clone();
 
         let mut worker = DocumentMetricsWorker {
             ctx,
@@ -108,7 +108,7 @@ impl StatefulRequest for DocumentMetricsRequest {
             font_info: Default::default(),
         };
 
-        worker.work(doc)?;
+        worker.work(&doc)?;
 
         let font_info = worker.compute()?;
         let span_info = SpanInfo {
@@ -140,7 +140,7 @@ impl DocumentMetricsWorker<'_> {
     fn work(&mut self, doc: &TypstDocument) -> Option<()> {
         match doc {
             TypstDocument::Paged(paged_doc) => {
-                for page in &paged_doc.pages {
+                for page in paged_doc.pages() {
                     self.work_frame(&page.frame)?;
                 }
 
@@ -170,7 +170,7 @@ impl DocumentMetricsWorker<'_> {
     }
 
     fn work_text(&mut self, text: &TextItem) -> Option<()> {
-        let font_key = text.font.clone();
+        let font_key = text.font.font().clone();
         let glyph_len = text.glyphs.len();
 
         let has_source_info = if let Some(font_info) = self.font_info.get(&font_key) {
@@ -206,11 +206,11 @@ impl DocumentMetricsWorker<'_> {
         let world = self.ctx.world();
         let file_id = span.id()?;
         let source = world.source(file_id).ok()?;
-        let range = source.range(span)?;
+        let range = source_range(&source, span)?;
         let byte_index = range.start + usize::from(span_offset);
         let byte_index = byte_index.min(range.end - 1);
-        let line = source.byte_to_line(byte_index)?;
-        let column = source.byte_to_column(byte_index)?;
+        let line = source.lines().byte_to_line(byte_index)?;
+        let column = source.lines().byte_to_column(byte_index)?;
 
         let filepath = self.ctx.path_for_id(file_id).ok()?;
         let filepath_str = filepath.as_path().display().to_string();
@@ -229,7 +229,6 @@ impl DocumentMetricsWorker<'_> {
     }
 
     fn compute(&mut self) -> Option<Vec<DocumentFontInfo>> {
-        use ttf_parser::name_id::*;
         let font_info = std::mem::take(&mut self.font_info)
             .into_iter()
             .map(|(font, font_info_value)| {
@@ -240,9 +239,9 @@ impl DocumentMetricsWorker<'_> {
                     style: info.variant.style,
                     weight: info.variant.weight,
                     stretch: info.variant.stretch,
-                    postscript_name: font.find_name(POST_SCRIPT_NAME),
-                    full_name: font.find_name(FULL_NAME),
-                    family: font.find_name(FAMILY),
+                    postscript_name: font.post_script_name(),
+                    full_name: Some(info.family.clone()),
+                    family: Some(info.family.clone()),
                     fixed_family: Some(info.family.clone()),
                     source: extra.map(|source| self.internal_source(source)),
                     index: Some(font.index()),

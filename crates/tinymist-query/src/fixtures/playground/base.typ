@@ -1,2 +1,2 @@
-#let tmpl2(stroke) = text(stroke: stroke)
-#tmpl2(/* position */)
+#let f() = 1;
+#(/* position after */ f());

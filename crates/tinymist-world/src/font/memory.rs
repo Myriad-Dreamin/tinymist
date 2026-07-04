@@ -1,6 +1,9 @@
+//! Font searchers to run the compiler in the generic environment (for example,
+//! `nostd`).
+
 use std::sync::Arc;
 
-use rayon::iter::ParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use typst::foundations::Bytes;
 use typst::text::{FontBook, FontInfo};
 
@@ -10,6 +13,7 @@ use crate::font::{BufferFontLoader, FontResolverImpl, FontSlot};
 /// A memory font searcher.
 #[derive(Debug)]
 pub struct MemoryFontSearcher {
+    /// The fonts found during the search.
     pub fonts: Vec<(FontInfo, FontSlot)>,
 }
 
@@ -25,20 +29,44 @@ impl MemoryFontSearcher {
         Self { fonts: vec![] }
     }
 
-    /// Adds an in-memory font.
+    /// Creates a new searcher with fonts in a font resolver.
+    pub fn from_resolver(resolver: FontResolverImpl) -> Self {
+        let fonts = resolver
+            .slots
+            .into_iter()
+            .enumerate()
+            .map(|(idx, slot)| {
+                (
+                    resolver
+                        .book
+                        .info(idx)
+                        .expect("font should be in font book")
+                        .clone(),
+                    slot,
+                )
+            })
+            .collect();
+
+        Self { fonts }
+    }
+
+    /// Adds an in-memory font to the searcher.
     pub fn add_memory_font(&mut self, data: Bytes) {
         self.add_memory_fonts(rayon::iter::once(data));
     }
 
-    /// Adds in-memory fonts.
-    pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
+    /// Adds in-memory fonts to the searcher.
+    pub fn add_memory_fonts(&mut self, data: impl IntoParallelIterator<Item = Bytes>) {
         let source = DataSource::Memory(MemoryDataSource {
             name: "<memory>".to_owned(),
         });
-        self.extend_bytes(data.map(|data| (data, Some(source.clone()))));
+        self.extend_bytes(
+            data.into_par_iter()
+                .map(|data| (data, Some(source.clone()))),
+        );
     }
 
-    /// Adds a number of raw font resources.
+    /// Adds a number of raw font resources to the searcher.
     ///
     /// Note: if you would like to reuse font resources across builds, use
     /// [`Self::extend_bytes`] instead.
@@ -84,5 +112,6 @@ impl MemoryFontSearcher {
     }
 }
 
+/// A deprecated type to build a font resolver.
 #[deprecated(note = "use [`MemoryFontSearcher`] instead")]
 pub type MemoryFontBuilder = MemoryFontSearcher;

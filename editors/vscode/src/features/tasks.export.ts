@@ -1,31 +1,86 @@
+/** biome-ignore-all lint/complexity/useLiteralKeys: special keys */
 import * as vscode from "vscode";
+import type {
+  ExportBundleOpts,
+  ExportHtmlOpts,
+  ExportPdfOpts,
+  ExportPngOpts,
+  ExportQueryOpts,
+  ExportSvgOpts,
+  ExportTextOpts,
+  ExportTypliteOpts,
+} from "../cmd.export";
 import { tinymist } from "../lsp";
-import { VirtualConsole } from "../util";
 import { extensionState } from "../state";
+import { VirtualConsole } from "../util";
 
-type ExportFormat = "pdf" | "png" | "svg" | "html" | "markdown" | "text" | "query" | "pdfpc";
+export type ExportFormat =
+  | "pdf"
+  | "png"
+  | "svg"
+  | "html"
+  | "bundle"
+  | "markdown"
+  | "tex"
+  | "text"
+  | "query"
+  | "pdfpc";
 
-interface ExportArgs {
+export interface ExportArgs {
   format: ExportFormat | ExportFormat[];
   inputPath: string;
   outputPath: string;
-  "pdf.creationTimestamp"?: string | null;
-  "png.ppi"?: number;
-  fill?: string;
-  "png.fill"?: string;
+
+  pages?: string | string[]; // Array of page ranges like ["1-3", "5", "7-9"], or comma separated ranges
+  "pdf.pages"?: string | string[];
+  "png.pages"?: string | string[];
+  "svg.pages"?: string | string[];
+
+  pageNumberTemplate?: string;
+  "png.pageNumberTemplate"?: string;
+  "svg.pageNumberTemplate"?: string;
+
   merged?: boolean;
   "svg.merged"?: boolean;
   "png.merged"?: boolean;
+
   "merged.gap"?: string;
   "png.merged.gap"?: string;
   "svg.merged.gap"?: string;
-  "query.format"?: string;
+
+  "pdf.creationTimestamp"?: string | null;
+  "pdf.pdfVersion"?: string;
+  "pdf.pdfValidator"?: string;
+  "pdf.pdfStandard"?: string[];
+  "pdf.pdfTags"?: boolean;
+
+  "bundle.pages"?: string | string[];
+  "bundle.creationTimestamp"?: string | null;
+  "bundle.pdfVersion"?: string;
+  "bundle.pdfValidator"?: string;
+  "bundle.pdfStandard"?: string[];
+  "bundle.pdfTags"?: boolean;
+  "bundle.ppi"?: number;
+
+  "png.ppi"?: number;
+
+  fill?: string;
+  "png.fill"?: string;
+
+  "query.format": string;
   "query.outputExtension"?: string;
   "query.strict"?: boolean;
   "query.pretty"?: boolean;
-  "query.selector"?: string;
+  "query.selector": string;
   "query.field"?: string;
   "query.one"?: boolean;
+
+  processor?: string;
+  "markdown.processor"?: string;
+  "tex.processor"?: string;
+  assetsPath?: string;
+  "markdown.assetsPath"?: string;
+  "tex.assetsPath"?: string;
 }
 
 export const runExport = (def: vscode.TaskDefinition) => {
@@ -39,7 +94,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
     onDidWrite: vc.writeEmitter.event,
     onDidClose: closeEmitter.event,
     open,
-    close() {},
+    close() { },
   });
 
   async function open() {
@@ -47,7 +102,7 @@ export const runExport = (def: vscode.TaskDefinition) => {
 
     try {
       await run();
-    } catch (e: any) {
+    } catch (e) {
       vc.writeln(`Typst export task failed: ${err(e)}`);
     } finally {
       closeEmitter.fire(0);
@@ -79,21 +134,21 @@ export const runExport = (def: vscode.TaskDefinition) => {
   }
 };
 
-const exportOps = (exportArgs: ExportArgs) => ({
-  inheritedProp(prop: "merged" | "merged.gap", from: "svg" | "png"): any {
-    return exportArgs[`${from}.${prop}`] === undefined
-      ? exportArgs[prop]
-      : exportArgs[`${from}.${prop}`];
+export const exportOps = (exportArgs: ExportArgs) => ({
+  inheritedProp<P extends keyof ExportArgs>(prop: P, from: ExportFormat): ExportArgs[P] {
+    const key = `${from}.${prop}` as keyof ExportArgs;
+    return exportArgs[key] === undefined ? exportArgs[prop] : (exportArgs[key] as ExportArgs[P]);
   },
-  resolvePageOpts(fmt: "svg" | "png"): any {
+  resolvePagesOpts(fmt: "pdf" | "png" | "svg" | "bundle") {
+    const pages = this.inheritedProp("pages", fmt);
+    return typeof pages === "string" ? pages.split(",") : pages;
+  },
+  resolveMergeOpts(fmt: "png" | "svg") {
     if (this.inheritedProp("merged", fmt)) {
       return {
-        merged: {
-          gap: this.inheritedProp("merged.gap", fmt),
-        },
+        gap: this.inheritedProp("merged.gap", fmt),
       };
     }
-    return "first";
   },
   resolveInputPath() {
     const inputPath = exportArgs.inputPath;
@@ -105,53 +160,112 @@ const exportOps = (exportArgs: ExportArgs) => ({
   },
 });
 
-const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => ({
+export const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => ({
   pdf: {
-    opts() {
+    opts(): ExportPdfOpts {
+      const rawCreationTimestamp = exportArgs["pdf.creationTimestamp"];
+      const creationTimestamp = rawCreationTimestamp?.includes("T")
+        ? Math.floor(new Date(rawCreationTimestamp).getTime() / 1000).toString() // datetime-local to unix timestamp
+        : rawCreationTimestamp; // already unix timestamp or null/undefined
+
+      const pdfStandard = exportArgs["pdf.pdfStandard"] ?? [
+        ...(exportArgs["pdf.pdfVersion"] ? [exportArgs["pdf.pdfVersion"]] : []),
+        ...(exportArgs["pdf.pdfValidator"] ? [exportArgs["pdf.pdfValidator"]] : []),
+      ]; // combine version and validator into array
+
       return {
-        creationTimestamp: exportArgs["pdf.creationTimestamp"],
+        pages: ops.resolvePagesOpts("pdf"),
+        creationTimestamp,
+        pdfStandard,
+        noPdfTags: !exportArgs["pdf.pdfTags"], // invert to noPdfTags
       };
     },
     export: tinymist.exportPdf,
   },
   png: {
-    opts() {
+    opts(): ExportPngOpts {
       return {
-        ppi: exportArgs["png.ppi"] || 96,
-        fill: exportArgs["png.fill"] || exportArgs["fill"],
-        page: ops.resolvePageOpts("png"),
+        pages: ops.resolvePagesOpts("png"),
+        pageNumberTemplate:
+          exportArgs["png.pageNumberTemplate"] ?? exportArgs["pageNumberTemplate"],
+        merge: ops.resolveMergeOpts("png"),
+        ppi: exportArgs["png.ppi"],
+        fill: exportArgs["png.fill"] ?? exportArgs["fill"],
       };
     },
     export: tinymist.exportPng,
   },
   svg: {
-    opts() {
+    opts(): ExportSvgOpts {
       return {
-        page: ops.resolvePageOpts("svg"),
+        pages: ops.resolvePagesOpts("svg"),
+        pageNumberTemplate:
+          exportArgs["svg.pageNumberTemplate"] ?? exportArgs["pageNumberTemplate"],
+        merge: ops.resolveMergeOpts("svg"),
       };
     },
     export: tinymist.exportSvg,
   },
   html: {
-    opts() {
+    opts(): ExportHtmlOpts {
       return {};
     },
     export: tinymist.exportHtml,
   },
+  bundle: {
+    opts(): ExportBundleOpts {
+      const rawCreationTimestamp =
+        exportArgs["bundle.creationTimestamp"] ?? exportArgs["pdf.creationTimestamp"];
+      const creationTimestamp = rawCreationTimestamp?.includes("T")
+        ? Math.floor(new Date(rawCreationTimestamp).getTime() / 1000).toString()
+        : rawCreationTimestamp;
+
+      const pdfVersion = exportArgs["bundle.pdfVersion"] ?? exportArgs["pdf.pdfVersion"];
+      const pdfValidator = exportArgs["bundle.pdfValidator"] ?? exportArgs["pdf.pdfValidator"];
+      const pdfStandard = exportArgs["bundle.pdfStandard"] ??
+        exportArgs["pdf.pdfStandard"] ?? [
+          ...(pdfVersion ? [pdfVersion] : []),
+          ...(pdfValidator ? [pdfValidator] : []),
+        ];
+
+      const pdfTags = exportArgs["bundle.pdfTags"] ?? exportArgs["pdf.pdfTags"];
+
+      return {
+        pages: ops.resolvePagesOpts("bundle"),
+        creationTimestamp,
+        pdfStandard,
+        noPdfTags: pdfTags === undefined ? undefined : !pdfTags,
+        ppi: exportArgs["bundle.ppi"] ?? exportArgs["png.ppi"],
+      };
+    },
+    export: tinymist.exportBundle,
+  },
   markdown: {
-    opts() {
-      return {};
+    opts(): ExportTypliteOpts {
+      return {
+        processor: exportArgs["markdown.processor"] ?? exportArgs["processor"],
+        assetsPath: exportArgs["markdown.assetsPath"] ?? exportArgs["assetsPath"],
+      };
     },
     export: tinymist.exportMarkdown,
   },
+  tex: {
+    opts(): ExportTypliteOpts {
+      return {
+        processor: exportArgs["tex.processor"] ?? exportArgs["processor"],
+        assetsPath: exportArgs["tex.assetsPath"] ?? exportArgs["assetsPath"],
+      };
+    },
+    export: tinymist.exportTeX,
+  },
   text: {
-    opts() {
+    opts(): ExportTextOpts {
       return {};
     },
     export: tinymist.exportText,
   },
   query: {
-    opts() {
+    opts(): ExportQueryOpts {
       return {
         format: exportArgs["query.format"],
         outputExtension: exportArgs["query.outputExtension"],
@@ -165,7 +279,7 @@ const provideFormats = (exportArgs: ExportArgs, ops = exportOps(exportArgs)) => 
     export: tinymist.exportQuery,
   },
   pdfpc: {
-    opts() {
+    opts(): ExportQueryOpts {
       return {
         format: "json",
         pretty: exportArgs["query.pretty"],

@@ -1,10 +1,10 @@
 use typst_shim::syntax::LinkedNodeExt;
 
 use crate::{
+    SemanticRequest,
     adt::interner::Interned,
     prelude::*,
-    syntax::{classify_context, classify_syntax, ArgClass, SyntaxContext},
-    SemanticRequest,
+    syntax::{ArgClass, SyntaxContext, classify_context, classify_syntax},
 };
 
 /// The [`textDocument/signatureHelp`] request is sent from the client to the
@@ -38,7 +38,7 @@ impl SemanticRequest for SignatureHelpRequest {
         };
 
         let syntax = classify_syntax(callee, cursor)?;
-        let def = ctx.def_of_syntax(&source, None, syntax)?;
+        let def = ctx.def_of_syntax_or_dyn(&source, syntax)?;
         let sig = ctx.sig_of_def(def.clone())?;
         crate::log_debug_ct!("got signature {sig:?}");
 
@@ -66,7 +66,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 }
                 ArgClass::Named(name) => {
                     let focus_name = focus_name
-                        .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
+                        .get_or_init(|| Interned::new_str(&name.get().clone().full_text()));
                     if focus_name == &param.name {
                         active_parameter = Some(real_offset);
                     }
@@ -88,14 +88,11 @@ impl SemanticRequest for SignatureHelpRequest {
                     .unwrap_or("any")
             ));
 
+            let documentation = param.docs.as_ref().map(|docs| markdown_docs(ctx, docs));
+
             params.push(ParameterInformation {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: param.docs.as_ref().map(|docs| {
-                    Documentation::MarkupContent(MarkupContent {
-                        value: docs.as_ref().into(),
-                        kind: MarkupKind::Markdown,
-                    })
-                }),
+                documentation,
             });
         }
         label.push(')');
@@ -115,7 +112,11 @@ impl SemanticRequest for SignatureHelpRequest {
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {
                 label: label.to_string(),
-                documentation: sig.primary().docs.as_deref().map(markdown_docs),
+                documentation: sig
+                    .primary()
+                    .docs
+                    .as_ref()
+                    .map(|docs| markdown_docs(ctx, docs)),
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
             }],
@@ -125,10 +126,11 @@ impl SemanticRequest for SignatureHelpRequest {
     }
 }
 
-fn markdown_docs(docs: &str) -> Documentation {
+fn markdown_docs(ctx: &mut LocalContext, docs: &crate::docs::DocText) -> Documentation {
+    let docs = crate::docs::resolve_doc_text(ctx.shared(), docs);
     Documentation::MarkupContent(MarkupContent {
         kind: MarkupKind::Markdown,
-        value: docs.to_owned(),
+        value: docs.into(),
     })
 }
 
@@ -141,7 +143,7 @@ mod tests {
     fn test() {
         snapshot_testing("signature_help", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
-            let (position, anno) = make_pos_annoation(&source);
+            let (position, anno) = make_pos_annotation(&source);
 
             let request = SignatureHelpRequest { path, position };
 

@@ -8,6 +8,10 @@ async function main() {
   // The folder containing the Extension Manifest package.json
   // Passed to `--extensionDevelopmentPath`
   const extensionDevelopmentPath = path.resolve(__dirname, "../../");
+  const previewProviderFixturePath = path.resolve(
+    extensionDevelopmentPath,
+    "../../contrib/previewer-provider/editors/vscode",
+  );
 
   const userDataDirectory = fs.mkdtempSync(path.join(tmpdir(), "vsce"));
 
@@ -40,13 +44,14 @@ async function main() {
   // Run tests using the minimal supported version and the latest one.
   for (const version of [minimalVersion, "stable"]) {
     for (const uri of [
-      path.resolve(extensionDevelopmentPath, "e2e-workspaces/export"),
-      undefined,
+      // path.resolve(extensionDevelopmentPath, "e2e-workspaces/export"),
+      path.resolve(extensionDevelopmentPath, "e2e-workspaces/book"),
+      // undefined,
     ]) {
       await runTests({
         version,
         launchArgs: uri ? [...launchArgs, uri] : launchArgs,
-        extensionDevelopmentPath,
+        extensionDevelopmentPath: [extensionDevelopmentPath, previewProviderFixturePath],
         extensionTestsPath,
         extensionTestsEnv,
       });

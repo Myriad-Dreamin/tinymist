@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use lsp_types::request::WorkspaceConfiguration;
+use lsp_types::request::*;
 use lsp_types::*;
 use reflexo::ImmutPath;
 use request::{RegisterCapability, UnregisterCapability};
@@ -10,6 +10,9 @@ use tinymist_std::error::{prelude::*, IgnoreLogging};
 
 pub mod init;
 pub(crate) mod query;
+
+#[cfg(all(test, feature = "system"))]
+mod workspace_change_tests;
 
 use crate::actor::editor::{EditorActorConfig, EditorRequest};
 use crate::task::FormatterConfig;
@@ -60,6 +63,7 @@ impl ServerState {
             .log_error("could not register to watch config changes");
         }
 
+        self.schedule_async();
         log::info!("server initialized");
         Ok(())
     }
@@ -86,7 +90,7 @@ impl ServerState {
 impl ServerState {
     pub(crate) fn did_open(&mut self, params: DidOpenTextDocumentParams) -> LspResult<()> {
         log::info!("did open {}", params.text_document.uri);
-        let path: ImmutPath = as_path_(params.text_document.uri).as_path().into();
+        let path: ImmutPath = as_path_(&params.text_document.uri).as_path().into();
         let text = params.text_document.text;
 
         self.create_source(path.clone(), text)
@@ -94,26 +98,34 @@ impl ServerState {
 
         // Focus after opening
         self.implicit_focus_entry(|| Some(path), 'o');
+
+        self.schedule_async();
         Ok(())
     }
 
     pub(crate) fn did_close(&mut self, params: DidCloseTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri).as_path().into();
+        let path = as_path(params.text_document).as_path().into();
 
         self.remove_source(path).map_err(invalid_params)?;
+        self.schedule_async();
         Ok(())
     }
 
     pub(crate) fn did_change(&mut self, params: DidChangeTextDocumentParams) -> LspResult<()> {
-        let path = as_path_(params.text_document.uri).as_path().into();
+        let path = as_path_(&params.text_document.uri).as_path().into();
         let changes = params.content_changes;
 
         self.edit_source(path, changes, self.const_config().position_encoding)
             .map_err(invalid_params)?;
+        self.schedule_async();
         Ok(())
     }
 
-    pub(crate) fn did_save(&mut self, _params: DidSaveTextDocumentParams) -> LspResult<()> {
+    pub(crate) fn did_save(&mut self, params: DidSaveTextDocumentParams) -> LspResult<()> {
+        let path = as_path(params.text_document).as_path().into();
+        self.save_source(path).map_err(invalid_params)?;
+
+        self.schedule_async();
         Ok(())
     }
 }
@@ -136,9 +148,14 @@ impl ServerState {
             }
         }
 
-        let new_export_config = self.config.export();
-        if old_config.export() != new_export_config {
-            self.change_export_config(new_export_config);
+        self.config.configure_syntax_only();
+
+        #[cfg(feature = "export")]
+        {
+            let new_export_config = self.config.export();
+            if old_config.export() != new_export_config {
+                self.change_export_config(new_export_config);
+            }
         }
 
         if old_config.notify_status != self.config.notify_status {
@@ -149,8 +166,18 @@ impl ServerState {
                 .log_error("could not change editor actor configuration");
         }
 
-        if old_config.primary_opts() != self.config.primary_opts() {
-            self.config.fonts = OnceLock::new(); // todo: don't reload fonts if not changed
+        let primary_opts_changed = old_config.primary_opts() != self.config.primary_opts();
+        let restart_scoped_client_opts_changed =
+            old_config.restart_scoped_client_opts() != self.config.restart_scoped_client_opts();
+        if primary_opts_changed || restart_scoped_client_opts_changed {
+            if old_config.delegate_fs_requests != self.config.delegate_fs_requests {
+                self.config.access_model = OnceLock::new();
+                self.config.watch_access_model = OnceLock::new();
+            }
+            if primary_opts_changed {
+                // todo: don't reload fonts if not changed
+                self.config.fonts = OnceLock::new();
+            }
             self.reload_projects()
                 .log_error("could not restart primary");
         }
@@ -170,6 +197,7 @@ impl ServerState {
         }
 
         log::info!("new settings applied");
+        self.schedule_async();
         Ok(())
     }
 
@@ -299,12 +327,20 @@ impl ServerState {
         }
 
         const FORMATTING_REGISTRATION_ID: &str = "formatting";
-        const DOCUMENT_FORMATTING_METHOD_ID: &str = "textDocument/formatting";
+        const RANGE_FORMATTING_REGISTRATION_ID: &str = "rangeFormatting";
 
         pub fn get_formatting_registration() -> Registration {
             Registration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                method: Formatting::METHOD.to_owned(),
+                register_options: None,
+            }
+        }
+
+        pub fn get_range_formatting_registration() -> Registration {
+            Registration {
+                id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
+                method: RangeFormatting::METHOD.to_owned(),
                 register_options: None,
             }
         }
@@ -312,22 +348,35 @@ impl ServerState {
         pub fn get_formatting_unregistration() -> Unregistration {
             Unregistration {
                 id: FORMATTING_REGISTRATION_ID.to_owned(),
-                method: DOCUMENT_FORMATTING_METHOD_ID.to_owned(),
+                method: Formatting::METHOD.to_owned(),
+            }
+        }
+
+        pub fn get_range_formatting_unregistration() -> Unregistration {
+            Unregistration {
+                id: RANGE_FORMATTING_REGISTRATION_ID.to_owned(),
+                method: RangeFormatting::METHOD.to_owned(),
             }
         }
 
         match (enable, self.formatter_registered) {
             (true, false) => {
                 log::trace!("registering formatter");
-                self.register_capability(vec![get_formatting_registration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not register formatter")
+                self.register_capability(vec![
+                    get_formatting_registration(),
+                    get_range_formatting_registration(),
+                ])
+                .inspect(|_| self.formatter_registered = enable)
+                .context("could not register formatter")
             }
             (false, true) => {
                 log::trace!("unregistering formatter");
-                self.unregister_capability(vec![get_formatting_unregistration()])
-                    .inspect(|_| self.formatter_registered = enable)
-                    .context("could not unregister formatter")
+                self.unregister_capability(vec![
+                    get_formatting_unregistration(),
+                    get_range_formatting_unregistration(),
+                ])
+                .inspect(|_| self.formatter_registered = enable)
+                .context("could not unregister formatter")
             }
             _ => Ok(()),
         }

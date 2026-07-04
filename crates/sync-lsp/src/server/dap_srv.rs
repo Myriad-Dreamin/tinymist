@@ -1,8 +1,11 @@
+#[cfg(feature = "system")]
+use std::sync::atomic::Ordering;
+
 use dapts::IRequest;
 
 use super::*;
 
-impl<S: 'static> TypedLspClient<S> {
+impl LspClient {
     /// Sends a dap event to the client.
     pub fn send_dap_event<E: dapts::IEvent>(&self, body: E::Body) {
         let req_id = self.req_queue.lock().outgoing.alloc_request_id();
@@ -12,14 +15,7 @@ impl<S: 'static> TypedLspClient<S> {
 
     /// Sends an untyped dap_event to the client.
     pub fn send_dap_event_(&self, evt: dap::Event) {
-        let method = &evt.event;
-        let Some(sender) = self.sender.upgrade() else {
-            log::warn!("failed to send dap event ({method}): connection closed");
-            return;
-        };
-        if let Err(res) = sender.lsp.send(evt.into()) {
-            log::warn!("failed to send dap event: {res:?}");
-        }
+        self.sender.send_message(evt.into());
     }
 }
 
@@ -27,16 +23,6 @@ impl<Args: Initializer> LsBuilder<DapMessage, Args>
 where
     Args::S: 'static,
 {
-    /// Registers an raw event handler.
-    pub fn with_command_(
-        mut self,
-        cmd: &'static str,
-        handler: RawHandler<Args::S, Vec<JsonValue>>,
-    ) -> Self {
-        self.command_handlers.insert(cmd, raw_to_boxed(handler));
-        self
-    }
-
     /// Registers an async command handler.
     pub fn with_command<R: Serialize + 'static>(
         mut self,
@@ -45,50 +31,50 @@ where
     ) -> Self {
         self.command_handlers.insert(
             cmd,
-            Box::new(move |s, client, req_id, req| client.schedule(req_id, handler(s, req))),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, req))),
         );
         self
     }
 
     /// Registers a raw request handler that handlers a kind of untyped lsp
     /// request.
-    pub fn with_raw_request<R: dapts::IRequest>(
+    pub fn with_raw_request<R: IRequest>(
         mut self,
         handler: RawHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.req_handlers.insert(R::COMMAND, raw_to_boxed(handler));
+        self.req_handlers
+            .insert(R::COMMAND, Box::new(move |s, _req_id, req| handler(s, req)));
         self
     }
 
     // todo: unsafe typed
     /// Registers an raw request handler that handlers a kind of typed lsp
     /// request.
-    pub fn with_request_<R: dapts::IRequest>(
+    pub fn with_request_<R: IRequest>(
         mut self,
         handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, _client, req_id, req| handler(s, req_id, from_json(req)?)),
+            Box::new(move |s, req_id, req| scheduled_response(handler(s, req_id, from_json(req)?))),
         );
         self
     }
 
     /// Registers a typed request handler.
-    pub fn with_request<R: dapts::IRequest>(
+    pub fn with_request<R: IRequest>(
         mut self,
         handler: AsyncHandler<Args::S, R::Arguments, R::Response>,
     ) -> Self {
         self.req_handlers.insert(
             R::COMMAND,
-            Box::new(move |s, client, req_id, req| {
-                client.schedule(req_id, handler(s, from_json(req)?))
-            }),
+            Box::new(move |s, _req_id, req| erased_response(handler(s, from_json(req)?))),
         );
         self
     }
 }
 
+#[cfg(feature = "system")]
 impl<Args: Initializer> LsDriver<DapMessage, Args>
 where
     Args::S: 'static,
@@ -110,7 +96,7 @@ where
         if is_replay {
             let client = self.client.clone();
             let _ = std::thread::spawn(move || {
-                let since = std::time::Instant::now();
+                let since = tinymist_std::time::Instant::now();
                 let timeout = std::env::var("REPLAY_TIMEOUT")
                     .ok()
                     .and_then(|s| s.parse().ok())
@@ -122,7 +108,7 @@ where
                             client.begin_panic();
                         }
 
-                        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                        tokio::time::sleep(tinymist_std::time::Duration::from_millis(10)).await;
                     }
                 })
             })
@@ -137,7 +123,7 @@ where
         use EventOrMessage::*;
 
         while let Ok(msg) = inbox.recv() {
-            let loop_start = Instant::now();
+            let loop_start = tinymist_std::time::now();
             match msg {
                 Evt(event) => {
                     let Some(event_handler) = self.events.get(&event.as_ref().type_id()) else {
@@ -156,11 +142,23 @@ where
 
                     event_handler(s, &self.client, event)?;
                 }
-                Msg(DapMessage::Request(req)) => self.on_request(loop_start, req),
+                Msg(DapMessage::Request(req)) => {
+                    let client = self.client.clone();
+                    let req_id = (req.seq as i32).into();
+                    client.register_request(&req.command, &req_id, loop_start);
+                    let fut = client.schedule_tail(req_id.clone(), self.on_request(req_id, req));
+                    self.client.handle.spawn(fut);
+                }
                 Msg(DapMessage::Event(not)) => {
                     self.on_event(loop_start, not)?;
                 }
-                Msg(DapMessage::Response(resp)) => {
+                Msg(
+                    DapMessage::Response(resp)
+                    | DapMessage::ResponseWithCommand(dap::ResponseWithCommand {
+                        response: resp,
+                        ..
+                    }),
+                ) => {
                     let s = match &mut self.state {
                         State::Ready(s) => s,
                         _ => {
@@ -180,12 +178,8 @@ where
 
     /// Registers and handles a request. This should only be called once per
     /// incoming request.
-    fn on_request(&mut self, request_received: Instant, req: dap::Request) {
-        let req_id = (req.seq as i32).into();
-        self.client
-            .register_request(&req.command, &req_id, request_received);
-
-        let resp = match (&mut self.state, &*req.command) {
+    fn on_request(&mut self, req_id: RequestId, req: dap::Request) -> ScheduleResult {
+        match (&mut self.state, &*req.command) {
             (State::Uninitialized(args), dapts::request::Initialize::COMMAND) => {
                 // todo: what will happen if the request cannot be deserialized?
                 let params = serde_json::from_value::<Args::I>(req.arguments);
@@ -240,27 +234,24 @@ where
                     break 'serve_req just_result(Err(method_not_found()));
                 };
 
-                let result = handler(s, &self.client, req_id.clone(), req.arguments);
-                self.client.schedule_tail(req_id, result);
+                let resp = handler(s, req_id, req.arguments);
 
                 if is_disconnect {
                     self.state = State::ShuttingDown;
                 }
 
-                return;
+                resp
             }
             (State::ShuttingDown, _) => {
                 just_result(Err(invalid_request("server is shutting down")))
             }
-        };
-
-        let result = self.client.schedule(req_id.clone(), resp);
-        self.client.schedule_tail(req_id, result);
+        }
     }
 
     /// Handles an incoming event.
-    fn on_event(&mut self, received_at: Instant, not: dap::Event) -> anyhow::Result<()> {
-        self.client.start_notification(&not.event);
+    fn on_event(&mut self, received_at: Time, not: dap::Event) -> anyhow::Result<()> {
+        let track_id = self.next_not_id.fetch_add(1, Ordering::Relaxed);
+        self.client.hook.start_notification(track_id, &not.event);
         let handle = |s,
                       dap::Event {
                           seq: _,
@@ -273,7 +264,9 @@ where
             };
 
             let result = handler(s, body);
-            self.client.stop_notification(&event, received_at, result);
+            self.client
+                .hook
+                .stop_notification(track_id, &event, received_at, result);
 
             Ok(())
         };

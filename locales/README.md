@@ -5,7 +5,7 @@ This folder provides the locale files for the applications. The format of the lo
 
 ```
 [extension.tinymist.command.tinymist.pinMainToCurrent] # K
-en = "Pin the Main file to the Opening Document" # V-en
+en = "Pin the Main File to the Currently Open Document" # V-en
 zh-CN = "将主文件固定到当前打开的文档" # zh-CN
 ```
 

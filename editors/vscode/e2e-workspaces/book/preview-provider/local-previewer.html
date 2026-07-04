@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Tinymist Local Previewer</title>
+  </head>
+  <body>
+    <main id="local-previewer">Hello from the local html previewer</main>
+    <script src="/typst-webview-assets/local.js"></script>
+    <script>
+      window.__TINYMIST_LOCAL_PROVIDER__ = {
+        ws: "ws://127.0.0.1:23625",
+        mode: "preview-arg:previewMode:Doc",
+        state: "preview-arg:state:",
+      };
+    </script>
+  </body>
+</html>

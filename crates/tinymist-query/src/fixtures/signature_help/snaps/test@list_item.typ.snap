@@ -18,7 +18,7 @@ input_file: crates/tinymist-query/src/fixtures/signature_help/list_item.typ
     {
      "documentation": {
       "kind": "markdown",
-      "value": "The item's body."
+      "value": "The item’s body."
      },
      "label": "body:"
     }
