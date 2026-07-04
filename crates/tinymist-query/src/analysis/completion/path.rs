@@ -11,6 +11,7 @@ impl CompletionPair<'_, '_, '_> {
     pub fn complete_path(&mut self, preference: &PathKind) -> Option<Vec<CompletionItem>> {
         let id = self.cursor.source.id();
         if WorkspaceResolver::is_package_file(id) {
+            log::info!("completion.path.skip: package file id={id:?}");
             return None;
         }
 
@@ -41,6 +42,12 @@ impl CompletionPair<'_, '_, '_> {
             is_in_text = false;
         }
         crate::log_debug_ct!("complete_path: is_in_text: {is_in_text:?}");
+        log::info!(
+            "completion.path.start: id={id:?}, cursor={}, is_in_text={is_in_text}, raw_prefix={:?}, raw_full={:?}, decoded_prefix={text:?}, decoded_full={full_text:?}, range={rng:?}",
+            self.cursor.cursor,
+            &self.cursor.text[rng.start..self.cursor.cursor],
+            &self.cursor.text[rng.clone()],
+        );
         let full_path = Path::new(full_text.as_str());
         let path_text = text.as_str();
         let path = Path::new(path_text);
@@ -55,9 +62,11 @@ impl CompletionPair<'_, '_, '_> {
         // Reuse Typst's path semantics for root escape checks. Parent dirs are
         // fine while Typst resolves them within the workspace root.
         let Ok(resolved_path) = resolve_path_from_id(id, path.to_str()?) else {
+            log::info!("completion.path.resolve_prefix_failed: id={id:?}, path={path:?}");
             return Some(vec![]);
         };
         if resolve_path_from_id(id, full_path.to_str()?).is_err() {
+            log::info!("completion.path.resolve_full_failed: id={id:?}, full_path={full_path:?}");
             return Some(vec![]);
         }
 
@@ -68,9 +77,16 @@ impl CompletionPair<'_, '_, '_> {
             resolved_path.parent().unwrap_or(Path::new(""))
         };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
+        log::info!(
+            "completion.path.resolved: path={path:?}, full_path={full_path:?}, resolved={resolved_path:?}, compl_path={compl_path:?}, has_root={has_root}, base_dir={base_dir:?}"
+        );
 
         // List entries in the current completion directory.
         let dir_entries = self.directory_entries(compl_path)?;
+        log::info!(
+            "completion.path.dir_entries: compl_path={compl_path:?}, entries={}",
+            dir_entries.len()
+        );
         let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
         let mut module_completions = vec![];
@@ -143,6 +159,17 @@ impl CompletionPair<'_, '_, '_> {
             .to_string()
             .len();
         let completions = folder_completions.into_iter().chain(module_completions);
+        log::info!(
+            "completion.path.done: folders={}, files={}",
+            completions
+                .clone()
+                .filter(|(_, kind)| matches!(kind, CompletionKind::Folder))
+                .count(),
+            completions
+                .clone()
+                .filter(|(_, kind)| matches!(kind, CompletionKind::File))
+                .count()
+        );
         Some(
             completions
                 .map(|typst_completion| {
@@ -176,34 +203,56 @@ impl CompletionPair<'_, '_, '_> {
     }
 
     fn directory_entries(&self, dir: &Path) -> Option<Vec<(PathBuf, CompletionKind)>> {
-        let root = self.worker.ctx.world().entry_state().workspace_root()?;
+        let Some(root) = self.worker.ctx.world().entry_state().workspace_root() else {
+            log::info!("completion.path.directory_entries: no workspace root, dir={dir:?}");
+            return None;
+        };
         let dir = normalize_rootless_path(dir);
         let physical_dir = root.join(&dir);
         let mut entries = vec![];
-
-        #[cfg(not(target_arch = "wasm32"))]
-        if self
+        let fs_enabled = self
             .worker
             .ctx
             .analysis
             .completion_feat
-            .path_completion_by_filesystem
-            && let Ok(read_dir) = std::fs::read_dir(&physical_dir)
-        {
-            for entry in read_dir.flatten() {
-                let Ok(file_type) = entry.file_type() else {
-                    continue;
-                };
-                let path = entry.path();
-                let rootless = normalize_rootless_path(path.strip_prefix(root.as_ref()).ok()?);
-                if file_type.is_dir() {
-                    entries.push((rootless, CompletionKind::Folder));
-                } else if file_type.is_file() {
-                    entries.push((rootless, CompletionKind::File));
+            .path_completion_by_filesystem;
+        log::info!(
+            "completion.path.directory_entries: root={:?}, dir={dir:?}, physical_dir={physical_dir:?}, fs_enabled={fs_enabled}",
+            root.as_ref()
+        );
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if fs_enabled {
+            match std::fs::read_dir(&physical_dir) {
+                Ok(read_dir) => {
+                    let before = entries.len();
+                    for entry in read_dir.flatten() {
+                        let Ok(file_type) = entry.file_type() else {
+                            continue;
+                        };
+                        let path = entry.path();
+                        let rootless =
+                            normalize_rootless_path(path.strip_prefix(root.as_ref()).ok()?);
+                        if file_type.is_dir() {
+                            entries.push((rootless, CompletionKind::Folder));
+                        } else if file_type.is_file() {
+                            entries.push((rootless, CompletionKind::File));
+                        }
+                    }
+                    log::info!(
+                        "completion.path.directory_entries.fs: physical_dir={physical_dir:?}, entries={}",
+                        entries.len() - before
+                    );
+                }
+                Err(err) => {
+                    log::info!(
+                        "completion.path.directory_entries.fs_failed: physical_dir={physical_dir:?}, error={err}"
+                    );
                 }
             }
         }
 
+        let before_shadow = entries.len();
         for shadow_path in self.worker.world().shadow_paths() {
             if let Some(entry) =
                 shadow_file_to_dir_entry(shadow_path.strip_prefix(root.as_ref()).ok()?, &dir)
@@ -211,6 +260,10 @@ impl CompletionPair<'_, '_, '_> {
                 entries.push(entry);
             }
         }
+        log::info!(
+            "completion.path.directory_entries.shadow: entries={}",
+            entries.len() - before_shadow
+        );
 
         Some(entries)
     }

@@ -210,6 +210,11 @@ impl Config {
         #[cfg(feature = "system")]
         {
             self.completion.path_completion_by_filesystem = !self.delegate_fs_requests;
+            log::info!(
+                "completion.path.config: delegate_fs_requests={}, path_completion_by_filesystem={}",
+                self.delegate_fs_requests,
+                self.completion.path_completion_by_filesystem
+            );
         }
     }
 
