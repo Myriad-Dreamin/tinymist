@@ -71,11 +71,12 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let resolved_path = resolved_path.vpath().as_rootless_path_compat();
-        let compl_path = if path_text.ends_with('/') {
-            resolved_path
-        } else {
-            resolved_path.parent().unwrap_or(Path::new(""))
-        };
+        let compl_path =
+            if (path_text.is_empty() && full_text.is_empty()) || path_text.ends_with('/') {
+                resolved_path
+            } else {
+                resolved_path.parent().unwrap_or(Path::new(""))
+            };
         crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
         log::info!(
             "completion.path.resolved: path={path:?}, full_path={full_path:?}, resolved={resolved_path:?}, compl_path={compl_path:?}, has_root={has_root}, base_dir={base_dir:?}"
@@ -97,7 +98,12 @@ impl CompletionPair<'_, '_, '_> {
             }
 
             let is_folder = matches!(entry_kind, CompletionKind::Folder);
-            let label = completion_label(&entry_path, has_root, is_folder, base_dir)?;
+            let Some(label) = completion_label(&entry_path, has_root, is_folder, base_dir) else {
+                log::info!(
+                    "completion.path.label_failed: entry_path={entry_path:?}, has_root={has_root}, is_folder={is_folder}, base_dir={base_dir:?}"
+                );
+                continue;
+            };
             if seen_entries.insert(label.clone()) {
                 crate::log_debug_ct!("compl_dir_label: {label:?}");
                 if is_folder {
@@ -124,7 +130,12 @@ impl CompletionPair<'_, '_, '_> {
             if file_path.parent().unwrap_or(Path::new("")) != compl_path {
                 continue;
             }
-            let label = completion_label(&file_path, has_root, false, base_dir)?;
+            let Some(label) = completion_label(&file_path, has_root, false, base_dir) else {
+                log::info!(
+                    "completion.path.label_failed: file_path={file_path:?}, has_root={has_root}, is_folder=false, base_dir={base_dir:?}"
+                );
+                continue;
+            };
             if !seen_entries.insert(label.clone()) {
                 continue;
             }
