@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/doc_param_annotation_survives_infer.typ
+---
+"hook" = (Type(str)) => {"name": Type(str), "type": "hook"}
+"name" = Type(str)
+"hook-value" = {"name": "h", "type": "hook"}
+=====
+37..41 -> @hook
+42..46 -> @name
+54..80 -> {"name": @name, "type": "hook"}
+75..79 -> @name
+89..99 -> @hook-value
+102..106 -> @hook
+102..111 -> {"name": "h", "type": "hook"}

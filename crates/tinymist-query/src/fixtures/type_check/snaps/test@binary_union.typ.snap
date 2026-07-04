@@ -1,0 +1,73 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/binary_union.typ
+---
+"f" = (Any) => (Type(int) | Type(str))
+"flag" = Any
+"x" = ("s" | 1)
+"sub-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Sub }
+"a" = Any
+"b" = Any
+"mul-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Mul }
+"a" = Any
+"b" = Any
+"cross" = (Any, Any, Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Apply(@v"a".at, (1) => any), Apply(@v"o".at, (1) => any)), op: Sub }, TypeBinary { operands: (Apply(@v"b".at, (0) => any), Apply(@v"o".at, (0) => any)), op: Sub }), op: Mul }), op: Sub }
+"o" = Any
+"a" = Any
+"b" = Any
+"call-sub" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Sub }
+"a" = Any
+"b" = Any
+=====
+5..6 -> @f
+7..11 -> @flag
+23..24 -> @x
+30..34 -> @flag
+56..57 -> @x
+60..61 -> @x
+70..77 -> @sub-any
+78..79 -> @a
+81..82 -> @b
+86..87 -> @a
+90..91 -> @b
+98..105 -> @mul-any
+106..107 -> @a
+109..110 -> @b
+114..115 -> @a
+118..119 -> @b
+126..131 -> @cross
+132..133 -> @o
+135..136 -> @a
+138..139 -> @b
+144..145 -> @a
+144..148 -> @v"a".at
+144..151 -> Apply(@v"a".at, (0) => any)
+154..155 -> @o
+154..158 -> @v"o".at
+154..161 -> Apply(@v"o".at, (0) => any)
+166..167 -> @b
+166..170 -> @v"b".at
+166..173 -> Apply(@v"b".at, (1) => any)
+176..177 -> @o
+176..180 -> @v"o".at
+176..183 -> Apply(@v"o".at, (1) => any)
+188..189 -> @a
+188..192 -> @v"a".at
+188..195 -> Apply(@v"a".at, (1) => any)
+198..199 -> @o
+198..202 -> @v"o".at
+198..205 -> Apply(@v"o".at, (1) => any)
+210..211 -> @b
+210..214 -> @v"b".at
+210..217 -> Apply(@v"b".at, (0) => any)
+220..221 -> @o
+220..224 -> @v"o".at
+220..227 -> Apply(@v"o".at, (0) => any)
+235..243 -> @call-sub
+244..245 -> @a
+247..248 -> @b
+252..259 -> @sub-any
+252..265 -> TypeBinary { operands: (@a, @b), op: Sub }
+260..261 -> @a
+263..264 -> @b

@@ -1,0 +1,103 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
+---
+"array-push" = () => None
+"a" = ()
+"dict-insert" = () => None
+"d" = {}
+"push-loop" = () => ()
+"a" = ()
+"i" = Any
+"push-dict-loop" = () => Type(array)
+"guides" = ()
+"grp" = {"members": (1, )}
+"g" = {"kind": "x"}
+"" = (Any) => @v"g".kind
+"g" = Any
+"push-dict-loop-if" = () => Type(array)
+"guides" = ()
+"first" = true
+"g" = ({"kind": "other"} | {"kind": "swatch", "levels": ( ⪰ Type(array) | ())})
+"levels" = ( ⪰ Type(array) | ())
+"" = (Any) => @v"g".kind
+"g" = Any
+=====
+5..15 -> @array-push
+28..29 -> @a
+32..34 -> ()
+37..38 -> @a
+37..43 -> (Func(push) | @v"a".push)
+37..46 -> None
+55..66 -> @dict-insert
+79..80 -> @d
+83..86 -> {}
+89..90 -> @d
+89..97 -> (Func(insert) | @v"d".insert)
+89..105 -> None
+114..123 -> @push-loop
+136..137 -> @a
+140..142 -> ()
+149..150 -> @i
+154..159 -> Func(range)
+154..162 -> Type(array)
+169..170 -> @a
+169..175 -> (Func(push) | @v"a".push)
+169..178 -> None
+176..177 -> @i
+185..186 -> @a
+195..209 -> @push-dict-loop
+222..228 -> @guides
+231..233 -> ()
+240..243 -> @grp
+247..266 -> ({"members": (1, )}, )
+248..264 -> {"members": (1, )}
+258..262 -> (1, )
+277..278 -> @g
+281..292 -> {"kind": "x"}
+297..298 -> @g
+297..305 -> (Func(insert) | Func(insert) | @v"g".insert)
+297..317 -> None
+322..328 -> @guides
+322..333 -> (Func(push) | @v"guides".push)
+322..336 -> None
+334..335 -> @g
+343..349 -> @guides
+343..356 -> (Func(sorted) | @v"guides".sorted)
+343..374 -> Type(array)
+362..363 -> @g
+362..373 -> @
+367..368 -> @g
+367..373 -> @v"g".kind
+383..400 -> @push-dict-loop-if
+413..419 -> @guides
+422..424 -> ()
+431..436 -> @first
+440..447 -> (true, )
+458..459 -> @g
+465..470 -> @first
+483..489 -> @levels
+492..494 -> ()
+504..509 -> @first
+512..518 -> @levels
+521..527 -> @levels
+521..531 -> (Func(rev) | @v"levels".rev)
+521..533 -> Type(array)
+542..574 -> {"kind": "swatch", "levels": @levels}
+567..573 -> @levels
+594..609 -> {"kind": "other"}
+620..621 -> @g
+620..628 -> (Func(insert) | Func(insert) | @v"g".insert)
+620..640 -> None
+645..651 -> @guides
+645..656 -> (Func(push) | @v"guides".push)
+645..659 -> None
+657..658 -> @g
+666..672 -> @guides
+666..679 -> (Func(sorted) | @v"guides".sorted)
+666..697 -> Type(array)
+685..686 -> @g
+685..696 -> @
+690..691 -> @g
+690..696 -> @v"g".kind

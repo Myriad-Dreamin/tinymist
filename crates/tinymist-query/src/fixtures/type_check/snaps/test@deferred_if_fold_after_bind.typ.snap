@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/deferred_if_fold_after_bind.typ
+---
+"make-path" = (("mode": Any) => {"close": Boolean}).with(..("mode": "OPEN") => any)
+"mode" = ( ⪰ Type(str) | "OPEN")
+"close" = Boolean
+"default-path" = {"close": false}
+"pie-path" = {"close": true}
+=====
+5..14 -> @make-path
+15..19 -> @mode
+39..44 -> @close
+47..51 -> @mode
+64..78 -> {"close": @close}
+72..77 -> @close
+87..99 -> @default-path
+102..111 -> @make-path
+102..113 -> {"close": false}
+119..127 -> @pie-path
+130..139 -> @make-path
+130..152 -> {"close": true}
