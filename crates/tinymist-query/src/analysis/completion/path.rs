@@ -61,24 +61,14 @@ impl CompletionPair<'_, '_, '_> {
         }
 
         let resolved_path = resolved_path.vpath().as_rootless_path_compat();
-        let path_is_dir_like = (path_text.is_empty() && full_text.is_empty())
-            || path_text.ends_with('/')
-            || path_text == "."
-            || path_text.ends_with("/.");
-        let compl_path = if path_is_dir_like {
-            resolved_path
-        } else {
-            resolved_path.parent().unwrap_or(Path::new(""))
-        };
-        crate::log_debug_ct!("compl_path: {path:?} -> {compl_path:?}");
-
-        let mut filter_prefix = completion_label(resolved_path, has_root, false, base_dir)?;
-        if filter_prefix == "." {
-            filter_prefix.clear();
-        }
-        if path_is_dir_like && !filter_prefix.is_empty() && !filter_prefix.ends_with('/') {
-            filter_prefix.push('/');
-        }
+        let (directory_to_list, filter_prefix) = path_completion_target(
+            resolved_path,
+            path_text,
+            full_text.as_str(),
+            has_root,
+            base_dir,
+        )?;
+        crate::log_debug_ct!("directory_to_list: {path:?} -> {directory_to_list:?}");
 
         let mut seen_entries = HashSet::new();
         let mut folder_completions = vec![];
@@ -107,7 +97,7 @@ impl CompletionPair<'_, '_, '_> {
             }
         };
 
-        for (entry_path, kind) in self.directory_entries(compl_path) {
+        for (entry_path, kind) in self.directory_entries(&directory_to_list) {
             push_completion(&entry_path, kind);
         }
 
@@ -285,6 +275,42 @@ fn completion_label(
         label.push('/');
     }
     Some(label)
+}
+
+fn path_completion_target(
+    resolved_prefix: &Path,
+    typed_prefix: &str,
+    whole_string: &str,
+    has_root: bool,
+    base_dir: &Path,
+) -> Option<(PathBuf, EcoString)> {
+    let prefix_names_dir = path_prefix_names_directory(typed_prefix, whole_string);
+    let directory = if prefix_names_dir {
+        resolved_prefix.to_owned()
+    } else {
+        resolved_prefix.parent().unwrap_or(Path::new("")).to_owned()
+    };
+
+    let mut label_prefix = completion_label(resolved_prefix, has_root, false, base_dir)?;
+    if label_prefix == "." {
+        label_prefix.clear();
+    }
+    if prefix_names_dir && !label_prefix.is_empty() && !label_prefix.ends_with('/') {
+        label_prefix.push('/');
+    }
+
+    Some((directory, label_prefix))
+}
+
+/// Decide from source text whether to list this path itself or its parent.
+///
+/// `Path` components drop trailing `.`, but `../pkg/.` should list `../pkg/`.
+fn path_prefix_names_directory(typed_prefix: &str, whole_string: &str) -> bool {
+    if typed_prefix.is_empty() {
+        return whole_string.is_empty();
+    }
+
+    typed_prefix.ends_with('/') || typed_prefix == "." || typed_prefix.ends_with("/.")
 }
 
 fn completion_filter_text(label: &str, prefix: &str, raw_prefix: &str) -> Option<EcoString> {
