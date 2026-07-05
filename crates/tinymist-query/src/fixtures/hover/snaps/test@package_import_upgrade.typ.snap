@@ -1,0 +1,17 @@
+---
+source: crates/tinymist-query/src/hover.rs
+expression: content
+input_file: crates/tinymist-query/src/fixtures/hover/package_import_upgrade.typ
+---
+Range: 0:29:0:53
+
+[Universe](https://typst.app/universe/package/example)
+
+**Package:** `@preview/example:0.1.0`
+**Newer version available: 0.1.1**
+
+**Description:** example package (mock).
+
+**Available Versions (2)** (click to replace):
+- [0.1.1](command:tinymist.replaceText?%7B%22range%22%3A%7B%22end%22%3A%7B%22character%22%3A53%2C%22line%22%3A0%7D%2C%22start%22%3A%7B%22character%22%3A29%2C%22line%22%3A0%7D%7D%2C%22replace%22%3A%22%5C%22%40preview%2Fexample%3A0%2E1%2E1%5C%22%22%7D) / 
+- **0.1.0** /

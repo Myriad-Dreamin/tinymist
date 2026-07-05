@@ -1,6 +1,6 @@
 use typst_shim::syntax::LinkedNodeExt;
 
-use crate::{analysis::doc_highlight::DocumentHighlightWorker, prelude::*, SemanticRequest};
+use crate::{SemanticRequest, analysis::doc_highlight::DocumentHighlightWorker, prelude::*};
 
 /// The [`textDocument/documentHighlight`] request
 ///

@@ -1,0 +1,27 @@
+[package]
+name = "cmark-writer"
+version = "0.9.0"
+edition = "2021"
+description = "A CommonMark writer implementation in Rust for serializing AST nodes to CommonMark format"
+license = "MIT"
+authors = ["Hong Jiarong"]
+repository = "https://github.com/hongjr03/cmark-writer"
+keywords = ["markdown", "commonmark", "writer", "serializer"]
+categories = ["text-processing"]
+readme = "README.md"
+
+[dependencies]
+cmark-writer-macros.workspace = true
+ecow.workspace = true
+env_logger.workspace = true
+html-escape.workspace = true
+log.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[features]
+default = []
+# GitHub Flavored Markdown support including tables with alignment, strikethrough, 
+# task lists, and autolinks without angle brackets
+gfm = []

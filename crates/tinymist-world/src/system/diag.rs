@@ -1,21 +1,35 @@
 use std::io::IsTerminal;
 
-use codespan_reporting::{
-    diagnostic::{Diagnostic, Label},
-    term::{
-        self,
-        termcolor::{ColorChoice, StandardStream},
-    },
-};
+use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
+
+use ecow::EcoString;
 use tinymist_std::Result;
-use tinymist_vfs::FileId;
-use typst::diag::{eco_format, Severity, SourceDiagnostic};
-use typst::syntax::Span;
-use typst::WorldExt;
+use typst::diag::{SourceDiagnostic, StrResult};
 
-use crate::{CodeSpanReportWorld, DiagnosticFormat, SourceWorld};
+use crate::{DiagnosticFormat, SourceWorld};
 
-/// Get stderr with color support if desirable.
+/// Prints diagnostic messages to the terminal.
+#[deprecated(note = "Use `diag` mod instead")]
+pub fn print_diagnostics_to<'d, 'files>(
+    world: &'files dyn SourceWorld,
+    errors: impl Iterator<Item = &'d SourceDiagnostic>,
+    w: &mut impl WriteColor,
+    diagnostic_format: DiagnosticFormat,
+) -> Result<(), codespan_reporting::files::Error> {
+    crate::diag::print_diagnostics_to(world, errors, w, diagnostic_format)
+}
+
+/// Prints diagnostic messages to the terminal.
+#[deprecated(note = "Use `diag` mod instead")]
+pub fn print_diagnostics_to_string<'d, 'files>(
+    world: &'files dyn SourceWorld,
+    errors: impl Iterator<Item = &'d SourceDiagnostic>,
+    diagnostic_format: DiagnosticFormat,
+) -> StrResult<EcoString> {
+    crate::diag::print_diagnostics_to_string(world, errors, diagnostic_format)
+}
+
+/// Gets stderr with color support if desirable.
 fn color_stream() -> StandardStream {
     StandardStream::stderr(if std::io::stderr().is_terminal() {
         ColorChoice::Auto
@@ -24,59 +38,16 @@ fn color_stream() -> StandardStream {
     })
 }
 
-/// Print diagnostic messages to the terminal.
+/// Prints diagnostic messages to the terminal.
 pub fn print_diagnostics<'d, 'files>(
     world: &'files dyn SourceWorld,
     errors: impl Iterator<Item = &'d SourceDiagnostic>,
     diagnostic_format: DiagnosticFormat,
 ) -> Result<(), codespan_reporting::files::Error> {
-    let world = CodeSpanReportWorld::new(world);
-
     let mut w = match diagnostic_format {
         DiagnosticFormat::Human => color_stream(),
         DiagnosticFormat::Short => StandardStream::stderr(ColorChoice::Never),
     };
 
-    let mut config = term::Config {
-        tab_width: 2,
-        ..Default::default()
-    };
-    if diagnostic_format == DiagnosticFormat::Short {
-        config.display_style = term::DisplayStyle::Short;
-    }
-
-    for diagnostic in errors {
-        let diag = match diagnostic.severity {
-            Severity::Error => Diagnostic::error(),
-            Severity::Warning => Diagnostic::warning(),
-        }
-        .with_message(diagnostic.message.clone())
-        .with_notes(
-            diagnostic
-                .hints
-                .iter()
-                .map(|e| (eco_format!("hint: {e}")).into())
-                .collect(),
-        )
-        .with_labels(label(world.world, diagnostic.span).into_iter().collect());
-
-        term::emit(&mut w, &config, &world, &diag)?;
-
-        // Stacktrace-like helper diagnostics.
-        for point in &diagnostic.trace {
-            let message = point.v.to_string();
-            let help = Diagnostic::help()
-                .with_message(message)
-                .with_labels(label(world.world, point.span).into_iter().collect());
-
-            term::emit(&mut w, &config, &world, &help)?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Create a label for a span.
-fn label(world: &dyn SourceWorld, span: Span) -> Option<Label<FileId>> {
-    Some(Label::primary(span.id()?, world.range(span)?))
+    crate::diag::print_diagnostics_to(world, errors, &mut w, diagnostic_format)
 }

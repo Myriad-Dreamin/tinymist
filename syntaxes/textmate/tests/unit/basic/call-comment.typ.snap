@@ -9,6 +9,6 @@
 #      ^^^ source.typst variable.other.readwrite.typst
 #         ^^ source.typst comment.block.typst punctuation.definition.comment.typst
 #           ^^ source.typst comment.block.typst
-#             ^ source.typst meta.brace.round.typst
-#              ^ source.typst meta.brace.round.typst
+#             ^ source.typst markup.content.brace.typst
+#              ^ source.typst markup.content.brace.typst
 >

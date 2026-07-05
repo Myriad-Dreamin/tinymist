@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tinymist_l10n::DebugL10n;
+use tinymist_std::ImmutPath;
 use tinymist_std::error::prelude::*;
 use tinymist_std::hash::FxDashMap;
-use tinymist_std::ImmutPath;
 use tinymist_world::EntryState;
 use typst::syntax::VirtualPath;
 
@@ -125,13 +125,12 @@ impl EntryResolver {
             //     root,
             //     Some(FileId::new(None, VirtualPath::new(entry))),
             // )),
-            (Some(entry), Some(root)) => match entry.strip_prefix(&root) {
-                Ok(stripped) => Some(EntryState::new_rooted(
-                    root,
-                    Some(VirtualPath::new(stripped)),
-                )),
+            (Some(entry), Some(root)) => match VirtualPath::virtualize(&root, &entry) {
+                Ok(vpath) => Some(EntryState::new_rooted(root, Some(vpath))),
                 Err(err) => {
-                    log::info!("Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}");
+                    log::info!(
+                        "Entry is not in root directory: err {err:?}: entry: {entry:?}, root: {root:?}"
+                    );
                     EntryState::new_rooted_by_parent(entry)
                 }
             },
@@ -167,25 +166,25 @@ impl EntryResolver {
     pub fn resolve_default(&self) -> Option<ImmutPath> {
         let entry = self.entry.as_ref();
         // todo: pre-compute this when updating config
-        if let Some(entry) = entry {
-            if entry.is_relative() {
-                let root = self.root(None)?;
-                return Some(root.join(entry).as_path().into());
-            }
+        if let Some(entry) = entry
+            && entry.is_relative()
+        {
+            let root = self.root(None)?;
+            return Some(root.join(entry).as_path().into());
         }
         entry.cloned()
     }
 
     /// Validates the configuration.
     pub fn validate(&self) -> Result<()> {
-        if let Some(root) = &self.root_path {
-            if !root.is_absolute() {
-                tinymist_l10n::bail!(
-                    "tinymist-project.validate-error.root-path-not-absolute",
-                    "rootPath or typstExtraArgs.root must be an absolute path: {root:?}",
-                    root = root.debug_l10n()
-                );
-            }
+        if let Some(root) = &self.root_path
+            && !root.is_absolute()
+        {
+            tinymist_l10n::bail!(
+                "tinymist-project.validate-error.root-path-not-absolute",
+                "rootPath or typstExtraArgs.root must be an absolute path: {root:?}",
+                root = root.debug_l10n()
+            );
         }
 
         Ok(())
@@ -200,35 +199,42 @@ mod entry_tests {
     use super::*;
     use std::path::Path;
 
+    const ROOT: &str = if cfg!(windows) {
+        "C:\\dummy-root"
+    } else {
+        "/dummy-root"
+    };
+    const ROOT2: &str = if cfg!(windows) {
+        "C:\\dummy-root2"
+    } else {
+        "/dummy-root2"
+    };
+
     #[test]
     fn test_entry_resolution() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root_path = Path::new(ROOT);
 
         let entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
             ..Default::default()
         };
 
-        let entry = entry.resolve(if cfg!(windows) {
-            Some(Path::new("C:\\root\\main.typ").into())
-        } else {
-            Some(Path::new("/root/main.typ").into())
-        });
+        let entry = entry.resolve(Some(root_path.join("main.typ").into()));
 
         assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
         assert_eq!(
             entry.main(),
             Some(WorkspaceResolver::workspace_file(
                 entry.root().as_ref(),
-                VirtualPath::new("main.typ")
+                VirtualPath::new("main.typ").unwrap()
             ))
         );
     }
 
     #[test]
     fn test_entry_resolution_multi_root() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
-        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+        let root_path = Path::new(ROOT);
+        let root2_path = Path::new(ROOT2);
 
         let entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
@@ -237,35 +243,27 @@ mod entry_tests {
         };
 
         {
-            let entry = entry.resolve(if cfg!(windows) {
-                Some(Path::new("C:\\root\\main.typ").into())
-            } else {
-                Some(Path::new("/root/main.typ").into())
-            });
+            let entry = entry.resolve(Some(root_path.join("main.typ").into()));
 
             assert_eq!(entry.root(), Some(ImmutPath::from(root_path)));
             assert_eq!(
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }
 
         {
-            let entry = entry.resolve(if cfg!(windows) {
-                Some(Path::new("C:\\root2\\main.typ").into())
-            } else {
-                Some(Path::new("/root2/main.typ").into())
-            });
+            let entry = entry.resolve(Some(root2_path.join("main.typ").into()));
 
             assert_eq!(entry.root(), Some(ImmutPath::from(root2_path)));
             assert_eq!(
                 entry.main(),
                 Some(WorkspaceResolver::workspace_file(
                     entry.root().as_ref(),
-                    VirtualPath::new("main.typ")
+                    VirtualPath::new("main.typ").unwrap()
                 ))
             );
         }
@@ -273,8 +271,8 @@ mod entry_tests {
 
     #[test]
     fn test_entry_resolution_default_multi_root() {
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
-        let root2_path = Path::new(if cfg!(windows) { "C:\\root2" } else { "/root2" });
+        let root_path = Path::new(ROOT);
+        let root2_path = Path::new(ROOT2);
 
         let mut entry = EntryResolver {
             root_path: Some(ImmutPath::from(root_path)),
@@ -283,11 +281,7 @@ mod entry_tests {
         };
 
         {
-            entry.entry = if cfg!(windows) {
-                Some(Path::new("C:\\root\\main.typ").into())
-            } else {
-                Some(Path::new("/root/main.typ").into())
-            };
+            entry.entry = Some(root_path.join("main.typ").into());
 
             let default_entry = entry.resolve_default();
 
@@ -299,14 +293,7 @@ mod entry_tests {
 
             let default_entry = entry.resolve_default();
 
-            assert_eq!(
-                default_entry,
-                if cfg!(windows) {
-                    Some(Path::new("C:\\root\\main.typ").into())
-                } else {
-                    Some(Path::new("/root/main.typ").into())
-                }
-            );
+            assert_eq!(default_entry, Some(root_path.join("main.typ").into()));
         }
     }
 }

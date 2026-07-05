@@ -1,0 +1,9 @@
+---
+source: crates/tinymist-query/src/prepare_rename.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/rename/label.typ
+---
+{
+ "placeholder": "title_label",
+ "range": "6:22:6:33"
+}

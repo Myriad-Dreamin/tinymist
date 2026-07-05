@@ -13,14 +13,13 @@ import * as path from "path";
 import { loadTinymistConfig } from "./config";
 import { IContext } from "./context";
 import { getUserPackageData } from "./features/tool";
-import { SymbolViewProvider } from "./features/tool.symbol-view";
+import { SymbolViewProvider } from "./features/tool/views";
 import { mirrorLogRe, machineChanges } from "./language";
 import { LanguageState, tinymist } from "./lsp";
 import { commandCreateLocalPackage, commandOpenLocalPackage } from "./package-manager";
 import { extensionState } from "./state";
 import { triggerStatusBar } from "./ui-extends";
-import { activeTypstEditor, isTypstDocument } from "./util";
-import { LanguageClient } from "vscode-languageclient/node";
+import { activeTypstEditor, isTypstDocument, statusBarFormatString } from "./util";
 
 import { setIsTinymist as previewSetIsTinymist } from "./features/preview-compat";
 import { previewActivate, previewDeactivate } from "./features/preview";
@@ -33,9 +32,13 @@ import { copyAndPasteActivate, dragAndDropActivate } from "./features/drop-paste
 import { testingActivate } from "./features/testing";
 import { testingDebugActivate } from "./features/testing/debug";
 import { FeatureEntry, tinymistActivate, tinymistDeactivate } from "./extension.shared";
-import { commandShow, exportActivate, quickExports } from "./features/export";
+import { askPageSelection, commandShow, exportActivate, quickExports } from "./features/export";
+import { resolveCodeAction } from "./lsp.code-action";
+import { HoverTmpStorage } from "./features/hover-storage.tmp";
+import { createSystemLanguageClient } from "./lsp.system";
 
-LanguageState.Client = LanguageClient;
+LanguageState.Client = createSystemLanguageClient;
+LanguageState.HoverTmpStorage = HoverTmpStorage;
 
 const systemActivateTable = (): FeatureEntry[] => [
   [extensionState.features.label, labelActivate],
@@ -211,11 +214,14 @@ async function languageActivate(context: IContext) {
     commands.registerCommand("tinymist.createLocalPackage", commandCreateLocalPackage),
     commands.registerCommand("tinymist.openLocalPackage", commandOpenLocalPackage),
 
+    // similar to `rust-analyzer.resolveCodeAction` from https://github.com/rust-lang/rust-analyzer
+    commands.registerCommand("tinymist.resolveCodeAction", resolveCodeAction()),
     // We would like to define it at the server side, but it is not possible for now.
     // https://github.com/microsoft/language-server-protocol/issues/1117
     commands.registerCommand("tinymist.triggerSuggestAndParameterHints", triggerSuggestAndParameterHints),
+
+    commands.registerTextEditorCommand("tinymist.replaceText", commandReplaceText),
   );
-  // context.subscriptions.push
   const provider = new SymbolViewProvider(context.context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(SymbolViewProvider.Name, provider),
@@ -522,6 +528,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
       void vscode.commands.executeCommand(`typst-preview.preview`);
       return;
     }
+    case "export": {
+      void vscode.commands.executeCommand(`tinymist.openExportTool`);
+      break;
+    }
     case "export-html": {
       await commandShow("Html");
       break;
@@ -541,7 +551,10 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
   async function codeLensMore(): Promise<void> {
     const kBrowsing = "Browsing Preview Documents";
     const kPreviewIn = "Preview in ..";
-    const moreCodeLens = [{ label: kBrowsing }, { label: kPreviewIn }, ...quickExports] as const;
+    const kProfileServer = "Profile Server";
+    const moreCodeLensOthers_ = [kBrowsing, kPreviewIn, kProfileServer] as const;
+    const moreCodeLensOthers = moreCodeLensOthers_.map((label) => ({ label }));
+    const moreCodeLens = [...moreCodeLensOthers, ...quickExports] as const;
 
     const moreAction = (await vscode.window.showQuickPick(moreCodeLens, {
       title: "More Actions",
@@ -574,12 +587,19 @@ async function commandRunCodeLens(...args: string[]): Promise<void> {
         void vscode.commands.executeCommand(`typst-preview.${command}`);
         return;
       }
+      case kProfileServer: {
+        void vscode.commands.executeCommand(`tinymist.profileServer`);
+        return;
+      }
       default: {
         if (!moreAction || !("exportKind" in moreAction)) {
           return;
         }
 
         // A quick export action
+        if (!(await askPageSelection(moreAction))) {
+          return; // cancelled
+        }
         await commandShow(moreAction.exportKind, moreAction.extraOpts);
         return;
       }
@@ -592,10 +612,16 @@ function triggerSuggestAndParameterHints() {
   vscode.commands.executeCommand("editor.action.triggerParameterHints");
 }
 
-export function statusBarFormatString() {
-  const formatter = (
-    (vscode.workspace.getConfiguration("tinymist").get("statusBarFormat") as string) || ""
-  ).trim();
-
-  return formatter;
+async function commandReplaceText(
+  editor: TextEditor,
+  edit: vscode.TextEditorEdit,
+  args?: { range: vscode.Range; replace: string },
+): Promise<void> {
+  if (editor && args) {
+    const range = new vscode.Range(
+      new vscode.Position(args.range.start.line, args.range.start.character),
+      new vscode.Position(args.range.end.line, args.range.end.character),
+    );
+    edit.replace(range, args.replace);
+  }
 }

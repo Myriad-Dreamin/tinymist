@@ -72,10 +72,7 @@ export function equalPatchElem(prev: ElementChildren, next: ElementChildren) {
 /// To remove unused resources, An extra remove inst can remove a specify element
 ///
 /// Example5: resource:[o1, o2] -> <reuse o1> <append t1> <remove o2> -> [o1, t1] and remove o2
-export type TargetViewInstruction<T> =
-  | ["append", T]
-  | ["reuse", number]
-  | ["remove", number];
+export type TargetViewInstruction<T> = ["append", T] | ["reuse", number] | ["remove", number];
 
 /// The recursive patch operation must be applied to this two element.
 export type PatchPair<T> = [T /* origin */, T /* target */];
@@ -89,7 +86,7 @@ export function interpretTargetView<T extends ElementChildren, U extends T = T>(
   targetChildren: T[],
   // todo: remove this tag
   isPatchingSvg: boolean = true, // patch svg or outline
-  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid)
+  tIsU = (x: T): x is U => !!x.getAttribute(TypstPatchAttrs.Tid),
 ): ViewTransform<U> {
   const availableOwnedResource = new Map<string, [T, number[]]>();
   const targetView: TargetViewInstruction<U>[] = [];
@@ -187,13 +184,10 @@ export type OriginViewInstruction<T> =
 /// + Finally, it inserts the extra elements.
 ///
 /// Some better strategy would help and be implemented in future.
-export function changeViewPerspective<
-  T extends ElementChildren,
-  U extends T = T
->(
+export function changeViewPerspective<T extends ElementChildren, U extends T = T>(
   originChildren: T[],
   targetView: TargetViewInstruction<U>[],
-  tIsU = (_x: T): _x is U => true
+  tIsU = (_x: T): _x is U => true,
 ): OriginViewInstruction<U>[] {
   const originView: OriginViewInstruction<U>[] = [];
 
@@ -321,7 +315,7 @@ export function changeViewPerspective<
 
 export function runOriginViewInstructions(
   prev: Element,
-  originView: OriginViewInstruction<Node>[]
+  originView: OriginViewInstruction<Node>[],
 ) {
   // console.log("interpreted origin view", originView);
   for (const [op, off, fr] of originView) {

@@ -56,8 +56,8 @@ impl LazyFile {
 
 impl ReadAllOnce for LazyFile {
     fn read_all(mut self, buf: &mut Vec<u8>) -> std::io::Result<usize> {
-        let file = self.file.get_or_insert_with(|| File::open(&self.path));
-        let Ok(ref mut file) = file else {
+        let mut file = self.file.get_or_insert_with(|| File::open(&self.path));
+        let Ok(file) = &mut file else {
             let err = file.as_ref().unwrap_err();
             // todo: clone error or hide error
             return Err(std::io::Error::new(err.kind(), err.to_string()));

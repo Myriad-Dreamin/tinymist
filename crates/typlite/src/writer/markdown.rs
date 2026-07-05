@@ -1,11 +1,12 @@
 //! Markdown writer implementation
 
+use cmark_writer::WriterOptions;
 use cmark_writer::ast::Node;
 use cmark_writer::writer::CommonMarkWriter;
 use ecow::EcoString;
 
-use crate::common::FormatWriter;
 use crate::Result;
+use crate::common::FormatWriter;
 
 /// Markdown writer implementation
 #[derive(Default)]
@@ -19,8 +20,15 @@ impl MarkdownWriter {
 
 impl FormatWriter for MarkdownWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        let mut writer = CommonMarkWriter::new();
-        writer.write(document).expect("Failed to write document");
+        let mut writer = CommonMarkWriter::with_options(WriterOptions {
+            strict: false,
+            escape_special_chars: true,
+            trim_paragraph_trailing_hard_breaks: true,
+            ..Default::default()
+        });
+        writer
+            .write(document)
+            .map_err(|e| format!("failed to write document: {e}"))?;
         output.push_str(&writer.into_string());
         Ok(())
     }

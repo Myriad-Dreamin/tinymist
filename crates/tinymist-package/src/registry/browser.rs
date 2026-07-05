@@ -3,8 +3,11 @@
 use std::{io::Read, path::Path};
 
 use js_sys::Uint8Array;
-use typst::diag::{eco_format, EcoString};
-use wasm_bindgen::{prelude::*, JsValue};
+use tinymist_std::ImmutPath;
+use typst::diag::eco_format;
+use wasm_bindgen::{JsValue, prelude::*};
+
+use crate::registry::PackageIndexEntry;
 
 use super::{PackageError, PackageRegistry, PackageSpec};
 
@@ -115,8 +118,21 @@ impl PackageRegistry for JsRegistry {
     }
 
     // todo: provide package list for browser
-    fn packages(&self) -> &[(PackageSpec, Option<EcoString>)] {
+    fn packages(&self) -> &[PackageIndexEntry] {
         &[]
+    }
+}
+
+impl JsRegistry {
+    /// Returns the path at which non-local packages should be stored when
+    /// downloaded.
+    pub fn package_cache_path(&self) -> Option<&ImmutPath> {
+        None
+    }
+
+    /// Returns the path at which local packages are stored.
+    pub fn package_path(&self) -> Option<&ImmutPath> {
+        None
     }
 }
 

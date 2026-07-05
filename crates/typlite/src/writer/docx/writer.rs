@@ -4,17 +4,22 @@ use base64::Engine;
 use cmark_writer::ast::{ListItem, Node};
 use docx_rs::*;
 use ecow::EcoString;
+use log::debug;
 use std::fs;
 use std::io::Cursor;
 
-use crate::common::{FigureNode, FormatWriter};
 use crate::Result;
+use crate::common::{
+    BlockVerbatimNode, CenterNode, FigureNode, FormatWriter, HighlightNode, InlineNode,
+    VerbatimNode,
+};
 
 use super::image_processor::DocxImageProcessor;
 use super::numbering::DocxNumbering;
 use super::styles::DocxStyles;
 
-/// DOCX writer that generates DOCX directly from AST (without intermediate representation)
+/// DOCX writer that generates DOCX directly from AST (without intermediate
+/// representation)
 pub struct DocxWriter {
     styles: DocxStyles,
     numbering: DocxNumbering,
@@ -61,7 +66,7 @@ impl DocxWriter {
                 .image_processor
                 .process_image_data(docx, &img_data, alt_text.as_deref(), None))
         } else {
-            let placeholder = format!("[Image not found: {}]", url);
+            let placeholder = format!("[Image not found: {url}]");
             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
             Ok(docx.add_paragraph(para))
         }
@@ -80,7 +85,7 @@ impl DocxWriter {
                     } = node
                     {
                         // Process the image
-                        if let Ok(img_data) = fs::read(url) {
+                        if let Ok(img_data) = fs::read(url.as_str()) {
                             let alt_text = figure_node.caption.clone();
                             // Add the image with caption
                             docx = self.image_processor.process_image_data(
@@ -100,7 +105,7 @@ impl DocxWriter {
                             }
                         } else {
                             // Image not found, show placeholder
-                            let placeholder = format!("[Image not found: {}]", url);
+                            let placeholder = format!("[Image not found: {url}]");
                             let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
                             docx = docx.add_paragraph(para);
 
@@ -190,20 +195,15 @@ impl DocxWriter {
                 title: _,
                 alt: _,
             } => {
-                if let Ok(img_data) = fs::read(url) {
+                if let Ok(img_data) = fs::read(url.as_str()) {
                     run = self.image_processor.process_inline_image(run, &img_data)?;
                 } else {
-                    run = run.add_text(format!("[Image not found: {}]", url));
+                    run = run.add_text(format!("[Image not found: {url}]"));
                 }
             }
             Node::HtmlElement(element) => {
                 // Handle special HTML elements
-                if element.tag == "mark" {
-                    run = run.style("Highlight");
-                    for child in &element.children {
-                        run = self.process_inline_to_run(run, child)?;
-                    }
-                } else if element.tag == "img" && element.self_closing {
+                if element.tag == "img" && element.self_closing {
                     let is_typst_block = element
                         .attributes
                         .iter()
@@ -239,8 +239,27 @@ impl DocxWriter {
             Node::SoftBreak => {
                 run = run.add_text(" ");
             }
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                run = run.highlight("yellow");
+                for child in &highlight_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                for child in &inline_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+            }
+            node if node.is_custom_type::<VerbatimNode>() => {
+                let node = node.as_custom_type::<VerbatimNode>().unwrap();
+                run = run.style("CodeInline").add_text(&node.content);
+            }
             // Other inline element types
-            _ => {}
+            _ => {
+                debug!("unhandled inline node in DOCX export: {node:?}");
+            }
         }
 
         Ok(run)
@@ -380,13 +399,13 @@ impl DocxWriter {
                 block_type: _,
             } => {
                 // Add language information
-                if let Some(lang) = language {
-                    if !lang.is_empty() {
-                        let lang_para = Paragraph::new()
-                            .style("CodeBlock")
-                            .add_run(Run::new().add_text(lang));
-                        docx = docx.add_paragraph(lang_para);
-                    }
+                if let Some(lang) = language
+                    && !lang.is_empty()
+                {
+                    let lang_para = Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(Run::new().add_text(lang));
+                    docx = docx.add_paragraph(lang_para);
                 }
 
                 // Process code line by line, preserving line breaks
@@ -414,28 +433,96 @@ impl DocxWriter {
             Node::Image { url, title: _, alt } => {
                 docx = self.process_image(docx, url, alt)?;
             }
-            Node::Custom(custom_node) => {
-                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    // Process figure node with special handling
-                    docx = self.process_figure(docx, figure_node)?;
-                } else if let Some(external_frame) = custom_node
-                    .as_any()
-                    .downcast_ref::<crate::common::ExternalFrameNode>(
-                ) {
-                    let data = base64::engine::general_purpose::STANDARD
-                        .decode(&external_frame.svg_data)
-                        .map_err(|e| format!("Failed to decode SVG data: {}", e))?;
+            node if node.is_custom_type::<FigureNode>() => {
+                let figure_node = node.as_custom_type::<FigureNode>().unwrap();
+                docx = self.process_figure(docx, figure_node)?;
+            }
+            node if node.is_custom_type::<CenterNode>() => {
+                let center_node = node.as_custom_type::<CenterNode>().unwrap();
+                // Handle regular node but with center alignment
+                match &center_node.node {
+                    Node::Paragraph(content) => {
+                        docx = self.process_paragraph(docx, content, None)?;
+                        // Get the last paragraph and center it
+                        if let Some(DocumentChild::Paragraph(para)) =
+                            docx.document.children.last_mut()
+                        {
+                            para.property = para.property.clone().align(AlignmentType::Center);
+                        }
+                    }
+                    Node::HtmlElement(element) => {
+                        let start_idx = docx.document.children.len();
+                        for child in &element.children {
+                            docx = self.process_node(docx, child)?;
+                        }
+                        for child in docx.document.children.iter_mut().skip(start_idx) {
+                            if let DocumentChild::Paragraph(para) = child {
+                                para.property = para.property.clone().align(AlignmentType::Center);
+                            }
+                        }
+                    }
+                    other => {
+                        docx = self.process_node(docx, other)?;
+                        // Get the last element and center it if it's a paragraph
+                        if let Some(DocumentChild::Paragraph(para)) =
+                            docx.document.children.last_mut()
+                        {
+                            para.property = para.property.clone().align(AlignmentType::Center);
+                        }
+                    }
+                }
+            }
+            node if node.is_custom_type::<crate::common::ExternalFrameNode>() => {
+                let external_frame = node
+                    .as_custom_type::<crate::common::ExternalFrameNode>()
+                    .unwrap();
+                let data = base64::engine::general_purpose::STANDARD
+                    .decode(&external_frame.svg)
+                    .map_err(|e| format!("Failed to decode SVG data: {e}"))?;
 
-                    docx = self.image_processor.process_image_data(
-                        docx,
-                        &data,
-                        Some(&external_frame.alt_text),
-                        None,
-                    );
-                } else {
-                    // Fallback for unknown custom nodes - ignore or add placeholder
-                    let placeholder = "[Unknown custom content]";
-                    let para = Paragraph::new().add_run(Run::new().add_text(placeholder));
+                docx = self.image_processor.process_image_data(
+                    docx,
+                    &data,
+                    Some(&external_frame.alt_text),
+                    None,
+                );
+            }
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                // Handle HighlightNode at block level (convert to paragraph)
+                let mut para = Paragraph::new();
+                let mut run = Run::new().highlight("yellow");
+
+                for child in &highlight_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+
+                if !run.children.is_empty() {
+                    para = para.add_run(run);
+                    docx = docx.add_paragraph(para);
+                }
+            }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                let block_node = node.as_custom_type::<BlockVerbatimNode>().unwrap();
+                for line in block_node.content.split('\n') {
+                    let para = Paragraph::new()
+                        .style("CodeBlock")
+                        .add_run(Run::new().add_text(line));
+                    docx = docx.add_paragraph(para);
+                }
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                // Handle InlineNode at block level (convert to paragraph)
+                let mut para = Paragraph::new();
+                let mut run = Run::new();
+
+                for child in &inline_node.content {
+                    run = self.process_inline_to_run(run, child)?;
+                }
+
+                if !run.children.is_empty() {
+                    para = para.add_run(run);
                     docx = docx.add_paragraph(para);
                 }
             }
@@ -625,7 +712,7 @@ impl DocxWriter {
         let mut buffer = Vec::new();
         docx_built
             .pack(&mut Cursor::new(&mut buffer))
-            .map_err(|e| format!("Failed to pack DOCX: {}", e))?;
+            .map_err(|e| format!("Failed to pack DOCX: {e}"))?;
 
         Ok(buffer)
     }

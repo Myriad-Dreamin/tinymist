@@ -1,9 +1,9 @@
 use std::collections::HashSet;
 
 use crate::{
-    prelude::*,
-    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalKind, LexicalScopeKind},
     SyntaxRequest,
+    prelude::*,
+    syntax::{LexicalHierarchy, LexicalKind, LexicalScopeKind, get_lexical_hierarchy},
 };
 
 /// The [`textDocument/foldingRange`] request is sent from the client to the
@@ -83,7 +83,9 @@ impl SyntaxRequest for FoldingRangeRequest {
             results.reverse();
         }
 
-        crate::log_debug_ct!("FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {hierarchy:#?} results: {results:#?}");
+        crate::log_debug_ct!(
+            "FoldingRangeRequest(line_folding_only={line_folding_only}) symbols: {hierarchy:#?} results: {results:#?}"
+        );
 
         Some(results)
     }
@@ -137,10 +139,15 @@ fn calc_folding_range(
         }
 
         if let Some(ch) = &child.children {
-            let parent_last_loc = if is_not_last_range {
-                (range.end.line, Some(range.end.character))
-            } else {
-                parent_last_loc
+            let parent_last_loc = match child.info.kind {
+                LexicalKind::Heading(_) => (folding_range.end_line, folding_range.end_character),
+                _ => {
+                    if is_not_last_range {
+                        (range.end.line, Some(range.end.character))
+                    } else {
+                        parent_last_loc
+                    }
+                }
             };
 
             calc_folding_range(

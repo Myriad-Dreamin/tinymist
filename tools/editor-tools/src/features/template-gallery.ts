@@ -13,7 +13,7 @@ const { div, input, button, a, span } = van.tags;
 // https://packages.typst.org/preview/thumbnails/charged-ieee-0.1.0-small.webp
 
 const Card = (cls: string, ...content: any) => {
-  return div({ class: `tinymist-card ${cls}` }, ...content);
+  return div({ class: `card ${cls}` }, ...content);
 };
 
 interface PackageMeta {
@@ -30,10 +30,7 @@ interface PackageMeta {
   template: any;
 }
 
-const TemplateList = (
-  packages: State<PackageMeta[]>,
-  catState: FilterState
-) => {
+const TemplateList = (packages: State<PackageMeta[]>, catState: FilterState) => {
   const AuthorItem = (author: string) => {
     // split by <
     const [nameStart, emailRest] = author.split("<");
@@ -55,10 +52,7 @@ const TemplateList = (
 
   const AuthorList = (authors: string[]) => {
     if (authors.length <= 1) {
-      return span(
-        { class: `tinymist-author-container` },
-        ...authors.map(AuthorItem)
-      );
+      return span({ class: `tinymist-author-container` }, ...authors.map(AuthorItem));
     }
 
     return span(
@@ -70,77 +64,69 @@ const TemplateList = (
           style: "text-decoration: underline",
           title: authors.slice(1).join(", "),
         },
-        "et al."
-      )
+        "et al.",
+      ),
     );
   };
 
   const highlightMatches = (text: string, searchResults?: SearchResult[]): HTMLSpanElement => {
     if (!searchResults || !text) return van.tags.span({}, text);
-    const searchTerms = searchResults.flatMap(result => result.queryTerms);
-    const regex = new RegExp(`(${searchTerms.join("|")})`, 'gi');
+    const searchTerms = searchResults.flatMap((result) => result.queryTerms);
+    const regex = new RegExp(`(${searchTerms.join("|")})`, "gi");
 
     const parts = text.split(regex);
 
-    return van.tags.span({}, ...parts.map(part =>
-      regex.test(part)
-        ? van.tags.span({ class: 'tinymist-highlight' }, part)
-        : part
-    ));
-  }
+    return van.tags.span(
+      {},
+      ...parts.map((part) =>
+        regex.test(part) ? van.tags.span({ class: "tinymist-highlight" }, part) : part,
+      ),
+    );
+  };
 
   const TemplateListItem = (item: PackageMeta) => {
-    const TemplateAction = (
-      icon: ChildDom,
-      title: string,
-      onclick: () => void
-    ) =>
+    const TemplateAction = (icon: ChildDom, title: string, onclick: () => void) =>
       button(
         {
-          class: "tinymist-button tinymist-template-action",
+          class: "btn tinymist-template-action",
           title,
           onclick,
         },
-        icon
+        icon,
       );
 
     return Card(
       "template-card",
       div(
-        a({ href: item.repository, style: "font-size: 1.2em" },
-          () => {
-            return highlightMatches(item.name, catState.searchSelected.val);
-          }
-        ),
+        a({ href: item.repository, style: "font-size: 1.2em" }, () => {
+          return highlightMatches(item.name, catState.searchSelected.val);
+        }),
         span(" "),
         span({ style: "font-size: 0.8em" }, "v" + item.version),
         span(" by "),
-        AuthorList(item.authors)
+        AuthorList(item.authors),
       ),
       div(
         {
-          style:
-            "display: flex; align-items: center; gap: 0.25em; margin-top: 0.4em;",
+          style: "display: flex; align-items: stretch; gap: 0.25em; margin-top: 0.4em;",
           class: "tinymist-template-actions",
         },
         button(
           {
             class: van.derive(() => {
-              const activatingCls = catState.getIsFavorite("preview", item.name)
-                ? " activated"
-                : "";
-              return "tinymist-button tinymist-template-action" + activatingCls;
+              const activatingCls = catState.getIsFavorite("preview", item.name) ? " active" : "";
+              return "toggle-btn tinymist-template-action" + activatingCls;
             }),
             title: van.derive(() =>
               catState.getIsFavorite("preview", item.name)
                 ? "Removes from favorite"
-                : "Adds to favorite"
+                : "Adds to favorite",
             ),
             onclick() {
               catState.negIsFavorite("preview", item.name);
             },
           },
-          HeartIcon(16)
+          HeartIcon(16),
         ),
         TemplateAction(AddIcon(16), "Creates project", () => {
           const packageSpec = `@preview/${item.name}:${item.version}`;
@@ -156,22 +142,22 @@ const TemplateList = (
             }
             return { value: cat };
           })
-          .map(CategoryButton(catState))
+          .map(CategoryButton(catState)),
       ),
       div({ style: "clear: both" }),
-      div({ style: "margin-top: 0.4em" },
+      div(
+        { style: "margin-top: 0.4em" },
         div({}, () => {
           return highlightMatches(item.description, catState.searchSelected.val);
-        })
-      )
+        }),
+      ),
     );
   };
 
   function runFilterSearch(searchResult: SearchResult[] | undefined) {
     // console.log("search", searchResult);
     const searchResultMap = new Set(searchResult?.map((result) => result.id));
-    return (value: PackageMeta) =>
-      searchResult === undefined || searchResultMap.has(value.id);
+    return (value: PackageMeta) => searchResult === undefined || searchResultMap.has(value.id);
   }
 
   function runFilterCategory(categoryFilter: Set<string>) {
@@ -197,8 +183,8 @@ const TemplateList = (
         .filter(runFilterCategory(catState.categories.val))
         .filter(runFilterFavorite)
         .filter(runFilterSearch(catState.searchSelected.val))
-        .map(TemplateListItem) || []
-    )
+        .map(TemplateListItem) || [],
+    ),
   );
 };
 
@@ -280,19 +266,13 @@ const CategoryButton = (catState: FilterState) => (category: Category) => {
   return button(
     {
       class: van.derive(() => {
-        const activatingCls =
-          category.value === catState.activating.val ? " activated" : "";
-        return "tinymist-button" + activatingCls;
+        const activatingCls = category.value === catState.activating.val ? " active" : "";
+        return "toggle-btn" + activatingCls;
       }),
       title: "Filter by category: " + category.value,
       onclick: () => catState.setCategory(category.value),
     },
-    div(
-      {
-        style: "height: 16px;",
-      },
-      category.display || category.value
-    )
+    div(category.display || category.value),
   );
 };
 
@@ -300,19 +280,18 @@ const FilterRow = (catState: FilterState) => {
   const favButton = button(
     {
       class: van.derive(() => {
-        const activatingCls = catState.filterFavorite.val ? " activated" : "";
-        return "tinymist-button" + activatingCls;
+        const activatingCls = catState.filterFavorite.val ? " active" : "";
+        return "toggle-btn" + activatingCls;
       }),
       title: "Filter by favorite state",
-      onclick: () =>
-        (catState.filterFavorite.val = !catState.filterFavorite.val),
+      onclick: () => (catState.filterFavorite.val = !catState.filterFavorite.val),
     },
-    HeartIcon(16)
+    HeartIcon(16),
   );
   return div(
     { class: "tinymist-category-filter" },
     favButton,
-    ...CATEGORIES.map(CategoryButton(catState))
+    ...CATEGORIES.map(CategoryButton(catState)),
   );
 };
 
@@ -322,15 +301,13 @@ export const TemplateGallery = () => {
   const favoritePlaceholders = `:[[preview:FavoritePlaceholder]]:`;
   const catState = new FilterState(
     JSON.parse(
-      favoritePlaceholders.startsWith(":")
-        ? favoriteState
-        : base64Decode(favoritePlaceholders)
-    )
+      favoritePlaceholders.startsWith(":") ? favoriteState : base64Decode(favoritePlaceholders),
+    ),
   );
   van.derive(async () => {
-    const rawPackages = await fetch(
-      "https://packages.typst.org/preview/index.json"
-    ).then((res) => res.json());
+    const rawPackages = await fetch("https://packages.typst.org/preview/index.json").then((res) =>
+      res.json(),
+    );
 
     // collect packages by version
     const packagesIndex = new Map<string, PackageMeta[]>();
@@ -355,9 +332,5 @@ export const TemplateGallery = () => {
     packages.val = packagesList;
   });
 
-  return div(
-    SearchBar(packages, catState),
-    FilterRow(catState),
-    TemplateList(packages, catState)
-  );
+  return div(SearchBar(packages, catState), FilterRow(catState), TemplateList(packages, catState));
 };

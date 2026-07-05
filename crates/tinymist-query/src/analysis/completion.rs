@@ -4,41 +4,38 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashSet};
 use std::ops::Range;
 
-use ecow::{eco_format, EcoString};
-use if_chain::if_chain;
+use ecow::{EcoString, eco_format};
 use lsp_types::InsertTextFormat;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
-use tinymist_analysis::syntax::{bad_completion_cursor, BadCompletionCursor};
-use tinymist_analysis::{analyze_labels, func_signature, DynLabel};
+use tinymist_analysis::syntax::{BadCompletionCursor, bad_completion_cursor};
+use tinymist_analysis::{DynLabel, analyze_labels, func_signature};
 use tinymist_derive::BindTyCtx;
 use tinymist_project::LspWorld;
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
+use typst::World;
 use typst::foundations::{
-    fields_on, format_str, repr, AutoValue, Func, Label, NoneValue, Repr, Scope, StyleChain, Type,
-    Value,
+    AutoValue, Func, NoneValue, Repr, Scope, StyleChain, Type, Value, fields_on, format_str, repr,
 };
 use typst::syntax::ast::{self, AstNode, Param};
 use typst::syntax::{is_id_continue, is_id_start, is_ident};
 use typst::text::RawElem;
-use typst::visualize::Color;
-use typst::World;
 use typst_shim::{syntax::LinkedNodeExt, utils::hash128};
 use unscanny::Scanner;
 
 use crate::adt::interner::Interned;
-use crate::analysis::{BuiltinTy, LocalContext, PathPreference, Ty};
+use crate::analysis::{BuiltinTy, LocalContext, PathKind, Ty};
 use crate::completion::{
     Completion, CompletionCommand, CompletionContextKey, CompletionItem, CompletionKind,
+    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET, EcoCompletionTextEdit, EcoInsertReplaceEdit,
     EcoTextEdit, ParsedSnippet, PostfixSnippet, PostfixSnippetScope, PrefixSnippet,
-    DEFAULT_POSTFIX_SNIPPET, DEFAULT_PREFIX_SNIPPET,
 };
 use crate::prelude::*;
 use crate::syntax::{
+    InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext, VarClass,
     classify_context, interpret_mode_at, is_ident_like, node_ancestors, previous_decls,
-    surrounding_syntax, InterpretMode, PreviousDecl, SurroundingSyntax, SyntaxClass, SyntaxContext,
-    VarClass,
+    surrounding_syntax,
 };
 use crate::ty::{
     DynTypeBounds, Iface, IfaceChecker, InsTy, SigTy, TyCtx, TypeInfo, TypeInterface, TypeVar,
@@ -70,18 +67,24 @@ type LspCompletion = CompletionItem;
 #[serde(rename_all = "camelCase")]
 pub struct CompletionFeat {
     /// Whether to trigger completions on arguments (placeholders) of snippets.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_on_snippet_placeholders: bool,
     /// Whether supports trigger suggest completion, a.k.a. auto-completion.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_suggest: bool,
     /// Whether supports trigger parameter hint, a.k.a. signature help.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_parameter_hints: bool,
     /// Whether supports trigger the command combining suggest and parameter
     /// hints.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub trigger_suggest_and_parameter_hints: bool,
+    /// Whether the client supports LSP insert/replace completion text edits.
+    #[serde(skip)]
+    pub insert_replace_edit: bool,
+    /// Whether path completion may read directories from the host file system.
+    #[serde(skip)]
+    pub path_completion_by_filesystem: bool,
 
     /// The Way to complete symbols.
     pub symbol: Option<SymbolCompletionWay>,
@@ -255,10 +258,18 @@ impl<'a> CompletionCursor<'a> {
 
             // @identifier
             //  ^ from
-            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref(..)))
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::Ref { .. }))
                 && self.leaf.offset() + 1 == self.from;
             if is_from_ref {
                 return Some(SelectedNode::Ref(self.leaf.clone()));
+            }
+
+            // @identifier
+            //  ^ from
+            let is_from_ref = matches!(self.syntax, Some(SyntaxClass::At { .. }))
+                && self.leaf.offset() + 1 == self.from;
+            if is_from_ref {
+                return Some(SelectedNode::At(self.leaf.clone()));
             }
 
             None
@@ -272,7 +283,7 @@ impl<'a> CompletionCursor<'a> {
 
             match self.syntax_context.clone() {
                 Some(SyntaxContext::Arg { args, .. }) => {
-                    args_node = Some(args.cast::<ast::Args>()?.to_untyped().clone());
+                    args_node = Some(args.get().clone());
                 }
                 Some(SyntaxContext::Normal(node))
                     if (matches!(node.kind(), SyntaxKind::ContentBlock)
@@ -287,6 +298,8 @@ impl<'a> CompletionCursor<'a> {
                     | SyntaxContext::VarAccess(..)
                     | SyntaxContext::Paren { .. }
                     | SyntaxContext::Label { .. }
+                    | SyntaxContext::Ref { .. }
+                    | SyntaxContext::At { .. }
                     | SyntaxContext::Normal(..),
                 )
                 | None => {}
@@ -299,10 +312,10 @@ impl<'a> CompletionCursor<'a> {
     /// Gets the LSP range of a given range with caching.
     fn lsp_range_of(&mut self, rng: Range<usize>) -> LspRange {
         // self.ctx.to_lsp_range(rng, &self.source)
-        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair {
-            if *last_rng == rng {
-                return *last_lsp_rng;
-            }
+        if let Some((last_rng, last_lsp_rng)) = &self.last_lsp_range_pair
+            && *last_rng == rng
+        {
+            return *last_lsp_rng;
         }
 
         let lsp_rng = self.ctx.to_lsp_range(rng.clone(), &self.source);
@@ -310,11 +323,63 @@ impl<'a> CompletionCursor<'a> {
         lsp_rng
     }
 
+    fn insert_range_of(&self, replace: Range<usize>) -> Range<usize> {
+        let end = self.cursor.clamp(replace.start, replace.end);
+        replace.start..end
+    }
+
+    fn completion_text_edit(
+        &mut self,
+        insert: Range<usize>,
+        replace: Range<usize>,
+        new_text: EcoString,
+    ) -> EcoCompletionTextEdit {
+        let insert = self.lsp_range_of(insert);
+        let replace = self.lsp_range_of(replace);
+
+        if self.ctx.analysis.completion_feat.insert_replace_edit && insert != replace {
+            EcoInsertReplaceEdit::new(insert, replace, new_text).into()
+        } else {
+            EcoTextEdit::new(replace, new_text).into()
+        }
+    }
+
+    fn capture_suffix_as_first_arg(&self, snippet: &mut EcoString, replace: Range<usize>) -> bool {
+        if self.cursor >= replace.end {
+            return false;
+        }
+
+        let suffix = &self.text[self.cursor..replace.end];
+        if suffix.is_empty() || !suffix.chars().all(is_id_continue) {
+            return false;
+        }
+
+        fill_first_empty_placeholder(snippet, suffix)
+    }
+
+    fn string_content_range(&self) -> Option<Range<usize>> {
+        if !self.leaf.is::<ast::Str>() {
+            return None;
+        }
+
+        let str_range = self.leaf.range();
+        if str_range.end <= str_range.start + 1 {
+            return None;
+        }
+
+        let content_range = str_range.start + 1..str_range.end - 1;
+        if self.cursor == content_range.end || content_range.contains(&self.cursor) {
+            Some(content_range)
+        } else {
+            None
+        }
+    }
+
     /// Makes a full completion item from a cursor-insensitive completion.
     fn lsp_item_of(&mut self, item: &Completion) -> LspCompletion {
         // Determine range to replace
         let mut snippet = item.apply.as_ref().unwrap_or(&item.label).clone();
-        let replace_range = match self.selected_node() {
+        let mut replace_range = match self.selected_node() {
             Some(SelectedNode::Ident(from_ident)) => {
                 let mut rng = from_ident.range();
 
@@ -329,35 +394,57 @@ impl<'a> CompletionCursor<'a> {
                     rng.end = self.cursor;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
             Some(SelectedNode::Label(from_label)) => {
                 let mut rng = from_label.range();
-                if from_label.text().starts_with('<') && !snippet.starts_with('<') {
+                if from_label.leaf_text().starts_with('<') && !snippet.starts_with('<') {
                     rng.start += 1;
                 }
-                if from_label.text().ends_with('>') && !snippet.ends_with('>') {
+                if from_label.leaf_text().ends_with('>') && !snippet.ends_with('>') {
                     rng.end -= 1;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
-            Some(SelectedNode::Ref(from_ref)) => {
-                let mut rng = from_ref.range();
-                if from_ref.text().starts_with('@') && !snippet.starts_with('@') {
+            Some(node @ (SelectedNode::At(from_ref) | SelectedNode::Ref(from_ref))) => {
+                let mut rng = if matches!(node, SelectedNode::At(..)) {
+                    let offset = from_ref.offset();
+                    offset..offset + 1
+                } else {
+                    from_ref.range()
+                };
+                if from_ref.leaf_text().starts_with('@') && !snippet.starts_with('@') {
                     rng.start += 1;
                 }
 
-                self.lsp_range_of(rng)
+                rng
             }
-            None => self.lsp_range_of(self.from..self.cursor),
+            None => self.from..self.cursor,
         };
+        if let Some(range) = self.string_content_range() {
+            if let Some(trimmed) = snippet.strip_prefix('"') {
+                snippet = trimmed.into();
+            }
+            if let Some(trimmed) = snippet.strip_suffix('"') {
+                snippet = trimmed.into();
+            }
+            replace_range = range;
+        }
 
-        let text_edit = EcoTextEdit::new(replace_range, snippet);
+        let text_edit = if item.capture_suffix
+            && self.capture_suffix_as_first_arg(&mut snippet, replace_range.clone())
+        {
+            let replace_range = self.lsp_range_of(replace_range);
+            EcoTextEdit::new(replace_range, snippet).into()
+        } else {
+            let insert_range = self.insert_range_of(replace_range.clone());
+            self.completion_text_edit(insert_range, replace_range, snippet)
+        };
 
         LspCompletion {
             label: item.label.clone(),
-            kind: item.kind,
+            kind: item.kind.clone(),
             detail: item.detail.clone(),
             sort_text: item.sort_text.clone(),
             filter_text: item.filter_text.clone(),
@@ -376,12 +463,14 @@ type Cursor<'a> = CompletionCursor<'a>;
 
 /// A node selected by [`CompletionCursor`].
 enum SelectedNode<'a> {
-    /// Selects an identifier, e.g. `foo|` or `fo|o`.
+    /// Selects an identifier, e.g. `foobar|` or `foo|bar`.
     Ident(LinkedNode<'a>),
-    /// Selects a label, e.g. `<foo|>` or `<fo|o>`.
+    /// Selects a label, e.g. `<foobar|>` or `<foo|bar>`.
     Label(LinkedNode<'a>),
-    /// Selects a reference, e.g. `@foo|` or `@fo|o`.
+    /// Selects a reference, e.g. `@foobar|` or `@foo|bar`.
     Ref(LinkedNode<'a>),
+    /// Selects a `@` text, e.g. `@|`.
+    At(LinkedNode<'a>),
 }
 
 /// Autocomplete a cursor position in a source file.
@@ -451,7 +540,7 @@ impl<'a> CompletionWorker<'a> {
     fn enrich(&mut self, prefix: &str, suffix: &str) {
         for LspCompletion { text_edit, .. } in &mut self.completions {
             let apply = match text_edit {
-                Some(EcoTextEdit { new_text, .. }) => new_text,
+                Some(text_edit) => text_edit.new_text_mut(),
                 _ => continue,
             };
 
@@ -490,9 +579,9 @@ impl<'a> CompletionWorker<'a> {
         if matches!(
             cursor.syntax,
             Some(SyntaxClass::Callee(..) | SyntaxClass::VarAccess(..) | SyntaxClass::Normal(..))
-        ) && cursor.leaf.erroneous()
+        ) && cursor.leaf.diagnosis().errors
         {
-            let mut chars = cursor.leaf.text().chars();
+            let mut chars = cursor.leaf.leaf_text().chars();
             match chars.next() {
                 Some(ch) if ch.is_numeric() => return None,
                 Some('.') => {
@@ -522,6 +611,7 @@ impl<'a> CompletionWorker<'a> {
         let _ = pair.complete_cursor();
 
         // Filters
+        // todo: reference filter
         if let Some(SelectedNode::Ident(from_ident)) = cursor.selected_node() {
             let ident_prefix = cursor.text[from_ident.offset()..cursor.cursor].to_string();
 
@@ -542,10 +632,8 @@ impl<'a> CompletionWorker<'a> {
         }
 
         for item in &mut self.completions {
-            if let Some(EcoTextEdit {
-                ref mut new_text, ..
-            }) = item.text_edit
-            {
+            if let Some(text_edit) = &mut item.text_edit {
+                let new_text = text_edit.new_text_mut();
                 *new_text = to_lsp_snippet(new_text);
             }
         }
@@ -600,12 +688,11 @@ impl CompletionPair<'_, '_, '_> {
                 };
             }
             Some(SyntaxContext::Arg { args, .. }) => {
-                // The existing arguments are not interesting
-                let args = args.cast::<ast::Args>()?;
-                for arg in args.items() {
-                    if let ast::Arg::Named(named) = arg {
-                        self.worker.seen_field(named.name().into());
-                    }
+                for arg in args.children() {
+                    let Some(ast::Arg::Named(named)) = arg.cast::<ast::Arg>() else {
+                        continue;
+                    };
+                    self.worker.seen_field(named.name().into());
                 }
             }
             // todo: complete field by types
@@ -631,7 +718,7 @@ impl CompletionPair<'_, '_, '_> {
                     self.package_completions(all_versions);
                     return Some(());
                 } else {
-                    let paths = self.complete_path(&crate::analysis::PathPreference::Source {
+                    let paths = self.complete_path(&crate::analysis::PathKind::Source {
                         allow_package: true,
                     });
                     // todo: remove ctx.completions
@@ -641,8 +728,14 @@ impl CompletionPair<'_, '_, '_> {
                 return Some(());
             }
             // todo: complete reference by type
-            Some(SyntaxContext::Normal(node)) if (matches!(node.kind(), SyntaxKind::Ref)) => {
-                self.cursor.from = self.cursor.leaf.offset() + 1;
+            Some(
+                SyntaxContext::Ref {
+                    node,
+                    suffix_colon: _,
+                }
+                | SyntaxContext::At { node },
+            ) => {
+                self.cursor.from = node.offset() + 1;
                 self.ref_completions();
                 return Some(());
             }
@@ -816,8 +909,8 @@ impl CompletionPair<'_, '_, '_> {
                 && node.children().fold(0i32, |acc, node| match node.kind() {
                     SyntaxKind::LeftParen => acc + 1,
                     SyntaxKind::RightParen => acc - 1,
-                    SyntaxKind::Error if node.text() == "(" => acc + 1,
-                    SyntaxKind::Error if node.text() == ")" => acc - 1,
+                    SyntaxKind::Error if node.leaf_text() == "(" => acc + 1,
+                    SyntaxKind::Error if node.leaf_text() == ")" => acc - 1,
                     _ => acc,
                 }) > 0;
             if is_unclosed {
@@ -850,17 +943,46 @@ impl CompletionPair<'_, '_, '_> {
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode detailed description.
-pub fn symbol_detail(ch: char) -> EcoString {
-    let ld = symbol_label_detail(ch);
+pub fn symbol_detail(s: &str) -> EcoString {
+    let ld = symbol_label_detail(s);
     if ld.starts_with("\\u") {
         return ld;
     }
-    format!("{}, unicode: `\\u{{{:04x}}}`", ld, ch as u32).into()
+
+    let mut chars = s.chars();
+    let unicode_repr = if let (Some(ch), None) = (chars.next(), chars.next()) {
+        format!("\\u{{{:04x}}}", ch as u32)
+    } else {
+        let codes: Vec<String> = s
+            .chars()
+            .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+            .collect();
+        codes.join(" + ")
+    };
+
+    format!("{ld}, unicode: `{unicode_repr}`").into()
 }
 
 /// If is printable, return the symbol itself.
 /// Otherwise, return the symbol's unicode description.
-pub fn symbol_label_detail(ch: char) -> EcoString {
+pub fn symbol_label_detail(s: &str) -> EcoString {
+    let mut chars = s.chars();
+    if let (Some(ch), None) = (chars.next(), chars.next()) {
+        return symbol_label_detail_single_char(ch);
+    }
+
+    if s.chars().all(|ch| !ch.is_whitespace() && !ch.is_control()) {
+        return s.into();
+    }
+
+    let codes: Vec<String> = s
+        .chars()
+        .map(|ch| format!("\\u{{{:04x}}}", ch as u32))
+        .collect();
+    codes.join(" + ").into()
+}
+
+fn symbol_label_detail_single_char(ch: char) -> EcoString {
     if !ch.is_whitespace() && !ch.is_control() {
         return ch.into();
     }
@@ -905,6 +1027,25 @@ fn slice_at(s: &str, mut rng: Range<usize>) -> &str {
     }
 
     &s[rng]
+}
+
+fn fill_first_empty_placeholder(snippet: &mut EcoString, text: &str) -> bool {
+    let Some(pos) = snippet.find("${}") else {
+        return false;
+    };
+
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('$', "\\$")
+        .replace('}', "\\}");
+    let mut filled = EcoString::new();
+    filled.push_str(&snippet[..pos]);
+    filled.push_str("${");
+    filled.push_str(&escaped);
+    filled.push('}');
+    filled.push_str(&snippet[pos + "${}".len()..]);
+    *snippet = filled;
+    true
 }
 
 static TYPST_SNIPPET_PLACEHOLDER_RE: LazyLock<Regex> =
@@ -991,6 +1132,17 @@ fn is_arg_like_context(mut matching: &LinkedNode) -> bool {
 //     ctx.completions.push(compl);
 // }
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
+// todo: doesn't complete parameter now, which is not good.
+
 #[cfg(test)]
 mod tests {
     use super::slice_at;
@@ -1005,5 +1157,3 @@ mod tests {
         }
     }
 }
-
-// todo: doesn't complete parameter now, which is not good.

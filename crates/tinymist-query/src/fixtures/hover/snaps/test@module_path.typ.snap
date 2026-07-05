@@ -1,9 +1,8 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/module_path.typ
 ---
-{
- "contents": "## Some Module\n",
- "range": "0:29:0:46"
-}
+Range: 0:29:0:46
+
+## Some Module

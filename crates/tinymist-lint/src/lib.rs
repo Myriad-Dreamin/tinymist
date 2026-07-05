@@ -1,18 +1,21 @@
 //! A linter for Typst.
 
-use std::sync::Arc;
+mod rules;
+
+use std::{cell::OnceCell, sync::Arc};
 
 use tinymist_analysis::{
-    syntax::ExprInfo,
+    adt::interner::Interned,
+    syntax::{Decl, ExprInfo},
     ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
 use typst::{
-    diag::{eco_format, EcoString, SourceDiagnostic, Tracepoint},
+    diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
     syntax::{
+        DiagSpan, FileId, Span, Spanned, SyntaxNode,
         ast::{self, AstNode},
-        FileId, Span, Spanned, SyntaxNode,
     },
 };
 
@@ -31,31 +34,93 @@ pub struct LintInfo {
 }
 
 /// Performs linting check on file and returns a vector of diagnostics.
-pub fn lint_file(world: &LspWorld, expr: &ExprInfo, ti: Arc<TypeInfo>) -> LintInfo {
-    let diagnostics = Linter::new(world, ti).lint(expr.source.root());
+pub fn lint_file(
+    world: &LspWorld,
+    ei: &ExprInfo,
+    ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
+) -> LintInfo {
+    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
     LintInfo {
-        revision: expr.revision,
-        fid: expr.fid,
+        revision: ei.revision,
+        fid: ei.fid,
         diagnostics,
+    }
+}
+
+/// Information about issues the linter checks for that will already be reported
+/// to the user via other means (such as compiler diagnostics), to avoid
+/// duplicating warnings.
+#[derive(Default, Clone, Hash)]
+pub struct KnownIssues {
+    unknown_vars: EcoVec<DiagSpan>,
+    unknown_fonts: EcoVec<(DiagSpan, EcoString)>,
+}
+
+impl KnownIssues {
+    /// Collects known lint issues from the given compiler diagnostics.
+    pub fn from_compiler_diagnostics<'a>(
+        diags: impl Iterator<Item = &'a SourceDiagnostic>,
+    ) -> Self {
+        let mut unknown_vars = Vec::default();
+        let mut unknown_fonts = Vec::default();
+        for diag in diags {
+            if diag.message.starts_with("unknown variable") {
+                unknown_vars.push(diag.span);
+            } else if let Some(font_name) = rules::bad_font::extract_unknown_font(&diag.message) {
+                unknown_fonts.push((diag.span, font_name));
+            }
+        }
+        let unknown_vars = EcoVec::from(unknown_vars);
+        let unknown_fonts = EcoVec::from(unknown_fonts);
+        Self {
+            unknown_vars,
+            unknown_fonts,
+        }
+    }
+
+    pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
+        self.unknown_vars.contains(&ident.span().into())
+    }
+
+    pub(crate) fn get_unknown_font(&self, span: Span) -> Option<&EcoString> {
+        let span = DiagSpan::from(span);
+        self.unknown_fonts
+            .iter()
+            .find_map(|(candidate, name)| (*candidate == span).then_some(name))
     }
 }
 
 struct Linter<'w> {
     world: &'w LspWorld,
+    ei: ExprInfo,
     ti: Arc<TypeInfo>,
+    known_issues: KnownIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
     func_info: Option<FuncInfo>,
+
+    /// Cached available fonts (sorted)
+    available_fonts: OnceCell<Vec<&'w str>>,
 }
 
 impl<'w> Linter<'w> {
-    fn new(world: &'w LspWorld, ti: Arc<TypeInfo>) -> Self {
+    fn new(
+        world: &'w LspWorld,
+        ei: ExprInfo,
+        ti: Arc<TypeInfo>,
+        known_issues: KnownIssues,
+    ) -> Self {
         Self {
             world,
+            ei,
             ti,
+            known_issues,
             diag: EcoVec::new(),
             loop_info: None,
             func_info: None,
+
+            available_fonts: OnceCell::new(),
         }
     }
 
@@ -149,8 +214,8 @@ impl<'w> Linter<'w> {
             let mut first = true;
             for set in block.iter() {
                 let msg = match set {
-                    ast::Expr::Set(..) => "This set statement doesn't take effect.",
-                    ast::Expr::Show(..) => "This show statement doesn't take effect.",
+                    ast::Expr::SetRule(..) => "This set statement doesn't take effect.",
+                    ast::Expr::ShowRule(..) => "This show statement doesn't take effect.",
                     _ => continue,
                 };
                 let mut warning = SourceDiagnostic::warning(set.span(), msg);
@@ -173,7 +238,7 @@ impl<'w> Linter<'w> {
         for it in block.iter() {
             if is_show_set(it) {
                 has_set = true;
-            } else if matches!(it, ast::Expr::Break(..) | ast::Expr::Continue(..)) {
+            } else if matches!(it, ast::Expr::LoopBreak(..) | ast::Expr::LoopContinue(..)) {
                 return has_set;
             } else if !it.to_untyped().kind().is_trivia() {
                 return false;
@@ -215,49 +280,6 @@ impl<'w> Linter<'w> {
             ty: self.ti.type_of_span(expr.span()),
         }
     }
-
-    fn check_variable_font<'a>(&mut self, args: impl IntoIterator<Item = ast::Arg<'a>>) {
-        for arg in args {
-            if let ast::Arg::Named(arg) = arg {
-                if arg.name().as_str() == "font" {
-                    self.check_variable_font_object(arg.expr().to_untyped());
-                    if let Some(array) = arg.expr().to_untyped().cast::<ast::Array>() {
-                        for item in array.items() {
-                            self.check_variable_font_object(item.to_untyped());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    fn check_variable_font_object(&mut self, expr: &SyntaxNode) -> Option<()> {
-        if let Some(font_dict) = expr.cast::<ast::Dict>() {
-            for item in font_dict.items() {
-                if let ast::DictItem::Named(arg) = item {
-                    if arg.name().as_str() == "name" {
-                        self.check_variable_font_str(arg.expr().to_untyped());
-                    }
-                }
-            }
-        }
-
-        self.check_variable_font_str(expr)
-    }
-    fn check_variable_font_str(&mut self, expr: &SyntaxNode) -> Option<()> {
-        if !expr.cast::<ast::Str>()?.get().ends_with("VF") {
-            return None;
-        }
-
-        let _ = self.world;
-
-        let diag =
-            SourceDiagnostic::warning(expr.span(), "variable font is not supported by typst yet");
-        let diag = diag.with_hint("consider using a static font instead. For more information, see https://github.com/typst/typst/issues/185");
-        self.diag.push(diag);
-
-        Some(())
-    }
 }
 
 impl DataFlowVisitor for Linter<'_> {
@@ -274,8 +296,8 @@ impl DataFlowVisitor for Linter<'_> {
         }
         self.exprs(expr.args().to_untyped().exprs());
 
-        if expr.target().to_untyped().text() == "text" {
-            self.check_variable_font(expr.args().items());
+        if expr.target().to_untyped().leaf_text() == "text" {
+            self.check_bad_font(expr.args().items());
         }
 
         self.expr(expr.target())
@@ -383,9 +405,30 @@ impl DataFlowVisitor for Linter<'_> {
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
         // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
         // "VF"
-        if expr.callee().to_untyped().text() == "text" {
-            self.check_variable_font(expr.args().items());
+        if expr.callee().to_untyped().leaf_text() == "text" {
+            self.check_bad_font(expr.args().items());
         }
+        self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
+        Some(())
+    }
+
+    fn math_ident(&mut self, ident: ast::MathIdent<'_>) -> Option<()> {
+        let resolved = self.ei.get_def(&Interned::new(Decl::math_ident_ref(ident)));
+        let is_defined = resolved.is_some_and(|expr| expr.is_defined());
+
+        if !is_defined && !self.known_issues.has_unknown_math_ident(ident) {
+            let var = ident.as_str();
+            let mut warning =
+                SourceDiagnostic::warning(ident.span(), eco_format!("unknown variable: {var}"));
+
+            // Tries to produce the same hints as the corresponding Typst compiler error.
+            // See `unknown_variable_math` in typst-library/src/foundations/scope.rs:
+            // https://github.com/typst/typst/blob/v0.13.1/crates/typst-library/src/foundations/scope.rs#L386
+            let in_global = self.world.library.global.scope().get(var).is_some();
+            hint_unknown_variable_math(var, in_global, &mut warning);
+            self.diag.push(warning);
+        }
+
         Some(())
     }
 }
@@ -536,7 +579,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn include(&mut self, expr: ast::ModuleInclude<'_>) -> Option<()> {
-        self.value(ast::Expr::Include(expr));
+        self.value(ast::Expr::ModuleInclude(expr));
         Some(())
     }
 
@@ -591,15 +634,16 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 ),
             );
             let diag = match expr {
-                ast::Expr::Show(..) | ast::Expr::Set(..) => diag,
+                ast::Expr::ShowRule(..) | ast::Expr::SetRule(..) => diag,
                 expr if expr.hash() => diag.with_hint(eco_format!(
                     "consider ignoring the value explicitly using underscore: `let _ = {}`",
-                    expr.to_untyped().clone().into_text()
+                    expr.to_untyped().clone().full_text()
                 )),
                 _ => diag,
             };
             self.linter.diag.push(diag);
-        } else if ri.return_none && matches!(expr, ast::Expr::Show(..) | ast::Expr::Set(..)) {
+        } else if ri.return_none && matches!(expr, ast::Expr::ShowRule(..) | ast::Expr::SetRule(..))
+        {
             ri.warned = true;
             let diag = SourceDiagnostic::warning(
                 expr.span(),
@@ -615,12 +659,12 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
     }
 
     fn show(&mut self, expr: ast::ShowRule<'_>) -> Option<()> {
-        self.value(ast::Expr::Show(expr));
+        self.value(ast::Expr::ShowRule(expr));
         Some(())
     }
 
     fn set(&mut self, expr: ast::SetRule<'_>) -> Option<()> {
-        self.value(ast::Expr::Set(expr));
+        self.value(ast::Expr::SetRule(expr));
         Some(())
     }
 
@@ -654,8 +698,8 @@ trait DataFlowVisitor {
     fn expr(&mut self, expr: ast::Expr) -> Option<()> {
         match expr {
             ast::Expr::Parenthesized(expr) => self.expr(expr.expr()),
-            ast::Expr::Code(expr) => self.block(expr.body().exprs()),
-            ast::Expr::Content(expr) => self.block(expr.body().exprs()),
+            ast::Expr::CodeBlock(expr) => self.block(expr.body().exprs()),
+            ast::Expr::ContentBlock(expr) => self.block(expr.body().exprs()),
             ast::Expr::Math(expr) => self.exprs(expr.exprs()),
 
             ast::Expr::Text(..) => self.value(expr),
@@ -686,13 +730,15 @@ trait DataFlowVisitor {
             ast::Expr::Strong(content) => self.exprs(content.body().exprs()),
             ast::Expr::Emph(content) => self.exprs(content.body().exprs()),
             ast::Expr::Heading(content) => self.exprs(content.body().exprs()),
-            ast::Expr::List(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Enum(content) => self.exprs(content.body().exprs()),
-            ast::Expr::Term(content) => {
+            ast::Expr::ListItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::EnumItem(content) => self.exprs(content.body().exprs()),
+            ast::Expr::TermItem(content) => {
                 self.exprs(content.term().exprs().chain(content.description().exprs()))
             }
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
             ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
+            ast::Expr::MathFieldAccess(expr) => self.math_field_access(expr),
+            ast::Expr::MathCall(expr) => self.math_call(expr),
 
             ast::Expr::Ident(expr) => self.ident(expr),
             ast::Expr::MathIdent(expr) => self.math_ident(expr),
@@ -704,19 +750,19 @@ trait DataFlowVisitor {
             ast::Expr::FieldAccess(expr) => self.field_access(expr),
             ast::Expr::FuncCall(expr) => self.func_call(expr),
             ast::Expr::Closure(expr) => self.closure(expr),
-            ast::Expr::Let(expr) => self.let_binding(expr),
-            ast::Expr::DestructAssign(expr) => self.destruct_assign(expr),
-            ast::Expr::Set(expr) => self.set(expr),
-            ast::Expr::Show(expr) => self.show(expr),
+            ast::Expr::LetBinding(expr) => self.let_binding(expr),
+            ast::Expr::DestructAssignment(expr) => self.destruct_assign(expr),
+            ast::Expr::SetRule(expr) => self.set(expr),
+            ast::Expr::ShowRule(expr) => self.show(expr),
             ast::Expr::Contextual(expr) => self.contextual(expr),
             ast::Expr::Conditional(expr) => self.conditional(expr),
-            ast::Expr::While(expr) => self.while_loop(expr),
-            ast::Expr::For(expr) => self.for_loop(expr),
-            ast::Expr::Import(expr) => self.import(expr),
-            ast::Expr::Include(expr) => self.include(expr),
-            ast::Expr::Break(expr) => self.loop_break(expr),
-            ast::Expr::Continue(expr) => self.loop_continue(expr),
-            ast::Expr::Return(expr) => self.func_return(expr),
+            ast::Expr::WhileLoop(expr) => self.while_loop(expr),
+            ast::Expr::ForLoop(expr) => self.for_loop(expr),
+            ast::Expr::ModuleImport(expr) => self.import(expr),
+            ast::Expr::ModuleInclude(expr) => self.include(expr),
+            ast::Expr::LoopBreak(expr) => self.loop_break(expr),
+            ast::Expr::LoopContinue(expr) => self.loop_continue(expr),
+            ast::Expr::FuncReturn(expr) => self.func_return(expr),
         }
     }
 
@@ -773,6 +819,22 @@ trait DataFlowVisitor {
 
     fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
         self.expr(expr.target())
+    }
+
+    fn math_access(&mut self, access: ast::MathAccess<'_>) -> Option<()> {
+        match access {
+            ast::MathAccess::MathIdent(expr) => self.math_ident(expr),
+            ast::MathAccess::MathFieldAccess(expr) => self.math_field_access(expr),
+        }
+    }
+
+    fn math_field_access(&mut self, expr: ast::MathFieldAccess<'_>) -> Option<()> {
+        self.math_access(expr.target())
+    }
+
+    fn math_call(&mut self, expr: ast::MathCall<'_>) -> Option<()> {
+        self.exprs(expr.args().to_untyped().exprs())?;
+        self.math_access(expr.callee())
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
@@ -893,8 +955,8 @@ enum Block<'a> {
 impl<'a> Block<'a> {
     fn from(expr: ast::Expr<'a>) -> Option<Self> {
         Some(match expr {
-            ast::Expr::Code(block) => Block::Code(block.body()),
-            ast::Expr::Content(block) => Block::Markup(block.body()),
+            ast::Expr::CodeBlock(block) => Block::Code(block.body()),
+            ast::Expr::ContentBlock(block) => Block::Markup(block.body()),
             _ => return None,
         })
     }
@@ -944,23 +1006,23 @@ impl BuggyBlockLoc<'_> {
     fn hint(&self, show_set: ast::Expr<'_>) -> EcoString {
         match self {
             BuggyBlockLoc::Show(show_parent) => {
-                if let ast::Expr::Show(show) = show_set {
+                if let ast::Expr::ShowRule(show) = show_set {
                     eco_format!(
                         "consider changing parent to `show {}: it => {{ {}; it }}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show.to_untyped().clone().into_text()
+                        show.to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `show {}: {}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show_set.to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text()
                     )
                 }
             }
@@ -970,36 +1032,36 @@ impl BuggyBlockLoc<'_> {
                 } else {
                     "not "
                 };
-                if let ast::Expr::Show(show) = show_set {
+                if let ast::Expr::ShowRule(show) = show_set {
                     eco_format!(
                         "consider changing parent to `show {}: if {neg}({}) {{ .. }}`",
                         match show.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        conditional.condition().to_untyped().clone().into_text()
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `{} if {neg}({})`",
-                        show_set.to_untyped().clone().into_text(),
-                        conditional.condition().to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text(),
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 }
             }
             BuggyBlockLoc::While(w) => {
                 eco_format!(
                     "consider changing parent to `show: it => if {} {{ {}; it }}`",
-                    w.condition().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    w.condition().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
             BuggyBlockLoc::For(f) => {
                 eco_format!(
                     "consider changing parent to `show: {}.fold(it => it, (style-it, {}) => it => {{ {}; style-it(it) }})`",
-                    f.iterable().to_untyped().clone().into_text(),
-                    f.pattern().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    f.iterable().to_untyped().clone().full_text(),
+                    f.pattern().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
         }
@@ -1014,10 +1076,39 @@ enum ExprContext {
 }
 
 fn is_show_set(it: ast::Expr) -> bool {
-    matches!(it, ast::Expr::Set(..) | ast::Expr::Show(..))
+    matches!(it, ast::Expr::SetRule(..) | ast::Expr::ShowRule(..))
 }
 
 fn is_compare_op(op: ast::BinOp) -> bool {
     use ast::BinOp::*;
     matches!(op, Lt | Leq | Gt | Geq | Eq | Neq)
+}
+
+/// The error message when a variable wasn't found it math.
+#[cold]
+fn hint_unknown_variable_math(var: &str, in_global: bool, diag: &mut SourceDiagnostic) {
+    if matches!(var, "none" | "auto" | "false" | "true") {
+        diag.hint(eco_format!(
+            "if you meant to use a literal, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else if in_global {
+        diag.hint(eco_format!(
+            "`{var}` is not available directly in math, \
+             try adding a hash before it: `#{var}`",
+        ));
+    } else {
+        diag.hint(eco_format!(
+            "if you meant to display multiple letters as is, \
+             try adding spaces between each letter: `{}`",
+            var.chars()
+                .flat_map(|c| [' ', c])
+                .skip(1)
+                .collect::<EcoString>()
+        ));
+        diag.hint(eco_format!(
+            "or if you meant to display this as text, \
+             try placing it in quotes: `\"{var}\"`"
+        ));
+    }
 }

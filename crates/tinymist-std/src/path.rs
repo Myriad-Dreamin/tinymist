@@ -71,7 +71,7 @@ pub fn diff(path: &Path, base: &Path) -> Option<PathBuf> {
 mod test {
     use std::path::{Path, PathBuf};
 
-    use super::{clean as inner_path_clean, unix_slash, PathClean};
+    use super::{PathClean, clean as inner_path_clean, unix_slash};
 
     pub fn clean<P: AsRef<Path>>(path: P) -> String {
         unix_slash(&inner_path_clean(path))

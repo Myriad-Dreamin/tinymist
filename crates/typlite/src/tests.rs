@@ -1,7 +1,8 @@
 use std::sync::OnceLock;
 
+use ecow::EcoVec;
 use regex::Regex;
-use typst::html::{HtmlNode, HtmlTag};
+use typst_html::{HtmlNode, HtmlTag};
 use typst_syntax::Span;
 
 use super::*;
@@ -46,7 +47,7 @@ fn test_docx_generation() {
         let docx_data = match converter.to_docx() {
             Ok(data) => data,
             Err(err) => {
-                panic!("Failed to generate DOCX: {}", err);
+                panic!("Failed to generate DOCX: {err}");
             }
         };
 
@@ -91,7 +92,8 @@ impl ConvKind {
 }
 
 fn conv(world: LspWorld, kind: ConvKind) -> String {
-    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
+    let world = Arc::new(world);
+    let converter = Typlite::new(world.clone()).with_feature(TypliteFeat {
         annotate_elem: kind.for_docs(),
         ..Default::default()
     });
@@ -100,24 +102,37 @@ fn conv(world: LspWorld, kind: ConvKind) -> String {
         Err(err) => return format!("failed to convert to markdown: {err}"),
     };
 
-    let repr = typst_html::html(&redact(doc.base.clone())).unwrap();
+    let repr = typst_html::html(
+        &redact(doc.base.clone()),
+        &typst_html::HtmlOptions { pretty: true },
+    )
+    .unwrap();
     let res = match kind {
         ConvKind::Md { .. } => doc.to_md_string().unwrap(),
-        ConvKind::LaTeX => doc.to_tex_string(false).unwrap(),
+        ConvKind::LaTeX => doc.to_tex_string().unwrap(),
     };
 
     static REG: OnceLock<Regex> = OnceLock::new();
     let reg = REG.get_or_init(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
-    let res = reg.replace_all(&res, |_captures: &regex::Captures| {
-        "data:image-hash/svg+xml;base64,redacted"
-    });
+    let res = reg.replace_all(
+        &res,
+        |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
+    );
 
-    [repr.as_str(), res.as_ref()].join("\n=====\n")
+    normalize_snapshot_output(&[repr.as_str(), res.as_ref()].join("\n=====\n"))
+}
+
+fn normalize_snapshot_output(output: &str) -> String {
+    output
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn redact(doc: HtmlDocument) -> HtmlDocument {
     let mut doc = doc;
-    for node in doc.root.children.iter_mut() {
+    for node in doc.root_mut().children.make_mut().iter_mut() {
         redact_node(node);
     }
     doc
@@ -127,9 +142,9 @@ fn redact_node(node: &mut HtmlNode) {
     match node {
         HtmlNode::Element(elem) => {
             if elem.tag == HtmlTag::constant("svg") {
-                elem.children = vec![];
+                elem.children = EcoVec::new();
             } else {
-                for child in elem.children.iter_mut() {
+                for child in elem.children.make_mut().iter_mut() {
                     redact_node(child);
                 }
             }

@@ -37,7 +37,7 @@ impl<S: AsRef<str>> PackFs for HttpPack<S> {
             let reader = match resp.and_then(|r| r.error_for_status()) {
                 Ok(response) => response,
                 Err(err) if matches!(err.status().map(|s| s.as_u16()), Some(404)) => {
-                    return Err(PackageError::NotFound(spec.clone()))
+                    return Err(PackageError::NotFound(spec.clone()));
                 }
                 Err(err) => return Err(PackageError::NetworkFailed(Some(eco_format!("{err}")))),
             };

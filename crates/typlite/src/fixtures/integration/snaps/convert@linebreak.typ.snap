@@ -1,0 +1,19 @@
+---
+source: crates/typlite/src/tests.rs
+expression: "conv(world, ConvKind::Md { for_docs: false })"
+input_file: crates/typlite/src/fixtures/integration/linebreak.typ
+---
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
+  <body><m1document>Text2<br>Text1<br><m1parbreak></m1parbreak><m1heading level="2"><span style="display: inline-block">H1</span></m1heading></m1document></body>
+</html>
+
+=====
+Text2\
+Text1
+
+### H1

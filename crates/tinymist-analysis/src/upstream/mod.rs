@@ -1,22 +1,23 @@
 //! Functions from typst-ide
 
+mod tooltip;
+
+pub use tooltip::{Tooltip, tooltip_};
+
 use std::{collections::HashMap, fmt::Write, sync::LazyLock};
 
 use comemo::Tracked;
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use serde::Deserialize;
 use serde_yaml as yaml;
 use typst::{
-    diag::{bail, StrResult},
+    Category, Feature, Features, Library, LibraryExt, World,
+    diag::{StrResult, bail},
     foundations::{Binding, Content, Func, Module, Type, Value},
     introspection::MetadataElem,
     syntax::Span,
     text::{FontInfo, FontStyle},
-    Category, Library, World,
 };
-
-mod tooltip;
-pub use tooltip::*;
 
 /// Extract the first sentence of plain text of a piece of documentation.
 ///
@@ -109,7 +110,7 @@ impl GroupData {
 static GROUPS: LazyLock<Vec<GroupData>> = LazyLock::new(|| {
     let mut groups: Vec<GroupData> = yaml::from_str(include_str!("groups.yml")).unwrap();
     for group in &mut groups {
-        if group.filter.is_empty() {
+        if group.filter.is_empty() && group.name != "std" {
             group.filter = group
                 .module()
                 .scope()
@@ -171,7 +172,11 @@ fn resolve_known(head: &str, base: &str) -> Option<String> {
     })
 }
 
-static LIBRARY: LazyLock<Library> = LazyLock::new(Library::default);
+static LIBRARY: LazyLock<Library> = LazyLock::new(|| {
+    Library::builder()
+        .with_features(Features::from_iter([Feature::Html]))
+        .build()
+});
 
 /// Extract a module from another module.
 #[track_caller]
@@ -226,14 +231,13 @@ fn resolve_definition(head: &str, base: &str) -> StrResult<String> {
         if let Ok(field) = value.field(next, ()) {
             route.push_str("/#definitions-");
             route.push_str(next);
-            if let Some(next) = parts.next() {
-                if field
+            if let Some(next) = parts.next()
+                && field
                     .cast::<Func>()
                     .is_ok_and(|func| func.param(next).is_some())
-                {
-                    route.push('-');
-                    route.push_str(next);
-                }
+            {
+                route.push('-');
+                route.push_str(next);
             }
         } else if value
             .clone()
@@ -259,7 +263,7 @@ enum CatKey {
 
 impl PartialEq for CatKey {
     fn eq(&self, other: &Self) -> bool {
-        use typst::foundations::func::Repr::*;
+        use typst::foundations::FuncInner::*;
         match (self, other) {
             (CatKey::Func(a), CatKey::Func(b)) => match (a.inner(), b.inner()) {
                 (Native(a), Native(b)) => a == b,
@@ -322,7 +326,17 @@ static ROUTE_MAPS: LazyLock<HashMap<CatKey, String>> = LazyLock::new(|| {
                         crate::log_debug_ct!("type: {t:?} -> {cat:?}");
 
                         let route = format_route(parent_name.as_deref(), &name, &cat);
-                        map.insert(CatKey::Type(*t), route);
+
+                        // Some types are defined multiple times, and the first one should take
+                        // precedence.
+                        //
+                        // For example, typst 0.13.0 renamed `pattern` to `tiling`, but keep
+                        // `pattern` remains as a deprecated alias.
+                        // Therefore, `Tiling` is first defined as `tiling`, then defined as
+                        // `pattern` with deprecation again. https://typst.app/docs/changelog/0.13.0/#visualization
+                        // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L34
+                        // https://github.com/typst/typst/blob/9a6268050fb769e18c4889fa5f59d4150e8878d6/crates/typst-library/src/visualize/mod.rs#L47-L49
+                        map.entry(CatKey::Type(*t)).or_insert(route);
                     }
                     scope_to_finds.push((t.scope(), Some(name), cat));
                 }
@@ -423,7 +437,7 @@ pub fn truncated_repr_<const SZ_LIMIT: usize>(value: &Value) -> EcoString {
 
 /// Get the representation but truncated to a certain size.
 pub fn truncated_repr(value: &Value) -> EcoString {
-    const _10MB: usize = 100 * 1024 * 1024;
+    const _10MB: usize = 10 * 1024 * 1024;
     truncated_repr_::<_10MB>(value)
 }
 
@@ -438,14 +452,15 @@ pub fn with_vm<T>(
     use typst::introspection::*;
     use typst_shim::eval::*;
 
-    let introspector = Introspector::default();
+    let library = world.library();
+    let introspector = EmptyIntrospector;
     let traced = Traced::default();
     let mut sink = Sink::new();
     let engine = Engine {
-        routines: &typst::ROUTINES,
+        library,
         world,
         route: Route::default(),
-        introspector: introspector.track(),
+        introspector: typst::utils::Protected::new(introspector.track()),
         traced: traced.track(),
         sink: sink.track_mut(),
     };
@@ -495,26 +510,23 @@ mod tests {
         let mut values = ROUTE_MAPS.values().map(access).collect::<Vec<_>>();
         values.sort();
 
-        insta::assert_snapshot!(values.as_slice().join("\n"), @r###"
+        insta::assert_snapshot!(values.as_slice().join("\n"), @"
         https://typst.app/docs/reference/data-loading/cbor/
-        https://typst.app/docs/reference/data-loading/cbor/#definitions-decode
         https://typst.app/docs/reference/data-loading/cbor/#definitions-encode
         https://typst.app/docs/reference/data-loading/csv/
-        https://typst.app/docs/reference/data-loading/csv/#definitions-decode
         https://typst.app/docs/reference/data-loading/json/
-        https://typst.app/docs/reference/data-loading/json/#definitions-decode
         https://typst.app/docs/reference/data-loading/json/#definitions-encode
         https://typst.app/docs/reference/data-loading/read/
         https://typst.app/docs/reference/data-loading/toml/
-        https://typst.app/docs/reference/data-loading/toml/#definitions-decode
         https://typst.app/docs/reference/data-loading/toml/#definitions-encode
         https://typst.app/docs/reference/data-loading/xml/
-        https://typst.app/docs/reference/data-loading/xml/#definitions-decode
         https://typst.app/docs/reference/data-loading/yaml/
-        https://typst.app/docs/reference/data-loading/yaml/#definitions-decode
         https://typst.app/docs/reference/data-loading/yaml/#definitions-encode
         https://typst.app/docs/reference/foundations/arguments/
         https://typst.app/docs/reference/foundations/arguments/#definitions-at
+        https://typst.app/docs/reference/foundations/arguments/#definitions-filter
+        https://typst.app/docs/reference/foundations/arguments/#definitions-len
+        https://typst.app/docs/reference/foundations/arguments/#definitions-map
         https://typst.app/docs/reference/foundations/arguments/#definitions-named
         https://typst.app/docs/reference/foundations/arguments/#definitions-pos
         https://typst.app/docs/reference/foundations/array/
@@ -561,15 +573,19 @@ mod tests {
         https://typst.app/docs/reference/foundations/bytes/#definitions-slice
         https://typst.app/docs/reference/foundations/calc/#functions-abs
         https://typst.app/docs/reference/foundations/calc/#functions-acos
+        https://typst.app/docs/reference/foundations/calc/#functions-acosh
         https://typst.app/docs/reference/foundations/calc/#functions-asin
+        https://typst.app/docs/reference/foundations/calc/#functions-asinh
         https://typst.app/docs/reference/foundations/calc/#functions-atan
         https://typst.app/docs/reference/foundations/calc/#functions-atan2
+        https://typst.app/docs/reference/foundations/calc/#functions-atanh
         https://typst.app/docs/reference/foundations/calc/#functions-binom
         https://typst.app/docs/reference/foundations/calc/#functions-ceil
         https://typst.app/docs/reference/foundations/calc/#functions-clamp
         https://typst.app/docs/reference/foundations/calc/#functions-cos
         https://typst.app/docs/reference/foundations/calc/#functions-cosh
         https://typst.app/docs/reference/foundations/calc/#functions-div-euclid
+        https://typst.app/docs/reference/foundations/calc/#functions-erf
         https://typst.app/docs/reference/foundations/calc/#functions-even
         https://typst.app/docs/reference/foundations/calc/#functions-exp
         https://typst.app/docs/reference/foundations/calc/#functions-fact
@@ -616,9 +632,11 @@ mod tests {
         https://typst.app/docs/reference/foundations/decimal/
         https://typst.app/docs/reference/foundations/dictionary/
         https://typst.app/docs/reference/foundations/dictionary/#definitions-at
+        https://typst.app/docs/reference/foundations/dictionary/#definitions-filter
         https://typst.app/docs/reference/foundations/dictionary/#definitions-insert
         https://typst.app/docs/reference/foundations/dictionary/#definitions-keys
         https://typst.app/docs/reference/foundations/dictionary/#definitions-len
+        https://typst.app/docs/reference/foundations/dictionary/#definitions-map
         https://typst.app/docs/reference/foundations/dictionary/#definitions-pairs
         https://typst.app/docs/reference/foundations/dictionary/#definitions-remove
         https://typst.app/docs/reference/foundations/dictionary/#definitions-values
@@ -651,6 +669,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/label/
         https://typst.app/docs/reference/foundations/module/
         https://typst.app/docs/reference/foundations/panic/
+        https://typst.app/docs/reference/foundations/path/
         https://typst.app/docs/reference/foundations/plugin/
         https://typst.app/docs/reference/foundations/plugin/#definitions-transition
         https://typst.app/docs/reference/foundations/regex/
@@ -660,6 +679,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/selector/#definitions-and
         https://typst.app/docs/reference/foundations/selector/#definitions-before
         https://typst.app/docs/reference/foundations/selector/#definitions-or
+        https://typst.app/docs/reference/foundations/selector/#definitions-within
         https://typst.app/docs/reference/foundations/str/
         https://typst.app/docs/reference/foundations/str/#definitions-at
         https://typst.app/docs/reference/foundations/str/#definitions-clusters
@@ -673,6 +693,7 @@ mod tests {
         https://typst.app/docs/reference/foundations/str/#definitions-len
         https://typst.app/docs/reference/foundations/str/#definitions-match
         https://typst.app/docs/reference/foundations/str/#definitions-matches
+        https://typst.app/docs/reference/foundations/str/#definitions-normalize
         https://typst.app/docs/reference/foundations/str/#definitions-position
         https://typst.app/docs/reference/foundations/str/#definitions-replace
         https://typst.app/docs/reference/foundations/str/#definitions-rev
@@ -682,9 +703,124 @@ mod tests {
         https://typst.app/docs/reference/foundations/str/#definitions-to-unicode
         https://typst.app/docs/reference/foundations/str/#definitions-trim
         https://typst.app/docs/reference/foundations/symbol/
+        https://typst.app/docs/reference/foundations/target/
         https://typst.app/docs/reference/foundations/type/
         https://typst.app/docs/reference/foundations/version/
         https://typst.app/docs/reference/foundations/version/#definitions-at
+        https://typst.app/docs/reference/html/typed/#functions-a
+        https://typst.app/docs/reference/html/typed/#functions-abbr
+        https://typst.app/docs/reference/html/typed/#functions-address
+        https://typst.app/docs/reference/html/typed/#functions-area
+        https://typst.app/docs/reference/html/typed/#functions-article
+        https://typst.app/docs/reference/html/typed/#functions-aside
+        https://typst.app/docs/reference/html/typed/#functions-audio
+        https://typst.app/docs/reference/html/typed/#functions-b
+        https://typst.app/docs/reference/html/typed/#functions-base
+        https://typst.app/docs/reference/html/typed/#functions-bdi
+        https://typst.app/docs/reference/html/typed/#functions-bdo
+        https://typst.app/docs/reference/html/typed/#functions-blockquote
+        https://typst.app/docs/reference/html/typed/#functions-body
+        https://typst.app/docs/reference/html/typed/#functions-br
+        https://typst.app/docs/reference/html/typed/#functions-button
+        https://typst.app/docs/reference/html/typed/#functions-canvas
+        https://typst.app/docs/reference/html/typed/#functions-caption
+        https://typst.app/docs/reference/html/typed/#functions-cite
+        https://typst.app/docs/reference/html/typed/#functions-code
+        https://typst.app/docs/reference/html/typed/#functions-col
+        https://typst.app/docs/reference/html/typed/#functions-colgroup
+        https://typst.app/docs/reference/html/typed/#functions-data
+        https://typst.app/docs/reference/html/typed/#functions-datalist
+        https://typst.app/docs/reference/html/typed/#functions-dd
+        https://typst.app/docs/reference/html/typed/#functions-del
+        https://typst.app/docs/reference/html/typed/#functions-details
+        https://typst.app/docs/reference/html/typed/#functions-dfn
+        https://typst.app/docs/reference/html/typed/#functions-dialog
+        https://typst.app/docs/reference/html/typed/#functions-div
+        https://typst.app/docs/reference/html/typed/#functions-dl
+        https://typst.app/docs/reference/html/typed/#functions-dt
+        https://typst.app/docs/reference/html/typed/#functions-elem
+        https://typst.app/docs/reference/html/typed/#functions-em
+        https://typst.app/docs/reference/html/typed/#functions-embed
+        https://typst.app/docs/reference/html/typed/#functions-fieldset
+        https://typst.app/docs/reference/html/typed/#functions-figcaption
+        https://typst.app/docs/reference/html/typed/#functions-figure
+        https://typst.app/docs/reference/html/typed/#functions-footer
+        https://typst.app/docs/reference/html/typed/#functions-form
+        https://typst.app/docs/reference/html/typed/#functions-frame
+        https://typst.app/docs/reference/html/typed/#functions-h1
+        https://typst.app/docs/reference/html/typed/#functions-h2
+        https://typst.app/docs/reference/html/typed/#functions-h3
+        https://typst.app/docs/reference/html/typed/#functions-h4
+        https://typst.app/docs/reference/html/typed/#functions-h5
+        https://typst.app/docs/reference/html/typed/#functions-h6
+        https://typst.app/docs/reference/html/typed/#functions-head
+        https://typst.app/docs/reference/html/typed/#functions-header
+        https://typst.app/docs/reference/html/typed/#functions-hgroup
+        https://typst.app/docs/reference/html/typed/#functions-hr
+        https://typst.app/docs/reference/html/typed/#functions-html
+        https://typst.app/docs/reference/html/typed/#functions-i
+        https://typst.app/docs/reference/html/typed/#functions-iframe
+        https://typst.app/docs/reference/html/typed/#functions-img
+        https://typst.app/docs/reference/html/typed/#functions-input
+        https://typst.app/docs/reference/html/typed/#functions-ins
+        https://typst.app/docs/reference/html/typed/#functions-kbd
+        https://typst.app/docs/reference/html/typed/#functions-label
+        https://typst.app/docs/reference/html/typed/#functions-legend
+        https://typst.app/docs/reference/html/typed/#functions-li
+        https://typst.app/docs/reference/html/typed/#functions-link
+        https://typst.app/docs/reference/html/typed/#functions-main
+        https://typst.app/docs/reference/html/typed/#functions-map
+        https://typst.app/docs/reference/html/typed/#functions-mark
+        https://typst.app/docs/reference/html/typed/#functions-menu
+        https://typst.app/docs/reference/html/typed/#functions-meta
+        https://typst.app/docs/reference/html/typed/#functions-meter
+        https://typst.app/docs/reference/html/typed/#functions-nav
+        https://typst.app/docs/reference/html/typed/#functions-noscript
+        https://typst.app/docs/reference/html/typed/#functions-object
+        https://typst.app/docs/reference/html/typed/#functions-ol
+        https://typst.app/docs/reference/html/typed/#functions-optgroup
+        https://typst.app/docs/reference/html/typed/#functions-option
+        https://typst.app/docs/reference/html/typed/#functions-output
+        https://typst.app/docs/reference/html/typed/#functions-p
+        https://typst.app/docs/reference/html/typed/#functions-picture
+        https://typst.app/docs/reference/html/typed/#functions-pre
+        https://typst.app/docs/reference/html/typed/#functions-progress
+        https://typst.app/docs/reference/html/typed/#functions-q
+        https://typst.app/docs/reference/html/typed/#functions-rp
+        https://typst.app/docs/reference/html/typed/#functions-rt
+        https://typst.app/docs/reference/html/typed/#functions-ruby
+        https://typst.app/docs/reference/html/typed/#functions-s
+        https://typst.app/docs/reference/html/typed/#functions-samp
+        https://typst.app/docs/reference/html/typed/#functions-script
+        https://typst.app/docs/reference/html/typed/#functions-search
+        https://typst.app/docs/reference/html/typed/#functions-section
+        https://typst.app/docs/reference/html/typed/#functions-select
+        https://typst.app/docs/reference/html/typed/#functions-slot
+        https://typst.app/docs/reference/html/typed/#functions-small
+        https://typst.app/docs/reference/html/typed/#functions-source
+        https://typst.app/docs/reference/html/typed/#functions-span
+        https://typst.app/docs/reference/html/typed/#functions-strong
+        https://typst.app/docs/reference/html/typed/#functions-style
+        https://typst.app/docs/reference/html/typed/#functions-sub
+        https://typst.app/docs/reference/html/typed/#functions-summary
+        https://typst.app/docs/reference/html/typed/#functions-sup
+        https://typst.app/docs/reference/html/typed/#functions-table
+        https://typst.app/docs/reference/html/typed/#functions-tbody
+        https://typst.app/docs/reference/html/typed/#functions-td
+        https://typst.app/docs/reference/html/typed/#functions-template
+        https://typst.app/docs/reference/html/typed/#functions-textarea
+        https://typst.app/docs/reference/html/typed/#functions-tfoot
+        https://typst.app/docs/reference/html/typed/#functions-th
+        https://typst.app/docs/reference/html/typed/#functions-thead
+        https://typst.app/docs/reference/html/typed/#functions-time
+        https://typst.app/docs/reference/html/typed/#functions-title
+        https://typst.app/docs/reference/html/typed/#functions-tr
+        https://typst.app/docs/reference/html/typed/#functions-track
+        https://typst.app/docs/reference/html/typed/#functions-u
+        https://typst.app/docs/reference/html/typed/#functions-ul
+        https://typst.app/docs/reference/html/typed/#functions-var
+        https://typst.app/docs/reference/html/typed/#functions-video
+        https://typst.app/docs/reference/html/typed/#functions-wbr
         https://typst.app/docs/reference/introspection/counter/
         https://typst.app/docs/reference/introspection/counter/#definitions-at
         https://typst.app/docs/reference/introspection/counter/#definitions-display
@@ -719,8 +855,11 @@ mod tests {
         https://typst.app/docs/reference/layout/direction/
         https://typst.app/docs/reference/layout/direction/#definitions-axis
         https://typst.app/docs/reference/layout/direction/#definitions-end
+        https://typst.app/docs/reference/layout/direction/#definitions-from
         https://typst.app/docs/reference/layout/direction/#definitions-inv
+        https://typst.app/docs/reference/layout/direction/#definitions-sign
         https://typst.app/docs/reference/layout/direction/#definitions-start
+        https://typst.app/docs/reference/layout/direction/#definitions-to
         https://typst.app/docs/reference/layout/fraction/
         https://typst.app/docs/reference/layout/grid/
         https://typst.app/docs/reference/layout/grid/#definitions-cell
@@ -796,10 +935,12 @@ mod tests {
         https://typst.app/docs/reference/math/variants/#functions-frak
         https://typst.app/docs/reference/math/variants/#functions-mono
         https://typst.app/docs/reference/math/variants/#functions-sans
+        https://typst.app/docs/reference/math/variants/#functions-scr
         https://typst.app/docs/reference/math/variants/#functions-serif
         https://typst.app/docs/reference/math/vec/
         https://typst.app/docs/reference/model/bibliography/
         https://typst.app/docs/reference/model/cite/
+        https://typst.app/docs/reference/model/divider/
         https://typst.app/docs/reference/model/document/
         https://typst.app/docs/reference/model/emph/
         https://typst.app/docs/reference/model/entry/#definitions-body
@@ -834,7 +975,9 @@ mod tests {
         https://typst.app/docs/reference/model/table/#definitions-vline
         https://typst.app/docs/reference/model/terms/
         https://typst.app/docs/reference/model/terms/#definitions-item
-        https://typst.app/docs/reference/pdf/embed/
+        https://typst.app/docs/reference/model/title/
+        https://typst.app/docs/reference/pdf/artifact/
+        https://typst.app/docs/reference/pdf/attach/
         https://typst.app/docs/reference/text/highlight/
         https://typst.app/docs/reference/text/linebreak/
         https://typst.app/docs/reference/text/lorem/
@@ -869,6 +1012,7 @@ mod tests {
         https://typst.app/docs/reference/visualize/color/#definitions-rotate
         https://typst.app/docs/reference/visualize/color/#definitions-saturate
         https://typst.app/docs/reference/visualize/color/#definitions-space
+        https://typst.app/docs/reference/visualize/color/#definitions-spot
         https://typst.app/docs/reference/visualize/color/#definitions-to-hex
         https://typst.app/docs/reference/visualize/color/#definitions-transparentize
         https://typst.app/docs/reference/visualize/curve/
@@ -896,15 +1040,14 @@ mod tests {
         https://typst.app/docs/reference/visualize/gradient/#definitions-space
         https://typst.app/docs/reference/visualize/gradient/#definitions-stops
         https://typst.app/docs/reference/visualize/image/
-        https://typst.app/docs/reference/visualize/image/#definitions-decode
         https://typst.app/docs/reference/visualize/line/
-        https://typst.app/docs/reference/visualize/path/
-        https://typst.app/docs/reference/visualize/pattern/
         https://typst.app/docs/reference/visualize/polygon/
         https://typst.app/docs/reference/visualize/polygon/#definitions-regular
         https://typst.app/docs/reference/visualize/rect/
+        https://typst.app/docs/reference/visualize/spot/#definitions-tint
         https://typst.app/docs/reference/visualize/square/
         https://typst.app/docs/reference/visualize/stroke/
-        "###);
+        https://typst.app/docs/reference/visualize/tiling/
+        ");
     }
 }

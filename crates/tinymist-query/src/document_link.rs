@@ -1,4 +1,4 @@
-use crate::{analysis::get_link_exprs, prelude::*, SemanticRequest};
+use crate::{SemanticRequest, analysis::get_link_exprs, prelude::*};
 
 /// The [`textDocument/documentLink`] request is sent from the client to the
 /// server to request the location of links in a document.

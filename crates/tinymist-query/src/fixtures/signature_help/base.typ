@@ -1,3 +1,3 @@
 #let f(x) = x;
 
-#(f(/* position */));
+#(f(/* loc 0, 0 */));

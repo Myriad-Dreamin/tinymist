@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 use typst::{foundations::Bytes, model::CslStyle};
+use typst_shim::syntax::VirtualPathExt;
 use yaml_rust2::{parser::Event, parser::MarkedEventReceiver, scanner::Marker};
 
 use super::prelude::*;
@@ -49,7 +50,11 @@ struct BibWorker {
 
 impl BibWorker {
     fn analyze_path(&mut self, file_id: TypstFileId, content: Bytes) -> Option<()> {
-        let file_extension = file_id.vpath().as_rooted_path().extension()?.to_str()?;
+        let file_extension = file_id
+            .vpath()
+            .as_rooted_path_compat()
+            .extension()?
+            .to_str()?;
         let content = std::str::from_utf8(&content).ok()?;
 
         // Reparse the content to get all entries
@@ -209,7 +214,6 @@ impl YamlBib {
 #[cfg(test)]
 mod tests {
     use core::fmt;
-    use std::path::Path;
 
     use typst::syntax::{FileId, VirtualPath};
 
@@ -233,11 +237,14 @@ Euclid2:
 "#;
         let bib = super::YamlBib::from_content(
             content,
-            FileId::new_fake(VirtualPath::new(Path::new("test.yml"))),
+            FileId::unique(typst::syntax::RootedPath::new(
+                typst::syntax::VirtualRoot::Project,
+                VirtualPath::new("test.yml").expect("valid test path"),
+            )),
         );
         assert_eq!(bib.entries.len(), 2);
-        assert_snapshot!(bib_snap(&bib.entries[0]), @r###"("Euclid", BibEntry { file_id: /test.yml, name_range: 1..7, range: 1..63, raw_entry: None })"###);
-        assert_snapshot!(bib_snap(&bib.entries[1]), @r###"("Euclid2", BibEntry { file_id: /test.yml, name_range: 63..70, range: 63..126, raw_entry: None })"###);
+        assert_snapshot!(bib_snap(&bib.entries[0]), @r#"("Euclid", BibEntry { file_id: "/test.yml", name_range: 1..7, range: 1..63, raw_entry: None })"#);
+        assert_snapshot!(bib_snap(&bib.entries[1]), @r#"("Euclid2", BibEntry { file_id: "/test.yml", name_range: 63..70, range: 63..126, raw_entry: None })"#);
     }
 
     #[test]
@@ -248,7 +255,10 @@ Euclid:
   title: '{Elements, {V}ols.\ 1--13}'
 Euclid3
 "#;
-        let file_id = FileId::new_fake(VirtualPath::new(Path::new("test.yml")));
+        let file_id = FileId::unique(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Project,
+            VirtualPath::new("test.yml").expect("valid test path"),
+        ));
         super::YamlBib::from_content(content, file_id);
     }
 }

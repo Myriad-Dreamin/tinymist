@@ -1,4 +1,5 @@
-#![allow(missing_docs)]
+//! Next generation of the export task. Not used because it is still
+//! complicated.
 
 use std::sync::Arc;
 
@@ -7,60 +8,68 @@ use reflexo_vec2svg::DefaultExportFeature;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
 use tinymist_task::{ExportTimings, TextExport};
-use typlite::Typlite;
-use typst::diag::SourceResult;
+use typlite::{Format, Typlite};
 
 use crate::project::{
-    ExportMarkdownTask, HtmlExport, LspCompilerFeat, PdfExport, PngExport, ProjectTask, SvgExport,
+    ExportTeXTask, HtmlExport, LspCompilerFeat, PdfExport, PngExport, ProjectTask, SvgExport,
     TaskWhen,
 };
 use crate::world::base::{
-    ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, HtmlCompilationTask,
-    OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
+    BundleCompilationTask, ConfigTask, DiagnosticsTask, ExportComputation, FlagTask,
+    HtmlCompilationTask, OptionDocumentTask, PagedCompilationTask, WorldComputable,
+    WorldComputeGraph,
 };
 
+/// A task that checks if the project needs to be compiled.
 #[derive(Clone, Copy, Default)]
 pub struct ProjectCompilation;
 
 impl ProjectCompilation {
+    /// Preconfigures the timings for the project compilation.
     pub fn preconfig_timings<F: CompilerFeat>(graph: &Arc<WorldComputeGraph<F>>) -> Result<bool> {
         // todo: configure run_diagnostics!
         let paged_diag = Some(TaskWhen::OnType);
+        let paged_diag2 = Some(TaskWhen::Script);
         let html_diag = Some(TaskWhen::Never);
 
         let pdf: Option<TaskWhen> = graph
             .get::<ConfigTask<<PdfExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let svg: Option<TaskWhen> = graph
             .get::<ConfigTask<<SvgExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let png: Option<TaskWhen> = graph
             .get::<ConfigTask<<PngExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let html: Option<TaskWhen> = graph
             .get::<ConfigTask<<HtmlExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let md: Option<TaskWhen> = graph
-            .get::<ConfigTask<ExportMarkdownTask>>()
+            .get::<ConfigTask<ExportTeXTask>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
         let text: Option<TaskWhen> = graph
             .get::<ConfigTask<<TextExport as ExportComputation<LspCompilerFeat, _>>::Config>>()
             .transpose()?
-            .map(|config| config.export.when);
+            .map(|config| config.export.when.clone());
 
         let doc = None::<TypstPagedDocument>.as_ref();
-        let check = |timing| ExportTimings::needs_run(&graph.snap, timing, doc).unwrap_or(true);
+        let check = |timing: Option<TaskWhen>| {
+            ExportTimings::needs_run(&graph.snap, timing.as_ref(), doc).unwrap_or(true)
+        };
 
-        let compile_paged = [paged_diag, pdf, svg, png, text, md].into_iter().any(check);
+        let compile_paged = [paged_diag, paged_diag2, pdf, svg, png, text, md]
+            .into_iter()
+            .any(check);
         let compile_html = [html_diag, html].into_iter().any(check);
 
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(compile_paged)));
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(compile_html)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
 
         Ok(compile_paged || compile_html)
     }
@@ -76,15 +85,17 @@ impl<F: CompilerFeat> WorldComputable<F> for ProjectCompilation {
     }
 }
 
+/// A task that runs the export.
 pub struct ProjectExport;
 
 impl ProjectExport {
+    /// Exports the document to bytes artifact.
     fn export_bytes<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
-        when: Option<TaskWhen>,
+        when: Option<&TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
         let doc = graph.compute::<OptionDocumentTask<D>>()?;
@@ -98,12 +109,13 @@ impl ProjectExport {
         res.transpose()
     }
 
+    /// Exports the document to string artifact.
     fn export_string<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = String>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
-        when: Option<TaskWhen>,
+        when: Option<&TaskWhen>,
         config: &T::Config,
     ) -> Result<Option<Bytes>> {
         let doc = graph.compute::<OptionDocumentTask<D>>()?;
@@ -136,9 +148,10 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
             match config.as_ref() {
                 Preview(..) => todo!(),
                 ExportPdf(config) => Self::export_bytes::<_, PdfExport>(graph, when, config),
-                ExportPng(config) => Self::export_bytes::<_, PngExport>(graph, when, config),
-                ExportSvg(config) => Self::export_string::<_, SvgExport>(graph, when, config),
+                ExportPng(_config) => todo!(),
+                ExportSvg(_config) => todo!(),
                 ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
+                ExportBundle(..) => unreachable!(),
                 // todo: configuration
                 ExportSvgHtml(_config) => Self::export_string::<
                     _,
@@ -146,7 +159,7 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                 >(
                     graph, when, &ExportWebSvgHtmlTask::default()
                 ),
-                ExportMd(_config) => {
+                ExportMd(..) => {
                     let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
                     let doc = doc.as_ref();
                     let n =
@@ -156,6 +169,17 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                     }
 
                     Ok(TypliteMdExport::run(graph)?.map(Bytes::from_string))
+                }
+                ExportTeX(..) => {
+                    let doc = graph.compute::<OptionDocumentTask<TypstPagedDocument>>()?;
+                    let doc = doc.as_ref();
+                    let n =
+                        ExportTimings::needs_run(&graph.snap, when, doc.as_deref()).unwrap_or(true);
+                    if !n {
+                        return Ok(None);
+                    }
+
+                    Ok(TypliteTeXExport::run(graph)?.map(Bytes::from_string))
                 }
                 ExportText(config) => Self::export_string::<_, TextExport>(graph, when, config),
                 Query(..) => todo!(),
@@ -174,22 +198,45 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
     }
 }
 
-pub struct TypliteMdExport(pub Option<SourceResult<String>>);
+/// A task that exports the document to a specific format by typlite.
+pub struct TypliteExport<const FORMAT: char>;
 
-impl TypliteMdExport {
+const fn typlite_format(f: char) -> Format {
+    match f {
+        'm' => Format::Md,
+        'x' => Format::LaTeX,
+        _ => panic!("unsupported format for TypliteExport"),
+    }
+}
+
+const fn typlite_name(f: char) -> &'static str {
+    match f {
+        'm' => "Markdown",
+        'x' => "LaTeX",
+        _ => panic!("unsupported format for TypliteExport"),
+    }
+}
+
+impl<const F: char> TypliteExport<F> {
     fn run(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Option<String>> {
         let conv = Typlite::new(Arc::new(graph.snap.world.clone()))
+            .with_format(typlite_format(F))
             .convert()
-            .map_err(|e| anyhow::anyhow!("failed to convert to markdown: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("failed to convert to {}: {e}", typlite_name(F)))?;
 
         Ok(Some(conv.to_string()))
     }
 }
 
-impl WorldComputable<LspCompilerFeat> for TypliteMdExport {
+impl<const F: char> WorldComputable<LspCompilerFeat> for TypliteExport<F> {
     type Output = Option<String>;
 
     fn compute(graph: &Arc<WorldComputeGraph<LspCompilerFeat>>) -> Result<Self::Output> {
         Self::run(graph)
     }
 }
+
+/// A task that exports the document to markdown.
+pub type TypliteMdExport = TypliteExport<'m'>;
+/// A task that exports the document to LaTeX.
+pub type TypliteTeXExport = TypliteExport<'x'>;

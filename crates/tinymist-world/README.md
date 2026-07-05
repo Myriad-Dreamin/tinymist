@@ -16,9 +16,9 @@ let universe = args
 ```rust
 let world = verse.snapshot();
 // in current thread
-let doc = typst::compile(&world)?;
+let doc = typst_shim::compile_opt(&world)?;
 // the snapshot is Send + Sync
 std::thread::spawn(move || {
-    let doc = typst::compile(&world)?;
+    let doc = typst_shim::compile_opt(&world)?;
 });
 ```

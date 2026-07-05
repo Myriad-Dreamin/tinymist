@@ -1,0 +1,17 @@
+{
+  "name": "typst-preview-frontend-ng",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite -c vite.config.mjs",
+    "build": "vite build -c vite.config.mjs",
+    "preview": "vite preview -c vite.config.mjs",
+    "link:local": "yarn link @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer",
+    "unlink:local": "yarn unlink @myriaddreamin/typst.ts @myriaddreamin/typst-ts-renderer"
+  },
+  "dependencies": {
+    "@myriaddreamin/typst-ts-renderer": "=0.8.0-rc3",
+    "@myriaddreamin/typst.ts": "=0.8.0-rc3"
+  }
+}

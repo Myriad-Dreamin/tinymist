@@ -1,0 +1,78 @@
+---
+source: crates/tinymist-query/src/code_action.rs
+description: "Code Action on $xy||z/* range "
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/code_action/unknown_math_ident.typ
+---
+[
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "\n\nlet xyz",
+      "range": "0:0:0:0"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Create missing variable"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 2,
+      "newText": "x y z",
+      "range": "0:1:0:4"
+     }
+    ]
+   }
+  },
+  "kind": "quickfix",
+  "title": "Add spaces between letters"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": " ",
+      "range": "0:1:0:1"
+     },
+     {
+      "insertTextFormat": 1,
+      "newText": " ",
+      "range": "0:4:0:22"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to block equation"
+ },
+ {
+  "edit": {
+   "changes": {
+    "s0.typ": [
+     {
+      "insertTextFormat": 1,
+      "newText": "\n",
+      "range": "0:1:0:1"
+     },
+     {
+      "insertTextFormat": 1,
+      "newText": "\n",
+      "range": "0:4:0:22"
+     }
+    ]
+   }
+  },
+  "kind": "refactor.rewrite",
+  "title": "Convert to multiple-line block equation"
+ }
+]

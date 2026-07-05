@@ -15,8 +15,7 @@ use rkyv::{Archive, Deserialize as rDeser, Serialize as rSer};
 
 use crate::error::prelude::Result;
 
-pub(crate) type FxBuildHasher = std::hash::BuildHasherDefault<FxHasher>;
-pub use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
+pub use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 // pub type FxIndexSet<K> = indexmap::IndexSet<K, FxHasher>;
 // pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxHasher>;
 /// A dashmap that uses the FxHasher as the underlying hasher.
@@ -34,7 +33,8 @@ pub type FxDashMap<K, V> = dashmap::DashMap<K, V, FxBuildHasher>;
 /// > is a probability of 1 in 36,890,000,000,000 of a `StableCrateId`
 /// > collision.
 ///
-/// This stores the 16-bytes data in a pair of `u64` instead of single `u128` to avoid heavily affecting `align` of the embedding structs.
+/// This stores the 16-bytes data in a pair of `u64` instead of single `u128` to
+/// avoid heavily affecting `align` of the embedding structs.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "rkyv", derive(Archive, rDeser, rSer))]
 #[cfg_attr(feature = "rkyv-validation", archive(check_bytes))]

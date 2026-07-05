@@ -1,17 +1,19 @@
 //! Tests support for tinymist crates.
 
+pub mod mock;
+
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},
 };
 
 use tinymist_project::{
-    base::ShadowApi, font::FontResolverImpl, CompileFontArgs, EntryManager, EntryState,
-    ExportTarget, LspUniverse, LspUniverseBuilder,
+    CompileFontArgs, DynAccessModel, EntryManager, EntryState, ExportTarget, LspUniverse,
+    LspUniverseBuilder, base::ShadowApi, font::FontResolverImpl, vfs::system::SystemAccessModel,
 };
 use typst::{foundations::Bytes, syntax::VirtualPath};
 
-pub use insta::{assert_debug_snapshot, assert_snapshot, glob, with_settings, Settings};
+pub use insta::{Settings, assert_debug_snapshot, assert_snapshot, glob, with_settings};
 
 /// Runs snapshot tests.
 #[macro_export]
@@ -52,9 +54,9 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     });
 
     let root = if cfg!(windows) {
-        PathBuf::from("C:\\root")
+        PathBuf::from("C:\\dummy-root")
     } else {
-        PathBuf::from("/root")
+        PathBuf::from("/dummy-root")
     };
     let mut verse = LspUniverseBuilder::build(
         EntryState::new_rooted(root.as_path().into(), None),
@@ -63,6 +65,8 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
         Default::default(),
         LspUniverseBuilder::resolve_package(None, None),
         FONT_RESOLVER.clone(),
+        None,
+        DynAccessModel(Arc::new(SystemAccessModel {})),
     );
     let sources = source.split("-----");
 
@@ -96,7 +100,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     verse
         .mutate_entry(EntryState::new_rooted(
             root.as_path().into(),
-            Some(VirtualPath::new(pw.strip_prefix(root).unwrap())),
+            Some(VirtualPath::virtualize(&root, &pw).expect("valid virtual test path")),
         ))
         .unwrap();
     f(&mut verse, pw)

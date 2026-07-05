@@ -6,43 +6,43 @@ Normally, you should always create release candidates to avoid failures in the r
 - At most 9 release candidates can be created for a version. This is because semver compares the version number as a string, and `rc9` is greater than `rc10` in sense of string comparison.
 - You must publish the release soon after a good release candidate is created, otherwise CI may fail tomorrow.
 
-#set heading(numbering: numbly(none, "Step {2:1}~"))
+The steps to release are list as following:
+- Checking before releases.
+- Making a release PR.
+- Tagging and pushing current revision to release
 
-== Updating Version String to Release
+= Codex-assisted Release
 
-- The `tinymist-assets` package
-  - package.json should be the version.
-- The VSCode Extension
-  - package.json should be the version.
-- The Language Server Binaries
-  - Cargo.toml should be the version.
-- The `tinymist-web` NPM package
-  - package.json should be the version.
+You can ask Codex to prepare a release with `/tinymist-dev:release v0.14.12-rc1`.
 
-You can `grep` the version number in the repository to check if all the components are updated. Some CI script will also assert failing to help you catch the issue.
+The Codex-assisted release workflow should follow three phases:
+- Inspection and planning.
+- Local preparation.
+- External actions.
 
-== Updating the Changelog
+In the inspection phase, Codex should read this document and run `node scripts/release-preflight.mjs v0.14.12-rc1 --json` or `yarn release:preflight -- v0.14.12-rc1 --json` to list tracked `Cargo.toml` and `package.json` files, detect the version-bearing lines that match the current release version, and generate executable shell commands that apply unified diff patches for those updates and the later release handoff.
 
-All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
+In the local preparation phase, Codex may make only reversible, reviewable checkout-local changes, such as:
+- Running the generated patch commands.
+- Drafting `editors/vscode/CHANGELOG.md`.
+- Refreshing generated docs with `node scripts/link-docs.mjs` when the preflight report requires it.
+- Running generated review commands like `git diff`.
+- Creating the local checkpoint commit `build: bump version to {version}`.
 
-== Generating the GitHub Release's Body (Content)
+After local preparation, Codex should rerun the preflight helper and keep the maintainer in the Codex console. If the refreshed readiness report is clean, Codex should explicitly report that `yarn release {version}` is the next external action. If the refreshed readiness report still shows blockers or omitted changelog items, Codex should stop and surface them before moving on.
 
-Run following commands to generate the body of the release announcement:
+In the external actions phase, Codex must stop and ask for explicit maintainer approval immediately before any command or workflow with side effects outside the current checkout. For regular and release-candidate releases, the first approval boundary is `yarn release {version}` after the local checkpoint commit.
 
-```bash
-$ yarn draft-release 0.12.19
-Please check the generated announcement in target/announcement.gen.md
-```
+The current repository entry points remain the source of truth for those external steps:
+- `scripts/release.mjs` creates the release PR, dispatches `tinymist::assets::publish`, updates the `tinymist-assets` pin in `Cargo.toml`, commits, and pushes.
+- `scripts/draft-release.mjs` and `.github/workflows/announce.yml` generate release announcement content and the GitHub release draft.
+- `.github/workflows/release-nightly.yml` and `scripts/nightly-utils.mjs` remain the nightly and canary release path.
 
-The `target/announcement.gen.md` first includes the changelog read from the `CHANGELOG.md` file, then attack the download script and available download links.
+If tooling, authentication, or permissions are missing, Codex should stop, report the blocker, and provide the exact manual shell command needed next.
 
-== Drafting the Release
+#set heading(numbering: numbly("Step {1}~"))
 
-Create a draft release on GitHub with the generated announcement.
-
-If you are releasing a nightly version, please set the prerelease flag to true. Otherwise, if you are releasing a regular version, please set the prerelease flag to false. Some package registries relies on this flag to determine whether to update their stable channel.
-
-#include "versioning.typ"
+= Checking before Releases
 
 == Checking the `Cargo.toml` and the `Cargo.lock`
 
@@ -55,15 +55,129 @@ Please check the deadline of the publish tokens stored in the GitHub secrets. If
 - Renew the `VSCODE_MARKETPLACE_TOKEN` according to the #link("https://learn.microsoft.com/en-us/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate?view=azure-devops&tabs=Windows")[Azure DevOps -- Use personal access tokens.]
 - Renew the `OPENVSX_ACCESS_TOKEN` at the #link("https://open-vsx.org/user-settings/tokens")[Open VSX Registry -- Access Tokens.]
 
+= Making a Release PR
+
+You should perform following steps to make a release PR  with name in format of `build: bump version to {version}`:
+
+== Determining the Version Number
+
+Before release, you should determine the version number to release.
+
+#include "versioning.typ"
+
+== Updating Version String in Codebase
+
+Update Version String in Codebase other than that of `tinymist-assets`, which will be released in the `tinymist::assets::publish` CI. You can `grep` the version number in the repository to check if all the version numbers in the `Cargo.toml` and `package.json` files are updated. Some CI script will also assert failing to help you catch the issue.
+
+Release-sensitive non-manifest files should be reviewed as well, especially `editors/neovim/bootstrap.sh` and `editors/neovim/samples/lazyvim-dev/Dockerfile`.
+
+After the version-bearing source files are updated, refresh generated docs with `node scripts/link-docs.mjs`. This updates generated outputs such as `crates/typlite/README.md`, which may embed release download URLs.
+
+== Updating the Changelog
+
+All released version must be documented in the changelog. The changelog is located at `editors/vscode/CHANGELOG.md`. Please ensure the correct format otherwise CI will fail.
+
+You can make it with following steps:
+
+- Get new generated release notes from GitHub API
+  ```
+  gh api 'repos/Myriad-Dreamin/tinymist/releases/generate-notes' -f tag_name=v0.14.12 -f previous_tag_name=v0.14.10 --jq .body
+  ```
+
+  If you are releasing `v0.14.12-rc1` or `v0.14.12`, the `tag_name` will be `v0.14.12`, and `previous_tag_name` is previous stable release, which is `v0.14.10`.
+- Edit the generated release notes to fit the format of the changelog.
+  - If Codex is assisting with the release, review the preflight changelog summary before finalizing the changelog. It reports which candidate generated-note items are already represented in the changelog and which still need maintainer judgment.
+  - The changelog lines unspecified with authors are all written by the "Myriad-Dreamin".
+  - Separate notes into different topics. You can only use the topics in the following list. The valid topics are:
+    - Announcement: New Maintainers
+    - AST Matchers
+    - Autocompletion
+    - CLI
+    - Codelens
+    - Code Action
+    - Code Analysis
+    - Color Provider
+    - Commands/Tools
+    - Completion
+    - Compiler
+    - Crityp
+    - Definition
+    - Diagnostics
+    - Docs
+    - Docstring
+    - Document Highlighting
+    - Document Link
+    - Document Symbol
+    - Drop and Paste
+    - Editor
+    - Editor Tools
+    - Export
+    - Folding Range
+    - Formatting
+    - Hover
+    - Hover (Tooltip)
+    - HTML Export
+    - Inlay Hint
+    - Internal Optimization
+    - Label View
+    - Linting
+    - Localization
+    - LSIF
+    - Misc
+    - On Enter
+    - Preview
+    - Profiling
+    - References
+    - Rename
+    - Server
+    - Signature Help
+    - Symbols
+    - Syntax Highlighting
+    - Syntax/Semantic Highlighting
+    - Testing
+    - tinymist.lock
+    - Type Checking
+    - Type Checking (Docstring)
+    - Typlite
+    - Wasm
+  - Edit changeline to fit in our rule:
+    - For `feat`, if there is a break change add `(Change)` prefix, otherwise without prefix.
+    - For `build`, if there is a upstream dependency update, put it before all other changes, otherwise omit it.
+    - For `fix`, `perf`, `test`, `docs`, you should add the prefix `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` respectively.
+    - For `refactor`, `ci`, `rename`, `chore`, omit the change because it is not a user-facing change.
+    - Put the change with `(Fix)`, `(Perf)`,  `(Test)`, `(Docs)` prefix before all other changes.
+    - If a changeline has an author other than "Myriad-Dreamin", and the author doesn't add other contributions, it must be included in the changelog to ensure that the contributor is credited at least once in this version.
+
+  Example:
+
+  ```md
+  ## v0.14.6 - [2026-01-02]
+
+  * Bumped typst to v0.14.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2312
+
+  ### Server
+
+  * (Fix) Correctly handled relative user-specified output paths in compile command by @moeleak and @Myriad-Dreamin in https://github.com/Myriad-Dreamin/tinymist/pull/1941 and https://github.com/Myriad-Dreamin/tinymist/pull/1942
+  * Added `--input` flag to CLI commands by @xiyihan0 in https://github.com/Myriad-Dreamin/tinymist/pull/2328
+  ```
+
+  Explanation:
+  - The build change is put before all other changes without under any topic.
+  - The fix change is put before all other changes with `(Fix)` prefix.
+  - The fix change is achieved by two PRs. The LLM cannot determine which of changes could be merged so leave decision to merge by the publisher.
+  - The build change is made by only "Myriad-Dreamin", so it doesn't mention "Myriad-Dreamin".
+  - The fix change is made by "moeleak" and "Myriad-Dreamin", so it mentions both of them.
+  - The feat change is made by "xiyihan0", so it mentions "xiyihan0".
+
 == Publishing the tinymist-assets crate
 
-Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
+Run the `tinymist::assets::publish` CI to release the `tinymist-assets` crate. Ensure that the `tinymist-assets` crate is published to the registry. Please see `Cargo.lock` to check the released crate is used correctly.
 
-== Dry running the CI
+If Codex is assisting with the release, this is an approval boundary. Codex should stop and ask for explicit approval before dispatching this workflow directly or via `scripts/release.mjs`.
 
-Dry running the `release.yml` and the `release-vscode.yml` if you feel necessary.
+After publish, you should update `tinymist-assets` version in the `Cargo.toml` file.
 
-== Tagging the Release
+= Tagging and Pushing Current Revision to Release
 
 Push a tag to the repository with the version number. For example, if you are releasing version `0.12.19`, you should run the following command:
 
@@ -72,10 +186,6 @@ $ git tag v0.12.19
 $ git push --tag
 ```
 
-This step will trigger the `release-vscode.yml` CI to build and publish the VS Code extensions to the marketplace.
+If Codex is assisting with the release, this is also an approval boundary because it mutates the remote repository and triggers the release pipeline.
 
-== Triggering the Binary Releases
-
-The binary releases is triggered by the `release.yml` CI. You should trigger it after `release-vscode.yml` finished.
-
-The `release.yml` CI will finally undraft the GitHub release automatically that inform everyone the release is ready.
+This step will trigger the `ci.yml` CI to build and publish the VS Code extensions to the marketplace.

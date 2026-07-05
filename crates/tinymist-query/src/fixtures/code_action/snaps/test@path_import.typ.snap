@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-description: "Code Action on rt \"base.t||yp\"/* rang)"
+description: "Code Action on rt \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/path_import.typ
 ---
@@ -10,6 +10,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_import.typ
    "changes": {
     "s1.typ": [
      {
+      "insertTextFormat": 1,
       "newText": "\"/base.typ\"",
       "range": "0:8:0:18"
      }

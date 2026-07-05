@@ -1,21 +1,23 @@
 //! Package management tools.
 
-use std::collections::HashSet;
+use std::borrow::Cow;
 use std::path::PathBuf;
-use std::sync::OnceLock;
 
-use ecow::{eco_format, eco_vec, EcoVec};
-use parking_lot::Mutex;
+use ecow::eco_format;
+#[cfg(feature = "local-registry")]
+use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
 use serde::{Deserialize, Serialize};
-use tinymist_world::package::registry::HttpRegistry;
-use tinymist_world::package::PackageSpec;
+use tinymist_world::package::registry::PackageIndexEntry;
+use tinymist_world::package::{PackageSpec, PackageSpecExt};
+use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, VirtualPath};
-use typst::World;
+use typst::syntax::{FileId, LinkedNode, RootedPath, SyntaxKind, VirtualPath, VirtualRoot, ast};
+use typst_shim::syntax::resolve_path_from_id;
 
 use crate::LocalContext;
+use crate::analysis::SharedContext;
 
 /// Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,10 +32,11 @@ pub struct PackageInfo {
     pub version: String,
 }
 
-impl From<(PathBuf, PackageSpec)> for PackageInfo {
-    fn from((path, spec): (PathBuf, PackageSpec)) -> Self {
+impl From<PackageIndexEntry> for PackageInfo {
+    fn from(entry: PackageIndexEntry) -> Self {
+        let spec = entry.spec();
         Self {
-            path,
+            path: entry.path.unwrap_or_default(),
             namespace: spec.namespace,
             name: spec.name,
             version: spec.version.to_string(),
@@ -41,16 +44,75 @@ impl From<(PathBuf, PackageSpec)> for PackageInfo {
     }
 }
 
+/// Parses a package import from a string literal node in an import statement.
+/// Returns the PackageSpec if it's a valid package import.
+pub fn parse_package_import(node: &LinkedNode) -> Option<PackageSpec> {
+    if !matches!(node.kind(), SyntaxKind::Str) {
+        return None;
+    }
+
+    let import_node = node.parent()?.cast::<ast::ModuleImport>()?;
+
+    let ast::Expr::Str(str_node) = import_node.source() else {
+        return None;
+    };
+    let import_str = str_node.get();
+    if import_str.starts_with('@') {
+        import_str.parse().ok()
+    } else {
+        None
+    }
+}
+
+/// Finds the package entry for a given package spec, and also the latest
+/// version entry.
+pub fn find_package_and_latest<'a>(
+    ctx: &'a SharedContext,
+    package_spec: &PackageSpec,
+) -> (
+    Option<Cow<'a, PackageIndexEntry>>,
+    Option<Cow<'a, PackageIndexEntry>>,
+) {
+    let versionless_spec = package_spec.versionless();
+
+    if package_spec.is_preview() {
+        let packages = ctx.world().packages();
+
+        let current = packages.iter().find(|it| it.matches(package_spec));
+        let latest = packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (current.map(Cow::Borrowed), latest.map(Cow::Borrowed))
+    } else if cfg!(feature = "local-registry") {
+        let local_packages = ctx.non_preview_packages();
+
+        let current = local_packages.iter().find(|it| it.matches(package_spec));
+        let latest = local_packages
+            .iter()
+            .filter(|it| it.matches_versionless(&versionless_spec))
+            .max_by_key(|entry| entry.package.version);
+
+        (
+            current.map(|p| Cow::Owned(p.clone())),
+            latest.map(|p| Cow::Owned(p.clone())),
+        )
+    } else {
+        (None, None)
+    }
+}
+
 /// Parses the manifest of the package located at `package_path`.
 pub fn get_manifest_id(spec: &PackageInfo) -> StrResult<FileId> {
-    Ok(FileId::new(
-        Some(PackageSpec {
+    Ok(FileId::new(RootedPath::new(
+        VirtualRoot::Package(PackageSpec {
             namespace: spec.namespace.clone(),
             name: spec.name.clone(),
             version: spec.version.parse()?,
         }),
-        VirtualPath::new("typst.toml"),
-    ))
+        VirtualPath::new("typst.toml").expect("valid manifest path"),
+    )))
 }
 
 /// Parses the manifest of the package located at `package_path`.
@@ -66,47 +128,80 @@ pub fn get_manifest(world: &dyn World, toml_id: FileId) -> StrResult<PackageMani
         .map_err(|err| eco_format!("package manifest is malformed ({})", err.message()))
 }
 
+pub(crate) fn package_entrypoint_id(manifest_id: FileId, entrypoint: &str) -> FileId {
+    resolve_path_from_id(manifest_id, entrypoint)
+        .expect("valid package entrypoint")
+        .intern()
+}
+
 /// Check Package.
 pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()> {
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
 
-    let entry_point = toml_id.join(&manifest.package.entrypoint);
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
 
-    ctx.shared_().preload_package(entry_point);
+    ctx.preload_package(entry_point);
     Ok(())
 }
 
+/// A filter for packages.
+#[cfg(feature = "local-registry")]
+pub enum PackageFilter {
+    /// Filter for packages that match the given namespace.
+    For(EcoString),
+    /// Filter for packages that do not match the given namespace.
+    ExceptFor(EcoString),
+    /// Filter that matches all packages.
+    All,
+}
+
+#[cfg(feature = "local-registry")]
 /// Get the packages in namespaces and their descriptions.
-pub fn list_package_by_namespace(
-    registry: &HttpRegistry,
-    ns: EcoString,
-) -> EcoVec<(PathBuf, PackageSpec)> {
+pub fn list_package(
+    world: &tinymist_project::LspWorld,
+    filter: PackageFilter,
+) -> EcoVec<PackageIndexEntry> {
+    trait IsDirFollowLinks {
+        fn is_dir_follow_links(&self) -> bool;
+    }
+
+    impl IsDirFollowLinks for PathBuf {
+        fn is_dir_follow_links(&self) -> bool {
+            // Although `canonicalize` is heavy, we must use it because `symlink_metadata`
+            // is not reliable.
+            self.canonicalize()
+                .map(|meta| meta.is_dir())
+                .unwrap_or(false)
+        }
+    }
+
+    let registry = &world.registry;
+
     // search packages locally. We only search in the data
     // directory and not the cache directory, because the latter is not
     // intended for storage of local packages.
     let mut packages = eco_vec![];
 
-    log::info!(
-        "searching for packages in namespace {ns} in paths {:?}",
-        registry.paths()
-    );
-    for dir in registry.paths() {
-        let local_path = dir.join(ns.as_str());
+    let paths = registry.paths();
+    log::info!("searching for packages in paths {paths:?}");
+
+    let mut search_in_dir = |local_path: PathBuf, ns: EcoString| {
         if !local_path.exists() || !local_path.is_dir_follow_links() {
-            continue;
+            return;
         }
         // namespace/package_name/version
         // 2. package_name
         let Some(package_names) = once_log(std::fs::read_dir(local_path), "read local package")
         else {
-            continue;
+            return;
         };
         for package in package_names {
             let Some(package) = once_log(package, "read package name") else {
                 continue;
             };
-            if package.file_name().to_string_lossy().starts_with('.') {
+            let package_name = EcoString::from(package.file_name().to_string_lossy());
+            if package_name.starts_with('.') {
                 continue;
             }
 
@@ -120,50 +215,88 @@ pub fn list_package_by_namespace(
                 continue;
             };
             for version in versions {
-                let Some(version) = once_log(version, "read package version") else {
+                let Some(version_entry) = once_log(version, "read package version") else {
                     continue;
                 };
-                if version.file_name().to_string_lossy().starts_with('.') {
+                if version_entry.file_name().to_string_lossy().starts_with('.') {
                     continue;
                 }
-                let package_version_path = version.path();
+                let package_version_path = version_entry.path();
                 if !package_version_path.is_dir_follow_links() {
                     continue;
                 }
                 let Some(version) = once_log(
-                    version.file_name().to_string_lossy().parse(),
+                    version_entry.file_name().to_string_lossy().parse(),
                     "parse package version",
                 ) else {
                     continue;
                 };
                 let spec = PackageSpec {
                     namespace: ns.clone(),
-                    name: package.file_name().to_string_lossy().into(),
+                    name: package_name.clone(),
                     version,
                 };
-                packages.push((package_version_path, spec));
+                let manifest_id = typst::syntax::FileId::new(typst::syntax::RootedPath::new(
+                    typst::syntax::VirtualRoot::Package(spec.clone()),
+                    typst::syntax::VirtualPath::new("typst.toml").expect("valid manifest path"),
+                ));
+                let Some(manifest) =
+                    once_log(get_manifest(world, manifest_id), "read package manifest")
+                else {
+                    continue;
+                };
+                packages.push(PackageIndexEntry {
+                    namespace: ns.clone(),
+                    package: manifest.package,
+                    template: manifest.template,
+                    updated_at: None,
+                    path: Some(package_version_path),
+                });
             }
+        }
+    };
+
+    for dir in paths {
+        let matching_ns = match &filter {
+            PackageFilter::For(ns) => {
+                let local_path = dir.join(ns.as_str());
+                search_in_dir(local_path, ns.clone());
+
+                continue;
+            }
+            PackageFilter::ExceptFor(ns) => Some(ns),
+            PackageFilter::All => None,
+        };
+
+        let Some(namespaces) = once_log(std::fs::read_dir(dir), "read package directory") else {
+            continue;
+        };
+        for dir in namespaces {
+            let Some(dir) = once_log(dir, "read ns directory") else {
+                continue;
+            };
+            let ns = dir.file_name();
+            let ns = ns.to_string_lossy();
+            if let Some(matching_ns) = &matching_ns
+                && matching_ns.as_str() == ns.as_ref()
+            {
+                continue;
+            }
+            let local_path = dir.path();
+            search_in_dir(local_path, ns.into());
         }
     }
 
     packages
 }
 
-trait IsDirFollowLinks {
-    fn is_dir_follow_links(&self) -> bool;
-}
-
-impl IsDirFollowLinks for PathBuf {
-    fn is_dir_follow_links(&self) -> bool {
-        // Although `canonicalize` is heavy, we must use it because `symlink_metadata`
-        // is not reliable.
-        self.canonicalize()
-            .map(|meta| meta.is_dir())
-            .unwrap_or(false)
-    }
-}
-
+#[cfg(feature = "local-registry")]
 fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -> Option<T> {
+    use std::collections::HashSet;
+    use std::sync::OnceLock;
+
+    use parking_lot::Mutex;
+
     let err = match result {
         Ok(value) => return Some(value),
         Err(err) => err,
@@ -176,4 +309,40 @@ fn once_log<T, E: std::fmt::Display>(result: Result<T, E>, site: &'static str) -
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use typst::syntax::package::PackageSpec;
+
+    use super::*;
+
+    fn manifest_id() -> FileId {
+        FileId::new(RootedPath::new(
+            VirtualRoot::Package(
+                PackageSpec::from_str("@preview/example:0.1.0").expect("valid package spec"),
+            ),
+            VirtualPath::new("typst.toml").expect("valid manifest path"),
+        ))
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_relative_to_manifest_parent() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "src/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/src/lib.typ");
+    }
+
+    #[test]
+    fn package_entrypoint_id_resolves_absolute_path_in_package_root() {
+        let manifest_id = manifest_id();
+        let entrypoint = package_entrypoint_id(manifest_id, "/lib.typ");
+
+        assert_eq!(entrypoint.root(), manifest_id.root());
+        assert_eq!(entrypoint.vpath().get_with_slash(), "/lib.typ");
+    }
 }

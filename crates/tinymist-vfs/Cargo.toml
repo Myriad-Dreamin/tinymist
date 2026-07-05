@@ -2,7 +2,7 @@
 name = "tinymist-vfs"
 description = "Vfs for tinymist."
 # group: world
-version = "0.13.12"
+version = "0.15.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -11,15 +11,15 @@ repository.workspace = true
 
 [dependencies]
 
-typst.workspace = true
-tinymist-std = { workspace = true, features = ["typst"] }
-parking_lot.workspace = true
-nohash-hasher.workspace = true
-indexmap.workspace = true
 comemo.workspace = true
 ecow.workspace = true
+indexmap.workspace = true
 log.workspace = true
+nohash-hasher.workspace = true
+parking_lot.workspace = true
 rpds = "1"
+tinymist-std = { workspace = true, features = ["typst"] }
+typst.workspace = true
 
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true, features = ["console"] }
@@ -27,6 +27,7 @@ js-sys = { workspace = true, optional = true }
 
 [features]
 
+mock = []
 web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
 browser = ["web"]
 system = ["tinymist-std/system"]

@@ -1,0 +1,956 @@
+//! This component is built based on xilem's canvas.
+
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+use masonry::accesskit::{Node, Role};
+use masonry::core::keyboard::Key;
+use masonry::core::{
+    AccessCtx, ArcStr, ChildrenIds, CursorIcon, KeyboardEvent, LayoutCtx, MeasureCtx, Modifiers,
+    PaintCtx, PointerButton, PointerButtonEvent, PointerEvent, PointerUpdate, PropertiesMut,
+    PropertiesRef, QueryCtx, RegisterCtx, TextEvent, Widget, WidgetId, WidgetMut,
+};
+use masonry::layout::{LenReq, Length};
+use tracing::{Span, trace_span};
+use vello::Scene;
+use vello::kurbo::{Affine, Axis, Point, Rect, Size};
+use vello::peniko::{Color, Fill};
+use xilem::core::{Arg, MessageCtx, MessageResult, Mut, View, ViewArgument, ViewMarker};
+use xilem::{Pod, ViewCtx};
+
+use crate::{PageAccessibility, PageTextPosition, PageTextSelection};
+
+/// Accesses a raw vello [`Scene`] within a canvas that fills its parent
+pub fn doc<State, Action, F, G>(
+    scene: Arc<Scene>,
+    scene_scale: f64,
+    background_color: Option<Color>,
+    on_click: F,
+    on_zoom: G,
+) -> TypstDocPage<State, Action, F, G>
+where
+    State: ViewArgument,
+    F: Fn(Point, Rect) + 'static,
+    G: Fn(Arg<'_, State>, ZoomAction) -> Action + 'static,
+{
+    TypstDocPage {
+        scene,
+        scene_scale,
+        background_color,
+        on_click,
+        on_zoom,
+        alt_text: Option::default(),
+        accessibility: Arc::new(PageAccessibility::default()),
+        phantom: PhantomData,
+    }
+}
+
+/// A viewer zoom command emitted by page input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZoomAction {
+    /// Increase viewer zoom.
+    In,
+    /// Decrease viewer zoom.
+    Out,
+    /// Reset viewer zoom to the default fitted scale.
+    Reset,
+}
+
+/// The [`View`] created by [`canvas`].
+#[must_use = "View values do nothing unless provided to Xilem."]
+pub struct TypstDocPage<State, Action, F, G> {
+    scene: Arc<Scene>,
+    scene_scale: f64,
+    background_color: Option<Color>,
+    alt_text: Option<ArcStr>,
+    accessibility: Arc<PageAccessibility>,
+    on_click: F,
+    on_zoom: G,
+    phantom: PhantomData<fn() -> (State, Action)>,
+}
+
+impl<State, Action, F, G> TypstDocPage<State, Action, F, G> {
+    /// Sets alt text for the contents of the canvas.
+    ///
+    /// Users are strongly encouraged to provide alt text for accessibility
+    /// tools to use.
+    pub fn alt_text(mut self, alt_text: impl Into<ArcStr>) -> Self {
+        self.alt_text = Some(alt_text.into());
+        self
+    }
+
+    /// Sets synthetic AccessKit nodes for the page contents.
+    pub fn accessibility(mut self, accessibility: Arc<PageAccessibility>) -> Self {
+        self.accessibility = accessibility;
+        self
+    }
+}
+
+impl<State, Action, F, G> ViewMarker for TypstDocPage<State, Action, F, G> {}
+
+impl<State, Action, F, G> View<State, Action, ViewCtx> for TypstDocPage<State, Action, F, G>
+where
+    State: ViewArgument,
+    Action: 'static,
+    F: Fn(Point, Rect) + 'static,
+    G: Fn(Arg<'_, State>, ZoomAction) -> Action + 'static,
+{
+    type Element = Pod<PageCanvas>;
+    type ViewState = ();
+
+    fn build(&self, ctx: &mut ViewCtx, _: Arg<'_, State>) -> (Self::Element, Self::ViewState) {
+        (
+            ctx.with_action_widget(|ctx| {
+                ctx.create_pod(PageCanvas {
+                    alt_text: self.alt_text.clone(),
+                    size: Size::default(),
+                    scene_scale: self.scene_scale,
+                    background_color: self.background_color,
+                    scene: self.scene.clone(),
+                    accessibility: self.accessibility.clone(),
+                    selection: None,
+                    selection_drag_anchor: None,
+                    selection_dragged: false,
+                })
+            }),
+            (),
+        )
+    }
+
+    fn rebuild(
+        &self,
+        prev: &Self,
+        (): &mut Self::ViewState,
+        _ctx: &mut ViewCtx,
+        mut element: Mut<'_, Self::Element>,
+        _state: Arg<'_, State>,
+    ) {
+        PageCanvas::request_render(
+            &mut element,
+            self.scene.clone(),
+            self.scene_scale,
+            self.background_color,
+        );
+        if self.alt_text != prev.alt_text {
+            PageCanvas::set_alt_text(&mut element, self.alt_text.clone());
+        }
+        if !Arc::ptr_eq(&self.accessibility, &prev.accessibility) {
+            PageCanvas::set_accessibility(&mut element, self.accessibility.clone());
+        }
+    }
+
+    fn teardown(&self, (): &mut Self::ViewState, _: &mut ViewCtx, _: Mut<'_, Self::Element>) {}
+
+    fn message(
+        &self,
+        (): &mut Self::ViewState,
+        message: &mut MessageCtx,
+        _element: Mut<'_, Self::Element>,
+        app_state: Arg<'_, State>,
+    ) -> MessageResult<Action> {
+        debug_assert!(
+            message.remaining_path().is_empty(),
+            "id path should be empty in Canvas::message"
+        );
+        match message.take_message::<PageAction>() {
+            Some(a) => match a.as_ref() {
+                PageAction::SizeChanged { .. } => MessageResult::RequestRebuild,
+                PageAction::Click {
+                    cursor_pos,
+                    content_box,
+                } => {
+                    (self.on_click)(*cursor_pos, *content_box);
+                    MessageResult::Nop
+                }
+                PageAction::Zoom(action) => {
+                    MessageResult::Action((self.on_zoom)(app_state, *action))
+                }
+            },
+            None => {
+                log::error!("Wrong message type in Canvas::message, got {message:?}.");
+                MessageResult::Stale
+            }
+        }
+    }
+}
+
+/// The preferred size of the square Canvas.
+const DEFAULT_LENGTH: Length = Length::const_px(100.);
+
+/// A widget used for drawing page.
+///
+/// A canvas takes a painter callback; every time the canvas is repainted, that
+/// callback in run with a [`Scene`].
+/// That Scene is then used as the canvas' contents.
+#[derive(Default)]
+pub struct PageCanvas {
+    alt_text: Option<ArcStr>,
+    /// The drawable area size, which matches the widget's content-box.
+    size: Size,
+    scene_scale: f64,
+    background_color: Option<Color>,
+    scene: Arc<Scene>,
+    accessibility: Arc<PageAccessibility>,
+    selection: Option<PageTextSelection>,
+    selection_drag_anchor: Option<PageTextPosition>,
+    selection_dragged: bool,
+}
+
+// --- MARK: BUILDERS
+impl PageCanvas {
+    /// Creates a page canvas from an already-flushed Vello scene.
+    pub fn new(scene: Arc<Scene>, scene_scale: f64, background_color: Option<Color>) -> Self {
+        Self {
+            alt_text: None,
+            size: Size::default(),
+            scene_scale,
+            background_color,
+            scene,
+            accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
+        }
+    }
+
+    /// Sets the text that will describe the canvas to screen readers.
+    ///
+    /// Users are encouraged to set alt text for the canvas.
+    /// If possible, the alt-text should succinctly describe what the canvas
+    /// represents.
+    ///
+    /// If the canvas is decorative users should set alt text to `""`.
+    /// If it's too hard to describe through text, the alt text should be left
+    /// unset. This allows accessibility clients to know that there is no
+    /// accessible description of the canvas content.
+    pub fn with_alt_text(mut self, alt_text: impl Into<ArcStr>) -> Self {
+        self.alt_text = Some(alt_text.into());
+        self
+    }
+
+    /// Sets synthetic AccessKit nodes for this page canvas.
+    pub fn with_accessibility(mut self, accessibility: Arc<PageAccessibility>) -> Self {
+        self.accessibility = accessibility;
+        self
+    }
+}
+
+// --- MARK: METHODS
+impl PageCanvas {
+    /// Returns the current size of the canvas, which matches its content-box
+    /// size.
+    pub fn size(&self) -> Size {
+        self.size
+    }
+
+    fn page_point_from_local(&self, pos: Point) -> Option<Point> {
+        if self.scene_scale <= 0.0 || !self.scene_scale.is_finite() {
+            return None;
+        }
+        Some(Point::new(
+            pos.x / self.scene_scale,
+            pos.y / self.scene_scale,
+        ))
+    }
+
+    fn selection_is_valid(&self) -> bool {
+        let Some(selection) = self.selection else {
+            return true;
+        };
+        selection.anchor.run_index < self.accessibility.text_runs().len()
+            && selection.focus.run_index < self.accessibility.text_runs().len()
+    }
+}
+
+// --- MARK: WIDGETMUT
+impl PageCanvas {
+    /// Requests a render of the canvas.
+    pub fn request_render(
+        this: &mut WidgetMut<'_, Self>,
+        scene: Arc<Scene>,
+        scene_scale: f64,
+        background_color: Option<Color>,
+    ) {
+        let should_render = !Arc::ptr_eq(&this.widget.scene, &scene)
+            || this.widget.scene_scale != scene_scale
+            || this.widget.background_color != background_color;
+
+        this.widget.scene = scene;
+        this.widget.scene_scale = scene_scale;
+        this.widget.background_color = background_color;
+        if should_render {
+            this.ctx.request_render();
+        }
+    }
+
+    /// Sets the text that will describe the canvas to screen readers.
+    ///
+    /// See [`Canvas::with_alt_text`] for details.
+    pub fn set_alt_text(this: &mut WidgetMut<'_, Self>, alt_text: Option<impl Into<ArcStr>>) {
+        this.widget.alt_text = alt_text.map(Into::into);
+        this.ctx.request_accessibility_update();
+    }
+
+    /// Sets synthetic AccessKit nodes for this page canvas.
+    pub fn set_accessibility(
+        this: &mut WidgetMut<'_, Self>,
+        accessibility: Arc<PageAccessibility>,
+    ) {
+        this.widget.accessibility = accessibility;
+        if !this.widget.selection_is_valid() {
+            this.widget.selection = None;
+            this.widget.selection_drag_anchor = None;
+            this.widget.selection_dragged = false;
+        }
+        this.ctx.request_accessibility_update();
+    }
+}
+
+/// Actions that can be performed on the page.
+#[derive(Debug)]
+pub enum PageAction {
+    /// The size of the page has changed.
+    SizeChanged {
+        /// The new size of the page
+        size: Size,
+    },
+    /// The user has clicked on the page.
+    Click {
+        /// The content box of the page
+        content_box: Rect,
+        /// The position of the cursor
+        cursor_pos: Point,
+    },
+    /// The user has requested a zoom change.
+    Zoom(ZoomAction),
+}
+
+fn is_zoom_modifier(modifiers: Modifiers) -> bool {
+    modifiers.ctrl() || modifiers.meta()
+}
+
+fn zoom_action_from_keyboard(event: &KeyboardEvent) -> Option<ZoomAction> {
+    if !event.state.is_down() || !is_zoom_modifier(event.modifiers) {
+        return None;
+    }
+
+    match &event.key {
+        Key::Character(key) if key == "+" || key == "=" => Some(ZoomAction::In),
+        Key::Character(key) if key == "-" => Some(ZoomAction::Out),
+        Key::Character(key) if key == "0" => Some(ZoomAction::Reset),
+        _ => None,
+    }
+}
+
+fn is_copy_shortcut(event: &KeyboardEvent) -> bool {
+    if !event.state.is_down() {
+        return false;
+    }
+    let action_modifier = if cfg!(target_os = "macos") {
+        event.modifiers.meta()
+    } else {
+        event.modifiers.ctrl()
+    };
+    action_modifier
+        && matches!(&event.key, Key::Character(key) if key.as_str().eq_ignore_ascii_case("c"))
+}
+
+const TEXT_SELECTION_COLOR: Color = Color::from_rgba8(0x7d, 0xb9, 0xde, 0xa0);
+
+fn scale_access_rect(rect: masonry::accesskit::Rect, scale: f64) -> Rect {
+    Rect::new(
+        rect.x0 * scale,
+        rect.y0 * scale,
+        rect.x1 * scale,
+        rect.y1 * scale,
+    )
+}
+
+// --- MARK: IMPL WIDGET
+impl Widget for PageCanvas {
+    type Action = PageAction;
+
+    fn on_pointer_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        _props: &mut PropertiesMut<'_>,
+        event: &PointerEvent,
+    ) {
+        match event {
+            PointerEvent::Down(PointerButtonEvent {
+                button: None | Some(PointerButton::Primary),
+                state,
+                ..
+            }) => {
+                let cursor_pos = ctx.local_position(state.position);
+                let new_selection = self
+                    .page_point_from_local(cursor_pos)
+                    .and_then(|point| self.accessibility.hit_test_text(point))
+                    .map(PageTextSelection::collapsed);
+                let selection_changed = self.selection != new_selection;
+                self.selection = new_selection;
+                self.selection_drag_anchor = new_selection.map(|selection| selection.anchor);
+                self.selection_dragged = false;
+
+                ctx.request_focus();
+                ctx.capture_pointer();
+                ctx.request_paint_only();
+                if selection_changed {
+                    ctx.request_accessibility_update();
+                }
+            }
+            PointerEvent::Move(PointerUpdate { current, .. }) => {
+                if ctx.is_active()
+                    && let Some(anchor) = self.selection_drag_anchor
+                    && let Some(focus) = self
+                        .page_point_from_local(ctx.local_position(current.position))
+                        .and_then(|point| self.accessibility.hit_test_text(point))
+                {
+                    let new_selection = PageTextSelection { anchor, focus };
+                    if self.selection != Some(new_selection) {
+                        self.selection_dragged = true;
+                        self.selection = Some(new_selection);
+                        ctx.request_paint_only();
+                        ctx.request_accessibility_update();
+                    }
+                }
+            }
+            PointerEvent::Up(event) => {
+                let suppress_click = self.selection_dragged
+                    && self
+                        .selection
+                        .is_some_and(|selection| !selection.is_collapsed());
+                self.selection_drag_anchor = None;
+                self.selection_dragged = false;
+
+                if ctx.is_active() && ctx.is_hovered() && !suppress_click {
+                    let content_box = ctx.content_box();
+                    let cursor_pos = ctx.local_position(event.state.position);
+                    ctx.submit_action::<Self::Action>(PageAction::Click {
+                        content_box,
+                        cursor_pos,
+                    });
+                }
+                ctx.request_paint_only();
+            }
+            PointerEvent::Cancel(_) => {
+                self.selection_drag_anchor = None;
+                self.selection_dragged = false;
+                ctx.request_paint_only();
+            }
+            _ => (),
+        }
+    }
+
+    fn on_text_event(
+        &mut self,
+        ctx: &mut masonry::core::EventCtx<'_>,
+        _props: &mut masonry::core::PropertiesMut<'_>,
+        event: &TextEvent,
+    ) {
+        if let TextEvent::Keyboard(event) = event
+            && let Some(action) = zoom_action_from_keyboard(event)
+        {
+            ctx.submit_action::<Self::Action>(PageAction::Zoom(action));
+            ctx.set_handled();
+        } else if let TextEvent::Keyboard(event) = event
+            && is_copy_shortcut(event)
+        {
+            if let Some(selection) = self.selection {
+                let selected_text = self.accessibility.selected_text(selection);
+                if !selected_text.is_empty() {
+                    ctx.set_clipboard(selected_text);
+                }
+            }
+            ctx.set_handled();
+        }
+    }
+
+    // TODO - Do we want the Canvas to be transparent to pointer events?
+    fn accepts_pointer_interaction(&self) -> bool {
+        true
+    }
+
+    fn get_cursor(&self, ctx: &QueryCtx<'_>, pos: Point) -> CursorIcon {
+        let local_pos = ctx.to_local(pos);
+        let Some(page_pos) = self.page_point_from_local(local_pos) else {
+            return CursorIcon::Default;
+        };
+        if self.accessibility.hit_test_link(page_pos).is_some() {
+            CursorIcon::Pointer
+        } else if self.accessibility.hit_test_text(page_pos).is_some() {
+            CursorIcon::Text
+        } else {
+            CursorIcon::Default
+        }
+    }
+
+    fn register_children(&mut self, _ctx: &mut RegisterCtx<'_>) {}
+
+    fn measure(
+        &mut self,
+        _ctx: &mut MeasureCtx<'_>,
+        _props: &PropertiesRef<'_>,
+        _axis: Axis,
+        len_req: LenReq,
+        _cross_length: Option<f64>,
+    ) -> f64 {
+        // TODO: Remove HACK: Until scale factor rework happens, just pretend it's
+        // always 1.0.       https://github.com/linebender/xilem/issues/1264
+        let scale = 1.0;
+
+        // We use all the available space or fall back to our const preferred size.
+        match len_req {
+            LenReq::FitContent(space) => space,
+            _ => DEFAULT_LENGTH.dp(scale),
+        }
+    }
+
+    fn layout(&mut self, ctx: &mut LayoutCtx<'_>, _props: &PropertiesRef<'_>, size: Size) {
+        if self.size != size {
+            self.size = size;
+            ctx.submit_action::<Self::Action>(PageAction::SizeChanged { size });
+        }
+        // We clip the contents we draw.
+        ctx.set_clip_path(size.to_rect());
+    }
+
+    fn paint(&mut self, _: &mut PaintCtx<'_>, _props: &PropertiesRef<'_>, scene: &mut Scene) {
+        if let Some(background_color) = self.background_color {
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                background_color,
+                None,
+                &self.size.to_rect(),
+            );
+        }
+        scene.append(&self.scene, Some(Affine::scale(self.scene_scale)));
+        if let Some(selection) = self.selection {
+            for rect in self.accessibility.selection_rects(selection) {
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    TEXT_SELECTION_COLOR,
+                    None,
+                    &scale_access_rect(rect, self.scene_scale),
+                );
+            }
+        }
+    }
+
+    fn accessibility_role(&self) -> Role {
+        if self.accessibility.is_empty() {
+            Role::Canvas
+        } else {
+            Role::Document
+        }
+    }
+
+    fn accessibility(
+        &mut self,
+        ctx: &mut AccessCtx<'_>,
+        _props: &PropertiesRef<'_>,
+        node: &mut Node,
+    ) {
+        if let Some(alt_text) = &self.alt_text {
+            node.set_description(&**alt_text);
+        }
+        self.accessibility.push_accesskit_nodes(
+            ctx.tree_update(),
+            node,
+            AccessCtx::next_node_id,
+            self.scene_scale,
+        );
+    }
+
+    fn children_ids(&self) -> ChildrenIds {
+        ChildrenIds::new()
+    }
+
+    fn make_trace_span(&self, widget_id: WidgetId) -> Span {
+        trace_span!("PageCanvas", id = widget_id.trace())
+    }
+
+    fn get_debug_text(&self) -> Option<String> {
+        self.alt_text.as_ref().map(ToString::to_string)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use masonry::accesskit::{Action, Rect as AccessRect, Role};
+    use masonry::core::keyboard::{Code, Key, KeyState};
+    use masonry::core::{
+        CursorIcon, KeyboardEvent, Modifiers, NewWidget, PointerButton, TextEvent, Widget,
+        WidgetTag,
+    };
+    use masonry::peniko::{Color, Fill};
+    use masonry::theme::default_property_set;
+    use masonry::vello::Scene;
+    use masonry::vello::kurbo::{Affine, Point, Size};
+    use masonry_testing::{TestHarness, TestHarnessParams};
+    use reflexo::vector::incr::IncrDocClient;
+    use reflexo::vector::stream::BytesModuleStream;
+    use reflexo_vec2svg::IncrSvgDocServer;
+    use tinymist_preview::protocol::{DIFF_V1_PREFIX, NEW_PREFIX};
+    use tinymist_std::typst::TypstDocument;
+
+    use crate::incr::IncrVelloDocClient;
+    use crate::protocol::preview_update_from_bytes;
+    use crate::{PageAccessibility, PageTextPosition, PageTextRun, PageTextSelection};
+
+    use super::{PageCanvas, ZoomAction, zoom_action_from_keyboard};
+
+    #[test]
+    fn page_canvas_paints_supplied_white_background() {
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color: Some(Color::WHITE),
+            scene: Arc::new(Scene::new()),
+            accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(64.0, 64.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+
+        let rendered = harness.render();
+        let center = rendered.get_pixel(32, 32).0;
+
+        assert_eq!(
+            center,
+            [255, 255, 255, 255],
+            "a Typst page with a supplied white background should not reveal the viewer background"
+        );
+    }
+
+    #[test]
+    fn diff_v1_preview_frame_paints_generated_page() {
+        let (frame, _) = generated_preview_frames();
+        assert!(
+            frame.starts_with(DIFF_V1_PREFIX),
+            "the initial backend preview frame should be diff-v1"
+        );
+
+        let center = render_preview_frame_center(&frame);
+
+        assert_black_pixel(
+            center,
+            "a rendered diff-v1 frame should paint the generated black page",
+        );
+    }
+
+    #[test]
+    fn full_current_preview_frame_paints_generated_page_after_reset() {
+        let (_, frame) = generated_preview_frames();
+        assert!(
+            frame.starts_with(NEW_PREFIX),
+            "the backend full-current preview frame should be new"
+        );
+
+        let center = render_preview_frame_center(&frame);
+
+        assert_black_pixel(
+            center,
+            "a rendered new frame should reset, merge, and paint the generated black page",
+        );
+    }
+
+    #[test]
+    fn modified_keyboard_shortcuts_map_to_zoom_actions() {
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("+", Modifiers::CONTROL)),
+            Some(ZoomAction::In)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("=", Modifiers::META)),
+            Some(ZoomAction::In)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("-", Modifiers::CONTROL)),
+            Some(ZoomAction::Out)
+        );
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("0", Modifiers::META)),
+            Some(ZoomAction::Reset)
+        );
+    }
+
+    #[test]
+    fn unmodified_keyboard_zoom_shortcut_is_ignored() {
+        assert_eq!(
+            zoom_action_from_keyboard(&keyboard_event("+", Modifiers::empty())),
+            None
+        );
+    }
+
+    fn generated_preview_frames() -> (Vec<u8>, Vec<u8>) {
+        const SOURCE: &str = r#"
+#set page(width: 16pt, height: 16pt, margin: 0pt, fill: white)
+#rect(width: 16pt, height: 16pt, fill: black)
+"#;
+
+        tinymist_tests::run_with_sources(SOURCE, |verse, _| {
+            let world = verse.snapshot();
+            let doc = typst::compile::<tinymist_std::typst::TypstPagedDocument>(&world)
+                .output
+                .expect("short viewer preview fixture should compile");
+            let document = TypstDocument::Paged(Arc::new(doc));
+            let mut renderer = IncrSvgDocServer::default();
+
+            let diff = renderer.pack_delta(&document);
+            let current = tinymist_preview::protocol::full_current_frame_from_delta(&diff)
+                .expect("full current can be built from an initial incremental frame");
+
+            (diff, current)
+        })
+    }
+
+    fn keyboard_event(key: &str, modifiers: Modifiers) -> KeyboardEvent {
+        KeyboardEvent {
+            state: KeyState::Down,
+            key: Key::Character(key.to_owned()),
+            code: Code::Unidentified,
+            modifiers,
+            ..Default::default()
+        }
+    }
+
+    fn render_preview_frame_center(frame: &[u8]) -> [u8; 4] {
+        let mut doc = IncrDocClient::default();
+        let mut vello = IncrVelloDocClient::default();
+
+        let update = preview_update_from_bytes(frame).expect("preview frame should be accepted");
+        if update.reset_before_merge {
+            doc = IncrDocClient::default();
+            vello.reset();
+        }
+
+        let delta = BytesModuleStream::from_slice(update.payload).checkout_owned();
+        doc.merge_delta(delta);
+
+        let mut pages = vello
+            .render_pages(&mut doc)
+            .expect("preview frame should render through the viewer");
+        assert_eq!(pages.len(), 1, "preview fixture should render one page");
+
+        let (scene, size) = pages.pop().expect("one rendered page should exist");
+        assert_eq!(size, Size::new(16.0, 16.0));
+
+        render_page_canvas_center(scene, vello.background_color())
+    }
+
+    fn render_page_canvas_center(scene: Arc<Scene>, background_color: Option<Color>) -> [u8; 4] {
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color,
+            scene,
+            accessibility: Arc::new(PageAccessibility::default()),
+            selection: None,
+            selection_drag_anchor: None,
+            selection_dragged: false,
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(32.0, 32.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+        let rendered = harness.render();
+
+        rendered.get_pixel(8, 8).0
+    }
+
+    #[test]
+    fn page_canvas_exposes_synthetic_accesskit_link_nodes() {
+        let page_accessibility = Arc::new(PageAccessibility::new([PageAccessibility::link_node(
+            "https://example.com",
+            AccessRect::new(1.0, 2.0, 7.0, 10.0),
+        )]));
+        let page = PageCanvas::new(Arc::new(Scene::new()), 2.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        let page_id = harness.get_widget(tag).id();
+        let page_node = harness
+            .access_node(page_id)
+            .expect("page canvas should have an AccessKit node");
+        assert_eq!(page_node.role(), Role::Document);
+
+        let link_node = page_node
+            .children()
+            .next()
+            .expect("page canvas should contain synthetic link node");
+        assert_eq!(link_node.role(), Role::Link);
+        assert_eq!(link_node.value().as_deref(), Some("https://example.com"));
+        assert!(link_node.supports_action(Action::Click, &|_| {
+            accesskit_consumer::FilterResult::Include
+        }));
+        assert_eq!(
+            link_node.raw_bounds(),
+            Some(AccessRect::new(2.0, 4.0, 14.0, 20.0))
+        );
+    }
+
+    #[test]
+    fn page_canvas_uses_pointer_cursor_over_links() {
+        let page_accessibility = Arc::new(PageAccessibility::new([PageAccessibility::link_node(
+            "https://example.com",
+            AccessRect::new(0.0, 0.0, 20.0, 20.0),
+        )]));
+        let page = PageCanvas::new(Arc::new(Scene::new()), 1.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        harness.mouse_move(Point::new(10.0, 10.0));
+        assert_eq!(harness.cursor_icon(), CursorIcon::Pointer);
+    }
+
+    #[test]
+    fn page_canvas_exposes_synthetic_accesskit_text_runs() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let page = PageCanvas::new(Arc::new(Scene::new()), 2.0, None)
+            .with_accessibility(page_accessibility);
+        let tag = WidgetTag::named("page");
+        let widget = NewWidget::new_with_tag(page, tag);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        let page_id = harness.get_widget(tag).id();
+        let page_node = harness
+            .access_node(page_id)
+            .expect("page canvas should have an AccessKit node");
+        assert_eq!(page_node.role(), Role::Document);
+
+        let text_node = page_node
+            .children()
+            .next()
+            .expect("page canvas should contain synthetic text node");
+        assert_eq!(text_node.role(), Role::TextRun);
+        assert_eq!(text_node.value().as_deref(), Some("hello"));
+        assert_eq!(text_node.data().character_lengths(), &[1, 1, 1, 1, 1]);
+        assert_eq!(
+            text_node.raw_bounds(),
+            Some(AccessRect::new(0.0, 0.0, 100.0, 20.0))
+        );
+    }
+
+    #[test]
+    fn page_canvas_selects_and_copies_text() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let page = PageCanvas::new(Arc::new(Scene::new()), 1.0, None)
+            .with_accessibility(page_accessibility);
+        let widget = NewWidget::new(page);
+        let mut harness = TestHarness::create(default_property_set(), widget);
+
+        let _ = harness.render();
+        harness.mouse_move(Point::new(1.0, 5.0));
+        assert_eq!(harness.cursor_icon(), CursorIcon::Text);
+        harness.mouse_button_press(PointerButton::Primary);
+        harness.mouse_move(Point::new(49.0, 5.0));
+        harness.mouse_button_release(PointerButton::Primary);
+        harness.process_text_event(TextEvent::Keyboard(keyboard_event("c", copy_modifiers())));
+
+        assert_eq!(harness.clipboard_contents(), "hello");
+    }
+
+    #[test]
+    fn page_canvas_paints_selection_overlay_above_scene() {
+        let page_accessibility = Arc::new(text_accessibility());
+        let mut scene = Scene::new();
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            Color::WHITE,
+            None,
+            &Size::new(50.0, 10.0).to_rect(),
+        );
+        let page = PageCanvas {
+            alt_text: None,
+            size: Size::ZERO,
+            scene_scale: 1.0,
+            background_color: None,
+            scene: Arc::new(scene),
+            accessibility: page_accessibility,
+            selection: Some(PageTextSelection {
+                anchor: PageTextPosition {
+                    run_index: 0,
+                    character_index: 0,
+                },
+                focus: PageTextPosition {
+                    run_index: 0,
+                    character_index: 5,
+                },
+            }),
+            selection_drag_anchor: None,
+            selection_dragged: false,
+        };
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(64.0, 32.0);
+        params.background_color = Color::from_rgb8(0x29, 0x29, 0x29);
+
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+        let rendered = harness.render();
+        let selected_pixel = rendered.get_pixel(5, 5).0;
+
+        assert!(
+            selected_pixel[2] > selected_pixel[0],
+            "selection overlay should tint an opaque page scene blue; got rgba({},{},{},{})",
+            selected_pixel[0],
+            selected_pixel[1],
+            selected_pixel[2],
+            selected_pixel[3],
+        );
+    }
+
+    fn text_accessibility() -> PageAccessibility {
+        let mut accessibility = PageAccessibility::default();
+        accessibility.push_text_run(PageTextRun::new(
+            "hello",
+            AccessRect::new(0.0, 0.0, 50.0, 10.0),
+            (0..5).map(|index| {
+                let x0 = index as f64 * 10.0;
+                AccessRect::new(x0, 0.0, x0 + 10.0, 10.0)
+            }),
+        ));
+        accessibility
+    }
+
+    fn copy_modifiers() -> Modifiers {
+        if cfg!(target_os = "macos") {
+            Modifiers::META
+        } else {
+            Modifiers::CONTROL
+        }
+    }
+
+    fn assert_black_pixel(pixel: [u8; 4], message: &str) {
+        assert!(
+            pixel[0] <= 4 && pixel[1] <= 4 && pixel[2] <= 4 && pixel[3] == 255,
+            "{message}; got rgba({},{},{},{})",
+            pixel[0],
+            pixel[1],
+            pixel[2],
+            pixel[3]
+        );
+    }
+}

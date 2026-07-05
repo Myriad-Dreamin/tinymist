@@ -1,0 +1,72 @@
+{
+  "name": "tinymist-gpu-viewer",
+  "displayName": "Tinymist GPU Viewer",
+  "description": "GPU-backed Typst previewer provider for Tinymist.",
+  "publisher": "myriad-dreamin",
+  "version": "0.15.2",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
+  "keywords": [
+    "typst",
+    "tinymist",
+    "preview",
+    "previewer",
+    "gpu",
+    "vello"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.97.0"
+  },
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.provideTinymistPreviewer",
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.handleTinymistPreview",
+    "onCommand:myriad-dreamin.tinymist-gpu-viewer.disposeTinymistPreview"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Tinymist GPU Viewer",
+      "properties": {
+        "tinymist.gpuViewer.executable": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null,
+          "markdownDescription": "Path to the `tinymist-viewer` executable. When unset, the extension uses a bundled binary under `bin` or `tinymist-viewer` from PATH."
+        },
+        "tinymist.gpuViewer.windowLayout": {
+          "type": "string",
+          "enum": [
+            "disabled",
+            "sideBySide"
+          ],
+          "default": "sideBySide",
+          "markdownDescription": "Controls desktop window arrangement after launching the native GPU viewer. `sideBySide` places VS Code on the left and Tinymist GPU Viewer on the right when the platform allows window automation. Set to `disabled` to leave windows where the operating system places them."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "vscode:prepublish": "yarn run compile",
+    "package": "npx @vscode/vsce package --yarn --no-dependencies",
+    "type-check": "tsc --noEmit -p ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/vscode": "^1.97.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.2.2"
+  }
+}

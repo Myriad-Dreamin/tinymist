@@ -2,7 +2,7 @@
 
 /// Tag definitions specific to markdown conversion
 pub mod md_tag {
-    use typst::html::HtmlTag;
+    use typst_html::HtmlTag;
 
     macro_rules! tags {
         ($($tag:ident -> $name:ident)*) => {
@@ -19,9 +19,8 @@ pub mod md_tag {
         image -> m1image
         strong -> m1strong
         emph -> m1emph
-        highlight -> m1highlight
-        strike -> m1strike
         raw -> m1raw
+        verbatim -> m1verbatim
         label -> m1label
         reference -> m1ref
         heading -> m1heading
@@ -29,6 +28,8 @@ pub mod md_tag {
         outline_entry -> m1outentry
         quote -> m1quote
         table -> m1table
+        idoc -> m1idoc
+        source -> m1source
         // table_cell -> m1tablecell
         grid -> m1grid
         // grid_cell -> m1gridcell
@@ -36,7 +37,7 @@ pub mod md_tag {
 
         math_equation_inline -> m1eqinline
         math_equation_block -> m1eqblock
-
+        alerts -> m1alerts
         doc -> m1document
         link -> m1link
     }

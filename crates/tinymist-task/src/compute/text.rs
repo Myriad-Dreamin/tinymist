@@ -1,14 +1,19 @@
+//! The computation for text export.
+
 use core::fmt;
 use std::sync::Arc;
+use typst_html::{HtmlNode::*, tag};
 
 use crate::ExportTextTask;
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tinymist_world::{CompilerFeat, ExportComputation, WorldComputeGraph};
 
+/// The computation for text export.
 pub struct TextExport;
 
 impl TextExport {
+    /// Runs the computation on a document.
     pub fn run_on_doc(doc: &TypstDocument) -> Result<String> {
         Ok(format!("{}", FullTextDigest(doc)))
     }
@@ -56,20 +61,26 @@ impl FullTextDigest<'_> {
         }
     }
 
-    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst::html::HtmlElement) -> fmt::Result {
+    fn export_element(f: &mut fmt::Formatter<'_>, elem: &typst_html::HtmlElement) -> fmt::Result {
         for child in elem.children.iter() {
             Self::export_html_node(f, child)?;
         }
         Ok(())
     }
 
-    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst::html::HtmlNode) -> fmt::Result {
-        use typst::html::HtmlNode::*;
+    fn export_html_node(f: &mut fmt::Formatter<'_>, node: &typst_html::HtmlNode) -> fmt::Result {
         match node {
             Tag(_) => Ok(()),
-            Element(elem) => Self::export_element(f, elem),
+            Element(elem) => {
+                // Skips certain tags that do not contribute to text content.
+                if matches!(elem.tag, tag::style | tag::script) {
+                    Ok(())
+                } else {
+                    Self::export_element(f, elem)
+                }
+            }
             Text(t, _) => f.write_str(t.as_str()),
-            Frame(frame) => Self::export_frame(f, frame),
+            Frame(frame) => Self::export_frame(f, &frame.inner),
         }
     }
 }
@@ -78,13 +89,13 @@ impl fmt::Display for FullTextDigest<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             TypstDocument::Paged(paged_doc) => {
-                for page in paged_doc.pages.iter() {
+                for page in paged_doc.pages() {
                     Self::export_frame(f, &page.frame)?;
                 }
                 Ok(())
             }
             TypstDocument::Html(html_doc) => {
-                Self::export_element(f, &html_doc.root)?;
+                Self::export_element(f, html_doc.root())?;
                 Ok(())
             }
         }

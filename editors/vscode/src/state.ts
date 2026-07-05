@@ -8,6 +8,7 @@ interface ExtensionState {
   features: {
     web: boolean;
     lsp: boolean;
+    lspSystem: boolean;
     export: boolean;
     task: boolean;
     devKit: boolean;
@@ -27,6 +28,8 @@ interface ExtensionState {
   mut: {
     focusing: FocusState;
     focusingPreviewPanelContext: PreviewPanelContext | undefined;
+    serverHealthWarningShown: boolean;
+    serverReady: boolean;
   };
   getFocusingPreviewPanelContext(): PreviewPanelContext | undefined;
 }
@@ -35,6 +38,7 @@ export const extensionState: ExtensionState = {
   features: {
     web: false,
     lsp: true,
+    lspSystem: true,
     export: true,
     testingDebug: true,
     task: true,
@@ -54,6 +58,8 @@ export const extensionState: ExtensionState = {
   mut: {
     focusing: new FocusState(),
     focusingPreviewPanelContext: undefined,
+    serverHealthWarningShown: false,
+    serverReady: false,
   },
   getFocusingPreviewPanelContext() {
     return extensionState.mut.focusingPreviewPanelContext;

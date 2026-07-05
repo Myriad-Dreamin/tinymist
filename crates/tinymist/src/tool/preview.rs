@@ -8,27 +8,27 @@ mod http;
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
-use clap::Parser;
-use futures::{SinkExt, StreamExt, TryStreamExt};
+use clap::{Parser, ValueEnum};
+use futures::{SinkExt, TryStreamExt};
 use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStream};
 use lsp_types::notification::Notification;
 use lsp_types::Url;
 use reflexo_typst::error::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
+use tinymist_preview::{
+    frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
+    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, ViewerWindowState, WsMessage,
+};
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
+use tinymist_task::ExportTarget;
 use tokio::sync::{mpsc, oneshot};
-use typst_preview::{
-    frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewArgs, PreviewBuilder, PreviewMode, Previewer, WsMessage,
-};
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
-use crate::project::{ProjectInsId, ProjectPreviewState, WorldProvider};
-use crate::tool::project::{start_project, ProjectOpts, StartProjectResult};
+use crate::project::{ProjectInsId, ProjectPreviewState};
 use crate::*;
 
 /// The kind of the preview.
@@ -42,23 +42,152 @@ pub enum PreviewKind {
     Background,
 }
 
-/// CLI Arguments for the preview tool.
+/// The refresh style for the preview.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
+pub enum RefreshStyle {
+    /// Refresh preview on save
+    #[cfg_attr(feature = "clap", clap(name = "onSave"))]
+    OnSave,
+
+    /// Refresh preview on type
+    #[cfg_attr(feature = "clap", clap(name = "onType"))]
+    #[default]
+    OnType,
+}
+
+impl From<RefreshStyle> for TaskWhen {
+    fn from(style: RefreshStyle) -> Self {
+        match style {
+            RefreshStyle::OnSave => TaskWhen::OnSave,
+            RefreshStyle::OnType => TaskWhen::OnType,
+        }
+    }
+}
+
+/// Specify arguments related to the preview service.
 #[derive(Debug, Clone, clap::Parser)]
-pub struct PreviewCliArgs {
-    /// Preview arguments
-    #[clap(flatten)]
-    pub preview: PreviewArgs,
+pub struct PreviewArgs {
+    /// Configure the preview output format.
+    ///
+    /// `tinymist preview` does not write an output file, so this selects the
+    /// Typst compilation target used by the live preview.
+    #[clap(long = "format", default_value = "paged", value_name = "FORMAT")]
+    pub format: ExportTarget,
 
-    /// Compile arguments
-    #[clap(flatten)]
-    pub compile: CompileOnceArgs,
-
-    /// Preview mode
+    /// Configure the preview mode.
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
 
-    /// Data plane server will bind to this address. Note: if it equals to
-    /// `static_file_host`, same address will be used.
+    /// Set the preview page title.
+    ///
+    /// If not specified, the title falls back to the input filename when
+    /// available, or otherwise to `"Typst Preview"`.
+    #[clap(long = "page-title", value_name = "TITLE")]
+    pub page_title: Option<String>,
+
+    /// Only render visible part of the document.
+    ///
+    /// This can improve performance but still being experimental.
+    #[clap(long = "partial-rendering")]
+    pub enable_partial_rendering: Option<bool>,
+
+    /// Configure the way to invert colors of the preview.
+    ///
+    /// This is useful for dark themes without cost.
+    ///
+    /// Please note you could see the original colors when you hover elements in
+    /// the preview.
+    ///
+    /// It is also possible to specify strategy to each element kind by an
+    /// object map in JSON format.
+    ///
+    /// Possible element kinds:
+    /// - `image`: Images in the preview.
+    /// - `rest`: Rest elements in the preview.
+    ///
+    /// By default, the preview will never invert colors.
+    ///
+    /// ## Example
+    ///
+    /// By string:
+    ///
+    /// ```shell
+    /// --invert-colors=auto
+    /// ```
+    ///
+    /// By element:
+    ///
+    /// ```shell
+    /// --invert-colors='{"rest": "always", "image": "never"}'
+    /// ```
+    #[clap(long)]
+    pub invert_colors: Option<String>,
+
+    /// Used by lsp for controlling the preview refresh style.
+    ///
+    /// This is hidden from the CLI.
+    #[clap(long, hide(true))]
+    pub refresh_style: Option<RefreshStyle>,
+}
+
+/// Resolves the browser page title for preview HTML.
+pub fn resolve_page_title(page_title: Option<&str>, input: Option<&str>) -> String {
+    if let Some(title) = page_title {
+        return title.to_owned();
+    }
+
+    input
+        .and_then(|path| Path::new(path).file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Typst Preview".to_string())
+}
+
+impl PreviewArgs {
+    /// Get the configuration for the preview.
+    pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
+        PreviewConfig {
+            format: self.format,
+            enable_partial_rendering: self
+                .enable_partial_rendering
+                .unwrap_or(config.enable_partial_rendering),
+            refresh_style: self
+                .refresh_style
+                .map(From::from)
+                .unwrap_or_else(|| config.refresh_style.clone()),
+            invert_colors: match &self.invert_colors {
+                Some(s) => s.clone(),
+                None => config.invert_colors.clone(),
+            },
+        }
+    }
+}
+
+/// Specify arguments related to the preview CLI.
+#[derive(Debug, Clone, clap::Parser)]
+pub struct PreviewCliArgs {
+    /// Configure the preview service.
+    #[clap(flatten)]
+    pub preview: PreviewArgs,
+
+    /// Specify common arguments to create a world (environment) to run typst
+    /// tasks.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// Used by lsp for identifying the task.
+    ///
+    /// This is hidden from the CLI.
+    #[clap(
+        long = "task-id",
+        default_value = "default_preview",
+        value_name = "TASK_ID",
+        hide(true)
+    )]
+    pub task_id: String,
+
+    /// Configure the data plane server address.
+    ///
+    /// Note: if it equals to `static_file_host`, same address will be used.
     #[clap(
         long = "data-plane-host",
         default_value = "127.0.0.1:23625",
@@ -67,7 +196,7 @@ pub struct PreviewCliArgs {
     )]
     pub data_plane_host: String,
 
-    /// Control plane server will bind to this address
+    /// Configure the control plane server address.
     #[clap(
         long = "control-plane-host",
         default_value = "127.0.0.1:23626",
@@ -76,8 +205,9 @@ pub struct PreviewCliArgs {
     )]
     pub control_plane_host: String,
 
-    /// (Deprecated) (File) Host for the preview server. Note: if it equals to
-    /// `data_plane_host`, same address will be used.
+    /// (Deprecated) Configure (File) Host address for the preview server.
+    ///
+    /// Note: if it equals to `data_plane_host`, same address will be used.
     #[clap(
         long = "host",
         value_name = "HOST",
@@ -87,6 +217,8 @@ pub struct PreviewCliArgs {
     pub static_file_host: String,
 
     /// Let it not be the primary instance.
+    ///
+    /// This is hidden from the CLI.
     #[clap(long = "not-primary", hide(true))]
     pub not_as_primary: bool,
 
@@ -99,16 +231,20 @@ pub struct PreviewCliArgs {
     /// set as well, this flag will win.
     #[clap(long = "no-open")]
     pub no_open: bool,
+
+    /// Emit INFO level logging. The default is WARN.
+    #[clap(long = "verbose")]
+    pub verbose: bool,
 }
 
 impl PreviewCliArgs {
-    /// Whether to open the preview in the browser after compilation.
+    /// Determines whether to open the preview in the browser after compilation.
     pub fn open_in_browser(&self, default: bool) -> bool {
         !self.no_open && (self.open || default)
     }
 }
 
-/// Response for starting a preview.
+/// Response for starting a preview instance.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPreviewResponse {
@@ -165,6 +301,8 @@ impl ServerState {
             .chain(cli_args.iter().map(|e| e.as_str()));
         let cli_args =
             PreviewCliArgs::try_parse_from(cli_args).map_err(|e| invalid_params(e.to_string()))?;
+        // default configs
+        let config = cli_args.preview.config(&self.config.preview());
 
         // todo: preview specific arguments are not used
         let entry = cli_args.compile.input.as_ref();
@@ -180,7 +318,7 @@ impl ServerState {
             })
             .transpose()?;
 
-        let task_id = cli_args.preview.task_id.clone();
+        let task_id = cli_args.task_id.clone();
         if task_id == "primary" {
             return Err(invalid_params("task id 'primary' is reserved"));
         }
@@ -191,8 +329,8 @@ impl ServerState {
             ));
         }
 
-        let previewer = typst_preview::PreviewBuilder::new(cli_args.preview.clone());
-        let watcher = previewer.compile_watcher();
+        let previewer = tinymist_preview::PreviewBuilder::new(config);
+        let watcher = previewer.compile_watcher(task_id.clone());
 
         let primary = &mut self.project.compiler.primary;
         // todo: recover pin status reliably
@@ -232,7 +370,7 @@ impl ServerState {
             self.preview
                 .start(cli_args, previewer, id, false, is_background)
         } else {
-            return Err(internal_error("entry file must be provided"));
+            Err(internal_error("entry file must be provided"))
         }
     }
 }
@@ -308,7 +446,8 @@ impl PreviewState {
             client: Box::new(self.client.clone().to_untyped()),
         });
 
-        let task_id = args.preview.task_id.clone();
+        let task_id = args.task_id.clone();
+        #[cfg(feature = "open")]
         let open_in_browser = args.open_in_browser(false);
         log::info!("PreviewTask({task_id}): arguments: {args:#?}");
 
@@ -334,7 +473,7 @@ impl PreviewState {
         self.client.handle.spawn(async move {
             let mut resp_rx = resp_rx;
             while let Some(resp) = resp_rx.recv().await {
-                use typst_preview::ControlPlaneResponse::*;
+                use tinymist_preview::ControlPlaneResponse::*;
 
                 match resp {
                     // ignoring compile status per task.
@@ -350,6 +489,13 @@ impl PreviewState {
                         }
                     }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
+                    ViewerWindowState(s) => client.send_notification::<NotifViewerWindowState>(
+                        &ViewerWindowStateParams {
+                            task_id: tid.clone(),
+                            schema_version: s.schema_version,
+                            window: s.window,
+                        },
+                    ),
                 }
             }
 
@@ -382,11 +528,23 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
+            let page_title = resolve_page_title(
+                args.preview.page_title.as_deref(),
+                args.compile.input.as_deref(),
+            );
+            let frontend_html = frontend_html(
+                TYPST_PREVIEW_HTML,
+                args.preview.preview_mode,
+                "/",
+                &page_title,
+            );
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
-            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
+            log::info!(
+                target: crate::PREVIEW_COMPAT_LOG_TARGET,
+                "PreviewTask({task_id}): preview server listening on: {addr}"
+            );
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(addr.port()),
@@ -395,6 +553,7 @@ impl PreviewState {
                 is_primary,
             };
 
+            #[cfg(feature = "open")]
             if open_in_browser {
                 open::that_detached(format!("http://127.0.0.1:{}", addr.port()))
                     .log_error("failed to open browser for preview");
@@ -452,153 +611,6 @@ impl PreviewState {
     }
 }
 
-/// Entry point of the preview tool.
-pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
-    log::info!("Arguments: {args:#?}");
-    let handle = tokio::runtime::Handle::current();
-
-    let open_in_browser = args.open_in_browser(true);
-    let static_file_host =
-        if args.static_file_host == args.data_plane_host || !args.static_file_host.is_empty() {
-            Some(args.static_file_host)
-        } else {
-            None
-        };
-
-    exit_on_ctrl_c();
-
-    let verse = args.compile.resolve()?;
-    let previewer = PreviewBuilder::new(args.preview);
-
-    let (service, handle) = {
-        let preview_state = ProjectPreviewState::default();
-        let opts = ProjectOpts {
-            handle: Some(handle),
-            preview: preview_state.clone(),
-            ..ProjectOpts::default()
-        };
-
-        let StartProjectResult {
-            service,
-            intr_tx,
-            mut editor_rx,
-        } = start_project(verse, Some(opts), |compiler, intr, next| {
-            next(compiler, intr)
-        });
-
-        // Consume editor_rx
-        tokio::spawn(async move { while editor_rx.recv().await.is_some() {} });
-
-        let id = service.compiler.primary.id.clone();
-        let registered = preview_state.register(&id, previewer.compile_watcher());
-        if !registered {
-            tinymist_std::bail!("failed to register preview");
-        }
-
-        let handle: Arc<ProjectPreviewHandler> = Arc::new(ProjectPreviewHandler {
-            project_id: id,
-            client: Box::new(intr_tx),
-        });
-
-        (service, handle)
-    };
-
-    let (lsp_tx, mut lsp_rx) = ControlPlaneTx::new(true);
-
-    let control_plane_server_handle = tokio::spawn(async move {
-        let (control_sock_tx, mut control_sock_rx) = mpsc::unbounded_channel();
-
-        let srv =
-            make_http_server(String::default(), args.control_plane_host, control_sock_tx).await;
-        log::info!("Control panel server listening on: {}", srv.addr);
-
-        let control_websocket = control_sock_rx.recv().await.unwrap();
-        let ws = control_websocket.await.unwrap();
-
-        tokio::pin!(ws);
-
-        loop {
-            tokio::select! {
-                Some(resp) = lsp_rx.resp_rx.recv() => {
-                    let r = ws
-                        .send(Message::Text(serde_json::to_string(&resp).unwrap()))
-                        .await;
-                    let Err(err) = r else {
-                        continue;
-                    };
-
-                    log::warn!("failed to send response to editor {err:?}");
-                    break;
-
-                }
-                msg = ws.next() => {
-                    let msg = match msg {
-                        Some(Ok(Message::Text(msg))) => Some(msg),
-                        Some(Ok(msg)) => {
-                            log::error!("unsupported message: {msg:?}");
-                            break;
-                        }
-                        Some(Err(e)) => {
-                            log::error!("failed to receive message: {e}");
-                            break;
-                        }
-                        _ => None,
-                    };
-
-                    if let Some(msg) = msg {
-                        let Ok(msg) = serde_json::from_str::<ControlPlaneMessage>(&msg) else {
-                            log::warn!("failed to parse control plane request: {msg:?}");
-                            break;
-                        };
-
-                        lsp_rx.ctl_tx.send(msg).unwrap();
-                    } else {
-                        // todo: inform the editor that the connection is closed.
-                        break;
-                    }
-                }
-
-            }
-        }
-
-        let _ = srv.shutdown_tx.send(());
-        let _ = srv.join.await;
-    });
-
-    let (websocket_tx, websocket_rx) = mpsc::unbounded_channel();
-    let mut previewer = previewer.build(lsp_tx, handle.clone()).await;
-    tokio::spawn(service.run());
-
-    bind_streams(&mut previewer, websocket_rx);
-
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview_mode, "/");
-
-    let static_server = if let Some(static_file_host) = static_file_host {
-        log::warn!("--static-file-host is deprecated, which will be removed in the future. Use --data-plane-host instead.");
-        let html = frontend_html.clone();
-        Some(make_http_server(html, static_file_host, websocket_tx.clone()).await)
-    } else {
-        None
-    };
-
-    let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
-    log::info!("Data plane server listening on: {}", srv.addr);
-
-    let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
-    log::info!("Static file server listening on: {static_server_addr}");
-
-    if open_in_browser {
-        open::that_detached(format!("http://{static_server_addr}"))
-            .log_error("failed to open browser for preview");
-    }
-
-    let _ = tokio::join!(previewer.join(), srv.join, control_plane_server_handle);
-    // Assert that the static server's lifetime is longer than the previewer.
-    let _s = static_server;
-
-    Ok(())
-}
-
 struct ScrollSource;
 
 impl Notification for ScrollSource {
@@ -609,8 +621,22 @@ impl Notification for ScrollSource {
 struct NotifDocumentOutline;
 
 impl Notification for NotifDocumentOutline {
-    type Params = typst_preview::Outline;
+    type Params = tinymist_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
+}
+
+#[derive(Serialize, Deserialize)]
+struct ViewerWindowStateParams {
+    task_id: String,
+    schema_version: u32,
+    window: ViewerWindowState,
+}
+
+struct NotifViewerWindowState;
+
+impl Notification for NotifViewerWindowState {
+    type Params = ViewerWindowStateParams;
+    const METHOD: &'static str = "tinymist/preview/windowState";
 }
 
 fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInfo, tid: &str) {
@@ -655,28 +681,38 @@ fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInf
     );
 }
 
-fn bind_streams(previewer: &mut Previewer, websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>) {
+/// Bind the hyper websocket streams to the previewer.
+pub fn bind_streams(
+    previewer: &mut Previewer,
+    websocket_rx: mpsc::UnboundedReceiver<HyperWebsocket>,
+) {
     previewer.start_data_plane(
         websocket_rx,
         |conn: Result<HyperWebsocketStream, hyper_tungstenite::tungstenite::Error>| {
-            let conn = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
+            let conn: hyper_tungstenite::WebSocketStream<
+                hyper_util::rt::TokioIo<hyper::upgrade::Upgraded>,
+            > = conn.map_err(error_once_map_string!("cannot receive websocket"))?;
 
             Ok(conn
                 .sink_map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
                 .map_err(|e| error_once!("cannot serve_with websocket", err: e.to_string()))
                 .with(|msg| {
                     Box::pin(async move {
-                        let msg = match msg {
-                            WsMessage::Text(msg) => Message::Text(msg),
+                        Ok(match msg {
+                            WsMessage::Text(msg) => Message::text(msg),
                             WsMessage::Binary(msg) => Message::Binary(msg),
-                        };
-                        Ok(msg)
+                            WsMessage::Ping(msg) => Message::Ping(msg),
+                            WsMessage::Pong(msg) => Message::Pong(msg),
+                        })
                     })
                 })
                 .map_ok(|msg| match msg {
-                    Message::Text(msg) => WsMessage::Text(msg),
+                    Message::Text(msg) => WsMessage::Text(msg.as_str().to_owned()),
                     Message::Binary(msg) => WsMessage::Binary(msg),
-                    _ => WsMessage::Text("unsupported message".to_owned()),
+                    Message::Ping(msg) => WsMessage::Ping(msg),
+                    Message::Pong(msg) => WsMessage::Pong(msg),
+                    Message::Close(..) => WsMessage::Text("bad_client_msg: Close".to_owned()),
+                    Message::Frame(..) => WsMessage::Text("bad_client_msg: Frame".to_owned()),
                 }))
         },
     );

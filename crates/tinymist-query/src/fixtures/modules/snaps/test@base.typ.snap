@@ -2,7 +2,6 @@
 source: crates/tinymist-query/src/analysis.rs
 expression: "JsonRepr::new_pure(dependencies)"
 input_file: crates/tinymist-query/src/fixtures/modules/base.typ
-snapshot_kind: text
 ---
 [
  {

@@ -1,4 +1,5 @@
 import type { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
+import { TypstPreviewDocument } from "./index.preview.mjs";
 
 export interface ContainerDOMState {
   /// cached `hookedElem.offsetWidth` or `hookedElem.innerWidth`
@@ -21,7 +22,8 @@ export enum PreviewMode {
 }
 
 export interface Options {
-  hookedElem: HTMLElement;
+  windowElem: TypstDomWindowElement;
+  hookedElem: TypstDomHookedElement;
   kModule: RenderSession;
   renderMode?: RenderMode;
   previewMode?: PreviewMode;
@@ -38,8 +40,32 @@ interface TypstDocumentFacade {
   postRender(): void;
 }
 
+export interface Sendable {
+  send: (data: string | ArrayBuffer) => Promise<void>;
+}
+
+interface TypstPosition {
+  page: number;
+  x: number;
+  y: number;
+}
+
+export interface TypstDomWindowElement extends HTMLElement {
+  initTypstSvg(docRoot: SVGElement): void;
+  currentPosition(elem: Element): TypstPosition | undefined;
+  handleTypstLocation(elem: Element, page: number, x: number, y: number): void;
+  documents: any[];
+  typstWebsocket: Sendable;
+}
+
+export interface TypstDomHookedElement extends HTMLElement {
+  document: TypstPreviewDocument;
+  sourceMappingHandler?: (event: MouseEvent) => Promise<void>;
+}
+
 export class TypstDocumentContext<O = any> {
-  public hookedElem: HTMLElement;
+  public hookedElem: TypstDomHookedElement;
+  public windowElem: TypstDomWindowElement;
   public kModule: RenderSession;
   public opts: O;
   modes: [string, TypstDocumentFacade][] = [];
@@ -112,14 +138,14 @@ export class TypstDocumentContext<O = any> {
   };
 
   constructor(opts: Options & O) {
+    this.windowElem = opts.windowElem;
     this.hookedElem = opts.hookedElem;
     this.kModule = opts.kModule;
     this.opts = opts || {};
 
     /// Apply configuration
     {
-      const { renderMode, previewMode, isContentPreview, retrieveDOMState } =
-        opts || {};
+      const { renderMode, previewMode, isContentPreview, retrieveDOMState } = opts || {};
       this.partialRendering = false;
       this.renderMode = renderMode ?? this.renderMode;
       this.previewMode = previewMode ?? this.previewMode;
@@ -133,9 +159,9 @@ export class TypstDocumentContext<O = any> {
             boundingRect: this.hookedElem.getBoundingClientRect(),
           };
         });
-      this.backgroundColor = getComputedStyle(
-        document.documentElement
-      ).getPropertyValue("--typst-preview-background-color");
+      this.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue(
+        "--typst-preview-background-color",
+      );
     }
 
     // if init scale == 1
@@ -163,15 +189,12 @@ export class TypstDocumentContext<O = any> {
   }
 
   static derive(ctx: any, mode: string) {
-    return ["rescale", "rerender", "postRender"].reduce(
-      (acc: any, x: string) => {
-        let index = x + "$" + mode;
-        acc[x] = ctx[index].bind(ctx);
-        console.assert(acc[x] !== undefined, `${x}$${mode} is undefined`);
-        return acc;
-      },
-      {} as TypstDocumentFacade
-    );
+    return ["rescale", "rerender", "postRender"].reduce((acc: any, x: string) => {
+      let index = x + "$" + mode;
+      acc[x] = ctx[index].bind(ctx);
+      console.assert(acc[x] !== undefined, `${x}$${mode} is undefined`);
+      return acc;
+    }, {} as TypstDocumentFacade);
   }
 
   registerMode(mode: any) {
@@ -183,15 +206,18 @@ export class TypstDocumentContext<O = any> {
   }
 
   private installRescaleHandler() {
-
     // Ctrl+scroll and Ctrl+=/- rescaling
     // will disable auto resizing
     // fixed factors, same as pdf.js
     const factors = [
-      0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9,
-      2.1, 2.4, 2.7, 3, 3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
+      0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.3, 1.5, 1.7, 1.9, 2.1, 2.4, 2.7, 3,
+      3.3, 3.7, 4.1, 4.6, 5.1, 5.7, 6.3, 7, 7.7, 8.5, 9.4, 10,
     ];
-    const doRescale = (scrollDirection: number, pageX: number | undefined, pageY: number | undefined) => {
+    const doRescale = (
+      scrollDirection: number,
+      pageX: number | undefined,
+      pageY: number | undefined,
+    ) => {
       const prevScaleRatio = this.currentScaleRatio;
       // Get wheel scroll direction and calculate new scale
       if (scrollDirection === -1) {
@@ -200,18 +226,14 @@ export class TypstDocumentContext<O = any> {
           // already large than max factor
           return;
         } else {
-          this.currentScaleRatio = factors
-            .filter((x) => x > this.currentScaleRatio)
-            .at(0)!;
+          this.currentScaleRatio = factors.filter((x) => x > this.currentScaleRatio).at(0)!;
         }
       } else if (scrollDirection === 1) {
         // reduce
         if (this.currentScaleRatio <= factors.at(0)!) {
           return;
         } else {
-          this.currentScaleRatio = factors
-            .filter((x) => x < this.currentScaleRatio)
-            .at(-1)!;
+          this.currentScaleRatio = factors.filter((x) => x < this.currentScaleRatio).at(-1)!;
         }
       } else {
         // no y-axis scroll
@@ -241,9 +263,7 @@ export class TypstDocumentContext<O = any> {
       if (svg) {
         const scaleRatio = this.getSvgScaleRatio();
 
-        const dataHeight = Number.parseFloat(
-          svg.getAttribute("data-height")!
-        );
+        const dataHeight = Number.parseFloat(svg.getAttribute("data-height")!);
         const scaledHeight = Math.ceil(dataHeight * scaleRatio);
 
         // we increase the height by 2 times.
@@ -252,24 +272,24 @@ export class TypstDocumentContext<O = any> {
       }
 
       // make sure the cursor is still on the same position
-      if(pageX !== undefined && pageY !== undefined) {
+      if (pageX !== undefined && pageY !== undefined) {
         const scrollX = pageX * (scrollFactor - 1);
         const scrollY = pageY * (scrollFactor - 1);
-        window.scrollBy(scrollX, scrollY);
+        this.hookedElem.parentElement!.scrollBy(scrollX, scrollY);
       }
       // toggle scale change event
       this.addViewportChange();
     };
 
     // Ctrl+= or Ctrl+- rescaling
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') !== -1;
+    const isMac = navigator.platform.toUpperCase().indexOf("MAC") !== -1;
     const keydownEventHandler = (event: KeyboardEvent) => {
-      if((!isMac && event.ctrlKey) || (isMac && event.metaKey)) {
-        if(event.key === "=") {
+      if ((!isMac && event.ctrlKey) || (isMac && event.metaKey)) {
+        if (event.key === "=") {
           event.preventDefault();
           doRescale(-1, undefined, undefined);
           return false;
-        } else if(event.key === "-") {
+        } else if (event.key === "-") {
           event.preventDefault();
           doRescale(+1, undefined, undefined);
           return false;
@@ -288,9 +308,9 @@ export class TypstDocumentContext<O = any> {
         // retrieve dom state before any operation
         this.cachedDOMState = this.retrieveDOMState();
 
-        if (window.onresize !== null) {
+        if (this.windowElem.onresize !== null) {
           // is auto resizing
-          window.onresize = null;
+          this.windowElem.onresize = null;
         }
         // accumulate delta distance
         const pixels = event.deltaMode === 0 ? event.deltaY : event.deltaY * pixelPerLine;
@@ -300,7 +320,9 @@ export class TypstDocumentContext<O = any> {
         }
         const scrollDirection = deltaDistance > 0 ? 1 : -1;
         deltaDistance = 0;
-        doRescale(scrollDirection, event.pageX, event.pageY);
+
+        const baseRect = this.hookedElem.getBoundingClientRect();
+        doRescale(scrollDirection, event.pageX - baseRect.x, event.pageY - baseRect.y);
         return false;
       }
     };
@@ -336,10 +358,10 @@ export class TypstDocumentContext<O = any> {
     const container = this.cachedDOMState;
 
     const svgWidth = Number.parseFloat(
-      svg.getAttribute("data-width") || svg.getAttribute("width") || "1"
+      svg.getAttribute("data-width") || svg.getAttribute("width") || "1",
     );
     const svgHeight = Number.parseFloat(
-      svg.getAttribute("data-height") || svg.getAttribute("height") || "1"
+      svg.getAttribute("data-height") || svg.getAttribute("height") || "1",
     );
     this.currentRealScale =
       this.previewMode === PreviewMode.Slide
@@ -412,12 +434,9 @@ export class TypstDocumentContext<O = any> {
         let t2 = performance.now();
 
         /// perf event
-        const d = (e: string, x: number, y: number) =>
-          `${e} ${(y - x).toFixed(2)} ms`;
+        const d = (e: string, x: number, y: number) => `${e} ${(y - x).toFixed(2)} ms`;
         this.sampledRenderTime = t2 - t0;
-        console.log(
-          [d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", ")
-        );
+        console.log([d("parse", t0, t1), d("rerender", t1, t2), d("total", t0, t2)].join(", "));
 
         requestAnimationFrame(doUpdate);
       } catch (e) {
@@ -473,6 +492,19 @@ export class TypstDocumentContext<O = any> {
   addViewportChange() {
     this.addChangement(["viewport-change", ""]);
   }
+
+  setPartialPageNumber(page: number): boolean {
+    if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
+      return false;
+    }
+    this.partialRenderPage = page - 1;
+    this.addViewportChange();
+    return true;
+  }
+
+  getPartialPageNumber(): number {
+    return this.partialRenderPage + 1;
+  }
 }
 
 export interface TypstDocument<T> {
@@ -491,7 +523,7 @@ export interface TypstDocument<T> {
 }
 
 export function provideDoc<T extends TypstDocumentContext>(
-  Base: GConstructor<T>
+  Base: GConstructor<T>,
 ): new (options: Options) => TypstDocument<T> {
   return class TypstDocument {
     public impl: T;
@@ -546,16 +578,11 @@ export function provideDoc<T extends TypstDocumentContext>(
     }
 
     setPartialPageNumber(page: number): boolean {
-      if (page <= 0 || page > this.kModule.retrievePagesInfo().length) {
-        return false;
-      }
-      this.impl.partialRenderPage = page - 1;
-      this.addViewportChange();
-      return true;
+      return this.impl.setPartialPageNumber(page);
     }
 
     getPartialPageNumber(): number {
-      return this.impl.partialRenderPage + 1;
+      return this.impl.getPartialPageNumber();
     }
 
     setOutineData(outline: any) {
@@ -567,25 +594,25 @@ export function provideDoc<T extends TypstDocumentContext>(
 
 export function composeDoc<TBase extends GConstructor, F1>(
   Base: TBase,
-  f1: (base: TBase) => F1
+  f1: (base: TBase) => F1,
 ): TBase & F1;
 export function composeDoc<TBase extends GConstructor, F1, F2>(
   Base: TBase,
   f1: (base: TBase) => F1,
-  f2: (base: F1) => F2
+  f2: (base: F1) => F2,
 ): TBase & F1 & F2;
 export function composeDoc<TBase extends GConstructor, F1, F2, F3>(
   Base: TBase,
   f1: (base: TBase) => F1,
   f2: (base: F1) => F2,
-  f3: (base: F2) => F3
+  f3: (base: F2) => F3,
 ): TBase & F1 & F2 & F3;
 export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4>(
   Base: TBase,
   f1: (base: TBase) => F1,
   f2: (base: F1) => F2,
   f3: (base: F2) => F3,
-  f4: (base: F3) => F4
+  f4: (base: F3) => F4,
 ): TBase & F1 & F2 & F3 & F4;
 export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5>(
   Base: TBase,
@@ -593,7 +620,7 @@ export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5>(
   f2: (base: F1) => F2,
   f3: (base: F2) => F3,
   f4: (base: F3) => F4,
-  f5: (base: F4) => F5
+  f5: (base: F4) => F5,
 ): TBase & F1 & F2 & F3 & F4 & F5;
 export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5, F6>(
   Base: TBase,
@@ -602,38 +629,9 @@ export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5, F6>(
   f3: (base: F2) => F3,
   f4: (base: F3) => F4,
   f5: (base: F4) => F5,
-  f6: (base: F5) => F6
-): TBase & F1 & F2 & F3 & F4 & F5 & F6;
-export function composeDoc<
-  TBase extends GConstructor,
-  F1,
-  F2,
-  F3,
-  F4,
-  F5,
-  F6,
-  F7
->(
-  Base: TBase,
-  f1: (base: TBase) => F1,
-  f2: (base: F1) => F2,
-  f3: (base: F2) => F3,
-  f4: (base: F3) => F4,
-  f5: (base: F4) => F5,
   f6: (base: F5) => F6,
-  f7: (base: F6) => F7
-): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7;
-export function composeDoc<
-  TBase extends GConstructor,
-  F1,
-  F2,
-  F3,
-  F4,
-  F5,
-  F6,
-  F7,
-  F8
->(
+): TBase & F1 & F2 & F3 & F4 & F5 & F6;
+export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5, F6, F7>(
   Base: TBase,
   f1: (base: TBase) => F1,
   f2: (base: F1) => F2,
@@ -642,20 +640,8 @@ export function composeDoc<
   f5: (base: F4) => F5,
   f6: (base: F5) => F6,
   f7: (base: F6) => F7,
-  f8: (base: F7) => F8
-): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8;
-export function composeDoc<
-  TBase extends GConstructor,
-  F1,
-  F2,
-  F3,
-  F4,
-  F5,
-  F6,
-  F7,
-  F8,
-  F9
->(
+): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7;
+export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5, F6, F7, F8>(
   Base: TBase,
   f1: (base: TBase) => F1,
   f2: (base: F1) => F2,
@@ -665,11 +651,19 @@ export function composeDoc<
   f6: (base: F5) => F6,
   f7: (base: F6) => F7,
   f8: (base: F7) => F8,
-  f9: (base: F8) => F9
-): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9;
-export function composeDoc<TBase extends GConstructor>(
+): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8;
+export function composeDoc<TBase extends GConstructor, F1, F2, F3, F4, F5, F6, F7, F8, F9>(
   Base: TBase,
-  ...mixins: any[]
-): TBase {
+  f1: (base: TBase) => F1,
+  f2: (base: F1) => F2,
+  f3: (base: F2) => F3,
+  f4: (base: F3) => F4,
+  f5: (base: F4) => F5,
+  f6: (base: F5) => F6,
+  f7: (base: F6) => F7,
+  f8: (base: F7) => F8,
+  f9: (base: F8) => F9,
+): TBase & F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 & F9;
+export function composeDoc<TBase extends GConstructor>(Base: TBase, ...mixins: any[]): TBase {
   return mixins.reduce((acc, mixin) => mixin(acc), Base);
 }

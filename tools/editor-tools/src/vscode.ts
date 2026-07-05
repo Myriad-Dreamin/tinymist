@@ -44,17 +44,32 @@ interface TraceReport {
   stderr: string;
 }
 
-export interface StyleAtCursor {
-  version: number;
-  textDocument: any;
-  position: any;
+export interface SelectionStyle {
+  textDocument: {
+    uri: string;
+  };
+  position: {
+    line: number;
+    character: number;
+  };
   style: string[];
   styleAt: any[];
 }
 
+export interface StyleAtCursor {
+  version: number;
+  selections: SelectionStyle[];
+}
+
 // import { traceDataMock } from "./vscode.trace.mock";
 // export const traceData = van.state<TraceReport | undefined>(traceDataMock);
-export const traceData = van.state<TraceReport | undefined>(undefined);
+export const programTrace = van.state<TraceReport | undefined>(undefined);
+export const serverTrace = van.state<any | undefined>(undefined);
+
+export const didStartServerProfiling = van.state<boolean>(false);
+
+let lastFocusedTypstDocVersion = 0;
+export const lastFocusedTypstDoc = van.state<string | undefined>(undefined);
 
 export const styleAtCursor = van.state<StyleAtCursor | undefined>(undefined);
 
@@ -66,18 +81,30 @@ export function setupVscodeChannel() {
     window.addEventListener("message", (event: any) => {
       switch (event.data.type) {
         case "traceData": {
-          traceData.val = event.data.data;
+          programTrace.val = event.data.data;
+          break;
+        }
+        case "didStartServerProfiling": {
+          serverTrace.val = event.data.data;
+          break;
+        }
+        case "focusTypstDoc": {
+          if (event.data.version >= lastFocusedTypstDocVersion) {
+            lastFocusedTypstDocVersion = event.data.version;
+            lastFocusedTypstDoc.val = event.data.fsPath;
+          }
           break;
         }
         case "styleAtCursor": {
           styleAtCursor.val = event.data.data;
+          break;
         }
       }
     });
   }
 }
 
-export function requestSavePackageData(data: any) {
+export function requestSavePackageData(data: unknown) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "savePackageData", data });
   }
@@ -101,6 +128,11 @@ export function requestRevealPath(path: string) {
   }
 }
 
+export function stopServerProfiling() {
+  if (vscodeAPI?.postMessage) {
+    vscodeAPI.postMessage({ type: "stopServerProfiling" });
+  }
+}
 export interface TextEdit {
   range?: undefined;
   newText:
@@ -135,7 +167,7 @@ export function requestTextEdit(edit: TextEdit) {
     navigator.clipboard.writeText(
       typeof edit.newText === "string"
         ? edit.newText
-        : edit.newText.code || edit.newText.rest || ""
+        : edit.newText.code || edit.newText.rest || "",
     );
   }
 }
@@ -147,9 +179,32 @@ export function saveDataToFile({
 }: {
   data: string;
   path?: string;
-  option?: any;
+  option?: Record<string, unknown>;
 }) {
   if (vscodeAPI?.postMessage) {
     vscodeAPI.postMessage({ type: "saveDataToFile", data, path, option });
   }
+}
+
+export function requestGeneratePreview(
+  format: string,
+  extraArgs: Record<string, unknown>,
+  version: number = 0,
+) {
+  console.log("requestGeneratePreview", format, extraArgs, version);
+  vscodeAPI?.postMessage?.({
+    type: "generatePreview",
+    format,
+    extraArgs: extraArgs ?? {},
+    version,
+  });
+}
+
+export function requestExportDocument(format: string, extraArgs: Record<string, unknown>) {
+  console.log("requestExportDocument", format, extraArgs);
+  vscodeAPI?.postMessage?.({
+    type: "exportDocument",
+    format,
+    extraArgs: extraArgs ?? {},
+  });
 }

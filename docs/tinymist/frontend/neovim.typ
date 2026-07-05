@@ -1,10 +1,10 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [Neovim])
+#show: book-page.with(title: [Tinymist Neovim Support for Typst])
 
 Run and configure `tinymist` in Neovim with support for all major distros and package managers.
 
-== Feature Integration
+= Feature Integration
 - *Language service* (completion, definitions, etc.)
 - *Code Formatting*
 - *Live Web Preview* with #link("https://github.com/chomosuke/typst-preview.nvim")[typst-preview.]
@@ -13,11 +13,11 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   Work for full parity for all `tinymist` features is underway. This will include: exporting to different file types, template preview, and multifile support. Neovim integration is behind VS Code currently but should be caught up in the near future.
 ]
 
-== Installation
-- (Recommended) #link("https://github.com/williamboman/mason.nvim")[mason.nvim];.
+= Installation
+- (Recommended) #link("https://github.com/mason-org/mason.nvim")[mason.nvim];.
   ```lua
   {
-    "williamboman/mason.nvim",
+    "mason-org/mason.nvim",
     opts = {
       ensure_installed = {
         "tinymist",
@@ -29,7 +29,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 
   #include "common-finding-executable.typ"
 
-== Configuration
+= Configuration
 - With `lspconfig`:
   ```lua
   require("lspconfig")["tinymist"].setup {
@@ -66,17 +66,26 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 
-For a full list of available settings see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration].
+For a full list of available settings see #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration].
 
-== Formatting
+= Formatting
 
-Either `typstyle` or `typstfmt`. Both are now included in `tinymist`, you can select the one you prefer with:
+Either #link("https://typstyle-rs.github.io/typstyle/")[`typstyle`] or #link("https://github.com/astrale-sharp/typstfmt")[`typstfmt`] can be used. 
+Both are now included in `tinymist`, so you do not need to install them separately if you only intend to use them through `tinymist`.
+You can select the one you prefer using the `formatterMode` setting. 
+The following snippet shows all formatting settings that you can put in the `settings` table of the snippets from the previous section:
 
 ```lua
-formatterMode = "typstyle"
+formatterMode = "typstyle", -- or "typstfmt"
+formatterProseWrap = true, -- wrap lines in content mode
+formatterPrintWidth = 80,  -- limit line length to 80 if possible
+formatterIndentSize = 4,   -- indentation width
 ```
 
-== Live Preview
+Note that, since #link("https://github.com/neovim/neovim/pull/19677")[this Neovim PR], neovim uses LSP servers (hence `tinymist` in our case) by default when formatting code. 
+This applies to calls to `vim.lsp.buf.format()` (which formats the whole current buffer) and also to the `gq` command.
+
+= Live Preview
 <live-preview>
 
 Live preview can be achieved with either a web preview or a pdf reader that supports automatic reloading (#link("https://pwmt.org/projects/zathura/")[zathura] is good).
@@ -117,8 +126,12 @@ end, {})
 
 Make sure to change `exportPdf` to "onType" or "onSave".
 
-=== Working with Multiple-Files Projects
-<working-with-multiple-file-projects>
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+#include "syntax-only.typ"
+
+== Working with Multiple-Files Projects
+<working-with-multiple-files-projects>
 
 Tinymist cannot know the main file of a multiple-files project if you don't tell it explicitly. This causes the well-known label error when editing the `/sub.typ` file in a project like that:
 
@@ -171,12 +184,12 @@ It also doesn't remember the pinned main file across sessions, so you may need t
 
 This could be improved in the future.
 
-== Troubleshooting
+= Troubleshooting
 <troubleshooting>
 
 Generally you can find in depth information via the `:mes` command. `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
 
-=== tinymist not starting when creating/opening files
+== tinymist not starting when creating/opening files
 <tinymist-does-not-start-on-creatingopening-files>
 
 This is most commonly due to nvim not recognizing the `.typ` file extension as a `typst` source file. In most cases is can be resolved with:
@@ -191,6 +204,7 @@ In older versions of Neovim an autocommand may be necessary.
 autocmd BufNewFile,BufRead *.typ setfiletype typst
 ```
 
-== Contributing
+= Contributing
 <contributing>
-You can submit issues or make PRs to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub];.
+
+Please check the #github-link("/editors/neovim/CONTRIBUTING.md")[contributing guide] for more information on how to contribute to the project.

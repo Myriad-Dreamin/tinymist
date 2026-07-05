@@ -1,6 +1,6 @@
 ---
 source: crates/tinymist-query/src/code_action.rs
-description: "Code Action on rt \"base.t||yp\"/* rang)"
+description: "Code Action on rt \"base.t||yp\"/* rang"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
 ---
@@ -10,6 +10,7 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
    "changes": {
     "s1.typ": [
      {
+      "insertTextFormat": 1,
       "newText": "\"/base.typ\"",
       "range": "0:9:0:19"
      }
@@ -24,10 +25,12 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
    "changes": {
     "s1.typ": [
      {
+      "insertTextFormat": 1,
       "newText": " ",
       "range": "0:1:0:1"
      },
      {
+      "insertTextFormat": 1,
       "newText": " ",
       "range": "0:38:0:38"
      }
@@ -42,10 +45,12 @@ input_file: crates/tinymist-query/src/fixtures/code_action/path_and_equation.typ
    "changes": {
     "s1.typ": [
      {
+      "insertTextFormat": 1,
       "newText": "\n",
       "range": "0:1:0:1"
      },
      {
+      "insertTextFormat": 1,
       "newText": "\n",
       "range": "0:38:0:38"
      }

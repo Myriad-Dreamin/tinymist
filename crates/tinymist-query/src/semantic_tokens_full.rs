@@ -37,6 +37,13 @@ impl SemanticRequest for SemanticTokensFullRequest {
     }
 }
 
+impl SemanticTokensFullRequest {
+    /// Computes the semantic tokens for a given source code.
+    pub fn compute(ctx: &mut LocalContext, source: &Source) -> crate::analysis::SemanticTokens {
+        crate::analysis::semantic_tokens::get_semantic_tokens(ctx.shared(), source)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -111,7 +118,9 @@ mod tests {
                     );
                 } else if prev_line_number == line_number && prev_end_character > start_character {
                     // this token overlaps with the previous token
-                    panic!("Overlapping semantic tokens at line {line_number}, character {start_character}, previous line {prev_line_number}, previous end {prev_end_character}");
+                    panic!(
+                        "Overlapping semantic tokens at line {line_number}, character {start_character}, previous line {prev_line_number}, previous end {prev_end_character}"
+                    );
                 } else {
                     prev_line_number = line_number;
                     prev_end_character = end_character;

@@ -1,13 +1,5 @@
-interface TypstPosition {
-  page: number;
-  x: number;
-  y: number;
-}
+const acquireVsCodeApi: any;
 
 interface Window {
-  initTypstSvg(docRoot: SVGElement): void;
-  currentPosition(elem: Element): TypstPosition | undefined;
-  handleTypstLocation(elem: Element, page: number, x: number, y: number);
-  typstWebsocket: WebSocket;
+    handleTypstLocation(elem: Element, page: number, x: number, y: number);
 }
-const acquireVsCodeApi: any;

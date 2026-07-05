@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
-use ecow::{eco_format, EcoString};
+use ecow::{EcoString, eco_format};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;

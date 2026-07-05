@@ -105,7 +105,8 @@ impl PeriscopeRenderer {
                 let mut doc = UsingExporter::svg_doc(paged_doc);
                 doc.module.prepare_glyphs();
                 let page0 = doc.pages.get(pos.page.get() - 1)?.clone();
-                let mut svg_text = UsingExporter::render(&doc.module, &[page0.clone()], None);
+                let mut svg_text =
+                    UsingExporter::render(&doc.module, std::slice::from_ref(&page0), None);
 
                 // todo: let typst.ts expose it
                 let svg_header = svg_text.get_mut(0)?;

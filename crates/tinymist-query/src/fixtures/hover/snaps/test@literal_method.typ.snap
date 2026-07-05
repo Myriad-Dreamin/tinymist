@@ -1,9 +1,34 @@
 ---
 source: crates/tinymist-query/src/hover.rs
-expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+expression: content
 input_file: crates/tinymist-query/src/fixtures/hover/literal_method.typ
 ---
-{
- "contents": "```typc\nlet clusters(\n  self: str,\n) = array;\n```\n\n---\n\nReturns the grapheme clusters of the string as an array of substrings.\n\n# Positional Parameters\n\n## self\n\n```typc\ntype: str\n```\n\n\n\n---\n\n[Open docs](https://typst.app/docs/reference/foundations/str/#definitions-clusters)",
- "range": "0:23:0:31"
-}
+Range: 0:23:0:31
+
+```typc
+let clusters(
+  self: str,
+) = array;
+```
+
+
+======
+
+
+Returns the grapheme clusters of the string as an array of substrings.
+
+# Positional Parameters
+
+## self
+
+```typc
+type: str
+```
+
+
+
+
+======
+
+
+[Open docs](https://typst.app/docs/reference/foundations/str/#definitions-clusters)

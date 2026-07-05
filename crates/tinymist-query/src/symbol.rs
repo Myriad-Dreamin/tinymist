@@ -1,7 +1,7 @@
 use crate::{
-    prelude::*,
-    syntax::{get_lexical_hierarchy, LexicalHierarchy, LexicalScopeKind},
     SemanticRequest,
+    prelude::*,
+    syntax::{LexicalHierarchy, LexicalScopeKind, get_lexical_hierarchy},
 };
 
 /// The [`workspace/symbol`] request is sent from the client to the server to
@@ -32,8 +32,6 @@ impl SemanticRequest for SymbolRequest {
     type Response = Vec<SymbolInformation>;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
-        // todo: let typst.ts expose source
-
         let mut symbols = vec![];
 
         for id in ctx.depended_files() {
@@ -75,6 +73,7 @@ fn filter_document_symbols(
                 .into_iter()
                 .chain(hierarchy.children.as_deref().into_iter().flatten())
         })
+        .filter(|hierarchy| hierarchy.info.kind.is_valid_lsp_symbol())
         .flat_map(|hierarchy| {
             if query_string.is_some_and(|s| !hierarchy.info.name.contains(s)) {
                 return None;
@@ -84,7 +83,7 @@ fn filter_document_symbols(
 
             Some(SymbolInformation {
                 name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().try_into().unwrap(),
+                kind: hierarchy.info.kind.clone().into(),
                 tags: None,
                 deprecated: None,
                 location: LspLocation {
@@ -95,4 +94,38 @@ fn filter_document_symbols(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::find_module_level_docs;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        // need to compile the doc to get the dependencies
+        let opts = Opts { need_compile: true };
+        snapshot_testing_with("symbols", opts, &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let docs = find_module_level_docs(&source).unwrap_or_default();
+            let properties = get_test_properties(&docs);
+
+            let request = SymbolRequest {
+                pattern: properties.get("pattern").copied().map(str::to_owned),
+            };
+
+            let mut result = request.request(ctx);
+            if let Some(result) = &mut result {
+                // Sort the symbols by name for consistent output
+                result.sort_by(|x, y| {
+                    x.name
+                        .cmp(&y.name)
+                        .then_with(|| x.location.uri.cmp(&y.location.uri))
+                });
+            }
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
+    }
 }

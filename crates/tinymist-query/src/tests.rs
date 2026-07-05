@@ -8,15 +8,18 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde_json::{ser::PrettyFormatter, Serializer, Value};
-use tinymist_project::{LspCompileSnapshot, LspComputeGraph};
+use regex::{Regex, Replacer};
+use serde_json::{Serializer, Value, ser::PrettyFormatter};
+use tinymist_project::{LspCompileSnapshot, LspComputeGraph, LspWorld};
 use tinymist_std::path::unix_slash;
 use tinymist_std::typst::TypstDocument;
 use tinymist_world::debug_loc::LspRange;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::WorkspaceResolver;
 use tinymist_world::{EntryReader, ShadowApi, TaskInputs};
 use typst::syntax::ast::{self, AstNode};
+use typst::syntax::package::PackageInfo;
 use typst::syntax::{LinkedNode, Source, SyntaxKind, VirtualPath};
 use typst_shim::syntax::LinkedNodeExt;
 
@@ -26,13 +29,36 @@ pub use tinymist_project::LspUniverse;
 pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
+use crate::index::query::IndexQueryCtx;
 pub use crate::syntax::find_module_level_docs;
-use crate::{analysis::Analysis, prelude::LocalContext, LspPosition, PositionEncoding};
-use crate::{to_lsp_position, CompletionFeat};
+use crate::{CompletionFeat, to_lsp_position, to_typst_position};
+use crate::{LspPosition, PositionEncoding, analysis::Analysis, prelude::LocalContext};
+
+pub fn lsif_testing(name: &str, f: &impl Fn(&mut LocalContext, &mut IndexQueryCtx, PathBuf)) {
+    use crate::index::*;
+    snapshot_testing(name, &move |ctx, path| {
+        // todo: error test
+        let knowledge = knowledge(ctx).expect("failed to generate knowledge");
+        let res = knowledge.bind(ctx.shared()).to_string();
+        let mut index = IndexQueryCtx::read(&mut res.as_bytes()).expect("failed to read index");
+        f(ctx, &mut index, path);
+    });
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct Opts {
+    pub need_compile: bool,
+}
 
 pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
         run_with_ctx(verse, path, f);
+    });
+}
+
+pub fn snapshot_testing_with(name: &str, opts: Opts, f: &impl Fn(&mut LocalContext, PathBuf)) {
+    tinymist_tests::snapshot_testing!(name, |verse, path| {
+        run_with_ctx_(verse, path, opts, f);
     });
 }
 
@@ -41,14 +67,24 @@ pub fn run_with_ctx<T>(
     path: PathBuf,
     f: &impl Fn(&mut LocalContext, PathBuf) -> T,
 ) -> T {
+    run_with_ctx_(verse, path, Opts::default(), f)
+}
+
+pub fn run_with_ctx_<T>(
+    verse: &mut LspUniverse,
+    path: PathBuf,
+    opts: Opts,
+    f: &impl Fn(&mut LocalContext, PathBuf) -> T,
+) -> T {
     let root = verse.entry_state().workspace_root().unwrap();
-    let paths = verse
-        .shadow_paths()
+    let mut shadow_paths = verse.shadow_paths();
+    shadow_paths.sort_by(|a, b| a.as_ref().cmp(b.as_ref()));
+    let paths = shadow_paths
         .into_iter()
         .map(|path| {
             WorkspaceResolver::workspace_file(
                 Some(&root),
-                VirtualPath::new(path.strip_prefix(&root).unwrap()),
+                VirtualPath::virtualize(&root, &path).unwrap(),
             )
         })
         .collect::<Vec<_>>();
@@ -64,28 +100,58 @@ pub fn run_with_ctx<T>(
         .map(|v| v.trim() == "true")
         .unwrap_or(true);
 
-    let mut ctx = Arc::new(Analysis {
+    let g = compile_doc_for_test(&world, &properties, opts.need_compile);
+    let a = Arc::new(Analysis {
         remove_html: !supports_html,
         completion_feat: CompletionFeat {
             trigger_on_snippet_placeholders: true,
             trigger_suggest: true,
             trigger_parameter_hints: true,
             trigger_suggest_and_parameter_hints: true,
+            insert_replace_edit: properties
+                .get("insert_replace")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false),
             ..Default::default()
         },
         ..Analysis::default()
-    })
-    .enter(world);
+    });
+    let mut ctx = a.enter_(g, a.lock_revision(None));
 
     ctx.test_package_list(|| {
-        vec![(
-            PackageSpec::from_str("@preview/example:0.1.0").unwrap(),
-            Some("example package (mock).".into()),
-        )]
+        vec![
+            dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.0").unwrap()),
+            dummy_package_from_spec(&PackageSpec::from_str("@preview/example:0.1.1").unwrap()),
+        ]
     });
     ctx.test_completion_files(|| paths.clone());
     ctx.test_files(|| paths);
     f(&mut ctx, path)
+}
+
+fn dummy_package_from_spec(spec: &PackageSpec) -> PackageIndexEntry {
+    PackageIndexEntry {
+        namespace: spec.namespace.clone(),
+        package: PackageInfo {
+            name: spec.name.clone(),
+            version: spec.version,
+            entrypoint: Default::default(),
+            authors: Default::default(),
+            license: Default::default(),
+            description: Some("example package (mock).".into()),
+            homepage: Default::default(),
+            repository: Default::default(),
+            keywords: Default::default(),
+            categories: Default::default(),
+            disciplines: Default::default(),
+            compiler: Default::default(),
+            exclude: Default::default(),
+            unknown_fields: Default::default(),
+        },
+        template: None,
+        updated_at: None,
+        path: None,
+    }
 }
 
 pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
@@ -102,18 +168,20 @@ pub fn get_test_properties(s: &str) -> HashMap<&'_ str, &'_ str> {
 }
 
 pub fn compile_doc_for_test(
-    ctx: &mut LocalContext,
+    world: &LspWorld,
     properties: &HashMap<&str, &str>,
+    need_compile: bool,
 ) -> LspComputeGraph {
-    let prev = ctx.world.entry_state();
+    let prev = world.entry_state();
     let next = match properties.get("compile").map(|s| s.trim()) {
+        _ if need_compile => prev.clone(),
         Some("true") => prev.clone(),
-        None | Some("false") => return WorldComputeGraph::from_world(ctx.world.clone()),
+        None | Some("false") => return WorldComputeGraph::from_world(world.clone()),
         Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
         v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
-    let mut world = Cow::Borrowed(&ctx.world);
+    let mut world = Cow::Borrowed(world);
     if next != prev {
         world = Cow::Owned(world.task(TaskInputs {
             entry: Some(next),
@@ -123,7 +191,7 @@ pub fn compile_doc_for_test(
     let mut snap = LspCompileSnapshot::from_world(world.into_owned());
     snap.world.set_is_compiling(true);
 
-    let doc = typst::compile(&snap.world).output.unwrap();
+    let doc = typst_shim::compile_opt(&snap.world).output.unwrap();
     snap.success_doc = Some(TypstDocument::Paged(Arc::new(doc)));
     WorldComputeGraph::new(snap)
 }
@@ -174,50 +242,60 @@ pub fn find_test_lsp_pos(s: &Source, offset: usize) -> LspPosition {
 }
 
 pub fn find_test_typst_pos(s: &Source) -> usize {
-    enum AstMatcher {
-        MatchAny { prev: bool },
-        MatchIdent { prev: bool },
+    enum PosMatcher {
+        Pos { prev: bool, ident: bool },
+        LoC { line: i32, column: i32 },
     }
-    use AstMatcher::*;
+    use PosMatcher::*;
 
-    let re = s
-        .text()
-        .find("/* position */")
-        .zip(Some(MatchAny { prev: true }));
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* position after */")
-            .zip(Some(MatchAny { prev: false }))
-    });
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* ident */")
-            .zip(Some(MatchIdent { prev: true }))
-    });
-    let re = re.or_else(|| {
-        s.text()
-            .find("/* ident after */")
-            .zip(Some(MatchIdent { prev: false }))
-    });
-    let (re, m) = re
-        .ok_or_else(|| panic!("No position marker found in source:\n{}", s.text()))
-        .unwrap();
+    fn pos(prev: bool, ident: bool) -> Option<PosMatcher> {
+        Some(Pos { prev, ident })
+    }
 
-    let n = LinkedNode::new(s.root());
-    let mut n = n.leaf_at_compat(re + 1).unwrap();
+    let re = s.text().find("/* position */").zip(pos(true, false));
+    let re = re.or_else(|| s.text().find("/* position after */").zip(pos(false, false)));
+    let re = re.or_else(|| s.text().find("/* ident */").zip(pos(true, true)));
+    let re = re.or_else(|| s.text().find("/* ident after */").zip(pos(false, true)));
+    let re = re.or_else(|| {
+        let re = s.text().find("/* loc ")?;
+        let (parts, _) = s.text()[re + "/* loc ".len()..]
+            .trim()
+            .split_once("*/")
+            .expect("bad loc marker");
+        let (line, column) = parts.split_once(',').expect("bad loc marker");
+        let line = line.trim().parse::<i32>().expect("bad loc marker");
+        let column = column.trim().parse::<i32>().expect("bad loc marker");
+        Some((re, LoC { line, column }))
+    });
 
-    let match_prev = match &m {
-        MatchAny { prev } => *prev,
-        MatchIdent { prev } => *prev,
-    };
-    let match_ident = match m {
-        MatchAny { .. } => false,
-        MatchIdent { .. } => true,
+    let Some((rel_offset, matcher)) = re else {
+        panic!("No (or bad) position marker found in source:\n{}", s.text())
     };
 
+    match matcher {
+        Pos { prev, ident } => {
+            let node = LinkedNode::new(s.root());
+            let node = node.leaf_at_compat(rel_offset + 1).unwrap();
+
+            match_by_pos(node, prev, ident)
+        }
+        LoC { line, column } => {
+            let column = if line != 0 { column } else { 0 };
+
+            let rel_pos = to_lsp_position(rel_offset, PositionEncoding::Utf16, s);
+            let pos = LspPosition {
+                line: (rel_pos.line as i32 + line) as u32,
+                character: (rel_pos.character as i32 + column) as u32,
+            };
+            to_typst_position(pos, PositionEncoding::Utf16, s).expect("invalid loc")
+        }
+    }
+}
+
+fn match_by_pos(mut n: LinkedNode, prev: bool, ident: bool) -> usize {
     'match_loop: loop {
         if n.kind().is_trivia() || n.kind().is_error() {
-            let m = if match_prev {
+            let m = if prev {
                 n.prev_sibling()
             } else {
                 n.next_sibling()
@@ -226,34 +304,34 @@ pub fn find_test_typst_pos(s: &Source) -> usize {
             continue;
         }
         if matches!(n.kind(), SyntaxKind::Named) {
-            if match_ident {
+            if ident {
                 n = n
                     .children()
                     .find(|n| matches!(n.kind(), SyntaxKind::Ident))
                     .unwrap();
             } else {
-                n = n.children().last().unwrap();
+                n = n.children().next_back().unwrap();
             }
             continue;
         }
-        if match_ident {
+        if ident {
             match n.kind() {
                 SyntaxKind::Closure => {
                     let closure = n.cast::<ast::Closure>().unwrap();
-                    if let Some(name) = closure.name() {
-                        if let Some(m) = n.find(name.span()) {
-                            n = m;
-                            break 'match_loop;
-                        }
+                    if let Some(name) = closure.name()
+                        && let Some(m) = n.find(name.span())
+                    {
+                        n = m;
+                        break 'match_loop;
                     }
                 }
                 SyntaxKind::LetBinding => {
                     let let_binding = n.cast::<ast::LetBinding>().unwrap();
-                    if let Some(name) = let_binding.kind().bindings().first() {
-                        if let Some(m) = n.find(name.span()) {
-                            n = m;
-                            break 'match_loop;
-                        }
+                    if let Some(name) = let_binding.kind().bindings().first()
+                        && let Some(m) = n.find(name.span())
+                    {
+                        n = m;
+                        break 'match_loop;
                     }
                 }
                 _ => {}
@@ -265,7 +343,19 @@ pub fn find_test_typst_pos(s: &Source) -> usize {
     n.offset()
 }
 
-pub fn make_range_annoation(source: &Source) -> String {
+pub fn make_pos_annotation(source: &Source) -> (LspPosition, String) {
+    let pos = find_test_typst_pos(source);
+    let range_before = pos.saturating_sub(10)..pos;
+    let range_after = pos..pos.saturating_add(10).min(source.text().len());
+
+    let window_before = &source.text()[range_before];
+    let window_after = &source.text()[range_after];
+
+    let pos = to_lsp_position(pos, PositionEncoding::Utf16, source);
+    (pos, format!("{window_before}|{window_after}"))
+}
+
+pub fn make_range_annotation(source: &Source) -> String {
     let range = find_test_range_(source);
     let range_before = range.start.saturating_sub(10)..range.start;
     let range_window = range.clone();
@@ -283,6 +373,7 @@ pub static REDACT_LOC: LazyLock<RedactFields> = LazyLock::new(|| {
     RedactFields::from_iter([
         "location",
         "contents",
+        "file",
         "uri",
         "oldUri",
         "newUri",
@@ -309,6 +400,27 @@ impl JsonRepr {
         let s = serde_json::to_value(v).unwrap();
         Self(rm.redact(s))
     }
+
+    pub fn md_content(v: &str) -> Cow<'_, str> {
+        static REG: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
+        static REG2: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r#"C:\\?\\dummy-root\\?\\"#).unwrap());
+        let v = REG.replace_all(
+            v,
+            |_captures: &regex::Captures| "data:image-hash/svg+xml;base64,redacted",
+        );
+        REG2.replace_all_cow(v, "/dummy-root/")
+    }
+
+    pub fn range(v: impl serde::Serialize) -> String {
+        let t = serde_json::to_value(v).unwrap();
+        Self::range_(&t)
+    }
+
+    pub fn range_(t: &Value) -> String {
+        format!("{}:{}", pos(&t["start"]), pos(&t["end"]))
+    }
 }
 
 impl fmt::Display for JsonRepr {
@@ -319,8 +431,7 @@ impl fmt::Display for JsonRepr {
 
         let res = String::from_utf8(ser.into_inner().into_inner().unwrap()).unwrap();
         // replace Span(number) to Span(..)
-        static REG: LazyLock<regex::Regex> =
-            LazyLock::new(|| regex::Regex::new(r#"Span\((\d+)\)"#).unwrap());
+        static REG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Span\((\d+)\)"#).unwrap());
         let res = REG.replace_all(&res, "Span(..)");
         f.write_str(&res)
     }
@@ -348,13 +459,35 @@ fn pos(v: &Value) -> String {
 
 impl Redact for RedactFields {
     fn redact(&self, json_val: Value) -> Value {
-        static REG: LazyLock<regex::Regex> =
-            LazyLock::new(|| regex::Regex::new(r#"data:image/svg\+xml;base64,([^"]+)"#).unwrap());
         match json_val {
             Value::Object(mut map) => {
                 for (_, val) in map.iter_mut() {
                     *val = self.redact(val.clone());
                 }
+
+                if let Some(kind) = map.get("kind")
+                    && matches!(kind.as_str(), Some("pathAt"))
+                {
+                    if let Some(value) = map.get("value")
+                        && let Value::String(s) = value
+                    {
+                        let v = file_path_(Path::new(s)).into();
+                        map.insert("value".to_owned(), v);
+                    }
+
+                    if let Some(error) = map.get("error") {
+                        let error = error.as_str().unwrap();
+                        static REG: LazyLock<Regex> = LazyLock::new(|| {
+                            Regex::new(r#"(/dummy-root/|C:\\dummy-root\\).*?\.typ"#).unwrap()
+                        });
+                        let error = REG.replace_all(error, "/__redacted_path__.typ").replace(
+                            "crates\\tinymist-query\\src\\code_context.rs",
+                            "crates/tinymist-query/src/code_context.rs",
+                        );
+                        map.insert("error".to_owned(), Value::String(error));
+                    }
+                }
+
                 for key in self.0.iter().copied() {
                     let Some(t) = map.remove(key) else {
                         continue;
@@ -366,30 +499,29 @@ impl Redact for RedactFields {
                             map.insert(
                                 key.to_owned(),
                                 Value::Object(
-                                    obj.iter().map(|(k, v)| (file_path(k), v.clone())).collect(),
+                                    obj.iter().map(|(k, v)| (file_uri(k), v.clone())).collect(),
                                 ),
                             );
                         }
+                        "file" => {
+                            map.insert(
+                                key.to_owned(),
+                                file_path_(Path::new(t.as_str().unwrap())).into(),
+                            );
+                        }
                         "uri" | "target" | "oldUri" | "newUri" | "targetUri" => {
-                            map.insert(key.to_owned(), file_path(t.as_str().unwrap()).into());
+                            map.insert(key.to_owned(), file_uri(t.as_str().unwrap()).into());
                         }
                         "range"
                         | "selectionRange"
                         | "originSelectionRange"
                         | "targetRange"
                         | "targetSelectionRange" => {
-                            map.insert(
-                                key.to_owned(),
-                                format!("{}:{}", pos(&t["start"]), pos(&t["end"])).into(),
-                            );
+                            map.insert(key.to_owned(), JsonRepr::range_(&t).into());
                         }
                         "contents" => {
                             let res = t.as_str().unwrap();
-                            let res = REG.replace_all(res, |_captures: &regex::Captures| {
-                                "data:image-hash/svg+xml;base64,redacted"
-                            });
-
-                            map.insert(key.to_owned(), res.into());
+                            map.insert(key.to_owned(), JsonRepr::md_content(res).into());
                         }
                         _ => {}
                     }
@@ -408,33 +540,39 @@ impl Redact for RedactFields {
     }
 }
 
-pub(crate) fn file_path(uri: &str) -> String {
-    file_path_(&lsp_types::Url::parse(uri).unwrap())
+pub(crate) fn file_uri(uri: &str) -> String {
+    file_uri_(&lsp_types::Url::parse(uri).unwrap())
 }
 
-pub(crate) fn file_path_(uri: &lsp_types::Url) -> String {
-    let root = if cfg!(windows) {
-        PathBuf::from("C:\\root")
-    } else {
-        PathBuf::from("/root")
-    };
+pub(crate) fn file_uri_(uri: &lsp_types::Url) -> String {
     let uri = uri.to_file_path().unwrap();
-    let abs_path = Path::new(&uri).strip_prefix(root).map(|p| p.to_owned());
+    file_path_(&uri)
+}
+
+pub(crate) fn file_path_(path: &Path) -> String {
+    let root = if cfg!(windows) {
+        PathBuf::from("C:\\dummy-root")
+    } else {
+        PathBuf::from("/dummy-root")
+    };
+    let abs_path = path.strip_prefix(root).map(|p| p.to_owned());
     let rel_path =
-        abs_path.unwrap_or_else(|_| Path::new("-").join(Path::new(&uri).iter().last().unwrap()));
+        abs_path.unwrap_or_else(|_| Path::new("-").join(path.iter().next_back().unwrap()));
 
     unix_slash(&rel_path)
 }
 
-pub struct HashRepr<T>(pub T);
+/// Extension methods for `Regex` that operate on `Cow<str>` instead of `&str`.
+pub trait RegexCowExt {
+    /// [`Regex::replace_all`], but taking text as `Cow<str>` instead of `&str`.
+    fn replace_all_cow<'t, R: Replacer>(&self, text: Cow<'t, str>, rep: R) -> Cow<'t, str>;
+}
 
-// sha256
-impl fmt::Display for HashRepr<JsonRepr> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use sha2::{Digest, Sha256};
-
-        let res = self.0.to_string();
-        let hash = Sha256::digest(res).to_vec();
-        write!(f, "sha256:{}", hex::encode(hash))
+impl RegexCowExt for Regex {
+    fn replace_all_cow<'t, R: Replacer>(&self, text: Cow<'t, str>, rep: R) -> Cow<'t, str> {
+        match self.replace_all(&text, rep) {
+            Cow::Owned(result) => Cow::Owned(result),
+            Cow::Borrowed(_) => text,
+        }
     }
 }

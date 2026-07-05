@@ -4,13 +4,16 @@ import { Tracing } from "./features/tracing";
 import { Summary } from "./features/summary";
 import { Diagnostics } from "./features/diagnostics";
 import { Docs } from "./features/docs";
-import { FontView } from "./features/font-view";
+import Exporter from "./features/exporter";
+import FontView from "./features/font-view";
 
 mainHarness({
   "template-gallery": TemplateGallery,
-  tracing: Tracing,
+  tracing: Tracing(false),
+  "profile-server": Tracing(true),
   summary: Summary,
   diagnostics: Diagnostics,
   "font-view": FontView,
   docs: Docs,
+  exporter: Exporter,
 });

@@ -2,7 +2,10 @@ use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use clap::Parser;
+use clap::{
+    error::{ContextKind, ContextValue, ErrorKind},
+    Parser,
+};
 use itertools::Itertools;
 use lsp_types::*;
 use reflexo::error::IgnoreLogging;
@@ -11,43 +14,66 @@ use reflexo_typst::{ImmutPath, TypstDict};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use strum::IntoEnumIterator;
-use task::{ExportUserConfig, FormatUserConfig, FormatterConfig};
+use task::{FormatUserConfig, FormatterConfig};
 use tinymist_l10n::DebugL10n;
+use tinymist_project::{DynAccessModel, LspAccessModel};
 use tinymist_query::analysis::{Modifier, TokenType};
-use tinymist_query::{CompletionFeat, PositionEncoding};
+use tinymist_query::{url_to_path, CompletionFeat, PositionEncoding};
 use tinymist_render::PeriscopeArgs;
 use tinymist_std::error::prelude::*;
 use tinymist_task::ExportTarget;
 use typst::foundations::IntoValue;
 use typst::Features;
 use typst_shim::utils::LazyHash;
+use typst_shim::SYNTAX_ONLY;
 
 use super::*;
+use crate::input::WatchAccessModel;
 use crate::project::{
-    EntryResolver, ExportPdfTask, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind,
-    ProjectTask, TaskWhen,
+    EntryResolver, ExportTask, ImmutDict, PathPattern, ProjectResolutionKind, TaskWhen,
 };
 use crate::world::font::FontResolverImpl;
+
+#[cfg(feature = "export")]
+use task::ExportUserConfig;
+#[cfg(feature = "preview")]
+use tinymist_preview::{PreviewConfig, PreviewInvertColors};
+
+#[cfg(feature = "export")]
+use crate::project::{ExportPdfTask, ProjectTask};
 
 // region Configuration Items
 const CONFIG_ITEMS: &[&str] = &[
     "tinymist",
     "colorTheme",
     "compileStatus",
+    "lint",
     "completion",
+    "customizedShowDocument",
+    "development",
+    "delegateFsRequests",
     "exportPdf",
     "exportTarget",
     "fontPaths",
     "formatterMode",
     "formatterPrintWidth",
     "formatterIndentSize",
+    "formatterProseWrap",
     "hoverPeriscope",
+    "onEnter",
     "outputPath",
+    "syntaxOnly",
     "preview",
     "projectResolution",
     "rootPath",
     "semanticTokens",
+    "supportClientCodelens",
+    "supportExtendedCodeAction",
+    "supportHtmlInMarkdown",
     "systemFonts",
+    "triggerParameterHints",
+    "triggerSuggest",
+    "triggerSuggestAndParameterHints",
     "typstExtraArgs",
 ];
 // endregion Configuration Items
@@ -64,6 +90,8 @@ pub struct Config {
     /// Constant DAP-specific configuration during session.
     pub const_dap_config: ConstDapConfig,
 
+    /// Whether to delegate file system accesses to the client.
+    pub delegate_fs_requests: bool,
     /// Whether to send show document requests with customized notification.
     pub customized_show_document: bool,
     /// Whether the configuration can have a default entry path.
@@ -72,6 +100,18 @@ pub struct Config {
     pub notify_status: bool,
     /// Whether to remove HTML from markup content in responses.
     pub support_html_in_markdown: bool,
+    /// Whether the client has a handler for client-side code lenses.
+    /// When true, the server uses the `tinymist.runCodeLens` command and lets
+    /// the client handle code lens execution. When false, the server provides
+    /// direct export commands instead of client-side code lenses.
+    pub support_client_codelens: bool,
+    /// Whether to utilize the extended `tinymist.resolveCodeAction` at client
+    /// side.
+    pub extended_code_action: bool,
+    /// Whether to run the server in development mode.
+    pub development: bool,
+    /// Whether to run the server in syntax-only mode.
+    pub syntax_only: bool,
 
     /// The preferred color theme for rendering.
     pub color_theme: Option<String>,
@@ -90,8 +130,10 @@ pub struct Config {
     pub completion: CompletionFeat,
     /// Tinymist's preview features.
     pub preview: PreviewFeat,
-    /// When to trigger the lint checks.
+    /// Tinymist's lint features.
     pub lint: LintFeat,
+    /// Tinymist's on-enter features.
+    pub on_enter: OnEnterFeat,
 
     /// Specifies the cli font options
     pub font_opts: CompileFontArgs,
@@ -101,6 +143,11 @@ pub struct Config {
     pub fonts: OnceLock<Derived<Arc<FontResolverImpl>>>,
     /// Whether to use system fonts.
     pub system_fonts: Option<bool>,
+
+    /// Computed watch access model based on configuration.
+    pub watch_access_model: OnceLock<Derived<Arc<WatchAccessModel>>>,
+    /// Computed access model based on configuration.
+    pub access_model: OnceLock<Derived<Arc<dyn LspAccessModel>>>,
 
     /// Tinymist's default export target.
     pub export_target: ExportTarget,
@@ -116,9 +163,24 @@ pub struct Config {
     pub formatter_print_width: Option<u32>,
     /// Sets the indent size (using space) for the formatter.
     pub formatter_indent_size: Option<u32>,
-
+    /// Sets the hard line wrapping mode for the formatter.
+    pub formatter_prose_wrap: Option<bool>,
     /// The warnings during configuration update.
     pub warnings: Vec<CowStr>,
+}
+
+/// Client options whose changes are applied through a project restart boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RestartScopedClientOptions {
+    notify_status: bool,
+    trigger_suggest: bool,
+    trigger_parameter_hints: bool,
+    trigger_suggest_and_parameter_hints: bool,
+    support_html_in_markdown: bool,
+    support_client_codelens: bool,
+    extended_code_action: bool,
+    customized_show_document: bool,
+    delegate_fs_requests: bool,
 }
 
 impl Config {
@@ -144,6 +206,18 @@ impl Config {
         config
     }
 
+    fn configure_completion_access(&mut self) {
+        #[cfg(feature = "system")]
+        {
+            self.completion.path_completion_by_filesystem = !self.delegate_fs_requests;
+            log::info!(
+                "completion.path.config: delegate_fs_requests={}, path_completion_by_filesystem={}",
+                self.delegate_fs_requests,
+                self.completion.path_completion_by_filesystem
+            );
+        }
+    }
+
     /// Creates a new configuration from the LSP initialization parameters.
     ///
     /// The function has side effects:
@@ -157,13 +231,13 @@ impl Config {
         let roots = match params.workspace_folders.as_ref() {
             Some(roots) => roots
                 .iter()
-                .filter_map(|root| root.uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|root| ImmutPath::from(url_to_path(&root.uri)))
                 .collect(),
             #[allow(deprecated)] // `params.root_path` is marked as deprecated
             None => params
                 .root_uri
                 .as_ref()
-                .and_then(|uri| uri.to_file_path().ok().map(ImmutPath::from))
+                .map(|uri| ImmutPath::from(url_to_path(uri)))
                 .or_else(|| Some(Path::new(&params.root_path.as_ref()?).into()))
                 .into_iter()
                 .collect(),
@@ -174,6 +248,7 @@ impl Config {
         if let Some(locale) = config.const_config.locale.as_ref() {
             tinymist_l10n::set_locale(locale);
         }
+        config.configure_syntax_only();
 
         let err = params
             .initialization_options
@@ -306,7 +381,9 @@ impl Config {
         }
 
         assign_config!(color_theme := "colorTheme"?: Option<String>);
+        assign_config!(lint := "lint"?: LintFeat);
         assign_config!(completion := "completion"?: CompletionFeat);
+        assign_config!(on_enter := "onEnter"?: OnEnterFeat);
         assign_config!(completion.trigger_suggest := "triggerSuggest"?: bool);
         assign_config!(completion.trigger_parameter_hints := "triggerParameterHints"?: bool);
         assign_config!(completion.trigger_suggest_and_parameter_hints := "triggerSuggestAndParameterHints"?: bool);
@@ -318,11 +395,16 @@ impl Config {
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
+        assign_config!(formatter_prose_wrap := "formatterProseWrap"?: Option<bool>);
         assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
         assign_config!(semantic_tokens := "semanticTokens"?: SemanticTokensMode);
+        assign_config!(delegate_fs_requests := "delegateFsRequests"?: bool);
         assign_config!(support_html_in_markdown := "supportHtmlInMarkdown"?: bool);
+        assign_config!(support_client_codelens := "supportClientCodelens"?: bool);
+        assign_config!(extended_code_action := "supportExtendedCodeAction"?: bool);
+        assign_config!(development := "development"?: bool);
         assign_config!(system_fonts := "systemFonts"?: Option<bool>);
 
         self.notify_status = match try_(|| update.get("compileStatus")?.as_str()) {
@@ -332,6 +414,26 @@ impl Config {
                 self.warnings.push(tinymist_l10n::t!(
                     "tinymist.config.badCompileStatus",
                     "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}",
+                    value = value.debug_l10n(),
+                ));
+
+                false
+            }
+        };
+        self.syntax_only = match try_(|| update.get("syntaxOnly")?.as_str()) {
+            #[cfg(feature = "battery")]
+            Some("onPowerSaving") => tinymist_std::battery::is_power_saving(),
+            #[cfg(not(feature = "battery"))]
+            Some("onPowerSaving") => {
+                log::warn!("battery feature is not enabled for checking power saving mode, syntax-only mode is disabled");
+                false
+            }
+            Some("enable") => true,
+            Some("disable" | "auto") | None => false,
+            Some(value) => {
+                self.warnings.push(tinymist_l10n::t!(
+                    "tinymist.config.badSyntaxOnly",
+                    "syntaxOnly must be either `\"enable\"`, `\"disable\", `\"onPowerSaving\"`, or `\"auto\"`, got {value}",
                     value = value.debug_l10n(),
                 ));
 
@@ -361,22 +463,13 @@ impl Config {
             }
         }
 
-        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> CowStr {
-            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
-            tinymist_l10n::t!(
-                "tinymist.config.badTypstExtraArgs",
-                "failed to parse typstExtraArgs: {err}, args: {args}",
-                err = err.debug_l10n(),
-                args = args.debug_l10n(),
-            )
-        }
-
         {
-            let raw_args = || update.get("typstExtraArgs");
-            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+            let raw_args = update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args.cloned().map(serde_json::from_value) {
                 Some(Ok(args)) => args,
                 Some(Err(err)) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, None));
                     None
                 }
                 // Even if the list is none, it should be parsed since we have env vars to
@@ -387,11 +480,15 @@ impl Config {
             let empty_typst_args = typst_args.is_empty();
 
             let args = match CompileOnceArgs::try_parse_from(
-                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+                Some("typst-cli".to_owned())
+                    .into_iter()
+                    .chain(typst_args.iter().cloned()),
             ) {
                 Ok(args) => args,
                 Err(err) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    let hint = typst_extra_args_parse_hint(&typst_args, &err);
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, hint));
 
                     if empty_typst_args {
                         CompileOnceArgs::default()
@@ -413,7 +510,9 @@ impl Config {
                 root_dir: args.root.as_ref().map(|r| r.as_path().into()),
                 font: args.font,
                 package: args.package,
-                pdf_standard: args.pdf_standard,
+                pdf_standard: args.pdf.standard,
+                no_pdf_tags: args.pdf.no_tags,
+                ppi: args.png.ppi,
                 features: args.features,
                 creation_timestamp: args.creation_timestamp,
                 cert: args.cert.as_deref().map(From::from),
@@ -451,6 +550,7 @@ impl Config {
             Arc::new(LazyHash::new(dict))
         };
 
+        self.configure_completion_access();
         self.validate()
     }
 
@@ -461,21 +561,37 @@ impl Config {
         Ok(())
     }
 
+    /// Configures the syntax-only mode.
+    pub fn configure_syntax_only(&self) {
+        if self.syntax_only {
+            log::info!("Server: running lsp in syntax-only mode, some features may be disabled");
+            SYNTAX_ONLY.store(true, std::sync::atomic::Ordering::SeqCst);
+        } else {
+            log::info!("Server: running lsp in full mode");
+            SYNTAX_ONLY.store(false, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
     /// Gets the formatter configuration.
     pub fn formatter(&self) -> FormatUserConfig {
         let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
         let formatter_indent_size = self.formatter_indent_size.unwrap_or(2) as usize;
+        let formatter_line_wrap = self.formatter_prose_wrap.unwrap_or(false);
 
         FormatUserConfig {
             config: match self.formatter_mode {
-                FormatterMode::Typstyle => FormatterConfig::Typstyle(Box::new(
-                    typstyle_core::Config::default()
-                        .with_width(formatter_print_width)
-                        .with_tab_spaces(formatter_indent_size),
-                )),
+                FormatterMode::Typstyle => {
+                    FormatterConfig::Typstyle(Box::new(typstyle_core::Config {
+                        tab_spaces: formatter_indent_size,
+                        max_width: formatter_print_width,
+                        wrap_text: formatter_line_wrap,
+                        ..typstyle_core::Config::default()
+                    }))
+                }
                 FormatterMode::Typstfmt => FormatterConfig::Typstfmt(Box::new(typstfmt::Config {
                     max_line_length: formatter_print_width,
                     indent_space: formatter_indent_size,
+                    line_wrap: formatter_line_wrap,
                     ..typstfmt::Config::default()
                 })),
                 FormatterMode::Disable => FormatterConfig::Disable,
@@ -484,16 +600,29 @@ impl Config {
         }
     }
 
+    /// Gets the preview configuration.
+    #[cfg(feature = "preview")]
+    pub fn preview(&self) -> PreviewConfig {
+        PreviewConfig {
+            format: ExportTarget::Paged,
+            enable_partial_rendering: self.preview.partial_rendering,
+            refresh_style: self.preview.refresh.clone().unwrap_or(TaskWhen::OnType),
+            invert_colors: serde_json::to_string(&self.preview.invert_colors)
+                .unwrap_or_else(|_| "never".to_string()),
+        }
+    }
+
     /// Gets the export task configuration.
     pub(crate) fn export_task(&self) -> ExportTask {
         ExportTask {
-            when: self.export_pdf,
+            when: self.export_pdf.clone(),
             output: Some(self.output_path.clone()),
             transform: vec![],
         }
     }
 
     /// Gets the export configuration.
+    #[cfg(feature = "export")]
     pub(crate) fn export(&self) -> ExportUserConfig {
         let export = self.export_task();
         ExportUserConfig {
@@ -509,10 +638,13 @@ impl Config {
             // },
             task: ProjectTask::ExportPdf(ExportPdfTask {
                 export,
+                pages: None, // todo: set pages
                 pdf_standards: self.pdf_standards().unwrap_or_default(),
+                no_pdf_tags: self.no_pdf_tags(),
                 creation_timestamp: self.creation_timestamp(),
             }),
             count_words: self.notify_status,
+            development: self.development,
         }
     }
 
@@ -608,6 +740,18 @@ impl Config {
         Some(self.typst_extra_args.as_ref()?.pdf_standard.clone())
     }
 
+    /// Determines the no pdf tags.
+    pub fn no_pdf_tags(&self) -> bool {
+        self.typst_extra_args
+            .as_ref()
+            .is_some_and(|x| x.no_pdf_tags)
+    }
+
+    /// Determines the ppi.
+    pub fn ppi(&self) -> Option<f32> {
+        Some(self.typst_extra_args.as_ref()?.ppi)
+    }
+
     /// Determines the creation timestamp.
     pub fn creation_timestamp(&self) -> Option<i64> {
         self.typst_extra_args.as_ref()?.creation_timestamp
@@ -623,18 +767,170 @@ impl Config {
     pub fn primary_opts(
         &self,
     ) -> (
+        bool,
+        ImmutDict,
+        ExportTarget,
+        Option<Vec<typst::Feature>>,
+        Option<ImmutPath>,
+        CompilePackageArgs,
         Option<bool>,
-        &Vec<PathBuf>,
-        Option<&CompileFontArgs>,
+        CompileFontArgs,
+        Option<i64>,
         Option<Arc<Path>>,
     ) {
         (
+            // server
+            self.syntax_only,
+            // typst library
+            self.user_inputs(),
+            self.export_target,
+            self.typst_features().map(|feat| {
+                let mut features = vec![];
+                if feat.is_enabled(typst::Feature::Html) {
+                    features.push(typst::Feature::Html);
+                }
+                if feat.is_enabled(typst::Feature::A11yExtras) {
+                    features.push(typst::Feature::A11yExtras);
+                }
+
+                features
+            }),
+            // typst package
+            self.certification_path(),
+            self.package_opts(),
+            // typst font
             self.system_fonts,
-            &self.font_paths,
-            self.typst_extra_args.as_ref().map(|e| &e.font),
+            self.font_opts(),
+            self.creation_timestamp(),
+            // typst root
             self.entry_resolver
                 .root(self.entry_resolver.resolve_default().as_ref()),
         )
+    }
+
+    /// Returns the client options that require a project restart when changed.
+    pub fn restart_scoped_client_opts(&self) -> RestartScopedClientOptions {
+        RestartScopedClientOptions {
+            notify_status: self.notify_status,
+            trigger_suggest: self.completion.trigger_suggest,
+            trigger_parameter_hints: self.completion.trigger_parameter_hints,
+            trigger_suggest_and_parameter_hints: self
+                .completion
+                .trigger_suggest_and_parameter_hints,
+            support_html_in_markdown: self.support_html_in_markdown,
+            support_client_codelens: self.support_client_codelens,
+            extended_code_action: self.extended_code_action,
+            customized_show_document: self.customized_show_document,
+            delegate_fs_requests: self.delegate_fs_requests,
+        }
+    }
+
+    #[cfg(not(feature = "system"))]
+    fn create_physical_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>
+    }
+
+    #[cfg(feature = "system")]
+    fn create_physical_access_model(
+        &self,
+        _client: &TypedLspClient<ServerState>,
+    ) -> Arc<dyn LspAccessModel> {
+        use reflexo_typst::vfs::system::SystemAccessModel;
+        Arc::new(SystemAccessModel {})
+    }
+
+    pub(crate) fn watch_access_model(
+        &self,
+        client: &TypedLspClient<ServerState>,
+    ) -> &Arc<WatchAccessModel> {
+        let client = client.clone();
+        &self
+            .watch_access_model
+            .get_or_init(|| Derived(Arc::new(WatchAccessModel::new(client))))
+            .0
+    }
+
+    pub(crate) fn access_model(&self, client: &TypedLspClient<ServerState>) -> DynAccessModel {
+        let access_model = || {
+            log::info!(
+                "creating AccessModel with delegation={:?}",
+                self.delegate_fs_requests
+            );
+            if self.delegate_fs_requests {
+                Derived(self.watch_access_model(client).clone() as Arc<dyn LspAccessModel>)
+            } else {
+                Derived(self.create_physical_access_model(client))
+            }
+        };
+        DynAccessModel(self.access_model.get_or_init(access_model).0.clone())
+    }
+}
+
+fn typst_extra_args_parse_hint(args: &[String], err: &clap::Error) -> Option<CowStr> {
+    if err.kind() != ErrorKind::UnknownArgument {
+        return None;
+    }
+
+    let Some(ContextValue::String(invalid_arg)) = err.get(ContextKind::InvalidArg) else {
+        return None;
+    };
+    let Some(ContextValue::String(option)) = err.get(ContextKind::SuggestedArg) else {
+        return None;
+    };
+
+    let value = invalid_arg.strip_prefix(option)?;
+    if !value.chars().next().is_some_and(char::is_whitespace) {
+        return None;
+    }
+
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let (arg, value) = args
+        .iter()
+        .map(|arg| arg.trim())
+        .filter(|arg| arg.starts_with(invalid_arg.as_str()))
+        .find_map(|arg| {
+            let value = arg.strip_prefix(option.as_str())?;
+            value
+                .chars()
+                .next()
+                .is_some_and(char::is_whitespace)
+                .then_some((arg, value.trim()))
+        })
+        .filter(|(_, value)| !value.is_empty())
+        .unwrap_or((invalid_arg.as_str(), value));
+
+    Some(tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs.joinedOptionValueHint",
+        "`tinymist.typstExtraArgs` is an argv array, so `\"{arg}\"` is treated as one argument. Split the option and value into two entries like `\"{option}\", \"{value}\"`, or use `\"{option}={value}\"` when the option accepts the `--flag=value` form.",
+        arg = arg.into(),
+        option = option.as_str().into(),
+        value = value.into(),
+    ))
+}
+
+fn format_typst_extra_args_error(
+    args: &impl fmt::Debug,
+    err: &impl std::error::Error,
+    hint: Option<CowStr>,
+) -> CowStr {
+    log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+    let message = tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs",
+        "failed to parse typstExtraArgs: {err}, args: {args}",
+        err = err.debug_l10n(),
+        args = args.debug_l10n(),
+    );
+
+    match hint {
+        Some(hint) => format!("{message}\n{hint}").into(),
+        None => message,
     }
 }
 
@@ -659,6 +955,8 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// Allow insert/replace text edits in completion items.
+    pub completion_insert_replace_support: bool,
     /// The locale of the editor.
     pub locale: Option<String>,
 }
@@ -671,18 +969,22 @@ impl Default for ConstConfig {
 
 impl From<&InitializeParams> for ConstConfig {
     fn from(params: &InitializeParams) -> Self {
-        const DEFAULT_ENCODING: &[PositionEncodingKind] = &[PositionEncodingKind::UTF16];
+        // const DEFAULT_ENCODING: &[PositionEncodingKind] =
+        // &[PositionEncodingKind::UTF16];
 
+        // todo: respect position encoding.
         let position_encoding = {
-            let general = params.capabilities.general.as_ref();
-            let encodings = try_(|| Some(general?.position_encodings.as_ref()?.as_slice()));
-            let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
+            // let general = params.capabilities.general.as_ref();
+            // let encodings = try_(||
+            // Some(general?.position_encodings.as_ref()?.as_slice()));
+            // let encodings = encodings.unwrap_or(DEFAULT_ENCODING);
 
-            if encodings.contains(&PositionEncodingKind::UTF8) {
-                PositionEncoding::Utf8
-            } else {
-                PositionEncoding::Utf16
-            }
+            // if encodings.contains(&PositionEncodingKind::UTF8) {
+            //     PositionEncoding::Utf8
+            // } else {
+            //     PositionEncoding::Utf16
+            // }
+            PositionEncoding::Utf16
         };
 
         let workspace = params.capabilities.workspace.as_ref();
@@ -691,6 +993,7 @@ impl From<&InitializeParams> for ConstConfig {
         let sema = try_(|| doc?.semantic_tokens.as_ref());
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
+        let completion_item = try_(|| doc?.completion.as_ref()?.completion_item.as_ref());
 
         let locale = params
             .initialization_options
@@ -707,6 +1010,10 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            completion_insert_replace_support: try_or(
+                || completion_item?.insert_replace_support,
+                false,
+            ),
             locale: locale.map(ToOwned::to_owned),
         }
     }
@@ -760,9 +1067,9 @@ impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
 #[serde(rename_all = "camelCase")]
 pub enum FormatterMode {
     /// Disable the formatter.
-    #[default]
     Disable,
     /// Use `typstyle` formatter.
+    #[default]
     Typstyle,
     /// Use `typstfmt` formatter.
     Typstfmt,
@@ -784,11 +1091,21 @@ pub enum SemanticTokensMode {
 #[serde(rename_all = "camelCase")]
 pub struct PreviewFeat {
     /// The browsing preview options.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub browsing: BrowsingPreviewOpts,
     /// The background preview options.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub background: BackgroundPreviewOpts,
+    /// When to refresh the preview.
+    #[serde(default)]
+    pub refresh: Option<TaskWhen>,
+    /// Whether to enable partial rendering.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub partial_rendering: bool,
+    /// Invert colors for the preview.
+    #[cfg(feature = "preview")]
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub invert_colors: PreviewInvertColors,
 }
 
 /// The lint features.
@@ -802,13 +1119,21 @@ pub struct LintFeat {
 
 impl LintFeat {
     /// When to trigger the lint checks.
-    pub fn when(&self) -> TaskWhen {
+    pub fn when(&self) -> &TaskWhen {
         if matches!(self.enabled, Some(false) | None) {
-            return TaskWhen::Never;
+            return &TaskWhen::Never;
         }
 
-        self.when.unwrap_or(TaskWhen::OnSave)
+        self.when.as_ref().unwrap_or(&TaskWhen::OnSave)
     }
+}
+/// The lint features.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OnEnterFeat {
+    /// Whether to handle list.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub handle_list: bool,
 }
 
 /// Options for browsing preview.
@@ -824,6 +1149,7 @@ pub struct BrowsingPreviewOpts {
 #[serde(rename_all = "camelCase")]
 pub struct BackgroundPreviewOpts {
     /// Whether to run the preview in the background.
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub enabled: bool,
     /// The arguments for the background preview.
     pub args: Option<Vec<String>>,
@@ -850,6 +1176,13 @@ pub struct TypstExtraArgs {
     /// One (or multiple comma-separated) PDF standards that Typst will enforce
     /// conformance with.
     pub pdf_standard: Vec<PdfStandard>,
+    /// The PPI (pixels per inch) to use for PNG export.
+    pub ppi: f32,
+    /// By default, even when not producing a `PDF/UA-1` document, a tagged PDF
+    /// document is written to provide a baseline of accessibility. In some
+    /// circumstances (for example when trying to reduce the size of a document)
+    /// it can be desirable to disable tagged PDF.
+    pub no_pdf_tags: bool,
     /// The creation timestamp for various outputs (in seconds).
     pub creation_timestamp: Option<i64>,
     /// The path to the certification file.
@@ -870,10 +1203,21 @@ pub(crate) fn get_semantic_tokens_options() -> SemanticTokensOptions {
     }
 }
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    T: Default + Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    let opt = Option::deserialize(deserializer)?;
+    Ok(opt.unwrap_or_default())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    #[cfg(feature = "preview")]
+    use tinymist_preview::{PreviewInvertColor, PreviewInvertColorObject};
 
     fn update_config(config: &mut Config, update: &JsonValue) -> Result<()> {
         temp_env::with_vars_unset(Vec::<String>::new(), || config.update(update))
@@ -882,6 +1226,15 @@ mod tests {
     fn good_config(config: &mut Config, update: &JsonValue) {
         update_config(config, update).expect("not good");
         assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+    }
+
+    fn warning_text(config: &Config) -> String {
+        config
+            .warnings
+            .iter()
+            .map(|warning| warning.as_ref())
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     #[test]
@@ -894,7 +1247,11 @@ mod tests {
     fn test_config_update() {
         let mut config = Config::default();
 
-        let root_path = Path::new(if cfg!(windows) { "C:\\root" } else { "/root" });
+        let root_path = Path::new(if cfg!(windows) {
+            "C:\\dummy-root"
+        } else {
+            "/dummy-root"
+        });
 
         let update = json!({
             "outputPath": "out",
@@ -927,6 +1284,7 @@ mod tests {
             config.typst_extra_args,
             Some(TypstExtraArgs {
                 root_dir: Some(ImmutPath::from(root_path)),
+                ppi: 144.0,
                 ..TypstExtraArgs::default()
             })
         );
@@ -967,6 +1325,69 @@ mod tests {
     }
 
     #[test]
+    fn test_all_config_items_are_polled() {
+        let sections = Config::get_items()
+            .into_iter()
+            .filter_map(|item| item.section)
+            .collect::<Vec<_>>();
+        let expected = CONFIG_ITEMS
+            .iter()
+            .flat_map(|&item| [format!("tinymist.{item}"), item.to_owned()])
+            .collect::<Vec<_>>();
+
+        assert_eq!(sections, expected);
+    }
+
+    #[test]
+    fn test_polled_restart_scoped_client_options_update_config() {
+        let values = Config::get_items()
+            .into_iter()
+            .map(|item| match item.section.as_deref() {
+                Some("tinymist.compileStatus") => json!("enable"),
+                Some("tinymist.triggerSuggest")
+                | Some("tinymist.triggerParameterHints")
+                | Some("tinymist.triggerSuggestAndParameterHints")
+                | Some("tinymist.supportHtmlInMarkdown")
+                | Some("tinymist.supportClientCodelens")
+                | Some("tinymist.supportExtendedCodeAction")
+                | Some("tinymist.customizedShowDocument")
+                | Some("tinymist.delegateFsRequests") => json!(true),
+                _ => JsonValue::Null,
+            })
+            .collect::<Vec<_>>();
+
+        let update = Config::values_to_map(values);
+        let mut config = Config::default();
+        config.update_by_map(&update).expect("valid config");
+
+        assert!(config.notify_status);
+        assert!(config.completion.trigger_suggest);
+        assert!(config.completion.trigger_parameter_hints);
+        assert!(config.completion.trigger_suggest_and_parameter_hints);
+        assert!(config.support_html_in_markdown);
+        assert!(config.support_client_codelens);
+        assert!(config.extended_code_action);
+        assert!(config.customized_show_document);
+        assert!(config.delegate_fs_requests);
+    }
+
+    #[test]
+    fn test_restart_scoped_client_options_diff() {
+        let old_config = Config::default();
+        let mut new_config = Config::default();
+        let update = json!({
+            "supportClientCodelens": true,
+        });
+
+        good_config(&mut new_config, &update);
+
+        assert_ne!(
+            old_config.restart_scoped_client_opts(),
+            new_config.restart_scoped_client_opts()
+        );
+    }
+
+    #[test]
     fn test_config_creation_timestamp() {
         type Timestamp = Option<i64>;
 
@@ -1004,6 +1425,55 @@ mod tests {
     }
 
     #[test]
+    fn test_typst_extra_args_hint_for_joined_option_value() {
+        for (joined, option, value) in [
+            ("--input foo=bar", "--input", "foo=bar"),
+            ("--pdf-standard ua-1", "--pdf-standard", "ua-1"),
+            ("--root /workspace", "--root", "/workspace"),
+        ] {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": [joined]
+            });
+
+            update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+            let warnings = warning_text(&config);
+            let split_form = format!(r#""{option}", "{value}""#);
+            let equal_form = format!(r#""{option}={value}""#);
+            for expected in [
+                "argv array",
+                joined,
+                split_form.as_str(),
+                equal_form.as_str(),
+            ] {
+                assert!(
+                    warnings.contains(expected),
+                    "warnings for {joined}: {warnings}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_typst_extra_args_no_joined_option_value_hint_for_equal_form_with_spaces() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": ["--input=a=x y", "--unknown"]
+        });
+
+        update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+        let warnings = warning_text(&config);
+
+        assert!(!warnings.contains("argv array"), "warnings: {warnings}");
+        assert!(
+            warnings.contains("--unknown"),
+            "unexpected warnings: {warnings}"
+        );
+    }
+
+    #[test]
     fn test_empty_extra_args() {
         let mut config = Config::default();
         let update = json!({
@@ -1014,33 +1484,72 @@ mod tests {
     }
 
     #[test]
-    fn test_null_completion() {
-        let mut config = Config::default();
-        let update = json!({
-            "completion": null
-        });
+    fn test_null_args() {
+        fn test_good_config(path: &str) -> Config {
+            let mut obj = json!(null);
+            let path = path.split('.').collect::<Vec<_>>();
+            for p in path.iter().rev() {
+                obj = json!({ *p: obj });
+            }
 
-        good_config(&mut config, &update);
-    }
+            let mut c = Config::default();
+            good_config(&mut c, &obj);
+            c
+        }
 
-    #[test]
-    fn test_null_root() {
-        let mut config = Config::default();
-        let update = json!({
-            "root": null
-        });
+        test_good_config("root");
+        test_good_config("rootPath");
+        test_good_config("colorTheme");
+        test_good_config("lint");
+        test_good_config("customizedShowDocument");
+        test_good_config("projectResolution");
+        test_good_config("exportPdf");
+        test_good_config("exportTarget");
+        test_good_config("fontPaths");
+        test_good_config("formatterMode");
+        test_good_config("formatterPrintWidth");
+        test_good_config("formatterIndentSize");
+        test_good_config("formatterProseWrap");
+        test_good_config("outputPath");
+        test_good_config("semanticTokens");
+        test_good_config("delegateFsRequests");
+        test_good_config("supportHtmlInMarkdown");
+        test_good_config("supportClientCodelens");
+        test_good_config("supportExtendedCodeAction");
+        test_good_config("development");
+        test_good_config("systemFonts");
 
-        good_config(&mut config, &update);
-    }
+        test_good_config("completion");
+        test_good_config("completion.triggerSuggest");
+        test_good_config("completion.triggerParameterHints");
+        test_good_config("completion.triggerSuggestAndParameterHints");
+        test_good_config("completion.triggerOnSnippetPlaceholders");
+        test_good_config("completion.symbol");
+        test_good_config("completion.postfix");
+        test_good_config("completion.postfixUfcs");
+        test_good_config("completion.postfixUfcsLeft");
+        test_good_config("completion.postfixUfcsRight");
+        test_good_config("completion.postfixSnippets");
 
-    #[test]
-    fn test_null_extra_args() {
-        let mut config = Config::default();
-        let update = json!({
-            "typstExtraArgs": null
-        });
+        test_good_config("lint");
+        test_good_config("lint.enabled");
+        test_good_config("lint.when");
 
-        good_config(&mut config, &update);
+        test_good_config("preview");
+        test_good_config("preview.browsing");
+        test_good_config("preview.browsing.args");
+        test_good_config("preview.background");
+        test_good_config("preview.background.enabled");
+        test_good_config("preview.background.args");
+        test_good_config("preview.refresh");
+        test_good_config("preview.partialRendering");
+        #[cfg(feature = "preview")]
+        let c = test_good_config("preview.invertColors");
+        #[cfg(feature = "preview")]
+        assert_eq!(
+            c.preview.invert_colors,
+            PreviewInvertColors::Enum(PreviewInvertColor::Never)
+        );
     }
 
     #[test]
@@ -1080,6 +1589,38 @@ mod tests {
             "typstExtraArgs": ["--ignore-system-fonts"]
         })));
         assert!(!font_opts.ignore_system_fonts);
+    }
+
+    #[test]
+    fn test_preview_opts() {
+        fn opts(update: Option<&JsonValue>) -> PreviewFeat {
+            let mut config = Config::default();
+            if let Some(update) = update {
+                good_config(&mut config, update);
+            }
+
+            config.preview
+        }
+
+        let preview = opts(Some(&json!({
+            "preview": {
+            }
+        })));
+        assert_eq!(preview.refresh, None);
+
+        let preview = opts(Some(&json!({
+            "preview": {
+                "refresh":"onType"
+            }
+        })));
+        assert_eq!(preview.refresh, Some(TaskWhen::OnType));
+
+        let preview = opts(Some(&json!({
+            "preview": {
+                "refresh":"onSave"
+            }
+        })));
+        assert_eq!(preview.refresh, Some(TaskWhen::OnSave));
     }
 
     #[test]
@@ -1149,7 +1690,7 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert!(matches!(config.config, FormatterConfig::Disable));
+        assert!(matches!(config.config, FormatterConfig::Typstyle(_)));
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 
@@ -1207,10 +1748,82 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "preview")]
+    fn test_default_preview_config() {
+        let config = Config::default().preview();
+        assert!(!config.enable_partial_rendering);
+        assert_eq!(config.refresh_style, TaskWhen::OnType);
+        assert_eq!(config.invert_colors, "\"never\"");
+    }
+
+    #[test]
+    #[cfg(feature = "preview")]
+    fn test_preview_config() {
+        let config = Config {
+            preview: PreviewFeat {
+                partial_rendering: true,
+                refresh: Some(TaskWhen::OnSave),
+                invert_colors: PreviewInvertColors::Enum(PreviewInvertColor::Auto),
+                ..PreviewFeat::default()
+            },
+            ..Config::default()
+        }
+        .preview();
+
+        assert!(config.enable_partial_rendering);
+        assert_eq!(config.refresh_style, TaskWhen::OnSave);
+        assert_eq!(config.invert_colors, "\"auto\"");
+    }
+
+    #[test]
     fn test_default_lsp_config_initialize() {
-        let (_conf, err) =
+        let (conf, err) =
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
+        assert!(!conf.const_config.completion_insert_replace_support);
+    }
+
+    #[cfg(feature = "system")]
+    #[test]
+    fn test_system_lsp_config_enables_filesystem_path_completion() {
+        let (conf, err) =
+            Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.completion.path_completion_by_filesystem);
+
+        let params = InitializeParams {
+            initialization_options: Some(json!({
+                "delegateFsRequests": true,
+            })),
+            ..InitializeParams::default()
+        };
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(!conf.completion.path_completion_by_filesystem);
+    }
+
+    #[test]
+    fn test_lsp_config_completion_insert_replace_support() {
+        let params = InitializeParams {
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    completion: Some(CompletionClientCapabilities {
+                        completion_item: Some(CompletionItemCapability {
+                            insert_replace_support: Some(true),
+                            ..CompletionItemCapability::default()
+                        }),
+                        ..CompletionClientCapabilities::default()
+                    }),
+                    ..TextDocumentClientCapabilities::default()
+                }),
+                ..ClientCapabilities::default()
+            },
+            ..InitializeParams::default()
+        };
+
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.const_config.completion_insert_replace_support);
     }
 
     #[test]
@@ -1235,5 +1848,57 @@ mod tests {
                 .is_some_and(|args| args.package.package_cache_path == Some(pkg_path.into()));
             assert!(applied_cache_path);
         });
+    }
+
+    #[test]
+    #[cfg(feature = "preview")]
+    fn test_invert_colors_validation() {
+        fn test(s: &str) -> anyhow::Result<PreviewInvertColors> {
+            Ok(serde_json::from_str(s)?)
+        }
+
+        assert_eq!(
+            test(r#""never""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Never)
+        );
+        assert_eq!(
+            test(r#""auto""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Auto)
+        );
+        assert_eq!(
+            test(r#""always""#).unwrap(),
+            PreviewInvertColors::Enum(PreviewInvertColor::Always)
+        );
+        assert!(test(r#""e""#).is_err());
+
+        assert_eq!(
+            test(r#"{"rest": "never"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{"image": "always"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Always,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert_eq!(
+            test(r#"{"unknown": "ovo"}"#).unwrap(),
+            PreviewInvertColors::Object(PreviewInvertColorObject {
+                image: PreviewInvertColor::Never,
+                rest: PreviewInvertColor::Never,
+            })
+        );
+        assert!(test(r#"{"image": "e"}"#).is_err());
     }
 }

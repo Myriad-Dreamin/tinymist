@@ -1,10 +1,10 @@
 ---
 source: crates/typlite/src/tests.rs
-expression: "conv(world, false)"
+expression: "conv(world, ConvKind::Md { for_docs: false })"
 input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 ---
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,6 +13,5 @@ input_file: crates/typlite/src/fixtures/integration/figure_caption.typ
 </html>
 
 =====
-![Content](./fig.svg)
-
-Caption
+<p align="center"><figure class="figure"><p><img src="./fig.svg" alt="Content" /></p>
+</figure></p>

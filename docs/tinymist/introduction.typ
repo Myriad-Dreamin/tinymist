@@ -2,22 +2,48 @@
 // dist/tinymist/rs
 #import "mod.typ": *
 
-#show: book-page.with(title: "Introduction")
+#let title = if is-md-target {
+  "Tinymist"
+} else {
+  "Introduction"
+}
 
-Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it "微霭" [wēi ǎi] in Chinese.
+#show: book-page.with(title: title)
+
+#if is-md-target {
+  let image(src, alt: none) = html.elem("img", attrs: (src: src, alt: alt))
+  link(
+    "https://github.com/Myriad-Dreamin/tinymist/blob/main/LICENSE",
+    image("https://img.shields.io/github/license/Myriad-Dreamin/tinymist", alt: "GitHub license"),
+  )
+  link("https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml", image(
+    "https://github.com/Myriad-Dreamin/tinymist/actions/workflows/ci.yml/badge.svg?event=push",
+    alt: "Actions status",
+  ))
+  link("https://myriad-dreamin.github.io/tinymist/", image(
+    "https://img.shields.io/badge/view-documentation-blue",
+    alt: "Documentation",
+  ))
+  link("https://deepwiki.com/Myriad-Dreamin/tinymist", image(
+    "https://deepwiki.com/badge.svg",
+    alt: "Ask DeepWiki",
+  ))
+}
+
+Tinymist [ˈtaɪni mɪst] is an integrated language service for #link("https://typst.app/")[Typst] [taɪpst]. You can also call it #ruby[微][wēi][霭][ǎi] in Chinese.
 
 It contains:
-- an analyzing library for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist-query")[tinymist-query].
-- a CLI for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/crates/tinymist/")[tinymist].
+- an analyzing library for Typst, see #github-link("/crates/tinymist-query/")[tinymist-query].
+- a CLI for Typst, see #github-link("/crates/tinymist/")[tinymist].
   - which provides a language server for Typst, see #cross-link("/feature/language.typ")[Language Features].
   - which provides a preview server for Typst, see #cross-link("/feature/preview.typ")[Preview Feature].
-- a VSCode extension for Typst, see #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode/")[Tinymist VSCode Extension].
+- a VSCode extension for Typst, see #github-link("/editors/vscode/")[Tinymist VSCode Extension].
 
-== Features
+= Features
 
 #include "feature/language-content.typ"
 
-== Versioning and Release Cycle
+= Versioning and Release Cycle
 
 #include "versioning.typ"
 
@@ -25,7 +51,7 @@ The release cycle is as follows:
 - If there is a typst version update, a new major or minor version will be released intermediately. This means tinymist will always align the minor version with typst.
 - If there is at least a bug or feature added this week, a new patch version will be released.
 
-== Installation
+= Installation
 
 Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/vscode.typ")[VS Cod(e,ium)]
@@ -35,11 +61,11 @@ Follow the instructions to enable tinymist in your favorite editor.
 - #cross-link("/frontend/helix.typ")[Helix]
 - #cross-link("/frontend/zed.typ")[Zed]
 
-== Installing Regular/Nightly Prebuilds from GitHub
+= Installing Regular/Nightly Prebuilds from GitHub
 
-Note: if you are not knowing what is a regular/nightly release, please don't follow this section.
+Note: if you don't know what is a regular/nightly release, please don't follow this section.
 
-Besides published releases specific for each editors, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
+Besides published releases specific to each editor, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
 
 - Regular prebuilts can be found in #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases].
 - Nightly prebuilts can be found in #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].
@@ -56,45 +82,51 @@ Besides published releases specific for each editors, you can also download the 
 
 To install extension file (the file with `.vsix` extension) manually, please #kbd("Ctrl+Shift+X") in the editor window and drop the downloaded vsix file into the opened extensions view.
 
-== Documentation
+= Documentation
 
 See #link("https://myriad-dreamin.github.io/tinymist/")[Online Documentation].
 
-== Packaging
+= Packaging
+
+#let channel-img(lnk, img) = if sys-is-html-target {
+  html.elem("a", attrs: (
+    href: lnk,
+    target: "_blank",
+    rel: "noopener noreferrer",
+  ))[
+    #html.elem("img", attrs: (src: img, alt: "Packaging status", style: "max-width: 100%; height: auto;"))
+  ]
+} else {
+  link(lnk)
+}
 
 Stable Channel:
 
-#link(
+#channel-img(
   "https://repology.org/project/tinymist/versions",
-  md-alter(
-    "Packaging status",
-    () => image("https://repology.org/badge/vertical-allrepos/tinymist.svg", alt: "Packaging status"),
-  ),
+  "https://repology.org/badge/vertical-allrepos/tinymist.svg",
 )
 
 Nightly Channel:
 
-#link(
+#channel-img(
   "https://repology.org/project/tinymist-nightly/versions",
-  md-alter(
-    "Packaging status",
-    () => image("https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg", alt: "Packaging status"),
-  ),
+  "https://repology.org/badge/vertical-allrepos/tinymist-nightly.svg",
 )
 
-== Roadmap
+= Roadmap
 
-=== Short Terms
+== Short Terms
 
 To encourage contributions, we create many #link("https://github.com/Myriad-Dreamin/tinymist/pulls")[Pull Requests] in draft to navigate short-term plans. They give you a hint of what or where to start in this large repository.
 
-=== Long Terms
+== Long Terms
 
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
-- Type checking: complete the type checker.
-- Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
-- Inlay hint: It is disabled _by default_ because of performance issues.
+- Type checking: Complete the type checker.
+- Periscope renderer: Disabled since vscode rejects to render SVGs containing foreignObjects.
+- Inlay hints: Disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
 - Improve symbol view's appearance.
 - Improve package view.
@@ -109,21 +141,21 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
   - Pin drop-down: Set the file to preview in the drop-down for clients that doesn't support passing arguments to the preview command.
   - Render in web worker (another thread) to reduce overhead on the electron's main thread.
 - #strike[Spell checking: There is already a branch but no suitable (default) spell checking library is found.]
-  - #link("https://github.com/crate-ci/typos")[typos] is great for typst. #link("harper")[harper] looks promise.
+  - #link("https://github.com/crate-ci/typos")[typos] is great for typst. #link("https://github.com/Automattic/harper")[harper] looks promise.
 
-If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub.]
+If you are interested in any of the above features, please feel free to send Issues to discuss or PRs to implement to #link("https://github.com/Myriad-Dreamin/tinymist")[GitHub.]
 
-== Contributing
+= Contributing
 
 Please read the #link("CONTRIBUTING.md")[CONTRIBUTING.md] file for contribution guidelines.
 
-== Sponsoring
+= Sponsoring
 
-Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #link("https://github.com/Myriad-Dreamin/tinymist/blob/main/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
+Tinymist thrives on community love and remains proudly independent. While we don't accept direct project funding, we warmly welcome support for our maintainers' personal efforts. Please go to #github-link("/MAINTAINERS.md")[Maintainers Page] and #link("https://github.com/Myriad-Dreamin/tinymist/graphs/contributors")[Contributors Page] and find their personal pages for more information. It is also welcomed to directly ask questions about sponsoring on the #link("https://github.com/Myriad-Dreamin/tinymist/issues/new")[GitHub Issues].
 
-== Acknowledgements
+= Acknowledgements
 
-- Partially code is inherited from #link("https://github.com/nvarner/typst-lsp")[typst-lsp]
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#symbol-view")[integrating] *offline* handwritten-stroke recognizer is powered by #link("https://detypify.quarticcat.com/")[Detypify].
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#preview-command")[integrating] preview service is powered by #link("https://github.com/Enter-tainer/typst-preview")[typst-preview].
-- The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/vscode#managing-local-packages")[integrating] local package management functions are adopted from #link("https://github.com/OrangeX4/vscode-typst-sync")[vscode-typst-sync].
+- Part of the code is inherited from #link("https://github.com/nvarner/typst-lsp")[typst-lsp]
+- The #github-link("/editors/vscode#symbol-view")[integrating] *offline* handwritten-stroke recognizer is powered by #link("https://detypify.quarticcat.com/")[Detypify].
+- The #github-link("/editors/vscode#preview-command")[integrating] preview service is powered by #link("https://github.com/Enter-tainer/typst-preview")[typst-preview].
+- The #github-link("/editors/vscode#managing-local-packages")[integrating] local package management functions are adopted from #link("https://github.com/OrangeX4/vscode-typst-sync")[vscode-typst-sync].

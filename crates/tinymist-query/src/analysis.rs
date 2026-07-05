@@ -1,7 +1,6 @@
 //! Semantic static and dynamic analysis of the source code.
 
 mod bib;
-
 pub(crate) use bib::*;
 pub mod call;
 pub use call::*;
@@ -15,36 +14,38 @@ pub mod doc_highlight;
 pub use doc_highlight::*;
 pub mod link_expr;
 pub use link_expr::*;
-pub mod stats;
-pub use stats::*;
 pub mod definition;
 pub use definition::*;
 pub mod signature;
 pub use signature::*;
 pub mod semantic_tokens;
 pub use semantic_tokens::*;
-mod post_tyck;
-mod tyck;
-pub(crate) use crate::ty::*;
-pub(crate) use post_tyck::*;
-pub(crate) use tyck::*;
-mod prelude;
 
 mod global;
+mod post_tyck;
+mod prelude;
+mod tyck;
+
+pub(crate) use crate::ty::*;
 pub use global::*;
+pub(crate) use post_tyck::*;
+pub(crate) use tinymist_analysis::stats::{AnalysisStats, QueryStatGuard};
+pub(crate) use tyck::*;
+pub use typst_shim::syntax::VirtualPathExt;
 
 use std::sync::Arc;
 
 use ecow::eco_format;
 use lsp_types::Url;
 use tinymist_project::LspComputeGraph;
-use tinymist_std::{bail, Result};
-use tinymist_world::{EntryReader, TaskInputs};
-use typst::diag::{FileError, FileResult};
+use tinymist_std::error::WithContextUntyped;
+use tinymist_std::{Result, bail};
+use tinymist_world::{EntryReader, EntryState, TaskInputs};
+use typst::diag::{FileError, FileResult, StrResult};
 use typst::foundations::{Func, Value};
 use typst::syntax::FileId;
 
-use crate::{path_res_to_url, CompilerQueryResponse, SemanticRequest, StatefulRequest};
+use crate::{CompilerQueryResponse, SemanticRequest, path_res_to_url};
 
 pub(crate) trait ToFunc {
     fn to_func(&self) -> Option<Func>;
@@ -100,17 +101,6 @@ impl LspQuerySnapshot {
         self
     }
 
-    /// Runs a stateful query.
-    pub fn run_stateful<T: StatefulRequest>(
-        self,
-        query: T,
-        wrapper: fn(Option<T::Response>) -> CompilerQueryResponse,
-    ) -> Result<CompilerQueryResponse> {
-        let graph = self.snap.clone();
-        self.run_analysis(|ctx| query.request(ctx, graph))
-            .map(wrapper)
-    }
-
     /// Runs a semantic query.
     pub fn run_semantic<T: SemanticRequest>(
         self,
@@ -122,14 +112,45 @@ impl LspQuerySnapshot {
 
     /// Runs a query.
     pub fn run_analysis<T>(self, f: impl FnOnce(&mut LocalContextGuard) -> T) -> Result<T> {
-        let world = self.snap.world().clone();
-        let Some(..) = world.main_id() else {
+        let graph = self.snap.clone();
+        let Some(..) = graph.world().main_id() else {
             log::error!("Project: main file is not set");
             bail!("main file is not set");
         };
 
-        let mut ctx = self.analysis.enter_(world, self.rev_lock);
+        let mut ctx = self.analysis.enter_(graph, self.rev_lock);
         Ok(f(&mut ctx))
+    }
+
+    /// Checks within package
+    pub fn run_within_package<T>(
+        self,
+        info: &crate::package::PackageInfo,
+        f: impl FnOnce(&mut LocalContextGuard) -> Result<T> + Send + Sync,
+    ) -> Result<T> {
+        let world = self.world();
+
+        let entry: StrResult<EntryState> = Ok(()).and_then(|_| {
+            let toml_id = crate::package::get_manifest_id(info)?;
+            let toml_path = world.path_for_id(toml_id)?.as_path().to_owned();
+            let pkg_root = toml_path
+                .parent()
+                .ok_or_else(|| eco_format!("cannot get package root (parent of {toml_path:?})"))?;
+
+            let manifest = crate::package::get_manifest(world, toml_id)?;
+            let entry_point =
+                crate::package::package_entrypoint_id(toml_id, &manifest.package.entrypoint);
+
+            Ok(EntryState::new_rooted_by_id(pkg_root.into(), entry_point))
+        });
+        let entry = entry.context_ut("resolve package entry")?;
+
+        let snap = self.task(TaskInputs {
+            entry: Some(entry),
+            inputs: None,
+        });
+
+        snap.run_analysis(f)?
     }
 }
 
@@ -167,6 +188,7 @@ mod expr_tests {
     use tinymist_std::path::unix_slash;
     use tinymist_world::vfs::WorkspaceResolver;
     use typst::syntax::Source;
+    use typst_shim::syntax::{RootedPathExt, VirtualPathExt, source_range};
 
     use crate::syntax::{Expr, RefExpr};
     use crate::tests::*;
@@ -179,14 +201,16 @@ mod expr_tests {
         fn show_expr(&self, node: &Expr) -> String {
             match node {
                 Expr::Decl(decl) => {
-                    let range = self.range(decl.span()).unwrap_or_default();
+                    let range = source_range(self, decl.span()).unwrap_or_default();
                     let fid = if let Some(fid) = decl.file_id() {
-                        let vpath = fid.vpath().as_rooted_path();
-                        match fid.package() {
-                            Some(package) if WorkspaceResolver::is_package_file(fid) => {
-                                format!(" in {package:?}{}", unix_slash(vpath))
-                            }
-                            Some(_) | None => format!(" in {}", unix_slash(vpath)),
+                        if WorkspaceResolver::is_package_file(fid) {
+                            let package = fid.package_compat().expect("package file");
+                            format!(
+                                " in {package:?}{}",
+                                unix_slash(fid.vpath().as_rooted_path_compat())
+                            )
+                        } else {
+                            format!(" in {}", unix_slash(fid.vpath().as_rooted_path_compat()))
                         }
                     } else {
                         "".to_string()
@@ -291,7 +315,7 @@ mod module_tests {
             fn ids(ids: EcoVec<FileId>) -> Vec<String> {
                 let mut ids: Vec<String> = ids
                     .into_iter()
-                    .map(|id| unix_slash(id.vpath().as_rooted_path()))
+                    .map(|id| unix_slash(id.vpath().as_rooted_path_compat()))
                     .collect();
                 ids.sort();
                 ids
@@ -303,7 +327,7 @@ mod module_tests {
                 .into_iter()
                 .map(|(id, v)| {
                     (
-                        unix_slash(id.vpath().as_rooted_path()),
+                        unix_slash(id.vpath().as_rooted_path_compat()),
                         ids(v.dependencies),
                         ids(v.dependents),
                     )
@@ -338,6 +362,7 @@ mod type_check_tests {
     use typst::syntax::Source;
 
     use crate::tests::*;
+    use typst_shim::syntax::source_range;
 
     use super::{Ty, TypeInfo};
 
@@ -375,7 +400,7 @@ mod type_check_tests {
             let mut mapping = info
                 .mapping
                 .iter()
-                .map(|pair| (source.range(*pair.0).unwrap_or_default(), pair.1))
+                .map(|pair| (source_range(source, *pair.0).unwrap_or_default(), pair.1))
                 .collect::<Vec<_>>();
 
             mapping.sort_by(|x, y| {
@@ -413,7 +438,7 @@ mod post_type_check_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let result = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &result, node);
@@ -448,7 +473,7 @@ mod type_describe_tests {
                 .unwrap();
             let root = LinkedNode::new(source.root());
             let node = root.leaf_at_compat(pos + 1).unwrap();
-            let text = node.get().clone().into_text();
+            let text = node.get().clone().full_text();
 
             let ti = ctx.type_check(&source);
             let post_ty = post_type_check(ctx.shared_(), &ti, node);
@@ -472,7 +497,7 @@ mod signature_tests {
     use typst::syntax::LinkedNode;
     use typst_shim::syntax::LinkedNodeExt;
 
-    use crate::analysis::{analyze_signature, Signature, SignatureTarget};
+    use crate::analysis::{Signature, SignatureTarget, analyze_signature};
     use crate::syntax::classify_syntax;
     use crate::tests::*;
 
@@ -598,7 +623,7 @@ mod call_info_tests {
             w.sort_by(|x, y| x.0.span().into_raw().cmp(&y.0.span().into_raw()));
 
             for (arg, arg_call_info) in w {
-                writeln!(f, "{} -> {:?}", arg.clone().into_text(), arg_call_info)?;
+                writeln!(f, "{} -> {:?}", arg.clone().full_text(), arg_call_info)?;
             }
 
             Ok(())
@@ -610,6 +635,8 @@ mod call_info_tests {
 mod lint_tests {
     use std::collections::BTreeMap;
 
+    use tinymist_lint::KnownIssues;
+
     use crate::tests::*;
 
     #[test]
@@ -617,11 +644,11 @@ mod lint_tests {
         snapshot_testing("lint", &|ctx, path| {
             let source = ctx.source_by_path(&path).unwrap();
 
-            let result = ctx.lint(&source);
+            let result = ctx.lint(&source, &KnownIssues::default());
             let result = crate::diagnostics::DiagWorker::new(ctx).convert_all(result.iter());
             let result = result
                 .into_iter()
-                .map(|(k, v)| (file_path_(&k), v))
+                .map(|(k, v)| (file_uri_(&k), v))
                 .collect::<BTreeMap<_, _>>();
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });

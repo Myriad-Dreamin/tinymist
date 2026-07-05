@@ -1,0 +1,26 @@
+{
+  "name": "@tinymist/renderer-diff",
+  "description": "Web viewer for Tinymist renderer diff artifacts.",
+  "private": true,
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myriad-Dreamin/tinymist.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6"
+  }
+}

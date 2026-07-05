@@ -1,9 +1,9 @@
 use lsp_types::{
-    DocumentChangeOperation, DocumentChanges, OneOf, OptionalVersionedTextDocumentIdentifier,
-    RenameFile, TextDocumentEdit,
+    AnnotatedTextEdit, ChangeAnnotation, DocumentChangeOperation, DocumentChanges, OneOf,
+    OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
-use tinymist_std::path::{unix_slash, PathClean};
+use tinymist_std::path::{PathClean, unix_slash};
 use typst::{
     foundations::{Repr, Str},
     syntax::Span,
@@ -11,11 +11,11 @@ use typst::{
 
 use crate::adt::interner::Interned;
 use crate::{
-    analysis::{get_link_exprs, LinkObject, LinkTarget},
+    analysis::{LinkObject, LinkTarget, get_link_exprs},
     find_references,
     prelude::*,
     prepare_renaming,
-    syntax::{first_ancestor_expr, get_index_info, node_ancestors, Decl, RefExpr, SyntaxClass},
+    syntax::{Decl, RefExpr, SyntaxClass, first_ancestor_expr, get_index_info, node_ancestors},
 };
 
 /// The [`textDocument/rename`] request is sent from the client to the server to
@@ -33,16 +33,14 @@ pub struct RenameRequest {
     pub new_name: String,
 }
 
-impl StatefulRequest for RenameRequest {
+impl SemanticRequest for RenameRequest {
     type Response = WorkspaceEdit;
 
-    fn request(self, ctx: &mut LocalContext, graph: LspComputeGraph) -> Option<Self::Response> {
-        let doc = graph.snap.success_doc.as_ref();
-
+    fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
         let syntax = ctx.classify_for_decl(&source, self.position)?;
 
-        let def = ctx.def_of_syntax(&source, doc, syntax.clone())?;
+        let def = ctx.def_of_syntax(&source, syntax.clone())?;
 
         prepare_renaming(&syntax, &def)?;
 
@@ -64,7 +62,9 @@ impl StatefulRequest for RenameRequest {
                 let rename_loc = Path::new(ref_path_str.as_str());
                 let diff = tinymist_std::path::diff(new_path, rename_loc)?;
                 if diff.is_absolute() {
-                    log::info!("bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}");
+                    log::info!(
+                        "bad rename: absolute path, base: {rename_loc:?}, new: {new_path:?}, diff: {diff:?}"
+                    );
                     return None;
                 }
 
@@ -76,7 +76,7 @@ impl StatefulRequest for RenameRequest {
                 let mut edits: HashMap<Url, Vec<TextEdit>> = HashMap::new();
                 do_rename_file(ctx, def_fid, diff, &mut edits);
 
-                let mut document_changes = edits_to_document_changes(edits);
+                let mut document_changes = edits_to_document_changes(edits, None);
 
                 document_changes.push(lsp_types::DocumentChangeOperation::Op(
                     lsp_types::ResourceOp::Rename(RenameFile {
@@ -94,7 +94,8 @@ impl StatefulRequest for RenameRequest {
                 })
             }
             _ => {
-                let references = find_references(ctx, &source, doc, syntax)?;
+                let is_label = matches!(def.decl.kind(), DefKind::Reference);
+                let references = find_references(ctx, &source, syntax)?;
 
                 let mut edits = HashMap::new();
 
@@ -108,12 +109,30 @@ impl StatefulRequest for RenameRequest {
                     });
                 }
 
-                log::info!("rename edits: {edits:?}");
+                crate::log_debug_ct!("rename edits: {edits:?}");
 
-                Some(WorkspaceEdit {
-                    changes: Some(edits),
-                    ..Default::default()
-                })
+                if !is_label {
+                    Some(WorkspaceEdit {
+                        changes: Some(edits),
+                        ..Default::default()
+                    })
+                } else {
+                    let change_id = "Typst Rename Labels";
+
+                    let document_changes = edits_to_document_changes(edits, Some(change_id));
+
+                    let change_annotations = Some(create_change_annotation(
+                        change_id,
+                        true,
+                        Some("The language server fuzzy searched the labels".to_string()),
+                    ));
+
+                    Some(WorkspaceEdit {
+                        document_changes: Some(DocumentChanges::Operations(document_changes)),
+                        change_annotations,
+                        ..Default::default()
+                    })
+                }
             }
         }
     }
@@ -125,22 +144,27 @@ pub(crate) fn do_rename_file(
     diff: PathBuf,
     edits: &mut HashMap<Url, Vec<TextEdit>>,
 ) -> Option<()> {
-    let def_path = def_fid
-        .vpath()
-        .as_rooted_path()
+    let def_path = def_fid.vpath().get_with_slash();
+    let def_path = std::path::Path::new(def_path)
         .file_name()
         .unwrap_or_default()
         .to_str()
         .unwrap_or_default()
         .into();
-    let mut ctx = RenameFileWorker {
+    let mut worker = RenameFileWorker {
         ctx,
         def_fid,
         def_path,
         diff,
         inserted: FxHashSet::default(),
     };
-    ctx.work(edits)
+    worker.work(edits)
+}
+
+fn link_path_matches_def(def_fid: TypstFileId, file_id: TypstFileId, path: &str) -> bool {
+    resolve_path_from_id(file_id, path).is_ok_and(|resolved| {
+        resolved.root() == def_fid.root() && resolved.vpath() == def_fid.vpath()
+    })
 }
 
 struct RenameFileWorker<'a> {
@@ -213,7 +237,7 @@ impl RenameFileWorker<'_> {
         let edits = edits.entry(uri).or_default();
         for obj in &link_info.objects {
             if !matches!(&obj.target,
-                LinkTarget::Path(file_id, _) if *file_id == self.def_fid
+                LinkTarget::Path(file_id, path) if link_path_matches_def(self.def_fid, *file_id, path.as_ref())
             ) {
                 continue;
             }
@@ -248,11 +272,11 @@ impl RenameFileWorker<'_> {
         let import_node = root.find(span).and_then(first_ancestor_expr)?;
         let (import_path, has_path_var) = node_ancestors(&import_node).find_map(|import_node| {
             match import_node.cast::<ast::Expr>()? {
-                ast::Expr::Import(import) => Some((
+                ast::Expr::ModuleImport(import) => Some((
                     import.source(),
                     import.new_name().is_none() && import.imports().is_none(),
                 )),
-                ast::Expr::Include(include) => Some((include.source(), false)),
+                ast::Expr::ModuleInclude(include) => Some((include.source(), false)),
                 _ => None,
             }
         })?;
@@ -300,23 +324,55 @@ impl RenameFileWorker<'_> {
 
 pub(crate) fn edits_to_document_changes(
     edits: HashMap<Url, Vec<TextEdit>>,
+    change_id: Option<&str>,
 ) -> Vec<DocumentChangeOperation> {
     let mut document_changes = vec![];
 
     for (uri, edits) in edits {
         document_changes.push(lsp_types::DocumentChangeOperation::Edit(TextDocumentEdit {
             text_document: OptionalVersionedTextDocumentIdentifier { uri, version: None },
-            edits: edits.into_iter().map(OneOf::Left).collect(),
+            edits: edits
+                .into_iter()
+                .map(|edit| match change_id {
+                    Some(change_id) => OneOf::Right(AnnotatedTextEdit {
+                        text_edit: edit,
+                        annotation_id: change_id.to_owned(),
+                    }),
+                    None => OneOf::Left(edit),
+                })
+                .collect(),
         }));
     }
 
     document_changes
 }
 
+pub(crate) fn create_change_annotation(
+    label: &str,
+    needs_confirmation: bool,
+    description: Option<String>,
+) -> HashMap<String, ChangeAnnotation> {
+    let mut change_annotations = HashMap::new();
+    change_annotations.insert(
+        label.to_owned(),
+        ChangeAnnotation {
+            label: label.to_owned(),
+            needs_confirmation: Some(needs_confirmation),
+            description,
+        },
+    );
+
+    change_annotations
+}
+
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
     use crate::tests::*;
+    use tinymist_world::package::PackageSpec;
+    use typst::syntax::VirtualPath;
 
     #[test]
     fn test() {
@@ -328,9 +384,8 @@ mod tests {
                 position: find_test_position(&source),
                 new_name: "new_name".to_string(),
             };
-            let snap = WorldComputeGraph::from_world(ctx.world.clone());
 
-            let mut result = request.request(ctx, snap);
+            let mut result = request.request(ctx);
             // sort the edits to make the snapshot stable
             if let Some(r) = result.as_mut().and_then(|r| r.changes.as_mut()) {
                 for edits in r.values_mut() {
@@ -345,5 +400,50 @@ mod tests {
 
             assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
         });
+    }
+
+    #[test]
+    fn link_path_match_requires_same_package_spec() {
+        let package_v010 = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
+        let package_v011 = PackageSpec::from_str("@preview/example:0.1.1").unwrap();
+        let def_fid = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010.clone()),
+            VirtualPath::new("/assets/logo.typ").unwrap(),
+        ));
+        let same_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v010),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
+        let other_package_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            typst::syntax::VirtualRoot::Package(package_v011),
+            VirtualPath::new("/docs/main.typ").unwrap(),
+        ));
+
+        assert!(link_path_matches_def(
+            def_fid,
+            same_package_ref,
+            "../assets/logo.typ"
+        ));
+        assert!(!link_path_matches_def(
+            def_fid,
+            other_package_ref,
+            "../assets/logo.typ"
+        ));
+    }
+
+    #[test]
+    fn link_path_match_keeps_root_fallback_for_root_base() {
+        let package = PackageSpec::from_str("@preview/example:0.1.0").unwrap();
+        let root = typst::syntax::VirtualRoot::Package(package);
+        let def_fid = TypstFileId::new(typst::syntax::RootedPath::new(
+            root.clone(),
+            VirtualPath::new("/assets/logo.typ").unwrap(),
+        ));
+        let root_ref = TypstFileId::new(typst::syntax::RootedPath::new(
+            root,
+            VirtualPath::new("/").unwrap(),
+        ));
+
+        assert!(link_path_matches_def(def_fid, root_ref, "assets/logo.typ"));
     }
 }

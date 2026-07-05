@@ -3,7 +3,6 @@ name = "tinymist-analysis"
 description = "Typst Static Analyzers for Tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
-# group: world
 version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -18,7 +17,6 @@ dashmap.workspace = true
 ecow.workspace = true
 ena.workspace = true
 hashbrown.workspace = true
-if_chain.workspace = true
 itertools.workspace = true
 log.workspace = true
 lsp-types.workspace = true
@@ -35,7 +33,9 @@ tinymist-world.workspace = true
 toml.workspace = true
 triomphe.workspace = true
 typst.workspace = true
+typst-macros.workspace = true
 typst-shim.workspace = true
+typst-timing.workspace = true
 unscanny.workspace = true
 
 [dev-dependencies]

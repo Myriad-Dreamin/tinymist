@@ -2,22 +2,32 @@ import { spawnSync } from "child_process";
 import { resolve } from "path";
 
 import * as vscode from "vscode";
-import { ExtensionMode } from "vscode";
-import type {
-  LanguageClient,
-  SymbolInformation,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import * as lc from "vscode-languageclient";
+import * as Is from "vscode-languageclient/lib/common/utils/is";
+import type { SymbolInformation, LanguageClientOptions } from "vscode-languageclient/node";
+import type { BaseLanguageClient as LanguageClient } from "vscode-languageclient";
 
 import { HoverDummyStorage } from "./features/hover-storage";
 import type { HoverTmpStorage } from "./features/hover-storage.tmp";
 import { extensionState } from "./state";
-import { DisposeList, getSensibleTextEditorColumn, typstDocumentSelector } from "./util";
-import { substVscodeVarsInConfig, TinymistConfig } from "./config";
+import {
+  bytesBase64Encode,
+  DisposeList,
+  getSensibleTextEditorColumn,
+  typstDocumentSelector,
+} from "./util";
+import type { ExportActionOpts, ExportOpts } from "./cmd.export";
+import {
+  patchInjectedClientOptionsInConfig,
+  substVscodeVarsInConfig,
+  TinymistConfig,
+} from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { saveStoredViewerWindowState } from "./features/preview-window-state";
+import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
+import type { createSystemLanguageClient } from "./lsp.system";
 
 interface ResourceRoutes {
   "/fonts": any;
@@ -89,12 +99,13 @@ interface JumpInfo {
 }
 
 export class LanguageState {
-  static Client: typeof LanguageClient = undefined!;
+  static Client: typeof createSystemLanguageClient = undefined!;
   static HoverTmpStorage?: typeof HoverTmpStorage = undefined;
 
   outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel("Tinymist Typst", "log");
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
+  _watcher: vscode.FileSystemWatcher | undefined = undefined;
   clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
@@ -106,14 +117,48 @@ export class LanguageState {
       this.clientPromiseResolve = resolve;
     });
 
+    if (this._watcher) {
+      this._watcher.dispose();
+      this._watcher = undefined;
+    }
     if (this.client) {
       await this.client.stop();
       this.client = undefined;
+    }
+    // Reset server readiness flag so other code doesn't assume a running server
+    if (extensionState?.mut) {
+      extensionState.mut.serverReady = false;
     }
   }
 
   getClient() {
     return this.clientPromise;
+  }
+
+  /**
+   * Checks if the LSP server is available and shows a warning if not.
+   * @returns true if server is available, false otherwise
+   */
+  checkServerHealth(): boolean {
+    if (this.client) return true;
+
+    // Server health check: warn user if server is unavailable
+    if (!extensionState.mut.serverHealthWarningShown) {
+      extensionState.mut.serverHealthWarningShown = true;
+      void vscode.window
+        .showWarningMessage(
+          l10nMsg(
+            "Tinymist server is not available. Some features like auto-formatting on Enter may not work. Try restarting the server.",
+          ),
+          l10nMsg("Restart Server"),
+        )
+        .then((selection) => {
+          if (selection === l10nMsg("Restart Server")) {
+            void vscode.commands.executeCommand("tinymist.restartServer");
+          }
+        });
+    }
+    return false;
   }
 
   probeEnvPath(configName: string, configPath?: string): string {
@@ -163,32 +208,11 @@ export class LanguageState {
     throw new Error(`Could not find a valid tinymist binary.\n${infos}`);
   }
 
-  initClient(config: TinymistConfig) {
+  async initClient(config: TinymistConfig) {
     const context = this.context;
-    const isProdMode = context.extensionMode === ExtensionMode.Production;
-
-    /// The `--mirror` flag is only used in development/test mode for testing
-    const mirrorFlag = isProdMode ? [] : ["--mirror", "tinymist-lsp.log"];
-    /// Set the `RUST_BACKTRACE` environment variable to `full` to print full backtrace on error. This is useless in
-    /// production mode because we don't put the debug information in the binary.
-    ///
-    /// Note: Developers can still download the debug information from the GitHub Releases and enable the backtrace
-    /// manually by themselves.
-    const RUST_BACKTRACE = isProdMode ? "1" : "full";
-
-    const run = {
-      command: config.probedServerPath,
-      args: ["lsp", ...mirrorFlag],
-      options: { env: Object.assign({}, process.env, { RUST_BACKTRACE }) },
-    };
-    // console.log("use arguments", run);
-    const serverOptions: ServerOptions = {
-      run,
-      debug: run,
-    };
 
     const trustedCommands = {
-      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal"],
+      enabledCommands: ["tinymist.openInternal", "tinymist.openExternal", "tinymist.replaceText"],
     };
     const hoverStorage =
       extensionState.features.renderDocs && LanguageState.HoverTmpStorage
@@ -207,7 +231,8 @@ export class LanguageState {
             if (!Array.isArray(result)) {
               return result;
             }
-            return substVscodeVarsInConfig(items, result);
+            const substituted = substVscodeVarsInConfig(items, result);
+            return patchInjectedClientOptionsInConfig(items, substituted, config);
           },
         },
         provideHover: async (document, position, token, next) => {
@@ -223,30 +248,72 @@ export class LanguageState {
               content.isTrusted = trustedCommands;
               content.supportHtml = true;
 
-              if (context.storageUri) {
-                content.baseUri = vscode.Uri.joinPath(context.storageUri, "tmp/");
-              }
+              // https://github.com/James-Yu/LaTeX-Workshop/blob/a0267e507867ae8be94b48a70d0541865fcf905f/src/preview/hover/ongraphics.ts
 
               // outline all data "data:image/svg+xml;base64," to render huge image correctly
-              content.value = content.value.replace(
-                /"data:image\/svg\+xml;base64,([^"]*)"/g,
-                (_, content: string) => hoverHandler.storeImage(content),
-              );
+              // Workaround for https://github.com/microsoft/vscode/issues/137632
+              // https://github.com/microsoft/vscode/issues/97759
+              if (vscode.env.remoteName) {
+              } else {
+                if (context.storageUri) {
+                  content.baseUri = vscode.Uri.joinPath(context.storageUri, "tmp/");
+                }
+
+                content.value = content.value.replace(
+                  /"data:image\/svg\+xml;base64,([^"]*)"/g,
+                  (_, content: string) => `"${hoverHandler.storeImage(content)}"`,
+                );
+              }
             }
           }
 
           await hoverHandler.finish();
           return hover;
         },
+        // Using custom handling of CodeActions to support action groups and snippet edits.
+        // Note that this means we have to re-implement lazy edit resolving ourselves as well.
+        async provideCodeActions(
+          document: vscode.TextDocument,
+          range: vscode.Range,
+          context: vscode.CodeActionContext,
+          token: vscode.CancellationToken,
+          _next: lc.ProvideCodeActionsSignature,
+        ) {
+          const params: lc.CodeActionParams = {
+            textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(document),
+            range: client.code2ProtocolConverter.asRange(range),
+            context: await client.code2ProtocolConverter.asCodeActionContext(context, token),
+          };
+          const callback = async (
+            values: (lc.Command | lc.CodeAction)[] | null,
+          ): Promise<(vscode.Command | vscode.CodeAction)[] | undefined> => {
+            if (values === null) return undefined;
+            const result: (vscode.CodeAction | vscode.Command)[] = [];
+            for (const item of values) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const kind = client.protocol2CodeConverter.asCodeActionKind((item as any).kind);
+              const action = new vscode.CodeAction(item.title, kind);
+              action.command = {
+                command: "tinymist.resolveCodeAction",
+                title: item.title,
+                arguments: [item],
+              };
+              // console.log("replace", action, "=>", action);
+
+              // Set a dummy edit, so that VS Code doesn't try to resolve this.
+              action.edit = new vscode.WorkspaceEdit();
+              result.push(action);
+            }
+            return result;
+          };
+          return client
+            .sendRequest(lc.CodeActionRequest.type, params, token)
+            .then(callback, (_error) => undefined);
+        },
       },
     };
 
-    const client = (this.client = new LanguageState.Client(
-      "tinymist",
-      "Tinymist Typst Language Server",
-      serverOptions,
-      clientOptions,
-    ));
+    const client = (this.client = await LanguageState.Client(context, config, clientOptions));
 
     this.clientPromiseResolve(client);
     return client;
@@ -254,17 +321,28 @@ export class LanguageState {
 
   async startClient(): Promise<void> {
     const client = this.client;
+    console.log("this.client", !!this.client);
     if (!client) {
       throw new Error("Language client is not set");
     }
 
+    this.registerClientSideWatch(client);
     client.onNotification("tinymist/compileStatus", (params: TinymistStatus) => {
       wordCountItemProcess(params);
     });
+    if (extensionState.features.preview) {
+      this.registerPreviewNotifications(client);
+    }
 
-    this.registerPreviewNotifications(client);
+    // Track server readiness state
+    client.onDidChangeState((event) => {
+      extensionState.mut.serverReady = event.newState === lc.State.Running;
+    });
 
     await client.start();
+
+    // Reset server health warning flag when client successfully starts
+    extensionState.mut.serverHealthWarningShown = false;
 
     return;
   }
@@ -282,11 +360,13 @@ export class LanguageState {
   exportSvg = exportCommand("tinymist.exportSvg");
   exportPng = exportCommand("tinymist.exportPng");
   exportHtml = exportCommand("tinymist.exportHtml");
+  exportBundle = exportCommand("tinymist.exportBundle");
   exportMarkdown = exportCommand("tinymist.exportMarkdown");
+  exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
   exportQuery = exportCommand("tinymist.exportQuery");
-  exportAnsiHighlight = exportCommand("tinymist.exportAnsiHighlight");
-  exportAst = exportCommand("tinymist.exportAst");
+  exportAnsiHighlight = exportStringCommand("tinymist.exportAnsiHighlight");
+  exportAst = exportStringCommand("tinymist.exportAst");
 
   getResource<T extends keyof ResourceRoutes>(path: T, ...args: any[]) {
     return tinymist.executeCommand<ResourceRoutes[T]>("tinymist.getResources", [path, ...args]);
@@ -294,6 +374,20 @@ export class LanguageState {
 
   getWorkspaceLabels() {
     return tinymist.executeCommand<SymbolInformation[]>("tinymist.getWorkspaceLabels", []);
+  }
+
+  interactCodeContext<Qs extends InteractCodeContextQuery[]>(
+    documentUri: string | vscode.Uri,
+    query: Qs,
+  ): Promise<InteractCodeContextResponses<Qs> | undefined> {
+    return tinymist.executeCommand("tinymist.interactCodeContext", [
+      {
+        textDocument: {
+          uri: typeof documentUri !== "string" ? documentUri.toString() : documentUri,
+        },
+        query,
+      },
+    ]);
   }
 
   showLog() {
@@ -389,6 +483,124 @@ export class LanguageState {
     return await tinymist.executeCommand(`tinymist.scrollPreview`, []);
   }
 
+  registerClientSideWatch(client: LanguageClient) {
+    const watches = new Set<string>();
+    const hasRead = new Map<string, [number, FileResult | undefined]>();
+    let watchClock = 0;
+
+    const tryRead = async (uri: vscode.Uri) =>
+      vscode.workspace.fs.readFile(uri).then(
+        (data): FileResult => {
+          return { type: "ok", content: bytesBase64Encode(data) } as const;
+        },
+        (err: any): FileResult => {
+          console.error("Failed to read file", uri, err);
+          return { type: "err", error: err.message as string } as const;
+        },
+      );
+
+    const registerHasRead = (uri: string, currentClock: number, content?: FileResult) => {
+      const previous = hasRead.get(uri);
+      if (previous && previous[0] >= currentClock) {
+        return false;
+      }
+      hasRead.set(uri, [currentClock, content]);
+      return true;
+    };
+
+    let watcher = () => {
+      if (this._watcher) {
+        return this._watcher;
+      }
+      console.log("registering watcher");
+
+      this._watcher = vscode.workspace.createFileSystemWatcher("**/*");
+
+      const watchRead = async (currentClock: number, uri: vscode.Uri) => {
+        console.log("watchRead", uri, currentClock, watches);
+        const uriStr = uri.toString();
+        if (!watches.has(uriStr)) {
+          return;
+        }
+
+        const content = await tryRead(uri);
+        if (!registerHasRead(uriStr, currentClock, content)) {
+          return;
+        }
+
+        const inserts: FileChange[] = [{ uri: uriStr, content }];
+        const removes: string[] = [];
+
+        client.sendRequest(fsChange, { inserts, removes, isSync: false });
+      };
+
+      this._watcher.onDidChange((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs change", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidCreate((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs create", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+      this._watcher.onDidDelete((uri) => {
+        const currentClock = watchClock++;
+        console.log("fs delete", uri, currentClock);
+        watchRead(currentClock, uri);
+      });
+
+      return this._watcher;
+    };
+
+    // todo: move registering to initClient to avoid unhandled errors.
+    client.onRequest("tinymist/fs/watch", (params: FsWatchRequest) => {
+      const currentClock = watchClock++;
+      console.log(
+        "fs watch request",
+        params,
+        vscode.workspace.workspaceFolders?.map((folder) => folder.uri.toString()),
+      );
+
+      const filesToRead = new Set<string>();
+      const filesDeleted = new Set<string>();
+
+      for (const path of params.inserts) {
+        if (!watches.has(path)) {
+          filesToRead.add(path);
+          watches.add(path);
+        }
+      }
+
+      for (const path of params.removes) {
+        if (watches.has(path)) {
+          filesDeleted.add(path);
+          watches.delete(path);
+        }
+      }
+      const removes: string[] = params.removes.filter((path) => {
+        return filesDeleted.has(path) && registerHasRead(path, currentClock, undefined);
+      });
+
+      (async () => {
+        const paths = Array.from(filesToRead);
+        const readFiles = await Promise.all(paths.map((path) => tryRead(vscode.Uri.parse(path))));
+
+        watcher();
+
+        const inserts: FileChange[] = paths
+          .map((path, idx) => ({
+            uri: path,
+            content: readFiles[idx],
+          }))
+          .filter((change) => registerHasRead(change.uri, currentClock, change.content));
+
+        console.log("fs watch read", currentClock, inserts, removes);
+        client.sendRequest(fsChange, { inserts, removes, isSync: true });
+      })();
+    });
+  }
+
   /**
    * Registers the preview notifications receiving from the language server. See
    * {@link _GroupDocumentPreviewFeatureCommands} for more information.
@@ -465,6 +677,11 @@ export class LanguageState {
     // (Optional) The server requests to update the document outline
     client.onNotification("tinymist/documentOutline", async (data: any) => {
       previewProcessOutline(data);
+    });
+
+    // (Optional) The server reports native previewer window state updates from the control plane.
+    client.onNotification("tinymist/preview/windowState", async (data: unknown) => {
+      await saveStoredViewerWindowState(this.context, data);
     });
   }
 
@@ -569,11 +786,76 @@ export class LanguageState {
 
 export const tinymist = new LanguageState();
 
+// Type definitions for export responses (matches Rust OnExportResponse)
+export type ExportResponse =
+  | { path: string | null; data: string | null } // Single
+  | { totalPages: number; items: ExportedPage[] }; // Multiple
+
+type ExportedPage = { page: number; path: string | null; data: string | null };
+
 function exportCommand(command: string) {
-  return (uri: string, extraOpts?: any) => {
-    return tinymist.executeCommand<string>(command, [uri, ...(extraOpts ? [extraOpts] : [])]);
+  return (
+    uri: string,
+    extraOpts?: ExportOpts,
+    actions?: ExportActionOpts,
+  ): Promise<ExportResponse | null> => {
+    return tinymist.executeCommand<ExportResponse | null>(command, [
+      uri,
+      extraOpts ?? {},
+      actions ?? {},
+    ]);
   };
 }
+
+function exportStringCommand(command: string) {
+  return (uri: string, extraOpts?: ExportOpts): Promise<string> => {
+    return tinymist.executeCommand<string>(command, [uri, extraOpts ?? {}]);
+  };
+}
+
+type InteractCodeContextQuery = PathAtQuery | ModeAtQuery | StyleAtQuery;
+type LspPosition = {
+  line: number;
+  character: number;
+};
+interface PathAtQuery {
+  kind: "pathAt";
+  code: string;
+  inputs?: Record<string, string>;
+}
+interface ModeAtQuery {
+  kind: "modeAt";
+  position: LspPosition;
+}
+interface StyleAtQuery {
+  kind: "styleAt";
+  position: LspPosition;
+  style: string[];
+}
+type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = {
+  [Index in keyof Qs]: InteractCodeContextResponse<Qs[Index]>;
+} & { length: Qs["length"] };
+type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
+  ? CodeContextQueryResult
+  : Q extends ModeAtQuery
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
+export type CodeContextQueryResult<T = any> =
+  | {
+      value: T;
+    }
+  | {
+      error: string;
+    };
+export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
+export type StyleAtQueryResult = {
+  style: any[];
+};
+export type ModeAtQueryResult = {
+  mode: InterpretMode;
+};
 
 const previewDisposes: Record<string, () => void> = {};
 export function registerPreviewTaskDispose(taskId: string, dl: DisposeList): void {
@@ -598,3 +880,43 @@ export interface SymbolInfo {
   kind: string;
   children: SymbolInfo[];
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isCodeActionWithoutEditsAndCommands(value: any): boolean {
+  const candidate: lc.CodeAction = value;
+  return (
+    candidate &&
+    Is.string(candidate.title) &&
+    (candidate.diagnostics === void 0 || Is.typedArray(candidate.diagnostics, lc.Diagnostic.is)) &&
+    (candidate.kind === void 0 || Is.string(candidate.kind)) &&
+    candidate.edit === void 0 &&
+    candidate.command === void 0
+  );
+}
+
+interface FsWatchRequest {
+  inserts: string[];
+  removes: string[];
+}
+
+interface FileResult {
+  type: "ok" | "err";
+  content?: string;
+  error?: string;
+}
+
+interface FileChange {
+  uri: string;
+  content: FileResult;
+}
+
+/**
+ * A parameter literal used in requests to pass a list of file changes.
+ */
+export interface FsChangeParams {
+  inserts: FileChange[];
+  removes: string[];
+  isSync: boolean;
+}
+
+const fsChange = new lc.RequestType<FsChangeParams, void, void>("tinymist/fsChange");

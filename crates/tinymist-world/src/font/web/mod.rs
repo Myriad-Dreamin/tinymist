@@ -1,14 +1,21 @@
+//! Font searchers to run the compiler in the browser environment.
+
+use std::borrow::Cow;
+
 use js_sys::ArrayBuffer;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tinymist_std::error::prelude::*;
 use typst::foundations::Bytes;
 use typst::text::{
-    Coverage, Font, FontBook, FontFlags, FontInfo, FontStretch, FontStyle, FontVariant, FontWeight,
+    Coverage, Font, FontFlags, FontInfo, FontStretch, FontStyle, FontVariant, FontWeight,
 };
 use wasm_bindgen::prelude::*;
 
 use super::{BufferFontLoader, FontLoader, FontResolverImpl, FontSlot};
+use crate::config::CompileFontOpts;
 use crate::font::cache::FontInfoCache;
 use crate::font::info::typst_typographic_family;
+use crate::font::memory::MemoryFontSearcher;
 
 /// Destructures a JS `[key, value]` pair into a tuple of [`Deserializer`]s.
 pub(crate) fn convert_pair(pair: JsValue) -> (JsValue, JsValue) {
@@ -181,11 +188,11 @@ fn infer_info_from_web_font(
                             _ => None,
                         };
 
-                        if let Some(guess_stretch) = guess_stretch {
-                            if idx == 0 {
-                                stretch = Some(guess_stretch);
-                                break 'searchLoop;
-                            }
+                        if let Some(guess_stretch) = guess_stretch
+                            && idx == 0
+                        {
+                            stretch = Some(guess_stretch);
+                            break 'searchLoop;
                         }
                     }
                 }
@@ -221,6 +228,7 @@ fn infer_info_from_web_font(
         family,
         variant,
         flags,
+        axes: Vec::new(),
         coverage,
     })
 }
@@ -313,15 +321,21 @@ impl FontBuilder {
     }
 }
 
+/// A web font.
 #[derive(Clone, Debug)]
 pub struct WebFont {
+    /// The font info.
     pub info: FontInfo,
+    /// The context of the font.
     pub context: JsValue,
+    /// The blob loader.
     pub blob: js_sys::Function,
+    /// The index in a font file.
     pub index: u32,
 }
 
 impl WebFont {
+    /// Loads the font from the blob.
     pub fn load(&self) -> Option<ArrayBuffer> {
         self.blob
             .call1(&self.context, &self.index.into())
@@ -335,13 +349,17 @@ impl WebFont {
 /// cannot share data between workers.
 unsafe impl Send for WebFont {}
 
+/// A web font loader.
 #[derive(Debug)]
 pub struct WebFontLoader {
+    /// The font.
     font: WebFont,
+    /// The index in a font file.
     index: u32,
 }
 
 impl WebFontLoader {
+    /// Creates a new web font loader.
     pub fn new(font: WebFont, index: u32) -> Self {
         Self { font, index }
     }
@@ -355,7 +373,6 @@ impl FontLoader for WebFontLoader {
             &font.context,
             &format!("{:?}", font.info).into(),
         );
-        // let blob = pollster::block_on(JsFuture::from(blob.array_buffer())).unwrap();
         let blob = font.load()?;
         let blob = Bytes::new(js_sys::Uint8Array::new(&blob).to_vec());
 
@@ -363,84 +380,66 @@ impl FontLoader for WebFontLoader {
     }
 }
 
-/// Searches for fonts.
+/// Searches for fonts in the browser.
 pub struct BrowserFontSearcher {
-    pub fonts: Vec<(FontInfo, FontSlot)>,
+    /// The base font searcher.
+    base: MemoryFontSearcher,
 }
 
 impl BrowserFontSearcher {
-    /// Create a new, empty browser searcher.
+    /// Creates a new, empty browser searcher.
     pub fn new() -> Self {
-        Self { fonts: vec![] }
+        Self {
+            base: MemoryFontSearcher::default(),
+        }
     }
 
-    /// Create a new browser searcher with fonts in a FontResolverImpl.
+    /// Creates a new searcher with fonts in a font resolver.
     pub fn from_resolver(resolver: FontResolverImpl) -> Self {
-        let fonts = resolver
-            .slots
-            .into_iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    resolver
-                        .book
-                        .info(idx)
-                        .expect("font should be in font book")
-                        .clone(),
-                    slot,
-                )
-            })
-            .collect();
-
-        Self { fonts }
+        let base = MemoryFontSearcher::from_resolver(resolver);
+        Self { base }
     }
 
-    /// Create a new browser searcher with fonts cloned from a FontResolverImpl.
-    /// Since FontSlot only holds QueryRef to font data, cloning is cheap.
-    pub fn new_with_resolver(resolver: &FontResolverImpl) -> Self {
-        let fonts = resolver
-            .slots
-            .iter()
-            .enumerate()
-            .map(|(idx, slot)| {
-                (
-                    resolver
-                        .book
-                        .info(idx)
-                        .expect("font should be in font book")
-                        .clone(),
-                    slot.clone(),
-                )
-            })
-            .collect();
-
-        Self { fonts }
-    }
-
-    /// Build a FontResolverImpl.
+    /// Builds a font resolver.
     pub fn build(self) -> FontResolverImpl {
-        let (info, slots): (Vec<FontInfo>, Vec<FontSlot>) = self.fonts.into_iter().unzip();
-
-        let book = FontBook::from_infos(info);
-
-        FontResolverImpl::new(vec![], book, slots)
+        self.base.build()
     }
 }
 
 impl BrowserFontSearcher {
-    /// Add fonts that are embedded in the binary.
+    /// Resolves fonts from given options and adds them to the searcher.
+    pub fn resolve_opts(&mut self, opts: CompileFontOpts) -> Result<()> {
+        // Source3: add the fonts in memory.
+        self.add_memory_fonts(opts.with_embedded_fonts.into_par_iter().map(|font_data| {
+            match font_data {
+                Cow::Borrowed(data) => Bytes::new(data),
+                Cow::Owned(data) => Bytes::new(data),
+            }
+        }));
+
+        Ok(())
+    }
+
+    /// Adds fonts that are embedded in the binary to the searcher.
     #[cfg(feature = "fonts")]
+    #[deprecated(note = "use `typst_assets::fonts` directly")]
     pub fn add_embedded(&mut self) {
         for font_data in typst_assets::fonts() {
             let buffer = Bytes::new(font_data);
 
-            self.fonts.extend(
+            self.base.fonts.extend(
                 Font::iter(buffer)
                     .map(|font| (font.info().clone(), FontSlot::new_loaded(Some(font)))),
             );
         }
     }
 
+    /// Adds in-memory fonts to the searcher.
+    pub fn add_memory_fonts(&mut self, data: impl ParallelIterator<Item = Bytes>) {
+        self.base.add_memory_fonts(data);
+    }
+
+    /// Adds web fonts to the searcher.
     pub async fn add_web_fonts(&mut self, fonts: js_sys::Array) -> Result<()> {
         let font_builder = FontBuilder {};
 
@@ -448,8 +447,8 @@ impl BrowserFontSearcher {
             let (font_ref, font_blob_loader, font_info) = font_builder.font_web_to_typst(&v)?;
 
             for (i, info) in font_info.into_iter().enumerate() {
-                let index = self.fonts.len();
-                self.fonts.push((
+                let index = self.base.fonts.len();
+                self.base.fonts.push((
                     info.clone(),
                     FontSlot::new(WebFontLoader {
                         font: WebFont {
@@ -467,10 +466,11 @@ impl BrowserFontSearcher {
         Ok(())
     }
 
+    /// Adds font data to the searcher.
     pub fn add_font_data(&mut self, buffer: Bytes) {
         for (i, info) in FontInfo::iter(buffer.as_slice()).enumerate() {
             let buffer = buffer.clone();
-            self.fonts.push((
+            self.base.fonts.push((
                 info,
                 FontSlot::new(BufferFontLoader {
                     buffer: Some(buffer),
@@ -480,8 +480,9 @@ impl BrowserFontSearcher {
         }
     }
 
+    /// Mutates the fonts in the searcher.
     pub fn with_fonts_mut(&mut self, func: impl FnOnce(&mut Vec<(FontInfo, FontSlot)>)) {
-        func(&mut self.fonts);
+        func(&mut self.base.fonts);
     }
 }
 

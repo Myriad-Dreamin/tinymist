@@ -323,18 +323,20 @@ export const launchPreviewCompat = async (task: LaunchInBrowserTask | LaunchInWe
   contentPreviewProvider.then((p) => p.postActivate(connectUrl));
   let panel: vscode.WebviewPanel | undefined = undefined;
   if (task.kind == "webview") {
-    panel = await openPreviewInWebView({
-      context,
-      task,
-      activeEditor,
-      dataPlanePort,
-      webviewPanel,
-      async panelDispose() {
-        activeTask.delete(bindDocument);
-        serverProcess.kill();
-        await contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
-      },
-    });
+    panel = (
+      await openPreviewInWebView({
+        context,
+        task,
+        activeEditor,
+        dataPlanePort,
+        webviewPanel,
+        async panelDispose() {
+          activeTask.delete(bindDocument);
+          serverProcess.kill();
+          await contentPreviewProvider.then((p) => p.postDeactivate(connectUrl));
+        },
+      })
+    ).panel;
   }
   // todo: may override the same file
   activeTask.set(bindDocument, {
@@ -681,4 +683,4 @@ export const revealDocumentCompat = async (args: any) => {
 
 export const ejectPreviewPanelCompat = async () => {
   vscode.window.showWarningMessage("Eject is not supported in compat mode");
-}
+};

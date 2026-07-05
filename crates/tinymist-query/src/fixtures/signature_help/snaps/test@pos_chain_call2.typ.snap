@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/signature_help.rs
+description: "signature help on /\n#cmp(1)(|1)\n"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/signature_help/pos_chain_call2.typ
+---
+null

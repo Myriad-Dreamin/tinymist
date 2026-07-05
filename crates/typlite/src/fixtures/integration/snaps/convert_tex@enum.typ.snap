@@ -4,7 +4,7 @@ expression: "conv(world, ConvKind::LaTeX)"
 input_file: crates/typlite/src/fixtures/integration/enum.typ
 ---
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,12 +13,7 @@ input_file: crates/typlite/src/fixtures/integration/enum.typ
 </html>
 
 =====
-\begin{document}
-
 \begin{enumerate}
 \item A
 \item B
 \end{enumerate}
-
-
-\end{document}

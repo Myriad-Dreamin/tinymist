@@ -50,6 +50,7 @@ impl CompletionPair<'_, '_, '_> {
         self.def_completions(defines, parens);
     }
 
+    #[typst_macros::time]
     pub fn scope_defs(&mut self) -> Option<Defines> {
         let mut defines = Defines {
             types: self.worker.ctx.type_check(&self.cursor.source),
@@ -138,10 +139,10 @@ impl CompletionPair<'_, '_, '_> {
                 SurroundingSyntax::SetRule => 'set_rule: {
                     // todo: user defined elements
                     for func in &checker.functions {
-                        if let Some(elem) = func.element() {
-                            if elem.params().iter().any(|param| param.settable) {
-                                break 'set_rule true;
-                            }
+                        if let Some(elem) = func.element()
+                            && elem.params().iter().any(|param| param.settable)
+                        {
+                            break 'set_rule true;
                         }
                     }
 
@@ -195,14 +196,13 @@ impl CompletionPair<'_, '_, '_> {
 }
 
 fn analyze_import_source(ctx: &LocalContext, types: &TypeInfo, s: ast::Expr) -> Option<Ty> {
-    if let Some(res) = types.type_of_span(s.span()) {
-        if !matches!(res.value(), Some(Value::Str(..))) {
-            return Some(types.simplify(res, false));
-        }
+    if let Some(res) = types.type_of_span(s.span())
+        && !matches!(res.value(), Some(Value::Str(..)))
+    {
+        return Some(types.simplify(res, false));
     }
 
-    let m = ctx.module_by_syntax(s.to_untyped())?;
-    Some(Ty::Value(InsTy::new_at(m, s.span())))
+    ctx.module_term_by_syntax(s.to_untyped(), false)
 }
 
 pub(crate) enum ScopeCheckKind {
@@ -236,10 +236,8 @@ impl CompletionScopeChecker<'_> {
             let val = bind.read().clone();
             let has_self = bound_self.is_some()
                 && (if let Value::Func(func) = &val {
-                    let first_pos = func
-                        .params()
-                        .and_then(|params| params.iter().find(|p| p.required));
-                    first_pos.is_some_and(|p| p.name == "self")
+                    let first_pos = func.params().find(|p| p.required());
+                    first_pos.is_some_and(|p| p.name() == Some("self"))
                 } else {
                     false
                 });
@@ -282,11 +280,12 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Content { val, .. } if self.is_field_access() => {
                 // 255 is the magic "label"
                 let styles = StyleChain::default();
+                let params = val.params();
                 for field_id in 0u8..254u8 {
                     let Some(field_name) = val.field_name(field_id) else {
                         continue;
                     };
-                    let param_info = val.params().iter().find(|p| p.name == field_name);
+                    let param_info = params.iter().find(|p| p.name == field_name);
                     let param_docs = param_info.map(|p| p.docs.into());
                     let ty_from_param = param_info.map(|f| Ty::from_cast_info(&f.input));
 

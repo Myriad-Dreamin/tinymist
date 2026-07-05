@@ -2,14 +2,17 @@
 name = "tinymist"
 description = "An integrated language service for Typst."
 categories = ["compilers", "command-line-utilities"]
-keywords = ["cli", "lsp", "language", "typst"]
+keywords = ["api", "lsp", "language", "typst"]
 authors.workspace = true
 version.workspace = true
 license.workspace = true
-edition.workspace = true
+edition = "2021"
 homepage.workspace = true
 repository.workspace = true
 rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow.workspace = true
@@ -25,29 +28,20 @@ clap_mangen.workspace = true
 crossbeam-channel.workspace = true
 codespan-reporting.workspace = true
 comemo.workspace = true
+dapts.workspace = true
 dhat = { workspace = true, optional = true }
 dirs.workspace = true
 env_logger.workspace = true
 futures.workspace = true
-hyper.workspace = true
-hyper-util = { workspace = true, features = [
-    "server",
-    "http1",
-    "http2",
-    "server-graceful",
-    "server-auto",
-] }
-http-body-util = "0.1.2"
-hyper-tungstenite = { workspace = true, optional = true }
 itertools.workspace = true
 lsp-types.workspace = true
 log.workspace = true
-open.workspace = true
+open = { workspace = true, optional = true }
 parking_lot.workspace = true
 paste.workspace = true
 rayon.workspace = true
 reflexo.workspace = true
-reflexo-typst = { workspace = true, features = ["system", "svg"] }
+reflexo-typst = { workspace = true, features = ["svg"] }
 reflexo-vec2svg.workspace = true
 rpds.workspace = true
 serde.workspace = true
@@ -56,92 +50,115 @@ serde_yaml.workspace = true
 strum.workspace = true
 sync-ls = { workspace = true, features = ["lsp", "server"] }
 tinymist-assets = { workspace = true }
+tinymist-debug = { workspace = true, optional = true }
+tinymist-l10n.workspace = true
 tinymist-query.workspace = true
 tinymist-std.workspace = true
-tinymist-core = { workspace = true, default-features = false, features = [] }
+tinymist-preview = { workspace = true, optional = true }
 tinymist-project = { workspace = true, features = ["lsp"] }
 tinymist-render.workspace = true
-tokio = { workspace = true, features = ["rt-multi-thread", "io-std"] }
+tinymist-dap = { workspace = true, optional = true }
+tinymist-task.workspace = true
+tokio = { workspace = true }
 tokio-util.workspace = true
 toml.workspace = true
 ttf-parser.workspace = true
-typlite.workspace = true
+typlite = { workspace = true, default-features = false }
 typst.workspace = true
+typst-bundle.workspace = true
 typst-svg.workspace = true
 typst-pdf.workspace = true
 typst-render.workspace = true
 typst-timing.workspace = true
-typst-html = { workspace = true, optional = true }
+typst-html.workspace = true
 typst-shim.workspace = true
-typst-preview = { workspace = true, optional = true }
 typst-ansi-hl.workspace = true
-tinymist-task.workspace = true
-tinymist-debug.workspace = true
 typstfmt.workspace = true
 typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
-tinymist-l10n.workspace = true
 
-dapts.workspace = true
+# Optional dependencies: preview
+http-body-util = { workspace = true, optional = true }
+hyper = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, features = [
+    "server",
+    "http1",
+    "http2",
+    "server-graceful",
+    "server-auto",
+] }
+hyper-tungstenite = { workspace = true, optional = true }
 
-[features]
-default = [
-    "cli",
-    "html",
-    "pdf",
-    "l10n",
-    "preview",
-    "embed-fonts",
-    "no-content-hint",
-    "dap",
-]
-
-cli = ["sync-ls/clap", "clap/wrap_help"]
-
-dhat-heap = ["dhat"]
-
-# Embeds Typst's default fonts for
-# - text (Linux Libertine),
-# - math (New Computer Modern Math), and
-# - code (Deja Vu Sans Mono)
-# and additionally New Computer Modern for text
-# into the binary.
-embed-fonts = ["tinymist-project/fonts"]
-
-# Enable the experimental HTML backend.
-html = ["dep:typst-html"]
-
-pdf = ["tinymist-task/pdf"]
-
-# Disable the default content hint.
-# This requires modifying typst.
-no-content-hint = [
-    "tinymist-task/no-content-hint",
-    "tinymist-project/no-content-hint",
-    "typst-preview/no-content-hint",
-    "reflexo-typst/no-content-hint",
-    "reflexo-vec2svg/no-content-hint",
-]
-
-preview = [
-    "typst-preview",
-    "typst-preview/clap",
-    "tinymist-assets/typst-preview",
-    "hyper-tungstenite",
-]
-
-dap = ["sync-ls/dap"]
-
-l10n = ["tinymist-assets/l10n"]
+# Optional dependencies: web
+console_error_panic_hook = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
 
 [dev-dependencies]
 temp-env.workspace = true
+tempfile.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true
-cargo_metadata = "0.18.0"
 vergen.workspace = true
+cargo_metadata.workspace = true
+
+[features]
+# Default features.
+# todo: remove `web` from default features.
+default = ["web", "no-content-hint"]
+# Disables content hint, which needs patch to official typst.
+no-content-hint = ["reflexo-typst/no-content-hint"]
+
+# Allows to detect battery status (to determine whether to run in syntax-only mode).
+battery = ["tinymist-std/battery"]
+# Enables DAP protocol.
+dap = ["sync-ls/dap", "tinymist-dap", "tinymist-debug"]
+# Enables preview server.
+preview = [
+    "http-body-util",
+    "hyper",
+    "hyper-util",
+    "hyper-tungstenite",
+    "tinymist-assets/typst-preview",
+    "tinymist-preview",
+    "tinymist-preview/clap",
+]
+# Enables tinymist.lock
+lock = []
+# Enables export command.
+export = []
+# Enables trace command.
+trace = []
+# Enables open feature. (open by system app after export.)
+open = ["dep:open"]
+
+# Targets to web.
+web = [
+    "console_error_panic_hook",
+    "js-sys",
+    "reflexo-typst/web",
+    "serde-wasm-bindgen",
+    "sync-ls/web",
+    "tinymist-project/web",
+    "wasm-bindgen",
+    "wasm-bindgen-futures",
+]
+# Targets to system.
+system = [
+    "lock",
+    "open",
+    "reflexo-typst/system",
+    "sync-ls/system",
+    "tinymist-project/system",
+    "tinymist-query/lsp",
+    "tinymist-query/local-registry",
+    "tokio/io-std",
+    "tokio/rt-multi-thread",
+]
 
 [lints]
 workspace = true

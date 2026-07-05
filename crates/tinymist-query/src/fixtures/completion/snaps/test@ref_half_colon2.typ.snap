@@ -32,6 +32,27 @@ input_file: crates/tinymist-query/src/fixtures/completion/ref_half_colon2.typ
  },
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 18,
+    "label": "sec:it",
+    "labelDetails": {
+     "description": "H"
+    },
+    "textEdit": {
+     "newText": "sec:it",
+     "range": {
+      "end": {
+       "character": 5,
+       "line": 13
+      },
+      "start": {
+       "character": 1,
+       "line": 13
+      }
+     }
+    }
+   }
+  ]
  }
 ]

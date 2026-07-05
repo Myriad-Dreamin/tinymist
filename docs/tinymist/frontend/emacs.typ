@@ -1,16 +1,19 @@
 #import "/docs/tinymist/frontend/mod.typ": *
 
-#show: book-page.with(title: [Emacs])
+#show: book-page.with(title: [Tinymist Emacs Support for Typst])
 
 Run and configure tinymist in Emacs for Typst.
 
-== Features
+= Features
 <features>
 See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Features] for a list of features.
 
+= Finding Executable
+<finding-executable>
+
 #include "common-finding-executable.typ"
 
-== Setup Server
+= Setup Server
 <setup-server>
 
 ```el
@@ -27,15 +30,19 @@ Above code adds `tinymist` downloaded by `typst-ts-lsp-download-binary`, `tinymi
 your PATH and `typst-lsp` in your `PATH` to the `typst-ts-mode` entry of `eglot-server-programs`.
 
 
-== Extra Settings
+= Extra Settings
 <extra-settings>
-=== Configuring Language Server
+== Configuring Language Server
 <configuring-language-server>
 
 You can either use `eglot-workspace-configuration` or specifying launch
 arguments for `tinymist`.
 
-==== eglot-workspace-configuration
+== Working under Power-Saving Mode or with Resource-consumed Projects
+<working-with-resource-consumed-projects>
+#include "syntax-only.typ"
+
+=== eglot-workspace-configuration
 <eglot-workspace-configuration>
 
 For example, if you want to export PDF on save:
@@ -48,11 +55,11 @@ For example, if you want to export PDF on save:
 You can also have configuration per directory. Be sure to look at the
 documentation of `eglot-workspace-configuration` by #link("https://www.gnu.org/software/emacs/manual/html_node/emacs/Name-Help.html")[`describe-symbol`]..
 
-See #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/editors/neovim/Configuration.md")[Tinymist Server Configuration]
+See #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration]
 for references.
 
 
-==== Launch Arguments
+=== Launch Arguments
 
 For example:
 

@@ -1,22 +1,21 @@
 use std::path::Path;
-use std::{borrow::Cow, sync::Arc};
+use std::sync::Arc;
 
+use tinymist_std::ImmutPath;
 use tinymist_std::error::prelude::*;
-use tinymist_std::{bail, ImmutPath};
 use tinymist_task::ExportTarget;
-use tinymist_world::config::CompileFontOpts;
-use tinymist_world::font::system::SystemFontSearcher;
-use tinymist_world::package::{registry::HttpRegistry, RegistryPathMapper};
-use tinymist_world::vfs::{system::SystemAccessModel, Vfs};
-use tinymist_world::{args::*, WorldComputeGraph};
+use tinymist_world::package::RegistryPathMapper;
+#[cfg(all(not(feature = "system"), feature = "web"))]
+use tinymist_world::package::registry::ProxyContext;
+use tinymist_world::vfs::Vfs;
 use tinymist_world::{
     CompileSnapshot, CompilerFeat, CompilerUniverse, CompilerWorld, EntryOpts, EntryState,
 };
-use typst::foundations::{Dict, Str, Value};
-use typst::utils::LazyHash;
+use tinymist_world::{WorldComputeGraph, args::*};
 use typst::Features;
-
-use crate::ProjectInput;
+use typst::diag::FileResult;
+use typst::foundations::{Bytes, Dict};
+use typst::utils::LazyHash;
 
 use crate::world::font::FontResolverImpl;
 use crate::{CompiledArtifact, Interrupt};
@@ -30,9 +29,12 @@ impl CompilerFeat for LspCompilerFeat {
     /// Uses [`FontResolverImpl`] directly.
     type FontResolver = FontResolverImpl;
     /// It accesses a physical file system.
-    type AccessModel = SystemAccessModel;
-    /// It performs native HTTP requests for fetching package data.
-    type Registry = HttpRegistry;
+    type AccessModel = DynAccessModel;
+    /// It performs:
+    /// - native HTTP requests for fetching package data in system environment
+    /// - js proxied requests to browser environment
+    /// - no package registry in other environments
+    type Registry = LspRegistry;
 }
 
 /// LSP universe that spawns LSP worlds.
@@ -58,6 +60,7 @@ pub trait WorldProvider {
     fn resolve(&self) -> Result<LspUniverse>;
 }
 
+#[cfg(feature = "system")]
 impl WorldProvider for CompileOnceArgs {
     fn resolve(&self) -> Result<LspUniverse> {
         let entry = self.entry()?.try_into()?;
@@ -76,6 +79,8 @@ impl WorldProvider for CompileOnceArgs {
             inputs,
             packages,
             fonts,
+            self.creation_timestamp,
+            DynAccessModel(Arc::new(tinymist_world::vfs::system::SystemAccessModel {})),
         ))
     }
 
@@ -126,8 +131,11 @@ impl WorldProvider for CompileOnceArgs {
 }
 
 // todo: merge me with the above impl
-impl WorldProvider for (ProjectInput, ImmutPath) {
+#[cfg(feature = "system")]
+impl WorldProvider for (crate::ProjectInput, ImmutPath) {
     fn resolve(&self) -> Result<LspUniverse> {
+        use typst::foundations::{Str, Value};
+
         let (proj, lock_dir) = self;
         let entry = self.entry()?.try_into()?;
         let inputs = proj
@@ -168,6 +176,8 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
             Arc::new(LazyHash::new(inputs)),
             packages,
             Arc::new(fonts),
+            None, // creation_timestamp - not available in project file context
+            DynAccessModel(Arc::new(tinymist_world::vfs::system::SystemAccessModel {})),
         ))
     }
 
@@ -202,71 +212,174 @@ impl WorldProvider for (ProjectInput, ImmutPath) {
     }
 }
 
+#[cfg(all(not(feature = "system"), feature = "web"))]
+type LspRegistry = tinymist_world::package::registry::JsRegistry;
+#[cfg(feature = "system")]
+type LspRegistry = tinymist_world::package::registry::HttpRegistry;
+#[cfg(not(any(feature = "system", feature = "web")))]
+type LspRegistry = tinymist_world::package::registry::DummyRegistry;
+
 /// Builder for LSP universe.
 pub struct LspUniverseBuilder;
 
 impl LspUniverseBuilder {
     /// Create [`LspUniverse`] with the given options.
     /// See [`LspCompilerFeat`] for instantiation details.
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         entry: EntryState,
         export_target: ExportTarget,
         features: Features,
         inputs: ImmutDict,
-        package_registry: HttpRegistry,
+        package_registry: LspRegistry,
         font_resolver: Arc<FontResolverImpl>,
+        creation_timestamp: Option<i64>,
+        access_model: DynAccessModel,
     ) -> LspUniverse {
         let package_registry = Arc::new(package_registry);
         let resolver = Arc::new(RegistryPathMapper::new(package_registry.clone()));
 
-        // todo: typst doesn't allow to merge features
-        let features = if matches!(export_target, ExportTarget::Html) {
-            Features::from_iter([typst::Feature::Html])
-        } else {
-            features
+        let target_feature = match export_target {
+            ExportTarget::Html => Some(typst::Feature::Html),
+            ExportTarget::Bundle => Some(typst::Feature::Bundle),
+            ExportTarget::Paged => None,
         };
+        let features = [
+            typst::Feature::Html,
+            typst::Feature::A11yExtras,
+            typst::Feature::Bundle,
+        ]
+        .into_iter()
+        .filter(|feature| features.is_enabled(*feature) || Some(*feature) == target_feature)
+        .collect();
 
         LspUniverse::new_raw(
             entry,
             features,
             Some(inputs),
-            Vfs::new(resolver, SystemAccessModel {}),
+            Vfs::new(resolver, access_model),
             package_registry,
             font_resolver,
+            creation_timestamp,
         )
     }
 
     /// Resolve fonts from given options.
+    #[cfg(feature = "system")]
     pub fn only_embedded_fonts() -> Result<FontResolverImpl> {
-        let mut searcher = SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: vec![],
             no_system_fonts: true,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
 
     /// Resolve fonts from given options.
+    #[cfg(feature = "system")]
     pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
-        let mut searcher = SystemFontSearcher::new();
-        searcher.resolve_opts(CompileFontOpts {
+        let mut searcher = tinymist_world::font::system::SystemFontSearcher::new();
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
             font_paths: args.font_paths,
             no_system_fonts: args.ignore_system_fonts,
-            with_embedded_fonts: typst_assets::fonts().map(Cow::Borrowed).collect(),
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
         })?;
         Ok(searcher.build())
     }
 
-    /// Resolve package registry from given options.
+    /// Resolve fonts from given options.
+    #[cfg(all(not(feature = "system"), feature = "web"))]
+    pub fn resolve_fonts(args: CompileFontArgs) -> Result<FontResolverImpl> {
+        let mut searcher = tinymist_world::font::web::BrowserFontSearcher::new();
+        searcher.resolve_opts(tinymist_world::config::CompileFontOpts {
+            font_paths: args.font_paths,
+            no_system_fonts: args.ignore_system_fonts,
+            with_embedded_fonts: typst_assets::fonts()
+                .map(std::borrow::Cow::Borrowed)
+                .collect(),
+        })?;
+        Ok(searcher.build())
+    }
+
+    /// Resolve fonts from given options.
+    #[cfg(not(any(feature = "system", feature = "web")))]
+    pub fn resolve_fonts(_args: CompileFontArgs) -> Result<FontResolverImpl> {
+        let mut searcher = tinymist_world::font::memory::MemoryFontSearcher::default();
+        searcher.add_memory_fonts(typst_assets::fonts().map(Bytes::new).collect::<Vec<_>>());
+        Ok(searcher.build())
+    }
+
+    /// Resolves package registry from given options.
+    #[cfg(feature = "system")]
     pub fn resolve_package(
         cert_path: Option<ImmutPath>,
         args: Option<&CompilePackageArgs>,
-    ) -> HttpRegistry {
-        HttpRegistry::new(
+    ) -> tinymist_world::package::registry::HttpRegistry {
+        tinymist_world::package::registry::HttpRegistry::new(
             cert_path,
             args.and_then(|args| Some(args.package_path.clone()?.into())),
             args.and_then(|args| Some(args.package_cache_path.clone()?.into())),
         )
     }
+
+    /// Resolves package registry from given options.
+    #[cfg(all(not(feature = "system"), feature = "web"))]
+    pub fn resolve_package(
+        _cert_path: Option<ImmutPath>,
+        _args: Option<&CompilePackageArgs>,
+        resolve_fn: js_sys::Function,
+    ) -> tinymist_world::package::registry::JsRegistry {
+        tinymist_world::package::registry::JsRegistry {
+            context: ProxyContext::new(wasm_bindgen::JsValue::NULL),
+            real_resolve_fn: resolve_fn,
+        }
+    }
+
+    /// Resolves package registry from given options.
+    #[cfg(not(any(feature = "system", feature = "web")))]
+    pub fn resolve_package(
+        _cert_path: Option<ImmutPath>,
+        _args: Option<&CompilePackageArgs>,
+    ) -> tinymist_world::package::registry::DummyRegistry {
+        tinymist_world::package::registry::DummyRegistry
+    }
+}
+
+/// Access model for LSP universe and worlds.
+pub trait LspAccessModel: Send + Sync {
+    /// Returns the content of a file entry.
+    fn content(&self, src: &Path) -> FileResult<Bytes>;
+}
+
+impl<T> LspAccessModel for T
+where
+    T: tinymist_world::vfs::PathAccessModel + Send + Sync + 'static,
+{
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        self.content(src)
+    }
+}
+
+/// Access model for LSP universe and worlds.
+#[derive(Clone)]
+pub struct DynAccessModel(pub Arc<dyn LspAccessModel>);
+
+impl DynAccessModel {
+    /// Create a new dynamic access model from the given access model.
+    pub fn new(access_model: Arc<dyn LspAccessModel>) -> Self {
+        Self(access_model)
+    }
+}
+
+impl tinymist_world::vfs::PathAccessModel for DynAccessModel {
+    fn content(&self, src: &Path) -> FileResult<Bytes> {
+        self.0.content(src)
+    }
+
+    fn reset(&mut self) {}
 }

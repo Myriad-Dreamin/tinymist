@@ -1,15 +1,21 @@
 #![doc = include_str!("../README.md")]
+// todo: remove me
+#![allow(missing_docs)]
 
 use std::{
     io::Write,
     path::{Path, PathBuf},
+    process::exit,
     sync::Arc,
 };
 
 use clap::Parser;
-use tinymist_project::WorldProvider;
-use typlite::{common::Format, TypliteFeat};
+use tinymist_project::{
+    DiagnosticFormat, LspWorld, SourceWorld, WorldProvider, base::print_diagnostics,
+};
+use tinymist_std::{Result, error::prelude::*};
 use typlite::{CompileOnceArgs, Typlite};
+use typlite::{TypliteFeat, common::Format};
 use typst::foundations::Bytes;
 
 /// Common arguments of compile, watch, and query.
@@ -24,69 +30,109 @@ pub struct CompileArgs {
 
     /// Configures the path of assets directory
     #[clap(long, default_value = None, value_name = "ASSETS_PATH")]
-    pub assets_path: Option<String>,
+    pub assets_path: Option<PathBuf>,
+
+    /// Specifies the package to process markup.
+    ///
+    /// ## `article` function
+    ///
+    /// The article function is used to wrap the typst content during
+    /// compilation. It resembles the regular typst show rule function, like
+    /// `#show: article`.
+    ///
+    /// typlite exactly uses the `#article` function to process the content as
+    /// follow:
+    ///
+    /// ```typst
+    /// #import "@local/ieee-tex:0.1.0": article
+    /// #article(include "the-processed-content.typ")
+    /// ```
+    #[clap(long = "processor", default_value = None, value_name = "PACKAGE_SPEC")]
+    pub processor: Option<String>,
 }
 
-fn main() -> typlite::Result<()> {
+fn main() -> Result<()> {
+    let _ = env_logger::try_init();
     // Parse command line arguments
     let args = CompileArgs::parse();
 
+    let verse = args.compile.resolve()?;
+    let world = Arc::new(verse.snapshot());
+
+    print_diag_or_error(world.as_ref(), run(args, world.clone()))
+}
+
+fn run(args: CompileArgs, world: Arc<LspWorld>) -> Result<()> {
     let input = args
         .compile
         .input
-        .as_ref()
-        .ok_or("Missing required argument: INPUT")?;
+        .context("Missing required argument: INPUT")?;
 
     let is_stdout = args.output.as_deref() == Some("-");
     let output_path = args
         .output
         .map(PathBuf::from)
-        .unwrap_or_else(|| Path::new(input).with_extension("md"));
+        .unwrap_or_else(|| Path::new(&input).with_extension("md"));
 
-    let output_format = match output_path.extension() {
-        Some(ext) if ext == std::ffi::OsStr::new("tex") => Format::LaTeX,
+    let output_format = match output_path.extension().and_then(std::ffi::OsStr::to_str) {
+        Some("tex") => Format::LaTeX,
+        Some("txt") => Format::Text,
         #[cfg(feature = "docx")]
-        Some(ext) if ext == std::ffi::OsStr::new("docx") => Format::Docx,
+        Some("docx") => Format::Docx,
         _ => Format::Md,
     };
 
-    let assets_path = match args.assets_path {
-        Some(assets_path) => {
-            let path = PathBuf::from(assets_path);
-            if !path.exists() {
-                if let Err(e) = std::fs::create_dir_all(&path) {
-                    return Err(format!("failed to create assets directory: {}", e).into());
-                }
-            }
-            Some(path)
-        }
-        None => None,
-    };
+    if let Some(assets_path) = args.assets_path.as_ref()
+        && !assets_path.exists()
+    {
+        std::fs::create_dir_all(assets_path).context("failed to create assets directory")?;
+    }
 
-    let universe = args.compile.resolve().map_err(|err| format!("{err:?}"))?;
-    let world = universe.snapshot();
-
-    let converter = Typlite::new(Arc::new(world)).with_feature(TypliteFeat {
-        assets_path: assets_path.clone(),
-        ..Default::default()
-    });
-    let doc = converter.convert_doc(output_format)?;
+    let doc = Typlite::new(world.clone())
+        .with_feature(TypliteFeat {
+            assets_path: args.assets_path,
+            processor: args.processor,
+            ..Default::default()
+        })
+        .convert_doc(output_format)?;
 
     let result = match output_format {
         Format::Md => Bytes::from_string(doc.to_md_string()?),
-        Format::LaTeX => Bytes::from_string(doc.to_tex_string(true)?),
+        Format::LaTeX => Bytes::from_string(doc.to_tex_string()?),
+        Format::Text => Bytes::from_string(doc.to_text_string()?),
         #[cfg(feature = "docx")]
         Format::Docx => Bytes::new(doc.to_docx()?),
     };
 
+    let warnings = doc.warnings();
+
     if is_stdout {
-        std::io::stdout().write_all(result.as_slice()).unwrap();
+        std::io::stdout()
+            .write_all(result.as_slice())
+            .context("failed to write to stdout")?;
     } else if let Err(err) = std::fs::write(&output_path, result.as_slice()) {
-        Err(format!(
-            "failed to write file {}: {err}",
-            output_path.display()
-        ))?;
+        bail!("failed to write file {output_path:?}: {err}");
+    }
+
+    if !warnings.is_empty() {
+        print_diagnostics(world.as_ref(), warnings.iter(), DiagnosticFormat::Human)
+            .context_ut("print warnings")?;
     }
 
     Ok(())
+}
+
+fn print_diag_or_error<T>(world: &impl SourceWorld, result: Result<T>) -> Result<T> {
+    match result {
+        Ok(v) => Ok(v),
+        Err(err) => {
+            if let Some(diagnostics) = err.diagnostics() {
+                print_diagnostics(world, diagnostics.iter(), DiagnosticFormat::Human)
+                    .context_ut("print diagnostics")?;
+                exit(1);
+            }
+
+            Err(err)
+        }
+    }
 }

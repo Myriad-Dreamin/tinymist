@@ -6,8 +6,11 @@ use cmark_writer::ast::Node;
 use ecow::EcoString;
 use tinymist_std::path::unix_slash;
 
-use crate::common::{ExternalFrameNode, FigureNode, FormatWriter, HighlightNode, ListState};
 use crate::Result;
+use crate::common::{
+    BlockVerbatimNode, CenterNode, ExternalFrameNode, FigureNode, FormatWriter, HighlightNode,
+    InlineNode, ListState, VerbatimNode,
+};
 
 /// LaTeX writer implementation
 pub struct LaTeXWriter {
@@ -23,32 +26,6 @@ impl Default for LaTeXWriter {
 impl LaTeXWriter {
     pub fn new() -> Self {
         Self { list_state: None }
-    }
-
-    pub fn default_prelude(output: &mut EcoString) {
-        // Write LaTeX document preamble using the new method
-        output.push_str("\\documentclass[12pt,a4paper]{article}\n");
-        output.push_str("\\usepackage[utf8]{inputenc}\n");
-        output.push_str("\\usepackage{hyperref}\n"); // For links
-        output.push_str("\\usepackage{graphicx}\n"); // For images
-        output.push_str("\\usepackage{ulem}\n"); // For strikethrough \sout
-        output.push_str("\\usepackage{listings}\n"); // For code blocks
-        output.push_str("\\usepackage{xcolor}\n"); // For colored text and backgrounds
-        output.push_str("\\usepackage{amsmath}\n"); // Math formula support
-        output.push_str("\\usepackage{amssymb}\n"); // Additional math symbols
-        output.push_str("\\usepackage{array}\n"); // Enhanced table functionality
-
-        // Set code highlighting style
-        output.push_str("\\lstset{\n");
-        output.push_str("  basicstyle=\\ttfamily\\small,\n");
-        output.push_str("  breaklines=true,\n");
-        output.push_str("  frame=single,\n");
-        output.push_str("  numbers=left,\n");
-        output.push_str("  numberstyle=\\tiny,\n");
-        output.push_str("  keywordstyle=\\color{blue},\n");
-        output.push_str("  commentstyle=\\color{green!60!black},\n");
-        output.push_str("  stringstyle=\\color{red}\n");
-        output.push_str("}\n\n");
     }
 
     fn write_inline_nodes(&mut self, nodes: &[Node], output: &mut EcoString) -> Result<()> {
@@ -76,7 +53,7 @@ impl LaTeXWriter {
                 heading_type: _,
             } => {
                 if *level > 4 {
-                    return Err(format!("heading level {} is not supported in LaTeX", level).into());
+                    return Err(format!("heading level {level} is not supported in LaTeX").into());
                 }
 
                 output.push('\\');
@@ -85,7 +62,7 @@ impl LaTeXWriter {
                     2 => output.push_str("section{"),
                     3 => output.push_str("subsection{"),
                     4 => output.push_str("subsubsection{"),
-                    _ => return Err(format!("Heading level {} is not supported", level).into()),
+                    _ => return Err(format!("Heading level {level} is not supported").into()),
                 }
 
                 self.write_inline_nodes(content, output)?;
@@ -229,79 +206,97 @@ impl LaTeXWriter {
                 output.push_str("\\end{tabular}\n");
                 output.push_str("\\end{table}\n\n");
             }
-            Node::Custom(custom_node) => {
-                if let Some(figure_node) = custom_node.as_any().downcast_ref::<FigureNode>() {
-                    // Start figure environment
-                    output.push_str("\\begin{figure}[htbp]\n\\centering\n");
+            node if node.is_custom_type::<FigureNode>() => {
+                let figure_node = node.as_custom_type::<FigureNode>().unwrap();
+                // Start figure environment
+                output.push_str("\\begin{figure}[htbp]\n\\centering\n");
 
-                    // Handle the body content (typically an image)
-                    match &*figure_node.body {
-                        Node::Paragraph(content) => {
-                            for node in content {
-                                // Special handling for image nodes in figures
-                                if let Node::Image {
-                                    url,
-                                    title: _,
-                                    alt: _,
-                                } = node
-                                {
-                                    // Path to the image file
-                                    let path = unix_slash(Path::new(url));
+                // Handle the body content (typically an image)
+                match &*figure_node.body {
+                    Node::Paragraph(content) => {
+                        for node in content {
+                            // Special handling for image nodes in figures
+                            if let Node::Image {
+                                url,
+                                title: _,
+                                alt: _,
+                            } = node
+                            {
+                                // Path to the image file
+                                let path = unix_slash(Path::new(url.as_str()));
 
-                                    // Write includegraphics command
-                                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
-                                    output.push_str(&path);
-                                    output.push_str("}\n");
-                                } else {
-                                    // For non-image content, just render it normally
-                                    self.write_node(node, output)?;
-                                }
+                                // Write includegraphics command
+                                output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                                output.push_str(&path);
+                                output.push_str("}\n");
+                            } else {
+                                // For non-image content, just render it normally
+                                self.write_node(node, output)?;
                             }
                         }
-                        // Directly handle the node if it's not in a paragraph
-                        node => self.write_node(node, output)?,
                     }
-
-                    // Add caption if present
-                    if !figure_node.caption.is_empty() {
-                        output.push_str("\\caption{");
-                        output.push_str(&escape_latex(&figure_node.caption));
-                        output.push_str("}\n");
-                    }
-
-                    // Close figure environment
-                    output.push_str("\\end{figure}\n\n");
-                } else if let Some(external_frame) =
-                    custom_node.as_any().downcast_ref::<ExternalFrameNode>()
-                {
-                    // Handle externally stored frames
-                    let path = unix_slash(&external_frame.file_path);
-
-                    output.push_str("\\begin{figure}[htbp]\n");
-                    output.push_str("\\centering\n");
-                    output.push_str("\\includegraphics[width=0.8\\textwidth]{");
-                    output.push_str(&path);
-                    output.push_str("}\n");
-
-                    if !external_frame.alt_text.is_empty() {
-                        output.push_str("\\caption{");
-                        output.push_str(&escape_latex(&external_frame.alt_text));
-                        output.push_str("}\n");
-                    }
-
-                    output.push_str("\\end{figure}\n\n");
-                } else if let Some(highlight_node) =
-                    custom_node.as_any().downcast_ref::<HighlightNode>()
-                {
-                    output.push_str("\\colorbox{yellow}{");
-                    for child in &highlight_node.content {
-                        self.write_node(child, output)?;
-                    }
-                    output.push_str("}");
-                } else {
-                    // Fallback for unknown custom nodes
-                    output.push_str("[Unknown custom node]");
+                    // Directly handle the node if it's not in a paragraph
+                    node => self.write_node(node, output)?,
                 }
+
+                // Add caption if present
+                if !figure_node.caption.is_empty() {
+                    output.push_str("\\caption{");
+                    output.push_str(&escape_latex(&figure_node.caption));
+                    output.push_str("}\n");
+                }
+
+                // Close figure environment
+                output.push_str("\\end{figure}\n\n");
+            }
+            node if node.is_custom_type::<ExternalFrameNode>() => {
+                let external_frame = node.as_custom_type::<ExternalFrameNode>().unwrap();
+                // Handle externally stored frames
+                let path = unix_slash(&external_frame.file_path);
+
+                output.push_str("\\begin{figure}[htbp]\n");
+                output.push_str("\\centering\n");
+                output.push_str("\\includegraphics[width=0.8\\textwidth]{");
+                output.push_str(&path);
+                output.push_str("}\n");
+
+                if !external_frame.alt_text.is_empty() {
+                    output.push_str("\\caption{");
+                    output.push_str(&escape_latex(&external_frame.alt_text));
+                    output.push_str("}\n");
+                }
+
+                output.push_str("\\end{figure}\n\n");
+            }
+            node if node.is_custom_type::<CenterNode>() => {
+                let center_node = node.as_custom_type::<CenterNode>().unwrap();
+                output.push_str("\\begin{center}\n");
+                self.write_node(&center_node.node, output)?;
+                output.push_str("\\end{center}\n\n");
+            }
+            node if node.is_custom_type::<HighlightNode>() => {
+                let highlight_node = node.as_custom_type::<HighlightNode>().unwrap();
+                output.push_str("\\colorbox{yellow}{");
+                for child in &highlight_node.content {
+                    self.write_node(child, output)?;
+                }
+                output.push_str("}");
+            }
+            node if node.is_custom_type::<InlineNode>() => {
+                let inline_node = node.as_custom_type::<InlineNode>().unwrap();
+                // Process all child nodes inline
+                for child in &inline_node.content {
+                    self.write_node(child, output)?;
+                }
+            }
+            node if node.is_custom_type::<BlockVerbatimNode>() => {
+                let block_node = node.as_custom_type::<BlockVerbatimNode>().unwrap();
+                output.push_str(&block_node.content);
+                output.push_str("\n\n");
+            }
+            node if node.is_custom_type::<VerbatimNode>() => {
+                let inline_node = node.as_custom_type::<VerbatimNode>().unwrap();
+                output.push_str(&inline_node.content);
             }
             Node::Text(text) => {
                 output.push_str(&escape_latex(text));
@@ -341,7 +336,7 @@ impl LaTeXWriter {
                     "".into()
                 };
 
-                let path = unix_slash(Path::new(url));
+                let path = unix_slash(Path::new(&url.as_str()));
 
                 output.push_str("\\begin{figure}\n");
                 output.push_str("\\centering\n");
@@ -372,12 +367,153 @@ impl LaTeXWriter {
                 output.push_str("\\hrule\n\n");
             }
             Node::HtmlElement(element) => {
-                for child in &element.children {
-                    self.write_node(child, output)?;
+                if element.tag == "table" {
+                    self.write_html_table(element, output)?;
+                } else {
+                    for child in &element.children {
+                        self.write_node(child, output)?;
+                    }
                 }
             }
             _ => {}
         }
+
+        Ok(())
+    }
+
+    /// Write HTML table element to LaTeX format
+    fn write_html_table(
+        &mut self,
+        table_element: &cmark_writer::ast::HtmlElement,
+        output: &mut EcoString,
+    ) -> Result<()> {
+        // Collect rows and determine column count
+        let mut headers: Vec<Vec<Vec<Node>>> = Vec::new();
+        let mut rows: Vec<Vec<Vec<Node>>> = Vec::new();
+        let mut col_count = 0;
+
+        // Process table structure
+        for child in &table_element.children {
+            if let Node::HtmlElement(elem) = child {
+                match elem.tag.as_str() {
+                    "thead" => {
+                        for row_node in &elem.children {
+                            if let Node::HtmlElement(row) = row_node
+                                && row.tag == "tr"
+                            {
+                                let cells: Vec<Vec<Node>> = row
+                                    .children
+                                    .iter()
+                                    .filter_map(|cell_node| {
+                                        if let Node::HtmlElement(cell) = cell_node
+                                            && (cell.tag == "th" || cell.tag == "td")
+                                        {
+                                            return Some(cell.children.clone());
+                                        }
+                                        None
+                                    })
+                                    .collect();
+                                col_count = col_count.max(cells.len());
+                                headers.push(cells);
+                            }
+                        }
+                    }
+                    "tbody" => {
+                        for row_node in &elem.children {
+                            if let Node::HtmlElement(row) = row_node
+                                && row.tag == "tr"
+                            {
+                                let cells: Vec<Vec<Node>> = row
+                                    .children
+                                    .iter()
+                                    .filter_map(|cell_node| {
+                                        if let Node::HtmlElement(cell) = cell_node
+                                            && (cell.tag == "th" || cell.tag == "td")
+                                        {
+                                            return Some(cell.children.clone());
+                                        }
+                                        None
+                                    })
+                                    .collect();
+                                col_count = col_count.max(cells.len());
+                                rows.push(cells);
+                            }
+                        }
+                    }
+                    "tr" => {
+                        // Direct row without thead/tbody
+                        let cells: Vec<Vec<Node>> = elem
+                            .children
+                            .iter()
+                            .filter_map(|cell_node| {
+                                if let Node::HtmlElement(cell) = cell_node
+                                    && (cell.tag == "th" || cell.tag == "td")
+                                {
+                                    return Some(cell.children.clone());
+                                }
+                                None
+                            })
+                            .collect();
+                        col_count = col_count.max(cells.len());
+
+                        // First row with th elements is header
+                        if headers.is_empty()
+                            && elem.children.iter().any(|n| {
+                                if let Node::HtmlElement(e) = n {
+                                    e.tag == "th"
+                                } else {
+                                    false
+                                }
+                            })
+                        {
+                            headers.push(cells);
+                        } else {
+                            rows.push(cells);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        if col_count == 0 {
+            return Ok(());
+        }
+
+        // Write LaTeX table
+        output.push_str("\\begin{table}[htbp]\n");
+        output.push_str("\\centering\n");
+        output.push_str("\\begin{tabular}{");
+        for _ in 0..col_count {
+            output.push('c');
+        }
+        output.push_str("}\n\\hline\n");
+
+        // Write headers
+        for header_row in &headers {
+            for (i, cell_nodes) in header_row.iter().enumerate() {
+                if i > 0 {
+                    output.push_str(" & ");
+                }
+                self.write_inline_nodes(cell_nodes, output)?;
+            }
+            output.push_str(" \\\\\n\\hline\n");
+        }
+
+        // Write rows
+        for row in &rows {
+            for (i, cell_nodes) in row.iter().enumerate() {
+                if i > 0 {
+                    output.push_str(" & ");
+                }
+                self.write_inline_nodes(cell_nodes, output)?;
+            }
+            output.push_str(" \\\\\n");
+        }
+
+        output.push_str("\\hline\n");
+        output.push_str("\\end{tabular}\n");
+        output.push_str("\\end{table}\n\n");
 
         Ok(())
     }
@@ -399,14 +535,8 @@ fn escape_latex(text: &str) -> String {
 
 impl FormatWriter for LaTeXWriter {
     fn write_eco(&mut self, document: &Node, output: &mut EcoString) -> Result<()> {
-        output.push_str("\\begin{document}\n\n");
-
         // Write the document content
         self.write_node(document, output)?;
-
-        // Add document ending
-        output.push_str("\n\\end{document}\n");
-
         Ok(())
     }
 

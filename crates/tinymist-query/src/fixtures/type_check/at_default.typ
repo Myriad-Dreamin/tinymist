@@ -1,0 +1,6 @@
+#let dynamic-default(d, key) = d.at(key, default: none)
+#let static-param(d) = d.at("x", default: none)
+#let static-default = (:).at("missing", default: 1)
+#let static-existing = (value: 2).at("value", default: 1)
+#let static-no-default = (value: 2).at("value")
+#let tuple-default = (1, 2).at(1, default: none)

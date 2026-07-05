@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::prelude::*;
 
-/// Extract the module-level documentation from a source.
+/// Extracts the module-level documentation from a source.
 pub fn find_module_level_docs(src: &Source) -> Option<String> {
     crate::log_debug_ct!("finding docs at: {id:?}", id = src.id());
 
@@ -20,6 +20,7 @@ pub fn find_module_level_docs(src: &Source) -> Option<String> {
     extract_mod_docs_between(&root, 0..src.text().len(), true)
 }
 
+/// Extracts the module-level documentation from a source.
 fn extract_mod_docs_between(
     node: &LinkedNode,
     rng: Range<usize>,
@@ -39,7 +40,11 @@ fn extract_mod_docs_between(
             break 'scan_comments;
         }
 
-        crate::log_debug_ct!("found comment for docs: {:?}: {:?}", n.kind(), n.text());
+        crate::log_debug_ct!(
+            "found comment for docs: {:?}: {:?}",
+            n.kind(),
+            n.leaf_text()
+        );
         if matcher.process(n.get()) {
             if first_group {
                 break 'scan_comments;
@@ -72,13 +77,13 @@ pub struct CommentGroupMatcher {
 }
 
 impl CommentGroupMatcher {
-    /// Reset the matcher. This usually happens after a group is collected or
+    /// Resets the matcher. This usually happens after a group is collected or
     /// when some other child item is breaking the comment group manually.
     pub fn reset(&mut self) {
         self.newline_count = 0;
     }
 
-    /// Process a child relative to some [`SyntaxNode`].
+    /// Processes a child relative to some [`SyntaxNode`].
     ///
     /// ## Example
     ///
@@ -91,7 +96,7 @@ impl CommentGroupMatcher {
                 CommentGroupSignal::Hash
             }
             SyntaxKind::Space => {
-                if n.text().contains('\n') {
+                if n.leaf_text().contains('\n') {
                     self.newline_count += 1;
                 }
                 if self.newline_count > 1 {
@@ -119,38 +124,45 @@ impl CommentGroupMatcher {
         }
     }
 }
+
+/// A raw comment.
 enum RawComment {
+    /// A line comment.
     Line(EcoString),
+    /// A block comment.
     Block(EcoString),
 }
 
 /// A matcher that collects documentation comments.
 #[derive(Default)]
 pub struct DocCommentMatcher {
+    /// The collected comments.
     comments: Vec<RawComment>,
+    /// The matcher for grouping comments.
     group_matcher: CommentGroupMatcher,
+    /// Whether to strictly match the comment format.
     strict: bool,
 }
 
 impl DocCommentMatcher {
-    /// Reset the matcher. This usually happens after a group is collected or
+    /// Resets the matcher. This usually happens after a group is collected or
     /// when some other child item is breaking the comment group manually.
     pub fn reset(&mut self) {
         self.comments.clear();
         self.group_matcher.reset();
     }
 
-    /// Process a child relative to some [`SyntaxNode`].
+    /// Processes a child relative to some [`SyntaxNode`].
     pub fn process(&mut self, n: &SyntaxNode) -> bool {
         match self.group_matcher.process(n) {
             CommentGroupSignal::LineComment => {
-                let text = n.text();
+                let text = n.leaf_text();
                 if !self.strict || text.starts_with("///") {
                     self.comments.push(RawComment::Line(text.clone()));
                 }
             }
             CommentGroupSignal::BlockComment => {
-                let text = n.text();
+                let text = n.leaf_text();
                 if !self.strict {
                     self.comments.push(RawComment::Block(text.clone()));
                 }
@@ -164,7 +176,7 @@ impl DocCommentMatcher {
         false
     }
 
-    /// Collect the comments and return the result.
+    /// Collects the comments and returns the result.
     pub fn collect(&mut self) -> Option<String> {
         let comments = &self.comments;
         if comments.is_empty() {
@@ -174,8 +186,7 @@ impl DocCommentMatcher {
         let comments = comments.iter().map(|comment| match comment {
             RawComment::Line(line) => {
                 // strip all slash prefix
-                let text = line.trim_start_matches('/');
-                text
+                line.trim_start_matches('/')
             }
             RawComment::Block(block) => {
                 fn remove_comment(text: &str) -> Option<&str> {
