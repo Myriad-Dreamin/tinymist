@@ -945,7 +945,10 @@
         "editor.wordWrap": "on",
         "editor.semanticHighlighting.enabled": true,
         "editor.tabSize": 2,
-        "editor.inlayHints.enabled": "off"
+        "editor.inlayHints.enabled": "off",
+        "editor.quickSuggestions": {
+          "strings": true
+        }
       }
     },
     "languages": [

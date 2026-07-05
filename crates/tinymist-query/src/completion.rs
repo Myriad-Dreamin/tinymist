@@ -141,6 +141,10 @@ mod tests {
                     includes.insert(kk.trim());
                 }
             }
+            let show_filter_text = properties
+                .get("filter_text")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false);
             let get_items = |items: Vec<CompletionItem>| {
                 let mut res: Vec<_> = items
                     .into_iter()
@@ -157,6 +161,7 @@ mod tests {
                         label: item.label,
                         label_details: item.label_details,
                         sort_text: item.sort_text,
+                        filter_text: show_filter_text.then_some(item.filter_text).flatten(),
                         kind: item.kind,
                         text_edit: item.text_edit,
                         additional_text_edits: item.additional_text_edits,

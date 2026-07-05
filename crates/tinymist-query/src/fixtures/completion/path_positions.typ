@@ -6,5 +6,5 @@ png
 #let intro = 1
 
 -----
-/// contains: assets/, assets/logo.png, chapters/, chapters/intro.typ
+/// contains: assets/, chapters/
 #read(""/* range -1..0 */)
