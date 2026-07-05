@@ -4,14 +4,14 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive_dispatch_deferred.typ
 ---
 "done" = (Any) => {"kind": "done", "value": Any}
-"value" = Type(int)
-"forward" = (Any, Any) => {"kind": "done", "value": Type(int)}
-"handler" = (Any) => {"kind": "done", "value": Type(int)}
-"value" = Type(int)
-"dispatch" = (Any) => {"kind": "done", "value": Type(int)}
-"value" = Type(int)
-"use-zero" = {"kind": "done", "value": Type(int)}
-"use-one" = {"kind": "done", "value": Type(int)}
+"value" = Any
+"forward" = (Any, Any) => IfTy { cond: TypeBinary { operands: (Any, 0), op: Eq }, then: {"kind": "done", "value": Any}, else_: None }
+"handler" = Any
+"value" = ( ⪰ 0 | TypeBinary { operands: (( ⪰ Type(int) | 0 | 1), 1), op: Sub })
+"dispatch" = (Any) => IfTy { cond: TypeBinary { operands: (Any, 0), op: Eq }, then: {"kind": "done", "value": Any}, else_: IfTy { cond: TypeBinary { operands: (Any, 1), op: Eq }, then: IfTy { cond: TypeBinary { operands: (Any, 0), op: Eq }, then: {"kind": "done", "value": Any}, else_: None }, else_: IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (Any, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (Any, 1), op: Sub }}, else_: None } } }
+"value" = ( ⪰ Type(int) | 0 | 1)
+"use-zero" = IfTy { cond: TypeBinary { operands: (0, 0), op: Eq }, then: {"kind": "done", "value": 0}, else_: IfTy { cond: TypeBinary { operands: (0, 1), op: Eq }, then: IfTy { cond: TypeBinary { operands: (0, 0), op: Eq }, then: {"kind": "done", "value": 0}, else_: None }, else_: IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (0, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (0, 1), op: Sub }}, else_: None } } }
+"use-one" = IfTy { cond: TypeBinary { operands: (1, 0), op: Eq }, then: {"kind": "done", "value": 1}, else_: IfTy { cond: TypeBinary { operands: (1, 1), op: Eq }, then: IfTy { cond: TypeBinary { operands: (1, 0), op: Eq }, then: {"kind": "done", "value": 1}, else_: None }, else_: IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (1, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (1, 1), op: Sub }}, else_: None } } }
 =====
 5..9 -> @done
 10..15 -> @value
@@ -22,29 +22,29 @@ input_file: crates/tinymist-query/src/fixtures/type_check/recursive_dispatch_def
 71..76 -> @value
 87..92 -> @value
 104..108 -> @done
-104..115 -> {"kind": "done", "value": Type(int)}
+104..115 -> {"kind": "done", "value": @value}
 109..114 -> @value
 131..138 -> @handler
-131..149 -> {"kind": "done", "value": Type(int)}
+131..149 -> Any
 139..144 -> @value
 162..170 -> @dispatch
 171..176 -> @value
 187..192 -> @value
 204..208 -> @done
-204..215 -> {"kind": "done", "value": Type(int)}
+204..215 -> {"kind": "done", "value": @value}
 209..214 -> @value
 228..233 -> @value
 245..252 -> @forward
-245..269 -> {"kind": "done", "value": Type(int)}
+245..269 -> IfTy { cond: TypeBinary { operands: (@value, 0), op: Eq }, then: {"kind": "done", "value": @value}, else_: None }
 253..261 -> @dispatch
 263..268 -> @value
 285..292 -> @forward
-285..313 -> {"kind": "done", "value": Type(int)}
+285..313 -> IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (@value, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (@value, 1), op: Sub }}, else_: None }
 293..301 -> @dispatch
 303..308 -> @value
 326..334 -> @use-zero
 337..345 -> @dispatch
-337..348 -> {"kind": "done", "value": Type(int)}
+337..348 -> IfTy { cond: TypeBinary { operands: (0, 0), op: Eq }, then: {"kind": "done", "value": 0}, else_: IfTy { cond: TypeBinary { operands: (0, 1), op: Eq }, then: IfTy { cond: TypeBinary { operands: (0, 0), op: Eq }, then: {"kind": "done", "value": 0}, else_: None }, else_: IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (0, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (0, 1), op: Sub }}, else_: None } } }
 354..361 -> @use-one
 364..372 -> @dispatch
-364..375 -> {"kind": "done", "value": Type(int)}
+364..375 -> IfTy { cond: TypeBinary { operands: (1, 0), op: Eq }, then: {"kind": "done", "value": 1}, else_: IfTy { cond: TypeBinary { operands: (1, 1), op: Eq }, then: IfTy { cond: TypeBinary { operands: (1, 0), op: Eq }, then: {"kind": "done", "value": 1}, else_: None }, else_: IfTy { cond: TypeBinary { operands: (TypeBinary { operands: (1, 1), op: Sub }, 0), op: Eq }, then: {"kind": "done", "value": TypeBinary { operands: (1, 1), op: Sub }}, else_: None } } }

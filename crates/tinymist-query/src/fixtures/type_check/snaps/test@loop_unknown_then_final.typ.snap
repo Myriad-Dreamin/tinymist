@@ -7,7 +7,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_unknown_then_fina
 "args" = Args
 "out" = {}
 "k" = Any
-"v" = Any
+"v" = Auto
 =====
 5..27 -> @loop-unknown-then-dict
 30..34 -> @args
@@ -17,11 +17,11 @@ input_file: crates/tinymist-query/src/fixtures/type_check/loop_unknown_then_fina
 66..67 -> @v
 72..76 -> @args
 72..82 -> @v"args".named
-72..84 -> Apply(@v"args".named, () => any)
+72..84 -> Any
 94..95 -> @v
 131..134 -> @out
-131..141 -> (Func(insert) | @v"out".insert)
-131..147 -> None
+131..141 -> @v"out".insert
+131..147 -> Any
 142..143 -> @k
 145..146 -> @v
 152..153 -> @v

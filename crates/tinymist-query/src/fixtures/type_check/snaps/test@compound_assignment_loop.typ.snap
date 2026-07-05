@@ -3,10 +3,10 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/compound_assignment_loop.typ
 ---
-"scan-backwards" = (Any) => TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }
+"scan-backwards" = (Any) => Any
 "s" = Any
-"len" = TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }
-"i" = TypeBinary { operands: (Apply(@v"s".len, () => any), 1), op: Sub }
+"len" = TypeBinary { operands: (Any, 1), op: Sub }
+"i" = Any
 "assign-from-unknown" = (Any) => 0
 "unknown" = Any
 "i" = 0
@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/compound_assignment_lo
 33..36 -> @len
 39..40 -> @s
 39..44 -> @v"s".len
-39..46 -> Apply(@v"s".len, () => any)
+39..46 -> Any
 57..58 -> @i
 61..64 -> @len
 73..74 -> @i

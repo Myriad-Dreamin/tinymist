@@ -3,25 +3,25 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_apply.typ
 ---
-"via-method" = (Any, Any) => Apply(@v"ctx".resolve-mapping, (Any) => any)
+"via-method" = (Any, Any) => Any
 "ctx" = Any
 "layer" = Any
-"mapping" = Apply(@v"ctx".resolve-mapping, (Any) => any)
+"mapping" = Any
 "known-layer" = {"mapping": {"x": "x"}}
-"known-ctx" = {"resolve-mapping": (Any) => (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)}
-"" = (Any) => (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
-"layer" = {"mapping": {"x": "x"}}
-"known-result" = (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
-"direct-known" = () => (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
-"obj" = {"f": (Any) => (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)}
-"" = (Any) => (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
-"x" = {"mapping": {"y": "y"}}
+"known-ctx" = {"resolve-mapping": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
+"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
+"layer" = None
+"known-result" = IfTy { cond: TypeBinary { operands: ({"mapping": {"x": "x"}}, None), op: Eq }, then: None, else_: {"mapping": {"x": "x"}}.mapping }
+"direct-known" = () => IfTy { cond: TypeBinary { operands: ({"mapping": {"y": "y"}}, None), op: Eq }, then: None, else_: {"mapping": {"y": "y"}}.mapping }
+"obj" = {"f": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
+"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
+"x" = ( ⪰ None | {"mapping": {"y": "y"}})
 =====
 5..15 -> @via-method
 16..19 -> @ctx
 21..26 -> @layer
 38..45 -> @mapping
-48..76 -> Apply(@v"ctx".resolve-mapping, (@layer) => any)
+48..76 -> Any
 49..52 -> @ctx
 49..68 -> @v"ctx".resolve-mapping
 70..75 -> @layer
@@ -30,27 +30,27 @@ input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_appl
 109..128 -> {"mapping": {"x": "x"}}
 119..127 -> {"x": "x"}
 134..143 -> @known-ctx
-146..227 -> {"resolve-mapping": (@layer) => @}
+146..227 -> {"resolve-mapping": (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping }}
 167..172 -> @layer
 167..224 -> @
 179..184 -> @layer
 209..214 -> @layer
-209..222 -> ({"x": "x"} | @v"layer".mapping)
+209..222 -> @v"layer".mapping
 233..245 -> @known-result
-248..288 -> (None | {"x": "x"} | {"mapping": {"x": "x"}}.mapping)
+248..288 -> IfTy { cond: TypeBinary { operands: (@known-layer, None), op: Eq }, then: None, else_: @v"known-layer".mapping }
 249..258 -> @known-ctx
-249..274 -> ((@layer) => @ | @v"known-ctx".resolve-mapping)
+249..274 -> (((@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping } | @v"known-ctx".resolve-mapping) | (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping })
 276..287 -> @known-layer
 295..307 -> @direct-known
 320..323 -> @obj
-326..376 -> {"f": (@x) => @}
+326..376 -> {"f": (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping }}
 330..331 -> @x
 330..375 -> @
 338..339 -> @x
 364..365 -> @x
-364..373 -> ({"y": "y"} | @v"x".mapping)
+364..373 -> @v"x".mapping
 379..382 -> @obj
-379..384 -> ((@x) => @ | @v"obj".f)
-379..405 -> (None | {"y": "y"} | {"mapping": {"y": "y"}}.mapping)
+379..384 -> (((@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping } | @v"obj".f) | (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping })
+379..405 -> IfTy { cond: TypeBinary { operands: ({"mapping": {"y": "y"}}, None), op: Eq }, then: None, else_: {"mapping": {"y": "y"}}.mapping }
 385..404 -> {"mapping": {"y": "y"}}
 395..403 -> {"y": "y"}

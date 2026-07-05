@@ -3,16 +3,16 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/content_sequence.typ
 ---
-"joined-context" = () => TypeUnary { lhs: Content, op: Context }
-"mixed-context" = (Any) => TypeUnary { lhs: Content, op: Context }
+"joined-context" = () => TypeUnary { lhs: Undef, op: Context }
+"mixed-context" = (Any) => TypeUnary { lhs: Any, op: Context }
 "x" = Any
-"return-or-content" = (Any) => (Content | TypeUnary { lhs: Content, op: Context })
+"return-or-content" = (Any) => TypeUnary { lhs: Undef, op: Context }
 "cond" = Any
-"repeated-content-loops" = (Any) => Content
+"repeated-content-loops" = (Any) => None
 "items" = Any
 "item" = Any
 "item" = Any
-"conditional-content-loop" = (Any, Any) => Content
+"conditional-content-loop" = (Any, Any) => IfTy { cond: Any, then: None, else_: Content(text) }
 "items" = Any
 "cond" = Any
 "item" = Any
