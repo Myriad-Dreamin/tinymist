@@ -66,7 +66,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact.outputs.filename }}
-          path: ./build/distributions/content/*/*
+          path: ${{ github.workspace }}/editors/intellij/build/distributions/content/*/*
 
   # Run tests and upload a code coverage report
   test:
@@ -109,13 +109,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tests-result
-          path: ${{ github.workspace }}/build/reports/tests
+          path: ${{ github.workspace }}/editors/intellij/build/reports/tests
 
       # Upload the Kover report to CodeCov
       - name: Upload Code Coverage Report
         uses: codecov/codecov-action@v5
         with:
-          files: ${{ github.workspace }}/build/reports/kover/report.xml
+          files: ${{ github.workspace }}/editors/intellij/build/reports/kover/report.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Run plugin structure verification along with IntelliJ Plugin Verifier
@@ -159,7 +159,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pluginVerifier-result
-          path: ${{ github.workspace }}/build/reports/pluginVerifier
+          path: ${{ github.workspace }}/editors/intellij/build/reports/pluginVerifier
 
   # Prepare a draft release for GitHub Releases page for the manual verification
   # If accepted and published, the release workflow would be triggered
