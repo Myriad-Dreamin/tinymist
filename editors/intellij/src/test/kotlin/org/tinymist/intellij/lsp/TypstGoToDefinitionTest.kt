@@ -16,7 +16,7 @@ class TypstGoToDefinitionTest : TypstPlatformTestCase() {
      * navigates to the function definition.
      */
     fun testGoToDefinitionForFunctionCall() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -32,8 +32,7 @@ class TypstGoToDefinitionTest : TypstPlatformTestCase() {
         // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
         myFixture.configureByPhysicalText(fileName, fileContent)
 
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
+        waitForTinymistLanguageServerReady()
 
         // Get the current caret position
         val initialOffset = myFixture.editor.caretModel.offset
@@ -45,7 +44,7 @@ class TypstGoToDefinitionTest : TypstPlatformTestCase() {
         val newOffset = myFixture.editor.caretModel.offset
 
         // Calculate the expected position where the caret should move to
-        val functionDefinitionOffset = fileContent.indexOf("#let highlight")
+        val functionDefinitionOffset = fileContent.indexOf("highlight(content)")
 
         // Assert that the caret moved to the function definition
         assertEquals("Caret did not move to the function definition", functionDefinitionOffset, newOffset)
@@ -63,7 +62,7 @@ class TypstGoToDefinitionTest : TypstPlatformTestCase() {
      * navigates to the parameter definition.
      */
     fun testGoToDefinitionForParameterReference() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -79,8 +78,7 @@ class TypstGoToDefinitionTest : TypstPlatformTestCase() {
         // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
         myFixture.configureByPhysicalText(fileName, fileContent)
 
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
+        waitForTinymistLanguageServerReady()
 
         // Get the current caret position
         val initialOffset = myFixture.editor.caretModel.offset

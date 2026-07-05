@@ -1,7 +1,7 @@
 <!-- Basic plugin configuration -->
 <idea-plugin>
     <!-- Unique id for the plugin. Must stay constant for the lifetime of the plugin. -->
-    <id>org.tinymist.typst</id>
+    <id>org.tinymist.main</id>
 
     <!-- Text to display as name on Settings | Plugins page -->
     <name>Tinymist Typst</name>

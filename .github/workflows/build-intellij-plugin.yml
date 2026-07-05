@@ -93,15 +93,28 @@ jobs:
           distribution: zulu
           java-version: 21
 
+      # Set up Rust for building the Tinymist executable used by LSP tests
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache-shared-key: x86_64-unknown-linux-gnu
+          cache-save-if: false
+
       # Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: true
 
+      # Build the language server executable used by IntelliJ LSP integration tests
+      - name: Build Tinymist executable
+        run: cargo build --bin tinymist --locked
+
       # Run tests
       - name: Run Tests
         run: ./gradlew :intellij:check
+        env:
+          TINYMIST_EXECUTABLE: ${{ github.workspace }}/target/debug/tinymist
 
       # Collect Tests Result of failed tests
       - name: Collect Tests Result

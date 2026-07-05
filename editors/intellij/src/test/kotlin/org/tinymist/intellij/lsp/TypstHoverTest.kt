@@ -4,8 +4,6 @@ import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider
 import com.intellij.platform.backend.documentation.DocumentationTarget
 import com.intellij.platform.backend.documentation.impl.computeDocumentationBlocking
 import com.intellij.util.containers.ContainerUtil
-import java.awt.event.InputEvent
-import java.awt.event.MouseEvent
 
 /**
  * Test for hover functionality in Typst files.
@@ -22,7 +20,7 @@ class TypstHoverTest : TypstPlatformTestCase() {
      * places the caret on a parameter, and simulates a hover event.
      */
     fun testHoverOnParameter() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -42,17 +40,7 @@ class TypstHoverTest : TypstPlatformTestCase() {
         val offset = fileContent.indexOf("content)")
         myFixture.editor.caretModel.moveToOffset(offset)
 
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
-
-        // Simulate a mouse hover event at the current caret position
-        simulateMouseHover()
-
-        // Wait for the hover tooltip to appear
-        Thread.sleep(500)
-
-        // Log for debugging
-        println("[DEBUG_LOG] Hover event simulated at caret position for parameter")
+        waitForTinymistLanguageServerReady()
 
         // Get the documentation target at the caret position
         val targets = getDocumentationTargets()
@@ -79,7 +67,7 @@ class TypstHoverTest : TypstPlatformTestCase() {
      * Test that hover works for a function call.
      */
     fun testHoverOnFunctionCall() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -99,17 +87,7 @@ class TypstHoverTest : TypstPlatformTestCase() {
         val offset = fileContent.indexOf("#highlight")
         myFixture.editor.caretModel.moveToOffset(offset + 1) // Position after the # character
 
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
-
-        // Simulate a mouse hover event at the current caret position
-        simulateMouseHover()
-
-        // Wait for the hover tooltip to appear
-        Thread.sleep(500)
-
-        // Log for debugging
-        println("[DEBUG_LOG] Hover event simulated at caret position for function call")
+        waitForTinymistLanguageServerReady()
 
         // Get the documentation target at the caret position
         val targets = getDocumentationTargets()
@@ -130,31 +108,6 @@ class TypstHoverTest : TypstPlatformTestCase() {
         // Verify that the HTML content contains expected text
         assertTrue("Documentation HTML does not contain expected content", 
                   html?.contains("highlight") == true || html?.contains("function") == true)
-    }
-
-    /**
-     * Helper method to simulate a mouse hover event at the current caret position.
-     * This triggers the hover tooltip to appear.
-     */
-    private fun simulateMouseHover() {
-        val editor = myFixture.editor
-        val editorComponent = editor.contentComponent
-        val point = editor.visualPositionToXY(editor.caretModel.visualPosition)
-
-        // Create a mouse event that simulates hovering
-        val event = MouseEvent(
-            editorComponent,
-            MouseEvent.MOUSE_MOVED,
-            System.currentTimeMillis(),
-            InputEvent.BUTTON1_DOWN_MASK,
-            point.x,
-            point.y,
-            1,
-            false
-        )
-
-        // Dispatch the event to the editor component
-        editorComponent.dispatchEvent(event)
     }
 
     /**

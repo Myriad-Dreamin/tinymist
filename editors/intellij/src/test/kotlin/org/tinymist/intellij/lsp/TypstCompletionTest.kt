@@ -16,7 +16,7 @@ class TypstCompletionTest : TypstPlatformTestCase() {
      * completion suggestions are displayed when the completion action is triggered.
      */
     fun testCompletionAfterHash() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Create a temporary Typst file with content
         val fileName = "test.typ"
@@ -29,8 +29,7 @@ class TypstCompletionTest : TypstPlatformTestCase() {
         // Move the caret to the position where we want to trigger completion
         myFixture.editor.caretModel.moveToOffset(1)
 
-        // Wait for the LSP server to start and be ready
-        Thread.sleep(2000)
+        waitForTinymistLanguageServerReady()
 
         // Trigger completion at the current position
         val lookupElements = myFixture.completeBasic()

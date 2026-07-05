@@ -1,5 +1,6 @@
 package org.tinymist.intellij
 
+import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class TypstFileTypeTest : BasePlatformTestCase() {
@@ -13,14 +14,7 @@ class TypstFileTypeTest : BasePlatformTestCase() {
     }
 
     fun testFileTypeAssociation() {
-        // Create a temporary file with .typ extension
-        val fileName = "test.typ"
-        myFixture.configureByText(fileName, "")
-
-        // Get the virtual file
-        val virtualFile = myFixture.file.virtualFile
-
-        // Verify that the file is recognized as a Typst file
-        assertEquals(TypstFileType, virtualFile.fileType)
+        val fileType = FileTypeManager.getInstance().getFileTypeByFileName("test.typ")
+        assertEquals(TypstFileType, fileType)
     }
 }

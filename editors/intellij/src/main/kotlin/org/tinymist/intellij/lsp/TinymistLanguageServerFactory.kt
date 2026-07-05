@@ -5,7 +5,7 @@ import com.redhat.devtools.lsp4ij.LanguageServerFactory
 import com.redhat.devtools.lsp4ij.client.features.LSPClientFeatures
 import com.redhat.devtools.lsp4ij.installation.ServerInstaller
 import com.redhat.devtools.lsp4ij.server.StreamConnectionProvider
-import org.eclipse.lsp4j.InitializeParams
+import org.tinymist.intellij.settings.ServerManagementMode
 import org.tinymist.intellij.settings.TinymistSettingsService
 
 class TinymistLanguageServerFactory : LanguageServerFactory {
@@ -18,7 +18,14 @@ class TinymistLanguageServerFactory : LanguageServerFactory {
             .setDiagnosticFeature(TinymistLSPDiagnosticFeature())
     }
 
-    override fun createServerInstaller(): ServerInstaller {
+    override fun createServerInstaller(): ServerInstaller? {
+        val settingsService = TinymistSettingsService.instance
+        if (settingsService.serverManagementMode == ServerManagementMode.CUSTOM_PATH &&
+            settingsService.tinymistExecutablePath.isNotBlank()
+        ) {
+            return null
+        }
+
         return TinymistLanguageServerInstaller()
     }
 }

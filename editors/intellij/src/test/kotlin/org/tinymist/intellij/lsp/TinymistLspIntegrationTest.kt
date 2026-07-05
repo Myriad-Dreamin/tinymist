@@ -8,10 +8,10 @@ class TinymistLspIntegrationTest : TypstPlatformTestCase() {
 
     /**
      * Test that verifies the LSP server is correctly started when a Typst file is opened.
-     * This test runs only when an explicit test Tinymist executable is available.
+     * This test requires a Tinymist executable to be available.
      */
     fun testLspServerStartsForTypstFile() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Creates a temporary Typst file
         val fileName = "test.typ"
@@ -36,13 +36,8 @@ class TinymistLspIntegrationTest : TypstPlatformTestCase() {
             document!!.insertString(document.textLength, "\n\nAdded text for testing.")
         }
 
-        // Verifies that the LSP server exists for this file
-
-        // Note: LanguageServiceAccessor is used here despite being marked with @ApiStatus.Internal in LSP4IJ.
-        // This may lead to issues in the future if the API changes.
-        val languageServiceAccessor = com.redhat.devtools.lsp4ij.LanguageServiceAccessor.getInstance(project)
-        val hasServer = languageServiceAccessor.hasAny(myFixture.file) { true }
-        assertTrue("LSP server should exist for Typst files", hasServer)
+        val server = waitForTinymistLanguageServerReady()
+        assertEquals(TINYMIST_SERVER_ID, server.serverDefinition.id)
     }
 
     /**
@@ -50,7 +45,7 @@ class TinymistLspIntegrationTest : TypstPlatformTestCase() {
      * This test requires the actual tinymist executable to be available.
      */
     fun testLspCompletion() {
-        if (!configureTinymistExecutableForTests()) return
+        configureTinymistExecutableForTests()
 
         // Creates a temporary Typst file with content that should trigger completion
         val fileName = "completion_test.typ"
@@ -63,8 +58,7 @@ class TinymistLspIntegrationTest : TypstPlatformTestCase() {
         // Moves the caret to the position where we want to trigger completion
         myFixture.editor.caretModel.moveToOffset(fileContent.length)
 
-        // Waits for the LSP server to start and be ready
-        waitForLspServerReady()
+        waitForTinymistLanguageServerReady()
 
         // Triggers completion at the current position
         val lookupElements = myFixture.completeBasic()
@@ -78,12 +72,4 @@ class TinymistLspIntegrationTest : TypstPlatformTestCase() {
         assertTrue("Completion should include 'text' function", completionTexts.contains("text"))
     }
 
-    /**
-     * Helper method to wait for the LSP server to be ready.
-     * This is a simplified approach and might need to be adjusted based on the actual behavior.
-     */
-    private fun waitForLspServerReady() {
-        // Waits for a reasonable amount of time for the server to start
-        Thread.sleep(2000)
-    }
 }
