@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred.typ
+---
+"f" = () => Undef
+"g" = () => TypeUnary { lhs: 1, op: Return }
+"h" = () => Undef
+"g" = () => TypeUnary { lhs: 1, op: Return }
+=====
+5..6 -> @f
+19..20 -> @g
+53..54 -> @g
+53..56 -> TypeUnary { lhs: 1, op: Return }
+65..66 -> @h
+79..80 -> @g

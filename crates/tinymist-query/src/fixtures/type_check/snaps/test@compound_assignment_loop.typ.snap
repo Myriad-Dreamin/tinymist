@@ -1,0 +1,32 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/compound_assignment_loop.typ
+---
+"scan-backwards" = (Any) => Any
+"s" = Any
+"len" = TypeBinary { operands: (Any, 1), op: Sub }
+"i" = Any
+"assign-from-unknown" = (Any) => 0
+"unknown" = Any
+"i" = 0
+=====
+5..19 -> @scan-backwards
+20..21 -> @s
+33..36 -> @len
+39..40 -> @s
+39..44 -> @v"s".len
+39..46 -> Any
+57..58 -> @i
+61..64 -> @len
+73..74 -> @i
+85..86 -> @i
+98..99 -> @i
+108..127 -> @assign-from-unknown
+128..135 -> @unknown
+147..148 -> @i
+161..168 -> @unknown
+179..180 -> @i
+183..190 -> @unknown
+199..206 -> @unknown
+218..219 -> @i

@@ -1,0 +1,73 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
+---
+"loop-none" = () => None
+"i" = Any
+"x" = Any
+"loop-tuple" = (("size": Any) => None).with(..("size": 50) => any)
+"size" = 50
+"i" = Any
+"loop-command" = () => None
+"i" = Any
+"" = (Any) => Any
+"ctx" = Any
+"loop-continue-command" = () => None
+"i" = 0
+"" = (Any) => Any
+"ctx" = Any
+"loop-conditional-break" = () => None
+"i" = 1
+"" = (Any) => Any
+"ctx" = Any
+"loop-break" = () => 3
+"i" = Any
+"while-false" = () => 3
+=====
+5..14 -> @loop-none
+27..28 -> @i
+32..37 -> Func(range)
+32..40 -> Type(array)
+51..52 -> @x
+55..56 -> @i
+69..79 -> @loop-tuple
+80..84 -> @size
+100..101 -> @i
+105..110 -> Func(range)
+105..113 -> Type(array)
+120..178 -> ({"steps": @size, "type": "move"}, {"degrees": 90, "type": "turn"}, )
+121..148 -> {"steps": @size, "type": "move"}
+143..147 -> @size
+150..177 -> {"degrees": 90, "type": "turn"}
+191..203 -> @loop-command
+216..217 -> @i
+221..226 -> Func(range)
+221..229 -> Type(array)
+236..249 -> ((@ctx) => @ctx, )
+237..240 -> @ctx
+237..247 -> @
+244..247 -> @ctx
+262..283 -> @loop-continue-command
+296..297 -> @i
+301..306 -> Func(range)
+301..309 -> Type(array)
+319..320 -> @i
+343..356 -> ((@ctx) => @ctx, )
+344..347 -> @ctx
+344..354 -> @
+351..354 -> @ctx
+369..391 -> @loop-conditional-break
+404..405 -> @i
+409..414 -> Func(range)
+409..417 -> Type(array)
+427..428 -> @i
+448..461 -> ((@ctx) => @ctx, )
+449..452 -> @ctx
+449..459 -> @
+456..459 -> @ctx
+474..484 -> @loop-break
+497..498 -> @i
+502..507 -> Func(range)
+502..510 -> Type(array)
+539..550 -> @while-false
