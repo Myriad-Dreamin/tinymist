@@ -2,10 +2,11 @@ package org.tinymist.intellij.settings
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.redhat.devtools.lsp4ij.LanguageServersRegistry
+import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinition
 import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener.LanguageServerChangedEvent
-import com.redhat.devtools.lsp4ij.server.definition.LanguageServerDefinitionListener.LanguageServerDefinitionEvent
 import javax.swing.JComponent
 
 class TinymistSettingsConfigurable : Configurable {
@@ -35,7 +36,7 @@ class TinymistSettingsConfigurable : Configurable {
 
     override fun apply() {
         val panel = settingsPanel ?: return
-        
+
         val currentSettingsPath = settingsService.state.tinymistExecutablePath
         val currentManagementMode = settingsService.state.serverManagementMode
         val newPanelPath = panel.tinymistExecutablePath
@@ -59,21 +60,10 @@ class TinymistSettingsConfigurable : Configurable {
 
                 ProjectManager.getInstance().openProjects.forEach { project ->
                     if (!project.isDisposed && project.isOpen) {
-                        // Construct and fire the LanguageServerChangedEvent
-                        val event = LanguageServerChangedEvent(
-                            LanguageServerDefinitionEvent.UpdatedBy.USER, // who triggered the update
-                            project,       // current project
-                            serverDefinition, // the definition of our server
-                            false,         // nameChanged
-                            true,          // commandChanged - THIS IS KEY
-                            false,         // userEnvironmentVariablesChanged
-                            false,         // includeSystemEnvironmentVariablesChanged
-                            false,         // mappingsChanged
-                            false,         // clientConfigurationContentChanged
-                            false          // installerConfigurationContentChanged
-                        )
-                        registry.handleChangeEvent(event) // Notify lsp4ij about the change
-                        LOG.info("Fired LanguageServerChangedEvent for project: ${project.name}. lsp4ij should handle server restart.")
+                        createCommandChangedEvent(project, serverDefinition)?.let { event ->
+                            registry.handleChangeEvent(event) // Notify lsp4ij about the change
+                            LOG.info("Fired LanguageServerChangedEvent for project: ${project.name}. lsp4ij should handle server restart.")
+                        } ?: LOG.warn("Could not create a compatible LanguageServerChangedEvent for project: ${project.name}.")
                     }
                 }
             } else {
@@ -91,4 +81,53 @@ class TinymistSettingsConfigurable : Configurable {
     override fun disposeUIResources() {
         settingsPanel = null
     }
-} 
+
+    private fun createCommandChangedEvent(
+        project: Project,
+        serverDefinition: LanguageServerDefinition,
+    ): LanguageServerChangedEvent? {
+        val eventClass = LanguageServerChangedEvent::class.java
+
+        eventClass.constructors
+            .sortedByDescending { constructor ->
+                constructor.parameterTypes.count { parameterType -> parameterType == Boolean::class.javaPrimitiveType }
+            }
+            .forEach { constructor ->
+                val args = buildCommandChangedEventArgs(constructor.parameterTypes, project, serverDefinition)
+                    ?: return@forEach
+
+                return runCatching {
+                    constructor.newInstance(*args) as LanguageServerChangedEvent
+                }.getOrElse { error ->
+                    LOG.debug("Failed to create LanguageServerChangedEvent with constructor: $constructor", error)
+                    null
+                }
+            }
+
+        return null
+    }
+
+    private fun buildCommandChangedEventArgs(
+        parameterTypes: Array<Class<*>>,
+        project: Project,
+        serverDefinition: LanguageServerDefinition,
+    ): Array<Any>? {
+        var booleanIndex = 0
+        val args = mutableListOf<Any>()
+
+        parameterTypes.forEach { parameterType ->
+            val arg = when {
+                parameterType.isAssignableFrom(project.javaClass) -> project
+                parameterType.isAssignableFrom(serverDefinition.javaClass) -> serverDefinition
+                parameterType == Boolean::class.javaPrimitiveType -> booleanIndex++ == 1
+                parameterType.isEnum && parameterType.simpleName == "UpdatedBy" ->
+                    parameterType.enumConstants.firstOrNull { (it as? Enum<*>)?.name == "USER" }
+                else -> return null
+            } ?: return null
+
+            args.add(arg)
+        }
+
+        return if (booleanIndex >= 2) args.toTypedArray() else null
+    }
+}
