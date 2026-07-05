@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod apply;
+pub(crate) mod bytecode;
 mod docs;
 mod select;
 mod syntax;
