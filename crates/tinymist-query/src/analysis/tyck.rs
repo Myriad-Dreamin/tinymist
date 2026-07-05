@@ -5,6 +5,8 @@ use std::sync::OnceLock;
 use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
+use self::bytecode::TyExecutionBackend;
+
 use super::{
     BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
     TypeVarBounds, prelude::*,
@@ -27,6 +29,7 @@ pub(crate) use select::*;
 pub struct TypeEnv {
     visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
     exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
+    bytecode_caches: bytecode::TyVmCaches,
 }
 
 /// Type checking at the source unit level.
@@ -53,6 +56,9 @@ pub(crate) fn type_check(
         env,
         call_cache: Default::default(),
         module_exports: Default::default(),
+        bytecode_globals: Default::default(),
+        bytecode_metrics: Default::default(),
+        experimental_warnings: Default::default(),
     };
 
     let type_check_start = tinymist_std::time::Instant::now();
@@ -88,6 +94,9 @@ pub(crate) struct TypeChecker<'a> {
 
     info: TypeInfo,
     module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
+    bytecode_globals: FxHashMap<DeclExpr, bytecode::SemValue>,
+    bytecode_metrics: bytecode::VmMetrics,
+    experimental_warnings: FxHashSet<&'static str>,
 
     call_cache: FxHashSet<CallCacheDesc>,
 
@@ -149,6 +158,42 @@ impl TyCtxMut for TypeChecker<'_> {
 impl TypeChecker<'_> {
     fn check(&mut self, expr: &Expr) -> Ty {
         self.check_syntax(expr).unwrap_or(Ty::undef())
+    }
+
+    fn check_by_bytecode(&mut self, expr: &Expr) -> Option<Ty> {
+        if !bytecode::supports_compile_before_check(expr) {
+            return None;
+        }
+
+        let (value, meta_epoch) = self.eval_bytecode_unchecked(expr);
+        let ty = self.env.bytecode_caches.quote_cached(&value, meta_epoch);
+        let span = expr.span();
+        if !span.is_detached() {
+            self.info.witness_at_least(span, ty.clone());
+        }
+        Some(ty)
+    }
+
+    fn eval_bytecode_unchecked(&mut self, expr: &Expr) -> (bytecode::SemValue, u64) {
+        let mut compiler = bytecode::TyBytecodeCompiler::default();
+        let program = compiler.compile_expr(expr);
+        let meta_epoch = self.info.revision as u64;
+        let env = bytecode::ExecutionEnv {
+            globals: self.bytecode_globals.clone().into_iter().collect(),
+            source_revision: self.ei.revision as u64,
+            context_key: self.ei.fid.into_raw().get() as u64,
+            meta_epoch,
+        };
+        let result =
+            bytecode::RustInterpreterBackend.execute(&program, &env, &self.env.bytecode_caches);
+        self.bytecode_metrics += result.metrics;
+        (result.value, meta_epoch)
+    }
+
+    fn warn_experimental_once(&mut self, key: &'static str, message: impl std::fmt::Display) {
+        if self.experimental_warnings.insert(key) {
+            log::warn!("experimental type VM check: {message}");
+        }
     }
 
     fn copy_doc_vars(

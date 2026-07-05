@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/vm_binary_fold.typ
+---
+"x" = "ab"
+=====
+5..6 -> @x

@@ -564,6 +564,94 @@ impl TyBytecodeCompiler {
     }
 }
 
+/// Whether the checker may safely route this expression through the bytecode
+/// deduce path without losing side effects from the legacy traversal.
+pub(crate) fn supports_compile_before_check(expr: &Expr) -> bool {
+    match expr {
+        Expr::Array(args) | Expr::Dict(args) | Expr::Args(args) => {
+            args.args.iter().all(|arg| match arg {
+                ArgExpr::Pos(expr) | ArgExpr::Spread(expr) => supports_compile_before_check(expr),
+                ArgExpr::Named(named) => supports_compile_before_check(&named.1),
+                ArgExpr::NamedRt(named) => {
+                    supports_compile_before_check(&named.0)
+                        && supports_compile_before_check(&named.1)
+                }
+            })
+        }
+        Expr::Unary(unary) => supports_compile_before_check(&unary.lhs),
+        Expr::Binary(binary) => {
+            supports_compile_before_check(&binary.operands.0)
+                && supports_compile_before_check(&binary.operands.1)
+        }
+        Expr::Apply(apply) => {
+            supports_compile_before_check(&apply.callee)
+                && supports_compile_before_check(&apply.args)
+        }
+        Expr::Select(select) => supports_compile_before_check(&select.lhs),
+        Expr::Conditional(if_expr) => {
+            supports_compile_before_check(&if_expr.cond)
+                && supports_compile_before_check(&if_expr.then)
+                && supports_compile_before_check(&if_expr.else_)
+        }
+        Expr::Contextual(expr) => supports_compile_before_check(expr),
+        Expr::Type(..) | Expr::Decl(..) | Expr::Ref(..) => true,
+        Expr::Block(..)
+        | Expr::Func(..)
+        | Expr::Let(..)
+        | Expr::Pattern(..)
+        | Expr::Element(..)
+        | Expr::Import(..)
+        | Expr::Include(..)
+        | Expr::Show(..)
+        | Expr::Set(..)
+        | Expr::ContentRef(..)
+        | Expr::WhileLoop(..)
+        | Expr::ForLoop(..)
+        | Expr::Star => false,
+    }
+}
+
+/// Whether the checker may use VM evaluation directly without needing lexical
+/// bindings from the legacy `TypeInfo` scope.
+pub(crate) fn supports_binding_free_check(expr: &Expr) -> bool {
+    match expr {
+        Expr::Array(args) | Expr::Dict(args) | Expr::Args(args) => {
+            args.args.iter().all(|arg| match arg {
+                ArgExpr::Pos(expr) | ArgExpr::Spread(expr) => supports_binding_free_check(expr),
+                ArgExpr::Named(named) => supports_binding_free_check(&named.1),
+                ArgExpr::NamedRt(named) => {
+                    supports_binding_free_check(&named.0) && supports_binding_free_check(&named.1)
+                }
+            })
+        }
+        Expr::Unary(unary) => supports_binding_free_check(&unary.lhs),
+        Expr::Binary(binary) => {
+            supports_binding_free_check(&binary.operands.0)
+                && supports_binding_free_check(&binary.operands.1)
+        }
+        Expr::Contextual(expr) => supports_binding_free_check(expr),
+        Expr::Type(..) => true,
+        Expr::Decl(..)
+        | Expr::Ref(..)
+        | Expr::Apply(..)
+        | Expr::Select(..)
+        | Expr::Conditional(..)
+        | Expr::Block(..)
+        | Expr::Func(..)
+        | Expr::Let(..)
+        | Expr::Pattern(..)
+        | Expr::Element(..)
+        | Expr::Import(..)
+        | Expr::Include(..)
+        | Expr::Show(..)
+        | Expr::Set(..)
+        | Expr::ContentRef(..)
+        | Expr::WhileLoop(..)
+        | Expr::ForLoop(..)
+        | Expr::Star => false,
+    }
+}
+
 /// WebAssembly host ABI names and handle types for emitted type bytecode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct WasmHostAbi {
@@ -1023,11 +1111,8 @@ impl<'a> TyVm<'a> {
                 TyInstr::Binary(op) => {
                     let rhs = self.stack.pop().unwrap_or(SemValue::Any);
                     let lhs = self.stack.pop().unwrap_or(SemValue::Any);
-                    self.stack.push(SemValue::Neutral(NeutralValue::Binary {
-                        op: *op,
-                        lhs: Box::new(lhs),
-                        rhs: Box::new(rhs),
-                    }));
+                    let value = self.binary(*op, lhs, rhs);
+                    self.stack.push(value);
                 }
                 TyInstr::JumpIfFalse { target } => {
                     let cond = self.stack.pop().unwrap_or(SemValue::Any);
@@ -1165,6 +1250,37 @@ impl<'a> TyVm<'a> {
                 field,
             }),
         }
+    }
+
+    fn binary(&mut self, op: BinOp, lhs: SemValue, rhs: SemValue) -> SemValue {
+        match (&lhs, &rhs) {
+            (SemValue::Type(Ty::Value(lhs_val)), SemValue::Type(Ty::Value(rhs_val)))
+                if op == BinOp::Add =>
+            {
+                if let (
+                    typst::foundations::Value::Str(lhs_str),
+                    typst::foundations::Value::Str(rhs_str),
+                ) = (&lhs_val.val, &rhs_val.val)
+                {
+                    let mut combined = EcoString::with_capacity(lhs_str.len() + rhs_str.len());
+                    combined.push_str(lhs_str.as_str());
+                    combined.push_str(rhs_str.as_str());
+                    return SemValue::Type(Ty::Value(crate::ty::InsTy::new(
+                        typst::foundations::Value::Str(combined.into()),
+                    )));
+                }
+            }
+            (SemValue::Type(lhs), SemValue::Type(rhs)) => {
+                return SemValue::Type(Ty::Binary(TypeBinary::new(op, lhs.clone(), rhs.clone())));
+            }
+            _ => {}
+        }
+
+        SemValue::Neutral(NeutralValue::Binary {
+            op,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        })
     }
 
     fn pop_many(&mut self, len: usize) -> Vec<SemValue> {

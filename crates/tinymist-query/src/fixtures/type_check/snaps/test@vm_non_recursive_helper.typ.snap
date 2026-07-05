@@ -1,0 +1,16 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/vm_non_recursive_helper.typ
+---
+"g" = () => "ab"
+"f" = () => "ab"
+"x" = "ab"
+=====
+5..6 -> @g
+26..27 -> @f
+32..33 -> @g
+32..35 -> "ab"
+41..42 -> @x
+45..46 -> @f
+45..48 -> "ab"

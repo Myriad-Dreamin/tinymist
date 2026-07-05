@@ -395,6 +395,14 @@ impl TypeChecker<'_> {
             }
         }
 
+        let binary_expr = Expr::Binary(binary.clone());
+        if crate::analysis::tyck::bytecode::supports_binding_free_check(&binary_expr)
+            && let Some(ty) = self.check_by_bytecode(&binary_expr)
+        {
+            self.warn_experimental_once("binary-vm", format!("checked binary op {op:?}"));
+            return ty;
+        }
+
         if op == ast::BinOp::Add
             && let Ty::Value(lhs_val) = &lhs
             && let Ty::Value(rhs_val) = &rhs
@@ -454,6 +462,14 @@ impl TypeChecker<'_> {
 
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
 
+        if let Expr::Decl(decl) = &apply.callee
+            && self.bytecode_globals.contains_key(decl)
+            && let Some(res) = self.check_by_bytecode(&Expr::Apply(apply.clone()))
+        {
+            self.info.witness_at_least(apply.span, res.clone());
+            return res;
+        }
+
         if let Ty::Args(args) = args {
             let mut worker = ApplyTypeChecker {
                 base: self,
@@ -473,6 +489,8 @@ impl TypeChecker<'_> {
     fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {
         let def_id = func.decl.clone();
         let var = Ty::Var(self.get_var(&def_id));
+        let (closure, _) = self.eval_bytecode_unchecked(&Expr::Func(func.clone()));
+        self.bytecode_globals.insert(def_id.clone(), closure);
 
         let docstring = self.check_docstring(&def_id);
         let docstring = docstring.as_deref().unwrap_or(&EMPTY_DOCSTRING);
@@ -522,6 +540,12 @@ impl TypeChecker<'_> {
             Some(expr) => self.check(expr),
             None => Ty::Builtin(BuiltinTy::None),
         };
+        if let Some(Expr::Func(func)) = let_expr.body.as_ref()
+            && let Pattern::Simple(decl) = let_expr.pattern.as_ref()
+        {
+            let (closure, _) = self.eval_bytecode_unchecked(&Expr::Func(func.clone()));
+            self.bytecode_globals.insert(decl.clone(), closure);
+        }
         if let Some(annotated) = &docstring.res_ty {
             self.constrain(&term, annotated);
         }

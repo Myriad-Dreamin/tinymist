@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/vm_doc_signature.typ
+---
+"folded" = () => "ab"
+=====
+34..40 -> @folded

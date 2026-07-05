@@ -1030,6 +1030,9 @@ impl SharedContext {
     pub(crate) fn sig_of_def(self: &Arc<Self>, def: Definition) -> Option<Signature> {
         crate::log_debug_ct!("check definition func {def:?}");
         let source = def.decl.file_id().and_then(|id| self.source_by_id(id).ok());
+        if let Some(source) = source.as_ref() {
+            let _ = self.type_check(source);
+        }
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
