@@ -1,14 +1,12 @@
 package org.tinymist.intellij.lsp
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
-
 /**
  * Test for completion functionality in Typst files.
  *
  * This test verifies that the completion functionality works correctly
  * by opening a Typst file and checking that completion suggestions are displayed.
  */
-class TypstCompletionTest : BasePlatformTestCase() {
+class TypstCompletionTest : TypstPlatformTestCase() {
 
     /**
      * Test that completion works for a simple Typst file.
@@ -18,12 +16,15 @@ class TypstCompletionTest : BasePlatformTestCase() {
      * completion suggestions are displayed when the completion action is triggered.
      */
     fun testCompletionAfterHash() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Create a temporary Typst file with content
         val fileName = "test.typ"
         val fileContent = "#"
 
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configure the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger completion
         myFixture.editor.caretModel.moveToOffset(1)

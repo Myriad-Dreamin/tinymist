@@ -3,9 +3,7 @@ package org.tinymist.intellij.lsp
 import com.intellij.lang.documentation.ide.IdeDocumentationTargetProvider
 import com.intellij.platform.backend.documentation.DocumentationTarget
 import com.intellij.platform.backend.documentation.impl.computeDocumentationBlocking
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.containers.ContainerUtil
-import org.junit.Test
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 
@@ -15,7 +13,7 @@ import java.awt.event.MouseEvent
  * This test verifies that the hover functionality works correctly
  * by opening a Typst file and simulating a hover event.
  */
-class TypstHoverTest : BasePlatformTestCase() {
+class TypstHoverTest : TypstPlatformTestCase() {
 
     /**
      * Test that hover works for a simple Typst file.
@@ -24,6 +22,8 @@ class TypstHoverTest : BasePlatformTestCase() {
      * places the caret on a parameter, and simulates a hover event.
      */
     fun testHoverOnParameter() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Create a temporary Typst file with content
         val fileName = "test.typ"
         val fileContent = """
@@ -34,8 +34,9 @@ class TypstHoverTest : BasePlatformTestCase() {
             #highlight[This text should be highlighted in red.]
             """
 
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configure the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger hover
         val offset = fileContent.indexOf("content)")
@@ -78,6 +79,8 @@ class TypstHoverTest : BasePlatformTestCase() {
      * Test that hover works for a function call.
      */
     fun testHoverOnFunctionCall() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Create a temporary Typst file with content
         val fileName = "test.typ"
         val fileContent = """
@@ -88,8 +91,9 @@ class TypstHoverTest : BasePlatformTestCase() {
             #highlight[This text should be highlighted in red.]
             """
 
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configure the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Move the caret to the position where we want to trigger hover (on the function call)
         val offset = fileContent.indexOf("#highlight")

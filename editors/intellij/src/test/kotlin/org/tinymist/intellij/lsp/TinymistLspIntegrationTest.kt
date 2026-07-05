@@ -2,22 +2,24 @@ package org.tinymist.intellij.lsp
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.tinymist.intellij.TypstFileType
 
-class TinymistLspIntegrationTest : BasePlatformTestCase() {
+class TinymistLspIntegrationTest : TypstPlatformTestCase() {
 
     /**
      * Test that verifies the LSP server is correctly started when a Typst file is opened.
-     * This test uses a mock LSP server to avoid dependencies on the actual tinymist executable.
+     * This test runs only when an explicit test Tinymist executable is available.
      */
     fun testLspServerStartsForTypstFile() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Creates a temporary Typst file
         val fileName = "test.typ"
         val fileContent = "#set page(width: 10cm, height: auto)\n\n= Hello, Typst!\n\nThis is a test document."
 
-        // Configures the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configures the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Gets the virtual file
         val virtualFile = myFixture.file.virtualFile
@@ -48,12 +50,15 @@ class TinymistLspIntegrationTest : BasePlatformTestCase() {
      * This test requires the actual tinymist executable to be available.
      */
     fun testLspCompletion() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Creates a temporary Typst file with content that should trigger completion
         val fileName = "completion_test.typ"
         val fileContent = "#set page(width: 10cm, height: auto)\n\n#"
 
-        // Configures the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configures the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Moves the caret to the position where we want to trigger completion
         myFixture.editor.caretModel.moveToOffset(fileContent.length)

@@ -1,14 +1,12 @@
 package org.tinymist.intellij.lsp
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
-
 /**
  * Test for "Go to Definition" functionality in Typst files.
  * 
  * This test verifies that the "Go to Definition" functionality works correctly
  * by opening a Typst file and checking that navigation to the definition works.
  */
-class TypstGoToDefinitionTest : BasePlatformTestCase() {
+class TypstGoToDefinitionTest : TypstPlatformTestCase() {
 
     /**
      * Test that "Go to Definition" works for a function call.
@@ -18,6 +16,8 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
      * navigates to the function definition.
      */
     fun testGoToDefinitionForFunctionCall() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Create a temporary Typst file with content
         val fileName = "test.typ"
         val fileContent = """
@@ -28,8 +28,9 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
             #high<caret>light[This text should be highlighted in red.]
             """
 
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configure the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Wait for the LSP server to start and be ready
         Thread.sleep(2000)
@@ -62,6 +63,8 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
      * navigates to the parameter definition.
      */
     fun testGoToDefinitionForParameterReference() {
+        if (!configureTinymistExecutableForTests()) return
+
         // Create a temporary Typst file with content
         val fileName = "test.typ"
         val fileContent = """
@@ -72,8 +75,9 @@ class TypstGoToDefinitionTest : BasePlatformTestCase() {
             #highlight[This text should be highlighted in red.]
             """
 
-        // Configure the test fixture with the file
-        myFixture.configureByText(fileName, fileContent)
+        // Configure the test fixture with a real project file. LSP4IJ needs a
+        // file-backed VirtualFile; light files throw from VirtualFile.toNioPath.
+        myFixture.configureByPhysicalText(fileName, fileContent)
 
         // Wait for the LSP server to start and be ready
         Thread.sleep(2000)
