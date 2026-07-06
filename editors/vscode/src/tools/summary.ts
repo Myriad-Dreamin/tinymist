@@ -137,22 +137,27 @@ export default defineEditorTool({
     preserveFocus: true,
   },
 
-  transformHtml: async (html, { context }) => {
+  transformHtml: async (html, { context, dispose }) => {
     const fontsExportConfigure = getFontsExportConfigure(context);
     const fontsExportConfig = JSON.stringify(fontsExportConfigure.data);
     const [docMetrics, serverInfo] = await fetchSummaryInfo();
 
-    if (!docMetrics) {
-      vscode.window.showWarningMessage("No document metrics available");
-    }
-    if (!serverInfo) {
-      vscode.window.showWarningMessage("No server info");
+    if (!docMetrics || !serverInfo) {
+      if (!docMetrics) {
+        await vscode.window.showErrorMessage("No document metrics available");
+      }
+      if (!serverInfo) {
+        await vscode.window.showErrorMessage("No server info");
+      }
+
+      dispose();
+      throw new Error("No document metrics or server info");
     }
 
     return substituteTemplateString(html, {
       ":[[preview:FontsExportConfigure]]:": fontsExportConfig,
-      ":[[preview:DocumentMetrics]]:": docMetrics ?? "null",
-      ":[[preview:ServerInfo]]:": serverInfo ?? "null",
+      ":[[preview:DocumentMetrics]]:": docMetrics,
+      ":[[preview:ServerInfo]]:": serverInfo,
     });
   },
 });
