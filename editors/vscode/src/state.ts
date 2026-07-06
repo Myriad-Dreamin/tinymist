@@ -31,8 +31,6 @@ interface ExtensionState {
     serverHealthWarningShown: boolean;
     serverReady: boolean;
   };
-  getFocusingFile(): string | undefined;
-  getFocusingDoc(): vscode.TextDocument | undefined;
   getFocusingPreviewPanelContext(): PreviewPanelContext | undefined;
 }
 
@@ -62,18 +60,6 @@ export const extensionState: ExtensionState = {
     focusingPreviewPanelContext: undefined,
     serverHealthWarningShown: false,
     serverReady: false,
-  },
-  getFocusingFile() {
-    const doc = extensionState.getFocusingDoc();
-    if (!doc) {
-      return undefined;
-    }
-
-    return doc.isUntitled ? "/untitled/" + doc.uri.fsPath : doc.uri.fsPath;
-  },
-  getFocusingDoc() {
-    const doc = extensionState.mut.focusing.doc;
-    return doc?.isClosed === false ? doc : undefined;
   },
   getFocusingPreviewPanelContext() {
     return extensionState.mut.focusingPreviewPanelContext;
