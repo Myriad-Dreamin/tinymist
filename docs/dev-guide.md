@@ -28,7 +28,7 @@ To contribute to tinymist, you need to install the following tools:
 
 You don't have to configure anything to start developing tinymist. However, here we provide some tips to make your development experience better.
 
-- [@Myriad-Dreamin's VS Code Settings](#appendix-myriad-dreamins-vs-code-settings)
+- [@Myriad-Dreamin's VS Code Settings](./dev-guide/vscode-extension.md#appendix-myriad-dreamins-vs-code-settings)
 
 ## Building and Running
 
@@ -44,7 +44,9 @@ cargo build --release
 cargo build --profile=gh-release
 ```
 
-To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension. The VS Code extension also shows how we build and run the language server and the editor tools.
+To run VS Code extension locally, open the repository in VS Code and press `F5` to start a debug session to extension. The VS Code extension also shows how we build and run the language server and the editor tools. See [VS Code Extension](./dev-guide/vscode-extension.md) for more details.
+
+To run IntelliJ plugin, execute `./gradlew :intellij:runIde` in the root directory. See [IntelliJ Plugin](./dev-guide/intellij-plugin.md) for more details.
 
 ## Local Documentation
 
@@ -126,71 +128,3 @@ To run e2e tests for tinymist on Windows:
 ## Release on GitHub
 
 The code owners and maintainers of the release channels can check the [Release Guide](/dev-guide/release-instruction.md) to learn how to check and release the new version of tinymist.
-
-
-## APPENDIX: @Myriad-Dreamin's VS Code Settings
-
-Applies the workspace settings template:
-
-```
-cp .vscode/tinymist.code-workspace.tmpl.json .vscode/tinymist.code-workspace.json
-```
-
-And then open the workspace in VS Code.
-
-Rust Settings explained:
-
-This configuration enables clippy on save:
-
-```json
-{
-		"rust-analyzer.check.command": "clippy",
-}
-```
-
-This configuration wraps comments automatically:
-
-```json
-{
-		"rust-analyzer.rustfmt.extraArgs": ["--config=wrap_comments=true"],
-}
-```
-
-This configuration excludes the `target` folder from the file watcher:
-
-```json
-{
-  "files.watcherExclude": {
-    "**/target": true
-  },
-}
-```
-
-Typst Settings explained:
-
-This configuration help use the same fonts as the CI building tinymist docs:
-
-```json
-{
-  "tinymist.fontPaths": [
-    "assets/fonts"
-  ],
-}
-```
-
-Formatter Settings explained:
-
-This configuration runs formatters on save and using the `prettier` formatter:
-
-```json
-{
-  "[javascript]":{
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
-  },
-  "[json]": {
-    "editor.formatOnSave": true,
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
-  },
-}
-```

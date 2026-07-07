@@ -10,8 +10,10 @@ editors/vscode/out/
 editors/lapce/out/
 /external/typst-preview
 /dist
+/build
 
 *.pdf
 .vscode/*.code-workspace
 refs/
 .playwright-mcp/
+.gradle
