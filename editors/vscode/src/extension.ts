@@ -155,11 +155,11 @@ async function languageActivate(context: IContext) {
   // Find first document to focus
   const editor = window.activeTextEditor;
   if (isTypstDocument(editor?.document)) {
-    focusDoc(editor.document, editor);
+    commandActivateDoc(editor.document);
   } else {
     window.visibleTextEditors.forEach((editor) => {
       if (isTypstDocument(editor.document)) {
-        focusDoc(editor.document, editor);
+        commandActivateDoc(editor.document);
       }
     });
   }
@@ -173,16 +173,29 @@ async function languageActivate(context: IContext) {
       // if (langId === "plaintext") {
       //     console.log("plaintext", langId, editor?.document.uri.fsPath);
       // }
-      return focusDoc(isTypstDocument(editor?.document) ? editor?.document : undefined, editor);
+      if (!isTypstDocument(editor?.document)) {
+        // console.log("not typst", langId, editor?.document.uri.fsPath);
+        return commandActivateDoc(undefined);
+      }
+      return commandActivateDoc(editor?.document);
     }),
+  );
+  context.subscriptions.push(
     vscode.workspace.onDidOpenTextDocument((doc: vscode.TextDocument) => {
       if (doc.isUntitled && window.activeTextEditor?.document === doc) {
-        return focusDoc(isTypstDocument(doc) ? doc : undefined, window.activeTextEditor);
+        if (isTypstDocument(doc)) {
+          return commandActivateDocPath(doc, "/untitled/" + doc.uri.fsPath);
+        } else {
+          return commandActivateDoc(undefined);
+        }
       }
     }),
+  );
+  context.subscriptions.push(
     vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
-      if (extensionState.mut.focusing.doc === doc) {
-        focusDoc(undefined);
+      if (extensionState.mut.focusingDoc === doc) {
+        extensionState.mut.focusingDoc = undefined;
+        commandActivateDoc(undefined);
       }
     }),
   );
@@ -236,18 +249,6 @@ async function openInternal(target: string): Promise<void> {
 async function openExternal(target: string): Promise<void> {
   const uri = Uri.parse(target);
   await vscode.env.openExternal(uri);
-}
-
-function focusDoc(doc: vscode.TextDocument | undefined, editor?: TextEditor | undefined) {
-  // Changes focus state.
-  extensionState.mut.focusing.focusMain(doc, editor);
-
-  // Changes status bar.
-  const formatString = statusBarFormatString();
-  triggerStatusBar(
-    // Shows the status bar only the last focusing file is not closed (opened)
-    !!formatString && !!(extensionState.mut.focusing.doc?.isClosed === false),
-  );
 }
 
 async function commandGetCurrentDocumentMetrics(): Promise<any> {
@@ -510,6 +511,34 @@ async function initTemplate(context: vscode.ExtensionContext, inPlace: boolean, 
       quickPick.show();
     });
   }
+}
+
+function commandActivateDoc(doc: vscode.TextDocument | undefined) {
+  commandActivateDocPath(doc, doc?.uri.fsPath);
+}
+
+let focusMainTimeout: NodeJS.Timeout | undefined = undefined;
+function commandActivateDocPath(doc: vscode.TextDocument | undefined, fsPath: string | undefined) {
+  // console.log("focus main", fsPath, new Error().stack);
+  extensionState.mut.focusingFile = fsPath;
+  if (fsPath) {
+    extensionState.mut.focusingDoc = doc;
+  }
+  if (extensionState.mut.focusingDoc?.isClosed) {
+    extensionState.mut.focusingDoc = undefined;
+  }
+  const formatString = statusBarFormatString();
+  // remove the status bar until the last focusing file is closed
+  triggerStatusBar(
+    !!formatString && !!(fsPath || extensionState.mut.focusingDoc?.isClosed === false),
+  );
+
+  if (focusMainTimeout) {
+    clearTimeout(focusMainTimeout);
+  }
+  focusMainTimeout = setTimeout(() => {
+    tinymist.executeCommand("tinymist.focusMain", [fsPath]);
+  }, 100);
 }
 
 async function commandRunCodeLens(...args: string[]): Promise<void> {

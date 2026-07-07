@@ -2,7 +2,7 @@ use lsp_types::*;
 use reflexo_typst::Bytes;
 use serde::{Deserialize, Serialize};
 use tinymist_query::ty::PathKind;
-use tinymist_query::{is_untitled_path, to_typst_range, LspRange, PositionEncoding};
+use tinymist_query::{is_untitled_path, to_typst_range, PositionEncoding};
 use tinymist_std::error::prelude::*;
 use tinymist_std::ImmutPath;
 use typst::ecow::EcoString;
@@ -275,16 +275,6 @@ impl ServerState {
             }
             Ok(false) => {}
         }
-    }
-
-    /// Does the selection change. It accepts an optional list of selections.
-    /// The first selection is the primary one.
-    pub fn do_change_selections(&mut self, selections: Option<Vec<LspRange>>) -> Option<()> {
-        let selections = selections?;
-        let primary_selection = selections.into_iter().next()?;
-
-        self.focusing_selection = Some(primary_selection);
-        Some(())
     }
 }
 
