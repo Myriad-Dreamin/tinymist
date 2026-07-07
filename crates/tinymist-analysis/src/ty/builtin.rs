@@ -12,6 +12,7 @@ use typst::{
     foundations::{AutoValue, Content, Func, NoneValue, ParamInfo, Type, Value},
     layout::Length,
 };
+use typst_shim::syntax::RootedPathExt;
 
 use crate::syntax::Decl;
 use crate::ty::*;
@@ -145,28 +146,31 @@ impl Ty {
 
     /// Converts a parameter site to a type.
     pub fn from_param_site(func: &Func, param: &ParamInfo) -> Ty {
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         match func.inner() {
-            Repr::Element(..) | Repr::Native(..) | Repr::Plugin(..) => {
+            FuncInner::Element(..) | FuncInner::Native(..) | FuncInner::Plugin(..) => {
                 if let Some(ty) = param_mapping(func, param) {
                     return ty;
                 }
             }
-            Repr::Closure(_) => {}
-            Repr::With(w) => return Ty::from_param_site(&w.0, param),
+            FuncInner::Closure(_) => {}
+            FuncInner::With(w) => return Ty::from_param_site(&w.0, param),
         };
 
-        Self::from_cast_info(&param.input)
+        param
+            .to_native()
+            .map(|native| Self::from_cast_info(&native.input))
+            .unwrap_or(Ty::Any)
     }
 
     /// Converts a return site to a type.
     pub(crate) fn from_return_site(func: &Func, ty: &'_ CastInfo) -> Self {
-        use typst::foundations::func::Repr;
+        use typst::foundations::FuncInner;
         match func.inner() {
-            Repr::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
-            Repr::Closure(_) | Repr::Plugin(_) => {}
-            Repr::With(w) => return Ty::from_return_site(&w.0, ty),
-            Repr::Native(_) => {}
+            FuncInner::Element(elem) => return Ty::Builtin(BuiltinTy::Content(Some(*elem))),
+            FuncInner::Closure(_) | FuncInner::Plugin(_) => {}
+            FuncInner::With(w) => return Ty::from_return_site(&w.0, ty),
+            FuncInner::Native(_) => {}
         };
 
         Self::from_cast_info(ty)
@@ -225,9 +229,7 @@ impl TryFrom<FileId> for PackageId {
     type Error = ();
 
     fn try_from(value: FileId) -> Result<Self, Self::Error> {
-        let Some(spec) = value.package() else {
-            return Err(());
-        };
+        let spec = value.package_compat().ok_or(())?;
         Ok(PackageId {
             namespace: spec.namespace.as_str().into(),
             name: spec.name.as_str().into(),
@@ -547,7 +549,14 @@ macro_rules! flow_record {
 /// Maps a function parameter to a type.
 pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
     // todo: remove path params which is compatible with 0.12.0
-    match (func.name()?, param.name) {
+    let input_ty = || {
+        param
+            .to_native()
+            .map(|native| Ty::from_cast_info(&native.input))
+            .unwrap_or(Ty::Any)
+    };
+
+    match (func.name()?, param.name()?) {
         // todo: pdf.embed
         ("embed", "path") => Some(literally(Path(PathKind::None))),
         ("cbor", "path" | "source") => Some(literally(Path(PathKind::None))),
@@ -561,16 +570,12 @@ pub(super) fn param_mapping(func: &Func, param: &ParamInfo) -> Option<Ty> {
         ("toml", "path" | "source") => Some(literally(Path(PathKind::Toml))),
         ("raw", "theme") => Some(literally(Path(PathKind::RawTheme))),
         ("raw", "syntaxes") => Some(literally(Path(PathKind::RawSyntax))),
-        ("bibliography" | "cite", "style") => Some(Ty::iter_union([
-            literally(Path(PathKind::Csl)),
-            Ty::from_cast_info(&param.input),
-        ])),
+        ("bibliography" | "cite", "style") => {
+            Some(Ty::iter_union([literally(Path(PathKind::Csl)), input_ty()]))
+        }
         ("cite", "key") => Some(Ty::iter_union([literally(CiteLabel)])),
         ("ref", "target") => Some(Ty::iter_union([literally(RefLabel)])),
-        ("footnote", "body") => Some(Ty::iter_union([
-            literally(RefLabel),
-            Ty::from_cast_info(&param.input),
-        ])),
+        ("footnote", "body") => Some(Ty::iter_union([literally(RefLabel), input_ty()])),
         ("link", "dest") => {
             static LINK_DEST_TYPE: LazyLock<Ty> = LazyLock::new(|| {
                 flow_union!(

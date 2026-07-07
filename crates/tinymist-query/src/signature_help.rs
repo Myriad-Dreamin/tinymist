@@ -66,7 +66,7 @@ impl SemanticRequest for SignatureHelpRequest {
                 }
                 ArgClass::Named(name) => {
                     let focus_name = focus_name
-                        .get_or_init(|| Interned::new_str(&name.get().clone().into_text()));
+                        .get_or_init(|| Interned::new_str(&name.get().clone().full_text()));
                     if focus_name == &param.name {
                         active_parameter = Some(real_offset);
                     }
@@ -88,14 +88,11 @@ impl SemanticRequest for SignatureHelpRequest {
                     .unwrap_or("any")
             ));
 
+            let documentation = param.docs.as_ref().map(|docs| markdown_docs(ctx, docs));
+
             params.push(ParameterInformation {
                 label: lsp_types::ParameterLabel::Simple(format!("{}:", param.name)),
-                documentation: param.docs.as_ref().map(|docs| {
-                    Documentation::MarkupContent(MarkupContent {
-                        value: docs.as_ref().into(),
-                        kind: MarkupKind::Markdown,
-                    })
-                }),
+                documentation,
             });
         }
         label.push(')');
@@ -115,7 +112,11 @@ impl SemanticRequest for SignatureHelpRequest {
         Some(SignatureHelp {
             signatures: vec![SignatureInformation {
                 label: label.to_string(),
-                documentation: sig.primary().docs.as_deref().map(markdown_docs),
+                documentation: sig
+                    .primary()
+                    .docs
+                    .as_ref()
+                    .map(|docs| markdown_docs(ctx, docs)),
                 parameters: Some(params),
                 active_parameter: active_parameter.map(|x| x as u32),
             }],
@@ -125,10 +126,11 @@ impl SemanticRequest for SignatureHelpRequest {
     }
 }
 
-fn markdown_docs(docs: &str) -> Documentation {
+fn markdown_docs(ctx: &mut LocalContext, docs: &crate::docs::DocText) -> Documentation {
+    let docs = crate::docs::resolve_doc_text(ctx.shared(), docs);
     Documentation::MarkupContent(MarkupContent {
         kind: MarkupKind::Markdown,
-        value: docs.to_owned(),
+        value: docs.into(),
     })
 }
 

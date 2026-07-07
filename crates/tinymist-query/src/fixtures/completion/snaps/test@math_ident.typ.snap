@@ -14,7 +14,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/math_ident.typ
     "labelDetails": {
      "description": "ℜ"
     },
-    "sortText": "040",
+    "sortText": "039",
     "textEdit": {
      "newText": "Re",
      "range": {

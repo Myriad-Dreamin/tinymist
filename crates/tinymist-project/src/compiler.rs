@@ -14,9 +14,9 @@ use tinymist_world::vfs::notify::{
 };
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
-    CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse, DiagnosticsTask, EntryReader,
-    EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask, ProjectInsId, TaskInputs,
-    WorldComputeGraph, WorldDeps,
+    BundleCompilationTask, CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse,
+    DiagnosticsTask, EntryReader, EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask,
+    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::World;
@@ -91,6 +91,7 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
     pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> CompiledArtifact<F> {
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
         let doc = if is_html {
             graph.shared_compile_html().expect("html").map(From::from)
         } else {
@@ -101,6 +102,19 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
             diag: graph.shared_diagnostics().expect("diag"),
             graph,
             doc,
+            deps: OnceLock::default(),
+        }
+    }
+
+    /// Runs diagnostics without precompiling a paged or HTML document.
+    pub fn from_graph_without_doc(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
+        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(false)));
+        let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(false)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(true)));
+        CompiledArtifact {
+            diag: graph.shared_diagnostics().expect("diag"),
+            graph,
+            doc: None,
             deps: OnceLock::default(),
         }
     }
@@ -882,9 +896,9 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
         move || {
             let compiled = if syntax_only {
                 let main = graph.snap.world.main();
-                let source_res = graph.world().source(main).at(Span::from_range(main, 0..0));
+                let source_res = graph.world().source(main).at(Span::detached());
                 let syntax_res = source_res.and_then(|source| {
-                    let errors = source.root().errors();
+                    let errors = source.root().errors_and_warnings().0;
                     if errors.is_empty() {
                         Ok(())
                     } else {
@@ -900,7 +914,11 @@ impl<F: CompilerFeat, Ext: 'static> ProjectInsState<F, Ext> {
                     deps: OnceLock::default(),
                 }
             } else {
-                CompiledArtifact::from_graph(graph, matches!(export_target, ExportTarget::Html))
+                match export_target {
+                    ExportTarget::Bundle => CompiledArtifact::from_graph_without_doc(graph),
+                    ExportTarget::Html => CompiledArtifact::from_graph(graph, true),
+                    ExportTarget::Paged => CompiledArtifact::from_graph(graph, false),
+                }
             };
 
             let res = CompileStatusResult {
@@ -1022,4 +1040,1810 @@ where
     F: FnOnce() + Send + 'static,
 {
     func();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+
+    use tinymist_world::{
+        mock::{MockCompilerFeat, MockWorkspaceWorldExt},
+        vfs::{
+            FileChangeSet, FileSnapshot, FilesystemEvent,
+            mock::{MockChange, MockWorkspace},
+        },
+    };
+    use tokio::sync::mpsc;
+    use typst::{
+        diag::{FileError, FileResult},
+        foundations::Bytes,
+    };
+
+    use crate::mock::{MockProjectBuilderExt, MockProjectChangeExt, MockProjectCompiler};
+
+    const MAIN: &str = "main.typ";
+    const DEP: &str = "dep.typ";
+    const RENAMED_DEP: &str = "renamed.typ";
+    const UNRELATED: &str = "notes.typ";
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum OperationId {
+        O01,
+        O02,
+        O03,
+        O04,
+        O05,
+        O06,
+        O07,
+        O08,
+        O09,
+        O10,
+        O11,
+        O12,
+        O13,
+        O14,
+        O15,
+        O16,
+        O17,
+        O18,
+        O19,
+        O20,
+    }
+
+    impl OperationId {
+        fn label(self) -> &'static str {
+            match self {
+                OperationId::O01 => "O01",
+                OperationId::O02 => "O02",
+                OperationId::O03 => "O03",
+                OperationId::O04 => "O04",
+                OperationId::O05 => "O05",
+                OperationId::O06 => "O06",
+                OperationId::O07 => "O07",
+                OperationId::O08 => "O08",
+                OperationId::O09 => "O09",
+                OperationId::O10 => "O10",
+                OperationId::O11 => "O11",
+                OperationId::O12 => "O12",
+                OperationId::O13 => "O13",
+                OperationId::O14 => "O14",
+                OperationId::O15 => "O15",
+                OperationId::O16 => "O16",
+                OperationId::O17 => "O17",
+                OperationId::O18 => "O18",
+                OperationId::O19 => "O19",
+                OperationId::O20 => "O20",
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum MatrixOperation {
+        InitialSync,
+        FollowUpNonSyncUpdate,
+        CreateDependency,
+        EditEntry,
+        EditDependency,
+        CreateUnrelated,
+        RemoveDependency,
+        ReadErrorDependency,
+        EmptyDependency,
+        EmptyUnrelated,
+        RenameUpdatedReferences,
+        RenameStaleReferences,
+        DeleteThenRecreate,
+        FailedReadThenRecovery,
+        RenameBatch,
+        MultiFileUnrelatedBatch,
+        UpstreamInvalidation,
+        UnrelatedChurn,
+        EmptyChangeset,
+        DependencyMembershipRemoval,
+        DependencyMembershipReaddition,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum EventVariant {
+        Update,
+        UpstreamUpdate,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum SyncMode {
+        Sync,
+        NonSync,
+        NotApplicable,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum InsertPayload {
+        NonEmptyContent,
+        EmptyContent,
+        ReadErrorSnapshot,
+        NoInserts,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum RemovePayload {
+        NoRemoves,
+        OneRemovedPath,
+        MultipleRemovedPaths,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum PathRelation {
+        EntryFile,
+        ImportedDependency,
+        PreviouslyDependedPath,
+        NewlyCreatedDependency,
+        NewlyReferencedDependency,
+        RetainedInactiveDependency,
+        UnrelatedFile,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum BatchShape {
+        InsertOnly,
+        RemoveOnly,
+        RemovePlusInsert,
+        MultiFileBatch,
+        EmptyChangeset,
+        RemoveOnlyThenInsertOnly,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum SequenceShape {
+        InitialSync,
+        OneStepEdit,
+        CreateAfterMissingImport,
+        OneStepRemove,
+        RenameOldPlusNew,
+        FailedRead,
+        FailedReadThenRecovery,
+        TransientEmptyWrite,
+        DeleteThenRecreate,
+        DelayedMemoryThenFilesystem,
+        EmptyChangeset,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum ExpectedOutcome {
+        IgnoredFirstSync,
+        FsReasonRefreshesDependency,
+        RecoversNewDependency,
+        RefreshesEntrySource,
+        RefreshesDependencySource,
+        KeepsUnrelatedCreateHarmless,
+        ReportsRetiredDependencyUnavailable,
+        SurfacesReadErrorDiagnostics,
+        UsesEmptyDependencySnapshot,
+        KeepsEmptyUnrelatedHarmless,
+        FollowsRenamedPath,
+        ReportsOldImportUnavailable,
+        ReportsThenRecoversRecreatedSource,
+        ClearsDiagnosticsAfterRecovery,
+        RenameBatchFollowsRenamedPath,
+        MultiFileUnrelatedBatchHarmless,
+        AppliesDelayedMemoryBeforeFilesystem,
+        KeepsUnrelatedChurnHarmless,
+        ExplicitNoContentOutcome,
+        DropsInactiveDependency,
+        ReaddsChangedInactiveDependency,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct MatrixRow {
+        operation: MatrixOperation,
+        event_variant: EventVariant,
+        sync_mode: SyncMode,
+        insert_payload: InsertPayload,
+        remove_payload: RemovePayload,
+        path_relations: &'static [PathRelation],
+        batch_shape: BatchShape,
+        sequence_shape: SequenceShape,
+        expected: ExpectedOutcome,
+    }
+
+    #[derive(Debug, Clone, Copy)]
+    struct CompileCacheCoverageRow {
+        id: OperationId,
+        matrix_operations: &'static [MatrixOperation],
+        note: &'static str,
+    }
+
+    impl MatrixRow {
+        fn sync_bool(self) -> bool {
+            match self.sync_mode {
+                SyncMode::Sync => true,
+                SyncMode::NonSync => false,
+                SyncMode::NotApplicable => {
+                    panic!(
+                        "matrix row {:?} does not carry an update sync flag",
+                        self.operation
+                    )
+                }
+            }
+        }
+
+        fn apply_update(self, harness: &mut ProjectCompilerHarness, change: &MockChange) {
+            assert_eq!(self.event_variant, EventVariant::Update);
+            harness.apply_update(change, self.sync_bool());
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum OmittedEventCombination {
+        SyncFlagOnUpstreamUpdate,
+        EntryFileReadErrorAfterDirectClientInput,
+        BackendSpecificNotifyRenameQuirk,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum OmissionReason {
+        Unreachable,
+        Redundant,
+        Deferred,
+    }
+
+    #[derive(Debug)]
+    struct OmittedCombination {
+        combination: OmittedEventCombination,
+        reason: OmissionReason,
+    }
+
+    const PROJECT_COMPILER_FS_EVENT_MATRIX: &[MatrixRow] = &[
+        MatrixRow {
+            operation: MatrixOperation::InitialSync,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::Sync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::EntryFile, PathRelation::ImportedDependency],
+            batch_shape: BatchShape::MultiFileBatch,
+            sequence_shape: SequenceShape::InitialSync,
+            expected: ExpectedOutcome::IgnoredFirstSync,
+        },
+        MatrixRow {
+            operation: MatrixOperation::FollowUpNonSyncUpdate,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::ImportedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::FsReasonRefreshesDependency,
+        },
+        MatrixRow {
+            operation: MatrixOperation::CreateDependency,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::NewlyCreatedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::CreateAfterMissingImport,
+            expected: ExpectedOutcome::RecoversNewDependency,
+        },
+        MatrixRow {
+            operation: MatrixOperation::EditEntry,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::EntryFile],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::RefreshesEntrySource,
+        },
+        MatrixRow {
+            operation: MatrixOperation::EditDependency,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::ImportedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::RefreshesDependencySource,
+        },
+        MatrixRow {
+            operation: MatrixOperation::CreateUnrelated,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::UnrelatedFile],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::KeepsUnrelatedCreateHarmless,
+        },
+        MatrixRow {
+            operation: MatrixOperation::RemoveDependency,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NoInserts,
+            remove_payload: RemovePayload::OneRemovedPath,
+            path_relations: &[PathRelation::PreviouslyDependedPath],
+            batch_shape: BatchShape::RemoveOnly,
+            sequence_shape: SequenceShape::OneStepRemove,
+            expected: ExpectedOutcome::ReportsRetiredDependencyUnavailable,
+        },
+        MatrixRow {
+            operation: MatrixOperation::ReadErrorDependency,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::ReadErrorSnapshot,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::ImportedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::FailedRead,
+            expected: ExpectedOutcome::SurfacesReadErrorDiagnostics,
+        },
+        MatrixRow {
+            operation: MatrixOperation::EmptyDependency,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::EmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::ImportedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::TransientEmptyWrite,
+            expected: ExpectedOutcome::UsesEmptyDependencySnapshot,
+        },
+        MatrixRow {
+            operation: MatrixOperation::EmptyUnrelated,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::EmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::UnrelatedFile],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::TransientEmptyWrite,
+            expected: ExpectedOutcome::KeepsEmptyUnrelatedHarmless,
+        },
+        MatrixRow {
+            operation: MatrixOperation::RenameUpdatedReferences,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::OneRemovedPath,
+            path_relations: &[
+                PathRelation::PreviouslyDependedPath,
+                PathRelation::NewlyReferencedDependency,
+            ],
+            batch_shape: BatchShape::RemovePlusInsert,
+            sequence_shape: SequenceShape::RenameOldPlusNew,
+            expected: ExpectedOutcome::FollowsRenamedPath,
+        },
+        MatrixRow {
+            operation: MatrixOperation::RenameStaleReferences,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::OneRemovedPath,
+            path_relations: &[PathRelation::PreviouslyDependedPath],
+            batch_shape: BatchShape::RemovePlusInsert,
+            sequence_shape: SequenceShape::RenameOldPlusNew,
+            expected: ExpectedOutcome::ReportsOldImportUnavailable,
+        },
+        MatrixRow {
+            operation: MatrixOperation::DeleteThenRecreate,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::OneRemovedPath,
+            path_relations: &[PathRelation::PreviouslyDependedPath],
+            batch_shape: BatchShape::RemoveOnlyThenInsertOnly,
+            sequence_shape: SequenceShape::DeleteThenRecreate,
+            expected: ExpectedOutcome::ReportsThenRecoversRecreatedSource,
+        },
+        MatrixRow {
+            operation: MatrixOperation::FailedReadThenRecovery,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::ImportedDependency],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::FailedReadThenRecovery,
+            expected: ExpectedOutcome::ClearsDiagnosticsAfterRecovery,
+        },
+        MatrixRow {
+            operation: MatrixOperation::RenameBatch,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::OneRemovedPath,
+            path_relations: &[
+                PathRelation::PreviouslyDependedPath,
+                PathRelation::NewlyReferencedDependency,
+            ],
+            batch_shape: BatchShape::RemovePlusInsert,
+            sequence_shape: SequenceShape::RenameOldPlusNew,
+            expected: ExpectedOutcome::RenameBatchFollowsRenamedPath,
+        },
+        MatrixRow {
+            operation: MatrixOperation::MultiFileUnrelatedBatch,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::MultipleRemovedPaths,
+            path_relations: &[PathRelation::UnrelatedFile],
+            batch_shape: BatchShape::MultiFileBatch,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::MultiFileUnrelatedBatchHarmless,
+        },
+        MatrixRow {
+            operation: MatrixOperation::UpstreamInvalidation,
+            event_variant: EventVariant::UpstreamUpdate,
+            sync_mode: SyncMode::NotApplicable,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::EntryFile],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::DelayedMemoryThenFilesystem,
+            expected: ExpectedOutcome::AppliesDelayedMemoryBeforeFilesystem,
+        },
+        MatrixRow {
+            operation: MatrixOperation::UnrelatedChurn,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::UnrelatedFile],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::KeepsUnrelatedChurnHarmless,
+        },
+        MatrixRow {
+            operation: MatrixOperation::EmptyChangeset,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NoInserts,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[PathRelation::UnrelatedFile],
+            batch_shape: BatchShape::EmptyChangeset,
+            sequence_shape: SequenceShape::EmptyChangeset,
+            expected: ExpectedOutcome::ExplicitNoContentOutcome,
+        },
+        MatrixRow {
+            operation: MatrixOperation::DependencyMembershipRemoval,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+            ],
+            batch_shape: BatchShape::InsertOnly,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::DropsInactiveDependency,
+        },
+        MatrixRow {
+            operation: MatrixOperation::DependencyMembershipReaddition,
+            event_variant: EventVariant::Update,
+            sync_mode: SyncMode::NonSync,
+            insert_payload: InsertPayload::NonEmptyContent,
+            remove_payload: RemovePayload::NoRemoves,
+            path_relations: &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+                PathRelation::ImportedDependency,
+            ],
+            batch_shape: BatchShape::MultiFileBatch,
+            sequence_shape: SequenceShape::OneStepEdit,
+            expected: ExpectedOutcome::ReaddsChangedInactiveDependency,
+        },
+    ];
+
+    const VFS_OPERATION_COMPILE_CACHE_MATRIX: &[CompileCacheCoverageRow] = &[
+        CompileCacheCoverageRow {
+            id: OperationId::O01,
+            matrix_operations: &[MatrixOperation::CreateDependency],
+            note: "create recovers a missing dependency and refreshes compile dependencies",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O02,
+            matrix_operations: &[MatrixOperation::EditEntry, MatrixOperation::EditDependency],
+            note: "content updates are asserted for both entry and active dependency paths",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O03,
+            matrix_operations: &[
+                MatrixOperation::EmptyDependency,
+                MatrixOperation::EmptyUnrelated,
+            ],
+            note: "transient empty snapshots surface for active paths and remain harmless for unrelated paths",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O04,
+            matrix_operations: &[
+                MatrixOperation::ReadErrorDependency,
+                MatrixOperation::FailedReadThenRecovery,
+            ],
+            note: "read-error snapshots replace stale sources and later recover",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O05,
+            matrix_operations: &[MatrixOperation::RemoveDependency],
+            note: "remove retires a depended path from compile-visible state",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O06,
+            matrix_operations: &[MatrixOperation::DeleteThenRecreate],
+            note: "delete then recreate reports missing before recovering with new bytes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O07,
+            matrix_operations: &[MatrixOperation::EditDependency],
+            note: "atomic replace normalizes to a final dependency insert at the project boundary",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O08,
+            matrix_operations: &[MatrixOperation::RenameStaleReferences],
+            note: "stale-reference rename reports the old dependency unavailable",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O09,
+            matrix_operations: &[
+                MatrixOperation::RenameUpdatedReferences,
+                MatrixOperation::RenameBatch,
+            ],
+            note: "updated-reference rename follows the new path and drops the old dependency",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O10,
+            matrix_operations: &[MatrixOperation::RenameUpdatedReferences],
+            note: "case-only rename is compile-cache equivalent to an updated-reference file rename",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O11,
+            matrix_operations: &[
+                MatrixOperation::RemoveDependency,
+                MatrixOperation::CreateDependency,
+            ],
+            note: "root-boundary file moves normalize to remove-only or create-only project deltas",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O12,
+            matrix_operations: &[MatrixOperation::RenameStaleReferences],
+            note: "stale directory-prefix rename shares the old-path retirement obligation",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O13,
+            matrix_operations: &[MatrixOperation::RenameBatch],
+            note: "updated directory-prefix rename shares the batch new-path dependency obligation",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O14,
+            matrix_operations: &[MatrixOperation::RemoveDependency],
+            note: "directory delete compiles as one or more depended-path removals",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O15,
+            matrix_operations: &[
+                MatrixOperation::RemoveDependency,
+                MatrixOperation::CreateDependency,
+            ],
+            note: "root-boundary subtree moves combine moved-out removes and moved-in creates",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O16,
+            matrix_operations: &[MatrixOperation::DependencyMembershipRemoval],
+            note: "entry edits that drop imports must remove retained inactive paths from dependencies",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O17,
+            matrix_operations: &[MatrixOperation::DependencyMembershipReaddition],
+            note: "re-added dependencies must consume fresh sync snapshots after inactive changes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O18,
+            matrix_operations: &[MatrixOperation::UpstreamInvalidation],
+            note: "shadow-open filesystem races use upstream invalidation ordering",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O19,
+            matrix_operations: &[MatrixOperation::EditDependency],
+            note: "symlink-like target changes normalize to changed observable dependency bytes",
+        },
+        CompileCacheCoverageRow {
+            id: OperationId::O20,
+            matrix_operations: &[
+                MatrixOperation::RenameBatch,
+                MatrixOperation::MultiFileUnrelatedBatch,
+            ],
+            note: "mixed batches assert final-state dependency correctness and harmless unrelated churn",
+        },
+    ];
+
+    const OMITTED_PROJECT_COMPILER_FS_EVENT_COMBINATIONS: &[OmittedCombination] = &[
+        OmittedCombination {
+            combination: OmittedEventCombination::SyncFlagOnUpstreamUpdate,
+            reason: OmissionReason::Unreachable,
+        },
+        OmittedCombination {
+            combination: OmittedEventCombination::EntryFileReadErrorAfterDirectClientInput,
+            reason: OmissionReason::Redundant,
+        },
+        OmittedCombination {
+            combination: OmittedEventCombination::BackendSpecificNotifyRenameQuirk,
+            reason: OmissionReason::Deferred,
+        },
+    ];
+
+    struct ProjectCompilerHarness {
+        workspace: MockWorkspace,
+        compiler: MockProjectCompiler<()>,
+        notify_rx: mpsc::UnboundedReceiver<NotifyMessage>,
+    }
+
+    impl ProjectCompilerHarness {
+        fn new(files: &[(&str, &str)]) -> Self {
+            Self::with_opts(
+                files,
+                CompileServerOpts::<MockCompilerFeat, ()> {
+                    syntax_only: false,
+                    ..Default::default()
+                },
+            )
+        }
+
+        fn ignoring_first_sync(files: &[(&str, &str)]) -> Self {
+            Self::with_opts(
+                files,
+                CompileServerOpts::<MockCompilerFeat, ()> {
+                    ignore_first_sync: true,
+                    syntax_only: false,
+                    ..Default::default()
+                },
+            )
+        }
+
+        fn with_opts(
+            files: &[(&str, &str)],
+            opts: CompileServerOpts<MockCompilerFeat, ()>,
+        ) -> Self {
+            let mut builder = MockWorkspace::default_builder();
+            for (path, source) in files {
+                builder = builder.file(path, source.to_string());
+            }
+
+            let workspace = builder.build();
+            let (compiler, notify_rx) = workspace
+                .world(MAIN)
+                .project_compiler_with_opts::<()>(opts)
+                .unwrap();
+
+            Self {
+                workspace,
+                compiler,
+                notify_rx,
+            }
+        }
+
+        fn compile_primary(&mut self) -> CompiledArtifact<MockCompilerFeat> {
+            self.compiler
+                .process(Interrupt::Compile(ProjectInsId::PRIMARY));
+            self.compile_pending()
+        }
+
+        fn compile_pending(&mut self) -> CompiledArtifact<MockCompilerFeat> {
+            assert!(
+                self.compiler.primary.reason.any(),
+                "expected a pending compile reason"
+            );
+
+            let handler = self.compiler.handler.clone();
+            let compile = self
+                .compiler
+                .primary
+                .may_compile(&handler)
+                .expect("expected the primary project to compile");
+            let artifact = compile();
+            self.compiler.process(Interrupt::Compiled(artifact.clone()));
+            artifact
+        }
+
+        fn apply_update(&mut self, change: &MockChange, is_sync: bool) {
+            change.apply_as_fs_to_project(&mut self.compiler, is_sync);
+        }
+
+        fn apply_upstream_update(
+            &mut self,
+            changeset: FileChangeSet,
+            upstream_event: Option<UpstreamUpdateEvent>,
+        ) {
+            self.compiler
+                .process(Interrupt::Fs(FilesystemEvent::UpstreamUpdate {
+                    changeset,
+                    upstream_event,
+                }));
+        }
+
+        fn take_upstream_update(&mut self) -> UpstreamUpdateEvent {
+            loop {
+                let message = self
+                    .notify_rx
+                    .try_recv()
+                    .expect("expected an upstream update notification");
+                match message {
+                    NotifyMessage::UpstreamUpdate(event) => return event,
+                    NotifyMessage::SyncDependency(..) | NotifyMessage::Settle => {}
+                }
+            }
+        }
+
+        fn latest_sync_dependencies(&mut self) -> Vec<PathBuf> {
+            self.optional_sync_dependencies()
+                .expect("expected SyncDependency notification")
+        }
+
+        fn optional_sync_dependencies(&mut self) -> Option<Vec<PathBuf>> {
+            let mut latest = None;
+            while let Ok(message) = self.notify_rx.try_recv() {
+                if let NotifyMessage::SyncDependency(deps) = message {
+                    let mut paths = Vec::new();
+                    deps.dependencies(&mut |path| paths.push(path.as_ref().to_path_buf()));
+                    latest = Some(paths);
+                }
+            }
+
+            latest
+        }
+
+        fn dependency_paths_after_compile(&mut self) -> Vec<PathBuf> {
+            self.latest_sync_dependencies()
+        }
+
+        fn dependency_paths_after_harmless_compile(
+            &mut self,
+            previous: &[PathBuf],
+        ) -> Vec<PathBuf> {
+            self.optional_sync_dependencies()
+                .unwrap_or_else(|| previous.to_vec())
+        }
+    }
+
+    fn default_files() -> Vec<(&'static str, &'static str)> {
+        vec![
+            (MAIN, "#import \"dep.typ\": value\n#value"),
+            (DEP, "#let value = [before]"),
+            (UNRELATED, "#let note = [unchanged]"),
+        ]
+    }
+
+    fn source_snapshot(source: &str) -> FileSnapshot {
+        FileResult::Ok(Bytes::from_string(source.to_owned())).into()
+    }
+
+    fn read_error_snapshot(path: PathBuf) -> FileSnapshot {
+        FileResult::Err(FileError::NotFound(path)).into()
+    }
+
+    fn insert_source_change(workspace: &MockWorkspace, path: &str, source: &str) -> MockChange {
+        MockChange::new(FileChangeSet::new_inserts(vec![(
+            workspace.immut_path(path),
+            source_snapshot(source),
+        )]))
+    }
+
+    fn read_error_change(workspace: &MockWorkspace, path: &str) -> MockChange {
+        MockChange::new(FileChangeSet::new_inserts(vec![(
+            workspace.immut_path(path),
+            read_error_snapshot(workspace.path(path)),
+        )]))
+    }
+
+    fn remove_change(workspace: &MockWorkspace, path: &str) -> MockChange {
+        MockChange::new(FileChangeSet::new_removes(vec![workspace.immut_path(path)]))
+    }
+
+    fn empty_change() -> MockChange {
+        MockChange::new(FileChangeSet::default())
+    }
+
+    fn combine_changes(changes: &[MockChange]) -> MockChange {
+        let mut changeset = FileChangeSet::default();
+        for change in changes {
+            changeset.removes.extend(change.changeset().removes.clone());
+            changeset.inserts.extend(change.changeset().inserts.clone());
+        }
+
+        MockChange::new(changeset)
+    }
+
+    fn source_text(
+        artifact: &CompiledArtifact<MockCompilerFeat>,
+        workspace: &MockWorkspace,
+        path: &str,
+    ) -> String {
+        artifact
+            .graph
+            .snap
+            .world
+            .source_by_path(&workspace.path(path))
+            .unwrap()
+            .text()
+            .to_owned()
+    }
+
+    fn source_is_unavailable(
+        artifact: &CompiledArtifact<MockCompilerFeat>,
+        workspace: &MockWorkspace,
+        path: &str,
+    ) -> bool {
+        artifact
+            .graph
+            .snap
+            .world
+            .source_by_path(&workspace.path(path))
+            .is_err()
+    }
+
+    fn assert_fs_reason(compiler: &MockProjectCompiler<()>) {
+        assert!(
+            compiler.primary.reason.by_fs_events,
+            "expected filesystem compile reason"
+        );
+    }
+
+    fn assert_mem_reason(compiler: &MockProjectCompiler<()>) {
+        assert!(
+            compiler.primary.reason.by_mem_events,
+            "expected memory compile reason"
+        );
+    }
+
+    fn assert_deps_contain(workspace: &MockWorkspace, deps: &[PathBuf], path: &str) {
+        assert!(
+            deps.contains(&workspace.path(path)),
+            "expected dependencies to contain {path:?}; got {deps:?}"
+        );
+    }
+
+    fn assert_deps_do_not_contain(workspace: &MockWorkspace, deps: &[PathBuf], path: &str) {
+        assert!(
+            !deps.contains(&workspace.path(path)),
+            "expected dependencies not to contain {path:?}; got {deps:?}"
+        );
+    }
+
+    fn assert_matrix_contains<T: std::fmt::Debug>(
+        missing: T,
+        predicate: impl Fn(&MatrixRow) -> bool,
+    ) {
+        assert!(
+            PROJECT_COMPILER_FS_EVENT_MATRIX.iter().any(predicate),
+            "project compiler filesystem event matrix missing {missing:?}"
+        );
+    }
+
+    fn assert_compile_cache_matrix_contains(id: OperationId) {
+        assert!(
+            VFS_OPERATION_COMPILE_CACHE_MATRIX
+                .iter()
+                .any(|row| row.id == id),
+            "project compiler compile-cache matrix missing {}",
+            id.label()
+        );
+    }
+
+    fn project_matrix_row(operation: MatrixOperation) -> MatrixRow {
+        *PROJECT_COMPILER_FS_EVENT_MATRIX
+            .iter()
+            .find(|row| row.operation == operation)
+            .unwrap_or_else(|| panic!("missing project matrix row for {operation:?}"))
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "project compiler matrix rows are clearer when each dimension is asserted explicitly"
+    )]
+    fn assert_row_shape(
+        row: MatrixRow,
+        event_variant: EventVariant,
+        sync_mode: SyncMode,
+        insert_payload: InsertPayload,
+        remove_payload: RemovePayload,
+        path_relations: &[PathRelation],
+        batch_shape: BatchShape,
+        sequence_shape: SequenceShape,
+        expected: ExpectedOutcome,
+    ) {
+        assert_eq!(row.event_variant, event_variant);
+        assert_eq!(row.sync_mode, sync_mode);
+        assert_eq!(row.insert_payload, insert_payload);
+        assert_eq!(row.remove_payload, remove_payload);
+        assert_eq!(row.path_relations, path_relations);
+        assert_eq!(row.batch_shape, batch_shape);
+        assert_eq!(row.sequence_shape, sequence_shape);
+        assert_eq!(row.expected, expected);
+    }
+
+    fn clean_default_harness_with_deps() -> (ProjectCompilerHarness, Vec<PathBuf>) {
+        let files = default_files();
+        let mut harness = ProjectCompilerHarness::new(&files);
+        let initial = harness.compile_primary();
+        assert_eq!(initial.error_cnt(), 0);
+        let deps = harness.latest_sync_dependencies();
+        (harness, deps)
+    }
+
+    fn clean_default_harness() -> ProjectCompilerHarness {
+        clean_default_harness_with_deps().0
+    }
+
+    fn run_matrix_row(row: MatrixRow) {
+        match row.operation {
+            MatrixOperation::InitialSync => assert_initial_sync(row),
+            MatrixOperation::FollowUpNonSyncUpdate => assert_follow_up_non_sync_update(row),
+            MatrixOperation::CreateDependency => assert_create_dependency(row),
+            MatrixOperation::EditEntry => assert_edit_entry(row),
+            MatrixOperation::EditDependency => assert_edit_dependency(row),
+            MatrixOperation::CreateUnrelated => assert_create_unrelated(row),
+            MatrixOperation::RemoveDependency => assert_remove_dependency(row),
+            MatrixOperation::ReadErrorDependency => assert_read_error_dependency(row),
+            MatrixOperation::EmptyDependency => assert_empty_dependency(row),
+            MatrixOperation::EmptyUnrelated => assert_empty_unrelated(row),
+            MatrixOperation::RenameUpdatedReferences => assert_rename_updated_references(row),
+            MatrixOperation::RenameStaleReferences => assert_rename_stale_references(row),
+            MatrixOperation::DeleteThenRecreate => assert_delete_then_recreate(row),
+            MatrixOperation::FailedReadThenRecovery => assert_failed_read_then_recovery(row),
+            MatrixOperation::RenameBatch => assert_rename_batch(row),
+            MatrixOperation::MultiFileUnrelatedBatch => assert_multi_file_unrelated_batch(row),
+            MatrixOperation::UpstreamInvalidation => assert_upstream_invalidation(row),
+            MatrixOperation::UnrelatedChurn => assert_unrelated_churn(row),
+            MatrixOperation::EmptyChangeset => assert_empty_changeset(row),
+            MatrixOperation::DependencyMembershipRemoval => {
+                assert_dependency_membership_removal(row);
+            }
+            MatrixOperation::DependencyMembershipReaddition => {
+                assert_dependency_membership_readdition(row);
+            }
+        }
+    }
+
+    #[test]
+    fn project_compiler_fs_event_matrix_is_explicit() {
+        for row in PROJECT_COMPILER_FS_EVENT_MATRIX {
+            assert!(!row.path_relations.is_empty());
+        }
+
+        for operation in [
+            MatrixOperation::InitialSync,
+            MatrixOperation::FollowUpNonSyncUpdate,
+            MatrixOperation::CreateDependency,
+            MatrixOperation::EditEntry,
+            MatrixOperation::EditDependency,
+            MatrixOperation::CreateUnrelated,
+            MatrixOperation::RemoveDependency,
+            MatrixOperation::ReadErrorDependency,
+            MatrixOperation::EmptyDependency,
+            MatrixOperation::EmptyUnrelated,
+            MatrixOperation::RenameUpdatedReferences,
+            MatrixOperation::RenameStaleReferences,
+            MatrixOperation::DeleteThenRecreate,
+            MatrixOperation::FailedReadThenRecovery,
+            MatrixOperation::RenameBatch,
+            MatrixOperation::MultiFileUnrelatedBatch,
+            MatrixOperation::UpstreamInvalidation,
+            MatrixOperation::UnrelatedChurn,
+            MatrixOperation::EmptyChangeset,
+            MatrixOperation::DependencyMembershipRemoval,
+            MatrixOperation::DependencyMembershipReaddition,
+        ] {
+            assert_matrix_contains(operation, |row| row.operation == operation);
+        }
+        for variant in [EventVariant::Update, EventVariant::UpstreamUpdate] {
+            assert_matrix_contains(variant, |row| row.event_variant == variant);
+        }
+        for sync_mode in [SyncMode::Sync, SyncMode::NonSync, SyncMode::NotApplicable] {
+            assert_matrix_contains(sync_mode, |row| row.sync_mode == sync_mode);
+        }
+        for payload in [
+            InsertPayload::NonEmptyContent,
+            InsertPayload::EmptyContent,
+            InsertPayload::ReadErrorSnapshot,
+            InsertPayload::NoInserts,
+        ] {
+            assert_matrix_contains(payload, |row| row.insert_payload == payload);
+        }
+        for payload in [
+            RemovePayload::NoRemoves,
+            RemovePayload::OneRemovedPath,
+            RemovePayload::MultipleRemovedPaths,
+        ] {
+            assert_matrix_contains(payload, |row| row.remove_payload == payload);
+        }
+        for relation in [
+            PathRelation::EntryFile,
+            PathRelation::ImportedDependency,
+            PathRelation::PreviouslyDependedPath,
+            PathRelation::NewlyCreatedDependency,
+            PathRelation::NewlyReferencedDependency,
+            PathRelation::RetainedInactiveDependency,
+            PathRelation::UnrelatedFile,
+        ] {
+            assert_matrix_contains(relation, |row| row.path_relations.contains(&relation));
+        }
+        for batch in [
+            BatchShape::InsertOnly,
+            BatchShape::RemoveOnly,
+            BatchShape::RemovePlusInsert,
+            BatchShape::MultiFileBatch,
+            BatchShape::EmptyChangeset,
+            BatchShape::RemoveOnlyThenInsertOnly,
+        ] {
+            assert_matrix_contains(batch, |row| row.batch_shape == batch);
+        }
+        for sequence in [
+            SequenceShape::InitialSync,
+            SequenceShape::OneStepEdit,
+            SequenceShape::CreateAfterMissingImport,
+            SequenceShape::OneStepRemove,
+            SequenceShape::RenameOldPlusNew,
+            SequenceShape::FailedRead,
+            SequenceShape::FailedReadThenRecovery,
+            SequenceShape::TransientEmptyWrite,
+            SequenceShape::DeleteThenRecreate,
+            SequenceShape::DelayedMemoryThenFilesystem,
+            SequenceShape::EmptyChangeset,
+        ] {
+            assert_matrix_contains(sequence, |row| row.sequence_shape == sequence);
+        }
+
+        for omitted in OMITTED_PROJECT_COMPILER_FS_EVENT_COMBINATIONS {
+            assert!(matches!(
+                omitted.reason,
+                OmissionReason::Unreachable | OmissionReason::Redundant | OmissionReason::Deferred
+            ));
+            assert!(matches!(
+                omitted.combination,
+                OmittedEventCombination::SyncFlagOnUpstreamUpdate
+                    | OmittedEventCombination::EntryFileReadErrorAfterDirectClientInput
+                    | OmittedEventCombination::BackendSpecificNotifyRenameQuirk
+            ));
+        }
+    }
+
+    #[test]
+    fn project_compiler_fs_event_matrix_rows_execute_expected_outcomes() {
+        for row in PROJECT_COMPILER_FS_EVENT_MATRIX {
+            run_matrix_row(*row);
+        }
+    }
+
+    #[test]
+    fn project_compiler_compile_cache_matrix_covers_vfs_operation_rows() {
+        for id in [
+            OperationId::O01,
+            OperationId::O02,
+            OperationId::O03,
+            OperationId::O04,
+            OperationId::O05,
+            OperationId::O06,
+            OperationId::O07,
+            OperationId::O08,
+            OperationId::O09,
+            OperationId::O10,
+            OperationId::O11,
+            OperationId::O12,
+            OperationId::O13,
+            OperationId::O14,
+            OperationId::O15,
+            OperationId::O16,
+            OperationId::O17,
+            OperationId::O18,
+            OperationId::O19,
+            OperationId::O20,
+        ] {
+            assert_compile_cache_matrix_contains(id);
+        }
+
+        for coverage in VFS_OPERATION_COMPILE_CACHE_MATRIX {
+            assert!(
+                !coverage.matrix_operations.is_empty(),
+                "{} must have an executable project compiler representative",
+                coverage.id.label()
+            );
+            assert!(
+                !coverage.note.is_empty(),
+                "{} must document its project compile-cache equivalence",
+                coverage.id.label()
+            );
+
+            for operation in coverage.matrix_operations {
+                run_matrix_row(project_matrix_row(*operation));
+            }
+        }
+    }
+
+    fn assert_initial_sync(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::Sync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::EntryFile, PathRelation::ImportedDependency],
+            BatchShape::MultiFileBatch,
+            SequenceShape::InitialSync,
+            ExpectedOutcome::IgnoredFirstSync,
+        );
+
+        let files = default_files();
+        let mut harness = ProjectCompilerHarness::ignoring_first_sync(&files);
+        let initial = harness.compile_primary();
+        assert_eq!(initial.error_cnt(), 0);
+        harness.latest_sync_dependencies();
+
+        let sync = MockChange::new(harness.workspace.sync_changeset());
+        row.apply_update(&mut harness, &sync);
+        assert!(
+            !harness.compiler.primary.reason.any(),
+            "initial sync should not create a compile reason when ignored"
+        );
+    }
+
+    fn assert_follow_up_non_sync_update(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::ImportedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::FsReasonRefreshesDependency,
+        );
+
+        let files = default_files();
+        let mut harness = ProjectCompilerHarness::ignoring_first_sync(&files);
+        let initial = harness.compile_primary();
+        assert_eq!(initial.error_cnt(), 0);
+        harness.latest_sync_dependencies();
+
+        let sync = MockChange::new(harness.workspace.sync_changeset());
+        harness.apply_update(&sync, true);
+        assert!(!harness.compiler.primary.reason.any());
+
+        let follow_up = harness
+            .workspace
+            .update_source(DEP, "#let value = [after sync]");
+        row.apply_update(&mut harness, &follow_up);
+        assert_fs_reason(&harness.compiler);
+
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [after sync]"
+        );
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, DEP);
+    }
+
+    fn assert_create_dependency(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::NewlyCreatedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::CreateAfterMissingImport,
+            ExpectedOutcome::RecoversNewDependency,
+        );
+
+        let files = vec![
+            (
+                MAIN,
+                "#import \"dep.typ\": value\n#import \"new.typ\": newer\n#value\n#newer",
+            ),
+            (DEP, "#let value = [before]"),
+        ];
+        let mut harness = ProjectCompilerHarness::new(&files);
+        let initial = harness.compile_primary();
+        assert!(initial.error_cnt() > 0);
+        harness.latest_sync_dependencies();
+
+        let created_dependency = harness
+            .workspace
+            .create_source("new.typ", "#let newer = [new dependency]");
+        row.apply_update(&mut harness, &created_dependency);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, "new.typ"),
+            "#let newer = [new dependency]"
+        );
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, "new.typ");
+    }
+
+    fn assert_edit_entry(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::EntryFile],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::RefreshesEntrySource,
+        );
+
+        let mut harness = clean_default_harness();
+        let entry_edit = harness.workspace.update_source(
+            MAIN,
+            "#import \"dep.typ\": value\n#let local = [entry changed]\n#value\n#local",
+        );
+        row.apply_update(&mut harness, &entry_edit);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, MAIN),
+            "#import \"dep.typ\": value\n#let local = [entry changed]\n#value\n#local"
+        );
+    }
+
+    fn assert_edit_dependency(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::ImportedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::RefreshesDependencySource,
+        );
+
+        let mut harness = clean_default_harness();
+        let dependency_edit = harness
+            .workspace
+            .update_source(DEP, "#let value = [dependency changed]");
+        row.apply_update(&mut harness, &dependency_edit);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [dependency changed]"
+        );
+    }
+
+    fn assert_create_unrelated(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::UnrelatedFile],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::KeepsUnrelatedCreateHarmless,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        let unrelated_create = harness
+            .workspace
+            .create_source("scratch.typ", "#let scratch = [unused]");
+        row.apply_update(&mut harness, &unrelated_create);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
+        assert_eq!(deps_after, deps_before);
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, "scratch.typ");
+    }
+
+    fn assert_remove_dependency(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NoInserts,
+            RemovePayload::OneRemovedPath,
+            &[PathRelation::PreviouslyDependedPath],
+            BatchShape::RemoveOnly,
+            SequenceShape::OneStepRemove,
+            ExpectedOutcome::ReportsRetiredDependencyUnavailable,
+        );
+
+        let mut harness = clean_default_harness();
+        let removed = harness.workspace.remove(DEP).unwrap();
+        row.apply_update(&mut harness, &removed);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+    }
+
+    fn assert_read_error_dependency(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::ReadErrorSnapshot,
+            RemovePayload::NoRemoves,
+            &[PathRelation::ImportedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::FailedRead,
+            ExpectedOutcome::SurfacesReadErrorDiagnostics,
+        );
+
+        let mut harness = clean_default_harness();
+        let read_error = read_error_change(&harness.workspace, DEP);
+        row.apply_update(&mut harness, &read_error);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+    }
+
+    fn assert_empty_dependency(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::EmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::ImportedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::TransientEmptyWrite,
+            ExpectedOutcome::UsesEmptyDependencySnapshot,
+        );
+
+        let mut harness = clean_default_harness();
+        let empty_dependency = harness.workspace.update_source(DEP, "");
+        row.apply_update(&mut harness, &empty_dependency);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert_eq!(source_text(&artifact, &harness.workspace, DEP), "");
+    }
+
+    fn assert_empty_unrelated(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::EmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::UnrelatedFile],
+            BatchShape::InsertOnly,
+            SequenceShape::TransientEmptyWrite,
+            ExpectedOutcome::KeepsEmptyUnrelatedHarmless,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        let empty_unrelated = harness.workspace.update_source(UNRELATED, "");
+        row.apply_update(&mut harness, &empty_unrelated);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
+        assert_eq!(deps_after, deps_before);
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, UNRELATED);
+    }
+
+    fn assert_rename_updated_references(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::OneRemovedPath,
+            &[
+                PathRelation::PreviouslyDependedPath,
+                PathRelation::NewlyReferencedDependency,
+            ],
+            BatchShape::RemovePlusInsert,
+            SequenceShape::RenameOldPlusNew,
+            ExpectedOutcome::FollowsRenamedPath,
+        );
+
+        let mut harness = clean_default_harness();
+        let rename = harness.workspace.rename(DEP, RENAMED_DEP).unwrap();
+        row.apply_update(&mut harness, &rename);
+        let entry_update = harness
+            .workspace
+            .update_source(MAIN, "#import \"renamed.typ\": value\n#value");
+        harness.apply_update(&entry_update, false);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, RENAMED_DEP),
+            "#let value = [before]"
+        );
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, RENAMED_DEP);
+        assert_deps_do_not_contain(&harness.workspace, &deps, DEP);
+    }
+
+    fn assert_rename_stale_references(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::OneRemovedPath,
+            &[PathRelation::PreviouslyDependedPath],
+            BatchShape::RemovePlusInsert,
+            SequenceShape::RenameOldPlusNew,
+            ExpectedOutcome::ReportsOldImportUnavailable,
+        );
+
+        let mut harness = clean_default_harness();
+        let rename = harness.workspace.rename(DEP, RENAMED_DEP).unwrap();
+        row.apply_update(&mut harness, &rename);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, RENAMED_DEP),
+            "#let value = [before]"
+        );
+    }
+
+    fn assert_delete_then_recreate(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::OneRemovedPath,
+            &[PathRelation::PreviouslyDependedPath],
+            BatchShape::RemoveOnlyThenInsertOnly,
+            SequenceShape::DeleteThenRecreate,
+            ExpectedOutcome::ReportsThenRecoversRecreatedSource,
+        );
+
+        let mut harness = clean_default_harness();
+        let removed = harness.workspace.remove(DEP).unwrap();
+        row.apply_update(&mut harness, &removed);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+        harness.latest_sync_dependencies();
+
+        let recreated = harness
+            .workspace
+            .create_source(DEP, "#let value = [recreated]");
+        row.apply_update(&mut harness, &recreated);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [recreated]"
+        );
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, DEP);
+    }
+
+    fn assert_failed_read_then_recovery(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::ImportedDependency],
+            BatchShape::InsertOnly,
+            SequenceShape::FailedReadThenRecovery,
+            ExpectedOutcome::ClearsDiagnosticsAfterRecovery,
+        );
+
+        let mut harness = clean_default_harness();
+        let read_error = read_error_change(&harness.workspace, DEP);
+        row.apply_update(&mut harness, &read_error);
+        let artifact = harness.compile_pending();
+        assert!(artifact.error_cnt() > 0);
+        assert!(source_is_unavailable(&artifact, &harness.workspace, DEP));
+        harness.latest_sync_dependencies();
+
+        let recovered = harness
+            .workspace
+            .update_source(DEP, "#let value = [recovered]");
+        row.apply_update(&mut harness, &recovered);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [recovered]"
+        );
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, DEP);
+    }
+
+    fn assert_rename_batch(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::OneRemovedPath,
+            &[
+                PathRelation::PreviouslyDependedPath,
+                PathRelation::NewlyReferencedDependency,
+            ],
+            BatchShape::RemovePlusInsert,
+            SequenceShape::RenameOldPlusNew,
+            ExpectedOutcome::RenameBatchFollowsRenamedPath,
+        );
+
+        let mut harness = clean_default_harness();
+        let rename = harness.workspace.rename(DEP, RENAMED_DEP).unwrap();
+        let entry_update = harness
+            .workspace
+            .update_source(MAIN, "#import \"renamed.typ\": value\n#value");
+        let batch = combine_changes(&[rename, entry_update]);
+        row.apply_update(&mut harness, &batch);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps, RENAMED_DEP);
+        assert_deps_do_not_contain(&harness.workspace, &deps, DEP);
+    }
+
+    fn assert_multi_file_unrelated_batch(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::MultipleRemovedPaths,
+            &[PathRelation::UnrelatedFile],
+            BatchShape::MultiFileBatch,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::MultiFileUnrelatedBatchHarmless,
+        );
+
+        let files = vec![
+            (MAIN, "#import \"dep.typ\": value\n#value"),
+            (DEP, "#let value = [before]"),
+            ("old-a.typ", "#let old_a = [unused]"),
+            ("old-b.typ", "#let old_b = [unused]"),
+        ];
+        let mut harness = ProjectCompilerHarness::new(&files);
+        let initial = harness.compile_primary();
+        assert_eq!(initial.error_cnt(), 0);
+        let deps_before = harness.latest_sync_dependencies();
+
+        let remove_a = harness.workspace.remove("old-a.typ").unwrap();
+        let remove_b = harness.workspace.remove("old-b.typ").unwrap();
+        let create_a = harness
+            .workspace
+            .create_source("new-a.typ", "#let new_a = [unused]");
+        let create_b = harness
+            .workspace
+            .create_source("new-b.typ", "#let new_b = [unused]");
+        let batch = combine_changes(&[remove_a, remove_b, create_a, create_b]);
+        row.apply_update(&mut harness, &batch);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
+        assert_eq!(deps_after, deps_before);
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, "new-a.typ");
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, "new-b.typ");
+    }
+
+    fn assert_upstream_invalidation(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::UpstreamUpdate,
+            SyncMode::NotApplicable,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::EntryFile],
+            BatchShape::InsertOnly,
+            SequenceShape::DelayedMemoryThenFilesystem,
+            ExpectedOutcome::AppliesDelayedMemoryBeforeFilesystem,
+        );
+
+        let files = vec![(MAIN, "#let value = [disk]\n#value")];
+        let mut harness = ProjectCompilerHarness::new(&files);
+        let initial = harness.compile_primary();
+        assert_eq!(initial.error_cnt(), 0);
+        harness.latest_sync_dependencies();
+
+        let memory_insert = insert_source_change(
+            &harness.workspace,
+            MAIN,
+            "#let value = [memory shadow]\n#value",
+        );
+        harness
+            .compiler
+            .process(Interrupt::Memory(memory_insert.memory_event()));
+        assert_mem_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, MAIN),
+            "#let value = [memory shadow]\n#value"
+        );
+        harness.latest_sync_dependencies();
+
+        let memory_remove = remove_change(&harness.workspace, MAIN);
+        harness
+            .compiler
+            .process(Interrupt::Memory(memory_remove.memory_event()));
+        let upstream_event = harness.take_upstream_update();
+        assert!(
+            upstream_event
+                .invalidates
+                .contains(&harness.workspace.immut_path(MAIN))
+        );
+        assert!(
+            !harness.compiler.primary.reason.any(),
+            "delayed memory removal should wait for the upstream filesystem event"
+        );
+
+        let filesystem_update = harness
+            .workspace
+            .update_source(MAIN, "#let value = [filesystem]\n#value");
+        harness.apply_upstream_update(filesystem_update.into_changeset(), Some(upstream_event));
+        assert_fs_reason(&harness.compiler);
+        assert!(
+            !harness.compiler.primary.reason.by_mem_events,
+            "known upstream update should not add a separate memory reason"
+        );
+
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, MAIN),
+            "#let value = [filesystem]\n#value"
+        );
+    }
+
+    fn assert_unrelated_churn(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[PathRelation::UnrelatedFile],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::KeepsUnrelatedChurnHarmless,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        let unrelated = harness
+            .workspace
+            .update_source(UNRELATED, "#let note = [changed but unused]");
+        row.apply_update(&mut harness, &unrelated);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
+        assert_eq!(deps_after, deps_before);
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, UNRELATED);
+    }
+
+    fn assert_empty_changeset(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NoInserts,
+            RemovePayload::NoRemoves,
+            &[PathRelation::UnrelatedFile],
+            BatchShape::EmptyChangeset,
+            SequenceShape::EmptyChangeset,
+            ExpectedOutcome::ExplicitNoContentOutcome,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        let empty = empty_change();
+        row.apply_update(&mut harness, &empty);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_after = harness.dependency_paths_after_harmless_compile(&deps_before);
+        assert_eq!(deps_after, deps_before);
+    }
+
+    fn assert_dependency_membership_removal(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+            ],
+            BatchShape::InsertOnly,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::DropsInactiveDependency,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        assert_deps_contain(&harness.workspace, &deps_before, DEP);
+
+        let entry_without_dependency = harness
+            .workspace
+            .update_source(MAIN, "#let value = [inline]\n#value");
+        row.apply_update(&mut harness, &entry_without_dependency);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, MAIN),
+            "#let value = [inline]\n#value"
+        );
+        let deps_after = harness.dependency_paths_after_compile();
+        assert_deps_do_not_contain(&harness.workspace, &deps_after, DEP);
+    }
+
+    fn assert_dependency_membership_readdition(row: MatrixRow) {
+        assert_row_shape(
+            row,
+            EventVariant::Update,
+            SyncMode::NonSync,
+            InsertPayload::NonEmptyContent,
+            RemovePayload::NoRemoves,
+            &[
+                PathRelation::EntryFile,
+                PathRelation::RetainedInactiveDependency,
+                PathRelation::ImportedDependency,
+            ],
+            BatchShape::MultiFileBatch,
+            SequenceShape::OneStepEdit,
+            ExpectedOutcome::ReaddsChangedInactiveDependency,
+        );
+
+        let (mut harness, deps_before) = clean_default_harness_with_deps();
+        assert_deps_contain(&harness.workspace, &deps_before, DEP);
+
+        let entry_without_dependency = harness
+            .workspace
+            .update_source(MAIN, "#let value = [inline]\n#value");
+        harness.apply_update(&entry_without_dependency, false);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        let deps_without_dependency = harness.dependency_paths_after_compile();
+        assert_deps_do_not_contain(&harness.workspace, &deps_without_dependency, DEP);
+
+        let changed_while_inactive = harness
+            .workspace
+            .update_source(DEP, "#let value = [changed while inactive]");
+        let entry_readd = harness
+            .workspace
+            .update_source(MAIN, "#import \"dep.typ\": value\n#value");
+        row.apply_update(&mut harness, &entry_readd);
+        harness.apply_update(&changed_while_inactive, true);
+        assert_fs_reason(&harness.compiler);
+        let artifact = harness.compile_pending();
+        assert_eq!(artifact.error_cnt(), 0);
+        assert_eq!(
+            source_text(&artifact, &harness.workspace, DEP),
+            "#let value = [changed while inactive]"
+        );
+        let deps_after = harness.dependency_paths_after_compile();
+        assert_deps_contain(&harness.workspace, &deps_after, DEP);
+    }
 }

@@ -1,0 +1,74 @@
+---
+source: crates/tinymist-query/src/completion.rs
+description: "Completion on \" (131..132)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/include_parent_dot_path.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
+    "filterText": "../nanochat/.parts/",
+    "kind": 19,
+    "label": "../nanochat/parts/",
+    "sortText": "0",
+    "textEdit": {
+     "newText": "../nanochat/parts/",
+     "range": {
+      "end": {
+       "character": 23,
+       "line": 2
+      },
+      "start": {
+       "character": 10,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "filterText": "../nanochat/.main.typ",
+    "kind": 17,
+    "label": "../nanochat/main.typ",
+    "sortText": "1",
+    "textEdit": {
+     "newText": "../nanochat/main.typ",
+     "range": {
+      "end": {
+       "character": 23,
+       "line": 2
+      },
+      "start": {
+       "character": 10,
+       "line": 2
+      }
+     }
+    }
+   },
+   {
+    "filterText": "../nanochat/.parts/section.typ",
+    "kind": 17,
+    "label": "../nanochat/parts/section.typ",
+    "sortText": "2",
+    "textEdit": {
+     "newText": "../nanochat/parts/section.typ",
+     "range": {
+      "end": {
+       "character": 23,
+       "line": 2
+      },
+      "start": {
+       "character": 10,
+       "line": 2
+      }
+     }
+    }
+   }
+  ]
+ }
+]

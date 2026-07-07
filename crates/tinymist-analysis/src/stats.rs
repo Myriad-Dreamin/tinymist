@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock};
 
 use parking_lot::Mutex;
+use serde::Serialize;
 use tinymist_std::hash::FxDashMap;
 use tinymist_std::time::Duration;
 use typst::syntax::FileId;
@@ -85,6 +86,30 @@ pub struct QueryStatBucketData {
     pub(crate) max: Duration,
 }
 
+/// A serializable analysis query statistic entry.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryStatReportEntry {
+    /// The file id that owns the query, or `None` for aggregate statistics.
+    pub file: Option<String>,
+    /// The query name.
+    pub query: String,
+    /// The number of query calls.
+    pub count: u64,
+    /// The number of cache misses.
+    pub missing: u64,
+    /// The total query time in milliseconds.
+    pub total_ms: f64,
+    /// The minimum query time in milliseconds.
+    pub min_ms: f64,
+    /// The maximum query time in milliseconds.
+    pub max_ms: f64,
+}
+
+fn duration_ms(duration: Duration) -> f64 {
+    duration.as_secs_f64() * 1000.0
+}
+
 impl Default for QueryStatBucketData {
     fn default() -> Self {
         Self {
@@ -160,6 +185,37 @@ impl AnalysisStats {
             bucket: get(id),
             since: tinymist_std::time::Instant::now(),
         }
+    }
+
+    /// Returns a serializable snapshot of the analysis statistics.
+    pub fn report_json(&self) -> Vec<QueryStatReportEntry> {
+        let stats = &self.query_stats;
+        let mut data = Vec::new();
+        for refs in stats.iter() {
+            let id = refs.key();
+            let queries = refs.value();
+            for refs2 in queries.iter() {
+                let query = refs2.key();
+                let bucket = refs2.value().data.lock().clone();
+                let min = if bucket.query == 0 {
+                    Duration::from_secs(0)
+                } else {
+                    bucket.min
+                };
+                data.push(QueryStatReportEntry {
+                    file: id.map(|id| format!("{id:?}").replace('\\', "/")),
+                    query: query.to_string(),
+                    count: bucket.query,
+                    missing: bucket.missing,
+                    total_ms: duration_ms(bucket.total),
+                    min_ms: duration_ms(min),
+                    max_ms: duration_ms(bucket.max),
+                });
+            }
+        }
+
+        data.sort_by(|a, b| a.file.cmp(&b.file).then_with(|| a.query.cmp(&b.query)));
+        data
     }
 
     /// Reports the statistics of the analysis.

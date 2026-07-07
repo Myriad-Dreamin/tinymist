@@ -1,5 +1,5 @@
 import { PreviewMode } from "./typst-doc.mjs";
-import { TypstCancellationToken } from "./typst-cancel.mjs";
+import { TypstCancellationToken } from "@myriaddreamin/typst.ts/dist/esm/contrib/dom/typst-cancel.mjs";
 // import { patchOutlineEntry } from "./typst-outline.mjs";
 import { TypstPatchAttrs } from "./typst-patch.mjs";
 import type { GConstructor, TypstDocumentContext } from "./typst-doc.mjs";
@@ -134,12 +134,7 @@ export function provideCanvasDoc<
 
     async updateCanvas(pages: CanvasPage[], opts?: UpdateCanvasOptions): Promise<void> {
       const tok = opts?.cancel || undefined;
-      const perf = performance.now();
-      console.log("updateCanvas start");
-      // todo: priority in window
-      // await Promise.all(pagesInfo.map(async (pageInfo) => {
-      this.kModule.backgroundColor = "#ffffff";
-      this.kModule.pixelPerPt = this.pixelPerPt;
+
       const waitABit = async () => {
         return new Promise((resolve) => {
           if (opts?.lazy && "requestIdleCallback" in window) {
@@ -149,46 +144,43 @@ export function provideCanvasDoc<
           }
         });
       };
+
       for (const pageInfo of pages) {
         if (tok?.isCancelRequested()) {
           await tok.consume();
-          console.log("updateCanvas cancelled", performance.now() - perf);
           return;
         }
 
         const canvas = pageInfo.elem.firstElementChild as HTMLCanvasElement;
-        // const tt1 = performance.now();
 
         const pws = pageInfo.width.toFixed(3);
         const phs = pageInfo.height.toFixed(3);
 
-        let cached = this.prepareCanvas(pageInfo, canvas);
+        const cached = this.prepareCanvas(pageInfo, canvas);
 
         const cacheKey = pageInfo.elem.getAttribute("data-cache-key") || undefined;
         const result = await this.kModule.renderCanvas({
           canvas: canvas.getContext("2d")!,
           pageOffset: pageInfo.index,
+          backgroundColor: "#ffffff",
+          pixelPerPt: this.pixelPerPt,
           cacheKey: cached ? cacheKey : undefined,
           dataSelection: {
             body: true,
           },
         });
+        const canvasUpdated = !cached || cacheKey !== result.cacheKey;
         if (cacheKey !== result.cacheKey) {
-          console.log("updateCanvas one miss", cacheKey, result.cacheKey);
-          // console.log('renderCanvas', pageInfo.index, performance.now() - tt1, result);
-          // todo: cache key changed
-          // canvas.width = pageInfo.width * this.pixelPerPt;
-          // canvas.height = pageInfo.height * this.pixelPerPt;
           pageInfo.elem.setAttribute("data-page-width", pws);
           pageInfo.elem.setAttribute("data-page-height", phs);
           canvas.setAttribute("data-cache-key", result.cacheKey);
           pageInfo.elem.setAttribute("data-cache-key", result.cacheKey);
         }
 
-        await waitABit();
+        if (canvasUpdated) {
+          await waitABit();
+        }
       }
-
-      console.log("updateCanvas done", performance.now() - perf);
       await tok?.consume();
     }
 

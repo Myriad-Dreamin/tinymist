@@ -430,6 +430,7 @@ impl TypeChecker<'_> {
 
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
         let args = self.check(&apply.args);
+        let callee = self.check(&apply.callee);
 
         // Treat `dict.at("key")` as `dict.key` when the key is a constant string.
         if let Expr::Select(select) = &apply.callee
@@ -450,8 +451,6 @@ impl TypeChecker<'_> {
                 return res;
             }
         }
-
-        let callee = self.check(&apply.callee);
 
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
 
@@ -581,7 +580,7 @@ impl TypeChecker<'_> {
                 Value::Str(..) => text_type(),
                 Value::Content(c) => Ty::Builtin(BuiltinTy::Content(Some(c.elem()))),
                 Value::Func(f) => {
-                    if let Some(elem) = f.element() {
+                    if let Some(elem) = f.to_element() {
                         Ty::Builtin(BuiltinTy::Content(Some(elem)))
                     } else {
                         return None;

@@ -1,0 +1,43 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/at_default.typ
+---
+"dynamic-default" = (Any, Any) => Any
+"d" = Any
+"key" = Any
+"static-param" = (Any) => Any
+"d" = Any
+"static-default" = Any
+"static-existing" = Any
+"static-no-default" = {"value": 2}.value
+"tuple-default" = 2
+=====
+5..20 -> @dynamic-default
+21..22 -> @d
+24..27 -> @key
+31..32 -> @d
+31..35 -> @v"d".at
+31..55 -> Any
+36..39 -> @key
+61..73 -> @static-param
+74..75 -> @d
+79..80 -> @d
+79..83 -> @v"d".at
+79..103 -> Any
+109..123 -> @static-default
+126..129 -> {}
+126..132 -> {}.at
+126..155 -> Any
+161..176 -> @static-existing
+179..189 -> {"value": 2}
+179..192 -> {"value": 2}.at
+179..213 -> Any
+219..236 -> @static-no-default
+239..249 -> {"value": 2}
+239..252 -> {"value": 2}.at
+239..261 -> {"value": 2}.value
+267..280 -> @tuple-default
+283..289 -> (1, 2, )
+283..292 -> (Func(at) | (Func(at) | (1, 2, ).at))
+283..310 -> (Any | 2)

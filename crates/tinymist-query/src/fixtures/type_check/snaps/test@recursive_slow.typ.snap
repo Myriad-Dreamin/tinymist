@@ -1,0 +1,38 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/recursive_slow.typ
+---
+"l" = (Any) => (Any) => Any
+"" = (Any) => (Any) => Any
+"a" = Any
+"" = (Any) => Any
+"b" = Any
+"r" = (Any) => (Any) => (Any) => Any
+"" = (Any) => (Any) => (Any) => Any
+"a" = Any
+"" = (Any) => (Any) => Any
+"b" = Any
+"" = (Any) => Any
+"c" = Any
+"merged" = IfTy { cond: true, then: (Any) => (Any) => Any, else_: (Any) => (Any) => (Any) => Any }
+"use" = Any
+=====
+5..6 -> @l
+9..24 -> @
+10..11 -> @a
+16..24 -> @
+17..18 -> @b
+30..31 -> @r
+34..56 -> @
+35..36 -> @a
+41..56 -> @
+42..43 -> @b
+48..56 -> @
+49..50 -> @c
+62..68 -> @merged
+81..82 -> @l
+92..93 -> @r
+101..104 -> @use
+107..113 -> @merged
+107..116 -> Any

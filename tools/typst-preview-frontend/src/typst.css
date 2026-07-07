@@ -52,6 +52,7 @@ body {
 
 #typst-container-main {
   flex: 1;
+  overflow: auto;
   position: relative;
 }
 
@@ -77,10 +78,14 @@ body {
   filter: invert(1) hue-rotate(180deg);
 }
 
+#typst-container-main.hide-scrollbar-x,
+#typst-app.hide-scrollbar-x,
 .hide-scrollbar-x {
   overflow-x: hidden;
 }
 
+#typst-container-main.hide-scrollbar-y,
+#typst-app.hide-scrollbar-y,
 .hide-scrollbar-y {
   overflow-y: hidden;
 }

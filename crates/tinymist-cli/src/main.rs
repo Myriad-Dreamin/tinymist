@@ -10,7 +10,10 @@ mod cmd {
     #[cfg(feature = "dap")]
     pub mod dap;
     pub mod generate_script;
+    pub mod lint;
     pub mod lsp;
+    #[cfg(feature = "export")]
+    pub mod package;
     #[cfg(feature = "preview")]
     pub mod preview;
     pub mod query;
@@ -34,6 +37,7 @@ use crate::cmd::*;
 #[cfg(feature = "export")]
 use crate::compile::CompileArgs;
 use crate::conn::client_root;
+use crate::lint::LintArgs;
 use crate::utils::*;
 
 #[cfg(feature = "dhat-heap")]
@@ -62,6 +66,10 @@ static RUNTIMES: LazyLock<Runtimes> = LazyLock::new(Runtimes::default);
 #[derive(Debug, Clone, clap::Parser)]
 #[clap(name = "tinymist", author, version, about, long_version(tinymist::LONG_VERSION.as_str()))]
 struct Args {
+    /// Configure log filter of tinymist
+    #[clap(long = "log-filter", env = "TINYMIST_LOG")]
+    pub log_filter: Option<String>,
+
     /// Mode of the binary
     #[clap(subcommand)]
     pub cmd: Option<Commands>,
@@ -93,6 +101,12 @@ enum Commands {
     #[cfg(feature = "export")]
     #[clap(alias = "c")]
     Compile(CompileArgs),
+    /// Run Tinymist lint checks
+    Lint(LintArgs),
+    /// Run package tools
+    #[cfg(feature = "export")]
+    #[clap(subcommand)]
+    Package(crate::package::PackageCommands),
 
     /// Generate completion script to stdout
     Completion(crate::completion::ShellCompletionArgs),
@@ -125,8 +139,10 @@ fn main() -> Result<()> {
     let _profiler = dhat::Profiler::new_heap();
 
     // Parses command line arguments
-    let cmd = Args::parse().cmd;
-    let cmd = cmd.unwrap_or_else(|| Commands::Lsp(Default::default()));
+    let args = Args::parse();
+    let cmd = args
+        .cmd
+        .unwrap_or_else(|| Commands::Lsp(Default::default()));
 
     // Probes soon to avoid other initializations causing errors
     if matches!(cmd, Commands::Probe) {
@@ -137,12 +153,38 @@ fn main() -> Result<()> {
     #[cfg(feature = "l10n")]
     set_translations(load_translations(tinymist_assets::L10N_DATA)?);
     // Starts logging
-    let _ = tinymist::init_log(tinymist::InitLogOpts {
+    let verbose = match &cmd {
+        // Short-running commands, usually run from the CLI.
+        Commands::Completion(..) | Commands::Probe => false,
         #[cfg(feature = "export")]
-        is_transient_cmd: matches!(cmd, Commands::Compile(..)),
-        #[cfg(not(feature = "export"))]
-        is_transient_cmd: false,
-        is_test_no_verbose: matches!(&cmd, Commands::Test(test) if !test.verbose),
+        Commands::Compile(..) => false,
+        Commands::Lint(..) => false,
+        #[cfg(feature = "export")]
+        Commands::Package(package::PackageCommands::Docs(args)) => args.watch,
+
+        // Long-running commands, usually run from the CLI.
+        Commands::Test(test) => test.verbose,
+        #[cfg(feature = "preview")]
+        Commands::Preview(preview) => preview.verbose,
+
+        // Long-running commands, usually run from an editor.
+        Commands::Lsp(..) => true,
+        #[cfg(feature = "dap")]
+        Commands::Dap(..) => true,
+
+        // Hidden commands.
+        Commands::TraceLsp(..)
+        | Commands::Query(..)
+        | Commands::GenerateScript(..)
+        | Commands::Cov(..) => true,
+        #[cfg(feature = "lock")]
+        Commands::Doc(..) => true,
+        #[cfg(feature = "lock")]
+        Commands::Task(..) => true,
+    };
+    let _ = tinymist::init_log(tinymist::InitLogOpts {
+        verbose,
+        filter: args.log_filter,
         output: None,
     });
 
@@ -159,6 +201,9 @@ fn main() -> Result<()> {
         Commands::Preview(args) => block_on(crate::preview::preview_main(args)),
         #[cfg(feature = "export")]
         Commands::Compile(args) => block_on(crate::compile::compile_main(args)),
+        Commands::Lint(args) => crate::lint::lint_main(args),
+        #[cfg(feature = "export")]
+        Commands::Package(args) => block_on(crate::package::package_main(args)),
 
         Commands::Completion(args) => crate::completion::completion_main(args),
         Commands::GenerateScript(args) => crate::generate_script::generate_script_main(args),

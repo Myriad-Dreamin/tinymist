@@ -38,7 +38,7 @@ fn attribute_escaping_handles_quotes_and_special_chars() {
     let output = writer.into_string().unwrap();
     insta::assert_snapshot!(
         output,
-        @"<div data-title=\"He said &quot;&lt;Hello&gt;&quot; &amp; more\" />"
+        @r#"<div data-title="He said &quot;&lt;Hello&gt;&quot; &amp; more" />"#
     );
 }
 

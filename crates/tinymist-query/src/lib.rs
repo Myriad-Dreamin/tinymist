@@ -51,7 +51,7 @@ pub mod testing;
 pub use tinymist_analysis::{stats::GLOBAL_STATS, ty, upstream};
 
 /// The physical position in a document.
-pub type FramePosition = typst::layout::Position;
+pub type FramePosition = typst::introspection::PagedPosition;
 
 mod adt;
 mod lsp_typst_boundary;
@@ -234,8 +234,12 @@ mod polymorphic {
         OnExportMd(OnExportMdRequest),
         /// A request to get the hover information.
         Hover(HoverRequest),
+        /// A request to get the hover information for a symbol.
+        HoverSymbol(String),
         /// A request to go to the definition.
         GotoDefinition(GotoDefinitionRequest),
+        /// A request to go to the definition of a symbol.
+        GotoDefinitionSymbol(String),
         /// A request to go to the declaration.
         GotoDeclaration(GotoDeclarationRequest),
         /// A request to get the references.
@@ -300,7 +304,9 @@ mod polymorphic {
                 Self::OnExport(..) => Mergeable,
                 Self::OnExportMd(..) => Mergeable,
                 Self::Hover(..) => PinnedFirst,
+                Self::HoverSymbol(..) => PinnedFirst,
                 Self::GotoDefinition(..) => PinnedFirst,
+                Self::GotoDefinitionSymbol(..) => PinnedFirst,
                 Self::GotoDeclaration(..) => PinnedFirst,
                 Self::References(..) => PinnedFirst,
                 Self::InlayHint(..) => Unique,
@@ -338,7 +344,9 @@ mod polymorphic {
                 Self::OnExport(..) => return None,
                 Self::OnExportMd(..) => return None,
                 Self::Hover(req) => &req.path,
+                Self::HoverSymbol(..) => return None,
                 Self::GotoDefinition(req) => &req.path,
+                Self::GotoDefinitionSymbol(..) => return None,
                 Self::GotoDeclaration(req) => &req.path,
                 Self::References(req) => &req.path,
                 Self::InlayHint(req) => &req.path,

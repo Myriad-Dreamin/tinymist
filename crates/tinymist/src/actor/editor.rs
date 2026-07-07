@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use tinymist_project::CompileReport;
 use tinymist_query::DiagnosticsMap;
 use tokio::sync::mpsc;
+use typst_shim::syntax::VirtualPathExt;
 
 use crate::project::ProjectInsId;
 use crate::{tool::word_count::WordsCount, LspClient};
@@ -115,7 +116,7 @@ impl EditorActor {
 
                     self.status.path = compile_status
                         .compiling_id
-                        .map(|fid| unix_slash(fid.vpath().as_rooted_path()))
+                        .map(|fid| unix_slash(fid.vpath().as_rooted_path_compat()))
                         .unwrap_or_default();
                     self.status.page_count = compile_status.page_count;
                     self.status.status = match &compile_status.status {

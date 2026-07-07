@@ -1,0 +1,25 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/content_return.typ
+---
+"interpolated" = (Any, Any, Any) => None
+"day" = Any
+"month" = Any
+"year" = Any
+"month-name" = Any
+"final-unknown" = (Any) => Any
+"x" = Any
+=====
+5..17 -> @interpolated
+18..21 -> @day
+23..28 -> @month
+30..34 -> @year
+46..56 -> @month-name
+59..64 -> @month
+69..72 -> @day
+77..87 -> @month-name
+92..96 -> @year
+106..119 -> @final-unknown
+120..121 -> @x
+129..130 -> @x

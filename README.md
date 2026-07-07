@@ -100,9 +100,9 @@ Follow the instructions to enable tinymist in your favorite editor.
 
 ## Installing Regular/Nightly Prebuilds from GitHub
 
-Note: if you are not knowing what is a regular/nightly release, please don’t follow this section.
+Note: if you don’t know what is a regular/nightly release, please don’t follow this section.
 
-Besides published releases specific for each editors, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
+Besides published releases specific to each editor, you can also download the latest regular/nightly prebuilts from GitHub and install them manually.
 
 - Regular prebuilts can be found in [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).
 - Nightly prebuilts can be found in [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).
@@ -143,9 +143,9 @@ To encourage contributions, we create many [Pull Requests](https://github.com/My
 
 We are planning to implement the following features in typst v0.14.0 or spare time in weekend:
 
-- Type checking: complete the type checker.
-- Periscope renderer: It is disabled since vscode reject to render SVGs containing foreignObjects.
-- Inlay hint: It is disabled _by default_ because of performance issues.
+- Type checking: Complete the type checker.
+- Periscope renderer: Disabled since vscode rejects to render SVGs containing foreignObjects.
+- Inlay hints: Disabled _by default_ because of performance issues.
 - Find references of dictionary fields and named function arguments.
 - Improve symbol view’s appearance.
 - Improve package view.
@@ -162,7 +162,7 @@ We are planning to implement the following features in typst v0.14.0 or spare ti
 - Spell checking: There is already a branch but no suitable (default) spell checking library is found.
   - [typos](https://github.com/crate-ci/typos) is great for typst. [harper](https://github.com/Automattic/harper) looks promise.
 
-If you are interested by any above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)
+If you are interested in any of the above features, please feel free to send Issues to discuss or PRs to implement to [GitHub.](https://github.com/Myriad-Dreamin/tinymist)
 
 ## Contributing
 
@@ -174,7 +174,7 @@ Tinymist thrives on community love and remains proudly independent. While we don
 
 ## Acknowledgements
 
-- Partially code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
+- Part of the code is inherited from [typst-lsp](https://github.com/nvarner/typst-lsp)
 - The [integrating](/editors/vscode#symbol-view) **offline** handwritten-stroke recognizer is powered by [Detypify](https://detypify.quarticcat.com/).
 - The [integrating](/editors/vscode#preview-command) preview service is powered by [typst-preview](https://github.com/Enter-tainer/typst-preview).
 - The [integrating](/editors/vscode#managing-local-packages) local package management functions are adopted from [vscode-typst-sync](https://github.com/OrangeX4/vscode-typst-sync).

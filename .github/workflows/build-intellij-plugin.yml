@@ -1,0 +1,15 @@
+name: tinymist::build::intellij-plugin
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  placeholder:
+    name: IntelliJ Plugin Placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show placeholder status
+        run: |
+          echo "IntelliJ plugin workflow placeholder"
+          echo "Replace this workflow on feature branches while keeping it dispatchable from main."

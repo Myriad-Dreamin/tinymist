@@ -2,7 +2,7 @@
 name = "tinymist-vfs"
 description = "Vfs for tinymist."
 # group: world
-version = "0.14.6"
+version = "0.15.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -27,6 +27,7 @@ js-sys = { workspace = true, optional = true }
 
 [features]
 
+mock = []
 web = ["wasm-bindgen", "web-sys", "js-sys", "tinymist-std/web"]
 browser = ["web"]
 system = ["tinymist-std/system"]

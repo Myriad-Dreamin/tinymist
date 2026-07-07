@@ -1064,8 +1064,8 @@ en = "Export target"
 zh = "导出目标"
 
 [extension.tinymist.config.tinymist.exportTarget.desc]
-en = "The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html`. This configuration only affects how the language server completes your code."
-zh = "导出文档的目标。默认为 `paged`。注意：即使设置为 `html`，您仍然可以导出 PDF。此配置仅影响语言服务器如何补全您的代码。"
+en = "The target to export the document to. Defaults to `paged`. Note: you can still export PDF when it is set to `html` or `bundle`. This configuration only affects how the language server completes your code."
+zh = "导出文档的目标。默认为 `paged`。注意：即使设置为 `html` 或 `bundle`，您仍然可以导出 PDF。此配置仅影响语言服务器如何补全您的代码。"
 
 [extension.tinymist.config.tinymist.exportTarget.string.enum.paged]
 en = "The current export target is for PDF, PNG, and SVG export."
@@ -1074,6 +1074,10 @@ zh = "当前的导出目标是 PDF、PNG 和 SVG 导出。"
 [extension.tinymist.config.tinymist.exportTarget.string.enum.html]
 en = "The current export target is for HTML export."
 zh = "当前的导出目标是 HTML 导出。"
+
+[extension.tinymist.config.tinymist.exportTarget.string.enum.bundle]
+en = "The current export target is for bundle export."
+zh = "当前的导出目标是 bundle 导出。"
 
 [extension.tinymist.config.tinymist.exportPdf.title]
 en = "Export PDF"
@@ -1156,8 +1160,8 @@ en = "Root path"
 zh = "根路径"
 
 [extension.tinymist.config.tinymist.rootPath.desc]
-en = "Configure the root for absolute paths in typst. Note: for Neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)."
-zh = "配置 typst 中绝对路径的根。注意：对于 Neovim 用户，如果它抱怨找不到根目录，您还必须设置 `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }`，请参见 [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)。"
+en = "Configure the Typst root used for absolute paths. This dedicated setting overrides `--root` from `tinymist.typstExtraArgs`. For a broader explanation of shared compiler settings, see [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html). Note: for Neovim users, if it complains root not found, you must set `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }` as well, see [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)."
+zh = "配置 Typst 用于绝对路径的根目录。这个专用设置会覆盖 `tinymist.typstExtraArgs` 中的 `--root`。要了解共享编译器设置的完整说明，请参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。注意：对于 Neovim 用户，如果它抱怨找不到根目录，您还必须设置 `require(\"lspconfig\")[\"tinymist\"].setup { root_dir }`，请参见 [tinymist#528](https://github.com/Myriad-Dreamin/tinymist/issues/528)。"
 
 [extension.tinymist.config.tinymist.configureDefaultWordSeparator.title]
 en = "Configure default word separators"
@@ -1191,6 +1195,14 @@ zh = "使用语义标记进行语法高亮"
 en = "Do not use semantic tokens for syntax highlighting"
 zh = "不使用语义标记进行语法高亮"
 
+[extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.title]
+en = "Show Package Version Status"
+zh = "显示包版本状态"
+
+[extension.tinymist.config.tinymist.inlayHints.packageVersionStatus.desc]
+en = "Show inline decorations indicating package version status (latest, upgradable, or invalid)"
+zh = "显示包版本状态的内联装饰（最新、可升级或无效）"
+
 [extension.tinymist.config.tinymist.typingContinueCommentsOnNewline.title]
 en = "Continue Comments on Newline"
 zh = "在新行上继续注释"
@@ -1212,16 +1224,16 @@ en = "System Fonts"
 zh = "系统字体"
 
 [extension.tinymist.config.tinymist.systemFonts.desc]
-en = "A flag that determines whether to load system fonts for Typst compiler, which is useful for ensuring reproducible compilation. If set to null or not set, the extension will use the default behavior of the Typst compiler. Note: You need to restart LSP to change this options."
-zh = "一个标志，用于确定是否为 Typst 编译器加载系统字体，这对于确保可重现的编译很有用。如果设置为 null 或未设置，扩展将使用 Typst 编译器的默认行为。注意：更改此选项需要重新启动 LSP。"
+en = "Controls whether Tinymist loads system fonts for the shared Typst compiler environment used by editing, preview, and export. Set this to `false` together with explicit `tinymist.fontPaths` for reproducible builds; if left unset, Tinymist follows Typst's default behavior. This dedicated setting overrides `--ignore-system-fonts` from `tinymist.typstExtraArgs`. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html). Note: restart the LSP after changing this setting."
+zh = "控制 Tinymist 是否为编辑、预览和导出共用的 Typst 编译环境加载系统字体。将其设为 `false` 并配合明确的 `tinymist.fontPaths` 可以获得更可重现的构建；若不设置，则遵循 Typst 的默认行为。这个专用设置会覆盖 `tinymist.typstExtraArgs` 中的 `--ignore-system-fonts`。参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。注意：修改此设置后需要重启 LSP。"
 
 [extension.tinymist.config.tinymist.fontPaths.title]
 en = "Font Paths"
 zh = "字体路径"
 
 [extension.tinymist.config.tinymist.fontPaths.desc]
-en = "A list of file or directory path to fonts. Note: The configuration source in higher priority will **override** the configuration source in lower priority. The order of precedence is: Configuration `tinymist.fontPaths` > Configuration `tinymist.typstExtraArgs.fontPaths` > LSP's CLI Argument `--font-path` > The environment variable `TYPST_FONT_PATHS` (a path list separated by `;` (on Windows) or `:` (Otherwise)). Note: If the path to fonts is a relative path, it will be resolved based on the root directory. Note: In VSCode, you can use VSCode variables in the path, e.g. `${workspaceFolder}/fonts`."
-zh = "字体文件或目录路径列表。注意：优先级较高的配置源将**覆盖**优先级较低的配置源。优先级顺序为：配置 `tinymist.fontPaths` > 配置 `tinymist.typstExtraArgs.fontPaths` > LSP 的 CLI 参数 `--font-path` > 环境变量 `TYPST_FONT_PATHS`（由 `;`（在 Windows 上）或 `:`（其他情况）分隔的路径列表）。注意：如果字体路径是相对路径，它将基于根目录解析。注意：在 VSCode 中，您可以在路径中使用 VSCode 变量，例如 `${workspaceFolder}/fonts`。"
+en = "List of font files or directories to add to Tinymist's shared compiler environment. When `tinymist.systemFonts` is `false`, Tinymist uses its embedded Typst font bundle plus these paths, which is helpful for reproducible builds. Precedence is `tinymist.fontPaths` > `--font-path` entries from `tinymist.typstExtraArgs` > the LSP CLI `--font-path` argument > `TYPST_FONT_PATHS`. Relative paths resolve against the root directory, and VS Code variables such as `${workspaceFolder}` are supported. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)."
+zh = "要添加到 Tinymist 共用编译环境中的字体文件或目录列表。当 `tinymist.systemFonts` 为 `false` 时，Tinymist 会使用内置的 Typst 字体包以及这里列出的路径，这有助于获得可重现的构建。优先级为 `tinymist.fontPaths` > `tinymist.typstExtraArgs` 中的 `--font-path` > LSP CLI `--font-path` 参数 > `TYPST_FONT_PATHS`。相对路径会相对于根目录解析，并且支持 `${workspaceFolder}` 这样的 VS Code 变量。参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。"
 
 [extension.tinymist.config.tinymist.compileStatus.title]
 en = "Compile Status"
@@ -1244,16 +1256,16 @@ en = "Typst Extra Arguments"
 zh = "Typst 额外参数"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.desc]
-en = "You can pass any arguments as you like, and we will try to follow behaviors of the **same version** of typst-cli. Note: the arguments may be overridden by other settings. For example, `--font-path` will be overridden by `tinymist.fontPaths`."
-zh = "您可以传递任何您喜欢的参数，我们将尝试遵循**相同版本**的 typst-cli 的行为。注意：参数可能会被其他设置覆盖。例如，`--font-path` 将被 `tinymist.fontPaths` 覆盖。"
+en = "CLI-shaped arguments for the supported Typst subset that Tinymist parses today. Supported examples include `--input`, `--features=html`, `--root`, `--font-path`, `--ignore-system-fonts`, `--package-path`, `--package-cache-path`, `--creation-timestamp`, and `--cert`, plus a final entry file. Dedicated settings such as `tinymist.rootPath`, `tinymist.fontPaths`, and `tinymist.systemFonts` override overlapping arguments. See [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples."
+zh = "Tinymist 会解析一组受支持的 Typst CLI 风格参数，而不是无条件透传所有参数。当前支持的示例包括 `--input`、`--features=html`、`--root`、`--font-path`、`--ignore-system-fonts`、`--package-path`、`--package-cache-path`、`--creation-timestamp`、`--cert`，以及最后一个作为入口文件的字符串。像 `tinymist.rootPath`、`tinymist.fontPaths` 和 `tinymist.systemFonts` 这样的专用设置会覆盖对应参数。示例请参见 [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html)。"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.items.title]
 en = "arguments in order"
 zh = "按顺序的参数"
 
 [extension.tinymist.config.tinymist.typstExtraArgs.items.desc]
-en = "The arguments for Typst as same as typst-cli"
-zh = "与 typst-cli 相同的 Typst 参数"
+en = "Arguments in Typst CLI order. Unsupported flags are not passed through automatically."
+zh = "按 Typst CLI 的顺序填写参数。Tinymist 不会自动透传不受支持的标志。"
 
 [extension.tinymist.config.tinymist.serverPath.title]
 en = "Path to Server Binary"
@@ -1451,6 +1463,14 @@ zh = "启用预览功能。"
 en = "Disable preview features."
 zh = "禁用预览功能。"
 
+[extension.tinymist.config.tinymist.previewer.title]
+en = "Previewer"
+zh = "预览器"
+
+[extension.tinymist.config.tinymist.previewer.desc]
+en = "Select the previewer for Typst. `myriad-dreamin.tinymist` uses Tinymist's built-in previewer. Values starting with `html:` are treated as absolute HTML file paths after VS Code variable substitution, and other non-empty values are treated as extension ids. Overrides are ignored in untrusted workspaces."
+zh = "为 Typst 选择预览器。`myriad-dreamin.tinymist` 使用 Tinymist 内置预览器。以 `html:` 开头的值会在 VS Code 变量替换后被视为绝对 HTML 文件路径，其他非空值会被视为扩展 id。在不受信任的工作区中会忽略此覆盖。"
+
 [extension.tinymist.config.tinymist.preview.sysInputs.title]
 en = "Preview Sys Inputs"
 zh = "预览系统输入"
@@ -1468,28 +1488,28 @@ en = "Preview System Fonts"
 zh = "预览系统字体"
 
 [extension.tinymist.config.tinymist.preview.systemFonts.desc]
-en = "Whether to load system fonts. If disabled, only fonts in `typst-preview.fontPaths` is loaded"
-zh = "是否加载系统字体。如果禁用，只会加载 `typst-preview.fontPaths` 中的字体"
+en = "Deprecated preview-only font toggle. Preview now uses the same compiler font environment as editing and export."
+zh = "已弃用的预览专用字体开关。现在预览与编辑和导出共用同一套编译器字体环境。"
 
 [extension.tinymist.config.tinymist.preview.systemFonts.deprecation]
-en = "The configuration item is ignored. Please use `tinymist.systemFonts` instead."
-zh = "此配置项被忽略。请使用 `tinymist.systemFonts`。"
+en = "Ignored. Use `tinymist.systemFonts` for the shared compiler environment instead."
+zh = "此配置项已被忽略。请改用 `tinymist.systemFonts` 来配置共享的编译器环境。"
 
 [extension.tinymist.config.tinymist.preview.fontPaths.title]
 en = "Preview Font Paths"
 zh = "预览字体路径"
 
 [extension.tinymist.config.tinymist.preview.fontPaths.desc]
-en = "List of *additional* paths to font assets used by typst-preview."
-zh = "用于 typst-preview 的字体资产的*附加*路径列表。"
+en = "Deprecated preview-only font paths. Preview now uses the same compiler font environment as editing and export."
+zh = "已弃用的预览专用字体路径。现在预览与编辑和导出共用同一套编译器字体环境。"
 
 [extension.tinymist.config.tinymist.preview.fontPaths.deprecation]
-en = "The configuration item is ignored. Please use `tinymist.fontPaths` instead."
-zh = "此配置项被忽略。请使用 `tinymist.fontPaths`。"
+en = "Ignored. Use `tinymist.fontPaths` for the shared compiler environment instead."
+zh = "此配置项已被忽略。请改用 `tinymist.fontPaths` 来配置共享的编译器环境。"
 
 [extension.tinymist.config.tinymist.preview.fontPaths.items.desc]
-en = "Absolute path to a directory or file containing font assets."
-zh = "包含字体资产的目录或文件的绝对路径。"
+en = "Absolute path to a directory or file containing font assets. Use `tinymist.fontPaths` instead."
+zh = "包含字体资产的目录或文件的绝对路径。请改用 `tinymist.fontPaths`。"
 
 [extension.tinymist.config.tinymist.preview.refresh.title]
 en = "Preview Refresh"

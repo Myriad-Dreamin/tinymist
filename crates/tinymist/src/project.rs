@@ -35,7 +35,7 @@ use tinymist_query::{
 use tinymist_render::PeriscopeRenderer;
 use tinymist_std::{error::prelude::*, ImmutPath};
 use tokio::sync::mpsc;
-use typst::{diag::FileResult, foundations::Bytes, layout::Position as TypstPosition};
+use typst::{diag::FileResult, foundations::Bytes, introspection::PagedPosition as TypstPosition};
 
 use super::ServerState;
 use crate::actor::editor::{EditorRequest, ProjVersion};
@@ -150,6 +150,8 @@ impl ServerState {
         #[cfg(all(not(feature = "system"), feature = "web"))] resolve_fn: js_sys::Function,
     ) -> ProjectState {
         let const_config = &config.const_config;
+        let mut completion_feat = config.completion.clone();
+        completion_feat.insert_replace_edit = const_config.completion_insert_replace_support;
 
         // Run Export actors before preparing cluster to avoid loss of events
         #[cfg(feature = "export")]
@@ -176,7 +178,7 @@ impl ServerState {
                 remove_html: !config.support_html_in_markdown,
                 support_client_codelens: config.support_client_codelens,
                 extended_code_action: config.extended_code_action,
-                completion_feat: config.completion.clone(),
+                completion_feat,
                 color_theme: match config.color_theme.as_deref() {
                     Some("dark") => tinymist_query::ColorTheme::Dark,
                     _ => tinymist_query::ColorTheme::Light,

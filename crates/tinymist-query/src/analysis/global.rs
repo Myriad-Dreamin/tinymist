@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::num::NonZeroUsize;
 use std::ops::DerefMut;
 use std::sync::OnceLock;
@@ -5,11 +6,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
+use ecow::EcoString;
 use lsp_types::Url;
 use parking_lot::Mutex;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
-use tinymist_analysis::stats::AllocStats;
+use tinymist_analysis::stats::{AllocStats, QueryStatReportEntry};
 use tinymist_analysis::syntax::classify_def_loosely;
 use tinymist_analysis::ty::{BuiltinTy, InsTy, term_value};
 use tinymist_analysis::{analyze_expr_, analyze_import_};
@@ -22,13 +25,14 @@ use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::vfs::{PathResolution, WorkspaceResolver};
 use tinymist_world::{DETACHED_ENTRY, EntryReader};
 use typst::diag::{At, FileError, FileResult, SourceDiagnostic, SourceResult, StrResult};
-use typst::foundations::{Bytes, IntoValue, Module, StyleChain, Styles};
+use typst::foundations::{Bytes, IntoValue, Module, NativeElement, StyleChain, Styles};
 use typst::introspection::Introspector;
-use typst::layout::Position;
+use typst::introspection::PagedPosition as Position;
 use typst::model::BibliographyElem;
 use typst::syntax::package::PackageManifest;
 use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
+use typst_shim::syntax::VirtualPathExt;
 
 use super::{LspQuerySnapshot, TypeEnv};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
@@ -180,6 +184,11 @@ impl Analysis {
     /// Report the statistics of the analysis.
     pub fn report_query_stats(&self) -> String {
         self.stats.report()
+    }
+
+    /// Report the structured statistics of the analysis.
+    pub fn report_query_stats_json(&self) -> Vec<QueryStatReportEntry> {
+        self.stats.report_json()
     }
 
     /// Report the statistics of the allocation.
@@ -356,8 +365,13 @@ impl LocalContext {
             .get_or_init(|| {
                 if let Some(root) = self.world().entry_state().workspace_root() {
                     scan_workspace_files(&root, PathKind::Special.ext_matcher(), |path| {
-                        WorkspaceResolver::workspace_file(Some(&root), VirtualPath::new(path))
+                        VirtualPath::virtualize(&root, &root.join(path))
+                            .ok()
+                            .map(|path| WorkspaceResolver::workspace_file(Some(&root), path))
                     })
+                    .into_iter()
+                    .flatten()
+                    .collect()
                 } else {
                     vec![]
                 }
@@ -365,7 +379,7 @@ impl LocalContext {
             .iter()
             .filter(move |fid| {
                 fid.vpath()
-                    .as_rooted_path()
+                    .as_rooted_path_compat()
                     .extension()
                     .and_then(|path| path.to_str())
                     .is_some_and(|path| regexes.is_match(path))
@@ -401,7 +415,7 @@ impl LocalContext {
         let preference = PathKind::Source {
             allow_package: false,
         };
-        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path()));
+        ids.retain(|id| preference.is_match(id.vpath().as_rooted_path_compat()));
         ids
     }
 
@@ -434,6 +448,13 @@ impl LocalContext {
         self.shared_().preload_package(entry_point);
     }
 
+    pub(crate) fn preload_expr_stages<I>(&self, files: I)
+    where
+        I: IntoIterator<Item = TypstFileId>,
+    {
+        self.shared_().preload_expr_stages(files);
+    }
+
     pub(crate) fn with_vm<T>(&self, f: impl FnOnce(&mut typst_shim::eval::Vm) -> T) -> T {
         crate::upstream::with_vm((self.world() as &dyn World).track(), f)
     }
@@ -448,7 +469,7 @@ impl LocalContext {
     }
 
     pub(crate) fn cached_tokens(&mut self, source: &Source) -> (SemanticTokens, Option<String>) {
-        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self, source);
+        let tokens = crate::analysis::semantic_tokens::get_semantic_tokens(self.shared(), source);
 
         let result_id = self.tokens.as_ref().map(|t| {
             let id = t.next.revision;
@@ -514,11 +535,11 @@ impl LocalContext {
         match def.decl.kind() {
             DefKind::Function => {
                 let sig = self.sig_of_def(def.clone())?;
-                let docs = crate::docs::sig_docs(&sig)?;
+                let docs = crate::docs::sig_docs(self.shared(), &sig)?;
                 Some(DefDocs::Function(Box::new(docs)))
             }
             DefKind::Struct | DefKind::Constant | DefKind::Variable => {
-                let docs = crate::docs::var_docs(self, def.decl.span())?;
+                let docs = crate::docs::var_docs(self.shared(), def.decl.span())?;
                 Some(DefDocs::Variable(docs))
             }
             DefKind::Module => {
@@ -529,6 +550,39 @@ impl LocalContext {
             }
             DefKind::Reference => None,
         }
+    }
+}
+
+/// A concurrent per-request cache for expensive shared computations.
+#[derive(Clone)]
+pub struct SharedQueryCache<K, V> {
+    slots: Arc<FxDashMap<K, Arc<OnceLock<V>>>>,
+}
+
+impl<K, V> Default for SharedQueryCache<K, V>
+where
+    K: Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            slots: Arc::new(FxDashMap::default()),
+        }
+    }
+}
+
+impl<K, V> SharedQueryCache<K, V>
+where
+    K: Eq + Hash,
+    V: Clone,
+{
+    /// Gets a cached value for `key`, initializing it once if absent.
+    pub fn get_or_init(&self, key: K, init: impl FnOnce() -> V) -> V {
+        let slot = self
+            .slots
+            .entry(key)
+            .or_insert_with(|| Arc::new(OnceLock::new()))
+            .clone();
+        slot.get_or_init(init).clone()
     }
 }
 
@@ -602,7 +656,7 @@ impl SharedContext {
     pub fn to_lsp_range_(&self, position: Range<usize>, fid: TypstFileId) -> Option<LspRange> {
         let ext = fid
             .vpath()
-            .as_rootless_path()
+            .as_rootless_path_compat()
             .extension()
             .and_then(|ext| ext.to_str());
         // yaml/yml/bib
@@ -881,15 +935,6 @@ impl SharedContext {
         definition(self, source, syntax)
     }
 
-    /// Gets the definition from a declaration.
-    pub(crate) fn def_of_decl(&self, decl: &Interned<Decl>) -> Option<Definition> {
-        match decl.as_ref() {
-            Decl::Func(..) => Some(Definition::new(decl.clone(), None)),
-            Decl::Module(..) => None,
-            _ => None,
-        }
-    }
-
     /// Gets the definition from static analysis.
     ///
     /// Passing a `doc` (compiled result) can help resolve dynamic things, e.g.
@@ -988,6 +1033,27 @@ impl SharedContext {
         analyze_signature(self, SignatureTarget::Def(source, def))
     }
 
+    pub(crate) fn def_docs(self: &Arc<Self>, def: &Definition) -> Option<DefDocs> {
+        match def.decl.kind() {
+            DefKind::Function => {
+                let sig = self.sig_of_def(def.clone())?;
+                let docs = crate::docs::sig_docs(self, &sig)?;
+                Some(DefDocs::Function(Box::new(docs)))
+            }
+            DefKind::Struct | DefKind::Constant | DefKind::Variable => {
+                let docs = crate::docs::var_docs(self, def.decl.span())?;
+                Some(DefDocs::Variable(docs))
+            }
+            DefKind::Module => {
+                let ei = self.expr_stage_by_id(def.decl.file_id()?)?;
+                Some(DefDocs::Module(TidyModuleDocs {
+                    docs: ei.module_docstring.docs.clone().unwrap_or_default(),
+                }))
+            }
+            DefKind::Reference => None,
+        }
+    }
+
     pub(crate) fn sig_of_type(self: &Arc<Self>, ti: &TypeInfo, ty: Ty) -> Option<Signature> {
         super::sig_of_type(self, ti, ty)
     }
@@ -1031,7 +1097,7 @@ impl SharedContext {
     }
 
     /// Get bib info of a source file.
-    pub fn analyze_bib(&self, introspector: &Introspector) -> Option<Arc<BibInfo>> {
+    pub fn analyze_bib(&self, introspector: &dyn Introspector) -> Option<Arc<BibInfo>> {
         let world = self.world();
         let world = (world as &dyn World).track();
 
@@ -1142,6 +1208,20 @@ impl SharedContext {
         // });
     }
 
+    pub(crate) fn preload_expr_stages<I>(self: Arc<Self>, files: I)
+    where
+        I: IntoIterator<Item = TypstFileId>,
+    {
+        let files: Vec<_> = files.into_iter().collect();
+        files.par_iter().for_each(|fid| {
+            crate::log_debug_ct!("preload expr_stage {fid:?}");
+            let Some(source) = self.source_by_id(*fid).ok() else {
+                return;
+            };
+            self.expr_stage(&source);
+        });
+    }
+
     pub(crate) fn preload_package(self: Arc<Self>, entry_point: TypstFileId) {
         crate::log_debug_ct!("preload package start {entry_point:?}");
 
@@ -1154,7 +1234,9 @@ impl SharedContext {
         impl Preloader {
             fn work(&self, fid: TypstFileId) {
                 crate::log_debug_ct!("preload package {fid:?}");
-                let source = self.shared.source_by_id(fid).ok().unwrap();
+                let Some(source) = self.shared.source_by_id(fid).ok() else {
+                    return;
+                };
                 let exprs = self.shared.expr_stage(&source);
                 self.shared.type_check(&source);
                 exprs.imports.iter().for_each(|(fid, _)| {
@@ -1445,9 +1527,10 @@ fn ceil_char_boundary(text: &str, mut cursor: usize) -> usize {
 #[comemo::memoize]
 fn analyze_bib(
     world: Tracked<dyn World + '_>,
-    introspector: Tracked<Introspector>,
+    introspector: Tracked<dyn Introspector + '_>,
 ) -> Option<Arc<BibInfo>> {
-    let bib_elem = BibliographyElem::find(introspector).ok()?;
+    let bib_elems = introspector.query(&BibliographyElem::ELEM.select());
+    let bib_elem = bib_elems.iter().next()?.to_packed::<BibliographyElem>()?;
 
     // todo: it doesn't respect the style chain which can be get from
     // `analyze_expr`

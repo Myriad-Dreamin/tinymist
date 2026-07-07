@@ -20,7 +20,7 @@ use typst::{
 use super::{BoundPred, BuiltinTy, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
-    docs::UntypedDefDocs,
+    docs::{DocText, UntypedDefDocs},
     syntax::{DeclExpr, UnaryOp},
 };
 
@@ -223,7 +223,7 @@ impl Ty {
     pub fn element(&self) -> Option<Element> {
         match self {
             Ty::Value(ins_ty) => match &ins_ty.val {
-                Value::Func(func) => func.element(),
+                Value::Func(func) => func.to_element(),
                 _ => None,
             },
             Ty::Builtin(BuiltinTy::Element(v)) => Some(*v),
@@ -344,11 +344,11 @@ impl TypeSource {
     pub fn name(&self) -> StrRef {
         self.name_repr
             .get_or_init(|| {
-                let name = self.name_node.text();
+                let name = self.name_node.leaf_text();
                 if !name.is_empty() {
                     return name.into();
                 }
-                let name = self.name_node.clone().into_text();
+                let name = self.name_node.clone().full_text();
                 name.into()
             })
             .clone()
@@ -586,9 +586,9 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 return x.span().into_raw().cmp(&y.span().into_raw());
             }
 
-            use typst::foundations::func::Repr;
+            use typst::foundations::FuncInner;
             match (x.inner(), y.inner()) {
-                (Repr::Element(x), Repr::Element(y)) => x.cmp(y),
+                (FuncInner::Element(x), FuncInner::Element(y)) => x.cmp(y),
                 _ => ptr_cmp(x, y),
             }
         }
@@ -600,7 +600,7 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
             ptr_cmp(x, y)
         }
         (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
-            (Some(x), Some(y)) => x.cmp(&y),
+            (Some(x), Some(y)) => x.into_raw().cmp(&y.into_raw()),
             (Some(..), None) => std::cmp::Ordering::Less,
             (None, Some(..)) => std::cmp::Ordering::Greater,
             (None, None) => ptr_cmp(x, y),
@@ -819,10 +819,10 @@ impl ParamAttrs {
 impl From<&ParamInfo> for ParamAttrs {
     fn from(param: &ParamInfo) -> Self {
         ParamAttrs {
-            positional: param.positional,
-            named: param.named,
-            variadic: param.variadic,
-            settable: param.settable,
+            positional: param.positional(),
+            named: param.named(),
+            variadic: param.variadic(),
+            settable: param.settable(),
         }
     }
 }
@@ -833,7 +833,7 @@ pub struct ParamTy {
     /// The name of the parameter.
     pub name: StrRef,
     /// The docstring of the parameter.
-    pub docs: Option<EcoString>,
+    pub docs: Option<DocText>,
     /// The default value of the variable.
     pub default: Option<EcoString>,
     /// The type of the parameter.
@@ -1604,6 +1604,8 @@ impl FlowVarKind {
 pub(super) struct TypeCanoStore {
     /// Maps a type to its canonical form.
     pub cano_cache: FxHashMap<(Ty, bool), Ty>,
+    /// Memoizes sub-type transforms within one simplify call.
+    pub transform_cache: FxHashMap<(Ty, bool), Ty>,
     /// Maps a local type to its canonical form.
     pub cano_local_cache: FxHashMap<(DeclExpr, bool), Ty>,
     /// The negative bounds of a type variable.

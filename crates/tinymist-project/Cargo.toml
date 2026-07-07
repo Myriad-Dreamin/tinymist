@@ -4,7 +4,7 @@ description = "Project model of typst for tinymist."
 categories = ["compilers"]
 keywords = ["language", "typst"]
 # group: world
-version = "0.14.6"
+version = "0.15.0"
 authors.workspace = true
 license.workspace = true
 edition.workspace = true
@@ -41,12 +41,17 @@ wasm-bindgen = { workspace = true, optional = true }
 [features]
 
 fonts = ["typst-assets/fonts"]
+mock = ["tinymist-world/mock", "no-content-hint"]
 no-content-hint = ["tinymist-task/no-content-hint"]
 lsp = ["toml"]
 # "system", 
 
 system = ["tinymist-std/system", "tinymist-world/system", "toml", "notify"]
 web = ["tinymist-std/web", "tinymist-world/web", "js-sys", "wasm-bindgen"]
+
+[dev-dependencies]
+tinymist-world = { workspace = true, features = ["mock"] }
+tempfile.workspace = true
 
 [lints]
 workspace = true

@@ -68,7 +68,7 @@ input_file: crates/tinymist-query/src/fixtures/pkgs/touying-core-slides.typ
     "labelDetails": {
      "description": "(content, gap: length, justify: bool) => repeat"
     },
-    "sortText": "176",
+    "sortText": "174",
     "textEdit": {
      "newText": "repeat(${1:})",
      "range": {

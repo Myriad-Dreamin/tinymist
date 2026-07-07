@@ -1,16 +1,19 @@
 //! Analysis of function signatures.
 
+use std::cell::RefCell;
+
 use itertools::Either;
 use tinymist_analysis::{ArgInfo, ArgsInfo, PartialSignature, func_signature};
 use tinymist_derive::BindTyCtx;
+use tinymist_std::hash::FxHashSet;
 
 use super::{Definition, SharedContext, prelude::*};
 use crate::analysis::PostTypeChecker;
-use crate::docs::{UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
-use crate::syntax::classify_def_loosely;
+use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
+use crate::syntax::{DeclExpr, classify_def_loosely};
 use crate::ty::{
-    BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigWithTy, TyCtx, TypeInfo,
-    TypeVar,
+    BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigTy, SigWithTy, TyCtx, TyCtxMut,
+    TypeInfo, TypeVar,
 };
 
 pub use tinymist_analysis::{PrimarySignature, Signature};
@@ -96,7 +99,8 @@ pub(crate) fn sig_of_type(
     let type_var = srcs.into_iter().next()?;
     match type_var {
         DocSource::Var(v) => {
-            let mut ty_ctx = PostTypeChecker::new(ctx.clone(), type_info);
+            let mut ty_ctx =
+                SignatureTypeContext::new(PostTypeChecker::new(ctx.clone(), type_info));
             let sig_ty = Ty::Func(ty.sig_repr(true, &mut ty_ctx)?);
             let sig_ty = type_info.simplify(sig_ty, false);
             let Ty::Func(sig_ty) = sig_ty else {
@@ -109,6 +113,7 @@ pub(crate) fn sig_of_type(
             };
 
             // todo: this will affect inlay hint: _var_with
+            ty_ctx.reset_cycle_guard();
             let (var_with, docstring) = match type_info.var_docs.get(&v.def).map(|x| x.as_ref()) {
                 Some(UntypedDefDocs::Function(sig)) => (vec![], Either::Left(sig.as_ref())),
                 Some(UntypedDefDocs::Variable(docs)) => find_alias_stack(&mut ty_ctx, &v, docs)?,
@@ -144,7 +149,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name,
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::positional(),
@@ -166,7 +171,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: name.clone(),
-                    docs: docstring.map(|doc| doc.docs.clone()),
+                    docs: docstring.map(|doc| DocText::plain(doc.docs.clone())),
                     default,
                     ty,
                     attrs: ParamAttrs::named(),
@@ -178,7 +183,7 @@ pub(crate) fn sig_of_type(
 
                 param_specs.push(Interned::new(ParamTy {
                     name: doc.name.clone(),
-                    docs: Some(doc.docs.clone()),
+                    docs: Some(DocText::plain(doc.docs.clone())),
                     default,
                     ty: sig_ty.rest_param().cloned().unwrap_or(Ty::Any),
                     attrs: ParamAttrs::variadic(),
@@ -186,7 +191,7 @@ pub(crate) fn sig_of_type(
             }
 
             let sig = Signature::Primary(Arc::new(PrimarySignature {
-                docs: Some(docstring.docs.clone()),
+                docs: Some(DocText::plain(docstring.docs.clone())),
                 param_specs,
                 has_fill_or_size_or_stroke,
                 sig_ty,
@@ -197,6 +202,68 @@ pub(crate) fn sig_of_type(
         src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
             Some(ctx.type_of_func(src.as_func()?))
         }
+    }
+}
+
+/// A type context for signature rendering that memoizes `(TypeVar, polarity)`
+/// visits within a single traversal so recursive bounds are only expanded once.
+struct SignatureTypeContext<'a> {
+    inner: PostTypeChecker<'a>,
+    visited: RefCell<FxHashSet<(DeclExpr, bool)>>,
+}
+
+impl<'a> SignatureTypeContext<'a> {
+    fn new(inner: PostTypeChecker<'a>) -> Self {
+        Self {
+            inner,
+            visited: RefCell::new(FxHashSet::default()),
+        }
+    }
+
+    fn reset_cycle_guard(&self) {
+        self.visited.borrow_mut().clear();
+    }
+}
+
+impl TyCtx for SignatureTypeContext<'_> {
+    fn global_bounds(&self, var: &Interned<TypeVar>, pol: bool) -> Option<DynTypeBounds> {
+        if !self.visited.borrow_mut().insert((var.def.clone(), pol)) {
+            return None;
+        }
+
+        self.inner.global_bounds(var, pol)
+    }
+
+    fn local_bind_of(&self, var: &Interned<TypeVar>) -> Option<Ty> {
+        self.inner.local_bind_of(var)
+    }
+}
+
+impl TyCtxMut for SignatureTypeContext<'_> {
+    type Snap = <TypeInfo as TyCtxMut>::Snap;
+
+    fn start_scope(&mut self) -> Self::Snap {
+        self.inner.start_scope()
+    }
+
+    fn end_scope(&mut self, snap: Self::Snap) {
+        self.inner.end_scope(snap)
+    }
+
+    fn bind_local(&mut self, var: &Interned<TypeVar>, ty: Ty) {
+        self.inner.bind_local(var, ty);
+    }
+
+    fn type_of_func(&mut self, func: &Func) -> Option<Interned<SigTy>> {
+        self.inner.type_of_func(func)
+    }
+
+    fn type_of_value(&mut self, val: &Value) -> Ty {
+        self.inner.type_of_value(val)
+    }
+
+    fn check_module_item(&mut self, module: TypstFileId, key: &StrRef) -> Option<Ty> {
+        self.inner.check_module_item(module, key)
     }
 }
 
@@ -241,7 +308,7 @@ fn wind_stack(var_with: Vec<WithElem>, sig: Signature) -> Signature {
 type WithElem<'a> = (&'a UntypedVarDocs, Option<Interned<SigWithTy>>);
 
 fn find_alias_stack<'a>(
-    ctx: &'a mut PostTypeChecker,
+    ctx: &'a mut SignatureTypeContext,
     var: &Interned<TypeVar>,
     docs: &'a UntypedVarDocs,
 ) -> Option<(Vec<WithElem<'a>>, Either<&'a UntypedSignatureDocs, Func>)> {
@@ -259,7 +326,7 @@ fn find_alias_stack<'a>(
 #[derive(BindTyCtx)]
 #[bind(ctx)]
 struct AliasStackChecker<'a, 'b> {
-    ctx: &'a mut PostTypeChecker<'b>,
+    ctx: &'a mut SignatureTypeContext<'b>,
     stack: Vec<WithElem<'a>>,
     res: Option<Either<&'a UntypedSignatureDocs, Func>>,
     checking_with: bool,
@@ -277,7 +344,7 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
             return;
         }
 
-        let docs = self.ctx.info.var_docs.get(&u.def).map(|x| x.as_ref());
+        let docs = self.ctx.inner.info.var_docs.get(&u.def).map(|x| x.as_ref());
 
         crate::log_debug_ct!("collecting var {u:?} {pol:?} => {docs:?}");
         // todo: bind builtin functions

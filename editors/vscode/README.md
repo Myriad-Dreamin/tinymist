@@ -131,6 +131,8 @@ To configure path to search fonts:
 
 **Note:** you can use vscode variables in the settings, see [vscode-variables](https://www.npmjs.com/package/vscode-variables) for more information.
 
+For a reproducible setup, the shared embedded-font inventory, and package-path examples that affect preview and export the same way, see [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html).
+
 ### Configuring path to root directory
 
 To configure the root path resolved for Typst compiler:
@@ -138,6 +140,8 @@ To configure the root path resolved for Typst compiler:
 1. Open settings.
 2. Search for “Tinymist Root Path” and modify the value.
 3. Reload the window or restart the vscode editor to make the settings take effect. **Note:** you must provide absolute paths.
+
+If you also need package paths, package cache paths, or certificate settings, refer to [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html) for examples.
 
 ### Managing Local Packages
 
@@ -214,19 +218,7 @@ There is a **global** configuration `tinymist.typstExtraArgs` to pass extra argu
 typst watch --input=awa=1 --input=abaaba=2 main.typ
 ```
 
-Supported arguments:
-
-- entry file: The last string in the array will be treated as the entry file.
-  - This is used to specify the **default** entry file for the compiler, which may be overridden by other settings.
-- `--input`: Add a string key-value pair visible through `sys.inputs`.
-- `--font-path` (environment variable: `TYPST_FONT_PATHS`), Font paths, maybe overridden by `tinymist.fontPaths`.
-- `--ignore-system-fonts`: Ensures system fonts won’t be searched, maybe overridden by `tinymist.systemFonts`.
-- `--creation-timestamp` (environment variable: `SOURCE_DATE_EPOCH`): The document’s creation date formatted as a [UNIX timestamp](https://reproducible-builds.org/specs/source-date-epoch/).
-- `--cert` (environment variable: `TYPST_CERT`): Path to CA certificate file for network access, especially for downloading typst packages.
-
-**Note:** Fix entry to `main.typ` may help multiple-file projects but you may loss diagnostics and autocompletions in unrelated files.
-
-**Note:** the arguments has quite low priority, and that may be overridden by other settings.
+For the dedicated settings that override these arguments, reproducible font guidance, and package-path examples shared with preview and export, see [Compiler Settings](https://myriad-dreamin.github.io/tinymist/feature/compiler-settings.html).
 
 ## Contributing
 

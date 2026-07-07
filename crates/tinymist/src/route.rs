@@ -25,7 +25,8 @@ impl ProjectRouteState {
     }
 
     pub fn resolve(&mut self, leaf: &ImmutPath) -> Option<ProjectResolution> {
-        for path in std::iter::successors(Some(leaf.as_ref()), |p| p.parent()) {
+        let search_start = lock_search_start(leaf.as_ref())?;
+        for path in std::iter::successors(Some(search_start), |p| p.parent()) {
             if let Some(resolution) = self.resolve_at(path, leaf) {
                 return Some(resolution);
             }
@@ -164,6 +165,14 @@ impl ProjectRouteState {
 
         let material = serde_json::from_slice::<ProjectPathMaterial>(&data).ok()?;
         Some(material)
+    }
+}
+
+fn lock_search_start(leaf: &Path) -> Option<&Path> {
+    if leaf.is_dir() {
+        Some(leaf)
+    } else {
+        leaf.parent()
     }
 }
 

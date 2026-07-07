@@ -1,0 +1,215 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.typ
+---
+"f" = () => Undef
+"id" = (Any) => Any
+"x" = Type(int)
+"h" = () => Undef
+"choose" = (Any, Any) => IfTy { cond: true, then: Any, else_: Any }
+"x" = Type(int)
+"y" = Type(str)
+"k" = () => Undef
+"fill" = (Any) => Any
+"d" = Any
+"entry" = {}
+"m" = () => Undef
+"complete" = (Any, Any) => Any
+"key" = Type(str)
+"definitions" = Any
+"entry" = {}
+"n" = () => Undef
+"complete" = (Any, Any) => Any
+"key" = Type(str)
+"definitions" = Any
+"entry" = {}
+"top-complete" = (Any, Any) => Any
+"key" = Type(str)
+"definitions" = Any
+"p" = (Any) => TypeUnary { lhs: {}, op: Return }
+"definitions" = Any
+"entry" = {}
+"q" = (Any) => {}
+"definitions" = Any
+"entry" = {}
+"r" = (( ⪯ Any & Type(array))) => {}
+"definitions" = ( ⪰ Type(array) | Type(dictionary) | Type(string))
+"entry" = {}
+"n_defs" = ( ⪰ 0 | (Type(int) | Type(int)))
+"key" = Any
+"def" = Any
+"key" = Any
+"def" = Any
+=====
+5..6 -> @f
+19..21 -> @id
+22..23 -> @x
+27..28 -> @x
+38..40 -> @id
+38..43 -> 1
+52..53 -> @h
+66..72 -> @choose
+73..74 -> @x
+76..77 -> @y
+91..92 -> @x
+102..103 -> @y
+115..121 -> @choose
+115..129 -> IfTy { cond: true, then: 1, else_: "x" }
+138..139 -> @k
+152..156 -> @fill
+157..158 -> @d
+182..183 -> @d
+192..193 -> @d
+192..200 -> @v"d".insert
+192..208 -> Any
+219..220 -> @d
+231..236 -> @entry
+239..242 -> {}
+252..256 -> @fill
+252..263 -> @entry
+257..262 -> @entry
+272..273 -> @m
+286..294 -> @complete
+295..298 -> @key
+300..311 -> @definitions
+338..349 -> @definitions
+358..363 -> Func(panic)
+358..368 -> ()
+397..408 -> @definitions
+417..428 -> @definitions
+417..435 -> @v"definitions".insert
+417..449 -> Any
+445..448 -> @key
+460..471 -> @definitions
+482..487 -> @entry
+490..493 -> {}
+503..511 -> @complete
+503..523 -> @entry
+517..522 -> @entry
+532..533 -> @n
+546..554 -> @complete
+555..558 -> @key
+560..571 -> @definitions
+598..609 -> @definitions
+618..623 -> Func(panic)
+618..628 -> ()
+657..668 -> @definitions
+677..688 -> @definitions
+677..695 -> @v"definitions".insert
+677..709 -> Any
+705..708 -> @key
+741..752 -> @definitions
+761..772 -> @definitions
+761..779 -> @v"definitions".insert
+761..821 -> Any
+794..805 -> @definitions
+794..808 -> @v"definitions".at
+794..817 -> @v"definitions".short
+832..843 -> @definitions
+854..859 -> @entry
+862..865 -> {}
+875..883 -> @complete
+875..895 -> @entry
+889..894 -> @entry
+904..916 -> @top-complete
+917..920 -> @key
+922..933 -> @definitions
+958..969 -> @definitions
+976..981 -> Func(panic)
+976..986 -> ()
+1011..1022 -> @definitions
+1029..1040 -> @definitions
+1029..1047 -> @v"definitions".insert
+1029..1061 -> Any
+1057..1060 -> @key
+1089..1100 -> @definitions
+1107..1118 -> @definitions
+1107..1125 -> @v"definitions".insert
+1107..1167 -> Any
+1140..1151 -> @definitions
+1140..1154 -> @v"definitions".at
+1140..1163 -> @v"definitions".short
+1194..1205 -> @definitions
+1212..1223 -> @definitions
+1212..1230 -> @v"definitions".insert
+1212..1270 -> Any
+1244..1255 -> @definitions
+1244..1258 -> @v"definitions".at
+1244..1266 -> @v"definitions".long
+1277..1288 -> @definitions
+1297..1298 -> @p
+1299..1310 -> @definitions
+1322..1327 -> @entry
+1330..1333 -> {}
+1343..1355 -> @top-complete
+1343..1367 -> @entry
+1361..1366 -> @entry
+1376..1377 -> @q
+1378..1389 -> @definitions
+1401..1406 -> @entry
+1409..1412 -> {}
+1415..1427 -> @top-complete
+1415..1439 -> @entry
+1433..1438 -> @entry
+1448..1449 -> @r
+1450..1461 -> @definitions
+1473..1478 -> @entry
+1481..1484 -> {}
+1490..1494 -> Type(type)
+1490..1507 -> (Type(type) | TypeUnary { lhs: @definitions, op: TypeOf })
+1495..1506 -> @definitions
+1511..1514 -> Type(string)
+1521..1526 -> @entry
+1521..1533 -> @v"entry".insert
+1521..1554 -> Any
+1542..1553 -> @definitions
+1567..1571 -> Type(type)
+1567..1584 -> (Type(type) | TypeUnary { lhs: @definitions, op: TypeOf })
+1572..1583 -> @definitions
+1588..1593 -> Type(array)
+1604..1610 -> @n_defs
+1613..1624 -> @definitions
+1613..1628 -> (Func(len) | Func(len) | (Func(len) | Func(len) | @v"definitions".len))
+1613..1630 -> (Type(int) | Type(int))
+1638..1644 -> @n_defs
+1658..1663 -> Func(panic)
+1658..1668 -> ()
+1683..1689 -> @n_defs
+1702..1707 -> Func(panic)
+1702..1712 -> ()
+1728..1731 -> @key
+1733..1736 -> @def
+1741..1760 -> ("long", "long-pl", )
+1741..1764 -> (Func(zip) | (Func(zip) | ("long", "long-pl", ).zip))
+1741..1777 -> Type(array)
+1765..1776 -> @definitions
+1786..1791 -> @entry
+1786..1798 -> @v"entry".insert
+1786..1808 -> Any
+1799..1802 -> @key
+1804..1807 -> @def
+1827..1831 -> Type(type)
+1827..1844 -> (Type(type) | TypeUnary { lhs: @definitions, op: TypeOf })
+1832..1843 -> @definitions
+1848..1858 -> Type(dictionary)
+1882..1893 -> @definitions
+1902..1907 -> Func(panic)
+1902..1912 -> ()
+1928..1931 -> @key
+1933..1936 -> @def
+1941..1952 -> @definitions
+1964..1967 -> @key
+1971..2011 -> ("short", "short-pl", "long", "long-pl", )
+2022..2027 -> @entry
+2022..2034 -> @v"entry".insert
+2022..2044 -> Any
+2035..2038 -> @key
+2040..2043 -> @def
+2068..2073 -> Func(panic)
+2068..2078 -> ()
+2108..2113 -> Func(panic)
+2108..2118 -> ()
+2125..2137 -> @top-complete
+2125..2149 -> @entry
+2143..2148 -> @entry

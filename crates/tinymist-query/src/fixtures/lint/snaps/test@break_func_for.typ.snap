@@ -10,10 +10,10 @@ input_file: crates/tinymist-query/src/fixtures/lint/break_func_for.typ
    "range": "1:16:1:21",
    "relatedInformation": [
     {
-     "message": "error occurred while applying show rule to this loop"
+     "message": "while showing loop element"
     },
     {
-     "message": "error occurred in this function call"
+     "message": "while calling function"
     }
    ],
    "severity": 2,

@@ -1,0 +1,56 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_apply.typ
+---
+"via-method" = (Any, Any) => Any
+"ctx" = Any
+"layer" = Any
+"mapping" = Any
+"known-layer" = {"mapping": {"x": "x"}}
+"known-ctx" = {"resolve-mapping": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
+"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
+"layer" = None
+"known-result" = IfTy { cond: TypeBinary { operands: ({"mapping": {"x": "x"}}, None), op: Eq }, then: None, else_: {"mapping": {"x": "x"}}.mapping }
+"direct-known" = () => IfTy { cond: TypeBinary { operands: ({"mapping": {"y": "y"}}, None), op: Eq }, then: None, else_: {"mapping": {"y": "y"}}.mapping }
+"obj" = {"f": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
+"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
+"x" = ( ⪰ None | {"mapping": {"y": "y"}})
+=====
+5..15 -> @via-method
+16..19 -> @ctx
+21..26 -> @layer
+38..45 -> @mapping
+48..76 -> Any
+49..52 -> @ctx
+49..68 -> @v"ctx".resolve-mapping
+70..75 -> @layer
+79..86 -> @mapping
+95..106 -> @known-layer
+109..128 -> {"mapping": {"x": "x"}}
+119..127 -> {"x": "x"}
+134..143 -> @known-ctx
+146..227 -> {"resolve-mapping": (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping }}
+167..172 -> @layer
+167..224 -> @
+179..184 -> @layer
+209..214 -> @layer
+209..222 -> @v"layer".mapping
+233..245 -> @known-result
+248..288 -> IfTy { cond: TypeBinary { operands: (@known-layer, None), op: Eq }, then: None, else_: @v"known-layer".mapping }
+249..258 -> @known-ctx
+249..274 -> (((@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping } | @v"known-ctx".resolve-mapping) | (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping })
+276..287 -> @known-layer
+295..307 -> @direct-known
+320..323 -> @obj
+326..376 -> {"f": (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping }}
+330..331 -> @x
+330..375 -> @
+338..339 -> @x
+364..365 -> @x
+364..373 -> @v"x".mapping
+379..382 -> @obj
+379..384 -> (((@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping } | @v"obj".f) | (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping })
+379..405 -> IfTy { cond: TypeBinary { operands: ({"mapping": {"y": "y"}}, None), op: Eq }, then: None, else_: {"mapping": {"y": "y"}}.mapping }
+385..404 -> {"mapping": {"y": "y"}}
+395..403 -> {"y": "y"}

@@ -2,7 +2,9 @@
 
 pub use cov::CoverageResult;
 pub use debugger::{
-    BreakpointKind, DebugSession, DebugSessionHandler, set_debug_session, with_debug_session,
+    BreakpointKind, DebugSession, DebugSessionHandler, ResolvedSourceBreakpoint, SourceBreakpoint,
+    SourceBreakpointResolution, set_debug_function_breakpoints, set_debug_session,
+    set_debug_source_breakpoints, with_debug_session,
 };
 
 mod cov;
@@ -26,7 +28,7 @@ use cov::*;
 use instrument::InstrumentWorld;
 
 /// Collects the coverage of a single execution.
-pub fn collect_coverage<D: typst::Document, F: CompilerFeat>(
+pub fn collect_coverage<D: typst::model::Document + typst::foundations::Output, F: CompilerFeat>(
     base: &CompilerWorld<F>,
 ) -> Result<CoverageResult> {
     let (cov, result) = with_cov(base, |instr| {

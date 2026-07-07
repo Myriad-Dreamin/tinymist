@@ -1,5 +1,7 @@
 //! Tests support for tinymist crates.
 
+pub mod mock;
+
 use std::{
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},
@@ -98,7 +100,7 @@ pub fn run_with_sources<T>(source: &str, f: impl FnOnce(&mut LspUniverse, PathBu
     verse
         .mutate_entry(EntryState::new_rooted(
             root.as_path().into(),
-            Some(VirtualPath::new(pw.strip_prefix(root).unwrap())),
+            Some(VirtualPath::virtualize(&root, &pw).expect("valid virtual test path")),
         ))
         .unwrap();
     f(&mut verse, pw)

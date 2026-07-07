@@ -1,8 +1,8 @@
-#import "@preview/shiroa:0.2.3": templates, book-sys
+#import "@preview/shiroa:0.3.1": book-sys, templates
 #import templates: *
 
 #let is-md-target = book-sys.target == "md"
-#let sys-is-html-target = book-sys.sys-is-html-target
+#let sys-is-html-target = ("html" in dictionary(std))
 
 // Theme (Colors)
 #let dark-theme = book-theme-from(toml("theme-style.toml"), xml: it => xml(it), target: "web-ayu")

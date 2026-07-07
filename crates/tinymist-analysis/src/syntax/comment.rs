@@ -40,7 +40,11 @@ fn extract_mod_docs_between(
             break 'scan_comments;
         }
 
-        crate::log_debug_ct!("found comment for docs: {:?}: {:?}", n.kind(), n.text());
+        crate::log_debug_ct!(
+            "found comment for docs: {:?}: {:?}",
+            n.kind(),
+            n.leaf_text()
+        );
         if matcher.process(n.get()) {
             if first_group {
                 break 'scan_comments;
@@ -92,7 +96,7 @@ impl CommentGroupMatcher {
                 CommentGroupSignal::Hash
             }
             SyntaxKind::Space => {
-                if n.text().contains('\n') {
+                if n.leaf_text().contains('\n') {
                     self.newline_count += 1;
                 }
                 if self.newline_count > 1 {
@@ -152,13 +156,13 @@ impl DocCommentMatcher {
     pub fn process(&mut self, n: &SyntaxNode) -> bool {
         match self.group_matcher.process(n) {
             CommentGroupSignal::LineComment => {
-                let text = n.text();
+                let text = n.leaf_text();
                 if !self.strict || text.starts_with("///") {
                     self.comments.push(RawComment::Line(text.clone()));
                 }
             }
             CommentGroupSignal::BlockComment => {
-                let text = n.text();
+                let text = n.leaf_text();
                 if !self.strict {
                     self.comments.push(RawComment::Block(text.clone()));
                 }

@@ -15,8 +15,9 @@ use crate::project::{
     TaskWhen,
 };
 use crate::world::base::{
-    ConfigTask, DiagnosticsTask, ExportComputation, FlagTask, HtmlCompilationTask,
-    OptionDocumentTask, PagedCompilationTask, WorldComputable, WorldComputeGraph,
+    BundleCompilationTask, ConfigTask, DiagnosticsTask, ExportComputation, FlagTask,
+    HtmlCompilationTask, OptionDocumentTask, PagedCompilationTask, WorldComputable,
+    WorldComputeGraph,
 };
 
 /// A task that checks if the project needs to be compiled.
@@ -68,6 +69,7 @@ impl ProjectCompilation {
 
         let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(compile_paged)));
         let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(compile_html)));
+        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
 
         Ok(compile_paged || compile_html)
     }
@@ -89,7 +91,7 @@ pub struct ProjectExport;
 impl ProjectExport {
     /// Exports the document to bytes artifact.
     fn export_bytes<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = Bytes>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
@@ -109,7 +111,7 @@ impl ProjectExport {
 
     /// Exports the document to string artifact.
     fn export_string<
-        D: typst::Document + Send + Sync + 'static,
+        D: typst::model::Document + typst::foundations::Output + Send + Sync + 'static,
         T: ExportComputation<LspCompilerFeat, D, Output = String>,
     >(
         graph: &Arc<WorldComputeGraph<LspCompilerFeat>>,
@@ -149,6 +151,7 @@ impl WorldComputable<LspCompilerFeat> for ProjectExport {
                 ExportPng(_config) => todo!(),
                 ExportSvg(_config) => todo!(),
                 ExportHtml(config) => Self::export_string::<_, HtmlExport>(graph, when, config),
+                ExportBundle(..) => unreachable!(),
                 // todo: configuration
                 ExportSvgHtml(_config) => Self::export_string::<
                     _,

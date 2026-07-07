@@ -14,16 +14,17 @@ use hyper_tungstenite::{tungstenite::Message, HyperWebsocket, HyperWebsocketStre
 use lsp_types::notification::Notification;
 use lsp_types::Url;
 use reflexo_typst::error::prelude::*;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::just_ok;
 use tinymist_assets::TYPST_PREVIEW_HTML;
 use tinymist_preview::{
     frontend_html, ControlPlaneMessage, ControlPlaneRx, ControlPlaneTx, DocToSrcJumpInfo,
-    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, WsMessage,
+    PreviewBuilder, PreviewConfig, PreviewMode, Previewer, ViewerWindowState, WsMessage,
 };
 use tinymist_query::{LspPosition, LspRange};
 use tinymist_std::error::IgnoreLogging;
+use tinymist_task::ExportTarget;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::actor::preview::{PreviewActor, PreviewRequest, PreviewTab};
@@ -66,9 +67,23 @@ impl From<RefreshStyle> for TaskWhen {
 /// Specify arguments related to the preview service.
 #[derive(Debug, Clone, clap::Parser)]
 pub struct PreviewArgs {
+    /// Configure the preview output format.
+    ///
+    /// `tinymist preview` does not write an output file, so this selects the
+    /// Typst compilation target used by the live preview.
+    #[clap(long = "format", default_value = "paged", value_name = "FORMAT")]
+    pub format: ExportTarget,
+
     /// Configure the preview mode.
     #[clap(long = "preview-mode", default_value = "document", value_name = "MODE")]
     pub preview_mode: PreviewMode,
+
+    /// Set the preview page title.
+    ///
+    /// If not specified, the title falls back to the input filename when
+    /// available, or otherwise to `"Typst Preview"`.
+    #[clap(long = "page-title", value_name = "TITLE")]
+    pub page_title: Option<String>,
 
     /// Only render visible part of the document.
     ///
@@ -115,10 +130,23 @@ pub struct PreviewArgs {
     pub refresh_style: Option<RefreshStyle>,
 }
 
+/// Resolves the browser page title for preview HTML.
+pub fn resolve_page_title(page_title: Option<&str>, input: Option<&str>) -> String {
+    if let Some(title) = page_title {
+        return title.to_owned();
+    }
+
+    input
+        .and_then(|path| Path::new(path).file_name())
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "Typst Preview".to_string())
+}
+
 impl PreviewArgs {
     /// Get the configuration for the preview.
     pub fn config(&self, config: &PreviewConfig) -> PreviewConfig {
         PreviewConfig {
+            format: self.format,
             enable_partial_rendering: self
                 .enable_partial_rendering
                 .unwrap_or(config.enable_partial_rendering),
@@ -203,6 +231,10 @@ pub struct PreviewCliArgs {
     /// set as well, this flag will win.
     #[clap(long = "no-open")]
     pub no_open: bool,
+
+    /// Emit INFO level logging. The default is WARN.
+    #[clap(long = "verbose")]
+    pub verbose: bool,
 }
 
 impl PreviewCliArgs {
@@ -457,6 +489,13 @@ impl PreviewState {
                         }
                     }
                     Outline(s) => client.send_notification::<NotifDocumentOutline>(&s),
+                    ViewerWindowState(s) => client.send_notification::<NotifViewerWindowState>(
+                        &ViewerWindowStateParams {
+                            task_id: tid.clone(),
+                            schema_version: s.schema_version,
+                            window: s.window,
+                        },
+                    ),
                 }
             }
 
@@ -489,11 +528,23 @@ impl PreviewState {
             compile_handler.flush_compile();
 
             // Replace the data plane port in the html to self
-            let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
+            let page_title = resolve_page_title(
+                args.preview.page_title.as_deref(),
+                args.compile.input.as_deref(),
+            );
+            let frontend_html = frontend_html(
+                TYPST_PREVIEW_HTML,
+                args.preview.preview_mode,
+                "/",
+                &page_title,
+            );
 
             let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
             let addr = srv.addr;
-            log::info!("PreviewTask({task_id}): preview server listening on: {addr}");
+            log::info!(
+                target: crate::PREVIEW_COMPAT_LOG_TARGET,
+                "PreviewTask({task_id}): preview server listening on: {addr}"
+            );
 
             let resp = StartPreviewResponse {
                 static_server_port: Some(addr.port()),
@@ -572,6 +623,20 @@ struct NotifDocumentOutline;
 impl Notification for NotifDocumentOutline {
     type Params = tinymist_preview::Outline;
     const METHOD: &'static str = "tinymist/documentOutline";
+}
+
+#[derive(Serialize, Deserialize)]
+struct ViewerWindowStateParams {
+    task_id: String,
+    schema_version: u32,
+    window: ViewerWindowState,
+}
+
+struct NotifViewerWindowState;
+
+impl Notification for NotifViewerWindowState {
+    type Params = ViewerWindowStateParams;
+    const METHOD: &'static str = "tinymist/preview/windowState";
 }
 
 fn send_show_document(client: &TypedLspClient<PreviewState>, s: &DocToSrcJumpInfo, tid: &str) {

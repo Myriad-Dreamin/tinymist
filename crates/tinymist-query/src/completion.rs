@@ -100,6 +100,7 @@ impl SemanticRequest for CompletionRequest {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
+    use std::path::Path;
 
     use super::*;
     use crate::{completion::proto::CompletionItem, syntax::find_module_level_docs, tests::*};
@@ -140,6 +141,10 @@ mod tests {
                     includes.insert(kk.trim());
                 }
             }
+            let show_filter_text = properties
+                .get("filter_text")
+                .map(|v| v.trim() == "true")
+                .unwrap_or(false);
             let get_items = |items: Vec<CompletionItem>| {
                 let mut res: Vec<_> = items
                     .into_iter()
@@ -156,8 +161,10 @@ mod tests {
                         label: item.label,
                         label_details: item.label_details,
                         sort_text: item.sort_text,
+                        filter_text: show_filter_text.then_some(item.filter_text).flatten(),
                         kind: item.kind,
                         text_edit: item.text_edit,
+                        additional_text_edits: item.additional_text_edits,
                         command: item.command,
                         ..Default::default()
                     })
@@ -198,7 +205,7 @@ mod tests {
                 let files = ctx
                     .source_files()
                     .iter()
-                    .filter(|id| !id.vpath().as_rootless_path().ends_with("lib.typ"));
+                    .filter(|id| !id.vpath().get_without_slash().ends_with("lib.typ"));
                 for id in files.copied().collect::<Vec<_>>() {
                     test(ctx, id);
                 }
@@ -216,5 +223,46 @@ mod tests {
     #[test]
     fn test_pkgs() {
         snapshot_testing("pkgs", &run(TestConfig { pkg_mode: true }));
+    }
+
+    #[test]
+    fn explicit_citation_label_completion_strips_typed_angle_brackets() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/fixtures/completion/complete_half_label_cite_explicit.typ");
+        let contents = std::fs::read_to_string(&path).unwrap();
+
+        run_with_sources(&contents, |verse: &mut LspUniverse, path| {
+            run_with_ctx(verse, path, &|ctx, path| {
+                let source = ctx.source_by_path(&path).unwrap();
+                let rng = find_test_range_(&source);
+                let request = CompletionRequest {
+                    path: path.clone(),
+                    position: ctx.to_lsp_pos(rng.start, &source),
+                    explicit: false,
+                    trigger_character: None,
+                };
+                let result = request.request(ctx).unwrap();
+                let item = result
+                    .items
+                    .into_iter()
+                    .find(|item| item.label == "DBLP:books/lib/Knuth86a")
+                    .unwrap();
+
+                assert_eq!(
+                    item.text_edit.as_ref().unwrap().new_text().as_str(),
+                    "label(\"DBLP:books/lib/Knuth86a\")"
+                );
+
+                let cleanup_edits = item.additional_text_edits.unwrap();
+                assert_eq!(cleanup_edits.len(), 1);
+
+                let cleanup = &cleanup_edits[0];
+                assert_eq!(cleanup.new_text.as_str(), "");
+                assert_eq!(cleanup.range.start.line, 3);
+                assert_eq!(cleanup.range.start.character, 6);
+                assert_eq!(cleanup.range.end.line, 3);
+                assert_eq!(cleanup.range.end.character, 7);
+            });
+        });
     }
 }

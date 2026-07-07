@@ -1,50 +1,48 @@
-# Not for end users! This is a Dockerfile to develop the Neovim plugin it self.
-# https://github.com/Julian/lean.nvim/tree/1b2752069d700a3e6c7953f5c117d49c134ec711/.devcontainer/lazyvim
+# Not for end users! This image develops and tests the Neovim plugin itself.
+# It intentionally does not bundle tinymist. Mount the checkout's tinymist
+# binary into /usr/local/bin/tinymist when running the container.
 
-FROM debian:12 AS builder
+FROM debian:12
 
 RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
     --mount=target=/var/cache/apt,type=cache,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
     apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    wget \
     git \
-    file \
-    ninja-build gettext cmake unzip curl build-essential
+    ripgrep \
+    build-essential \
+    unzip \
+    python3 && \
+    update-ca-certificates
 
-RUN git clone --filter=blob:none --branch stable https://github.com/neovim/neovim && cd neovim && make CMAKE_BUILD_TYPE=RelWithDebInfo
-USER root
-RUN cd neovim/build && cpack -G DEB && dpkg -i nvim-linux-x86_64.deb
-
-FROM myriaddreamin/tinymist:0.14.10 as tinymist
-
-FROM debian:12
-
-COPY --from=builder /neovim/build/nvim-linux-x86_64.deb /tmp/nvim-linux-x86_64.deb
-
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && apt-get install -y curl wget git ripgrep build-essential unzip
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get update && apt-get install -y python3
-RUN --mount=target=/var/lib/apt/lists,type=cache,sharing=locked \
-    --mount=target=/var/cache/apt,type=cache,sharing=locked \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
-    apt-get install -y /tmp/nvim-linux-x86_64.deb \
-    && rm /tmp/nvim-linux-x86_64.deb
+RUN curl -fL https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.tar.gz -o /tmp/nvim-linux-x86_64.tar.gz && \
+    tar -C /opt -xzf /tmp/nvim-linux-x86_64.tar.gz && \
+    ln -s /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim && \
+    rm /tmp/nvim-linux-x86_64.tar.gz
 
 RUN useradd --create-home --shell /bin/bash runner
 USER runner
 WORKDIR /home/runner
 
-RUN for dependency in AndrewRadev/switch.vim andymass/vim-matchup neovim/nvim-lspconfig nvim-lua/plenary.nvim tomtom/tcomment_vim lewis6991/satellite.nvim; do git clone --quiet --filter=blob:none "https://github.com/$dependency" "packpath/$(basename $dependency)"; done
-RUN for dependency in Julian/inanis.nvim; do git clone --quiet --filter=blob:none "https://github.com/$dependency" "packpath/$(basename $dependency)"; done
-
-USER root
-COPY --from=tinymist /usr/local/bin/tinymist /usr/local/bin/tinymist
-USER runner
+RUN set -eux; \
+    for dependency in \
+      AndrewRadev/switch.vim \
+      andymass/vim-matchup \
+      neovim/nvim-lspconfig \
+      mfussenegger/nvim-dap \
+      nvim-lua/plenary.nvim \
+      tomtom/tcomment_vim \
+      lewis6991/satellite.nvim \
+      Julian/inanis.nvim; do \
+        for attempt in 1 2 3; do \
+          git clone --quiet --filter=blob:none "https://github.com/$dependency" "packpath/$(basename "$dependency")" && break; \
+          if [ "$attempt" = 3 ]; then exit 1; fi; \
+          sleep 2; \
+        done; \
+    done
 
 ENV XDG_CONFIG_HOME=/home/runner/.config
 ENV XDG_DATA_HOME=/home/runner/.local/share
@@ -57,6 +55,5 @@ COPY lazyvim-dev/plugins/mason-workaround.lua $XDG_CONFIG_HOME/nvim/lua/plugins/
 COPY lazyvim/plugins/lsp-folding.lua $XDG_CONFIG_HOME/nvim/lua/plugins/lsp-folding.lua
 COPY lazyvim/plugins/tinymist.lua $XDG_CONFIG_HOME/nvim/lua/others/tinymist.lua
 
-# SHELL isn't supported by OCI images
+# SHELL isn't supported by OCI images.
 ENTRYPOINT []
-

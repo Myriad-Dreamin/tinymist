@@ -1,9 +1,11 @@
 //! Analyze link expressions in a source file.
 
+use std::borrow::Cow;
 use std::str::FromStr;
 
 use lsp_types::Url;
 use tinymist_world::package::PackageSpec;
+use tinymist_world::vfs::PathResolution;
 
 use super::prelude::*;
 
@@ -12,16 +14,16 @@ use super::prelude::*;
 #[comemo::memoize]
 pub fn get_link_exprs(src: &Source) -> Arc<LinkInfo> {
     let root = LinkedNode::new(src.root());
-    Arc::new(get_link_exprs_in(&root).unwrap_or_default())
+    Arc::new(get_link_exprs_in(&root))
 }
 
 /// Get link expressions in a source node.
-pub fn get_link_exprs_in(node: &LinkedNode) -> Option<LinkInfo> {
+pub fn get_link_exprs_in(node: &LinkedNode) -> LinkInfo {
     let mut worker = LinkStrWorker {
         info: LinkInfo::default(),
     };
-    worker.collect_links(node)?;
-    Some(worker.info)
+    worker.collect_links(node);
+    worker.info
 }
 
 /// Link information in a source file.
@@ -49,7 +51,13 @@ pub enum LinkTarget {
     Package(Box<PackageSpec>),
     /// A URL.
     Url(Box<Url>),
-    /// A file path.
+    /// A file path reference with its associated Typst file identifier and path
+    /// string.
+    ///
+    /// # Fields
+    /// * `TypstFileId` - The unique identifier for the Typst file emits the
+    ///   link
+    /// * `EcoString` - An string representation of the target file path
     Path(TypstFileId, EcoString),
 }
 
@@ -59,10 +67,11 @@ impl LinkTarget {
             LinkTarget::Package(..) => None,
             LinkTarget::Url(url) => Some(url.as_ref().clone()),
             LinkTarget::Path(id, path) => {
-                // Avoid creating new ids here.
-                let root = ctx.path_for_id(id.join("/")).ok()?;
-                let path_in_workspace = id.vpath().join(Path::new(path.as_str()));
-                let path = root.resolve_to(&path_in_workspace)?;
+                let resolved = resolve_path_from_id(*id, path.as_str()).ok()?;
+                let path = match ctx.world().vfs().resolve_root(*id).ok()? {
+                    Some(root) => PathResolution::Resolved(resolved.vpath().realize(&root).ok()?),
+                    None => PathResolution::Rootless(Cow::Owned(resolved.vpath().clone())),
+                };
                 crate::path_res_to_url(path).ok()
             }
         }
@@ -74,30 +83,28 @@ struct LinkStrWorker {
 }
 
 impl LinkStrWorker {
-    fn collect_links(&mut self, node: &LinkedNode) -> Option<()> {
+    fn collect_links(&mut self, node: &LinkedNode) {
         match node.kind() {
             // SyntaxKind::Link => { }
             SyntaxKind::FuncCall => {
                 let fc = self.analyze_call(node);
                 if fc.is_some() {
-                    return Some(());
+                    return;
                 }
             }
             SyntaxKind::ModuleInclude => {
-                let inc = node.cast::<ast::ModuleInclude>()?;
+                let inc = node.cast::<ast::ModuleInclude>().expect("checked cast");
                 let path = inc.source();
                 self.analyze_path_expr(node, path);
             }
             // early exit
-            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return Some(()),
+            kind if kind.is_trivia() || kind.is_keyword() || kind.is_error() => return,
             _ => {}
         };
 
         for child in node.children() {
             self.collect_links(&child);
         }
-
-        Some(())
     }
 
     fn analyze_call(&mut self, node: &LinkedNode) -> Option<()> {

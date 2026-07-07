@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use typst::diag::SourceDiagnostic;
-use typst_syntax::Span;
+use typst_syntax::{DiagSpan, Span};
 
 use cmark_writer::WriteResult;
 use cmark_writer::ast::{CustomNode, HtmlAttribute, HtmlElement as CmarkHtmlElement, Node};
@@ -58,7 +58,13 @@ impl HtmlToAstParser {
                 Ok(())
             }
 
-            tag::p | tag::span | tag::div => {
+            tag::p => {
+                self.flush_inline_buffer();
+                self.convert_children(element)?;
+                Ok(())
+            }
+
+            tag::span | tag::div => {
                 self.convert_children(element)?;
                 Ok(())
             }
@@ -94,7 +100,6 @@ impl HtmlToAstParser {
                 self.flush_inline_buffer();
                 Ok(())
             }
-
             md_tag::heading => {
                 self.flush_inline_buffer();
                 let attrs = HeadingAttr::parse(&element.attrs)?;
@@ -320,14 +325,14 @@ impl HtmlToAstParser {
             .wrap_info
             .as_ref()
             .and_then(|info| self.remap_span_from_wrapper(span, info))
-            .unwrap_or(span);
+            .unwrap_or(span.into());
 
         let diag = SourceDiagnostic::warning(span, message);
         self.warnings.extend(std::iter::once(diag));
     }
 
-    fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<Span> {
-        info.remap_span(self.world.as_ref(), span)
+    fn remap_span_from_wrapper(&self, span: Span, info: &crate::WrapInfo) -> Option<DiagSpan> {
+        info.remap_diag_span(self.world.as_ref(), span.into())
     }
 }
 

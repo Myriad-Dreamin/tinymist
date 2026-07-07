@@ -61,7 +61,9 @@ const generateExtensionInstall = (version) => {
     platform("darwin-x64", "Intel macOS"),
     platform("darwin-arm64", "Apple Silicon macOS"),
     platform("alpine-x64", "x64 Alpine Linux"),
-    platform("alpine-arm64", "ARM64 Alpine Linux"),
+    // Disabled since v0.14.12 because GitHub Actions runners do not reliably support ARM64 Alpine containers.
+    // Once GitHub Actions adds stable support for ARM64 Alpine, feel free to submit a PR to re-enable this target.
+    // platform("alpine-arm64", "ARM64 Alpine Linux"),
     {
       name: "web",
       displayName: "Browser (Web)",

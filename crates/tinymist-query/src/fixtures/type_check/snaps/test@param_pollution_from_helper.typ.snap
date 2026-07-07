@@ -1,0 +1,27 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/param_pollution_from_helper.typ
+---
+"check-free-var" = (Any) => IfTy { cond: TypeBinary { operands: (Any, "i"), op: Eq }, then: Any, else_: None }
+"v" = "i"
+"public" = (Any, Any) => Any
+"expr" = Type(int)
+"var" = Type(str)
+"use-public" = 1
+=====
+5..19 -> @check-free-var
+20..21 -> @v
+32..33 -> @v
+47..52 -> Func(panic)
+47..73 -> ()
+86..92 -> @public
+93..97 -> @expr
+99..102 -> @var
+110..124 -> @check-free-var
+110..129 -> IfTy { cond: TypeBinary { operands: (@var, "i"), op: Eq }, then: (), else_: None }
+125..128 -> @var
+132..136 -> @expr
+145..155 -> @use-public
+158..164 -> @public
+158..172 -> 1

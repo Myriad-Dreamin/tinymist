@@ -1,0 +1,58 @@
+---
+source: crates/tinymist-query/src/completion.rs
+assertion_line: 194
+description: "Completion on \" (40..41)"
+expression: "JsonRepr::new_pure(results)"
+input_file: crates/tinymist-query/src/fixtures/completion/path_positions.typ
+---
+[
+ {
+  "isIncomplete": false,
+  "items": [
+   {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
+    "kind": 19,
+    "label": "assets/",
+    "sortText": "000",
+    "textEdit": {
+     "newText": "assets/",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   },
+   {
+    "command": {
+     "command": "editor.action.triggerSuggest",
+     "title": ""
+    },
+    "kind": 19,
+    "label": "chapters/",
+    "sortText": "001",
+    "textEdit": {
+     "newText": "chapters/",
+     "range": {
+      "end": {
+       "character": 7,
+       "line": 1
+      },
+      "start": {
+       "character": 7,
+       "line": 1
+      }
+     }
+    }
+   }
+  ]
+ }
+]

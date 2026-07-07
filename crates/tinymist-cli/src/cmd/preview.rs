@@ -3,6 +3,7 @@ use std::sync::Arc;
 use futures::{SinkExt, StreamExt};
 use hyper_tungstenite::tungstenite::Message;
 use tinymist::{
+    PREVIEW_COMPAT_LOG_TARGET,
     project::ProjectPreviewState,
     tool::{
         preview::{PreviewCliArgs, ProjectPreviewHandler, bind_streams, make_http_server},
@@ -15,6 +16,7 @@ use tinymist_preview::{
 };
 use tinymist_project::WorldProvider;
 use tinymist_std::error::prelude::*;
+use tinymist_task::ExportTarget;
 use tokio::sync::mpsc;
 
 use crate::utils::exit_on_ctrl_c;
@@ -36,6 +38,10 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     exit_on_ctrl_c();
 
+    let preview_target = args.preview.format;
+    if matches!(preview_target, ExportTarget::Bundle) {
+        bail!("bundle export target is not supported by preview");
+    }
     let verse = args.compile.resolve()?;
     let previewer = PreviewBuilder::new(config);
 
@@ -44,6 +50,7 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
         let opts = ProjectOpts {
             handle: Some(handle),
             preview: preview_state.clone(),
+            export_target: preview_target,
             ..ProjectOpts::default()
         };
 
@@ -79,7 +86,11 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
         let srv =
             make_http_server(String::default(), args.control_plane_host, control_sock_tx).await;
-        log::info!("Control panel server listening on: {}", srv.addr);
+        log::info!(
+            target: PREVIEW_COMPAT_LOG_TARGET,
+            "Control panel server listening on: {}",
+            srv.addr
+        );
 
         let control_websocket = control_sock_rx.recv().await.unwrap();
         let ws = control_websocket.await.unwrap();
@@ -156,7 +167,16 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
 
     bind_streams(&mut previewer, websocket_rx);
 
-    let frontend_html = frontend_html(TYPST_PREVIEW_HTML, args.preview.preview_mode, "/");
+    let page_title = tinymist::tool::preview::resolve_page_title(
+        args.preview.page_title.as_deref(),
+        args.compile.input.as_deref(),
+    );
+    let frontend_html = frontend_html(
+        TYPST_PREVIEW_HTML,
+        args.preview.preview_mode,
+        "/",
+        &page_title,
+    );
 
     let static_server = if let Some(static_file_host) = static_file_host {
         log::warn!(
@@ -169,10 +189,17 @@ pub async fn preview_main(args: PreviewCliArgs) -> Result<()> {
     };
 
     let srv = make_http_server(frontend_html, args.data_plane_host, websocket_tx).await;
-    log::info!("Data plane server listening on: {}", srv.addr);
+    log::info!(
+        target: PREVIEW_COMPAT_LOG_TARGET,
+        "Data plane server listening on: {}",
+        srv.addr
+    );
 
     let static_server_addr = static_server.as_ref().map(|s| s.addr).unwrap_or(srv.addr);
-    log::info!("Static file server listening on: {static_server_addr}");
+    log::info!(
+        target: PREVIEW_COMPAT_LOG_TARGET,
+        "Static file server listening on: {static_server_addr}"
+    );
 
     #[cfg(feature = "open")]
     if open_in_browser {

@@ -9,6 +9,34 @@ input_file: crates/tinymist-query/src/fixtures/completion/dot_content_math.typ
   "isIncomplete": false,
   "items": [
    {
+    "additionalTextEdits": [
+     {
+      "newText": "abs(",
+      "range": {
+       "end": {
+        "character": 1,
+        "line": 4
+       },
+       "start": {
+        "character": 1,
+        "line": 4
+       }
+      }
+     },
+     {
+      "newText": ")",
+      "range": {
+       "end": {
+        "character": 4,
+        "line": 4
+       },
+       "start": {
+        "character": 3,
+        "line": 4
+       }
+      }
+     }
+    ],
     "command": {
      "command": "tinymist.triggerSuggestAndParameterHints",
      "title": ""

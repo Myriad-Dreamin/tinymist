@@ -13,6 +13,45 @@ The Neovim Tinymist plugin serves as the **heavily-documented canonical implemen
 
 ## Development Workflow
 
+### Spec Environment Notes
+
+Neovim specs are container-only in normal development. Do not validate them
+with a host `nvim`, because the spec runner expects the container layout,
+runtime dependencies, and mounted fixtures used by `bootstrap.sh`.
+
+Before editing or running specs, read this file together with
+`docs/dev-guide.md`, then inspect the affected files under `spec/`, `lua/`,
+and `scripts/minimal_init.lua`.
+
+The supported entry point is:
+
+```bash
+./bootstrap.sh test
+```
+
+This builds/runs the `tinymist-nvim-spec-local` Neovim development container,
+mounts `tests/workspaces` read-only, copies the `book` fixture into a tmpfs
+workspace at `/home/runner/dev/workspaces`, runs `tinymist compile` for that
+fixture, then runs `spec/main.py` with headless Neovim and the `inanis` runner.
+The container must provide the Lua test dependencies on `/home/runner/packpath/*`,
+especially `inanis.nvim`, `plenary.nvim`, and `nvim-lspconfig`.
+
+The Neovim development image intentionally does not bundle `tinymist`.
+`bootstrap.sh` mounts a host-built binary into the container as
+`/usr/local/bin/tinymist`, preferring `target/debug/tinymist` and falling back
+to `target/release/tinymist`. Build one first with `cargo build --bin tinymist`,
+or set `TINYMIST_BIN=/absolute/path/to/tinymist` to override the selection.
+
+If Docker builds need an HTTP proxy, do not use `127.0.0.1` inside the
+container. Point Docker's proxy configuration at the host address visible from
+the default bridge network, usually `172.17.0.1:<port>`. A temporary
+`DOCKER_CONFIG` is preferred over editing the user's global Docker config.
+
+Warnings from newer `nvim-lspconfig` about the deprecated
+`require("lspconfig")` framework do not fail the suite by themselves. Treat a
+zero exit status and the final `passed` summary as the test result. Remove
+transient `.nvimlog` files if headless Neovim leaves them in the worktree.
+
 ### Interactive Editor Mode
 
 ```bash

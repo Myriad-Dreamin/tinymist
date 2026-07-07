@@ -17,9 +17,14 @@ import {
   typstDocumentSelector,
 } from "./util";
 import type { ExportActionOpts, ExportOpts } from "./cmd.export";
-import { substVscodeVarsInConfig, TinymistConfig } from "./config";
+import {
+  patchInjectedClientOptionsInConfig,
+  substVscodeVarsInConfig,
+  TinymistConfig,
+} from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
 import { previewProcessOutline } from "./features/preview";
+import { saveStoredViewerWindowState } from "./features/preview-window-state";
 import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
 import type { createSystemLanguageClient } from "./lsp.system";
@@ -101,13 +106,13 @@ export class LanguageState {
   context: vscode.ExtensionContext = undefined!;
   client: LanguageClient | undefined = undefined;
   _watcher: vscode.FileSystemWatcher | undefined = undefined;
-  clientPromiseResolve = (_client: LanguageClient) => { };
+  clientPromiseResolve = (_client: LanguageClient) => {};
   clientPromise: Promise<LanguageClient> = new Promise((resolve) => {
     this.clientPromiseResolve = resolve;
   });
 
   async stop() {
-    this.clientPromiseResolve = (_client: LanguageClient) => { };
+    this.clientPromiseResolve = (_client: LanguageClient) => {};
     this.clientPromise = new Promise((resolve) => {
       this.clientPromiseResolve = resolve;
     });
@@ -164,9 +169,9 @@ export class LanguageState {
     const serverPaths: [string, string][] = configPath
       ? [[`\`${configName}\` (${configPath})`, configPath]]
       : [
-        ["Bundled", resolve(__dirname, binaryName)],
-        ["In PATH", binaryName],
-      ];
+          ["Bundled", resolve(__dirname, binaryName)],
+          ["In PATH", binaryName],
+        ];
 
     return tinymist.probePaths(serverPaths);
   }
@@ -226,7 +231,8 @@ export class LanguageState {
             if (!Array.isArray(result)) {
               return result;
             }
-            return substVscodeVarsInConfig(items, result);
+            const substituted = substVscodeVarsInConfig(items, result);
+            return patchInjectedClientOptionsInConfig(items, substituted, config);
           },
         },
         provideHover: async (document, position, token, next) => {
@@ -354,6 +360,7 @@ export class LanguageState {
   exportSvg = exportCommand("tinymist.exportSvg");
   exportPng = exportCommand("tinymist.exportPng");
   exportHtml = exportCommand("tinymist.exportHtml");
+  exportBundle = exportCommand("tinymist.exportBundle");
   exportMarkdown = exportCommand("tinymist.exportMarkdown");
   exportTeX = exportCommand("tinymist.exportTeX");
   exportText = exportCommand("tinymist.exportText");
@@ -671,6 +678,11 @@ export class LanguageState {
     client.onNotification("tinymist/documentOutline", async (data: any) => {
       previewProcessOutline(data);
     });
+
+    // (Optional) The server reports native previewer window state updates from the control plane.
+    client.onNotification("tinymist/preview/windowState", async (data: unknown) => {
+      await saveStoredViewerWindowState(this.context, data);
+    });
   }
 
   /**
@@ -826,17 +838,17 @@ type InteractCodeContextResponses<Qs extends [...InteractCodeContextQuery[]]> = 
 type InteractCodeContextResponse<Q extends InteractCodeContextQuery> = Q extends PathAtQuery
   ? CodeContextQueryResult
   : Q extends ModeAtQuery
-  ? ModeAtQueryResult
-  : Q extends StyleAtQuery
-  ? StyleAtQueryResult
-  : never;
+    ? ModeAtQueryResult
+    : Q extends StyleAtQuery
+      ? StyleAtQueryResult
+      : never;
 export type CodeContextQueryResult<T = any> =
   | {
-    value: T;
-  }
+      value: T;
+    }
   | {
-    error: string;
-  };
+      error: string;
+    };
 export type InterpretMode = "math" | "markup" | "code" | "comment" | "string" | "raw";
 export type StyleAtQueryResult = {
   style: any[];

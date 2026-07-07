@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use futures::future::MaybeDone;
 use sync_ls::{
     internal_error, invalid_params, JsTransportSender, LsDriver, LspBuilder, LspClientRoot,
-    LspMessage, ResponseError,
+    LspMessage, RequestId, ResponseError,
 };
 use tinymist_project::CompileFontArgs;
 use wasm_bindgen::prelude::*;
@@ -26,6 +26,8 @@ pub struct TinymistLanguageServer {
     _client: LspClientRoot,
     /// The mutable state of the server.
     state: LsDriver<LspMessage, RegularInit>,
+    /// The next synthetic request id for the web bridge.
+    next_request_id: i32,
 }
 
 #[wasm_bindgen]
@@ -41,8 +43,8 @@ impl TinymistLanguageServer {
         let _client = LspClientRoot::new_js(RUNTIMES.tokio_runtime.handle().clone(), sender);
         // Starts logging
         let _ = crate::init_log(crate::InitLogOpts {
-            is_transient_cmd: false,
-            is_test_no_verbose: false,
+            verbose: true,
+            filter: None,
             output: Some(_client.weak()),
         });
         let state = ServerState::install_lsp(LspBuilder::new(
@@ -55,7 +57,11 @@ impl TinymistLanguageServer {
         ))
         .build();
 
-        Ok(Self { _client, state })
+        Ok(Self {
+            _client,
+            state,
+            next_request_id: 1,
+        })
     }
 
     /// Handles internal events.
@@ -71,7 +77,8 @@ impl TinymistLanguageServer {
             Err(err) => return lsp_err(invalid_params(err)),
         };
 
-        let result = self.state.on_lsp_request(&method, params);
+        let req_id = self.next_request_id();
+        let result = self.state.on_lsp_request(&method, req_id, params);
 
         match result {
             Ok(MaybeDone::Done(Ok(t))) => lsp_serialize(&t),
@@ -126,6 +133,14 @@ impl TinymistLanguageServer {
     /// Get the version of the language server.
     pub fn version() -> String {
         env!("CARGO_PKG_VERSION").to_string()
+    }
+}
+
+impl TinymistLanguageServer {
+    fn next_request_id(&mut self) -> RequestId {
+        let req_id = self.next_request_id;
+        self.next_request_id = self.next_request_id.checked_add(1).unwrap_or(1);
+        RequestId::from(req_id)
     }
 }
 

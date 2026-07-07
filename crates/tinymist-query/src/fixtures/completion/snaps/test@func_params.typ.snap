@@ -20,7 +20,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_params.typ
     },
     "sortText": "000",
     "textEdit": {
-     "newText": "aa(${1:})",
+     "newText": "aa(${1:c})",
      "range": {
       "end": {
        "character": 5,

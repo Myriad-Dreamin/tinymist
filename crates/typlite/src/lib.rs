@@ -11,6 +11,7 @@ pub mod parser;
 pub mod tags;
 pub mod writer;
 
+use std::ops::Range;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -22,13 +23,13 @@ use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
+use tinymist_std::typst_shim::syntax::{VirtualPathExt, resolve_path_from_id};
 use typst::World;
 use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
 use typst::foundations::Bytes;
 use typst_html::HtmlDocument;
-use typst_syntax::Span;
-use typst_syntax::VirtualPath;
+use typst_syntax::{DiagSpan, LinkedNode, RootedPath, Source, Span, VirtualPath, VirtualRoot};
 
 pub use crate::common::Format;
 use crate::diagnostics::WarningCollector;
@@ -113,7 +114,7 @@ impl MarkdownDocument {
         mut diagnostic: SourceDiagnostic,
         info: &WrapInfo,
     ) -> Option<SourceDiagnostic> {
-        if let Some(span) = info.remap_span(self.world.as_ref(), diagnostic.span) {
+        if let Some(span) = info.remap_diag_span(self.world.as_ref(), diagnostic.span) {
             diagnostic.span = span;
         } else {
             return None;
@@ -133,6 +134,20 @@ impl MarkdownDocument {
             )
             .collect();
 
+        diagnostic.hints = diagnostic
+            .hints
+            .into_iter()
+            .filter_map(|mut spanned| {
+                match info.remap_diag_span(self.world.as_ref(), spanned.span) {
+                    Some(span) => {
+                        spanned.span = span;
+                        Some(spanned)
+                    }
+                    None => None,
+                }
+            })
+            .collect();
+
         Some(diagnostic)
     }
 
@@ -142,7 +157,7 @@ impl MarkdownDocument {
             return Ok(ast.clone());
         }
         let parser = HtmlToAstParser::new(self.feat.clone(), &self.world, self.warning_collector());
-        parser.parse(&self.base.root).context_ut("failed to parse")
+        parser.parse(self.base.root()).context_ut("failed to parse")
     }
 
     /// Convert content to markdown string
@@ -213,13 +228,29 @@ pub struct WrapInfo {
 }
 
 impl WrapInfo {
+    /// Translate a diagnostic span from the wrapper file back into the original
+    /// file.
+    pub fn remap_diag_span(&self, world: &dyn typst::World, span: DiagSpan) -> Option<DiagSpan> {
+        if span.id() != Some(self.wrap_file_id) {
+            return Some(span);
+        }
+
+        let range = self.remap_range(world, world.range(span)?)?;
+        Some(DiagSpan::from_range(self.original_file_id, range))
+    }
+
     /// Translate a span from the wrapper file back into the original file.
     pub fn remap_span(&self, world: &dyn typst::World, span: Span) -> Option<Span> {
         if span.id() != Some(self.wrap_file_id) {
             return Some(span);
         }
 
-        let range = world.range(span)?;
+        let range = self.remap_range(world, world.range(span)?)?;
+        let original_source = world.source(self.original_file_id).ok()?;
+        WrapInfo::span_covering_range(&original_source, range)
+    }
+
+    fn remap_range(&self, world: &dyn typst::World, range: Range<usize>) -> Option<Range<usize>> {
         let start = range.start.checked_sub(self.prefix_len_bytes)?;
         let end = range.end.checked_sub(self.prefix_len_bytes)?;
 
@@ -230,7 +261,22 @@ impl WrapInfo {
             return None;
         }
 
-        Some(Span::from_range(self.original_file_id, start..end))
+        Some(start..end)
+    }
+
+    fn span_covering_range(source: &Source, range: Range<usize>) -> Option<Span> {
+        fn inner(node: LinkedNode<'_>, range: &Range<usize>) -> Option<Span> {
+            let node_range = node.range();
+            if range.start < node_range.start || range.end > node_range.end {
+                return None;
+            }
+
+            node.children()
+                .find_map(|child| inner(child, range))
+                .or_else(|| Some(node.span()))
+        }
+
+        inner(LinkedNode::new(source.root()), &range)
     }
 }
 
@@ -289,12 +335,18 @@ impl TypliteFeat {
             bail!("package file is not supported");
         }
 
-        let wrap_main_id = current.join("__wrap_md_main.typ");
+        let wrap_main_id = resolve_path_from_id(current, "__wrap_md_main.typ")
+            .ok()
+            .context_ut("failed to resolve virtual path")?
+            .intern();
 
         let (main_id, main_content) = match self.processor.as_ref() {
             None => (wrap_main_id, None),
             Some(processor) => {
-                let main_id = current.join("__md_main.typ");
+                let main_id = resolve_path_from_id(current, "__md_main.typ")
+                    .ok()
+                    .context_ut("failed to resolve virtual path")?
+                    .intern();
                 let content = format!(
                     r#"#import {processor:?}: article
 #article(include "__wrap_md_main.typ")"#
@@ -314,23 +366,31 @@ impl TypliteFeat {
         }
 
         let task_inputs = TaskInputs {
-            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path())),
+            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path_compat())),
             inputs: Some(Arc::new(LazyHash::new(dict))),
         };
 
         let mut world = world.task(task_inputs).html_task().into_owned();
 
-        let markdown_id = FileId::new(
-            Some(
-                typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0")
-                    .context_ut("failed to import markdown package")?,
-            ),
-            VirtualPath::new("lib.typ"),
+        let markdown_root = VirtualRoot::Package(
+            typst_syntax::package::PackageSpec::from_str("@local/_markdown:0.1.0")
+                .context_ut("failed to import markdown package")?,
         );
+        let markdown_id = FileId::new(RootedPath::new(
+            markdown_root.clone(),
+            VirtualPath::new("lib.typ")
+                .ok()
+                .context_ut("failed to resolve markdown lib path")?,
+        ));
 
         world
             .map_shadow_by_id(
-                markdown_id.join("typst.toml"),
+                FileId::new(RootedPath::new(
+                    markdown_root,
+                    VirtualPath::new("typst.toml")
+                        .ok()
+                        .context_ut("failed to resolve markdown manifest path")?,
+                )),
                 Bytes::from_string(include_str!("markdown-typst.toml")),
             )
             .context_ut("cannot map markdown-typst.toml")?;

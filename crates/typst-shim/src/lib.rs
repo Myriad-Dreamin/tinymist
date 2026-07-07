@@ -1,5 +1,6 @@
 //! # typst-shim
 
+mod path;
 mod syntax_only;
 pub use syntax_only::*;
 

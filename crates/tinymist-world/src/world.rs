@@ -22,6 +22,7 @@ use std::{
 };
 
 use tinymist_package::registry::PackageIndexEntry;
+use tinymist_std::typst_shim::syntax::VirtualPathExt;
 use tinymist_std::{ImmutPath, error::prelude::*};
 use tinymist_vfs::{
     FileId, FsProvider, PathResolution, RevisingVfs, SourceCache, Vfs, WorkspaceResolver,
@@ -29,7 +30,7 @@ use tinymist_vfs::{
 use typst::{
     Features, Library, LibraryExt, World, WorldExt,
     diag::{At, FileError, FileResult, SourceResult, eco_format},
-    foundations::{Bytes, Datetime, Dict},
+    foundations::{Bytes, Datetime, Dict, Duration},
     syntax::{Source, Span, VirtualPath},
     text::{Font, FontBook},
     utils::LazyHash,
@@ -166,7 +167,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
             self.snapshot_with(Some(TaskInputs {
                 entry: Some(
                     self.entry_state()
-                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path()),
+                        .select_in_workspace(MEMORY_MAIN_ENTRY.vpath().as_rooted_path_compat()),
                 ),
                 inputs: inputs.and_then(|i| i.inputs),
             }))
@@ -265,7 +266,7 @@ impl<F: CompilerFeat> CompilerUniverse<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 
@@ -501,6 +502,15 @@ type NowStorage = chrono::DateTime<chrono::Local>;
 #[cfg(not(any(feature = "web", feature = "system")))]
 type NowStorage = tinymist_std::time::UtcDateTime;
 
+fn duration_offset_seconds(offset: Duration) -> Option<i32> {
+    let seconds = offset.seconds().trunc();
+    if !seconds.is_finite() || seconds < f64::from(i32::MIN) || seconds > f64::from(i32::MAX) {
+        return None;
+    }
+
+    Some(seconds as i32)
+}
+
 /// The world of the compiler.
 pub struct CompilerWorld<F: CompilerFeat> {
     /// State for the *root & entry* of compilation.
@@ -647,7 +657,7 @@ impl<F: CompilerFeat> CompilerWorld<F> {
         let root = self.entry.workspace_root()?;
         Some(WorkspaceResolver::workspace_file(
             Some(&root),
-            VirtualPath::new(path.strip_prefix(&root).ok()?),
+            VirtualPath::virtualize(&root, path).ok()?,
         ))
     }
 
@@ -832,13 +842,13 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// Get the current date.
     ///
     /// If no offset is specified, the local date should be chosen. Otherwise,
-    /// the UTC date should be chosen with the corresponding offset in hours.
+    /// the UTC date should be chosen with the corresponding offset.
     ///
     /// If this function returns `None`, Typst's `datetime` function will
     /// return an error.
     #[cfg(any(feature = "web", feature = "system"))]
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use chrono::{Datelike, Duration};
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
+        use chrono::{Datelike, FixedOffset};
 
         let now = self.now.get_or_init(|| {
             if let Some(timestamp) = self.creation_timestamp {
@@ -852,7 +862,9 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
 
         let naive = match offset {
             None => now.naive_local(),
-            Some(o) => now.naive_utc() + Duration::try_hours(o)?,
+            Some(offset) => now
+                .with_timezone(&FixedOffset::east_opt(duration_offset_seconds(offset)?)?)
+                .naive_local(),
         };
 
         Datetime::from_ymd(
@@ -865,13 +877,13 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
     /// Get the current date.
     ///
     /// If no offset is specified, the local date should be chosen. Otherwise,
-    /// the UTC date should be chosen with the corresponding offset in hours.
+    /// the UTC date should be chosen with the corresponding offset.
     ///
     /// If this function returns `None`, Typst's `datetime` function will
     /// return an error.
     #[cfg(not(any(feature = "web", feature = "system")))]
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
-        use tinymist_std::time::{Duration, now, to_typst_time};
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
+        use tinymist_std::time::{now, to_typst_time};
 
         let now = self.now.get_or_init(|| {
             if let Some(timestamp) = self.creation_timestamp {
@@ -884,10 +896,10 @@ impl<F: CompilerFeat> World for CompilerWorld<F> {
 
         let now = offset
             .and_then(|offset| {
-                let dur = Duration::from_secs(offset.checked_mul(3600)? as u64)
-                    .try_into()
-                    .ok()?;
-                now.checked_add(dur)
+                let timestamp = now
+                    .unix_timestamp()
+                    .checked_add(i64::from(duration_offset_seconds(offset)?))?;
+                tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp).ok()
             })
             .unwrap_or(*now);
 
@@ -944,7 +956,7 @@ impl typst::World for WorldWithMain<'_> {
         self.world.font(index)
     }
 
-    fn today(&self, offset: Option<i64>) -> Option<Datetime> {
+    fn today(&self, offset: Option<Duration>) -> Option<Datetime> {
         self.world.today(offset)
     }
 }

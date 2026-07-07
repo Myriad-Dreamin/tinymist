@@ -2,7 +2,10 @@ use core::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, OnceLock};
 
-use clap::Parser;
+use clap::{
+    error::{ContextKind, ContextValue, ErrorKind},
+    Parser,
+};
 use itertools::Itertools;
 use lsp_types::*;
 use reflexo::error::IgnoreLogging;
@@ -46,7 +49,9 @@ const CONFIG_ITEMS: &[&str] = &[
     "compileStatus",
     "lint",
     "completion",
+    "customizedShowDocument",
     "development",
+    "delegateFsRequests",
     "exportPdf",
     "exportTarget",
     "fontPaths",
@@ -62,7 +67,13 @@ const CONFIG_ITEMS: &[&str] = &[
     "projectResolution",
     "rootPath",
     "semanticTokens",
+    "supportClientCodelens",
+    "supportExtendedCodeAction",
+    "supportHtmlInMarkdown",
     "systemFonts",
+    "triggerParameterHints",
+    "triggerSuggest",
+    "triggerSuggestAndParameterHints",
     "typstExtraArgs",
 ];
 // endregion Configuration Items
@@ -158,6 +169,20 @@ pub struct Config {
     pub warnings: Vec<CowStr>,
 }
 
+/// Client options whose changes are applied through a project restart boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RestartScopedClientOptions {
+    notify_status: bool,
+    trigger_suggest: bool,
+    trigger_parameter_hints: bool,
+    trigger_suggest_and_parameter_hints: bool,
+    support_html_in_markdown: bool,
+    support_client_codelens: bool,
+    extended_code_action: bool,
+    customized_show_document: bool,
+    delegate_fs_requests: bool,
+}
+
 impl Config {
     /// Creates a new configuration with system defaults.
     pub fn new(
@@ -179,6 +204,18 @@ impl Config {
             .update_by_map(&Map::default())
             .log_error("failed to assign Config defaults");
         config
+    }
+
+    fn configure_completion_access(&mut self) {
+        #[cfg(feature = "system")]
+        {
+            self.completion.path_completion_by_filesystem = !self.delegate_fs_requests;
+            log::info!(
+                "completion.path.config: delegate_fs_requests={}, path_completion_by_filesystem={}",
+                self.delegate_fs_requests,
+                self.completion.path_completion_by_filesystem
+            );
+        }
     }
 
     /// Creates a new configuration from the LSP initialization parameters.
@@ -426,22 +463,13 @@ impl Config {
             }
         }
 
-        fn invalid_extra_args(args: &impl fmt::Debug, err: impl std::error::Error) -> CowStr {
-            log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
-            tinymist_l10n::t!(
-                "tinymist.config.badTypstExtraArgs",
-                "failed to parse typstExtraArgs: {err}, args: {args}",
-                err = err.debug_l10n(),
-                args = args.debug_l10n(),
-            )
-        }
-
         {
-            let raw_args = || update.get("typstExtraArgs");
-            let typst_args: Vec<String> = match raw_args().cloned().map(serde_json::from_value) {
+            let raw_args = update.get("typstExtraArgs");
+            let typst_args: Vec<String> = match raw_args.cloned().map(serde_json::from_value) {
                 Some(Ok(args)) => args,
                 Some(Err(err)) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, None));
                     None
                 }
                 // Even if the list is none, it should be parsed since we have env vars to
@@ -452,11 +480,15 @@ impl Config {
             let empty_typst_args = typst_args.is_empty();
 
             let args = match CompileOnceArgs::try_parse_from(
-                Some("typst-cli".to_owned()).into_iter().chain(typst_args),
+                Some("typst-cli".to_owned())
+                    .into_iter()
+                    .chain(typst_args.iter().cloned()),
             ) {
                 Ok(args) => args,
                 Err(err) => {
-                    self.warnings.push(invalid_extra_args(&raw_args(), err));
+                    let hint = typst_extra_args_parse_hint(&typst_args, &err);
+                    self.warnings
+                        .push(format_typst_extra_args_error(&raw_args, &err, hint));
 
                     if empty_typst_args {
                         CompileOnceArgs::default()
@@ -518,6 +550,7 @@ impl Config {
             Arc::new(LazyHash::new(dict))
         };
 
+        self.configure_completion_access();
         self.validate()
     }
 
@@ -571,6 +604,7 @@ impl Config {
     #[cfg(feature = "preview")]
     pub fn preview(&self) -> PreviewConfig {
         PreviewConfig {
+            format: ExportTarget::Paged,
             enable_partial_rendering: self.preview.partial_rendering,
             refresh_style: self.preview.refresh.clone().unwrap_or(TaskWhen::OnType),
             invert_colors: serde_json::to_string(&self.preview.invert_colors)
@@ -774,6 +808,23 @@ impl Config {
         )
     }
 
+    /// Returns the client options that require a project restart when changed.
+    pub fn restart_scoped_client_opts(&self) -> RestartScopedClientOptions {
+        RestartScopedClientOptions {
+            notify_status: self.notify_status,
+            trigger_suggest: self.completion.trigger_suggest,
+            trigger_parameter_hints: self.completion.trigger_parameter_hints,
+            trigger_suggest_and_parameter_hints: self
+                .completion
+                .trigger_suggest_and_parameter_hints,
+            support_html_in_markdown: self.support_html_in_markdown,
+            support_client_codelens: self.support_client_codelens,
+            extended_code_action: self.extended_code_action,
+            customized_show_document: self.customized_show_document,
+            delegate_fs_requests: self.delegate_fs_requests,
+        }
+    }
+
     #[cfg(not(feature = "system"))]
     fn create_physical_access_model(
         &self,
@@ -818,6 +869,71 @@ impl Config {
     }
 }
 
+fn typst_extra_args_parse_hint(args: &[String], err: &clap::Error) -> Option<CowStr> {
+    if err.kind() != ErrorKind::UnknownArgument {
+        return None;
+    }
+
+    let Some(ContextValue::String(invalid_arg)) = err.get(ContextKind::InvalidArg) else {
+        return None;
+    };
+    let Some(ContextValue::String(option)) = err.get(ContextKind::SuggestedArg) else {
+        return None;
+    };
+
+    let value = invalid_arg.strip_prefix(option)?;
+    if !value.chars().next().is_some_and(char::is_whitespace) {
+        return None;
+    }
+
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+
+    let (arg, value) = args
+        .iter()
+        .map(|arg| arg.trim())
+        .filter(|arg| arg.starts_with(invalid_arg.as_str()))
+        .find_map(|arg| {
+            let value = arg.strip_prefix(option.as_str())?;
+            value
+                .chars()
+                .next()
+                .is_some_and(char::is_whitespace)
+                .then_some((arg, value.trim()))
+        })
+        .filter(|(_, value)| !value.is_empty())
+        .unwrap_or((invalid_arg.as_str(), value));
+
+    Some(tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs.joinedOptionValueHint",
+        "`tinymist.typstExtraArgs` is an argv array, so `\"{arg}\"` is treated as one argument. Split the option and value into two entries like `\"{option}\", \"{value}\"`, or use `\"{option}={value}\"` when the option accepts the `--flag=value` form.",
+        arg = arg.into(),
+        option = option.as_str().into(),
+        value = value.into(),
+    ))
+}
+
+fn format_typst_extra_args_error(
+    args: &impl fmt::Debug,
+    err: &impl std::error::Error,
+    hint: Option<CowStr>,
+) -> CowStr {
+    log::warn!("failed to parse typstExtraArgs: {err}, args: {args:?}");
+    let message = tinymist_l10n::t!(
+        "tinymist.config.badTypstExtraArgs",
+        "failed to parse typstExtraArgs: {err}, args: {args}",
+        err = err.debug_l10n(),
+        args = args.debug_l10n(),
+    );
+
+    match hint {
+        Some(hint) => format!("{message}\n{hint}").into(),
+        None => message,
+    }
+}
+
 /// Configuration set at initialization that won't change within a single
 /// session.
 #[derive(Debug, Clone)]
@@ -839,6 +955,8 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// Allow insert/replace text edits in completion items.
+    pub completion_insert_replace_support: bool,
     /// The locale of the editor.
     pub locale: Option<String>,
 }
@@ -875,6 +993,7 @@ impl From<&InitializeParams> for ConstConfig {
         let sema = try_(|| doc?.semantic_tokens.as_ref());
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
+        let completion_item = try_(|| doc?.completion.as_ref()?.completion_item.as_ref());
 
         let locale = params
             .initialization_options
@@ -891,6 +1010,10 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            completion_insert_replace_support: try_or(
+                || completion_item?.insert_replace_support,
+                false,
+            ),
             locale: locale.map(ToOwned::to_owned),
         }
     }
@@ -944,9 +1067,9 @@ impl From<&dapts::InitializeRequestArguments> for ConstDapConfig {
 #[serde(rename_all = "camelCase")]
 pub enum FormatterMode {
     /// Disable the formatter.
-    #[default]
     Disable,
     /// Use `typstyle` formatter.
+    #[default]
     Typstyle,
     /// Use `typstfmt` formatter.
     Typstfmt,
@@ -1105,6 +1228,15 @@ mod tests {
         assert!(config.warnings.is_empty(), "{:?}", config.warnings);
     }
 
+    fn warning_text(config: &Config) -> String {
+        config
+            .warnings
+            .iter()
+            .map(|warning| warning.as_ref())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
     #[test]
     fn test_default_encoding() {
         let cc = ConstConfig::default();
@@ -1193,6 +1325,69 @@ mod tests {
     }
 
     #[test]
+    fn test_all_config_items_are_polled() {
+        let sections = Config::get_items()
+            .into_iter()
+            .filter_map(|item| item.section)
+            .collect::<Vec<_>>();
+        let expected = CONFIG_ITEMS
+            .iter()
+            .flat_map(|&item| [format!("tinymist.{item}"), item.to_owned()])
+            .collect::<Vec<_>>();
+
+        assert_eq!(sections, expected);
+    }
+
+    #[test]
+    fn test_polled_restart_scoped_client_options_update_config() {
+        let values = Config::get_items()
+            .into_iter()
+            .map(|item| match item.section.as_deref() {
+                Some("tinymist.compileStatus") => json!("enable"),
+                Some("tinymist.triggerSuggest")
+                | Some("tinymist.triggerParameterHints")
+                | Some("tinymist.triggerSuggestAndParameterHints")
+                | Some("tinymist.supportHtmlInMarkdown")
+                | Some("tinymist.supportClientCodelens")
+                | Some("tinymist.supportExtendedCodeAction")
+                | Some("tinymist.customizedShowDocument")
+                | Some("tinymist.delegateFsRequests") => json!(true),
+                _ => JsonValue::Null,
+            })
+            .collect::<Vec<_>>();
+
+        let update = Config::values_to_map(values);
+        let mut config = Config::default();
+        config.update_by_map(&update).expect("valid config");
+
+        assert!(config.notify_status);
+        assert!(config.completion.trigger_suggest);
+        assert!(config.completion.trigger_parameter_hints);
+        assert!(config.completion.trigger_suggest_and_parameter_hints);
+        assert!(config.support_html_in_markdown);
+        assert!(config.support_client_codelens);
+        assert!(config.extended_code_action);
+        assert!(config.customized_show_document);
+        assert!(config.delegate_fs_requests);
+    }
+
+    #[test]
+    fn test_restart_scoped_client_options_diff() {
+        let old_config = Config::default();
+        let mut new_config = Config::default();
+        let update = json!({
+            "supportClientCodelens": true,
+        });
+
+        good_config(&mut new_config, &update);
+
+        assert_ne!(
+            old_config.restart_scoped_client_opts(),
+            new_config.restart_scoped_client_opts()
+        );
+    }
+
+    #[test]
     fn test_config_creation_timestamp() {
         type Timestamp = Option<i64>;
 
@@ -1227,6 +1422,55 @@ mod tests {
         //     });
 
         //     assert_eq!(args_timestamp, env_timestamp);
+    }
+
+    #[test]
+    fn test_typst_extra_args_hint_for_joined_option_value() {
+        for (joined, option, value) in [
+            ("--input foo=bar", "--input", "foo=bar"),
+            ("--pdf-standard ua-1", "--pdf-standard", "ua-1"),
+            ("--root /workspace", "--root", "/workspace"),
+        ] {
+            let mut config = Config::default();
+            let update = json!({
+                "typstExtraArgs": [joined]
+            });
+
+            update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+            let warnings = warning_text(&config);
+            let split_form = format!(r#""{option}", "{value}""#);
+            let equal_form = format!(r#""{option}={value}""#);
+            for expected in [
+                "argv array",
+                joined,
+                split_form.as_str(),
+                equal_form.as_str(),
+            ] {
+                assert!(
+                    warnings.contains(expected),
+                    "warnings for {joined}: {warnings}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_typst_extra_args_no_joined_option_value_hint_for_equal_form_with_spaces() {
+        let mut config = Config::default();
+        let update = json!({
+            "typstExtraArgs": ["--input=a=x y", "--unknown"]
+        });
+
+        update_config(&mut config, &update).expect("config should recover from bad extra args");
+
+        let warnings = warning_text(&config);
+
+        assert!(!warnings.contains("argv array"), "warnings: {warnings}");
+        assert!(
+            warnings.contains("--unknown"),
+            "unexpected warnings: {warnings}"
+        );
     }
 
     #[test]
@@ -1446,7 +1690,7 @@ mod tests {
     #[test]
     fn test_default_formatting_config() {
         let config = Config::default().formatter();
-        assert!(matches!(config.config, FormatterConfig::Disable));
+        assert!(matches!(config.config, FormatterConfig::Typstyle(_)));
         assert_eq!(config.position_encoding, PositionEncoding::Utf16);
     }
 
@@ -1533,9 +1777,53 @@ mod tests {
 
     #[test]
     fn test_default_lsp_config_initialize() {
-        let (_conf, err) =
+        let (conf, err) =
             Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
         assert!(err.is_none());
+        assert!(!conf.const_config.completion_insert_replace_support);
+    }
+
+    #[cfg(feature = "system")]
+    #[test]
+    fn test_system_lsp_config_enables_filesystem_path_completion() {
+        let (conf, err) =
+            Config::extract_lsp_params(InitializeParams::default(), CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.completion.path_completion_by_filesystem);
+
+        let params = InitializeParams {
+            initialization_options: Some(json!({
+                "delegateFsRequests": true,
+            })),
+            ..InitializeParams::default()
+        };
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(!conf.completion.path_completion_by_filesystem);
+    }
+
+    #[test]
+    fn test_lsp_config_completion_insert_replace_support() {
+        let params = InitializeParams {
+            capabilities: ClientCapabilities {
+                text_document: Some(TextDocumentClientCapabilities {
+                    completion: Some(CompletionClientCapabilities {
+                        completion_item: Some(CompletionItemCapability {
+                            insert_replace_support: Some(true),
+                            ..CompletionItemCapability::default()
+                        }),
+                        ..CompletionClientCapabilities::default()
+                    }),
+                    ..TextDocumentClientCapabilities::default()
+                }),
+                ..ClientCapabilities::default()
+            },
+            ..InitializeParams::default()
+        };
+
+        let (conf, err) = Config::extract_lsp_params(params, CompileFontArgs::default());
+        assert!(err.is_none());
+        assert!(conf.const_config.completion_insert_replace_support);
     }
 
     #[test]

@@ -14,7 +14,7 @@ use typst::{
     diag::{EcoString, SourceDiagnostic, Tracepoint, eco_format},
     ecow::EcoVec,
     syntax::{
-        FileId, Span, Spanned, SyntaxNode,
+        DiagSpan, FileId, Span, Spanned, SyntaxNode,
         ast::{self, AstNode},
     },
 };
@@ -53,8 +53,8 @@ pub fn lint_file(
 /// duplicating warnings.
 #[derive(Default, Clone, Hash)]
 pub struct KnownIssues {
-    unknown_vars: EcoVec<Span>,
-    unknown_fonts: EcoVec<(Span, EcoString)>,
+    unknown_vars: EcoVec<DiagSpan>,
+    unknown_fonts: EcoVec<(DiagSpan, EcoString)>,
 }
 
 impl KnownIssues {
@@ -71,8 +71,6 @@ impl KnownIssues {
                 unknown_fonts.push((diag.span, font_name));
             }
         }
-        unknown_vars.sort_by_key(|span| span.into_raw());
-        unknown_fonts.sort_by_key(|(span, _)| span.into_raw());
         let unknown_vars = EcoVec::from(unknown_vars);
         let unknown_fonts = EcoVec::from(unknown_fonts);
         Self {
@@ -82,14 +80,14 @@ impl KnownIssues {
     }
 
     pub(crate) fn has_unknown_math_ident(&self, ident: ast::MathIdent<'_>) -> bool {
-        self.unknown_vars.contains(&ident.span())
+        self.unknown_vars.contains(&ident.span().into())
     }
 
     pub(crate) fn get_unknown_font(&self, span: Span) -> Option<&EcoString> {
+        let span = DiagSpan::from(span);
         self.unknown_fonts
-            .binary_search_by_key(&span.into_raw(), |(s, _)| s.into_raw())
-            .ok()
-            .map(|i| &self.unknown_fonts[i].1)
+            .iter()
+            .find_map(|(candidate, name)| (*candidate == span).then_some(name))
     }
 }
 
@@ -298,7 +296,7 @@ impl DataFlowVisitor for Linter<'_> {
         }
         self.exprs(expr.args().to_untyped().exprs());
 
-        if expr.target().to_untyped().text() == "text" {
+        if expr.target().to_untyped().leaf_text() == "text" {
             self.check_bad_font(expr.args().items());
         }
 
@@ -407,7 +405,7 @@ impl DataFlowVisitor for Linter<'_> {
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
         // warn if text(font: ("Font Name", "Font Name")) in which Font Name ends with
         // "VF"
-        if expr.callee().to_untyped().text() == "text" {
+        if expr.callee().to_untyped().leaf_text() == "text" {
             self.check_bad_font(expr.args().items());
         }
         self.exprs(expr.args().to_untyped().exprs().chain(expr.callee().once()));
@@ -639,7 +637,7 @@ impl DataFlowVisitor for LateFuncLinter<'_, '_> {
                 ast::Expr::ShowRule(..) | ast::Expr::SetRule(..) => diag,
                 expr if expr.hash() => diag.with_hint(eco_format!(
                     "consider ignoring the value explicitly using underscore: `let _ = {}`",
-                    expr.to_untyped().clone().into_text()
+                    expr.to_untyped().clone().full_text()
                 )),
                 _ => diag,
             };
@@ -739,6 +737,8 @@ trait DataFlowVisitor {
             }
             ast::Expr::MathDelimited(content) => self.exprs(content.body().exprs()),
             ast::Expr::MathAttach(..) | ast::Expr::MathFrac(..) => self.exprs(expr.exprs()),
+            ast::Expr::MathFieldAccess(expr) => self.math_field_access(expr),
+            ast::Expr::MathCall(expr) => self.math_call(expr),
 
             ast::Expr::Ident(expr) => self.ident(expr),
             ast::Expr::MathIdent(expr) => self.math_ident(expr),
@@ -819,6 +819,22 @@ trait DataFlowVisitor {
 
     fn field_access(&mut self, expr: ast::FieldAccess<'_>) -> Option<()> {
         self.expr(expr.target())
+    }
+
+    fn math_access(&mut self, access: ast::MathAccess<'_>) -> Option<()> {
+        match access {
+            ast::MathAccess::MathIdent(expr) => self.math_ident(expr),
+            ast::MathAccess::MathFieldAccess(expr) => self.math_field_access(expr),
+        }
+    }
+
+    fn math_field_access(&mut self, expr: ast::MathFieldAccess<'_>) -> Option<()> {
+        self.math_access(expr.target())
+    }
+
+    fn math_call(&mut self, expr: ast::MathCall<'_>) -> Option<()> {
+        self.exprs(expr.args().to_untyped().exprs())?;
+        self.math_access(expr.callee())
     }
 
     fn func_call(&mut self, expr: ast::FuncCall<'_>) -> Option<()> {
@@ -994,19 +1010,19 @@ impl BuggyBlockLoc<'_> {
                     eco_format!(
                         "consider changing parent to `show {}: it => {{ {}; it }}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show.to_untyped().clone().into_text()
+                        show.to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `show {}: {}`",
                         match show_parent.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        show_set.to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text()
                     )
                 }
             }
@@ -1020,32 +1036,32 @@ impl BuggyBlockLoc<'_> {
                     eco_format!(
                         "consider changing parent to `show {}: if {neg}({}) {{ .. }}`",
                         match show.selector() {
-                            Some(selector) => selector.to_untyped().clone().into_text(),
+                            Some(selector) => selector.to_untyped().clone().full_text(),
                             None => "".into(),
                         },
-                        conditional.condition().to_untyped().clone().into_text()
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 } else {
                     eco_format!(
                         "consider changing parent to `{} if {neg}({})`",
-                        show_set.to_untyped().clone().into_text(),
-                        conditional.condition().to_untyped().clone().into_text()
+                        show_set.to_untyped().clone().full_text(),
+                        conditional.condition().to_untyped().clone().full_text()
                     )
                 }
             }
             BuggyBlockLoc::While(w) => {
                 eco_format!(
                     "consider changing parent to `show: it => if {} {{ {}; it }}`",
-                    w.condition().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    w.condition().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
             BuggyBlockLoc::For(f) => {
                 eco_format!(
                     "consider changing parent to `show: {}.fold(it => it, (style-it, {}) => it => {{ {}; style-it(it) }})`",
-                    f.iterable().to_untyped().clone().into_text(),
-                    f.pattern().to_untyped().clone().into_text(),
-                    show_set.to_untyped().clone().into_text()
+                    f.iterable().to_untyped().clone().full_text(),
+                    f.pattern().to_untyped().clone().full_text(),
+                    show_set.to_untyped().clone().full_text()
                 )
             }
         }

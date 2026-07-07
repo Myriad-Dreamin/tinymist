@@ -4,6 +4,8 @@
 
 You can export your documents to various formats using the `export` feature.
 
+Export uses the same compiler font, package, root, and certificate environment as ordinary editing and previewing. Configure that shared environment once in #cross-link("/feature/compiler-settings.typ", [Compiler Settings]).
+
 = Export from Query Result
 
 == Hello World Example (VSCode Tasks)

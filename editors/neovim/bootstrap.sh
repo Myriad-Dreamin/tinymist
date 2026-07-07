@@ -1,25 +1,74 @@
-# todo: it is in very early stage, so we are doing dirty things.
+#!/usr/bin/env bash
 
-# python3 ./spec/main.py
+set -euo pipefail
 
-DOCKER_ARGS=
-if [ "$1" = "test" ]; then
-    DOCKER_ARGS="python3 ./spec/main.py"
-elif [ "$1" = "bash" ]; then
-    DOCKER_ARGS="bash"
-elif [ "$1" = "editor" ]; then
-    DOCKER_ARGS="nvim ."
-else
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../.." && pwd)"
+
+image_name="${TINYMIST_NVIM_IMAGE:-tinymist-nvim-spec-local}"
+
+case "${1:-}" in
+  test)
+    shift
+    docker_args=(python3 ./spec/main.py "$@")
+    ;;
+  bash)
+    docker_args=(bash)
+    ;;
+  editor)
+    docker_args=(nvim .)
+    ;;
+  *)
     echo "Usage: $0 [test|bash|editor]"
     exit 1
+    ;;
+esac
+
+if [ -n "${TINYMIST_BIN:-}" ]; then
+  tinymist_bin="$TINYMIST_BIN"
+elif [ -x "$repo_root/target/debug/tinymist" ]; then
+  tinymist_bin="$repo_root/target/debug/tinymist"
+elif [ -x "$repo_root/target/release/tinymist" ]; then
+  tinymist_bin="$repo_root/target/release/tinymist"
+else
+  echo "No tinymist binary found."
+  echo "Build one first with: cargo build --bin tinymist"
+  echo "Or set TINYMIST_BIN=/absolute/path/to/tinymist."
+  exit 1
 fi
 
-(cd ../.. && docker build -t myriaddreamin/tinymist:0.14.10 .)
-(cd samples && docker build -t myriaddreamin/tinymist-nvim:0.14.10 -f lazyvim-dev/Dockerfile .)
-docker run --rm -it \
-  -v $PWD/../../tests/workspaces:/home/runner/dev/workspaces \
-  -v $PWD:/home/runner/dev \
-  -v $PWD/target/.local:/home/runner/.local \
-  -v $PWD/target/.cache:/home/runner/.cache \
-  -w /home/runner/dev myriaddreamin/tinymist-nvim:0.14.10 \
-  $DOCKER_ARGS
+if [ ! -x "$tinymist_bin" ]; then
+  echo "Tinymist binary is not executable: $tinymist_bin"
+  exit 1
+fi
+
+mkdir -p "$script_dir/target/.local" "$script_dir/target/.cache"
+
+docker_build_args=(-t "$image_name" -f lazyvim-dev/Dockerfile)
+if [ -n "${TINYMIST_NVIM_DOCKER_BUILD_NETWORK:-}" ]; then
+  docker_build_args+=(--network "$TINYMIST_NVIM_DOCKER_BUILD_NETWORK")
+fi
+
+(cd "$script_dir/samples" && docker build "${docker_build_args[@]}" .)
+
+docker_run_args=(
+  --rm
+  --tmpfs /home/runner/dev/workspaces:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/dev/target:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/.local:uid=1000,gid=1000,mode=755
+  --tmpfs /home/runner/.cache:uid=1000,gid=1000,mode=755
+  -v "$repo_root/tests/workspaces:/home/runner/workspaces-src:ro"
+  -v "$script_dir:/home/runner/dev"
+  -v "$tinymist_bin:/usr/local/bin/tinymist:ro"
+  -w /home/runner/dev
+)
+
+if [ -t 0 ] && [ -t 1 ]; then
+  docker_run_args+=(-it)
+fi
+
+docker run "${docker_run_args[@]}" "$image_name" bash -lc '
+  set -euo pipefail
+  cp -R /home/runner/workspaces-src/book /home/runner/dev/workspaces/book
+  exec "$@"
+' bash "${docker_args[@]}"

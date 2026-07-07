@@ -14,7 +14,7 @@ impl CompletionPair<'_, '_, '_> {
         {
             let items = match import.imports() {
                 Some(ast::Imports::Items(items)) => items,
-                _ => Default::default(),
+                _ => ast::ImportItems::placeholder(),
             };
 
             self.cursor.from = self.cursor.cursor;

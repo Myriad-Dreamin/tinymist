@@ -37,7 +37,7 @@ A frequently asked question is how to completing labels in sub files when writin
 #pro-tip[
   === Neovim:
 
-  See #github-link("/editors/neovim#working-with-multiple-files-projects")[Heovim: Working with Multiple File Projects].
+  See #github-link("/editors/neovim#working-with-multiple-files-projects")[Neovim: Working with Multiple File Projects].
 ]
 
 #pro-tip[

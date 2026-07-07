@@ -16,6 +16,7 @@ use tinymist_world::{CompilerFeat, CompilerWorld, EntryReader, EntryState};
 use typst::diag::EcoString;
 use typst::layout::PageRanges;
 use typst::syntax::FileId;
+use typst_shim::syntax::{RootedPathExt, VirtualPathExt};
 
 /// A scalar that is not NaN.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -80,7 +81,7 @@ impl Id {
     /// Creates a new project Id from a world.
     pub fn from_world<F: CompilerFeat>(world: &CompilerWorld<F>, ctx: CtxPath) -> Option<Self> {
         let entry = world.entry_state();
-        let id = unix_slash(entry.main()?.vpath().as_rootless_path());
+        let id = unix_slash(entry.main()?.vpath().as_rootless_path_compat());
 
         // todo: entry root may not be set, so we should use the cwd
         let path = &ResourcePath::from_user_sys(Path::new(&id), ctx);
@@ -158,17 +159,13 @@ impl PathPattern {
             return None;
         }
         // Files without a path are not exported
-        let path = main.vpath().resolve(&root)?;
+        let path = main.vpath().realize(&root).ok()?;
 
         // todo: handle untitled path
         if let Ok(path) = path.strip_prefix("/untitled") {
             let tmp = std::env::temp_dir();
             let path = tmp.join("typst").join(path);
             return Some(path.as_path().into());
-        }
-
-        if self.0.is_empty() {
-            return Some(path.to_path_buf().clean().into());
         }
 
         let path = path.strip_prefix(&root).ok()?;
@@ -179,11 +176,19 @@ impl PathPattern {
         let f = file_name.to_string_lossy();
         let f = f.as_ref().strip_suffix(".typ").unwrap_or(f.as_ref());
 
+        if self.0.is_empty() {
+            let dest = dir
+                .map(|d| root.join(d).join(f))
+                .unwrap_or_else(|| root.join(f));
+            return Some(dest.clean().into());
+        }
+
         // replace all $root
         let mut path = self.0.replace("$root", &w);
         if let Some(dir) = dir {
             let d = dir.to_string_lossy();
-            path = path.replace("$dir", &d);
+            let d = if d.is_empty() { "." } else { d.as_ref() };
+            path = path.replace("$dir", d);
         }
         path = path.replace("$name", f);
 
@@ -353,16 +358,19 @@ impl ResourcePath {
 
     /// Creates a new resource path from a file id.
     pub fn from_file_id(id: FileId) -> Self {
-        let package = id.package();
-        match package {
-            Some(package) => ResourcePath(
+        if let Some(package) = id.package_compat() {
+            ResourcePath(
                 "file_id".into(),
-                format!("{package}{}", unix_slash(id.vpath().as_rooted_path())),
-            ),
-            None => ResourcePath(
+                format!(
+                    "{package}{}",
+                    unix_slash(id.vpath().as_rooted_path_compat())
+                ),
+            )
+        } else {
+            ResourcePath(
                 "file_id".into(),
-                format!("$root{}", unix_slash(id.vpath().as_rooted_path())),
-            ),
+                format!("$root{}", unix_slash(id.vpath().as_rooted_path_compat())),
+            )
         }
     }
 
@@ -451,11 +459,26 @@ mod tests {
     use super::*;
     use typst::syntax::VirtualPath;
 
+    fn test_root() -> PathBuf {
+        if cfg!(windows) {
+            PathBuf::from(r"C:\dummy-root")
+        } else {
+            PathBuf::from("/dummy-root")
+        }
+    }
+
+    fn test_entry(path: &str) -> EntryState {
+        let root = test_root();
+        EntryState::new_rooted(root.into(), Some(VirtualPath::new(path).unwrap()))
+    }
+
     #[test]
     fn test_substitute_path() {
         let root = Path::new("/dummy-root");
-        let entry =
-            EntryState::new_rooted(root.into(), Some(VirtualPath::new("/dir1/dir2/file.txt")));
+        let entry = EntryState::new_rooted(
+            root.into(),
+            Some(VirtualPath::new("/dir1/dir2/file.txt").unwrap()),
+        );
 
         assert_eq!(
             PathPattern::new("/substitute/$dir/$name").substitute(&entry),
@@ -472,6 +495,49 @@ mod tests {
         assert_eq!(
             PathPattern::new("/substitute/target/$dir/$name").substitute(&entry),
             Some(PathBuf::from("/substitute/target/dir1/dir2/file.txt").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_keeps_workspace_root_relative() {
+        let entry = test_entry("/Chapter 1.1.typ");
+
+        assert_eq!(
+            PathPattern::new("$dir/$name").substitute(&entry),
+            Some(PathBuf::from("Chapter 1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_default_path_matches_documented_behavior() {
+        let root = test_root();
+        let entry = test_entry("/Chapter 1.1.typ");
+
+        assert_eq!(
+            PathPattern::default().substitute(&entry),
+            Some(root.join("Chapter 1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_preserves_multi_dot_stem() {
+        let root = test_root();
+        let entry = test_entry("/chapters/Chapter 1.1.1.typ");
+
+        assert_eq!(
+            PathPattern::new("$root/out/$dir/$name").substitute(&entry),
+            Some(root.join("out/chapters/Chapter 1.1.1").into())
+        );
+    }
+
+    #[test]
+    fn test_substitute_path_preserves_name_without_extension() {
+        let root = test_root();
+        let entry = test_entry("/README");
+
+        assert_eq!(
+            PathPattern::new("$root/$dir/$name").substitute(&entry),
+            Some(root.join("README").into())
         );
     }
 }

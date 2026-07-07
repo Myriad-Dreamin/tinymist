@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as lc from "vscode-languageclient";
 import { applySnippetWorkspaceEdit, SnippetTextDocumentEdit } from "./snippets";
 import { tinymist } from "./lsp";
-import type { LanguageClient } from "vscode-languageclient/node";
+import type { BaseLanguageClient } from "vscode-languageclient";
 
 export function resolveCodeAction(): any {
   return async (params: lc.CodeAction) => {
@@ -55,7 +55,7 @@ export function resolveCodeAction(): any {
   };
 }
 function asWorkspaceSnippetEdit(
-  client: LanguageClient,
+  client: BaseLanguageClient,
   item: lc.WorkspaceEdit,
 ): [vscode.WorkspaceEdit, SnippetTextDocumentEdit[]] {
   // partially borrowed from https://github.com/microsoft/vscode-languageserver-node/blob/295aaa393fda8ecce110c38880a00466b9320e63/client/src/common/protocolConverter.ts#L1060-L1101

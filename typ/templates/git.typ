@@ -1,13 +1,25 @@
 
 #import "target.typ": sys-is-html-target, is-md-target
 
-#let git-head = read("/.git/HEAD").trim()
-#let git-head-branch = if git-head.starts-with("ref: refs/heads/") {
+#let git-head-input = sys.inputs.at("tinymist-git-head", default: none)
+#let git-head-branch-input = sys.inputs.at("tinymist-git-head-branch", default: none)
+#let git-head-hash-input = sys.inputs.at("tinymist-git-head-hash", default: none)
+
+#let git-head = if git-head-input != none {
+  git-head-input
+} else {
+  read("/.git/HEAD").trim()
+}
+#let git-head-branch = if git-head-branch-input != none and git-head-branch-input != "" {
+  git-head-branch-input
+} else if git-head.starts-with("ref: refs/heads/") {
   git-head.slice("ref: refs/heads/".len())
 } else {
   none
 }
-#let git-head-hash = if git-head.starts-with("ref: ") {
+#let git-head-hash = if git-head-hash-input != none and git-head-hash-input != "" {
+  git-head-hash-input
+} else if git-head.starts-with("ref: ") {
   read("/.git/" + git-head.slice(5)).trim()
 } else {
   git-head

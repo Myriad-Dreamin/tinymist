@@ -22,7 +22,8 @@ A case distinction.
 
 Content across different branches can be aligned with the `&` symbol.
 
-# Example
+## Example
+
 ```typ
 $ f(x, y) := cases(
   1 "if" (x dot y)/2 <= 0,
@@ -52,9 +53,7 @@ type: array | none | str | symbol
 
 The delimiter to use.
 
-Can be a single character specifying the left delimiter, in which case
-the right delimiter is inferred. Otherwise, can be an array containing a
-left and a right delimiter.
+Can be a single character specifying the left delimiter, in which case the right delimiter is inferred. Otherwise, can be an array containing a left and a right delimiter.
 
 ```typ
 #set math.cases(delim: "[")
