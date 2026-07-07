@@ -54,7 +54,9 @@ async_tests.describe('Export', function()
     --- keep edit the same file, and save it multiple times, and we should get a sequence of distinct pdf files.
     --- If not, either export is not triggered, or the save events are not emitted.
 
-    local pdf_path = '/home/runner/test/main.pdf'
+    local typ_path = fixtures.project.child 'on-save-export.typ'
+    local pdf_path = '/home/runner/test/on-save-export.pdf'
+    vim.fn.writefile({ '= On Save Export', '', 'Initial content.' }, typ_path)
     assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created before testing')
 
     local pdf_hashes = {}
@@ -91,7 +93,7 @@ async_tests.describe('Export', function()
           resolve(nil) -- resolve the promise after 2 seconds
         end)
 
-        vim.cmd.edit(fixtures.project.some_existing_file)
+        vim.cmd.edit(typ_path)
         helpers.wait_for_ready_lsp()
         assert.is.same(1, #vim.lsp.get_clients { bufnr = 0, name = 'tinymist', _uninitialized = true })
         --- append a text to current buffer
