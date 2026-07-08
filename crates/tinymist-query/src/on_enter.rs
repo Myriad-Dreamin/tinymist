@@ -215,7 +215,7 @@ mod tests {
             let result = request.request(&source, PositionEncoding::Utf16);
 
             with_settings!({
-                description => format!("On Enter on {})", make_range_annotation(&source)),
+                description => format!("On Enter on {}", make_range_annotation(&source)),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
             })
