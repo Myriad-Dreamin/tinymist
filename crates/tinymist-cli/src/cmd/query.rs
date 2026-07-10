@@ -27,6 +27,7 @@ pub enum QueryCommands {
     /// Check a specific package.
     CheckPackage(PackageDocsArgs),
     /// Dump package scopes and type-checker results.
+    #[clap(hide(true))]
     TyckScope(QueryTyckScopeArgs),
 }
 
