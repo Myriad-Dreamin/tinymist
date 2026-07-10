@@ -2,6 +2,7 @@
 
 use std::borrow::Cow;
 use std::collections::VecDeque;
+use std::fmt::{self, Write as _};
 use std::ops::Range;
 use std::path::PathBuf;
 
@@ -695,7 +696,7 @@ fn dump_decl(source: &Source, decl: &DeclExpr) -> DumpDecl {
 fn dump_type(type_info: &TypeInfo, ty: Ty, options: PackageTyckDumpOptions) -> DumpType {
     let ty = type_info.simplify(ty, true);
     DumpType {
-        debug: truncate_dump_string(format!("{ty:#?}"), options.max_type_chars),
+        debug: format_debug_dump(&ty, options.max_type_chars),
         describe: ty
             .describe()
             .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
@@ -729,6 +730,50 @@ fn dump_type_mappings(
             .then_with(|| left.range.end.cmp(&right.range.end))
     });
     mappings
+}
+
+struct TruncatingString {
+    text: String,
+    remaining_chars: usize,
+    truncated: bool,
+}
+
+impl fmt::Write for TruncatingString {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        if self.remaining_chars == 0 {
+            self.truncated = true;
+            return Err(fmt::Error);
+        }
+
+        if let Some((byte_idx, _)) = text.char_indices().nth(self.remaining_chars) {
+            self.text.push_str(&text[..byte_idx]);
+            self.remaining_chars = 0;
+            self.truncated = true;
+            Err(fmt::Error)
+        } else {
+            self.remaining_chars -= text.chars().count();
+            self.text.push_str(text);
+            Ok(())
+        }
+    }
+}
+
+fn format_debug_dump<T: fmt::Debug>(value: &T, max_chars: Option<usize>) -> String {
+    let Some(max_chars) = max_chars else {
+        return format!("{value:#?}");
+    };
+
+    let mut out = TruncatingString {
+        text: String::new(),
+        remaining_chars: max_chars,
+        truncated: false,
+    };
+    let _ = write!(&mut out, "{value:#?}");
+    if out.truncated {
+        out.text.push_str(" ... truncated ...");
+        out.text.shrink_to_fit();
+    }
+    out.text
 }
 
 fn truncate_dump_string(mut text: String, max_chars: Option<usize>) -> String {
