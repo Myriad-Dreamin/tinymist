@@ -26,6 +26,9 @@ pub enum QueryCommands {
     PackageDocs(PackageDocsArgs),
     /// Check a specific package.
     CheckPackage(PackageDocsArgs),
+    /// Dump package scopes and type-checker results.
+    #[clap(hide(true))]
+    TyckScope(QueryTyckScopeArgs),
 }
 
 #[derive(Debug, Clone, clap::Parser)]
@@ -91,6 +94,26 @@ pub struct PackageDocsArgs {
     // pub format: Option<QueryDocsFormat>,
 }
 
+#[derive(Debug, Clone, clap::Parser)]
+pub struct QueryTyckScopeArgs {
+    /// Compile a document once before querying.
+    #[clap(flatten)]
+    pub compile: CompileOnceArgs,
+
+    /// The path of the package to request tyck scopes for.
+    #[clap(long)]
+    pub path: Option<String>,
+    /// The package to request tyck scopes for.
+    #[clap(long)]
+    pub id: String,
+    /// The output path for the requested tyck scope dump.
+    #[clap(short, long)]
+    pub output: String,
+    /// Maximum characters kept for each dumped type string. Set to 0 to keep full strings.
+    #[clap(long, default_value_t = 8192)]
+    pub max_type_chars: usize,
+}
+
 /// Creates the default analysis context for CLI query-style commands.
 pub fn default_analysis() -> Arc<Analysis> {
     let (config, _) = Config::extract_lsp_params(Default::default(), Default::default());
@@ -128,6 +151,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
         QueryCommands::Scip(args) => &mut args.compile,
         QueryCommands::PackageDocs(args) => &mut args.compile,
         QueryCommands::CheckPackage(args) => &mut args.compile,
+        QueryCommands::TyckScope(args) => &mut args.compile,
     };
     if compile.input.is_none() {
         compile.input = Some("main.typ".to_string());
@@ -141,6 +165,7 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
         QueryCommands::Scip(args) => (&args.id, &args.path),
         QueryCommands::PackageDocs(args) => (&args.id, &args.path),
         QueryCommands::CheckPackage(args) => (&args.id, &args.path),
+        QueryCommands::TyckScope(args) => (&args.id, &args.path),
     };
     let pkg = PackageSpec::from_str(id).unwrap();
     let path = path.as_ref().map(PathBuf::from);
@@ -213,6 +238,23 @@ pub fn query_main(mut cmds: QueryCommands) -> Result<()> {
                 tinymist_query::package::check_package(a, &info)
                     .map_err(map_string_err("failed to check package"))
             })?;
+        }
+        QueryCommands::TyckScope(args) => {
+            let options = tinymist_query::package::PackageTyckDumpOptions {
+                max_type_chars: (args.max_type_chars > 0).then_some(args.max_type_chars),
+            };
+            let res = snap.run_within_package(&info, |a| {
+                tinymist_query::package::package_tyck_scope(a, &info, options)
+                    .map_err(map_string_err("failed to dump package tyck scopes"))
+            })?;
+            let res = serde_json::to_vec_pretty(&res)
+                .context_ut("failed to serialize package tyck scope dump")?;
+
+            write_output(
+                Path::new(&args.output),
+                res,
+                "failed to write package tyck scope dump",
+            )?;
         }
     };
 
