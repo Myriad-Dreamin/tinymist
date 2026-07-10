@@ -1,23 +1,30 @@
 //! Package management tools.
 
 use std::borrow::Cow;
+use std::collections::VecDeque;
+use std::ops::Range;
 use std::path::PathBuf;
 
 use ecow::eco_format;
 #[cfg(feature = "local-registry")]
 use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::package::{PackageSpec, PackageSpecExt};
 use typst::World;
 use typst::diag::{EcoString, StrResult};
 use typst::syntax::package::PackageManifest;
-use typst::syntax::{FileId, LinkedNode, RootedPath, SyntaxKind, VirtualPath, VirtualRoot, ast};
-use typst_shim::syntax::resolve_path_from_id;
+use typst::syntax::{
+    FileId, LinkedNode, RootedPath, Source, Span, SyntaxKind, VirtualPath, VirtualRoot, ast,
+};
+use typst_shim::syntax::{resolve_path_from_id, source_range};
 
 use crate::LocalContext;
-use crate::analysis::SharedContext;
+use crate::analysis::{SharedContext, TypeInfo};
+use crate::syntax::{DeclExpr, Expr, LexicalScope, Pattern, PatternSig};
+use crate::ty::Ty;
 
 /// Information about a package.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,6 +150,650 @@ pub fn check_package(ctx: &mut LocalContext, spec: &PackageInfo) -> StrResult<()
 
     ctx.preload_package(entry_point);
     Ok(())
+}
+
+/// Dumps package scopes together with type-checker results.
+pub fn package_tyck_scope(
+    ctx: &mut LocalContext,
+    spec: &PackageInfo,
+    options: PackageTyckDumpOptions,
+) -> StrResult<PackageTyckDump> {
+    let toml_id = get_manifest_id(spec)?;
+    let manifest = ctx.get_manifest(toml_id)?;
+    let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
+    let package_root = entry_point.root().clone();
+
+    let mut files = vec![];
+    let mut seen = FxHashSet::default();
+    let mut queue = VecDeque::from([entry_point]);
+
+    while let Some(fid) = queue.pop_front() {
+        if !seen.insert(fid) {
+            continue;
+        }
+
+        let source = ctx
+            .source_by_id(fid)
+            .map_err(|err| eco_format!("failed to read package source {fid:?}: {err}"))?;
+        let expr_info = ctx.expr_stage(&source);
+        let type_info = ctx.type_check(&source);
+
+        let mut imported_files = expr_info
+            .imports
+            .keys()
+            .copied()
+            .map(dump_file_id)
+            .collect::<Vec<_>>();
+        imported_files.sort_by(|left, right| left.file_id.cmp(&right.file_id));
+
+        for imported in expr_info.imports.keys().copied() {
+            if imported.root() == &package_root && !seen.contains(&imported) {
+                queue.push_back(imported);
+            }
+        }
+
+        files.push(dump_file_scope(
+            &source,
+            &expr_info.exports,
+            &expr_info.root,
+            &type_info,
+            imported_files,
+            options,
+        ));
+    }
+
+    files.sort_by(|left, right| left.file_id.cmp(&right.file_id));
+
+    Ok(PackageTyckDump {
+        schema: 1,
+        package: DumpPackageInfo {
+            namespace: spec.namespace.to_string(),
+            name: spec.name.to_string(),
+            version: spec.version.clone(),
+            spec: format!("@{}/{}:{}", spec.namespace, spec.name, spec.version),
+            path: spec.path.to_string_lossy().into_owned(),
+            entrypoint: manifest.package.entrypoint.to_string(),
+        },
+        entrypoint: dump_file_id(entry_point),
+        files,
+    })
+}
+
+/// Options for dumping package scope and type-checker information.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PackageTyckDumpOptions {
+    /// Maximum characters kept for each dumped type string.
+    ///
+    /// Set to `None` to keep full type strings. Very large inferred types can
+    /// otherwise make the JSON dump impractical for downstream scripts.
+    pub max_type_chars: Option<usize>,
+}
+
+/// Package scope and type-checker dump.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackageTyckDump {
+    schema: u32,
+    package: DumpPackageInfo,
+    entrypoint: DumpFileId,
+    files: Vec<DumpFile>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpPackageInfo {
+    namespace: String,
+    name: String,
+    version: String,
+    spec: String,
+    path: String,
+    entrypoint: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpFileId {
+    file_id: String,
+    root: String,
+    path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpFile {
+    file_id: String,
+    root: String,
+    path: String,
+    imports: Vec<DumpFileId>,
+    scopes: Vec<DumpScope>,
+    type_mappings: Vec<DumpTypeMapping>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpScope {
+    kind: &'static str,
+    name: String,
+    declaration: Option<DumpDecl>,
+    variables: Vec<DumpVariable>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpVariable {
+    name: String,
+    kind: String,
+    source: &'static str,
+    exported: bool,
+    declaration: DumpDecl,
+    expression: Option<String>,
+    ty: Option<DumpType>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpDecl {
+    debug: String,
+    kind: String,
+    file_id: Option<String>,
+    range: Option<DumpRange>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpType {
+    debug: String,
+    describe: Option<String>,
+    repr: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpTypeMapping {
+    range: DumpRange,
+    ty: DumpType,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DumpRange {
+    start: usize,
+    end: usize,
+}
+
+fn dump_file_scope(
+    source: &Source,
+    exports: &LexicalScope,
+    root_expr: &Expr,
+    type_info: &TypeInfo,
+    imports: Vec<DumpFileId>,
+    options: PackageTyckDumpOptions,
+) -> DumpFile {
+    let fid = source.id();
+    let file = dump_file_id(fid);
+
+    let file_scope = DumpScope {
+        kind: "file",
+        name: file.path.clone(),
+        declaration: None,
+        variables: dump_scope_variables(source, type_info, exports, "export", true, options),
+    };
+
+    let mut scopes = vec![file_scope];
+    collect_function_scopes(source, type_info, root_expr, &mut scopes, options);
+
+    DumpFile {
+        file_id: file.file_id,
+        root: file.root,
+        path: file.path,
+        imports,
+        scopes,
+        type_mappings: dump_type_mappings(source, type_info, options),
+    }
+}
+
+fn dump_scope_variables(
+    source: &Source,
+    type_info: &TypeInfo,
+    scope: &LexicalScope,
+    var_source: &'static str,
+    exported: bool,
+    options: PackageTyckDumpOptions,
+) -> Vec<DumpVariable> {
+    let mut vars = scope
+        .iter()
+        .filter_map(|(name, expr)| {
+            let decl = expr_decl(expr)?;
+            Some(dump_variable(
+                source,
+                type_info,
+                name.as_ref(),
+                decl,
+                Some(expr),
+                var_source,
+                exported,
+                options,
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    vars.sort_by(variable_cmp);
+    vars.dedup_by(|left, right| {
+        left.name == right.name && left.declaration.debug == right.declaration.debug
+    });
+    vars
+}
+
+fn collect_function_scopes(
+    source: &Source,
+    type_info: &TypeInfo,
+    expr: &Expr,
+    scopes: &mut Vec<DumpScope>,
+    options: PackageTyckDumpOptions,
+) {
+    if let Expr::Func(func) = expr {
+        let mut variables = vec![];
+        collect_pattern_sig_variables(
+            source,
+            type_info,
+            &func.params,
+            "parameter",
+            &mut variables,
+            options,
+        );
+        collect_local_variables(source, type_info, &func.body, &mut variables, options);
+        variables.sort_by(variable_cmp);
+        variables.dedup_by(|left, right| {
+            left.name == right.name && left.declaration.debug == right.declaration.debug
+        });
+
+        scopes.push(DumpScope {
+            kind: "function",
+            name: scope_name(&func.decl),
+            declaration: Some(dump_decl(source, &func.decl)),
+            variables,
+        });
+
+        collect_function_scopes(source, type_info, &func.body, scopes, options);
+        return;
+    }
+
+    walk_expr_children(expr, &mut |child| {
+        collect_function_scopes(source, type_info, child, scopes, options);
+    });
+}
+
+fn collect_local_variables(
+    source: &Source,
+    type_info: &TypeInfo,
+    expr: &Expr,
+    variables: &mut Vec<DumpVariable>,
+    options: PackageTyckDumpOptions,
+) {
+    match expr {
+        Expr::Func(_) => {}
+        Expr::Let(let_expr) => {
+            collect_pattern_variables(
+                source,
+                type_info,
+                &let_expr.pattern,
+                "local",
+                variables,
+                options,
+            );
+            if let Some(body) = &let_expr.body {
+                collect_local_variables(source, type_info, body, variables, options);
+            }
+        }
+        Expr::ForLoop(for_loop) => {
+            collect_pattern_variables(
+                source,
+                type_info,
+                &for_loop.pattern,
+                "local",
+                variables,
+                options,
+            );
+            collect_local_variables(source, type_info, &for_loop.iter, variables, options);
+            collect_local_variables(source, type_info, &for_loop.body, variables, options);
+        }
+        _ => {
+            walk_expr_children(expr, &mut |child| {
+                collect_local_variables(source, type_info, child, variables, options);
+            });
+        }
+    }
+}
+
+fn collect_pattern_sig_variables(
+    source: &Source,
+    type_info: &TypeInfo,
+    sig: &PatternSig,
+    var_source: &'static str,
+    variables: &mut Vec<DumpVariable>,
+    options: PackageTyckDumpOptions,
+) {
+    for pattern in &sig.pos {
+        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+    }
+    for (decl, pattern) in &sig.named {
+        variables.push(dump_variable(
+            source,
+            type_info,
+            decl.name().as_ref(),
+            decl,
+            None,
+            var_source,
+            false,
+            options,
+        ));
+        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+    }
+    for (decl, pattern) in sig.spread_left.iter().chain(sig.spread_right.iter()) {
+        variables.push(dump_variable(
+            source,
+            type_info,
+            decl.name().as_ref(),
+            decl,
+            None,
+            var_source,
+            false,
+            options,
+        ));
+        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+    }
+}
+
+fn collect_pattern_variables(
+    source: &Source,
+    type_info: &TypeInfo,
+    pattern: &Pattern,
+    var_source: &'static str,
+    variables: &mut Vec<DumpVariable>,
+    options: PackageTyckDumpOptions,
+) {
+    match pattern {
+        Pattern::Expr(expr) => collect_local_variables(source, type_info, expr, variables, options),
+        Pattern::Simple(decl) => {
+            variables.push(dump_variable(
+                source,
+                type_info,
+                decl.name().as_ref(),
+                decl,
+                None,
+                var_source,
+                false,
+                options,
+            ));
+        }
+        Pattern::Sig(sig) => {
+            collect_pattern_sig_variables(source, type_info, sig, var_source, variables, options);
+        }
+    }
+}
+
+fn walk_expr_children(expr: &Expr, f: &mut impl FnMut(&Expr)) {
+    match expr {
+        Expr::Block(exprs) => exprs.iter().for_each(f),
+        Expr::Array(args) | Expr::Dict(args) | Expr::Args(args) => {
+            walk_args(args.args.iter(), f);
+        }
+        Expr::Pattern(pattern) => walk_pattern(pattern, f),
+        Expr::Element(elem) => elem.content.iter().for_each(f),
+        Expr::Unary(unary) => f(&unary.lhs),
+        Expr::Binary(binary) => {
+            f(&binary.operands.0);
+            f(&binary.operands.1);
+        }
+        Expr::Apply(apply) => {
+            f(&apply.callee);
+            f(&apply.args);
+        }
+        Expr::Func(func) => {
+            walk_pattern_sig(&func.params, f);
+            f(&func.body);
+        }
+        Expr::Let(let_expr) => {
+            walk_pattern(&let_expr.pattern, f);
+            if let Some(body) = &let_expr.body {
+                f(body);
+            }
+        }
+        Expr::Show(show) => {
+            if let Some(selector) = &show.selector {
+                f(selector);
+            }
+            f(&show.edit);
+        }
+        Expr::Set(set) => {
+            f(&set.target);
+            f(&set.args);
+            if let Some(cond) = &set.cond {
+                f(cond);
+            }
+        }
+        Expr::Ref(ref_expr) => {
+            if let Some(step) = &ref_expr.step {
+                f(step);
+            }
+            if let Some(root) = &ref_expr.root {
+                f(root);
+            }
+        }
+        Expr::ContentRef(content_ref) => {
+            if let Some(body) = &content_ref.body {
+                f(body);
+            }
+        }
+        Expr::Select(select) => f(&select.lhs),
+        Expr::Import(import) => {
+            f(&import.source);
+        }
+        Expr::Include(include) => {
+            f(&include.source);
+        }
+        Expr::Contextual(inner) => f(inner),
+        Expr::Conditional(cond) => {
+            f(&cond.cond);
+            f(&cond.then);
+            f(&cond.else_);
+        }
+        Expr::WhileLoop(while_loop) => {
+            f(&while_loop.cond);
+            f(&while_loop.body);
+        }
+        Expr::ForLoop(for_loop) => {
+            walk_pattern(&for_loop.pattern, f);
+            f(&for_loop.iter);
+            f(&for_loop.body);
+        }
+        Expr::Type(_) | Expr::Decl(_) | Expr::Star => {}
+    }
+}
+
+fn walk_args<'a>(
+    args: impl Iterator<Item = &'a crate::syntax::ArgExpr>,
+    f: &mut impl FnMut(&Expr),
+) {
+    for arg in args {
+        match arg {
+            crate::syntax::ArgExpr::Pos(expr) | crate::syntax::ArgExpr::Spread(expr) => f(expr),
+            crate::syntax::ArgExpr::Named(pair) => f(&pair.1),
+            crate::syntax::ArgExpr::NamedRt(pair) => {
+                f(&pair.0);
+                f(&pair.1);
+            }
+        }
+    }
+}
+
+fn walk_pattern(pattern: &Pattern, f: &mut impl FnMut(&Expr)) {
+    match pattern {
+        Pattern::Expr(expr) => f(expr),
+        Pattern::Simple(_) => {}
+        Pattern::Sig(sig) => walk_pattern_sig(sig, f),
+    }
+}
+
+fn walk_pattern_sig(sig: &PatternSig, f: &mut impl FnMut(&Expr)) {
+    for pattern in &sig.pos {
+        walk_pattern(pattern, f);
+    }
+    for (_, pattern) in &sig.named {
+        walk_pattern(pattern, f);
+    }
+    for (_, pattern) in sig.spread_left.iter().chain(sig.spread_right.iter()) {
+        walk_pattern(pattern, f);
+    }
+}
+
+fn expr_decl(expr: &Expr) -> Option<&DeclExpr> {
+    match expr {
+        Expr::Decl(decl) => Some(decl),
+        Expr::Ref(ref_expr) => ref_expr
+            .root
+            .as_ref()
+            .and_then(expr_decl)
+            .or(Some(&ref_expr.decl)),
+        _ => None,
+    }
+}
+
+fn dump_variable(
+    source: &Source,
+    type_info: &TypeInfo,
+    name: &str,
+    decl: &DeclExpr,
+    expr: Option<&Expr>,
+    var_source: &'static str,
+    exported: bool,
+    options: PackageTyckDumpOptions,
+) -> DumpVariable {
+    DumpVariable {
+        name: name.to_owned(),
+        kind: decl.kind().to_string(),
+        source: var_source,
+        exported,
+        declaration: dump_decl(source, decl),
+        expression: expr.map(ToString::to_string),
+        ty: type_info
+            .vars
+            .get(decl)
+            .map(|bounds| dump_type(type_info, bounds.as_type(), options)),
+    }
+}
+
+fn dump_decl(source: &Source, decl: &DeclExpr) -> DumpDecl {
+    DumpDecl {
+        debug: format!("{decl:?}"),
+        kind: decl.kind().to_string(),
+        file_id: decl.file_id().map(|fid| dump_file_id(fid).file_id),
+        range: dump_span_range(source, decl.span()),
+    }
+}
+
+fn dump_type(type_info: &TypeInfo, ty: Ty, options: PackageTyckDumpOptions) -> DumpType {
+    let ty = type_info.simplify(ty, true);
+    DumpType {
+        debug: truncate_dump_string(format!("{ty:#?}"), options.max_type_chars),
+        describe: ty
+            .describe()
+            .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
+        repr: ty
+            .repr()
+            .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
+    }
+}
+
+fn dump_type_mappings(
+    source: &Source,
+    type_info: &TypeInfo,
+    options: PackageTyckDumpOptions,
+) -> Vec<DumpTypeMapping> {
+    let mut mappings = type_info
+        .mapping
+        .iter()
+        .filter_map(|(span, types)| {
+            let range = dump_span_range(source, *span)?;
+            let ty = Ty::from_types(types.clone().into_iter());
+            Some(DumpTypeMapping {
+                range,
+                ty: dump_type(type_info, ty, options),
+            })
+        })
+        .collect::<Vec<_>>();
+    mappings.sort_by(|left, right| {
+        left.range
+            .start
+            .cmp(&right.range.start)
+            .then_with(|| left.range.end.cmp(&right.range.end))
+    });
+    mappings
+}
+
+fn truncate_dump_string(mut text: String, max_chars: Option<usize>) -> String {
+    let Some(max_chars) = max_chars else {
+        return text;
+    };
+    if let Some((byte_idx, _)) = text.char_indices().nth(max_chars) {
+        text.truncate(byte_idx);
+        text.push_str(" ... truncated ...");
+        text.shrink_to_fit();
+    }
+    text
+}
+
+fn dump_span_range(source: &Source, span: Span) -> Option<DumpRange> {
+    if span.id()? != source.id() {
+        return None;
+    }
+
+    let Range { start, end } = source_range(source, span)?;
+    Some(DumpRange { start, end })
+}
+
+fn dump_file_id(fid: FileId) -> DumpFileId {
+    let root = match fid.root() {
+        VirtualRoot::Project => "$project".to_owned(),
+        VirtualRoot::Package(spec) => spec.to_string(),
+    };
+    let path = fid.vpath().get_without_slash().to_owned();
+    let file_id = if matches!(fid.root(), VirtualRoot::Package(_)) {
+        format!("{root}/{}", fid.vpath().get_without_slash())
+    } else {
+        fid.vpath().get_with_slash().to_owned()
+    };
+
+    DumpFileId {
+        file_id,
+        root,
+        path,
+    }
+}
+
+fn scope_name(decl: &DeclExpr) -> String {
+    let name = decl.name().as_ref();
+    if name.is_empty() {
+        format!("{decl:?}")
+    } else {
+        name.to_owned()
+    }
+}
+
+fn variable_cmp(left: &DumpVariable, right: &DumpVariable) -> std::cmp::Ordering {
+    left.declaration
+        .range
+        .as_ref()
+        .map(|range| (range.start, range.end))
+        .cmp(
+            &right
+                .declaration
+                .range
+                .as_ref()
+                .map(|range| (range.start, range.end)),
+        )
+        .then_with(|| left.name.cmp(&right.name))
+        .then_with(|| left.kind.cmp(&right.kind))
 }
 
 /// A filter for packages.
