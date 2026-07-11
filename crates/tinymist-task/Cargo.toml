@@ -14,11 +14,8 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-chrono = { workspace = true, optional = true, features = [
-    "clock",
-    "std",
-    "wasmbind",
-] }
+# Host clock and timezone access stay behind tinymist-world's system/web features.
+chrono = { workspace = true, optional = true, default-features = false }
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true

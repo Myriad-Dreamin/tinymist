@@ -1,7 +1,7 @@
 //! The computation for pdf export.
 
-use chrono::{Datelike, Offset, Timelike};
-use tinymist_world::args::PdfStandard;
+use chrono::{Datelike, Timelike};
+use tinymist_world::{CompilerWorld, WorldDatetime, args::PdfStandard};
 use typst::foundations::Datetime;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
 pub use typst_pdf::pdf;
@@ -19,11 +19,12 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
     type Config = ExportPdfTask;
 
     fn run(
-        _graph: &Arc<WorldComputeGraph<F>>,
+        graph: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<TypstPagedDocument>,
         config: &ExportPdfTask,
     ) -> Result<Bytes> {
-        let options = pdf_options(
+        let options = pdf_options_with_world(
+            graph.world(),
             config.pages.as_deref(),
             &config.pdf_standards,
             config.no_pdf_tags,
@@ -45,18 +46,35 @@ pub fn pdf_options(
     no_pdf_tags: bool,
     creation_timestamp: Option<i64>,
 ) -> Result<PdfOptions> {
-    // Match Typst CLI semantics: explicit timestamps stay in UTC for
-    // reproducible builds, while the default records local wall time and its
-    // UTC offset.
-    let timestamp = match creation_timestamp {
-        Some(timestamp) => {
-            let datetime = chrono::DateTime::from_timestamp(timestamp, 0)
-                .context("timestamp is out of range")?;
-            convert_datetime(datetime).map(Timestamp::new_utc)
-        }
-        None => local_timestamp(chrono::Local::now()),
-    };
+    let timestamp = pdf_timestamp(creation_timestamp, || {
+        Some(WorldDatetime {
+            datetime: tinymist_std::time::to_typst_time(tinymist_std::time::utc_now()),
+            local_offset_minutes: None,
+        })
+    })?;
 
+    build_pdf_options(pages, pdf_standards, no_pdf_tags, timestamp)
+}
+
+/// Creates PDF options using the compiler environment's timezone capabilities.
+pub fn pdf_options_with_world<F: CompilerFeat>(
+    world: &CompilerWorld<F>,
+    pages: Option<&[Pages]>,
+    pdf_standards: &[PdfStandard],
+    no_pdf_tags: bool,
+    creation_timestamp: Option<i64>,
+) -> Result<PdfOptions> {
+    let timestamp = pdf_timestamp(creation_timestamp, || world.current_datetime())?;
+
+    build_pdf_options(pages, pdf_standards, no_pdf_tags, timestamp)
+}
+
+fn build_pdf_options(
+    pages: Option<&[Pages]>,
+    pdf_standards: &[PdfStandard],
+    no_pdf_tags: bool,
+    timestamp: Option<Timestamp>,
+) -> Result<PdfOptions> {
     let standards = PdfStandards::new(
         &pdf_standards
             .iter()
@@ -121,12 +139,28 @@ pub fn pdf_options(
     })
 }
 
-fn local_timestamp<Tz: chrono::TimeZone>(
-    local_datetime: chrono::DateTime<Tz>,
-) -> Option<Timestamp> {
-    let minute_offset = local_datetime.offset().fix().local_minus_utc() / 60;
-    convert_datetime(local_datetime)
-        .and_then(|datetime| Timestamp::new_local(datetime, minute_offset))
+fn pdf_timestamp(
+    creation_timestamp: Option<i64>,
+    current_datetime: impl FnOnce() -> Option<WorldDatetime>,
+) -> Result<Option<Timestamp>> {
+    // Match Typst CLI semantics: explicit timestamps stay in UTC for
+    // reproducible builds, while the default records local wall time and its
+    // UTC offset when the environment provides one.
+    Ok(match creation_timestamp {
+        Some(timestamp) => {
+            let datetime = chrono::DateTime::from_timestamp(timestamp, 0)
+                .context("timestamp is out of range")?;
+            convert_datetime(datetime).map(Timestamp::new_utc)
+        }
+        None => current_datetime().and_then(environment_timestamp),
+    })
+}
+
+fn environment_timestamp(datetime: WorldDatetime) -> Option<Timestamp> {
+    match datetime.local_offset_minutes {
+        Some(offset) => Timestamp::new_local(datetime.datetime, offset),
+        None => Some(Timestamp::new_utc(datetime.datetime)),
+    }
 }
 
 fn convert_datetime<Tz: chrono::TimeZone>(date_time: chrono::DateTime<Tz>) -> Option<Datetime> {
@@ -142,9 +176,14 @@ fn convert_datetime<Tz: chrono::TimeZone>(date_time: chrono::DateTime<Tz>) -> Op
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
-
     use super::*;
+
+    fn world_datetime(local_offset_minutes: Option<i32>) -> WorldDatetime {
+        WorldDatetime {
+            datetime: Datetime::from_ymd_hms(2024, 12, 17, 10, 11, 12).unwrap(),
+            local_offset_minutes,
+        }
+    }
 
     fn export_with_timestamp(timestamp: Timestamp) -> Vec<u8> {
         let document = TypstPagedDocument::new(Default::default(), Default::default());
@@ -178,8 +217,9 @@ mod tests {
 
     #[test]
     fn default_pdf_timestamp_uses_local_timezone() {
-        let options = pdf_options(None, &[], false, None).unwrap();
-        let timestamp = options.timestamp.unwrap();
+        let timestamp = pdf_timestamp(None, || Some(world_datetime(Some(0))))
+            .unwrap()
+            .unwrap();
 
         assert!(
             format!("{timestamp:?}").contains("timezone: Local"),
@@ -189,48 +229,72 @@ mod tests {
 
     #[test]
     fn explicit_pdf_timestamp_uses_utc() {
-        let options = pdf_options(None, &[], false, Some(0)).unwrap();
-        let timestamp = options.timestamp.unwrap();
+        let timestamp = pdf_options(None, &[], false, Some(0))
+            .unwrap()
+            .timestamp
+            .unwrap();
         let pdf = export_with_timestamp(timestamp);
 
         assert_pdf_dates(&pdf, "D:19700101000000Z", "1970-01-01T00:00:00+00:00");
     }
 
     #[test]
+    fn compatibility_pdf_options_default_stays_utc() {
+        let timestamp = pdf_options(None, &[], false, None)
+            .unwrap()
+            .timestamp
+            .unwrap();
+
+        assert!(
+            format!("{timestamp:?}").contains("timezone: UTC"),
+            "the compatibility PDF options should keep using UTC: {timestamp:?}"
+        );
+    }
+
+    #[test]
     fn explicit_timestamp_outside_typst_range_is_omitted() {
         // Chrono accepts this instant, but Typst's datetime ends at year 9999.
-        let options = pdf_options(None, &[], false, Some(253_402_300_800)).unwrap();
+        let timestamp = pdf_timestamp(Some(253_402_300_800), || {
+            panic!("must not read the host clock")
+        })
+        .unwrap();
 
-        assert!(options.timestamp.is_none());
+        assert!(timestamp.is_none());
     }
 
     #[test]
     fn invalid_explicit_timestamp_is_rejected() {
-        let error = pdf_options(None, &[], false, Some(i64::MAX)).unwrap_err();
+        let error =
+            pdf_timestamp(Some(i64::MAX), || panic!("must not read the host clock")).unwrap_err();
 
         assert_eq!(error.to_string(), "timestamp is out of range");
     }
 
     #[test]
+    fn capability_free_pdf_timestamp_uses_utc_fallback() {
+        let timestamp = pdf_timestamp(None, || Some(world_datetime(None)))
+            .unwrap()
+            .unwrap();
+        let pdf = export_with_timestamp(timestamp);
+
+        assert_pdf_dates(&pdf, "D:20241217101112Z", "2024-12-17T10:11:12+00:00");
+    }
+
+    #[test]
     fn local_pdf_timestamp_preserves_wall_time_and_offset() {
-        for (seconds, pdf_date, xmp_date) in [
+        for (offset_minutes, pdf_date, xmp_date) in [
             (
-                5 * 60 * 60 + 30 * 60,
+                5 * 60 + 30,
                 "D:20241217101112+05'30",
                 "2024-12-17T10:11:12+05:30",
             ),
             (
-                -(3 * 60 * 60 + 30 * 60),
+                -(3 * 60 + 30),
                 "D:20241217101112-03'30",
                 "2024-12-17T10:11:12-03:30",
             ),
         ] {
-            let offset = chrono::FixedOffset::east_opt(seconds).unwrap();
-            let local_datetime = offset
-                .with_ymd_and_hms(2024, 12, 17, 10, 11, 12)
-                .single()
-                .unwrap();
-            let timestamp = local_timestamp(local_datetime).unwrap();
+            let timestamp = environment_timestamp(world_datetime(Some(offset_minutes))).unwrap();
             let pdf = export_with_timestamp(timestamp);
 
             assert_pdf_dates(&pdf, pdf_date, xmp_date);

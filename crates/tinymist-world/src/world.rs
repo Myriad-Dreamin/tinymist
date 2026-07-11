@@ -502,6 +502,18 @@ type NowStorage = chrono::DateTime<chrono::Local>;
 #[cfg(not(any(feature = "web", feature = "system")))]
 type NowStorage = tinymist_std::time::UtcDateTime;
 
+/// A datetime supplied by the compiler environment.
+#[derive(Debug, Clone, Copy)]
+pub struct WorldDatetime {
+    /// The wall-clock datetime.
+    pub datetime: Datetime,
+    /// The local offset from UTC in whole minutes.
+    ///
+    /// `None` means that the environment does not provide local timezone
+    /// information and `datetime` is in UTC.
+    pub local_offset_minutes: Option<i32>,
+}
+
 fn duration_offset_seconds(offset: Duration) -> Option<i32> {
     let seconds = offset.seconds().trunc();
     if !seconds.is_finite() || seconds < f64::from(i32::MIN) || seconds > f64::from(i32::MAX) {
@@ -556,6 +568,55 @@ pub struct TaskInputs {
 }
 
 impl<F: CompilerFeat> CompilerWorld<F> {
+    /// Gets the current datetime and its available timezone information.
+    ///
+    /// The value is cached for the lifetime of this compilation. Environments
+    /// without the `system` or `web` capability return the existing UTC
+    /// fallback without accessing a host clock or timezone database.
+    pub fn current_datetime(&self) -> Option<WorldDatetime> {
+        #[cfg(any(feature = "web", feature = "system"))]
+        {
+            use chrono::{Datelike, Timelike};
+
+            let now = self.now.get_or_init(|| {
+                if let Some(timestamp) = self.creation_timestamp {
+                    chrono::DateTime::from_timestamp(timestamp, 0)
+                        .unwrap_or_else(|| tinymist_std::time::now().into())
+                        .into()
+                } else {
+                    tinymist_std::time::now().into()
+                }
+            });
+            Some(WorldDatetime {
+                datetime: Datetime::from_ymd_hms(
+                    now.year(),
+                    now.month().try_into().ok()?,
+                    now.day().try_into().ok()?,
+                    now.hour().try_into().ok()?,
+                    now.minute().try_into().ok()?,
+                    now.second().try_into().ok()?,
+                )?,
+                local_offset_minutes: Some(now.offset().local_minus_utc() / 60),
+            })
+        }
+
+        #[cfg(not(any(feature = "web", feature = "system")))]
+        {
+            let now = self.now.get_or_init(|| {
+                if let Some(timestamp) = self.creation_timestamp {
+                    tinymist_std::time::UtcDateTime::from_unix_timestamp(timestamp)
+                        .unwrap_or_else(|_| tinymist_std::time::now().into())
+                } else {
+                    tinymist_std::time::now().into()
+                }
+            });
+            Some(WorldDatetime {
+                datetime: tinymist_std::time::to_typst_time(*now),
+                local_offset_minutes: None,
+            })
+        }
+    }
+
     /// Creates a new world from the current world with the given inputs.
     pub fn task(&self, mutant: TaskInputs) -> CompilerWorld<F> {
         // Fetch to avoid inconsistent state.
