@@ -1,7 +1,8 @@
 //! The computation for pdf export.
 
 use chrono::{Datelike, Timelike};
-use tinymist_world::{CompilerWorld, WorldDatetime, args::PdfStandard};
+use tinymist_std::time::LocalDatetime;
+use tinymist_world::args::PdfStandard;
 use typst::foundations::Datetime;
 pub use typst_pdf::PdfStandard as TypstPdfStandard;
 pub use typst_pdf::pdf;
@@ -19,12 +20,11 @@ impl<F: CompilerFeat> ExportComputation<F, TypstPagedDocument> for PdfExport {
     type Config = ExportPdfTask;
 
     fn run(
-        graph: &Arc<WorldComputeGraph<F>>,
+        _graph: &Arc<WorldComputeGraph<F>>,
         doc: &Arc<TypstPagedDocument>,
         config: &ExportPdfTask,
     ) -> Result<Bytes> {
-        let options = pdf_options_with_world(
-            graph.world(),
+        let options = pdf_options(
             config.pages.as_deref(),
             &config.pdf_standards,
             config.no_pdf_tags,
@@ -46,35 +46,14 @@ pub fn pdf_options(
     no_pdf_tags: bool,
     creation_timestamp: Option<i64>,
 ) -> Result<PdfOptions> {
-    let timestamp = pdf_timestamp(creation_timestamp, || {
-        Some(WorldDatetime {
-            datetime: tinymist_std::time::to_typst_time(tinymist_std::time::utc_now()),
-            local_offset_minutes: None,
-        })
-    })?;
+    // Match Typst CLI semantics: explicit timestamps stay in UTC for
+    // reproducible builds, while the default records local wall time and its
+    // UTC offset when the environment provides one.
+    let timestamp = match creation_timestamp {
+        Some(timestamp) => explicit_timestamp(timestamp)?,
+        None => tinymist_std::time::local_now().and_then(environment_timestamp),
+    };
 
-    build_pdf_options(pages, pdf_standards, no_pdf_tags, timestamp)
-}
-
-/// Creates PDF options using the compiler environment's timezone capabilities.
-pub fn pdf_options_with_world<F: CompilerFeat>(
-    world: &CompilerWorld<F>,
-    pages: Option<&[Pages]>,
-    pdf_standards: &[PdfStandard],
-    no_pdf_tags: bool,
-    creation_timestamp: Option<i64>,
-) -> Result<PdfOptions> {
-    let timestamp = pdf_timestamp(creation_timestamp, || world.current_datetime())?;
-
-    build_pdf_options(pages, pdf_standards, no_pdf_tags, timestamp)
-}
-
-fn build_pdf_options(
-    pages: Option<&[Pages]>,
-    pdf_standards: &[PdfStandard],
-    no_pdf_tags: bool,
-    timestamp: Option<Timestamp>,
-) -> Result<PdfOptions> {
     let standards = PdfStandards::new(
         &pdf_standards
             .iter()
@@ -139,27 +118,18 @@ fn build_pdf_options(
     })
 }
 
-fn pdf_timestamp(
-    creation_timestamp: Option<i64>,
-    current_datetime: impl FnOnce() -> Option<WorldDatetime>,
-) -> Result<Option<Timestamp>> {
-    // Match Typst CLI semantics: explicit timestamps stay in UTC for
-    // reproducible builds, while the default records local wall time and its
-    // UTC offset when the environment provides one.
-    Ok(match creation_timestamp {
-        Some(timestamp) => {
-            let datetime = chrono::DateTime::from_timestamp(timestamp, 0)
-                .context("timestamp is out of range")?;
-            convert_datetime(datetime).map(Timestamp::new_utc)
-        }
-        None => current_datetime().and_then(environment_timestamp),
-    })
+fn explicit_timestamp(timestamp: i64) -> Result<Option<Timestamp>> {
+    let datetime =
+        chrono::DateTime::from_timestamp(timestamp, 0).context("timestamp is out of range")?;
+    Ok(convert_datetime(datetime).map(Timestamp::new_utc))
 }
 
-fn environment_timestamp(datetime: WorldDatetime) -> Option<Timestamp> {
-    match datetime.local_offset_minutes {
-        Some(offset) => Timestamp::new_local(datetime.datetime, offset),
-        None => Some(Timestamp::new_utc(datetime.datetime)),
+fn environment_timestamp(local_datetime: LocalDatetime) -> Option<Timestamp> {
+    let datetime = Datetime::Datetime(local_datetime.datetime);
+
+    match local_datetime.local_offset_minutes {
+        Some(offset) => Timestamp::new_local(datetime, offset),
+        None => Some(Timestamp::new_utc(datetime)),
     }
 }
 
@@ -178,11 +148,8 @@ fn convert_datetime<Tz: chrono::TimeZone>(date_time: chrono::DateTime<Tz>) -> Op
 mod tests {
     use super::*;
 
-    fn world_datetime(local_offset_minutes: Option<i32>) -> WorldDatetime {
-        WorldDatetime {
-            datetime: Datetime::from_ymd_hms(2024, 12, 17, 10, 11, 12).unwrap(),
-            local_offset_minutes,
-        }
+    fn local_datetime(local_offset_minutes: Option<i32>) -> LocalDatetime {
+        LocalDatetime::from_ymd_hms(2024, 12, 17, 10, 11, 12, local_offset_minutes).unwrap()
     }
 
     fn export_with_timestamp(timestamp: Timestamp) -> Vec<u8> {
@@ -216,10 +183,8 @@ mod tests {
     }
 
     #[test]
-    fn default_pdf_timestamp_uses_local_timezone() {
-        let timestamp = pdf_timestamp(None, || Some(world_datetime(Some(0))))
-            .unwrap()
-            .unwrap();
+    fn environment_timestamp_uses_local_timezone() {
+        let timestamp = environment_timestamp(local_datetime(Some(0))).unwrap();
 
         assert!(
             format!("{timestamp:?}").contains("timezone: Local"),
@@ -239,42 +204,23 @@ mod tests {
     }
 
     #[test]
-    fn compatibility_pdf_options_default_stays_utc() {
-        let timestamp = pdf_options(None, &[], false, None)
-            .unwrap()
-            .timestamp
-            .unwrap();
-
-        assert!(
-            format!("{timestamp:?}").contains("timezone: UTC"),
-            "the compatibility PDF options should keep using UTC: {timestamp:?}"
-        );
-    }
-
-    #[test]
     fn explicit_timestamp_outside_typst_range_is_omitted() {
         // Chrono accepts this instant, but Typst's datetime ends at year 9999.
-        let timestamp = pdf_timestamp(Some(253_402_300_800), || {
-            panic!("must not read the host clock")
-        })
-        .unwrap();
+        let timestamp = explicit_timestamp(253_402_300_800).unwrap();
 
         assert!(timestamp.is_none());
     }
 
     #[test]
     fn invalid_explicit_timestamp_is_rejected() {
-        let error =
-            pdf_timestamp(Some(i64::MAX), || panic!("must not read the host clock")).unwrap_err();
+        let error = explicit_timestamp(i64::MAX).unwrap_err();
 
         assert_eq!(error.to_string(), "timestamp is out of range");
     }
 
     #[test]
     fn capability_free_pdf_timestamp_uses_utc_fallback() {
-        let timestamp = pdf_timestamp(None, || Some(world_datetime(None)))
-            .unwrap()
-            .unwrap();
+        let timestamp = environment_timestamp(local_datetime(None)).unwrap();
         let pdf = export_with_timestamp(timestamp);
 
         assert_pdf_dates(&pdf, "D:20241217101112Z", "2024-12-17T10:11:12+00:00");
@@ -294,7 +240,7 @@ mod tests {
                 "2024-12-17T10:11:12-03:30",
             ),
         ] {
-            let timestamp = environment_timestamp(world_datetime(Some(offset_minutes))).unwrap();
+            let timestamp = environment_timestamp(local_datetime(Some(offset_minutes))).unwrap();
             let pdf = export_with_timestamp(timestamp);
 
             assert_pdf_dates(&pdf, pdf_date, xmp_date);

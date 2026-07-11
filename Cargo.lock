@@ -7157,6 +7157,7 @@ dependencies = [
  "base64 0.22.1",
  "battery",
  "bitvec",
+ "chrono",
  "comemo",
  "core-foundation 0.10.1",
  "dashmap",

@@ -185,22 +185,6 @@ pub fn embedded_font_resolver() -> Arc<FontResolverImpl> {
 mod tests {
     use super::*;
 
-    #[cfg(not(any(feature = "system", feature = "web")))]
-    #[test]
-    fn capability_free_world_datetime_uses_utc_epoch() {
-        let workspace = MockWorkspace::default_builder()
-            .file("main.typ", "Hello")
-            .build();
-        let world = workspace.world("main.typ").build_world().unwrap();
-        let current = world.current_datetime().unwrap();
-
-        assert_eq!(current.local_offset_minutes, None);
-        assert_eq!(
-            current.datetime,
-            typst::foundations::Datetime::from_ymd_hms(1970, 1, 1, 0, 0, 0).unwrap()
-        );
-    }
-
     #[test]
     fn mock_world_reads_follow_up_updates() {
         let workspace = MockWorkspace::default_builder()

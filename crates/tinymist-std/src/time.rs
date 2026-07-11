@@ -13,6 +13,69 @@ pub fn utc_now() -> UtcDateTime {
     now().into()
 }
 
+/// A local datetime and its available timezone information.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct LocalDatetime {
+    /// The local wall-clock datetime.
+    pub datetime: time::PrimitiveDateTime,
+    /// The local offset from UTC in whole minutes.
+    ///
+    /// `None` means that the environment does not provide local timezone
+    /// information and `datetime` is in UTC.
+    pub local_offset_minutes: Option<i32>,
+}
+
+impl LocalDatetime {
+    /// Creates a local datetime from calendar and clock components.
+    pub fn from_ymd_hms(
+        year: i32,
+        month: u8,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        local_offset_minutes: Option<i32>,
+    ) -> Option<Self> {
+        let date =
+            time::Date::from_calendar_date(year, time::Month::try_from(month).ok()?, day).ok()?;
+        let time = time::Time::from_hms(hour, minute, second).ok()?;
+        Some(Self {
+            datetime: time::PrimitiveDateTime::new(date, time),
+            local_offset_minutes,
+        })
+    }
+}
+
+/// Returns the current local datetime when the environment provides it.
+///
+/// Environments without the `system` or `web` capability return the existing
+/// UTC epoch fallback without accessing a host clock or timezone database.
+#[cfg(any(feature = "system", feature = "web"))]
+pub fn local_now() -> Option<LocalDatetime> {
+    use chrono::{Datelike, Timelike};
+
+    let now: chrono::DateTime<chrono::Local> = now().into();
+    LocalDatetime::from_ymd_hms(
+        now.year(),
+        now.month().try_into().ok()?,
+        now.day().try_into().ok()?,
+        now.hour().try_into().ok()?,
+        now.minute().try_into().ok()?,
+        now.second().try_into().ok()?,
+        Some(now.offset().local_minus_utc() / 60),
+    )
+}
+
+/// Returns the UTC fallback in environments without host time capabilities.
+#[cfg(not(any(feature = "system", feature = "web")))]
+pub fn local_now() -> Option<LocalDatetime> {
+    let now = utc_now();
+    Some(LocalDatetime {
+        datetime: time::PrimitiveDateTime::new(now.date(), now.time()),
+        local_offset_minutes: None,
+    })
+}
+
 /// Returns the current system time (UTC+0).
 #[cfg(any(feature = "system", feature = "web"))]
 pub fn now() -> Time {
@@ -70,6 +133,15 @@ pub fn yyyy_mm_dd() -> Vec<::time::format_description::BorrowedFormatItem<'stati
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(not(any(feature = "system", feature = "web")))]
+    #[test]
+    fn local_now_uses_utc_epoch_fallback() {
+        assert_eq!(
+            local_now(),
+            LocalDatetime::from_ymd_hms(1970, 1, 1, 0, 0, 0, None)
+        );
+    }
 
     #[test]
     fn test_yyyy_mm_dd() {

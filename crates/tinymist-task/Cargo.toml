@@ -14,7 +14,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
-# Host clock and timezone access stay behind tinymist-world's system/web features.
+# Only used for calendar conversion; host clock and timezone access live in tinymist-std.
 chrono = { workspace = true, optional = true, default-features = false }
 clap.workspace = true
 comemo.workspace = true

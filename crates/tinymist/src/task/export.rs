@@ -21,7 +21,7 @@ use tinymist_std::fs::paths::write_atomic;
 use tinymist_std::path::PathClean;
 use tinymist_std::typst::TypstDocument;
 use tinymist_task::{
-    output_template, pdf_options_with_world, DocumentQuery, ExportBundleTask, ExportMarkdownTask,
+    output_template, pdf_options, DocumentQuery, ExportBundleTask, ExportMarkdownTask,
     ExportPngTask, ExportSvgTask, ExportTarget, ImageOutput, PathPattern, PdfExport, PngExport,
     SvgExport, TextExport,
 };
@@ -776,8 +776,7 @@ fn export_bundle_artifact(
 
     let options = BundleOptions {
         html: typst_html::HtmlOptions::default(),
-        pdf: pdf_options_with_world(
-            graph.world(),
+        pdf: pdf_options(
             config.pages.as_deref(),
             &config.pdf_standards,
             config.no_pdf_tags,

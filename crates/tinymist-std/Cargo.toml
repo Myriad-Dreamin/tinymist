@@ -15,6 +15,10 @@ anyhow.workspace = true
 base64.workspace = true
 battery = { workspace = true, optional = true }
 bitvec.workspace = true
+chrono = { workspace = true, optional = true, default-features = false, features = [
+    "clock",
+    "std",
+] }
 comemo.workspace = true
 dashmap.workspace = true
 ecow = { workspace = true, features = ["serde"] }
@@ -79,8 +83,8 @@ rkyv = ["rkyv/alloc", "rkyv/archive_le"]
 rkyv-validation = ["rkyv/validation"]
 
 __web = ["wasm-bindgen", "js-sys", "web-time"]
-web = ["__web"]
-system = ["tempfile", "same-file"]
+web = ["__web", "dep:chrono", "chrono/wasmbind"]
+system = ["tempfile", "same-file", "dep:chrono"]
 battery = ["dep:battery"]
 bi-hash = []
 
