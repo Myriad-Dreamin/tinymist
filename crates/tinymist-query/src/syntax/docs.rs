@@ -162,7 +162,7 @@ impl DocsChecker<'_> {
             terms.push(ty);
         }
 
-        Some(Ty::from_types(terms.into_iter()))
+        (!terms.is_empty()).then(|| Ty::from_types(terms.into_iter()))
     }
 
     fn check_type_ident(&mut self, m: &Module, name: &str) -> Option<Ty> {
@@ -217,6 +217,11 @@ impl DocsChecker<'_> {
                 ("boolean", Ty::Boolean(None)),
                 ("false", Ty::Boolean(Some(false))),
                 ("true", Ty::Boolean(Some(true))),
+                ("stroke", Ty::Builtin(BuiltinTy::Stroke)),
+                ("margin", Ty::Builtin(BuiltinTy::Margin)),
+                ("inset", Ty::Builtin(BuiltinTy::Inset)),
+                ("outset", Ty::Builtin(BuiltinTy::Outset)),
+                ("radius", Ty::Builtin(BuiltinTy::Radius)),
             ];
             HashMap::from_iter(shorts.chain(longs).chain(builtins))
         });

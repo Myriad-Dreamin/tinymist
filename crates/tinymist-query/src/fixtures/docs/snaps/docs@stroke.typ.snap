@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: "snap.join(\"\\n\")"
+input_file: crates/tinymist-query/src/fixtures/docs/stroke.typ
+---
+= docstings
+Func(f)@54..55 in /s0.typ -> DocString { docs: Some(""), var_bounds: {}, vars: {"value": VarDoc { docs: "A documented stroke value.", ty: Some(Stroke) }}, res_ty: None }

@@ -24,6 +24,7 @@ The new pipeline should make bytecode evaluation the deduce stage. Checking beco
 - Keep checking logic as VM primitives or post-evaluation checks rather than duplicating expression traversal.
 - Make `precise_sig_of_def` force the relevant closure result through the VM and quote the final signature.
 - Represent cycles as neutral residuals, not as blocking waits or immediate `Any`.
+- Resolve documentation annotations through existing flow semantic types before applying them as input contracts. A wholly unresolved annotation contributes no bound instead of a synthetic `Any` bound.
 - Keep old checker paths behind tests during migration only if needed for diff analysis, not as a permanent dual implementation.
 
 ## Risks / Trade-offs
