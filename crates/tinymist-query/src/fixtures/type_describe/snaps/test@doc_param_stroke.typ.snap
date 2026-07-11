@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+description: "Check on \"f\" (101)"
+expression: post_ty
+input_file: crates/tinymist-query/src/fixtures/type_describe/doc_param_stroke.typ
+---
+(value: none | stroke) => none | stroke
