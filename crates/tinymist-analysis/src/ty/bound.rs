@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use typst::foundations::{self, Func};
 
+use crate::syntax::DeclExpr;
 use crate::ty::prelude::*;
 
 /// A trait for checking the bounds of a type.
@@ -10,18 +11,14 @@ pub trait BoundChecker: Sized + TyCtx {
     fn collect(&mut self, ty: &Ty, pol: bool);
 
     /// Checks the bounds of a variable.
-    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
-        self.check_var_rec(u, pol);
+    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool, ctx: &mut BoundCheckContext) {
+        ctx.check_var_rec(u, pol, self);
     }
 
     /// Checks the bounds of a variable recursively.
     fn check_var_rec(&mut self, u: &Interned<TypeVar>, pol: bool) {
-        let Some(w) = self.global_bounds(u, pol) else {
-            return;
-        };
-        let mut ctx = BoundCheckContext;
-        ctx.tys(w.ubs.iter(), pol, self);
-        ctx.tys(w.lbs.iter(), !pol, self);
+        let mut ctx = BoundCheckContext::default();
+        ctx.check_var_rec(u, pol, self);
     }
 }
 
@@ -147,14 +144,26 @@ impl Ty {
 
     /// Profiles the bounds of the given type.
     pub fn bounds(&self, pol: bool, checker: &mut impl BoundChecker) {
-        BoundCheckContext.ty(self, pol, checker);
+        let mut ctx = BoundCheckContext::default();
+        ctx.ty(self, pol, checker);
     }
 }
 
 /// A context for checking the bounds of a type.
-pub struct BoundCheckContext;
+#[derive(Default)]
+pub struct BoundCheckContext {
+    visiting: FxHashSet<(DeclExpr, bool)>,
+    steps: usize,
+}
 
 impl BoundCheckContext {
+    const STEP_BUDGET: usize = 100_000;
+
+    fn enter(&mut self) -> bool {
+        self.steps += 1;
+        self.steps <= Self::STEP_BUDGET
+    }
+
     /// Checks the bounds of multiple types.
     fn tys<'a>(&mut self, tys: impl Iterator<Item = &'a Ty>, pol: bool, c: &mut impl BoundChecker) {
         for ty in tys {
@@ -162,8 +171,36 @@ impl BoundCheckContext {
         }
     }
 
+    /// Recursively checks a variable while preserving this traversal's cycle guard.
+    pub fn check_var_rec(
+        &mut self,
+        u: &Interned<TypeVar>,
+        pol: bool,
+        checker: &mut impl BoundChecker,
+    ) {
+        if !self.enter() {
+            return;
+        }
+
+        let key = (u.def.clone(), pol);
+        if !self.visiting.insert(key.clone()) {
+            return;
+        }
+
+        if let Some(w) = checker.global_bounds(u, pol) {
+            self.tys(w.ubs.iter(), pol, checker);
+            self.tys(w.lbs.iter(), !pol, checker);
+        }
+
+        self.visiting.remove(&key);
+    }
+
     /// Checks the bounds of a type.
     fn ty(&mut self, ty: &Ty, pol: bool, checker: &mut impl BoundChecker) {
+        if !self.enter() {
+            return;
+        }
+
         match ty {
             Ty::Union(u) => {
                 self.tys(u.iter(), pol, checker);
@@ -172,7 +209,7 @@ impl BoundCheckContext {
                 self.tys(u.ubs.iter(), pol, checker);
                 self.tys(u.lbs.iter(), !pol, checker);
             }
-            Ty::Var(u) => checker.check_var(u, pol),
+            Ty::Var(u) => checker.check_var(u, pol, self),
             // todo: calculate these operators
             // Ty::Select(_) => {}
             // Ty::Unary(_) => {}
@@ -180,5 +217,60 @@ impl BoundCheckContext {
             // Ty::If(_) => {}
             ty => checker.collect(ty, pol),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::syntax::Decl;
+
+    struct HookChecker {
+        bounds: FxHashMap<DeclExpr, DynTypeBounds>,
+        hooks: Vec<DeclExpr>,
+    }
+
+    impl TyCtx for HookChecker {
+        fn local_bind_of(&self, _var: &Interned<TypeVar>) -> Option<Ty> {
+            None
+        }
+
+        fn global_bounds(&self, var: &Interned<TypeVar>, _pol: bool) -> Option<DynTypeBounds> {
+            self.bounds.get(&var.def).cloned()
+        }
+    }
+
+    impl BoundChecker for HookChecker {
+        fn collect(&mut self, _ty: &Ty, _pol: bool) {}
+
+        fn check_var(&mut self, var: &Interned<TypeVar>, pol: bool, ctx: &mut BoundCheckContext) {
+            self.hooks.push(var.def.clone());
+            ctx.check_var_rec(var, pol, self);
+        }
+    }
+
+    #[test]
+    fn custom_var_hook_preserves_cycle_guard() {
+        let a = TypeVar::new("a".into(), Decl::lit("a").into());
+        let b = TypeVar::new("b".into(), Decl::lit("b").into());
+
+        let mut a_bounds = DynTypeBounds::default();
+        a_bounds.ubs.insert_mut(Ty::Var(b.clone()));
+        let mut b_bounds = DynTypeBounds::default();
+        b_bounds.ubs.insert_mut(Ty::Var(a.clone()));
+
+        let mut checker = HookChecker {
+            bounds: [(a.def.clone(), a_bounds), (b.def.clone(), b_bounds)]
+                .into_iter()
+                .collect(),
+            hooks: vec![],
+        };
+
+        Ty::Var(a.clone()).bounds(true, &mut checker);
+
+        assert_eq!(
+            checker.hooks,
+            vec![a.def.clone(), b.def.clone(), a.def.clone()]
+        );
     }
 }

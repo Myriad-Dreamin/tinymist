@@ -12,8 +12,8 @@ use crate::analysis::PostTypeChecker;
 use crate::docs::{DocText, UntypedDefDocs, UntypedSignatureDocs, UntypedVarDocs};
 use crate::syntax::{DeclExpr, classify_def_loosely};
 use crate::ty::{
-    BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigTy, SigWithTy, TyCtx, TyCtxMut,
-    TypeInfo, TypeVar,
+    BoundCheckContext, BoundChecker, DocSource, DynTypeBounds, ParamAttrs, ParamTy, SigTy,
+    SigWithTy, TyCtx, TyCtxMut, TypeInfo, TypeVar,
 };
 
 pub use tinymist_analysis::{PrimarySignature, Signature};
@@ -333,14 +333,14 @@ struct AliasStackChecker<'a, 'b> {
 }
 
 impl BoundChecker for AliasStackChecker<'_, '_> {
-    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool) {
+    fn check_var(&mut self, u: &Interned<TypeVar>, pol: bool, ctx: &mut BoundCheckContext) {
         crate::log_debug_ct!("collecting var {u:?} {pol:?}");
         if self.res.is_some() {
             return;
         }
 
         if self.checking_with {
-            self.check_var_rec(u, pol);
+            ctx.check_var_rec(u, pol, self);
             return;
         }
 
@@ -355,7 +355,7 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
             Some(UntypedDefDocs::Variable(docs)) => {
                 self.checking_with = true;
                 self.stack.push((docs, None));
-                self.check_var_rec(u, pol);
+                ctx.check_var_rec(u, pol, self);
                 self.stack.pop();
                 self.checking_with = false;
             }
@@ -380,7 +380,8 @@ impl BoundChecker for AliasStackChecker<'_, '_> {
                 if let Some(src) = ty.as_source() {
                     match src {
                         DocSource::Var(u) => {
-                            self.check_var(&u, pol);
+                            let mut ctx = BoundCheckContext::default();
+                            self.check_var(&u, pol, &mut ctx);
                         }
                         src @ (DocSource::Builtin(..) | DocSource::Ins(..)) => {
                             if let Some(func) = src.as_func() {
