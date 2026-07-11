@@ -14,6 +14,11 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+chrono = { workspace = true, optional = true, features = [
+    "clock",
+    "std",
+    "wasmbind",
+] }
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
@@ -47,7 +52,7 @@ typst-svg.workspace = true
 default = ["pdf", "text"]
 no-content-hint = []
 
-pdf = []
+pdf = ["dep:chrono"]
 text = []
 
 [lints]

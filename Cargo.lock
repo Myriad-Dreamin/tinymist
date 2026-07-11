@@ -7194,6 +7194,7 @@ name = "tinymist-task"
 version = "0.15.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "comemo",
  "dirs",
