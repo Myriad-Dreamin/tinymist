@@ -14,6 +14,8 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+# Only used for calendar conversion; host clock and timezone access live in tinymist-std.
+chrono = { workspace = true, optional = true, default-features = false }
 clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
@@ -47,7 +49,7 @@ typst-svg.workspace = true
 default = ["pdf", "text"]
 no-content-hint = []
 
-pdf = []
+pdf = ["dep:chrono"]
 text = []
 
 [lints]

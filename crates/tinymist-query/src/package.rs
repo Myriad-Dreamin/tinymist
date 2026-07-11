@@ -337,7 +337,7 @@ fn dump_file_scope(
         kind: "file",
         name: file.path.clone(),
         declaration: None,
-        variables: dump_scope_variables(source, type_info, exports, "export", true, options),
+        variables: dump_scope_variables(source, type_info, exports, "export", options),
     };
 
     let mut scopes = vec![file_scope];
@@ -358,7 +358,6 @@ fn dump_scope_variables(
     type_info: &TypeInfo,
     scope: &LexicalScope,
     var_source: &'static str,
-    exported: bool,
     options: PackageTyckDumpOptions,
 ) -> Vec<DumpVariable> {
     let mut vars = scope
@@ -372,7 +371,6 @@ fn dump_scope_variables(
                 decl,
                 Some(expr),
                 var_source,
-                exported,
                 options,
             ))
         })
@@ -485,7 +483,6 @@ fn collect_pattern_sig_variables(
             decl,
             None,
             var_source,
-            false,
             options,
         ));
         collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
@@ -498,7 +495,6 @@ fn collect_pattern_sig_variables(
             decl,
             None,
             var_source,
-            false,
             options,
         ));
         collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
@@ -523,7 +519,6 @@ fn collect_pattern_variables(
                 decl,
                 None,
                 var_source,
-                false,
                 options,
             ));
         }
@@ -667,14 +662,13 @@ fn dump_variable(
     decl: &DeclExpr,
     expr: Option<&Expr>,
     var_source: &'static str,
-    exported: bool,
     options: PackageTyckDumpOptions,
 ) -> DumpVariable {
     DumpVariable {
         name: name.to_owned(),
         kind: decl.kind().to_string(),
         source: var_source,
-        exported,
+        exported: var_source == "export",
         declaration: dump_decl(source, decl),
         expression: expr.map(ToString::to_string),
         ty: type_info
