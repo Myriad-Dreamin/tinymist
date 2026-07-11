@@ -9,6 +9,7 @@
 - [ ] 2.1 Replace deferred function body vectors with closure state in the VM path.
 - [ ] 2.2 Force non-running closures on demand at call sites.
 - [ ] 2.3 Residualize recursive or blocked calls as neutral values.
+- [x] 2.4 Preserve parameter-dependent resultants across file boundaries without importing callee-local variables.
 
 ## 3. Checking Semantics
 

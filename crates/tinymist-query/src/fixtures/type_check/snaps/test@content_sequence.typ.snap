@@ -4,15 +4,15 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/content_sequence.typ
 ---
 "joined-context" = () => TypeUnary { lhs: Undef, op: Context }
-"mixed-context" = (Any) => TypeUnary { lhs: Any, op: Context }
+"mixed-context" = (@x) => TypeUnary { lhs: @x, op: Context }
 "x" = Any
-"return-or-content" = (Any) => TypeUnary { lhs: Undef, op: Context }
+"return-or-content" = (@cond) => TypeUnary { lhs: Content(text), op: Context }
 "cond" = Any
-"repeated-content-loops" = (Any) => None
+"repeated-content-loops" = (@items) => Any
 "items" = Any
 "item" = Any
 "item" = Any
-"conditional-content-loop" = (Any, Any) => IfTy { cond: Any, then: None, else_: Content(text) }
+"conditional-content-loop" = (@items, @cond) => IfTy { cond: @cond, then: Any, else_: Content(text) }
 "items" = Any
 "cond" = Any
 "item" = Any

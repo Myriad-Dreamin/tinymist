@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/doc_param_annotation_survives_infer.typ
 ---
-"hook" = (Any) => {"name": Any, "type": "hook"}
+"hook" = (@name) => {"name": @name, "type": "hook"}
 "name" = Type(str)
 "hook-value" = {"name": "h", "type": "hook"}
 =====

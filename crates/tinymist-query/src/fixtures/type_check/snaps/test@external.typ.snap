@@ -4,8 +4,9 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
 ---
 "base" = Any
-"bad-instantiate" = Any
-"prefix" = (("title": Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
+"bad-instantiate" = (@x) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (@x, None), op: Add }, None), op: Add }, None), op: Add }
+"x" = Any
+"prefix" = (("title": @title) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (@title, None), op: Add }, None), op: Add }, None), op: Add }).with(..("title": None) => any)
 "title" = None
 =====
 0..0 -> @bad-instantiate
@@ -13,5 +14,5 @@ input_file: crates/tinymist-query/src/fixtures/type_check/external.typ
 27..33 -> @prefix
 34..39 -> @title
 53..68 -> @bad-instantiate
-53..75 -> TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, None), op: Add }, None), op: Add }, None), op: Add }
+53..75 -> TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (@title, None), op: Add }, None), op: Add }, None), op: Add }
 69..74 -> @title

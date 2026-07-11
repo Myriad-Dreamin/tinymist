@@ -13,6 +13,11 @@ pub enum Iface<'a> {
     Tuple(&'a Interned<Vec<Ty>>),
     /// A dictionary type.
     Dict(&'a Interned<RecordTy>),
+    /// An arguments type.
+    Args {
+        /// The original type.
+        at: &'a Ty,
+    },
     /// A content type.
     Content {
         /// The element type.
@@ -71,7 +76,8 @@ impl Iface<'_> {
             Iface::Array(ty) => Ty::Array(ty.clone()),
             Iface::Tuple(tys) => Ty::Tuple(tys.clone()),
             Iface::Dict(dict) => Ty::Dict(dict.clone()),
-            Iface::Content { at, .. }
+            Iface::Args { at }
+            | Iface::Content { at, .. }
             | Iface::TypeType { at, .. }
             | Iface::Type { at, .. }
             | Iface::Func { at, .. }
@@ -90,6 +96,12 @@ impl Iface<'_> {
                 select_scope(Some(Type::of::<typst::foundations::Array>().scope()), key)
             }
             Iface::Dict(dict) => dict.field_by_name(key).cloned(),
+            Iface::Args { at } => {
+                if BuiltinSig::arguments_method(at, key).is_some() {
+                    return None;
+                }
+                select_scope(Some(Type::of::<typst::foundations::Args>().scope()), key)
+            }
             Iface::Content { val, .. } => select_scope(Some(val.scope()), key),
             // todo: distinguish TypeType and Type
             Iface::TypeType { val, .. } | Iface::Type { val, .. } => {
@@ -200,6 +212,9 @@ impl IfaceCheckDriver<'_> {
                 self.checker
                     .check(Iface::Dict(&FLOW_TEXT_FONT_DICT), &mut self.ctx, pol);
             }
+            Ty::Builtin(BuiltinTy::Args) => {
+                self.checker.check(Iface::Args { at }, &mut self.ctx, pol);
+            }
             Ty::Value(ins_ty) => {
                 // todo: deduplicate checking early
                 if self.value_as_iface() {
@@ -219,6 +234,9 @@ impl IfaceCheckDriver<'_> {
                         Value::Func(func) => {
                             self.checker
                                 .check(Iface::Func { val: func, at }, &mut self.ctx, pol);
+                        }
+                        Value::Args(..) => {
+                            self.checker.check(Iface::Args { at }, &mut self.ctx, pol);
                         }
                         Value::None
                         | Value::Auto
@@ -244,7 +262,6 @@ impl IfaceCheckDriver<'_> {
                         | Value::Content(..)
                         | Value::Styles(..)
                         | Value::Array(..)
-                        | Value::Args(..)
                         | Value::Dyn(..) => {
                             self.checker.check(
                                 Iface::Type {
@@ -309,6 +326,9 @@ impl IfaceCheckDriver<'_> {
             Ty::Array(sig) if self.array_as_iface() => {
                 // self.check_dict_signature(sig, pol, self.checker);
                 self.checker.check(Iface::Array(sig), &mut self.ctx, pol);
+            }
+            Ty::Args(..) => {
+                self.checker.check(Iface::Args { at }, &mut self.ctx, pol);
             }
             Ty::Dict(..) => {
                 self.checker.check(

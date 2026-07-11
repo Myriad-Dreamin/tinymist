@@ -1,0 +1,105 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/local_call_input_contract.typ
+---
+"value" = Auto
+"values" = ( ⪰ None | (1, 2, ))
+"value" = ( ⪰ None | Type(str))
+"value" = ( ⪰ None | Type(str) | (1, ))
+"make-array" = (@value) => Type(array)
+"value" = Type(int)
+"consume-array" = (@values) => @values
+"values" = Type(array)
+"use-array" = (@value) => Type(array)
+"value" = Type(int)
+"consume-overwrite" = (@values) => @values
+"values" = Type(array)
+"normalize" = (("value": @value) => Type(array)).with(..("value": Auto) => any)
+"value" = Type(array)
+"consume-before-overwrite" = (@values) => None
+"values" = None
+"overwrite-callee" = (@value) => 1
+"value" = 1
+"overwrite-tuple-callee" = (@value) => 2
+"value" = 2
+"seeded-tuple" = 2
+"call-before-refine" = () => 1
+"value" = "called"
+"result" = 1
+"result" = Type(array)
+"normalized" = Type(array)
+"consumed" = None
+"refined" = 1
+=====
+5..15 -> @make-array
+16..21 -> @value
+25..30 -> Func(range)
+25..37 -> Type(array)
+31..36 -> @value
+43..56 -> @consume-array
+57..63 -> @values
+67..73 -> @values
+79..88 -> @use-array
+89..94 -> @value
+98..111 -> @consume-array
+98..130 -> Type(array)
+112..122 -> @make-array
+112..129 -> Type(array)
+123..128 -> @value
+137..154 -> @consume-overwrite
+155..161 -> @values
+165..171 -> @values
+177..186 -> @normalize
+187..192 -> @value
+206..211 -> @value
+214..224 -> @make-array
+214..227 -> Type(array)
+230..247 -> @consume-overwrite
+230..254 -> @value
+248..253 -> @value
+263..287 -> @consume-before-overwrite
+288..294 -> @values
+305..311 -> @values
+331..337 -> @values
+331..340 -> @v"values".at
+331..343 -> Any
+350..356 -> @values
+366..372 -> @values
+381..397 -> @overwrite-callee
+398..403 -> @value
+414..419 -> @value
+439..444 -> @value
+451..456 -> @value
+465..487 -> @overwrite-tuple-callee
+488..493 -> @value
+504..509 -> @value
+529..534 -> @value
+541..546 -> @value
+555..567 -> @seeded-tuple
+570..592 -> @overwrite-tuple-callee
+570..598 -> 2
+593..597 -> (1, )
+605..623 -> @call-before-refine
+636..641 -> @value
+659..665 -> @result
+668..684 -> @overwrite-callee
+668..691 -> 1
+685..690 -> @value
+694..716 -> @overwrite-tuple-callee
+694..723 -> 2
+717..722 -> @value
+726..732 -> @result
+741..747 -> @result
+750..759 -> @use-array
+750..762 -> Type(array)
+768..778 -> @normalized
+781..790 -> @normalize
+781..792 -> Type(array)
+798..806 -> @consumed
+809..833 -> @consume-before-overwrite
+809..841 -> None
+834..840 -> (1, 2, )
+847..854 -> @refined
+857..875 -> @call-before-refine
+857..877 -> 1

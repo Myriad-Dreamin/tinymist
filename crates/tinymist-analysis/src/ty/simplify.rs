@@ -2,6 +2,7 @@
 
 use ecow::EcoVec;
 
+use crate::syntax::UnaryOp;
 use crate::{syntax::DeclExpr, ty::prelude::*};
 
 /// A compact type.
@@ -15,11 +16,56 @@ struct CompactTy {
     is_final: bool,
 }
 
+fn collect_input_type_vars(ty: &Ty, vars: &mut FxHashSet<DeclExpr>) {
+    match ty {
+        Ty::Var(var) => {
+            vars.insert(var.def.clone());
+        }
+        Ty::Func(_) | Ty::With(_) => {}
+        Ty::Param(param) => collect_input_type_vars(&param.ty, vars),
+        Ty::Union(types) | Ty::Tuple(types) => {
+            for ty in types.iter() {
+                collect_input_type_vars(ty, vars);
+            }
+        }
+        Ty::Let(bounds) => {
+            for ty in bounds.lbs.iter().chain(&bounds.ubs) {
+                collect_input_type_vars(ty, vars);
+            }
+        }
+        Ty::Dict(record) => {
+            for ty in record.types.iter() {
+                collect_input_type_vars(ty, vars);
+            }
+        }
+        Ty::Array(elem) => collect_input_type_vars(elem, vars),
+        Ty::Args(sig) | Ty::Pattern(sig) => {
+            for input in sig.inputs() {
+                collect_input_type_vars(input, vars);
+            }
+        }
+        Ty::Select(select) => collect_input_type_vars(&select.ty, vars),
+        Ty::Unary(unary) => collect_input_type_vars(&unary.lhs, vars),
+        Ty::Binary(binary) => {
+            let [lhs, rhs] = binary.operands();
+            collect_input_type_vars(lhs, vars);
+            collect_input_type_vars(rhs, vars);
+        }
+        Ty::If(if_ty) => {
+            collect_input_type_vars(&if_ty.cond, vars);
+            collect_input_type_vars(&if_ty.then, vars);
+            collect_input_type_vars(&if_ty.else_, vars);
+        }
+        Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
+    }
+}
+
 impl TypeInfo {
     /// Simplifies (canonicalizes) the given type with the given type scheme.
     pub fn simplify(&self, ty: Ty, principal: bool) -> Ty {
         let mut cache = self.cano_cache.lock();
         let cache = &mut *cache;
+        let mut signature_binders = FxHashSet::default();
 
         cache.transform_cache.clear();
         cache.cano_local_cache.clear();
@@ -37,7 +83,7 @@ impl TypeInfo {
             negatives: &mut cache.negatives,
         };
 
-        worker.simplify(ty, principal)
+        worker.simplify(ty, principal, &mut signature_binders)
     }
 }
 
@@ -56,112 +102,133 @@ struct TypeSimplifier<'a, 'b> {
 
 impl TypeSimplifier<'_, '_> {
     /// Simplifies the given type.
-    fn simplify(&mut self, ty: Ty, principal: bool) -> Ty {
+    fn simplify(
+        &mut self,
+        ty: Ty,
+        principal: bool,
+        signature_binders: &mut FxHashSet<DeclExpr>,
+    ) -> Ty {
         if let Some(cano) = self.cano_cache.get(&(ty.clone(), principal)) {
             return cano.clone();
         }
 
-        self.analyze(&ty, true);
-        let cano = self.transform(&ty, true);
+        self.analyze(&ty, true, signature_binders);
+        let cano = self.transform(&ty, true, signature_binders);
         self.cano_cache.insert((ty, principal), cano.clone());
         cano
     }
 
     /// Analyzes the given type.
-    fn analyze(&mut self, ty: &Ty, pol: bool) {
+    fn analyze(&mut self, ty: &Ty, pol: bool, signature_binders: &mut FxHashSet<DeclExpr>) {
         match ty {
             Ty::Var(var) => {
-                let w = self.vars.get(&var.def).unwrap();
+                if self.principal && signature_binders.contains(&var.def) {
+                    return;
+                }
+                let Some(w) = self.vars.get(&var.def) else {
+                    return;
+                };
+
+                let inserted = if pol {
+                    self.positives.insert(var.def.clone())
+                } else {
+                    self.negatives.insert(var.def.clone())
+                };
+                if !inserted {
+                    return;
+                }
+
                 match &w.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let bounds = w.read();
-                        let inserted = if pol {
-                            self.positives.insert(var.def.clone())
-                        } else {
-                            self.negatives.insert(var.def.clone())
-                        };
-                        if !inserted {
-                            return;
-                        }
-
                         if pol {
                             for lb in bounds.lbs.iter() {
-                                self.analyze(lb, pol);
+                                self.analyze(lb, pol, signature_binders);
                             }
                         } else {
                             for ub in bounds.ubs.iter() {
-                                self.analyze(ub, pol);
+                                self.analyze(ub, pol, signature_binders);
                             }
                         }
                     }
                 }
             }
             Ty::Func(func) => {
+                if self.principal {
+                    for input in func.inputs() {
+                        collect_input_type_vars(input, signature_binders);
+                    }
+                }
                 for input_ty in func.inputs() {
-                    self.analyze(input_ty, !pol);
+                    self.analyze(input_ty, !pol, signature_binders);
                 }
                 if let Some(ret_ty) = &func.body {
-                    self.analyze(ret_ty, pol);
+                    self.analyze(ret_ty, pol, signature_binders);
                 }
             }
             Ty::Dict(record) => {
                 for member in record.types.iter() {
-                    self.analyze(member, pol);
+                    self.analyze(member, pol, signature_binders);
                 }
             }
             Ty::Tuple(elems) => {
                 for elem in elems.iter() {
-                    self.analyze(elem, pol);
+                    self.analyze(elem, pol, signature_binders);
                 }
             }
             Ty::Array(arr) => {
-                self.analyze(arr, pol);
+                self.analyze(arr, pol, signature_binders);
             }
             Ty::With(with) => {
-                self.analyze(&with.sig, pol);
+                self.analyze(&with.sig, pol, signature_binders);
                 for input in with.with.inputs() {
-                    self.analyze(input, pol);
+                    self.analyze(input, pol, signature_binders);
                 }
             }
             Ty::Args(args) => {
                 for input in args.inputs() {
-                    self.analyze(input, pol);
+                    self.analyze(input, pol, signature_binders);
                 }
             }
             Ty::Pattern(pat) => {
+                if self.principal {
+                    for input in pat.inputs() {
+                        collect_input_type_vars(input, signature_binders);
+                    }
+                }
                 for input in pat.inputs() {
-                    self.analyze(input, pol);
+                    self.analyze(input, pol, signature_binders);
                 }
             }
-            Ty::Unary(unary) => self.analyze(&unary.lhs, pol),
+            Ty::Unary(unary) => self.analyze(&unary.lhs, pol, signature_binders),
             Ty::Binary(binary) => {
                 let [lhs, rhs] = binary.operands();
-                self.analyze(lhs, pol);
-                self.analyze(rhs, pol);
+                self.analyze(lhs, pol, signature_binders);
+                self.analyze(rhs, pol, signature_binders);
             }
             Ty::If(if_expr) => {
-                self.analyze(&if_expr.cond, pol);
-                self.analyze(&if_expr.then, pol);
-                self.analyze(&if_expr.else_, pol);
+                self.analyze(&if_expr.cond, pol, signature_binders);
+                self.analyze(&if_expr.then, pol, signature_binders);
+                self.analyze(&if_expr.else_, pol, signature_binders);
             }
             Ty::Union(types) => {
                 for ty in types.iter() {
-                    self.analyze(ty, pol);
+                    self.analyze(ty, pol, signature_binders);
                 }
             }
             Ty::Select(select) => {
-                self.analyze(&select.ty, pol);
+                self.analyze(&select.ty, pol, signature_binders);
             }
             Ty::Let(bounds) => {
                 for lb in bounds.lbs.iter() {
-                    self.analyze(lb, !pol);
+                    self.analyze(lb, !pol, signature_binders);
                 }
                 for ub in bounds.ubs.iter() {
-                    self.analyze(ub, pol);
+                    self.analyze(ub, pol, signature_binders);
                 }
             }
             Ty::Param(param) => {
-                self.analyze(&param.ty, pol);
+                self.analyze(&param.ty, pol, signature_binders);
             }
             Ty::Value(_v) => {}
             Ty::Any => {}
@@ -171,14 +238,27 @@ impl TypeSimplifier<'_, '_> {
     }
 
     /// Transforms the given type.
-    fn transform(&mut self, ty: &Ty, pol: bool) -> Ty {
-        if let Some(cano) = self.transform_cache.get(&(ty.clone(), pol)) {
+    fn transform(&mut self, ty: &Ty, pol: bool, signature_binders: &FxHashSet<DeclExpr>) -> Ty {
+        let cache_key = (ty.clone(), pol);
+        if let Some(cano) = self.transform_cache.get(&cache_key) {
             return cano.clone();
         }
 
         let cano = match ty {
-            Ty::Let(bounds) => self.transform_let(bounds.lbs.iter(), bounds.ubs.iter(), None, pol),
+            Ty::Let(bounds) => self.transform_let(
+                bounds.lbs.iter(),
+                bounds.ubs.iter(),
+                None,
+                pol,
+                signature_binders,
+            ),
             Ty::Var(var) => {
+                if self.principal && signature_binders.contains(&var.def) {
+                    return Ty::Var(var.clone());
+                }
+                let Some(bounds) = self.vars.get(&var.def) else {
+                    return Ty::Var(var.clone());
+                };
                 if let Some(cano) = self
                     .cano_local_cache
                     .get(&(var.def.clone(), self.principal))
@@ -189,11 +269,17 @@ impl TypeSimplifier<'_, '_> {
                 self.cano_local_cache
                     .insert((var.def.clone(), self.principal), Ty::Any);
 
-                let res = match &self.vars.get(&var.def).unwrap().bounds {
+                let res = match &bounds.bounds {
                     FlowVarKind::Strong(w) | FlowVarKind::Weak(w) => {
                         let w = w.read();
 
-                        self.transform_let(w.lbs.iter(), w.ubs.iter(), Some(&var.def), pol)
+                        self.transform_let(
+                            w.lbs.iter(),
+                            w.ubs.iter(),
+                            Some(&var.def),
+                            pol,
+                            signature_binders,
+                        )
                     }
                 };
 
@@ -202,56 +288,56 @@ impl TypeSimplifier<'_, '_> {
 
                 res
             }
-            Ty::Func(func) => Ty::Func(self.transform_sig(func, pol)),
+            Ty::Func(func) => Ty::Func(self.transform_sig(func, pol, signature_binders)),
             Ty::Dict(record) => {
                 let mut mutated = record.as_ref().clone();
-                mutated.types = self.transform_seq(&mutated.types, pol);
+                mutated.types = self.transform_seq(&mutated.types, pol, signature_binders);
 
                 Ty::Dict(mutated.into())
             }
-            Ty::Tuple(tup) => Ty::Tuple(self.transform_seq(tup, pol)),
-            Ty::Array(arr) => Ty::Array(self.transform(arr, pol).into()),
+            Ty::Tuple(tup) => self.transform_tuple(tup, pol, signature_binders),
+            Ty::Array(arr) => Ty::Array(self.transform(arr, pol, signature_binders).into()),
             Ty::With(with) => {
-                let sig = self.transform(&with.sig, pol).into();
+                let sig = self.transform(&with.sig, pol, signature_binders).into();
                 // Negate the pol to make correct covariance
-                let mutated = self.transform_sig(&with.with, !pol);
+                let mutated = self.transform_sig(&with.with, !pol, signature_binders);
 
                 Ty::With(SigWithTy::new(sig, mutated))
             }
             // Negate the pol to make correct covariance
             // todo: negate?
-            Ty::Args(args) => Ty::Args(self.transform_sig(args, !pol)),
-            Ty::Pattern(pat) => Ty::Pattern(self.transform_sig(pat, !pol)),
-            Ty::Unary(unary) => {
-                Ty::Unary(TypeUnary::new(unary.op, self.transform(&unary.lhs, pol)))
-            }
+            Ty::Args(args) => Ty::Args(self.transform_sig(args, !pol, signature_binders)),
+            Ty::Pattern(pat) => Ty::Pattern(self.transform_sig(pat, !pol, signature_binders)),
+            Ty::Unary(unary) => self.transform_unary(unary, pol, signature_binders),
             Ty::Binary(binary) => {
                 let [lhs, rhs] = binary.operands();
-                let lhs = self.transform(lhs, pol);
-                let rhs = self.transform(rhs, pol);
+                let lhs = self.transform(lhs, pol, signature_binders);
+                let rhs = self.transform(rhs, pol, signature_binders);
 
                 Ty::Binary(TypeBinary::new(binary.op, lhs, rhs))
             }
             Ty::If(if_ty) => Ty::If(IfTy::new(
-                self.transform(&if_ty.cond, pol).into(),
-                self.transform(&if_ty.then, pol).into(),
-                self.transform(&if_ty.else_, pol).into(),
+                self.transform(&if_ty.cond, pol, signature_binders).into(),
+                self.transform(&if_ty.then, pol, signature_binders).into(),
+                self.transform(&if_ty.else_, pol, signature_binders).into(),
             )),
             Ty::Union(types) => {
-                let seq = types.iter().map(|ty| self.transform(ty, pol));
+                let seq = types
+                    .iter()
+                    .map(|ty| self.transform(ty, pol, signature_binders));
                 let seq_no_any = seq.filter(|ty| !matches!(ty, Ty::Any));
                 let seq = seq_no_any.collect::<Vec<_>>();
                 Ty::from_types(seq.into_iter())
             }
             Ty::Param(param) => {
                 let mut param = param.as_ref().clone();
-                param.ty = self.transform(&param.ty, pol);
+                param.ty = self.transform(&param.ty, pol, signature_binders);
 
                 Ty::Param(param.into())
             }
             Ty::Select(sel) => {
                 let mut sel = sel.as_ref().clone();
-                sel.ty = self.transform(&sel.ty, pol).into();
+                sel.ty = self.transform(&sel.ty, pol, signature_binders).into();
 
                 Ty::Select(sel.into())
             }
@@ -262,13 +348,20 @@ impl TypeSimplifier<'_, '_> {
             Ty::Builtin(ty) => Ty::Builtin(ty.clone()),
         };
 
-        self.transform_cache.insert((ty.clone(), pol), cano.clone());
+        self.transform_cache.insert(cache_key, cano.clone());
         cano
     }
 
     /// Transforms the given sequence of types.
-    fn transform_seq(&mut self, types: &[Ty], pol: bool) -> Interned<Vec<Ty>> {
-        let seq = types.iter().map(|ty| self.transform(ty, pol));
+    fn transform_seq(
+        &mut self,
+        types: &[Ty],
+        pol: bool,
+        signature_binders: &FxHashSet<DeclExpr>,
+    ) -> Interned<Vec<Ty>> {
+        let seq = types
+            .iter()
+            .map(|ty| self.transform(ty, pol, signature_binders));
         seq.collect::<Vec<_>>().into()
     }
 
@@ -280,6 +373,7 @@ impl TypeSimplifier<'_, '_> {
         ubs_iter: impl ExactSizeIterator<Item = &'a Ty>,
         decl: Option<&DeclExpr>,
         pol: bool,
+        signature_binders: &FxHashSet<DeclExpr>,
     ) -> Ty {
         let mut lbs = HashSet::with_capacity(lbs_iter.len());
         let mut ubs = HashSet::with_capacity(ubs_iter.len());
@@ -288,12 +382,12 @@ impl TypeSimplifier<'_, '_> {
 
         if !self.principal || ((pol) && !decl.is_some_and(|decl| self.negatives.contains(decl))) {
             for lb in lbs_iter {
-                lbs.insert(self.transform(lb, pol));
+                lbs.insert(self.transform(lb, pol, signature_binders));
             }
         }
         if !self.principal || ((!pol) && !decl.is_some_and(|decl| self.positives.contains(decl))) {
             for ub in ubs_iter {
-                ubs.insert(self.transform(ub, !pol));
+                ubs.insert(self.transform(ub, !pol, signature_binders));
             }
         }
 
@@ -317,12 +411,127 @@ impl TypeSimplifier<'_, '_> {
         Ty::Let(TypeBounds { lbs, ubs }.into())
     }
 
+    fn transform_tuple(
+        &mut self,
+        tup: &[Ty],
+        pol: bool,
+        signature_binders: &FxHashSet<DeclExpr>,
+    ) -> Ty {
+        let mut types = Vec::with_capacity(tup.len());
+
+        for elem in tup.iter() {
+            let elem = self.transform(elem, pol, signature_binders);
+            if !Self::push_spread_tuple_elements(&mut types, &elem) {
+                types.push(elem);
+            }
+        }
+
+        Ty::Tuple(types.into())
+    }
+
+    fn push_spread_tuple_elements(types: &mut Vec<Ty>, ty: &Ty) -> bool {
+        let Ty::Unary(unary) = ty else {
+            return false;
+        };
+        if unary.op != UnaryOp::Spread {
+            return false;
+        }
+
+        match &unary.lhs {
+            Ty::Tuple(elems) => {
+                types.extend(elems.iter().cloned());
+                true
+            }
+            Ty::Args(args) => {
+                types.extend(args.positional_params().cloned());
+                if let Some(rest) = args.rest_param()
+                    && !Self::push_spread_tuple_elements(
+                        types,
+                        &Ty::Unary(TypeUnary::new(UnaryOp::Spread, rest.clone())),
+                    )
+                {
+                    types.push(Ty::Unary(TypeUnary::new(UnaryOp::Spread, rest.clone())));
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn transform_unary(
+        &mut self,
+        unary: &TypeUnary,
+        pol: bool,
+        signature_binders: &FxHashSet<DeclExpr>,
+    ) -> Ty {
+        let lhs = self.transform(&unary.lhs, pol, signature_binders);
+        if unary.op == UnaryOp::ElementOf
+            && let Some(elem) = Self::known_element_type(&lhs)
+        {
+            return elem;
+        }
+
+        Ty::Unary(TypeUnary::new(unary.op, lhs))
+    }
+
+    fn known_element_type(ty: &Ty) -> Option<Ty> {
+        match ty {
+            Ty::Array(elem) => Some(elem.as_ref().clone()),
+            Ty::Tuple(elems) => Self::known_tuple_element_type(elems),
+            Ty::Args(args) => Self::known_args_element_type(args),
+            Ty::Let(bounds) => Self::known_element_types(bounds.lbs.iter()),
+            Ty::Union(types) => Self::known_element_types(types.iter()),
+            _ => None,
+        }
+    }
+
+    fn known_element_types<'a>(types: impl Iterator<Item = &'a Ty>) -> Option<Ty> {
+        let types = types
+            .filter_map(Self::known_element_type)
+            .collect::<Vec<_>>();
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
+    fn known_tuple_element_type(elems: &[Ty]) -> Option<Ty> {
+        let mut types = vec![];
+        for elem in elems {
+            if let Ty::Unary(unary) = elem
+                && unary.op == UnaryOp::Spread
+            {
+                if let Some(elem) = Self::known_element_type(&unary.lhs) {
+                    types.push(elem);
+                }
+                continue;
+            }
+
+            types.push(elem.clone());
+        }
+
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
+    fn known_args_element_type(args: &ArgsTy) -> Option<Ty> {
+        let mut types = args.positional_params().cloned().collect::<Vec<_>>();
+        if let Some(rest) = args.rest_param()
+            && let Some(elem) = Self::known_element_type(rest)
+        {
+            types.push(elem);
+        }
+
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
     /// Transforms the given signature.
-    fn transform_sig(&mut self, sig: &SigTy, pol: bool) -> Interned<SigTy> {
+    fn transform_sig(
+        &mut self,
+        sig: &SigTy,
+        pol: bool,
+        signature_binders: &FxHashSet<DeclExpr>,
+    ) -> Interned<SigTy> {
         let mut sig = sig.clone();
-        sig.inputs = self.transform_seq(&sig.inputs, !pol);
+        sig.inputs = self.transform_seq(&sig.inputs, !pol, signature_binders);
         if let Some(ret) = &sig.body {
-            sig.body = Some(self.transform(ret, pol));
+            sig.body = Some(self.transform(ret, pol, signature_binders));
         }
 
         // todo: we can reduce one clone by early compare on sig.types
@@ -441,5 +650,53 @@ mod tests {
             "simplify should memoize the top-level result"
         );
         assert_eq!(first_cache_len, second_cache_len);
+    }
+
+    #[test]
+    fn test_signature_inputs_are_principal_binders() {
+        let binder = TypeVar::new("body".into(), Decl::lit("body").into());
+        let binder_ty = Ty::Var(binder.clone());
+        let content = Ty::Builtin(BuiltinTy::Content(None));
+        let sig = SigTy::unary(binder_ty.clone(), binder_ty);
+
+        let sig_ty = Ty::Func(sig);
+        let mut dynamic_bounds = DynTypeBounds::default();
+        dynamic_bounds.ubs.insert_mut(content);
+        let mut info = TypeInfo::default();
+        info.vars.insert(
+            binder.def.clone(),
+            TypeVarBounds::new(binder.as_ref().clone(), dynamic_bounds),
+        );
+        assert_eq!(
+            format!("{:?}", info.simplify(sig_ty.clone(), false)),
+            "(Content) => Content"
+        );
+        assert_eq!(
+            format!("{:?}", info.simplify(sig_ty, true)),
+            "(@body) => @body"
+        );
+        assert_eq!(info.vars.len(), 1);
+    }
+
+    #[test]
+    fn test_principal_simplify_preserves_unused_signature_binder() {
+        let binder = TypeVar::new("body".into(), Decl::lit("body").into());
+        let binder_ty = Ty::Var(binder.clone());
+        let sig = SigTy::unary(binder_ty, Ty::Builtin(BuiltinTy::Color));
+
+        let mut dynamic_bounds = DynTypeBounds::default();
+        dynamic_bounds
+            .ubs
+            .insert_mut(Ty::Builtin(BuiltinTy::Content(None)));
+        let mut info = TypeInfo::default();
+        info.vars.insert(
+            binder.def.clone(),
+            TypeVarBounds::new(binder.as_ref().clone(), dynamic_bounds),
+        );
+
+        assert_eq!(
+            format!("{:?}", info.simplify(Ty::Func(sig), true)),
+            "(@body) => Color"
+        );
     }
 }

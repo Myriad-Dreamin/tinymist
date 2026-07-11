@@ -5,8 +5,8 @@ input_file: crates/tinymist-query/src/fixtures/type_check/annotation_var.typ
 ---
 "x" = Any
 "y" = Any
-"mapper" = (Type(function) | (Any, Any) => Any)
-"" = (Any, Any) => Any
+"mapper" = (Type(function) | (@x, @y) => @x)
+"" = (@x, @f) => Any
 "x" = Any
 "f" = Any
 =====

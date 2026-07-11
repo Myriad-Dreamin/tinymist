@@ -13,7 +13,7 @@ let f(
   w01: int = 1,
   w02: str = "test",
   w03: any = 1 + 2,
-  w04: any = Label(test),
+  w04: label = Label(test),
   w05: (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box = (content | none, baseline: alignment | auto | dictionary | relative, clip: bool, fill: color, height: auto | relative, inset: inset, outset: outset, radius: radius, stroke: stroke, width: auto | fraction | relative) => box,
   w06: (content) => item | any = (body-indent: length, indent: length, marker: array | content | function, marker-align: alignment, spacing: auto | length, tight: bool, ..: content) => list.item,
   w07: text = Expr(..),
@@ -92,7 +92,7 @@ type: any
 ## w04 (named)
 
 ```typc
-type: 
+type: label
 ```
 
 

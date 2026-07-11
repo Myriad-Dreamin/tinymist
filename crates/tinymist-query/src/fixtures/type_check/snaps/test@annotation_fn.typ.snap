@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn.typ
 ---
-"touying-fn-wrapper" = ((Type(function), "max-repetitions": Type(int), "repetitions": Type(int), ...: Any) => None).with(..("max-repetitions": None, "repetitions": None) => any)
+"touying-fn-wrapper" = ((@fn, "max-repetitions": @max-repetitions, "repetitions": @repetitions, ...: @args) => None).with(..("max-repetitions": None, "repetitions": None) => any)
 "fn" = Any
 "max-repetitions" = None
 "repetitions" = None

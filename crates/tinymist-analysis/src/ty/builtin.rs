@@ -208,6 +208,15 @@ pub enum BuiltinSig<'a> {
     TupleMap(&'a Ty),
     /// Gets element of a tuple: `(a, b, c).at`
     TupleAt(&'a Ty),
+    /// Gets the positional values of arguments: `arguments.pos`
+    ArgumentsPos(&'a Ty),
+}
+
+impl<'a> BuiltinSig<'a> {
+    /// Gets a dependent method signature for an arguments receiver.
+    pub fn arguments_method(receiver: &'a Ty, method: &str) -> Option<Self> {
+        (method == "pos").then_some(Self::ArgumentsPos(receiver))
+    }
 }
 
 /// A package identifier.
@@ -252,6 +261,8 @@ pub enum BuiltinTy {
     Break,
     /// A continue type: `continue`
     Continue,
+    /// A never type for expressions that do not continue normally.
+    Never,
     /// An infer type: `any`
     Infer,
     /// A flow none type: `none`
@@ -333,6 +344,7 @@ impl fmt::Debug for BuiltinTy {
             BuiltinTy::None => f.write_str("None"),
             BuiltinTy::Break => f.write_str("Break"),
             BuiltinTy::Continue => f.write_str("Continue"),
+            BuiltinTy::Never => f.write_str("Never"),
             BuiltinTy::Infer => f.write_str("Infer"),
             BuiltinTy::FlowNone => f.write_str("FlowNone"),
             BuiltinTy::Auto => f.write_str("Auto"),
@@ -425,6 +437,7 @@ impl BuiltinTy {
             BuiltinTy::None => "none",
             BuiltinTy::Break => "break",
             BuiltinTy::Continue => "continue",
+            BuiltinTy::Never => "never",
             BuiltinTy::Infer => "any",
             BuiltinTy::FlowNone => "none",
             BuiltinTy::Auto => "auto",

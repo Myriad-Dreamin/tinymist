@@ -112,8 +112,9 @@ impl TypeChecker<'_> {
                 ArgExpr::Pos(pos) => {
                     elements.push(self.check(pos));
                 }
-                ArgExpr::Spread(..) => {
-                    // todo: handle spread args
+                ArgExpr::Spread(spread) => {
+                    let spread = self.check(spread);
+                    Self::push_tuple_spread(&mut elements, spread);
                 }
                 ArgExpr::NamedRt(..) | ArgExpr::Named(..) => unreachable!(),
             }
@@ -143,8 +144,9 @@ impl TypeChecker<'_> {
                         fields.push((const_key, val));
                     }
                 }
-                ArgExpr::Spread(..) => {
-                    // todo: handle spread args
+                ArgExpr::Spread(spread) => {
+                    let spread = self.check(spread);
+                    Self::push_dict_spread(&mut fields, spread);
                 }
                 ArgExpr::Pos(..) => unreachable!(),
             }
@@ -158,6 +160,7 @@ impl TypeChecker<'_> {
     fn check_args(&mut self, args: &[ArgExpr]) -> Ty {
         let mut args_res = Vec::new();
         let mut named = vec![];
+        let mut rest = None;
 
         for arg in args.iter() {
             match arg {
@@ -179,15 +182,85 @@ impl TypeChecker<'_> {
                         named.push((const_key, val));
                     }
                 }
-                ArgExpr::Spread(..) => {
-                    // todo: handle spread args
+                ArgExpr::Spread(spread) => {
+                    let spread = self.check(spread);
+                    Self::push_arg_spread(&mut args_res, &mut named, &mut rest, spread);
                 }
             }
         }
 
-        let args = ArgsTy::new(args_res.into_iter(), named, None, None, None);
+        let args = ArgsTy::new(args_res.into_iter(), named, None, rest, None);
 
         Ty::Args(args.into())
+    }
+
+    fn push_tuple_spread(elements: &mut Vec<Ty>, spread: Ty) {
+        match spread {
+            Ty::Tuple(elems) => elements.extend(elems.iter().cloned()),
+            Ty::Args(args) => {
+                elements.extend(args.positional_params().cloned());
+                if let Some(rest) = args.rest_param() {
+                    Self::push_tuple_spread(elements, rest.clone());
+                }
+            }
+            ty => elements.push(Ty::Unary(TypeUnary::new(UnaryOp::Spread, ty))),
+        }
+    }
+
+    fn push_dict_spread(fields: &mut Vec<(Interned<str>, Ty)>, spread: Ty) {
+        match spread {
+            Ty::Dict(record) => fields.extend(
+                record
+                    .interface()
+                    .map(|(name, ty)| (name.clone(), ty.clone())),
+            ),
+            Ty::Args(args) => fields.extend(
+                args.named_params()
+                    .map(|(name, ty)| (name.clone(), ty.clone())),
+            ),
+            _ => {}
+        }
+    }
+
+    fn push_arg_spread(
+        args_res: &mut Vec<Ty>,
+        named: &mut Vec<(Interned<str>, Ty)>,
+        rest: &mut Option<Ty>,
+        spread: Ty,
+    ) {
+        match spread {
+            Ty::Tuple(elems) => {
+                for elem in elems.iter() {
+                    if let Ty::Unary(unary) = elem
+                        && unary.op == UnaryOp::Spread
+                    {
+                        Self::push_arg_spread(args_res, named, rest, unary.lhs.clone());
+                        continue;
+                    }
+
+                    args_res.push(elem.clone());
+                }
+            }
+            Ty::Args(args) => {
+                args_res.extend(args.positional_params().cloned());
+                named.extend(
+                    args.named_params()
+                        .map(|(name, ty)| (name.clone(), ty.clone())),
+                );
+                if let Some(rest_ty) = args.rest_param() {
+                    *rest = Some(rest_ty.clone());
+                }
+            }
+            Ty::Dict(record) => {
+                named.extend(
+                    record
+                        .interface()
+                        .map(|(name, ty)| (name.clone(), ty.clone())),
+                );
+            }
+            Ty::Array(elem) => *rest = Some(Ty::Array(elem)),
+            ty => *rest = Some(ty),
+        }
     }
 
     fn check_pattern_exp(&mut self, pat: &Interned<Pattern>) -> Ty {
@@ -385,7 +458,7 @@ impl TypeChecker<'_> {
             }
             ast::BinOp::Assign => {
                 self.check_assignable(&lhs, &rhs);
-                self.possible_ever_be(&lhs, &rhs);
+                self.constrain_assignment(&lhs, &rhs);
             }
             ast::BinOp::AddAssign
             | ast::BinOp::SubAssign
@@ -431,6 +504,7 @@ impl TypeChecker<'_> {
     fn check_apply(&mut self, apply: &Interned<ApplyExpr>) -> Ty {
         let args = self.check(&apply.args);
         let callee = self.check(&apply.callee);
+        self.summarize_mutation_call(&apply.callee, &args);
 
         // Treat `dict.at("key")` as `dict.key` when the key is a constant string.
         if let Expr::Select(select) = &apply.callee
@@ -455,6 +529,12 @@ impl TypeChecker<'_> {
         crate::log_debug_ct!("func_call: {callee:?} with {args:?}");
 
         if let Ty::Args(args) = args {
+            if Self::is_builtin_panic_callee(&callee) {
+                let res = Ty::Builtin(BuiltinTy::Never);
+                self.info.witness_at_least(apply.span, res.clone());
+                return res;
+            }
+
             let mut worker = ApplyTypeChecker {
                 base: self,
                 call_site: apply.callee.span(),
@@ -463,11 +543,164 @@ impl TypeChecker<'_> {
             };
             callee.call(&args, true, &mut worker);
             let res = Ty::from_types(worker.resultant.into_iter());
+            let res = self.materialize_tuple_spreads(res);
             self.info.witness_at_least(apply.span, res.clone());
             return res;
         }
 
         Ty::Any
+    }
+
+    fn is_builtin_panic_callee(callee: &Ty) -> bool {
+        match callee {
+            Ty::Value(ins_ty) => match &ins_ty.val {
+                Value::Func(func) => func.name().is_some_and(|name| name == "panic"),
+                _ => false,
+            },
+            Ty::Union(types) => types.iter().any(Self::is_builtin_panic_callee),
+            _ => false,
+        }
+    }
+
+    fn is_arguments_like(&self, ty: &Ty) -> bool {
+        match ty {
+            Ty::Args(_) | Ty::Builtin(BuiltinTy::Args) => true,
+            Ty::Var(var) => {
+                let Some(bounds) = self.info.vars.get(&var.def) else {
+                    return false;
+                };
+                let lbs = bounds.bounds.bounds().read().lbs.clone();
+                lbs.iter().any(|lb| self.is_arguments_like(lb))
+            }
+            Ty::Let(bounds) => bounds.lbs.iter().any(|lb| self.is_arguments_like(lb)),
+            Ty::Union(types) => types.iter().any(|ty| self.is_arguments_like(ty)),
+            _ => false,
+        }
+    }
+
+    fn materialize_tuple_spreads(&self, ty: Ty) -> Ty {
+        match ty {
+            Ty::Tuple(elems) => {
+                let elems = elems
+                    .iter()
+                    .map(|elem| {
+                        if let Ty::Unary(unary) = elem
+                            && unary.op == UnaryOp::Spread
+                        {
+                            let lhs = match &unary.lhs {
+                                Ty::Var(var) if self.live_input_vars.contains(&var.def) => {
+                                    unary.lhs.clone()
+                                }
+                                lhs => self.info.simplify(lhs.clone(), true),
+                            };
+                            return Ty::Unary(TypeUnary::new(UnaryOp::Spread, lhs));
+                        }
+
+                        elem.clone()
+                    })
+                    .collect::<Vec<_>>();
+
+                Ty::Tuple(elems.into())
+            }
+            ty => ty,
+        }
+    }
+
+    fn summarize_mutation_call(&mut self, callee: &Expr, args: &Ty) {
+        let Expr::Select(select) = callee else {
+            return;
+        };
+        if select.key.name().as_ref() != "push" {
+            return;
+        }
+
+        let Ty::Args(args) = args else {
+            return;
+        };
+        if args.positional_params().len() != 1
+            || args.named_params().len() != 0
+            || args.rest_param().is_some()
+        {
+            return;
+        }
+
+        let Some(elem) = args.pos(0).cloned() else {
+            return;
+        };
+        let receiver = self.check(&select.lhs);
+        self.summarize_array_push(receiver, elem);
+    }
+
+    fn summarize_array_push(&mut self, receiver: Ty, elem: Ty) {
+        let Ty::Var(var) = receiver else {
+            return;
+        };
+        let elem = self.shallow_lower_bound(elem);
+        let Some(bounds) = self.info.vars.get_mut(&var.def) else {
+            return;
+        };
+
+        let mut bounds = bounds.bounds.bounds().write();
+        let mut elems = vec![elem];
+        let mut kept_lbs = Vec::with_capacity(bounds.lbs.size());
+
+        for lb in bounds.lbs.iter() {
+            if Self::collect_array_builder_elems(lb, &mut elems) {
+                continue;
+            }
+            kept_lbs.push(lb.clone());
+        }
+
+        let elem = Ty::from_types(elems.into_iter());
+        kept_lbs.push(Ty::Array(elem.into()));
+        bounds.lbs = kept_lbs.into_iter().collect();
+    }
+
+    fn collect_array_builder_elems(ty: &Ty, elems: &mut Vec<Ty>) -> bool {
+        match ty {
+            Ty::Array(elem) => {
+                elems.push(elem.as_ref().clone());
+                true
+            }
+            Ty::Tuple(items) => {
+                for item in items.iter() {
+                    if let Ty::Unary(unary) = item
+                        && unary.op == UnaryOp::Spread
+                    {
+                        Self::collect_array_builder_elems(&unary.lhs, elems);
+                    } else {
+                        elems.push(item.clone());
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub(super) fn shallow_lower_bound(&self, ty: Ty) -> Ty {
+        match ty {
+            Ty::Var(var) => {
+                let Some(bounds) = self.info.vars.get(&var.def) else {
+                    return Ty::Var(var);
+                };
+                let lbs = bounds
+                    .bounds
+                    .bounds()
+                    .read()
+                    .lbs
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                if lbs.is_empty() {
+                    return Ty::Var(var);
+                }
+                Ty::from_types(lbs.into_iter())
+            }
+            Ty::Let(bounds) if !bounds.lbs.is_empty() => Ty::from_types(bounds.lbs.iter().cloned()),
+            Ty::Let(bounds) => Ty::Let(bounds),
+            ty => ty,
+        }
     }
 
     fn check_func(&mut self, func: &Interned<FuncExpr>) -> Ty {
@@ -480,17 +713,30 @@ impl TypeChecker<'_> {
         crate::log_debug_ct!("check closure: {func:?} with docs {docstring:#?}");
 
         let (sig, defaults) = self.check_pattern_sig(Some(&def_id), &func.params, docstring);
+        let input_bounds = self.snapshot_function_input_bounds(&sig);
+        let input_defs = input_bounds
+            .iter()
+            .map(|(binder, _)| binder.def.clone())
+            .collect::<Vec<_>>();
+        let escaped_input_vars = self.live_input_vars.clone();
+        for def in &input_defs {
+            self.input_contract_bounds.remove(def);
+            self.live_input_vars.insert(def.clone());
+        }
 
-        let body = self.check(&func.body);
+        let body = Self::function_return_type(self.check(&func.body));
         let res_ty = if let Some(annotated) = &docstring.res_ty {
             self.constrain(&body, annotated);
-            Ty::Let(Interned::new(TypeBounds {
-                lbs: vec![body],
-                ubs: vec![annotated.clone()],
-            }))
+            self.function_annotated_return_type(body, annotated)
         } else {
             body
         };
+        let res_ty = self.close_function_resultant_type(res_ty, &input_bounds, &escaped_input_vars);
+        let sig = self.rebind_overwritten_function_inputs(sig, input_bounds, &escaped_input_vars);
+        self.live_input_vars = escaped_input_vars;
+        for def in input_defs {
+            self.input_contract_bounds.remove(&def);
+        }
 
         // freeze the signature
         for inp in sig.inputs.iter() {
@@ -511,6 +757,45 @@ impl TypeChecker<'_> {
 
         self.constrain(&sig, &var);
         sig
+    }
+
+    fn function_return_type(ty: Ty) -> Ty {
+        match ty {
+            Ty::Unary(unary) if unary.op == UnaryOp::Return => unary.lhs.clone(),
+            Ty::If(if_ty) => Ty::If(IfTy::new(
+                if_ty.cond.clone(),
+                Self::function_return_type(if_ty.then.as_ref().clone()).into(),
+                Self::function_return_type(if_ty.else_.as_ref().clone()).into(),
+            )),
+            ty => ty,
+        }
+    }
+
+    fn function_annotated_return_type(&self, body: Ty, annotated: &Ty) -> Ty {
+        let body_is_open = matches!(
+            &body,
+            Ty::Any
+                | Ty::Builtin(
+                    BuiltinTy::None | BuiltinTy::FlowNone | BuiltinTy::Undef | BuiltinTy::Never,
+                )
+        );
+        if !body_is_open || !self.annotation_has_information(annotated) {
+            return body;
+        }
+
+        annotated.clone()
+    }
+
+    fn annotation_has_information(&self, annotated: &Ty) -> bool {
+        match annotated {
+            Ty::Any => false,
+            Ty::Var(var) => self.info.vars.get(&var.def).is_some_and(|bounds| {
+                let bounds = bounds.bounds.bounds().read();
+                !bounds.lbs.is_empty() || !bounds.ubs.is_empty()
+            }),
+            Ty::Let(bounds) => !bounds.lbs.is_empty() || !bounds.ubs.is_empty(),
+            _ => true,
+        }
     }
 
     fn check_let(&mut self, let_expr: &Interned<LetExpr>) -> Ty {
@@ -626,7 +911,12 @@ impl TypeChecker<'_> {
     fn check_ref(&mut self, r: &Interned<RefExpr>) -> Ty {
         let s = r.decl.span();
         let s = (!s.is_detached()).then_some(s);
-        let of = r.root.as_ref().map(|of| self.check(of));
+        let of = self
+            .info
+            .vars
+            .contains_key(&r.decl)
+            .then(|| Ty::Var(self.get_var(&r.decl)));
+        let of = of.or_else(|| r.root.as_ref().map(|of| self.check(of)));
         let of = of.or_else(|| r.term.clone());
         if let Some((s, of)) = s.zip(of.as_ref()) {
             self.info.witness_at_most(s, of.clone());
@@ -672,15 +962,23 @@ impl TypeChecker<'_> {
 
     fn check_conditional(&mut self, if_expr: &Interned<IfExpr>) -> Ty {
         let cond = self.check(&if_expr.cond);
+        let branch_live_input_vars = self.live_input_vars.clone();
         let then = self.check(&if_expr.then);
+        let then_live_input_vars = self.live_input_vars.clone();
+        self.live_input_vars = branch_live_input_vars;
         let else_ = self.check(&if_expr.else_);
+        // The current value can still be the input if either branch leaves it untouched.
+        self.live_input_vars.extend(then_live_input_vars);
 
         Ty::If(IfTy::new(cond.into(), then.into(), else_.into()))
     }
 
     fn check_while_loop(&mut self, while_loop: &Interned<WhileExpr>) -> Ty {
         let _cond = self.check(&while_loop.cond);
+        let loop_live_input_vars = self.live_input_vars.clone();
         let _body = self.check(&while_loop.body);
+        // A loop body may execute zero times.
+        self.live_input_vars.extend(loop_live_input_vars);
 
         Ty::Any
     }
@@ -697,11 +995,7 @@ impl TypeChecker<'_> {
         if matches!(for_loop.pattern.as_ref(), Pattern::Simple(..)) {
             match &iter {
                 Ty::Array(elem) => self.constrain(elem, &pattern),
-                Ty::Tuple(elems) => {
-                    for elem in elems.iter() {
-                        self.constrain(elem, &pattern);
-                    }
-                }
+                Ty::Tuple(elems) => self.constrain_tuple_iter_pattern(elems, &pattern),
                 Ty::Var(var) => {
                     if let Some(bounds) = self.info.vars.get(&var.def) {
                         let lbs = bounds.bounds.bounds().read().lbs.clone();
@@ -712,9 +1006,7 @@ impl TypeChecker<'_> {
                                     self.constrain(&iter, &Ty::Array(pattern.clone().into()));
                                 }
                                 Ty::Tuple(elems) => {
-                                    for elem in elems.iter() {
-                                        self.constrain(elem, &pattern);
-                                    }
+                                    self.constrain_tuple_iter_pattern(elems, &pattern);
                                     let tuple = Ty::Tuple(Interned::new(
                                         elems.iter().map(|_| pattern.clone()).collect::<Vec<_>>(),
                                     ));
@@ -729,11 +1021,7 @@ impl TypeChecker<'_> {
                     for lb in bounds.lbs.iter() {
                         match lb {
                             Ty::Array(elem) => self.constrain(elem, &pattern),
-                            Ty::Tuple(elems) => {
-                                for elem in elems.iter() {
-                                    self.constrain(elem, &pattern);
-                                }
-                            }
+                            Ty::Tuple(elems) => self.constrain_tuple_iter_pattern(elems, &pattern),
                             _ => {}
                         }
                     }
@@ -741,9 +1029,81 @@ impl TypeChecker<'_> {
                 _ => {}
             }
         }
+        let loop_live_input_vars = self.live_input_vars.clone();
         let _body = self.check(&for_loop.body);
+        // A loop body may execute zero times.
+        self.live_input_vars.extend(loop_live_input_vars);
 
         Ty::Any
+    }
+
+    fn constrain_tuple_iter_pattern(&mut self, elems: &[Ty], pattern: &Ty) {
+        if let Some(elem) = self.tuple_iter_element_type(elems) {
+            self.constrain(&elem, pattern);
+        }
+    }
+
+    fn tuple_iter_element_type(&self, elems: &[Ty]) -> Option<Ty> {
+        let mut types = vec![];
+
+        for elem in elems {
+            if let Ty::Unary(unary) = elem
+                && unary.op == UnaryOp::Spread
+            {
+                if let Some(elem) = self.spread_iter_element_type(&unary.lhs) {
+                    types.push(elem);
+                }
+                continue;
+            }
+
+            types.push(elem.clone());
+        }
+
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
+    fn spread_iter_element_type(&self, source: &Ty) -> Option<Ty> {
+        match source {
+            Ty::Array(elem) => Some(elem.as_ref().clone()),
+            Ty::Tuple(elems) => self.tuple_iter_element_type(elems),
+            Ty::Args(args) => self.args_iter_element_type(args),
+            Ty::Var(var) if self.is_arguments_like(source) => Some(Ty::Unary(TypeUnary::new(
+                UnaryOp::ElementOf,
+                Ty::Var(var.clone()),
+            ))),
+            Ty::Var(var) => {
+                let bounds = self.info.vars.get(&var.def)?;
+                let lbs = bounds.bounds.bounds().read().lbs.clone();
+                let elems = lbs
+                    .iter()
+                    .filter_map(|lb| self.spread_iter_element_type(lb))
+                    .collect::<Vec<_>>();
+                (!elems.is_empty()).then(|| Ty::from_types(elems.into_iter()))
+            }
+            Ty::Let(bounds) => {
+                let elems = bounds
+                    .lbs
+                    .iter()
+                    .filter_map(|lb| self.spread_iter_element_type(lb))
+                    .collect::<Vec<_>>();
+                (!elems.is_empty()).then(|| Ty::from_types(elems.into_iter()))
+            }
+            _ => Some(Ty::Unary(TypeUnary::new(
+                UnaryOp::ElementOf,
+                source.clone(),
+            ))),
+        }
+    }
+
+    fn args_iter_element_type(&self, args: &ArgsTy) -> Option<Ty> {
+        let mut elems = args.positional_params().cloned().collect::<Vec<_>>();
+        if let Some(rest) = args.rest_param()
+            && let Some(elem) = self.spread_iter_element_type(rest)
+        {
+            elems.push(elem);
+        }
+
+        (!elems.is_empty()).then(|| Ty::from_types(elems.into_iter()))
     }
 
     fn check_type(&mut self, ty: &Ty) -> Ty {

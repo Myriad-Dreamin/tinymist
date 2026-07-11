@@ -7,6 +7,28 @@ input_file: crates/tinymist-query/src/fixtures/completion/cite_heading.typ
 [
  {
   "isIncomplete": false,
-  "items": []
+  "items": [
+   {
+    "kind": 18,
+    "label": "test",
+    "labelDetails": {
+     "description": "H"
+    },
+    "sortText": "001",
+    "textEdit": {
+     "newText": "test>",
+     "range": {
+      "end": {
+       "character": 15,
+       "line": 9
+      },
+      "start": {
+       "character": 13,
+       "line": 9
+      }
+     }
+    }
+   }
+  ]
  }
 ]

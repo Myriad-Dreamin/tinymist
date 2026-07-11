@@ -4,10 +4,11 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 ---
 "a" = (1, )
-"f" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
-"" = ((Type(bytes) | Type(decimal) | Type(float) | Type(int) | Type(label) | Type(str) | Type(type) | Type(version))) => Type(str)
+"f" = (@x) => Type(str)
+"" = (@x) => Type(str)
 "x" = Type(int)
 "b" = (Type(array) | ((Type(array) | Type(str)), ))
+"conditional" = (((Type(array) | Type(str)), (Type(array) | Type(str)), ) | ((Type(array) | Type(str)), (Type(array) | Type(str)), ))
 =====
 5..6 -> @a
 9..13 -> (1, )
@@ -22,3 +23,9 @@ input_file: crates/tinymist-query/src/fixtures/type_check/tuple_map.typ
 46..51 -> (Func(map) | (Func(map) | @v"a".map))
 46..54 -> (Type(array) | ((Type(array) | Type(str)), ))
 52..53 -> @f
+61..72 -> @conditional
+75..115 -> IfTy { cond: true, then: (1, 2, ), else_: (3, 4, ) }.map
+75..118 -> (((Type(array) | Type(str)), (Type(array) | Type(str)), ) | ((Type(array) | Type(str)), (Type(array) | Type(str)), ))
+86..92 -> (1, 2, )
+102..108 -> (3, 4, )
+116..117 -> @f

@@ -1,0 +1,14 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_empty_function.typ
+---
+"base" = Any
+"config-xxx" = () => None
+"result" = None
+=====
+0..0 -> @config-xxx
+1..21 -> @base
+28..34 -> @result
+37..47 -> @config-xxx
+37..49 -> None

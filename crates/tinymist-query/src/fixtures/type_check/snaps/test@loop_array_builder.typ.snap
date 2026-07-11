@@ -1,0 +1,110 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/loop_array_builder.typ
+---
+"collect-pair" = () => (None, TypeUnary { lhs: Array<1>, op: Spread }, )
+"result" = Array<1>
+"item" = 1
+"collected" = 1
+"direct-collected" = 1
+"collect-rest" = (...: @items) => (None, TypeUnary { lhs: Array<TypeUnary { lhs: @items, op: ElementOf }>, op: Spread }, )
+"items" = ( ⪰ Args | &(("x") => any))
+"result" = Array<"x">
+"item" = "x"
+"rest-collected" = "x"
+"positional-via-binding" = (...: @items) => (TypeUnary { lhs: @items, op: Spread }, )
+"items" = ( ⪰ Args | &(("a", 2) => any))
+"positional" = ( ⪰ Args | &(("a", 2) => any)).pos
+"rebound-pos" = ("a", 2, )
+"collect-annotated-rest" = (...: @items) => (None, TypeUnary { lhs: Array<TypeUnary { lhs: @items, op: ElementOf }>, op: Spread }, )
+"items" = ( ⪰ Args | &(("y") => any))
+"result" = Array<"y">
+"item" = "y"
+"annotated-collected" = "y"
+"collect-reassigned" = (...: @items) => (None, TypeUnary { lhs: Array<(1, 2, 0, )>, op: Spread }, )
+"items" = ( ⪰ Args | &(("z") => any))
+"result" = Array<(1, 2, 0, )>
+"item" = (1, 2, 0, )
+"reassigned-collected" = (1, 2, 0, )
+=====
+5..17 -> @collect-pair
+30..36 -> @result
+39..41 -> ()
+48..52 -> @item
+56..60 -> (1, )
+67..73 -> @result
+67..78 -> (Func(push) | (Func(push) | @v"result".push))
+67..84 -> Type(none)
+79..83 -> @item
+91..107 -> (None, TypeUnary { lhs: @result, op: Spread }, )
+100..106 -> @result
+120..129 -> @collected
+133..145 -> @collect-pair
+133..147 -> (None, TypeUnary { lhs: Array<1>, op: Spread }, )
+158..174 -> @direct-collected
+178..192 -> (None, 1, )
+187..191 -> (1, )
+199..211 -> @collect-rest
+214..219 -> @items
+231..237 -> @result
+240..242 -> ()
+249..253 -> @item
+257..262 -> @items
+257..266 -> @v"items".pos
+257..268 -> (TypeUnary { lhs: @items, op: Spread }, )
+275..281 -> @result
+275..286 -> (Func(push) | (Func(push) | @v"result".push))
+275..292 -> Type(none)
+287..291 -> @item
+299..315 -> (None, TypeUnary { lhs: @result, op: Spread }, )
+308..314 -> @result
+328..342 -> @rest-collected
+346..358 -> @collect-rest
+346..363 -> (None, TypeUnary { lhs: Array<"x">, op: Spread }, )
+370..392 -> @positional-via-binding
+395..400 -> @items
+412..422 -> @positional
+425..430 -> @items
+425..434 -> @v"items".pos
+437..447 -> @positional
+437..449 -> (TypeUnary { lhs: @items, op: Spread }, )
+458..469 -> @rebound-pos
+472..494 -> @positional-via-binding
+472..502 -> ("a", 2, )
+522..544 -> @collect-annotated-rest
+547..552 -> @items
+564..570 -> @result
+573..575 -> ()
+582..586 -> @item
+590..595 -> @items
+590..599 -> @v"items".pos
+590..601 -> (TypeUnary { lhs: @items, op: Spread }, )
+608..614 -> @result
+608..619 -> (Func(push) | (Func(push) | @v"result".push))
+608..625 -> Type(none)
+620..624 -> @item
+632..648 -> (None, TypeUnary { lhs: @result, op: Spread }, )
+641..647 -> @result
+661..680 -> @annotated-collected
+684..706 -> @collect-annotated-rest
+684..711 -> (None, TypeUnary { lhs: Array<"y">, op: Spread }, )
+718..736 -> @collect-reassigned
+739..744 -> @items
+756..762 -> @result
+765..767 -> ()
+774..778 -> @item
+782..787 -> @items
+782..791 -> @v"items".pos
+782..793 -> (TypeUnary { lhs: @items, op: Spread }, )
+800..804 -> @item
+807..816 -> (1, 2, 0, )
+821..827 -> @result
+821..832 -> (Func(push) | (Func(push) | @v"result".push))
+821..838 -> Type(none)
+833..837 -> @item
+845..861 -> (None, TypeUnary { lhs: @result, op: Spread }, )
+854..860 -> @result
+874..894 -> @reassigned-collected
+898..916 -> @collect-reassigned
+898..921 -> (None, TypeUnary { lhs: Array<(1, 2, 0, )>, op: Spread }, )

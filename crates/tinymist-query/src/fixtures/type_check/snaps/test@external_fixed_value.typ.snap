@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_fixed_value.typ
+---
+"base" = Any
+"fixed" = (1, 2, )
+"copied" = (1, 2, )
+"first" = 1
+=====
+0..0 -> @fixed
+1..25 -> @base
+20..25 -> @fixed
+32..38 -> @copied
+41..46 -> @fixed
+52..57 -> @first
+60..65 -> @fixed
+60..68 -> (Func(at) | (Func(at) | @v"fixed".at))
+60..71 -> (Any | 1)

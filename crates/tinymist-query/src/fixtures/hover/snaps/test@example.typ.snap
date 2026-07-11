@@ -10,7 +10,7 @@ let speaker-note(
   note: any,
   mode: str = "typ",
   setting: (any) => any = Closure(..),
-) = none;
+) = any;
 ```
 
 

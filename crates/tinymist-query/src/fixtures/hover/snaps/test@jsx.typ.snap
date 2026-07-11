@@ -8,7 +8,7 @@ Range: 4:20:4:27
 ```typc
 let Counter(
   initialCounter: int = 0,
-) = content | none;
+) = content;
 ```
 
 

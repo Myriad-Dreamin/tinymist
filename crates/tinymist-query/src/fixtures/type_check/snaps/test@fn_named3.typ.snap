@@ -3,17 +3,17 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named3.typ
 ---
-"fun" = () => TypeUnary { lhs: 2, op: Return }
-"foo" = (("b": Any) => Any).with(..("b": TypeUnary { lhs: 2, op: Return }) => any)
-"b" = TypeUnary { lhs: 2, op: Return }
-"x" = TypeUnary { lhs: 2, op: Return }
+"fun" = () => 2
+"foo" = (("b": @b) => @b).with(..("b": 2) => any)
+"b" = ( ⪰ Type(int) | 2)
+"x" = 2
 =====
 5..8 -> @fun
 33..36 -> @foo
 37..38 -> @b
 40..43 -> @fun
-40..45 -> TypeUnary { lhs: 2, op: Return }
+40..45 -> 2
 49..50 -> @b
 56..57 -> @x
 60..63 -> @foo
-60..65 -> TypeUnary { lhs: 2, op: Return }
+60..65 -> 2

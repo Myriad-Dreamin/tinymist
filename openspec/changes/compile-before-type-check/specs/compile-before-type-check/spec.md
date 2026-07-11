@@ -14,6 +14,10 @@ The checker SHALL evaluate function bodies on demand when a call needs the calle
 - **WHEN** a function body calls a same-scope helper whose closure is not running
 - **THEN** the VM evaluates the helper body and uses the resulting semantic type to compute the caller result
 
+#### Scenario: Cross-file dependent result
+- **WHEN** an imported function result depends on one of its parameters through local intermediate variables
+- **THEN** the checker substitutes the call arguments into the closed result without importing callee-local variables into the caller scope
+
 ### Requirement: Cycle residualization
 The checker SHALL residualize cyclic function-result dependencies as neutral values.
 

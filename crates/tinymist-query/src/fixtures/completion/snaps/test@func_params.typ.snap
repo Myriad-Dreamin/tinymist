@@ -16,7 +16,7 @@ input_file: crates/tinymist-query/src/fixtures/completion/func_params.typ
     "kind": 3,
     "label": "aa",
     "labelDetails": {
-     "description": "(any, any, any) => none"
+     "description": "(any, any, any) => any"
     },
     "sortText": "000",
     "textEdit": {

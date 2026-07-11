@@ -21,6 +21,8 @@ impl Sig<'_> {
         // todo: check if the signature has free variables
         // let has_free_vars = sig.has_free_variables;
 
+        let rest_bind = Self::rest_bind(&sig, args, withs);
+
         for (arg_recv, arg_ins) in sig.matches(args, withs) {
             if let Ty::Var(arg_recv) = arg_recv {
                 crate::log_debug_ct!("bind {arg_recv:?} {arg_ins:?}");
@@ -28,7 +30,43 @@ impl Sig<'_> {
             }
         }
 
+        if let Some((rest_var, rest_ty)) = rest_bind {
+            crate::log_debug_ct!("bind rest {rest_var:?} {rest_ty:?}");
+            ctx.bind_local(&rest_var, rest_ty);
+        }
+
         sig.body.clone()
+    }
+
+    fn rest_bind(
+        sig: &Interned<SigTy>,
+        args: &Interned<ArgsTy>,
+        withs: Option<&Vec<Interned<SigTy>>>,
+    ) -> Option<(Interned<TypeVar>, Ty)> {
+        let Ty::Var(rest_var) = sig.rest_param()? else {
+            return None;
+        };
+
+        let fixed_pos = sig.positional_params().len();
+        let rest_pos = withs
+            .into_iter()
+            .flat_map(|withs| withs.iter().rev())
+            .flat_map(|with| with.positional_params())
+            .chain(args.positional_params())
+            .skip(fixed_pos)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let rest_named = args
+            .named_params()
+            .filter(|(name, _)| sig.named(name).is_none())
+            .map(|(name, ty)| (name.clone(), ty.clone()))
+            .collect::<Vec<_>>();
+
+        let rest = args.rest_param().cloned();
+        let rest_args = ArgsTy::new(rest_pos.into_iter(), rest_named, None, rest, None);
+
+        Some((rest_var.clone(), Ty::Args(rest_args.into())))
     }
 }
 
@@ -47,12 +85,28 @@ impl<T: TyCtxMut> SubstituteChecker<'_, T> {
 impl<T: TyCtxMut> TyMutator for SubstituteChecker<'_, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
         // todo: extrude the type into a polarized type
-        let _ = pol;
-
-        if let Ty::Var(v) = ty {
-            self.ctx.local_bind_of(v)
-        } else {
-            self.mutate_rec(ty, pol)
+        match ty {
+            Ty::Var(var) => self.ctx.local_bind_of(var),
+            Ty::Let(bounds) => {
+                let mut lbs = bounds
+                    .lbs
+                    .iter()
+                    .map(|bound| self.mutate(bound, !pol).unwrap_or_else(|| bound.clone()))
+                    .collect::<Vec<_>>();
+                let mut ubs = bounds
+                    .ubs
+                    .iter()
+                    .map(|bound| self.mutate(bound, pol).unwrap_or_else(|| bound.clone()))
+                    .collect::<Vec<_>>();
+                if ubs.is_empty() && lbs.len() == 1 {
+                    return lbs.pop();
+                }
+                if lbs.is_empty() && ubs.len() == 1 {
+                    return ubs.pop();
+                }
+                Some(Ty::Let(TypeBounds { lbs, ubs }.into()))
+            }
+            _ => self.mutate_rec(ty, pol),
         }
     }
 }

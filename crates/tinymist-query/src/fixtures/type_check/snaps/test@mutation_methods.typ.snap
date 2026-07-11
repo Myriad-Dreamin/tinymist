@@ -4,24 +4,24 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/mutation_methods.typ
 ---
 "array-push" = () => Type(none)
-"a" = ()
-"dict-insert" = () => None
+"a" = Array<1>
+"dict-insert" = () => Any
 "d" = {}
-"push-loop" = () => ()
-"a" = ()
+"push-loop" = () => Array<Any>
+"a" = Array<Any>
 "i" = Any
 "push-dict-loop" = () => Type(array)
-"guides" = ()
+"guides" = Array<{"kind": "x"}>
 "grp" = {"members": (1, )}
 "g" = {"kind": "x"}
-"" = (Any) => Any.kind
+"" = (@g) => @v"g".kind
 "g" = Any
 "push-dict-loop-if" = () => Type(array)
-"guides" = ()
+"guides" = Array<IfTy { cond: true, then: Undef, else_: {"kind": "other"} }>
 "first" = true
 "g" = IfTy { cond: true, then: Undef, else_: {"kind": "other"} }
-"levels" = ( ⪰ Type(array) | ())
-"" = (Any) => Any.kind
+"levels" = Type(array)
+"" = (@g) => @v"g".kind
 "g" = Any
 =====
 5..15 -> @array-push

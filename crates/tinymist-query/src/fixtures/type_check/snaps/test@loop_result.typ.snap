@@ -3,23 +3,23 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/loop_result.typ
 ---
-"loop-none" = () => None
+"loop-none" = () => Any
 "i" = Any
 "x" = Any
-"loop-tuple" = (("size": Any) => None).with(..("size": 50) => any)
+"loop-tuple" = (("size": @size) => Any).with(..("size": 50) => any)
 "size" = 50
 "i" = Any
-"loop-command" = () => None
+"loop-command" = () => Any
 "i" = Any
-"" = (Any) => Any
+"" = (@ctx) => @ctx
 "ctx" = Any
-"loop-continue-command" = () => None
+"loop-continue-command" = () => Any
 "i" = 0
-"" = (Any) => Any
+"" = (@ctx) => @ctx
 "ctx" = Any
-"loop-conditional-break" = () => None
+"loop-conditional-break" = () => Any
 "i" = 1
-"" = (Any) => Any
+"" = (@ctx) => @ctx
 "ctx" = Any
 "loop-break" = () => 3
 "i" = Any

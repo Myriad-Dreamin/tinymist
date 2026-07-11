@@ -3,19 +3,19 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive_slow.typ
 ---
-"l" = (Any) => (Any) => Any
-"" = (Any) => (Any) => Any
+"l" = (@a) => (@b) => Any
+"" = (@a) => (@b) => Any
 "a" = Any
-"" = (Any) => Any
+"" = (@b) => Any
 "b" = Any
-"r" = (Any) => (Any) => (Any) => Any
-"" = (Any) => (Any) => (Any) => Any
+"r" = (@a) => (@b) => (@c) => Any
+"" = (@a) => (@b) => (@c) => Any
 "a" = Any
-"" = (Any) => (Any) => Any
+"" = (@b) => (@c) => Any
 "b" = Any
-"" = (Any) => Any
+"" = (@c) => Any
 "c" = Any
-"merged" = IfTy { cond: true, then: (Any) => (Any) => Any, else_: (Any) => (Any) => (Any) => Any }
+"merged" = IfTy { cond: true, then: (@a) => (@b) => Any, else_: (@a) => (@b) => (@c) => Any }
 "use" = Any
 =====
 5..6 -> @l

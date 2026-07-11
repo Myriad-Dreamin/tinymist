@@ -4,9 +4,9 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/fn_named2.typ
 ---
 "val" = 1
-"foo" = (("a": Any) => Any).with(..("a": 1) => any)
-"a" = Any
-"x" = Any
+"foo" = (("a": @a) => @a).with(..("a": 1) => any)
+"a" = 1
+"x" = 1
 =====
 5..8 -> @val
 18..21 -> @foo

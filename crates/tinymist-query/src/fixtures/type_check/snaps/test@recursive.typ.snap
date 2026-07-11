@@ -4,7 +4,8 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/recursive.typ
 ---
 "base" = Any
-"a" = Any
+"a" = (@x) => Any
+"x" = Any
 "f" = () => Any
 =====
 0..0 -> @a

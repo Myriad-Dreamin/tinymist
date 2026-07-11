@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/show_raw_where.typ
 ---
-"" = (Any) => Any.it
+"" = (@it) => @v"it".it
 "it" = Content(raw)
 =====
 26..29 -> Func(raw)

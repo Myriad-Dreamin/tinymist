@@ -190,6 +190,7 @@ impl FnCompletionFeat {
                 | BuiltinTy::None
                 | BuiltinTy::Break
                 | BuiltinTy::Continue
+                | BuiltinTy::Never
                 | BuiltinTy::Infer
                 | BuiltinTy::FlowNone
                 | BuiltinTy::Auto

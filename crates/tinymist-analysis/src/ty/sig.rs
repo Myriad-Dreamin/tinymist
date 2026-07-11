@@ -274,7 +274,14 @@ impl SigCheckDriver<'_> {
                 self.ty(&sig.sig, pol);
                 self.ctx.args.pop();
             }
-            Ty::Select(sel) => sel.ty.bounds(pol, &mut MethodDriver(self, &sel.select)),
+            Ty::Select(sel) => sel.ty.bounds(
+                pol,
+                &mut MethodDriver {
+                    driver: self,
+                    receiver: sel.ty.as_ref(),
+                    method: &sel.select,
+                },
+            ),
             // todo: calculate these operators
             Ty::Unary(_) => {}
             Ty::Binary(_) => {}
@@ -298,38 +305,51 @@ impl BoundChecker for SigCheckDriver<'_> {
 
 /// A driver to check a method.
 #[derive(BindTyCtx)]
-#[bind(0)]
-struct MethodDriver<'a, 'b>(&'a mut SigCheckDriver<'b>, &'a StrRef);
+#[bind(driver)]
+struct MethodDriver<'a, 'b> {
+    driver: &'a mut SigCheckDriver<'b>,
+    receiver: &'a Ty,
+    method: &'a StrRef,
+}
 
 impl MethodDriver<'_, '_> {
     fn is_binder(&self) -> bool {
-        matches!(self.1.as_ref(), "with" | "where")
+        matches!(self.method.as_ref(), "with" | "where")
     }
 
     fn array_method(&mut self, ty: &Ty, pol: bool) {
-        let method = match self.1.as_ref() {
+        let method = match self.method.as_ref() {
             "map" => BuiltinSig::TupleMap(ty),
             "at" => BuiltinSig::TupleAt(ty),
             _ => return,
         };
-        self.0
+        self.driver
             .checker
-            .check(Sig::Builtin(method), &mut self.0.ctx, pol);
+            .check(Sig::Builtin(method), &mut self.driver.ctx, pol);
+    }
+
+    fn arguments_method(&mut self, pol: bool) {
+        let Some(method) = BuiltinSig::arguments_method(self.receiver, self.method.as_ref()) else {
+            return;
+        };
+        self.driver
+            .checker
+            .check(Sig::Builtin(method), &mut self.driver.ctx, pol);
     }
 }
 
 impl BoundChecker for MethodDriver<'_, '_> {
     fn collect(&mut self, ty: &Ty, pol: bool) {
-        crate::log_debug_ct!("check method: {ty:?}.{}", self.1.as_ref());
+        crate::log_debug_ct!("check method: {ty:?}.{}", self.method.as_ref());
         match ty {
             // todo: deduplicate checking early
             Ty::Value(v) => {
                 match &v.val {
                     Value::Func(func) => {
                         if self.is_binder() {
-                            self.0.checker.check(
+                            self.driver.checker.check(
                                 Sig::Partialize(&Sig::Value { val: func, at: ty }),
-                                &mut self.0.ctx,
+                                &mut self.driver.ctx,
                                 pol,
                             );
                         } else {
@@ -337,6 +357,7 @@ impl BoundChecker for MethodDriver<'_, '_> {
                         }
                     }
                     Value::Array(..) => self.array_method(ty, pol),
+                    Value::Args(..) => self.arguments_method(pol),
                     _ => {}
                 }
             }
@@ -344,9 +365,9 @@ impl BoundChecker for MethodDriver<'_, '_> {
                 // todo: distinguish between element and function
                 if self.is_binder() {
                     let func = (*elem).into();
-                    self.0.checker.check(
+                    self.driver.checker.check(
                         Sig::Partialize(&Sig::Value { val: &func, at: ty }),
-                        &mut self.0.ctx,
+                        &mut self.driver.ctx,
                         pol,
                     );
                 } else {
@@ -355,20 +376,27 @@ impl BoundChecker for MethodDriver<'_, '_> {
             }
             Ty::Func(sig) => {
                 if self.is_binder() {
-                    self.0
-                        .checker
-                        .check(Sig::Partialize(&Sig::Type(sig)), &mut self.0.ctx, pol);
+                    self.driver.checker.check(
+                        Sig::Partialize(&Sig::Type(sig)),
+                        &mut self.driver.ctx,
+                        pol,
+                    );
                 } else {
                     // todo: general select operator
                 }
             }
             Ty::With(w) => {
-                self.0.ctx.args.push(w.with.clone());
+                self.driver.ctx.args.push(w.with.clone());
                 w.sig.bounds(pol, self);
-                self.0.ctx.args.pop();
+                self.driver.ctx.args.pop();
             }
             Ty::Tuple(..) => self.array_method(ty, pol),
             Ty::Array(..) => self.array_method(ty, pol),
+            Ty::Args(..) | Ty::Builtin(BuiltinTy::Args) => self.arguments_method(pol),
+            Ty::If(if_ty) => {
+                self.collect(&if_ty.then, pol);
+                self.collect(&if_ty.else_, pol);
+            }
             // todo: general select operator
             _ => {}
         }

@@ -3,20 +3,20 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/binary_union.typ
 ---
-"f" = (Any) => TypeBinary { operands: (IfTy { cond: Any, then: 1, else_: "s" }, IfTy { cond: Any, then: 1, else_: "s" }), op: Add }
+"f" = (@flag) => TypeBinary { operands: (IfTy { cond: @flag, then: 1, else_: "s" }, IfTy { cond: @flag, then: 1, else_: "s" }), op: Add }
 "flag" = Any
 "x" = IfTy { cond: Any, then: 1, else_: "s" }
-"sub-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Sub }
+"sub-any" = (@a, @b) => TypeBinary { operands: (@a, @b), op: Sub }
 "a" = Any
 "b" = Any
-"mul-any" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Mul }
+"mul-any" = (@a, @b) => TypeBinary { operands: (@a, @b), op: Mul }
 "a" = Any
 "b" = Any
-"cross" = (Any, Any, Any) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }), op: Sub }
+"cross" = (@o, @a, @b) => TypeBinary { operands: (TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }, TypeBinary { operands: (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }), op: Mul }), op: Sub }
 "o" = Any
 "a" = Any
 "b" = Any
-"call-sub" = (Any, Any) => TypeBinary { operands: (Any, Any), op: Sub }
+"call-sub" = (@a, @b) => TypeBinary { operands: (@a, @b), op: Sub }
 "a" = Any
 "b" = Any
 =====

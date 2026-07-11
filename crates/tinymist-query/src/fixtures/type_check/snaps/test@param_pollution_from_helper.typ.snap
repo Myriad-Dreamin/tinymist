@@ -3,9 +3,9 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/param_pollution_from_helper.typ
 ---
-"check-free-var" = (Any) => IfTy { cond: TypeBinary { operands: (Any, "i"), op: Eq }, then: Any, else_: None }
-"v" = "i"
-"public" = (Any, Any) => Any
+"check-free-var" = (@v) => None
+"v" = ( ⪰ Type(str) | "i")
+"public" = (@expr, @var) => @expr
 "expr" = Type(int)
 "var" = Type(str)
 "use-public" = 1
@@ -14,12 +14,12 @@ input_file: crates/tinymist-query/src/fixtures/type_check/param_pollution_from_h
 20..21 -> @v
 32..33 -> @v
 47..52 -> Func(panic)
-47..73 -> ()
+47..73 -> Never
 86..92 -> @public
 93..97 -> @expr
 99..102 -> @var
 110..124 -> @check-free-var
-110..129 -> IfTy { cond: TypeBinary { operands: (@var, "i"), op: Eq }, then: (), else_: None }
+110..129 -> None
 125..128 -> @var
 132..136 -> @expr
 145..155 -> @use-public

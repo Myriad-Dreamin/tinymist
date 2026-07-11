@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/multi_return_panic.typ
+---
+"choose" = (@flag) => ("ok" | (1, 2, ))
+"flag" = ( ⪰ Type(str) | "string" | "tuple")
+"tuple" = ("ok" | (1, 2, ))
+"string" = ("ok" | (1, 2, ))
+=====
+5..11 -> @choose
+12..16 -> @flag
+27..31 -> @flag
+56..62 -> (1, 2, )
+72..76 -> @flag
+113..118 -> Func(panic)
+113..130 -> Never
+139..144 -> @tuple
+147..153 -> @choose
+147..162 -> ("ok" | (1, 2, ))
+168..174 -> @string
+177..183 -> @choose
+177..193 -> ("ok" | (1, 2, ))
