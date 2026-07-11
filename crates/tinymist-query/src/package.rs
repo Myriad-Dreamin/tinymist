@@ -291,6 +291,12 @@ struct DumpVariable {
     ty: Option<DumpType>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct DumpVariableOrigin {
+    source: &'static str,
+    exported: bool,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DumpDecl {
@@ -337,7 +343,7 @@ fn dump_file_scope(
         kind: "file",
         name: file.path.clone(),
         declaration: None,
-        variables: dump_scope_variables(source, type_info, exports, "export", options),
+        variables: dump_scope_variables(source, type_info, exports, "export", true, options),
     };
 
     let mut scopes = vec![file_scope];
@@ -358,8 +364,13 @@ fn dump_scope_variables(
     type_info: &TypeInfo,
     scope: &LexicalScope,
     var_source: &'static str,
+    exported: bool,
     options: PackageTyckDumpOptions,
 ) -> Vec<DumpVariable> {
+    let origin = DumpVariableOrigin {
+        source: var_source,
+        exported,
+    };
     let mut vars = scope
         .iter()
         .filter_map(|(name, expr)| {
@@ -370,7 +381,7 @@ fn dump_scope_variables(
                 name.as_ref(),
                 decl,
                 Some(expr),
-                var_source,
+                origin,
                 options,
             ))
         })
@@ -482,7 +493,10 @@ fn collect_pattern_sig_variables(
             decl.name().as_ref(),
             decl,
             None,
-            var_source,
+            DumpVariableOrigin {
+                source: var_source,
+                exported: false,
+            },
             options,
         ));
         collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
@@ -494,7 +508,10 @@ fn collect_pattern_sig_variables(
             decl.name().as_ref(),
             decl,
             None,
-            var_source,
+            DumpVariableOrigin {
+                source: var_source,
+                exported: false,
+            },
             options,
         ));
         collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
@@ -518,7 +535,10 @@ fn collect_pattern_variables(
                 decl.name().as_ref(),
                 decl,
                 None,
-                var_source,
+                DumpVariableOrigin {
+                    source: var_source,
+                    exported: false,
+                },
                 options,
             ));
         }
@@ -661,14 +681,14 @@ fn dump_variable(
     name: &str,
     decl: &DeclExpr,
     expr: Option<&Expr>,
-    var_source: &'static str,
+    origin: DumpVariableOrigin,
     options: PackageTyckDumpOptions,
 ) -> DumpVariable {
     DumpVariable {
         name: name.to_owned(),
         kind: decl.kind().to_string(),
-        source: var_source,
-        exported: var_source == "export",
+        source: origin.source,
+        exported: origin.exported,
         declaration: dump_decl(source, decl),
         expression: expr.map(ToString::to_string),
         ty: type_info
@@ -688,15 +708,93 @@ fn dump_decl(source: &Source, decl: &DeclExpr) -> DumpDecl {
 }
 
 fn dump_type(type_info: &TypeInfo, ty: Ty, options: PackageTyckDumpOptions) -> DumpType {
+    let display_source = ty.clone();
     let ty = type_info.simplify(ty, true);
+    let display_ty = if contains_signature_binders(&ty) {
+        type_info.simplify(display_source, false)
+    } else {
+        ty.clone()
+    };
     DumpType {
         debug: format_debug_dump(&ty, options.max_type_chars),
-        describe: ty
+        describe: display_ty
             .describe()
             .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
-        repr: ty
+        repr: display_ty
             .repr()
             .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
+    }
+}
+
+fn contains_signature_binders(ty: &Ty) -> bool {
+    match ty {
+        Ty::Func(sig) | Ty::Pattern(sig) => {
+            sig.inputs().any(contains_type_var)
+                || sig.inputs().any(contains_signature_binders)
+                || sig.body.as_ref().is_some_and(contains_signature_binders)
+        }
+        Ty::Args(sig) => {
+            sig.inputs().any(contains_signature_binders)
+                || sig.body.as_ref().is_some_and(contains_signature_binders)
+        }
+        Ty::With(with) => {
+            contains_signature_binders(&with.sig)
+                || with.with.inputs().any(contains_signature_binders)
+                || with
+                    .with
+                    .body
+                    .as_ref()
+                    .is_some_and(contains_signature_binders)
+        }
+        Ty::Param(param) => contains_signature_binders(&param.ty),
+        Ty::Union(types) | Ty::Tuple(types) => types.iter().any(contains_signature_binders),
+        Ty::Let(bounds) => bounds
+            .lbs
+            .iter()
+            .chain(&bounds.ubs)
+            .any(contains_signature_binders),
+        Ty::Dict(record) => record.types.iter().any(contains_signature_binders),
+        Ty::Array(elem) => contains_signature_binders(elem),
+        Ty::Select(select) => contains_signature_binders(&select.ty),
+        Ty::Unary(unary) => contains_signature_binders(&unary.lhs),
+        Ty::Binary(binary) => binary
+            .operands()
+            .iter()
+            .any(|ty| contains_signature_binders(ty)),
+        Ty::If(if_ty) => {
+            contains_signature_binders(&if_ty.cond)
+                || contains_signature_binders(&if_ty.then)
+                || contains_signature_binders(&if_ty.else_)
+        }
+        Ty::Var(_) | Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => false,
+    }
+}
+
+fn contains_type_var(ty: &Ty) -> bool {
+    match ty {
+        Ty::Var(_) => true,
+        Ty::Func(sig) | Ty::Args(sig) | Ty::Pattern(sig) => {
+            sig.inputs().any(contains_type_var) || sig.body.as_ref().is_some_and(contains_type_var)
+        }
+        Ty::With(with) => {
+            contains_type_var(&with.sig)
+                || with.with.inputs().any(contains_type_var)
+                || with.with.body.as_ref().is_some_and(contains_type_var)
+        }
+        Ty::Param(param) => contains_type_var(&param.ty),
+        Ty::Union(types) | Ty::Tuple(types) => types.iter().any(contains_type_var),
+        Ty::Let(bounds) => bounds.lbs.iter().chain(&bounds.ubs).any(contains_type_var),
+        Ty::Dict(record) => record.types.iter().any(contains_type_var),
+        Ty::Array(elem) => contains_type_var(elem),
+        Ty::Select(select) => contains_type_var(&select.ty),
+        Ty::Unary(unary) => contains_type_var(&unary.lhs),
+        Ty::Binary(binary) => binary.operands().iter().any(|ty| contains_type_var(ty)),
+        Ty::If(if_ty) => {
+            contains_type_var(&if_ty.cond)
+                || contains_type_var(&if_ty.then)
+                || contains_type_var(&if_ty.else_)
+        }
+        Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => false,
     }
 }
 
