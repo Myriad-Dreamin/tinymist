@@ -721,6 +721,7 @@ impl Decl {
         match self {
             Self::Module(ModuleDecl { fid, .. }) => Some(*fid),
             Self::BibEntry(NameRangeDecl { at, .. }) => Some(at.0),
+            Self::Docs(DocsDecl { base, .. }) => base.file_id(),
             that => that.span().id(),
         }
     }
@@ -1463,7 +1464,9 @@ mod tests {
     use typst::syntax::{FileId, RootedPath, VirtualPath, VirtualRoot};
 
     use super::{Decl, StrictCmp};
+    use crate::adt::interner::Interned;
     use crate::prelude::TypstFileId;
+    use crate::ty::TypeVar;
 
     fn package(spec: &str) -> typst::syntax::package::PackageSpec {
         typst::syntax::package::PackageSpec::from_str(spec).expect("valid package spec")
@@ -1545,5 +1548,15 @@ mod tests {
             Ordering::Equal
         );
         assert_ne!(package_file.strict_cmp(&other_path), Ordering::Equal);
+    }
+
+    #[test]
+    fn docs_decl_inherits_base_file_id() {
+        let fid = file_id(VirtualRoot::Project, "/main.typ");
+        let base: Interned<Decl> = Decl::module(fid).into();
+        let var = TypeVar::new("input".into(), base.clone());
+        let docs = Decl::docs(base, var);
+
+        assert_eq!(docs.file_id(), Some(fid));
     }
 }
