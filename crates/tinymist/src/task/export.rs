@@ -1011,8 +1011,7 @@ mod tests {
 
         let graph = WorldComputeGraph::new(snap);
 
-        let needs_run =
-            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
+        let needs_run = ProjectCompilation::run(&graph).expect("failed to compile diagnostics");
 
         assert!(!needs_run);
     }
@@ -1035,8 +1034,7 @@ mod tests {
 
         let graph = WorldComputeGraph::new(snap);
 
-        let needs_run =
-            ProjectCompilation::preconfig_timings(&graph).expect("failed to preconfigure timings");
+        let needs_run = ProjectCompilation::run(&graph).expect("failed to compile diagnostics");
 
         assert!(needs_run);
     }

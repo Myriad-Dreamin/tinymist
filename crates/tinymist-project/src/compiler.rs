@@ -15,8 +15,8 @@ use tinymist_world::vfs::notify::{
 use tinymist_world::vfs::{FileId, FsProvider, RevisingVfs, WorkspaceResolver};
 use tinymist_world::{
     BundleCompilationTask, CompileSignal, CompileSnapshot, CompilerFeat, CompilerUniverse,
-    DiagnosticsTask, EntryReader, EntryState, FlagTask, HtmlCompilationTask, PagedCompilationTask,
-    ProjectInsId, TaskInputs, WorldComputeGraph, WorldDeps,
+    DiagnosticsTask, EntryReader, EntryState, ProjectInsId, TaskInputs, WorldComputeGraph,
+    WorldDeps,
 };
 use tokio::sync::mpsc;
 use typst::World;
@@ -89,9 +89,6 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 
     /// Runs the compiler and returns the compiled document.
     pub fn from_graph(graph: Arc<WorldComputeGraph<F>>, is_html: bool) -> CompiledArtifact<F> {
-        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(is_html)));
-        let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(!is_html)));
-        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(false)));
         let doc = if is_html {
             graph.shared_compile_html().expect("html").map(From::from)
         } else {
@@ -108,9 +105,9 @@ impl<F: CompilerFeat> CompiledArtifact<F> {
 
     /// Runs diagnostics without precompiling a paged or HTML document.
     pub fn from_graph_without_doc(graph: Arc<WorldComputeGraph<F>>) -> CompiledArtifact<F> {
-        let _ = graph.provide::<FlagTask<HtmlCompilationTask>>(Ok(FlagTask::flag(false)));
-        let _ = graph.provide::<FlagTask<PagedCompilationTask>>(Ok(FlagTask::flag(false)));
-        let _ = graph.provide::<FlagTask<BundleCompilationTask>>(Ok(FlagTask::flag(true)));
+        let _ = graph
+            .compute::<BundleCompilationTask>()
+            .expect("bundle compilation");
         CompiledArtifact {
             diag: graph.shared_diagnostics().expect("diag"),
             graph,
