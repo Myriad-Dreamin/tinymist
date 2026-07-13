@@ -232,7 +232,7 @@ pub trait ExportComputation<F: CompilerFeat, D> {
     ) -> Result<Self::Output>;
 }
 
-/// A task that computes a configuration.
+/// A task that computes a configuration supplied by an external caller.
 pub struct ConfigTask<T>(pub T);
 
 impl<F: CompilerFeat, T: Send + Sync + 'static> WorldComputable<F> for ConfigTask<T> {
@@ -241,27 +241,6 @@ impl<F: CompilerFeat, T: Send + Sync + 'static> WorldComputable<F> for ConfigTas
     fn compute(_graph: &Arc<WorldComputeGraph<F>>) -> Result<T> {
         let id = std::any::type_name::<T>();
         panic!("{id:?} must be provided before computation");
-    }
-}
-
-/// A task that computes a flag.
-pub type FlagTask<T> = ConfigTask<TaskFlagBase<T>>;
-
-/// A base task flag.
-pub struct TaskFlagBase<T> {
-    /// Whether the task is enabled.
-    pub enabled: bool,
-    /// The phantom data.
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> FlagTask<T> {
-    /// Creates a new flag task.
-    pub fn flag(flag: bool) -> Arc<TaskFlagBase<T>> {
-        Arc::new(TaskFlagBase {
-            enabled: flag,
-            _phantom: Default::default(),
-        })
     }
 }
 
@@ -334,12 +313,10 @@ impl<F: CompilerFeat, D> WorldComputable<F> for CompilationTask<D>
 where
     D: Output + Send + Sync + 'static,
 {
-    type Output = Option<Warned<SourceResult<Arc<D>>>>;
+    type Output = Warned<SourceResult<Arc<D>>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-        let enabled = graph.must_get::<FlagTask<CompilationTask<D>>>()?.enabled;
-
-        Ok(enabled.then(|| CompilationTask::<D>::execute(&graph.snap.world)))
+        Ok(CompilationTask::<D>::execute(&graph.snap.world))
     }
 }
 
@@ -353,11 +330,8 @@ where
     type Output = Option<Arc<D>>;
 
     fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self::Output> {
-        let doc = graph.compute::<CompilationTask<D>>()?;
-        let compiled = doc
-            .as_ref()
-            .as_ref()
-            .and_then(|warned| warned.output.clone().ok());
+        let compiled = graph.compute::<CompilationTask<D>>()?;
+        let compiled = compiled.output.clone().ok();
 
         Ok(compiled)
     }
@@ -373,11 +347,9 @@ struct CompilationDiagnostics {
 
 impl CompilationDiagnostics {
     /// Creates a new diagnostics from a result.
-    fn from_result<T>(result: &Option<Warned<SourceResult<T>>>) -> Self {
-        let errors = result
-            .as_ref()
-            .and_then(|r| r.output.as_ref().map_err(|e| e.clone()).err());
-        let warnings = result.as_ref().map(|r| r.warnings.clone());
+    fn from_result<T>(result: Option<&Warned<SourceResult<T>>>) -> Self {
+        let errors = result.and_then(|r| r.output.as_ref().map_err(|e| e.clone()).err());
+        let warnings = result.map(|r| r.warnings.clone());
 
         Self { errors, warnings }
     }
@@ -390,23 +362,21 @@ pub struct DiagnosticsTask {
     bundle: CompilationDiagnostics,
 }
 
-impl<F: CompilerFeat> WorldComputable<F> for DiagnosticsTask {
-    type Output = Self;
-
-    fn compute(graph: &Arc<WorldComputeGraph<F>>) -> Result<Self> {
-        let paged = graph.compute::<PagedCompilationTask>()?.clone();
-        let html = graph.compute::<HtmlCompilationTask>()?.clone();
-        let bundle = graph.compute::<BundleCompilationTask>()?.clone();
+impl DiagnosticsTask {
+    /// Collects diagnostics from compilation tasks that have already been
+    /// requested from the graph.
+    fn collect<F: CompilerFeat>(graph: &WorldComputeGraph<F>) -> Result<Self> {
+        let paged = graph.get::<PagedCompilationTask>().transpose()?;
+        let html = graph.get::<HtmlCompilationTask>().transpose()?;
+        let bundle = graph.get::<BundleCompilationTask>().transpose()?;
 
         Ok(Self {
-            paged: CompilationDiagnostics::from_result(&paged),
-            html: CompilationDiagnostics::from_result(&html),
-            bundle: CompilationDiagnostics::from_result(&bundle),
+            paged: CompilationDiagnostics::from_result(paged.as_deref()),
+            html: CompilationDiagnostics::from_result(html.as_deref()),
+            bundle: CompilationDiagnostics::from_result(bundle.as_deref()),
         })
     }
-}
 
-impl DiagnosticsTask {
     /// Creates diagnostics from errors.
     pub fn from_errors(paged_errors: Option<EcoVec<typst::diag::SourceDiagnostic>>) -> Self {
         Self {
@@ -491,6 +461,6 @@ impl<F: CompilerFeat> WorldComputeGraph<F> {
     /// Gets the diagnostics from shared compilation.
     #[must_use = "the result must be checked"]
     pub fn shared_diagnostics(self: &Arc<Self>) -> Result<Arc<DiagnosticsTask>> {
-        self.compute::<DiagnosticsTask>()
+        Ok(Arc::new(DiagnosticsTask::collect(self)?))
     }
 }
