@@ -2,12 +2,11 @@
 
 mod rules;
 
-use std::{cell::OnceCell, sync::Arc};
+use std::cell::OnceCell;
 
 use tinymist_analysis::{
     adt::interner::Interned,
     syntax::{Decl, ExprInfo},
-    ty::{Ty, TyCtx, TypeInfo},
 };
 use tinymist_project::LspWorld;
 use typst::{
@@ -34,13 +33,8 @@ pub struct LintInfo {
 }
 
 /// Performs linting check on file and returns a vector of diagnostics.
-pub fn lint_file(
-    world: &LspWorld,
-    ei: &ExprInfo,
-    ti: Arc<TypeInfo>,
-    known_issues: KnownIssues,
-) -> LintInfo {
-    let diagnostics = Linter::new(world, ei.clone(), ti, known_issues).lint(ei.source.root());
+pub fn lint_file(world: &LspWorld, ei: &ExprInfo, known_issues: KnownIssues) -> LintInfo {
+    let diagnostics = Linter::new(world, ei.clone(), known_issues).lint(ei.source.root());
     LintInfo {
         revision: ei.revision,
         fid: ei.fid,
@@ -94,7 +88,6 @@ impl KnownIssues {
 struct Linter<'w> {
     world: &'w LspWorld,
     ei: ExprInfo,
-    ti: Arc<TypeInfo>,
     known_issues: KnownIssues,
     diag: DiagnosticVec,
     loop_info: Option<LoopInfo>,
@@ -105,16 +98,10 @@ struct Linter<'w> {
 }
 
 impl<'w> Linter<'w> {
-    fn new(
-        world: &'w LspWorld,
-        ei: ExprInfo,
-        ti: Arc<TypeInfo>,
-        known_issues: KnownIssues,
-    ) -> Self {
+    fn new(world: &'w LspWorld, ei: ExprInfo, known_issues: KnownIssues) -> Self {
         Self {
             world,
             ei,
-            ti,
             known_issues,
             diag: EcoVec::new(),
             loop_info: None,
@@ -122,10 +109,6 @@ impl<'w> Linter<'w> {
 
             available_fonts: OnceCell::new(),
         }
-    }
-
-    fn tctx(&self) -> &impl TyCtx {
-        self.ti.as_ref()
     }
 
     fn lint(mut self, node: &SyntaxNode) -> DiagnosticVec {
@@ -247,39 +230,6 @@ impl<'w> Linter<'w> {
 
         has_set
     }
-
-    fn check_type_compare(&mut self, expr: ast::Binary<'_>) {
-        let op = expr.op();
-        if is_compare_op(op) {
-            let lhs = expr.lhs();
-            let rhs = expr.rhs();
-
-            let mut lhs = self.expr_ty(lhs);
-            let mut rhs = self.expr_ty(rhs);
-
-            let other_is_str = lhs.is_str(self.tctx());
-            if other_is_str {
-                (lhs, rhs) = (rhs, lhs);
-            }
-
-            if lhs.is_type(self.tctx()) && (other_is_str || rhs.is_str(self.tctx())) {
-                let msg = "comparing strings with types is deprecated";
-                let diag = SourceDiagnostic::warning(expr.span(), msg);
-                let diag = diag.with_hints([
-                    "compare with the literal type instead".into(),
-                    "this comparison will always return `false` since typst v0.14".into(),
-                ]);
-                self.diag.push(diag);
-            }
-        }
-    }
-
-    fn expr_ty<'a>(&self, expr: ast::Expr<'a>) -> TypedExpr<'a> {
-        TypedExpr {
-            expr,
-            ty: self.ti.type_of_span(expr.span()),
-        }
-    }
 }
 
 impl DataFlowVisitor for Linter<'_> {
@@ -398,7 +348,6 @@ impl DataFlowVisitor for Linter<'_> {
     }
 
     fn binary(&mut self, expr: ast::Binary<'_>) -> Option<()> {
-        self.check_type_compare(expr);
         self.exprs([expr.lhs(), expr.rhs()].into_iter())
     }
 
@@ -972,28 +921,6 @@ impl<'a> Block<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
-struct TypedExpr<'a> {
-    expr: ast::Expr<'a>,
-    ty: Option<Ty>,
-}
-
-impl TypedExpr<'_> {
-    fn is_str(&self, ctx: &impl TyCtx) -> bool {
-        self.ty
-            .as_ref()
-            .map(|ty| ty.is_str(ctx))
-            .unwrap_or_else(|| matches!(self.expr, ast::Expr::Str(..)))
-    }
-
-    fn is_type(&self, ctx: &impl TyCtx) -> bool {
-        self.ty
-            .as_ref()
-            .map(|ty| ty.is_type(ctx))
-            .unwrap_or_default()
-    }
-}
-
 enum BuggyBlockLoc<'a> {
     Show(ast::ShowRule<'a>),
     IfTrue(ast::Conditional<'a>),
@@ -1077,11 +1004,6 @@ enum ExprContext {
 
 fn is_show_set(it: ast::Expr) -> bool {
     matches!(it, ast::Expr::SetRule(..) | ast::Expr::ShowRule(..))
-}
-
-fn is_compare_op(op: ast::BinOp) -> bool {
-    use ast::BinOp::*;
-    matches!(op, Lt | Leq | Gt | Geq | Eq | Neq)
 }
 
 /// The error message when a variable wasn't found it math.
