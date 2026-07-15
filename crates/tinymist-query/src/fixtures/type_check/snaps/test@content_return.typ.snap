@@ -3,12 +3,12 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/content_return.typ
 ---
-"interpolated" = (Any, Any, Any) => None
+"interpolated" = (@day, @month, @year) => Any
 "day" = Any
 "month" = Any
 "year" = Any
 "month-name" = Any
-"final-unknown" = (Any) => Any
+"final-unknown" = (@x) => @x
 "x" = Any
 =====
 5..17 -> @interpolated

@@ -3,18 +3,18 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/deferred_selected_apply.typ
 ---
-"via-method" = (Any, Any) => Any
+"via-method" = (@ctx, @layer) => Any
 "ctx" = Any
 "layer" = Any
 "mapping" = Any
 "known-layer" = {"mapping": {"x": "x"}}
-"known-ctx" = {"resolve-mapping": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
-"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
-"layer" = None
+"known-ctx" = {"resolve-mapping": (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping }}
+"" = (@layer) => IfTy { cond: TypeBinary { operands: (@layer, None), op: Eq }, then: None, else_: @v"layer".mapping }
+"layer" = ( ⪰ None | {"mapping": {"x": "x"}})
 "known-result" = IfTy { cond: TypeBinary { operands: ({"mapping": {"x": "x"}}, None), op: Eq }, then: None, else_: {"mapping": {"x": "x"}}.mapping }
 "direct-known" = () => IfTy { cond: TypeBinary { operands: ({"mapping": {"y": "y"}}, None), op: Eq }, then: None, else_: {"mapping": {"y": "y"}}.mapping }
-"obj" = {"f": (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }}
-"" = (Any) => IfTy { cond: TypeBinary { operands: (Any, None), op: Eq }, then: None, else_: Any.mapping }
+"obj" = {"f": (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping }}
+"" = (@x) => IfTy { cond: TypeBinary { operands: (@x, None), op: Eq }, then: None, else_: @v"x".mapping }
 "x" = ( ⪰ None | {"mapping": {"y": "y"}})
 =====
 5..15 -> @via-method

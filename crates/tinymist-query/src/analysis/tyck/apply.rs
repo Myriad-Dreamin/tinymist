@@ -134,6 +134,29 @@ impl ApplyChecker for ApplyTypeChecker<'_, '_> {
                     crate::log_debug_ct!("resultant: {resultants:?}");
                 }
             }
+            Sig::Builtin(BuiltinSig::ArgumentsPos(this)) => {
+                if args.positional_params().len() == 0
+                    && args.named_params().len() == 0
+                    && args.rest_param().is_none()
+                {
+                    let res = match this {
+                        Ty::Args(args) => {
+                            let mut elements =
+                                args.positional_params().cloned().collect::<Vec<_>>();
+                            if let Some(rest) = args.rest_param() {
+                                elements
+                                    .push(Ty::Unary(TypeUnary::new(UnaryOp::Spread, rest.clone())));
+                            }
+                            Ty::Tuple(elements.into())
+                        }
+                        Ty::Builtin(BuiltinTy::Args) => Ty::Array(Ty::Any.into()),
+                        this => Ty::Tuple(
+                            vec![Ty::Unary(TypeUnary::new(UnaryOp::Spread, this.clone()))].into(),
+                        ),
+                    };
+                    self.resultant.push(res);
+                }
+            }
             _ => {}
         }
 

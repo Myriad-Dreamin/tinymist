@@ -1,0 +1,23 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_input_contract.typ
+---
+"base" = Any
+"scale-values" = (@values, @factor) => Any
+"values" = Type(array)
+"factor" = Type(int)
+"use-scale" = (@values) => Any
+"values" = Any
+"result" = (@values) => Any
+=====
+0..0 -> @scale-values
+1..32 -> @base
+20..32 -> @scale-values
+39..48 -> @use-scale
+49..55 -> @values
+59..71 -> @scale-values
+59..82 -> Any
+72..78 -> @values
+88..94 -> @result
+97..106 -> @use-scale

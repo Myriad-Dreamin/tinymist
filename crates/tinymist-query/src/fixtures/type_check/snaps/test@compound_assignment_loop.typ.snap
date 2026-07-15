@@ -3,11 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/compound_assignment_loop.typ
 ---
-"scan-backwards" = (Any) => Any
+"scan-backwards" = (@s) => TypeBinary { operands: (Any, 1), op: Sub }
 "s" = Any
 "len" = TypeBinary { operands: (Any, 1), op: Sub }
-"i" = Any
-"assign-from-unknown" = (Any) => 0
+"i" = TypeBinary { operands: (Any, 1), op: Sub }
+"assign-from-unknown" = (@unknown) => 0
 "unknown" = Any
 "i" = 0
 =====

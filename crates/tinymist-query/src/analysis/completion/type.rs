@@ -158,6 +158,7 @@ impl TypeCompletionWorker<'_, '_, '_, '_> {
             BuiltinTy::Space => return None,
             BuiltinTy::Break => return None,
             BuiltinTy::Continue => return None,
+            BuiltinTy::Never => return None,
             BuiltinTy::Content(..) => return None,
             BuiltinTy::Infer => return None,
             BuiltinTy::FlowNone => return None,

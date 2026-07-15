@@ -8,7 +8,7 @@ Range: 40:24:40:38
 ```typc
 let known-nonempty(
   pat: any | dictionary,
-  known: any,
+  known: dictionary,
 ) = any;
 ```
 
@@ -31,5 +31,5 @@ type: any | dictionary
 ## known (positional)
 
 ```typc
-type: 
+type: dictionary
 ```

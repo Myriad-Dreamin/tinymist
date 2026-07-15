@@ -3,38 +3,38 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.typ
 ---
-"f" = () => Undef
-"id" = (Any) => Any
+"f" = () => 1
+"id" = (@x) => @x
 "x" = Type(int)
-"h" = () => Undef
-"choose" = (Any, Any) => IfTy { cond: true, then: Any, else_: Any }
+"h" = () => IfTy { cond: true, then: 1, else_: "x" }
+"choose" = (@x, @y) => IfTy { cond: true, then: @x, else_: @y }
 "x" = Type(int)
 "y" = Type(str)
-"k" = () => Undef
-"fill" = (Any) => Any
-"d" = Any
+"k" = () => {}
+"fill" = (@d) => @d
+"d" = {}
 "entry" = {}
-"m" = () => Undef
-"complete" = (Any, Any) => Any
+"m" = () => {}
+"complete" = (@key, @definitions) => @definitions
 "key" = Type(str)
-"definitions" = Any
+"definitions" = {}
 "entry" = {}
-"n" = () => Undef
-"complete" = (Any, Any) => Any
+"n" = () => {}
+"complete" = (@key, @definitions) => @definitions
 "key" = Type(str)
-"definitions" = Any
+"definitions" = {}
 "entry" = {}
-"top-complete" = (Any, Any) => Any
+"top-complete" = (@key, @definitions) => @definitions
 "key" = Type(str)
-"definitions" = Any
-"p" = (Any) => TypeUnary { lhs: {}, op: Return }
-"definitions" = Any
-"entry" = {}
-"q" = (Any) => {}
+"definitions" = {}
+"p" = (@definitions) => {}
 "definitions" = Any
 "entry" = {}
-"r" = (( ⪯ Any & Type(array))) => {}
-"definitions" = ( ⪰ Type(array) | Type(dictionary) | Type(string))
+"q" = (@definitions) => {}
+"definitions" = Any
+"entry" = {}
+"r" = (@definitions) => {}
+"definitions" = ( ⪰ Type(array) | Type(dictionary) | Type(str))
 "entry" = {}
 "n_defs" = ( ⪰ 0 | (Type(int) | Type(int)))
 "key" = Any
@@ -75,7 +75,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 300..311 -> @definitions
 338..349 -> @definitions
 358..363 -> Func(panic)
-358..368 -> ()
+358..368 -> Never
 397..408 -> @definitions
 417..428 -> @definitions
 417..435 -> @v"definitions".insert
@@ -93,7 +93,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 560..571 -> @definitions
 598..609 -> @definitions
 618..623 -> Func(panic)
-618..628 -> ()
+618..628 -> Never
 657..668 -> @definitions
 677..688 -> @definitions
 677..695 -> @v"definitions".insert
@@ -117,7 +117,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 922..933 -> @definitions
 958..969 -> @definitions
 976..981 -> Func(panic)
-976..986 -> ()
+976..986 -> Never
 1011..1022 -> @definitions
 1029..1040 -> @definitions
 1029..1047 -> @v"definitions".insert
@@ -174,10 +174,10 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 1613..1630 -> (Type(int) | Type(int))
 1638..1644 -> @n_defs
 1658..1663 -> Func(panic)
-1658..1668 -> ()
+1658..1668 -> Never
 1683..1689 -> @n_defs
 1702..1707 -> Func(panic)
-1702..1712 -> ()
+1702..1712 -> Never
 1728..1731 -> @key
 1733..1736 -> @def
 1741..1760 -> ("long", "long-pl", )
@@ -195,7 +195,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 1848..1858 -> Type(dictionary)
 1882..1893 -> @definitions
 1902..1907 -> Func(panic)
-1902..1912 -> ()
+1902..1912 -> Never
 1928..1931 -> @key
 1933..1936 -> @def
 1941..1952 -> @definitions
@@ -207,9 +207,9 @@ input_file: crates/tinymist-query/src/fixtures/type_check/scope_deferred_apply.t
 2035..2038 -> @key
 2040..2043 -> @def
 2068..2073 -> Func(panic)
-2068..2078 -> ()
+2068..2078 -> Never
 2108..2113 -> Func(panic)
-2108..2118 -> ()
+2108..2118 -> Never
 2125..2137 -> @top-complete
 2125..2149 -> @entry
 2143..2148 -> @entry

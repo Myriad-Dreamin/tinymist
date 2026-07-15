@@ -1,0 +1,39 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/tuple_spread.typ
+---
+"fixed" = (1, 2, )
+"direct" = (0, 1, 2, 3, )
+"prepend" = (@head, ...: @tail) => (@head, TypeUnary { lhs: @tail, op: Spread }, )
+"head" = Type(int)
+"tail" = ( ⪰ Args | &((1, 2) => any))
+"prepended" = (0, 1, 2, )
+"identity-args" = (...: @args) => @args
+"args" = ( ⪰ Args | &(("x", "y") => any))
+"captured" = &(("x", "y") => any)
+"respread" = (0, "x", "y", 3, )
+=====
+5..10 -> @fixed
+13..19 -> (1, 2, )
+25..31 -> @direct
+34..49 -> (0, TypeUnary { lhs: @fixed, op: Spread }, 3, )
+40..45 -> @fixed
+56..63 -> @prepend
+64..68 -> @head
+72..76 -> @tail
+80..94 -> (@head, TypeUnary { lhs: @tail, op: Spread }, )
+81..85 -> @head
+89..93 -> @tail
+100..109 -> @prepended
+112..119 -> @prepend
+112..128 -> (0, 1, 2, )
+135..148 -> @identity-args
+151..155 -> @args
+159..163 -> @args
+169..177 -> @captured
+180..193 -> @identity-args
+180..203 -> &(("x", "y") => any)
+209..217 -> @respread
+220..238 -> (0, TypeUnary { lhs: @captured, op: Spread }, 3, )
+226..234 -> @captured

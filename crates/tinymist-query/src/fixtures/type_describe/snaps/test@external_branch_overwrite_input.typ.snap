@@ -1,0 +1,7 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+description: "Check on \"normalize\" (54)"
+expression: post_ty
+input_file: crates/tinymist-query/src/fixtures/type_describe/external_branch_overwrite_input.typ
+---
+(auto | function) => none

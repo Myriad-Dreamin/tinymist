@@ -4,7 +4,7 @@ expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/annotation_fn2.typ
 ---
 "args" = Any
-"fn-wrapper" = ((Type(function) | (...: Any) => Any), ...: Any) => None
+"fn-wrapper" = (@fn, ...: @args) => None
 "fn" = Any
 "args" = Args
 =====

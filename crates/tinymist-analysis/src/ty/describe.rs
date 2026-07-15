@@ -183,7 +183,10 @@ impl TypeDescriber {
                 return "content".into();
             }
             // Doesn't provide any information, hence we doesn't describe it intermediately here.
-            Ty::Any | Ty::Builtin(BuiltinTy::Clause | BuiltinTy::Undef | BuiltinTy::Infer) => {}
+            Ty::Any
+            | Ty::Builtin(
+                BuiltinTy::Clause | BuiltinTy::Undef | BuiltinTy::Never | BuiltinTy::Infer,
+            ) => {}
             Ty::Builtin(BuiltinTy::FlowNone | BuiltinTy::None) => {
                 return "none".into();
             }

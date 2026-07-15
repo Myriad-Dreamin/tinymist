@@ -1,0 +1,31 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_nested_dependent.typ
+---
+"base" = Any
+"make-pair" = (@left) => (@right) => (@left, @right, )
+"left" = Any
+"right" = Any
+"pair-builder" = (@right) => (1, @right, )
+"pair" = (1, "right", )
+"first" = 1
+"second" = "right"
+=====
+0..0 -> @make-pair
+1..29 -> @base
+20..29 -> @make-pair
+36..48 -> @pair-builder
+51..60 -> @make-pair
+51..63 -> (@right) => (1, @right, )
+69..73 -> @pair
+76..88 -> @pair-builder
+76..97 -> (1, "right", )
+103..108 -> @first
+111..115 -> @pair
+111..118 -> (Func(at) | (Func(at) | @v"pair".at))
+111..121 -> (Any | 1)
+127..133 -> @second
+136..140 -> @pair
+136..143 -> (Func(at) | (Func(at) | @v"pair".at))
+136..146 -> (Any | "right")

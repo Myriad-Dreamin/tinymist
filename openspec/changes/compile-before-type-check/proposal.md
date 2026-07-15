@@ -7,6 +7,7 @@ The current PR's deferred inference model improves precision but still leaves de
 - Replace the current deduce path with compile-to-bytecode followed by VM evaluation.
 - Keep a check phase that applies existing compatibility and warning logic after semantic results are available.
 - Preserve `precise_sig_of_def` as the public query for docs/signature consumers.
+- Preserve parameter-dependent function resultants across file boundaries without copying callee-local variables into caller scopes.
 - Avoid exposing shallow signatures through documentation APIs.
 - Retain snapshots as the primary correctness signal for this migration.
 

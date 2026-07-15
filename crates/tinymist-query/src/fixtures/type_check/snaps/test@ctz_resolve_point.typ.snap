@@ -1,0 +1,80 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/ctz_resolve_point.typ
+---
+"ctz-get-points" = (@ctx) => Any
+"ctx" = Any
+"ctz-resolve-point" = (@ctx, @p) => Any
+"ctx" = Any
+"p" = ( ⪰ Any | Type(str))
+"points" = Any
+"point" = Any
+"ctz-resolve-vector" = (@ctx, @vector) => (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }, 0, )
+"ctx" = Any
+"vector" = Any
+"v1" = Any
+"v2" = Any
+=====
+5..19 -> @ctz-get-points
+20..23 -> @ctx
+31..34 -> @ctx
+31..47 -> @v"ctx".shared-state
+31..50 -> @v"ctx".shared-state.at
+31..78 -> Any
+74..77 -> {}
+87..104 -> @ctz-resolve-point
+105..108 -> @ctx
+110..111 -> @p
+122..126 -> Type(type)
+122..129 -> (Type(type) | TypeUnary { lhs: @p, op: TypeOf })
+127..128 -> @p
+133..136 -> Type(string)
+147..153 -> @points
+156..170 -> @ctz-get-points
+156..175 -> Any
+171..174 -> @ctx
+183..184 -> @p
+188..194 -> @points
+210..216 -> @points
+210..219 -> @v"points".at
+210..222 -> Any
+220..221 -> @p
+241..246 -> @point
+250..268 -> Any.resolve
+250..276 -> Any
+269..272 -> @ctx
+274..275 -> @p
+288..293 -> @point
+300..305 -> Func(panic)
+300..329 -> Never
+338..356 -> @ctz-resolve-vector
+357..360 -> @ctx
+362..368 -> @vector
+380..382 -> @v1
+385..402 -> @ctz-resolve-point
+385..421 -> (Any | Any)
+403..406 -> @ctx
+408..414 -> @vector
+408..417 -> @v"vector".at
+408..420 -> Any
+428..430 -> @v2
+433..450 -> @ctz-resolve-point
+433..469 -> (Any | Any)
+451..454 -> @ctx
+456..462 -> @vector
+456..465 -> @v"vector".at
+456..468 -> Any
+472..517 -> (TypeBinary { operands: (Any, Any), op: Sub }, TypeBinary { operands: (Any, Any), op: Sub }, 0, )
+473..475 -> @v2
+473..478 -> @v"v2".at
+473..481 -> Any
+484..486 -> @v1
+484..489 -> @v"v1".at
+484..492 -> Any
+494..496 -> @v2
+494..499 -> @v"v2".at
+494..502 -> Any
+505..507 -> @v1
+505..510 -> @v"v1".at
+505..513 -> Any

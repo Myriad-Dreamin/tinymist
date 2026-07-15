@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_rest_builder.typ
+---
+"base" = Any
+"collect-rest" = (...: @items) => (None, TypeUnary { lhs: Array<TypeUnary { lhs: @items, op: ElementOf }>, op: Spread }, )
+"items" = Args
+"collected" = "external"
+"number" = 1
+=====
+0..0 -> @collect-rest
+1..21 -> @base
+32..41 -> @collected
+45..57 -> @collect-rest
+45..69 -> (None, TypeUnary { lhs: Array<"external">, op: Spread }, )
+79..85 -> @number
+89..101 -> @collect-rest
+89..104 -> (None, TypeUnary { lhs: Array<1>, op: Spread }, )

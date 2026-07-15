@@ -1,6 +1,6 @@
 //! Completion of definitions in scope.
 
-use typst::foundations::{Array, Dict};
+use typst::foundations::{Args, Array, Dict};
 
 use crate::ty::SigWithTy;
 
@@ -313,6 +313,9 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             Iface::Type { val, at } if self.is_field_access() => {
                 self.type_methods(Some(at.clone()), *val);
             }
+            Iface::Args { at } if self.is_field_access() => {
+                self.type_methods(Some(at.clone()), Type::of::<Args>());
+            }
             Iface::TypeType { val, .. } if self.is_field_access() => {
                 self.type_methods(None, *val);
             }
@@ -327,6 +330,9 @@ impl IfaceChecker for CompletionScopeChecker<'_> {
             }
             Iface::Content { val, .. } => {
                 self.defines.insert_scope(val.scope());
+            }
+            Iface::Args { .. } => {
+                self.defines.insert_scope(Type::of::<Args>().scope());
             }
             // todo: distingusish TypeType and Type
             Iface::TypeType { val, .. } | Iface::Type { val, .. } => {

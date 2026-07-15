@@ -1,0 +1,26 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_dependent_point.typ
+---
+"base" = Any
+"coordinate-resolve" = (@ctx, @p) => (None, @p, )
+"ctx" = Any
+"p" = Any
+"resolve-point" = (@ctx, @p) => @p
+"ctx" = Any
+"p" = Any
+"point" = (1, 2, 3, )
+"first" = 1
+=====
+0..0 -> @resolve-point
+0..0 -> @coordinate-resolve
+1..21 -> @base
+28..33 -> @point
+36..49 -> @resolve-point
+36..66 -> (1, 2, 3, )
+56..65 -> (1, 2, 3, )
+72..77 -> @first
+80..85 -> @point
+80..88 -> (Func(at) | (Func(at) | @v"point".at))
+80..91 -> (Any | 1)

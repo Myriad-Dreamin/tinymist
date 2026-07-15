@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/show.typ
 ---
-"" = (Any) => Any.it
+"" = (@it) => @v"it".it
 "it" = Content(text)
 =====
 26..31 -> Type(regex)

@@ -1,3 +1,4 @@
+use crate::syntax::UnaryOp;
 use crate::ty::def::*;
 
 /// A trait to mutate a type.
@@ -16,14 +17,14 @@ pub trait TyMutator {
             Var(..) | Let(..) => None,
             Array(arr) => Some(Array(self.mutate(arr, pol)?.into())),
             Dict(dict) => Some(Dict(self.mutate_record(dict, pol)?.into())),
-            Tuple(tup) => Some(Tuple(self.mutate_vec(tup, pol)?)),
+            Tuple(tup) => self.mutate_tuple(tup, pol),
             Func(func) => Some(Func(self.mutate_func(func, pol)?.into())),
             Args(args) => Some(Args(self.mutate_func(args, pol)?.into())),
             Pattern(pat) => Some(Pattern(self.mutate_func(pat, pol)?.into())),
             Param(param) => Some(Param(self.mutate_param(param, pol)?.into())),
             Select(sel) => Some(Select(self.mutate_select(sel, pol)?.into())),
             With(sig) => Some(With(self.mutate_with_sig(sig, pol)?.into())),
-            Unary(unary) => Some(Unary(self.mutate_unary(unary, pol)?.into())),
+            Unary(unary) => self.mutate_unary_ty(unary, pol),
             Binary(binary) => Some(Binary(self.mutate_binary(binary, pol)?.into())),
             If(if_expr) => Some(If(self.mutate_if(if_expr, pol)?.into())),
         }
@@ -45,6 +46,60 @@ pub trait TyMutator {
         }
 
         if mutated { Some(types.into()) } else { None }
+    }
+
+    /// Mutates and normalizes a tuple type.
+    fn mutate_tuple(&mut self, ty: &[Ty], pol: bool) -> Option<Ty> {
+        let mut mutated = false;
+        let mut types = Vec::with_capacity(ty.len());
+
+        for ty in ty.iter() {
+            let ty = match self.mutate(ty, pol) {
+                Some(ty) => {
+                    mutated = true;
+                    ty
+                }
+                None => ty.clone(),
+            };
+
+            if Self::push_spread_tuple_elements(&mut types, &ty) {
+                mutated = true;
+            } else {
+                types.push(ty);
+            }
+        }
+
+        mutated.then(|| Ty::Tuple(types.into()))
+    }
+
+    /// Pushes known tuple elements from an internal spread marker.
+    fn push_spread_tuple_elements(types: &mut Vec<Ty>, ty: &Ty) -> bool {
+        let Ty::Unary(unary) = ty else {
+            return false;
+        };
+        if unary.op != UnaryOp::Spread {
+            return false;
+        }
+
+        match &unary.lhs {
+            Ty::Tuple(elems) => {
+                types.extend(elems.iter().cloned());
+                true
+            }
+            Ty::Args(args) => {
+                types.extend(args.positional_params().cloned());
+                if let Some(rest) = args.rest_param()
+                    && !Self::push_spread_tuple_elements(
+                        types,
+                        &Ty::Unary(TypeUnary::new(UnaryOp::Spread, rest.clone())),
+                    )
+                {
+                    types.push(Ty::Unary(TypeUnary::new(UnaryOp::Spread, rest.clone())));
+                }
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Mutates the given option of type.
@@ -106,10 +161,66 @@ pub trait TyMutator {
     }
 
     /// Mutates the given unary type.
-    fn mutate_unary(&mut self, ty: &Interned<TypeUnary>, pol: bool) -> Option<TypeUnary> {
+    fn mutate_unary_ty(&mut self, ty: &Interned<TypeUnary>, pol: bool) -> Option<Ty> {
         let lhs = self.mutate(&ty.lhs, pol)?;
+        if ty.op == UnaryOp::ElementOf
+            && let Some(elem) = Self::known_element_type(&lhs)
+        {
+            return Some(elem);
+        }
 
-        Some(TypeUnary { lhs, op: ty.op })
+        Some(Ty::Unary(TypeUnary { lhs, op: ty.op }.into()))
+    }
+
+    /// Gets the known element type of an iterable-like type.
+    fn known_element_type(ty: &Ty) -> Option<Ty> {
+        match ty {
+            Ty::Array(elem) => Some(elem.as_ref().clone()),
+            Ty::Tuple(elems) => Self::known_tuple_element_type(elems),
+            Ty::Args(args) => Self::known_args_element_type(args),
+            Ty::Let(bounds) => Self::known_element_types(bounds.lbs.iter()),
+            Ty::Union(types) => Self::known_element_types(types.iter()),
+            _ => None,
+        }
+    }
+
+    /// Gets known element types from multiple iterable-like types.
+    fn known_element_types<'a>(types: impl Iterator<Item = &'a Ty>) -> Option<Ty> {
+        let types = types
+            .filter_map(Self::known_element_type)
+            .collect::<Vec<_>>();
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
+    /// Gets the known element type of a tuple.
+    fn known_tuple_element_type(elems: &[Ty]) -> Option<Ty> {
+        let mut types = vec![];
+        for elem in elems {
+            if let Ty::Unary(unary) = elem
+                && unary.op == UnaryOp::Spread
+            {
+                if let Some(elem) = Self::known_element_type(&unary.lhs) {
+                    types.push(elem);
+                }
+                continue;
+            }
+
+            types.push(elem.clone());
+        }
+
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
+    }
+
+    /// Gets the known positional element type of arguments.
+    fn known_args_element_type(args: &ArgsTy) -> Option<Ty> {
+        let mut types = args.positional_params().cloned().collect::<Vec<_>>();
+        if let Some(rest) = args.rest_param()
+            && let Some(elem) = Self::known_element_type(rest)
+        {
+            types.push(elem);
+        }
+
+        (!types.is_empty()).then(|| Ty::from_types(types.into_iter()))
     }
 
     /// Mutates the given binary type.

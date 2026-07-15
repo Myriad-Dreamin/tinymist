@@ -3,14 +3,14 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/loop_mutation_then_record.typ
 ---
-"bucket-by" = (Any, Any) => {"buckets": {}, "order": ()}
+"bucket-by" = (@data, @key-col) => {"buckets": {}, "order": Array<(Type(str) | "")>}
 "data" = Any
 "key-col" = Any
 "buckets" = {}
-"order" = ()
+"order" = Array<(Type(str) | "")>
 "row" = Any
 "key" = ( ⪰ Type(str) | "")
-"bucket" = Any
+"bucket" = ( ⪰ Any | Array<Any>)
 =====
 5..14 -> @bucket-by
 15..19 -> @data

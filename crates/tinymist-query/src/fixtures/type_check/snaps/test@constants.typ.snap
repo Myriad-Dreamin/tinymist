@@ -3,7 +3,7 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/constants.typ
 ---
-"f" = (Any) => TypeBinary { operands: (1, 1), op: Add }
+"f" = (@x) => TypeBinary { operands: (1, 1), op: Add }
 "x" = Any
 =====
 5..6 -> @f

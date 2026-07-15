@@ -3,11 +3,11 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/deferred_if_fold_after_bind.typ
 ---
-"make-path" = (("mode": Any) => {"close": TypeBinary { operands: (Any, "OPEN"), op: Neq }}).with(..("mode": "OPEN") => any)
+"make-path" = (("mode": @mode) => {"close": TypeBinary { operands: (@mode, "OPEN"), op: Neq }}).with(..("mode": "OPEN") => any)
 "mode" = ( ⪰ Type(str) | "OPEN")
 "close" = TypeBinary { operands: (( ⪰ Type(str) | "OPEN"), "OPEN"), op: Neq }
-"default-path" = {"close": TypeBinary { operands: (( ⪰ Type(str) | "OPEN"), "OPEN"), op: Neq }}
-"pie-path" = {"close": TypeBinary { operands: (( ⪰ Type(str) | "OPEN"), "OPEN"), op: Neq }}
+"default-path" = {"close": TypeBinary { operands: ("OPEN", "OPEN"), op: Neq }}
+"pie-path" = {"close": TypeBinary { operands: ("PIE", "OPEN"), op: Neq }}
 =====
 5..14 -> @make-path
 15..19 -> @mode
@@ -17,7 +17,7 @@ input_file: crates/tinymist-query/src/fixtures/type_check/deferred_if_fold_after
 72..77 -> @close
 87..99 -> @default-path
 102..111 -> @make-path
-102..113 -> {"close": @close}
+102..113 -> {"close": TypeBinary { operands: ("OPEN", "OPEN"), op: Neq }}
 119..127 -> @pie-path
 130..139 -> @make-path
-130..152 -> {"close": @close}
+130..152 -> {"close": TypeBinary { operands: ("PIE", "OPEN"), op: Neq }}

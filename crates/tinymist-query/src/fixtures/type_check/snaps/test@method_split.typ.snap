@@ -3,8 +3,8 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/method_split.typ
 ---
-"resolve-key" = (Any) => Any
-"" = (Any) => Any
+"resolve-key" = (@key) => Any
+"" = (@key) => Any
 "key" = Any
 "split-literal" = Type(array)
 =====

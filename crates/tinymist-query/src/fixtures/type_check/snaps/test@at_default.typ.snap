@@ -3,10 +3,10 @@ source: crates/tinymist-query/src/analysis.rs
 expression: result
 input_file: crates/tinymist-query/src/fixtures/type_check/at_default.typ
 ---
-"dynamic-default" = (Any, Any) => Any
+"dynamic-default" = (@d, @key) => Any
 "d" = Any
 "key" = Any
-"static-param" = (Any) => Any
+"static-param" = (@d) => Any
 "d" = Any
 "static-default" = Any
 "static-existing" = Any

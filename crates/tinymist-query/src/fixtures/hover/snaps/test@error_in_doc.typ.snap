@@ -10,7 +10,7 @@ let my-fun(
   note: any,
   mode: str = "typ",
   setting: (any) => any = Closure(..),
-) = none;
+) = any;
 ```
 
 

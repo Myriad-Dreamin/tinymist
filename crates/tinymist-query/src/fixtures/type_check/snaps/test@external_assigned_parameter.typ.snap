@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/analysis.rs
+expression: result
+input_file: crates/tinymist-query/src/fixtures/type_check/external_assigned_parameter.typ
+---
+"value" = Any
+"base" = Any
+"overwrite" = (@value) => 3
+"text-result" = 3
+"number-result" = 3
+=====
+0..0 -> @overwrite
+1..21 -> @base
+28..39 -> @text-result
+42..51 -> @overwrite
+42..62 -> 3
+68..81 -> @number-result
+84..93 -> @overwrite
+84..97 -> 3
