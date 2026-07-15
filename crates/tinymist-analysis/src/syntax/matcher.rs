@@ -890,6 +890,7 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
     if node.kind() == SyntaxKind::Text
         && node.offset() + 1 == cursor
         && node.leaf_text().starts_with('@')
+        && matches!(interpret_mode_at(Some(&node)), InterpretMode::Markup)
     {
         return Some(SyntaxClass::At { node });
     }
