@@ -233,7 +233,11 @@ impl<T: Internable> Eq for Interned<T> {}
 impl<T: Internable + PartialOrd> PartialOrd for Interned<T> {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.as_ref().partial_cmp(other.as_ref())
+        if self == other {
+            Some(std::cmp::Ordering::Equal)
+        } else {
+            self.as_ref().partial_cmp(other.as_ref())
+        }
     }
 }
 
@@ -409,3 +413,38 @@ pub use crate::_impl_internable as impl_internable;
 use crate::stats::AllocStats;
 
 impl_internable!(str,);
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::Ordering;
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    use super::*;
+
+    static PARTIAL_CMP_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Eq, Hash, PartialEq)]
+    struct Counted(u8);
+
+    impl PartialOrd for Counted {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            PARTIAL_CMP_CALLS.fetch_add(1, AtomicOrdering::Relaxed);
+            self.0.partial_cmp(&other.0)
+        }
+    }
+
+    impl_internable!(Counted);
+
+    #[test]
+    fn partial_cmp_short_circuits_shared_values() {
+        let value = Interned::new(Counted(1));
+
+        PARTIAL_CMP_CALLS.store(0, AtomicOrdering::Relaxed);
+        assert_eq!(value.partial_cmp(&value.clone()), Some(Ordering::Equal));
+        assert_eq!(PARTIAL_CMP_CALLS.load(AtomicOrdering::Relaxed), 0);
+
+        let other = Interned::new(Counted(2));
+        assert_eq!(value.partial_cmp(&other), Some(Ordering::Less));
+        assert_eq!(PARTIAL_CMP_CALLS.load(AtomicOrdering::Relaxed), 1);
+    }
+}

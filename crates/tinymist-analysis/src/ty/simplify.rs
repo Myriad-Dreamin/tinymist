@@ -16,45 +16,50 @@ struct CompactTy {
     is_final: bool,
 }
 
-fn collect_input_type_vars(ty: &Ty, vars: &mut FxHashSet<DeclExpr>) {
+#[allow(clippy::mutable_key_type)]
+fn collect_input_type_vars(ty: &Ty, vars: &mut FxHashSet<DeclExpr>, traversed: &mut FxHashSet<Ty>) {
+    if !traversed.insert(ty.clone()) {
+        return;
+    }
+
     match ty {
         Ty::Var(var) => {
             vars.insert(var.def.clone());
         }
         Ty::Func(_) | Ty::With(_) => {}
-        Ty::Param(param) => collect_input_type_vars(&param.ty, vars),
+        Ty::Param(param) => collect_input_type_vars(&param.ty, vars, traversed),
         Ty::Union(types) | Ty::Tuple(types) => {
             for ty in types.iter() {
-                collect_input_type_vars(ty, vars);
+                collect_input_type_vars(ty, vars, traversed);
             }
         }
         Ty::Let(bounds) => {
             for ty in bounds.lbs.iter().chain(&bounds.ubs) {
-                collect_input_type_vars(ty, vars);
+                collect_input_type_vars(ty, vars, traversed);
             }
         }
         Ty::Dict(record) => {
             for ty in record.types.iter() {
-                collect_input_type_vars(ty, vars);
+                collect_input_type_vars(ty, vars, traversed);
             }
         }
-        Ty::Array(elem) => collect_input_type_vars(elem, vars),
+        Ty::Array(elem) => collect_input_type_vars(elem, vars, traversed),
         Ty::Args(sig) | Ty::Pattern(sig) => {
             for input in sig.inputs() {
-                collect_input_type_vars(input, vars);
+                collect_input_type_vars(input, vars, traversed);
             }
         }
-        Ty::Select(select) => collect_input_type_vars(&select.ty, vars),
-        Ty::Unary(unary) => collect_input_type_vars(&unary.lhs, vars),
+        Ty::Select(select) => collect_input_type_vars(&select.ty, vars, traversed),
+        Ty::Unary(unary) => collect_input_type_vars(&unary.lhs, vars, traversed),
         Ty::Binary(binary) => {
             let [lhs, rhs] = binary.operands();
-            collect_input_type_vars(lhs, vars);
-            collect_input_type_vars(rhs, vars);
+            collect_input_type_vars(lhs, vars, traversed);
+            collect_input_type_vars(rhs, vars, traversed);
         }
         Ty::If(if_ty) => {
-            collect_input_type_vars(&if_ty.cond, vars);
-            collect_input_type_vars(&if_ty.then, vars);
-            collect_input_type_vars(&if_ty.else_, vars);
+            collect_input_type_vars(&if_ty.cond, vars, traversed);
+            collect_input_type_vars(&if_ty.then, vars, traversed);
+            collect_input_type_vars(&if_ty.else_, vars, traversed);
         }
         Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
     }
@@ -78,6 +83,8 @@ impl TypeInfo {
             cano_cache: &mut cache.cano_cache,
             transform_cache: &mut cache.transform_cache,
             cano_local_cache: &mut cache.cano_local_cache,
+            analyze_cache: FxHashSet::default(),
+            input_var_cache: FxHashSet::default(),
 
             positives: &mut cache.positives,
             negatives: &mut cache.negatives,
@@ -96,6 +103,8 @@ struct TypeSimplifier<'a, 'b> {
     cano_cache: &'b mut FxHashMap<(Ty, bool), Ty>,
     transform_cache: &'b mut FxHashMap<(Ty, bool), Ty>,
     cano_local_cache: &'b mut FxHashMap<(DeclExpr, bool), Ty>,
+    analyze_cache: FxHashSet<(Ty, bool)>,
+    input_var_cache: FxHashSet<Ty>,
     negatives: &'b mut FxHashSet<DeclExpr>,
     positives: &'b mut FxHashSet<DeclExpr>,
 }
@@ -120,6 +129,10 @@ impl TypeSimplifier<'_, '_> {
 
     /// Analyzes the given type.
     fn analyze(&mut self, ty: &Ty, pol: bool, signature_binders: &mut FxHashSet<DeclExpr>) {
+        if !self.analyze_cache.insert((ty.clone(), pol)) {
+            return;
+        }
+
         match ty {
             Ty::Var(var) => {
                 if self.principal && signature_binders.contains(&var.def) {
@@ -156,7 +169,11 @@ impl TypeSimplifier<'_, '_> {
             Ty::Func(func) => {
                 if self.principal {
                     for input in func.inputs() {
-                        collect_input_type_vars(input, signature_binders);
+                        collect_input_type_vars(
+                            input,
+                            signature_binders,
+                            &mut self.input_var_cache,
+                        );
                     }
                 }
                 for input_ty in func.inputs() {
@@ -193,7 +210,11 @@ impl TypeSimplifier<'_, '_> {
             Ty::Pattern(pat) => {
                 if self.principal {
                     for input in pat.inputs() {
-                        collect_input_type_vars(input, signature_binders);
+                        collect_input_type_vars(
+                            input,
+                            signature_binders,
+                            &mut self.input_var_cache,
+                        );
                     }
                 }
                 for input in pat.inputs() {
@@ -568,6 +589,40 @@ mod tests {
         res.extend(vec![ch("c"), val(Value::None), ch("a")]);
 
         test_sort_ty(res);
+    }
+
+    #[test]
+    #[allow(clippy::mutable_key_type)]
+    fn test_analyze_memoizes_shared_type_dag() {
+        const DEPTH: usize = 16;
+
+        let mut shared = Ty::Any;
+        for _ in 0..DEPTH {
+            shared = Ty::Tuple(vec![shared.clone(), shared].into());
+        }
+
+        let info = TypeInfo::default();
+        let mut cano_cache = FxHashMap::default();
+        let mut transform_cache = FxHashMap::default();
+        let mut cano_local_cache = FxHashMap::default();
+        let mut positives = FxHashSet::default();
+        let mut negatives = FxHashSet::default();
+        let mut worker = TypeSimplifier {
+            principal: true,
+            vars: &info.vars,
+            cano_cache: &mut cano_cache,
+            transform_cache: &mut transform_cache,
+            cano_local_cache: &mut cano_local_cache,
+            analyze_cache: FxHashSet::default(),
+            input_var_cache: FxHashSet::default(),
+            positives: &mut positives,
+            negatives: &mut negatives,
+        };
+        let mut signature_binders = FxHashSet::default();
+
+        worker.analyze(&shared, true, &mut signature_binders);
+
+        assert_eq!(worker.analyze_cache.len(), DEPTH + 1);
     }
 
     fn var(name: &str) -> TypeVarBounds {

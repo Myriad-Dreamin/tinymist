@@ -272,10 +272,18 @@ impl TypeChecker<'_> {
         Some((bounds, docs, input_bounds))
     }
 
+    #[allow(clippy::mutable_key_type)]
     fn copy_external_input_bounds(type_info: &TypeInfo, ty: &Ty) -> Vec<TypeVarBounds> {
         let mut pending = vec![];
         let mut seen = FxHashSet::default();
-        Self::collect_signature_input_binders(ty, &FxHashSet::default(), &mut seen, &mut pending);
+        let mut traversed = FxHashSet::default();
+        Self::collect_signature_input_binders(
+            ty,
+            &FxHashSet::default(),
+            &mut seen,
+            &mut traversed,
+            &mut pending,
+        );
 
         let mut copied = vec![];
         let mut idx = 0;
@@ -290,15 +298,16 @@ impl TypeChecker<'_> {
             let bounds = source.bounds.bounds().read().freeze();
 
             for bound in bounds.lbs.iter().chain(&bounds.ubs) {
-                Self::collect_signature_input_binders(bound, &escaped, &mut seen, &mut pending);
+                Self::collect_signature_input_binders(
+                    bound,
+                    &escaped,
+                    &mut seen,
+                    &mut traversed,
+                    &mut pending,
+                );
             }
 
-            let mut closer = FunctionResultantCloser {
-                vars: &type_info.vars,
-                params: escaped,
-                visiting: FxHashSet::default(),
-                visited: 0,
-            };
+            let mut closer = FunctionResultantCloser::new(&type_info.vars, escaped);
             let bounds = closer.close_bounds(&bounds);
             let mut imported =
                 TypeVarBounds::new(binder.as_ref().clone(), DynTypeBounds::from(bounds));
@@ -311,18 +320,32 @@ impl TypeChecker<'_> {
         copied
     }
 
+    #[allow(clippy::mutable_key_type)]
     fn collect_signature_input_binders(
         ty: &Ty,
         escaped: &FxHashSet<DeclExpr>,
         seen: &mut FxHashSet<DeclExpr>,
+        traversed: &mut FxHashSet<Ty>,
         binders: &mut Vec<(Interned<TypeVar>, FxHashSet<DeclExpr>)>,
     ) {
+        // Binder discovery is monotonic: the first full visit records every
+        // binder reachable from this interned type, regardless of later scopes.
+        if !traversed.insert(ty.clone()) {
+            return;
+        }
+
         match ty {
             Ty::Func(sig) => {
                 let mut direct = vec![];
                 let mut direct_seen = FxHashSet::default();
+                let mut direct_traversed = FxHashSet::default();
                 for input in sig.inputs() {
-                    Self::collect_input_binders(input, &mut direct_seen, &mut direct);
+                    Self::collect_input_binders(
+                        input,
+                        &mut direct_seen,
+                        &mut direct_traversed,
+                        &mut direct,
+                    );
                 }
 
                 let mut scope = escaped.clone();
@@ -334,73 +357,99 @@ impl TypeChecker<'_> {
                 }
 
                 for input in sig.inputs() {
-                    Self::collect_signature_input_binders(input, &scope, seen, binders);
+                    Self::collect_signature_input_binders(input, &scope, seen, traversed, binders);
                 }
                 if let Some(body) = &sig.body {
-                    Self::collect_signature_input_binders(body, &scope, seen, binders);
+                    Self::collect_signature_input_binders(body, &scope, seen, traversed, binders);
                 }
             }
             Ty::With(with) => {
-                Self::collect_signature_input_binders(&with.sig, escaped, seen, binders);
+                Self::collect_signature_input_binders(&with.sig, escaped, seen, traversed, binders);
                 for input in with.with.inputs() {
-                    Self::collect_signature_input_binders(input, escaped, seen, binders);
+                    Self::collect_signature_input_binders(input, escaped, seen, traversed, binders);
                 }
                 if let Some(body) = &with.with.body {
-                    Self::collect_signature_input_binders(body, escaped, seen, binders);
+                    Self::collect_signature_input_binders(body, escaped, seen, traversed, binders);
                 }
             }
             Ty::Args(sig) | Ty::Pattern(sig) => {
                 for input in sig.inputs() {
-                    Self::collect_signature_input_binders(input, escaped, seen, binders);
+                    Self::collect_signature_input_binders(input, escaped, seen, traversed, binders);
                 }
                 if let Some(body) = &sig.body {
-                    Self::collect_signature_input_binders(body, escaped, seen, binders);
+                    Self::collect_signature_input_binders(body, escaped, seen, traversed, binders);
                 }
             }
             Ty::Param(param) => {
-                Self::collect_signature_input_binders(&param.ty, escaped, seen, binders)
+                Self::collect_signature_input_binders(&param.ty, escaped, seen, traversed, binders)
             }
             Ty::Union(types) | Ty::Tuple(types) => {
                 for ty in types.iter() {
-                    Self::collect_signature_input_binders(ty, escaped, seen, binders);
+                    Self::collect_signature_input_binders(ty, escaped, seen, traversed, binders);
                 }
             }
             Ty::Let(bounds) => {
                 for ty in bounds.lbs.iter().chain(&bounds.ubs) {
-                    Self::collect_signature_input_binders(ty, escaped, seen, binders);
+                    Self::collect_signature_input_binders(ty, escaped, seen, traversed, binders);
                 }
             }
             Ty::Dict(record) => {
                 for ty in record.types.iter() {
-                    Self::collect_signature_input_binders(ty, escaped, seen, binders);
+                    Self::collect_signature_input_binders(ty, escaped, seen, traversed, binders);
                 }
             }
-            Ty::Array(elem) => Self::collect_signature_input_binders(elem, escaped, seen, binders),
+            Ty::Array(elem) => {
+                Self::collect_signature_input_binders(elem, escaped, seen, traversed, binders)
+            }
             Ty::Select(select) => {
-                Self::collect_signature_input_binders(&select.ty, escaped, seen, binders)
+                Self::collect_signature_input_binders(&select.ty, escaped, seen, traversed, binders)
             }
             Ty::Unary(unary) => {
-                Self::collect_signature_input_binders(&unary.lhs, escaped, seen, binders)
+                Self::collect_signature_input_binders(&unary.lhs, escaped, seen, traversed, binders)
             }
             Ty::Binary(binary) => {
                 let [lhs, rhs] = binary.operands();
-                Self::collect_signature_input_binders(lhs, escaped, seen, binders);
-                Self::collect_signature_input_binders(rhs, escaped, seen, binders);
+                Self::collect_signature_input_binders(lhs, escaped, seen, traversed, binders);
+                Self::collect_signature_input_binders(rhs, escaped, seen, traversed, binders);
             }
             Ty::If(if_ty) => {
-                Self::collect_signature_input_binders(&if_ty.cond, escaped, seen, binders);
-                Self::collect_signature_input_binders(&if_ty.then, escaped, seen, binders);
-                Self::collect_signature_input_binders(&if_ty.else_, escaped, seen, binders);
+                Self::collect_signature_input_binders(
+                    &if_ty.cond,
+                    escaped,
+                    seen,
+                    traversed,
+                    binders,
+                );
+                Self::collect_signature_input_binders(
+                    &if_ty.then,
+                    escaped,
+                    seen,
+                    traversed,
+                    binders,
+                );
+                Self::collect_signature_input_binders(
+                    &if_ty.else_,
+                    escaped,
+                    seen,
+                    traversed,
+                    binders,
+                );
             }
             Ty::Var(_) | Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
         }
     }
 
+    #[allow(clippy::mutable_key_type)]
     fn collect_input_binders(
         ty: &Ty,
         seen: &mut FxHashSet<DeclExpr>,
+        traversed: &mut FxHashSet<Ty>,
         binders: &mut Vec<Interned<TypeVar>>,
     ) {
+        if !traversed.insert(ty.clone()) {
+            return;
+        }
+
         match ty {
             Ty::Var(var) => {
                 if seen.insert(var.def.clone()) {
@@ -408,39 +457,39 @@ impl TypeChecker<'_> {
                 }
             }
             Ty::Func(_) | Ty::With(_) => {}
-            Ty::Param(param) => Self::collect_input_binders(&param.ty, seen, binders),
+            Ty::Param(param) => Self::collect_input_binders(&param.ty, seen, traversed, binders),
             Ty::Union(types) | Ty::Tuple(types) => {
                 for ty in types.iter() {
-                    Self::collect_input_binders(ty, seen, binders);
+                    Self::collect_input_binders(ty, seen, traversed, binders);
                 }
             }
             Ty::Let(bounds) => {
                 for ty in bounds.lbs.iter().chain(&bounds.ubs) {
-                    Self::collect_input_binders(ty, seen, binders);
+                    Self::collect_input_binders(ty, seen, traversed, binders);
                 }
             }
             Ty::Dict(record) => {
                 for ty in record.types.iter() {
-                    Self::collect_input_binders(ty, seen, binders);
+                    Self::collect_input_binders(ty, seen, traversed, binders);
                 }
             }
-            Ty::Array(elem) => Self::collect_input_binders(elem, seen, binders),
+            Ty::Array(elem) => Self::collect_input_binders(elem, seen, traversed, binders),
             Ty::Args(sig) | Ty::Pattern(sig) => {
                 for input in sig.inputs() {
-                    Self::collect_input_binders(input, seen, binders);
+                    Self::collect_input_binders(input, seen, traversed, binders);
                 }
             }
-            Ty::Select(select) => Self::collect_input_binders(&select.ty, seen, binders),
-            Ty::Unary(unary) => Self::collect_input_binders(&unary.lhs, seen, binders),
+            Ty::Select(select) => Self::collect_input_binders(&select.ty, seen, traversed, binders),
+            Ty::Unary(unary) => Self::collect_input_binders(&unary.lhs, seen, traversed, binders),
             Ty::Binary(binary) => {
                 let [lhs, rhs] = binary.operands();
-                Self::collect_input_binders(lhs, seen, binders);
-                Self::collect_input_binders(rhs, seen, binders);
+                Self::collect_input_binders(lhs, seen, traversed, binders);
+                Self::collect_input_binders(rhs, seen, traversed, binders);
             }
             Ty::If(if_ty) => {
-                Self::collect_input_binders(&if_ty.cond, seen, binders);
-                Self::collect_input_binders(&if_ty.then, seen, binders);
-                Self::collect_input_binders(&if_ty.else_, seen, binders);
+                Self::collect_input_binders(&if_ty.cond, seen, traversed, binders);
+                Self::collect_input_binders(&if_ty.then, seen, traversed, binders);
+                Self::collect_input_binders(&if_ty.else_, seen, traversed, binders);
             }
             Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => {}
         }
@@ -543,12 +592,7 @@ impl TypeChecker<'_> {
             return Ty::Any;
         }
 
-        let mut closer = FunctionResultantCloser {
-            vars: &self.info.vars,
-            params: FxHashSet::default(),
-            visiting: FxHashSet::default(),
-            visited: 0,
-        };
+        let mut closer = FunctionResultantCloser::new(&self.info.vars, FxHashSet::default());
         let mut bounds = closer.close_bounds(&bounds);
         if bounds.ubs.is_empty() && bounds.lbs.len() == 1 {
             return bounds.lbs.pop().unwrap();
@@ -560,11 +604,13 @@ impl TypeChecker<'_> {
         left.root() == right.root() && left.vpath() == right.vpath()
     }
 
+    #[allow(clippy::mutable_key_type)]
     fn snapshot_function_input_bounds(&self, sig: &SigTy) -> Vec<(Interned<TypeVar>, TypeBounds)> {
         let mut seen = FxHashSet::default();
+        let mut traversed = FxHashSet::default();
         let mut binders = vec![];
         for input in sig.inputs() {
-            Self::collect_input_binders(input, &mut seen, &mut binders);
+            Self::collect_input_binders(input, &mut seen, &mut traversed, &mut binders);
         }
 
         binders
@@ -596,12 +642,7 @@ impl TypeChecker<'_> {
                 .cloned(),
         );
 
-        let mut closer = FunctionResultantCloser {
-            vars: &self.info.vars,
-            params: resultant_params,
-            visiting: FxHashSet::default(),
-            visited: 0,
-        };
+        let mut closer = FunctionResultantCloser::new(&self.info.vars, resultant_params);
 
         closer.mutate(&body, true).unwrap_or(body)
     }
@@ -630,12 +671,7 @@ impl TypeChecker<'_> {
             bounds.ubs.sort();
             bounds.ubs.dedup();
 
-            let mut closer = FunctionResultantCloser {
-                vars: &self.info.vars,
-                params: scope.clone(),
-                visiting: FxHashSet::default(),
-                visited: 0,
-            };
+            let mut closer = FunctionResultantCloser::new(&self.info.vars, scope.clone());
             let mut bounds = closer.close_bounds(&bounds);
             bounds.lbs.sort();
             bounds.lbs.dedup();
@@ -1416,21 +1452,58 @@ struct ControlSplit {
     terminal: bool,
 }
 
+#[derive(Clone, Eq, Hash, PartialEq)]
+enum FunctionResultantEnvironmentTransition {
+    Visiting(DeclExpr),
+    Params(Vec<DeclExpr>),
+}
+
 struct FunctionResultantCloser<'a> {
     vars: &'a FxHashMap<DeclExpr, TypeVarBounds>,
     params: FxHashSet<DeclExpr>,
     visiting: FxHashSet<DeclExpr>,
     visited: usize,
+    environment: usize,
+    environments: FxHashMap<(usize, FunctionResultantEnvironmentTransition), usize>,
+    memo: FxHashMap<(usize, Ty, bool), Option<Ty>>,
 }
 
-impl FunctionResultantCloser<'_> {
+impl<'a> FunctionResultantCloser<'a> {
     const NODE_BUDGET: usize = 4096;
 
+    fn new(vars: &'a FxHashMap<DeclExpr, TypeVarBounds>, params: FxHashSet<DeclExpr>) -> Self {
+        Self {
+            vars,
+            params,
+            visiting: FxHashSet::default(),
+            visited: 0,
+            environment: 0,
+            environments: FxHashMap::default(),
+            memo: FxHashMap::default(),
+        }
+    }
+
+    fn enter_environment(&mut self, transition: FunctionResultantEnvironmentTransition) -> usize {
+        let parent = self.environment;
+        let key = (parent, transition);
+        let environment = if let Some(environment) = self.environments.get(&key) {
+            *environment
+        } else {
+            let environment = self.environments.len() + 1;
+            self.environments.insert(key, environment);
+            environment
+        };
+        self.environment = environment;
+        parent
+    }
+
+    #[allow(clippy::mutable_key_type)]
     fn close_scoped_sig(&mut self, sig: &SigTy, pol: bool) -> Option<SigTy> {
         let mut seen = FxHashSet::default();
+        let mut traversed = FxHashSet::default();
         let mut binders = vec![];
         for input in sig.inputs() {
-            TypeChecker::collect_input_binders(input, &mut seen, &mut binders);
+            TypeChecker::collect_input_binders(input, &mut seen, &mut traversed, &mut binders);
         }
         let inserted = binders
             .into_iter()
@@ -1440,12 +1513,20 @@ impl FunctionResultantCloser<'_> {
                     .then_some(binder.def.clone())
             })
             .collect::<Vec<_>>();
+        let parent_environment = (!inserted.is_empty()).then(|| {
+            self.enter_environment(FunctionResultantEnvironmentTransition::Params(
+                inserted.clone(),
+            ))
+        });
 
         let inputs = self.mutate_vec(&sig.inputs, pol);
         let body = self.mutate_option(sig.body.as_ref(), pol);
 
-        for def in inserted {
-            self.params.remove(&def);
+        for def in &inserted {
+            self.params.remove(def);
+        }
+        if let Some(parent_environment) = parent_environment {
+            self.environment = parent_environment;
         }
         if inputs.is_none() && body.is_none() {
             return None;
@@ -1473,20 +1554,24 @@ impl FunctionResultantCloser<'_> {
         if !self.visiting.insert(var.def.clone()) {
             return Some(Ty::Any);
         }
+        let parent_environment = self.enter_environment(
+            FunctionResultantEnvironmentTransition::Visiting(var.def.clone()),
+        );
 
-        let Some(bounds) = self.vars.get(&var.def) else {
-            self.visiting.remove(&var.def);
-            return Some(Ty::Any);
+        let bounds = self
+            .vars
+            .get(&var.def)
+            .map(|bounds| bounds.bounds.bounds().read().freeze());
+        let result = match bounds {
+            Some(bounds) if !bounds.lbs.is_empty() || !bounds.ubs.is_empty() => {
+                Some(Ty::Let(Interned::new(self.close_bounds(&bounds))))
+            }
+            _ => Some(Ty::Any),
         };
-        let bounds = bounds.bounds.bounds().read().freeze();
-        if bounds.lbs.is_empty() && bounds.ubs.is_empty() {
-            self.visiting.remove(&var.def);
-            return Some(Ty::Any);
-        }
 
-        let bounds = self.close_bounds(&bounds);
+        self.environment = parent_environment;
         self.visiting.remove(&var.def);
-        Some(Ty::Let(Interned::new(bounds)))
+        result
     }
 
     fn close_bounds(&mut self, bounds: &TypeBounds) -> TypeBounds {
@@ -1506,7 +1591,12 @@ impl FunctionResultantCloser<'_> {
 
 impl TyMutator for FunctionResultantCloser<'_> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
-        match ty {
+        let key = (self.environment, ty.clone(), pol);
+        if let Some(result) = self.memo.get(&key) {
+            return result.clone();
+        }
+
+        let result = match ty {
             Ty::Var(var) => self.lower_bounds_of(var),
             Ty::Let(bounds) => Some(Ty::Let(Interned::new(self.close_bounds(bounds)))),
             Ty::Func(sig) => self
@@ -1516,7 +1606,9 @@ impl TyMutator for FunctionResultantCloser<'_> {
                 .close_scoped_sig(sig, pol)
                 .map(|sig| Ty::Pattern(Interned::new(sig))),
             _ => self.mutate_rec(ty, pol),
-        }
+        };
+        self.memo.insert(key, result.clone());
+        result
     }
 }
 
@@ -1743,5 +1835,71 @@ impl TyMutator for VarReplacer {
         }
 
         self.mutate_rec(ty, pol)
+    }
+}
+
+#[cfg(test)]
+mod function_resultant_closer_tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::mutable_key_type)]
+    fn signature_binder_collection_visits_shared_type_once() {
+        const DEPTH: usize = 16;
+
+        let def: DeclExpr = Decl::lit("input").into();
+        let var = TypeVar::new("input".into(), def);
+        let var_ty = Ty::Var(var);
+        let mut shared = Ty::Func(SigTy::unary(var_ty.clone(), var_ty));
+        for _ in 0..DEPTH {
+            shared = Ty::Tuple(vec![shared.clone(), shared].into());
+        }
+
+        let mut seen = FxHashSet::default();
+        let mut traversed = FxHashSet::default();
+        let mut binders = vec![];
+        TypeChecker::collect_signature_input_binders(
+            &shared,
+            &FxHashSet::default(),
+            &mut seen,
+            &mut traversed,
+            &mut binders,
+        );
+
+        assert_eq!(binders.len(), 1);
+        assert!(binders[0].1.is_empty());
+        assert_eq!(traversed.len(), DEPTH + 2);
+    }
+
+    #[test]
+    fn memo_isolated_by_signature_binder_scope() {
+        let def: DeclExpr = Decl::lit("input").into();
+        let var = TypeVar::new("input".into(), def.clone());
+        let var_ty = Ty::Var(var.clone());
+        let bound = Ty::Boolean(Some(true));
+
+        let mut var_bounds = DynTypeBounds::default();
+        var_bounds.lbs.insert_mut(bound.clone());
+        let mut vars = FxHashMap::default();
+        vars.insert(def, TypeVarBounds::new(var.as_ref().clone(), var_bounds));
+
+        let scoped = Ty::Func(SigTy::unary(var_ty.clone(), var_ty.clone()));
+        let body = Ty::Tuple(vec![var_ty.clone(), scoped.clone(), var_ty.clone()].into());
+        let mut closer = FunctionResultantCloser::new(&vars, FxHashSet::default());
+
+        let closed = closer.mutate(&body, true).expect("outer variables close");
+        let Ty::Tuple(items) = closed else {
+            panic!("expected tuple resultant");
+        };
+        let expected = Ty::Let(
+            TypeBounds {
+                lbs: vec![bound],
+                ubs: vec![],
+            }
+            .into(),
+        );
+
+        assert_eq!(items.as_ref(), &[expected.clone(), scoped, expected]);
+        assert_eq!(closer.visited, 2);
     }
 }
