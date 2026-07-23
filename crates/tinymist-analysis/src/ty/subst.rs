@@ -9,7 +9,7 @@ impl Sig<'_> {
             let body = self.check_bind(args, ctx)?;
 
             // Substitute the bound variables in the body or just body
-            let mut checker = SubstituteChecker { ctx };
+            let mut checker = SubstituteChecker::new(ctx);
             Some(checker.ty(&body, pol).unwrap_or(body))
         })
     }
@@ -73,9 +73,17 @@ impl Sig<'_> {
 /// A checker to substitute the bound variables.
 struct SubstituteChecker<'a, T: TyCtxMut> {
     ctx: &'a mut T,
+    memo: FxHashMap<(Ty, bool), Option<Ty>>,
 }
 
 impl<T: TyCtxMut> SubstituteChecker<'_, T> {
+    fn new(ctx: &mut T) -> SubstituteChecker<'_, T> {
+        SubstituteChecker {
+            ctx,
+            memo: FxHashMap::default(),
+        }
+    }
+
     /// Substitutes the bound variables in the given type.
     fn ty(&mut self, body: &Ty, pol: bool) -> Option<Ty> {
         body.mutate(pol, self)
@@ -84,8 +92,13 @@ impl<T: TyCtxMut> SubstituteChecker<'_, T> {
 
 impl<T: TyCtxMut> TyMutator for SubstituteChecker<'_, T> {
     fn mutate(&mut self, ty: &Ty, pol: bool) -> Option<Ty> {
+        let key = (ty.clone(), pol);
+        if let Some(result) = self.memo.get(&key) {
+            return result.clone();
+        }
+
         // todo: extrude the type into a polarized type
-        match ty {
+        let result = match ty {
             Ty::Var(var) => self.ctx.local_bind_of(var),
             Ty::Let(bounds) => {
                 let mut lbs = bounds
@@ -99,15 +112,17 @@ impl<T: TyCtxMut> TyMutator for SubstituteChecker<'_, T> {
                     .map(|bound| self.mutate(bound, pol).unwrap_or_else(|| bound.clone()))
                     .collect::<Vec<_>>();
                 if ubs.is_empty() && lbs.len() == 1 {
-                    return lbs.pop();
+                    lbs.pop()
+                } else if lbs.is_empty() && ubs.len() == 1 {
+                    ubs.pop()
+                } else {
+                    Some(Ty::Let(TypeBounds { lbs, ubs }.into()))
                 }
-                if lbs.is_empty() && ubs.len() == 1 {
-                    return ubs.pop();
-                }
-                Some(Ty::Let(TypeBounds { lbs, ubs }.into()))
             }
             _ => self.mutate_rec(ty, pol),
-        }
+        };
+        self.memo.insert(key, result.clone());
+        result
     }
 }
 
@@ -166,5 +181,45 @@ mod tests {
 
         assert_snapshot!(call(literal_sig!(p1 -> p1), literal_args!(q1)), @"@q1");
         assert_snapshot!(call(literal_sig!(!u1: w1 -> w1), literal_args!(!u1: w2)), @"@w2");
+    }
+
+    #[test]
+    fn test_substitute_checker_memoizes_shared_type_dag() {
+        use super::*;
+        use crate::syntax::Decl;
+
+        let var = TypeVar::new("input".into(), Decl::lit("input").into());
+        let var_ty = Ty::Var(var.clone());
+        let changed = Ty::If(IfTy::new(
+            var_ty.clone().into(),
+            var_ty.clone().into(),
+            var_ty.clone().into(),
+        ));
+        let unchanged = Ty::If(IfTy::new(
+            Ty::Boolean(Some(true)).into(),
+            Ty::Boolean(Some(true)).into(),
+            Ty::Boolean(Some(true)).into(),
+        ));
+        let body = Ty::Tuple(
+            vec![
+                changed.clone(),
+                changed.clone(),
+                unchanged.clone(),
+                unchanged.clone(),
+            ]
+            .into(),
+        );
+
+        let mut ctx = TypeInfo::default();
+        ctx.bind_local(&var, Ty::Boolean(Some(false)));
+        let mut checker = SubstituteChecker::new(&mut ctx);
+        let result = checker.ty(&body, false);
+
+        assert!(result.is_some());
+        assert!(matches!(
+            checker.memo.get(&(changed, false)),
+            Some(Some(Ty::If(_)))
+        ));
+        assert_eq!(checker.memo.get(&(unchanged, false)), Some(&None));
     }
 }

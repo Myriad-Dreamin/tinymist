@@ -10,7 +10,7 @@ use ecow::eco_format;
 #[cfg(feature = "local-registry")]
 use ecow::{EcoVec, eco_vec};
 // use reflexo_typst::typst::prelude::*;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use tinymist_world::package::registry::PackageIndexEntry;
 use tinymist_world::package::{PackageSpec, PackageSpecExt};
@@ -162,8 +162,29 @@ pub fn package_tyck_scope(
     let toml_id = get_manifest_id(spec)?;
     let manifest = ctx.get_manifest(toml_id)?;
     let entry_point = package_entrypoint_id(toml_id, &manifest.package.entrypoint);
-    let package_root = entry_point.root().clone();
+    let files = collect_package_tyck_files(ctx, entry_point, options)?;
 
+    Ok(PackageTyckDump {
+        schema: 1,
+        package: DumpPackageInfo {
+            namespace: spec.namespace.to_string(),
+            name: spec.name.to_string(),
+            version: spec.version.clone(),
+            spec: format!("@{}/{}:{}", spec.namespace, spec.name, spec.version),
+            path: spec.path.to_string_lossy().into_owned(),
+            entrypoint: manifest.package.entrypoint.to_string(),
+        },
+        entrypoint: dump_file_id(entry_point),
+        files,
+    })
+}
+
+fn collect_package_tyck_files(
+    ctx: &mut LocalContext,
+    entry_point: FileId,
+    options: PackageTyckDumpOptions,
+) -> StrResult<Vec<DumpFile>> {
+    let package_root = entry_point.root().clone();
     let mut files = vec![];
     let mut seen = FxHashSet::default();
     let mut queue = VecDeque::from([entry_point]);
@@ -173,9 +194,18 @@ pub fn package_tyck_scope(
             continue;
         }
 
-        let source = ctx
-            .source_by_id(fid)
-            .map_err(|err| eco_format!("failed to read package source {fid:?}: {err}"))?;
+        let source = match ctx.source_by_id(fid) {
+            Ok(source) => source,
+            Err(err) if fid == entry_point => {
+                return Err(eco_format!(
+                    "failed to read package entrypoint {fid:?}: {err}"
+                ));
+            }
+            Err(err) => {
+                log::warn!("skipping unreadable package source {fid:?}: {err}");
+                continue;
+            }
+        };
         let expr_info = ctx.expr_stage(&source);
         let type_info = ctx.type_check(&source);
 
@@ -204,20 +234,7 @@ pub fn package_tyck_scope(
     }
 
     files.sort_by(|left, right| left.file_id.cmp(&right.file_id));
-
-    Ok(PackageTyckDump {
-        schema: 1,
-        package: DumpPackageInfo {
-            namespace: spec.namespace.to_string(),
-            name: spec.name.to_string(),
-            version: spec.version.clone(),
-            spec: format!("@{}/{}:{}", spec.namespace, spec.name, spec.version),
-            path: spec.path.to_string_lossy().into_owned(),
-            entrypoint: manifest.package.entrypoint.to_string(),
-        },
-        entrypoint: dump_file_id(entry_point),
-        files,
-    })
+    Ok(files)
 }
 
 /// Options for dumping package scope and type-checker information.
@@ -306,12 +323,52 @@ struct DumpDecl {
     range: Option<DumpRange>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct DumpType {
-    debug: String,
-    describe: Option<String>,
-    repr: Option<String>,
+    debug: EcoString,
+    describe: Option<EcoString>,
+    repr: Option<EcoString>,
+}
+
+struct TypeDumper<'a> {
+    type_info: &'a TypeInfo,
+    options: PackageTyckDumpOptions,
+    cache: FxHashMap<Ty, DumpType>,
+}
+
+impl<'a> TypeDumper<'a> {
+    fn new(type_info: &'a TypeInfo, options: PackageTyckDumpOptions) -> Self {
+        Self {
+            type_info,
+            options,
+            cache: FxHashMap::default(),
+        }
+    }
+
+    fn dump(&mut self, source: Ty) -> DumpType {
+        if let Some(dump) = self.cache.get(&source) {
+            return dump.clone();
+        }
+
+        let ty = self.type_info.simplify(source.clone(), true);
+        let display_ty = if contains_signature_binders(&ty) {
+            self.type_info.simplify(source.clone(), false)
+        } else {
+            ty.clone()
+        };
+        let dump = DumpType {
+            debug: format_debug_dump(&ty, self.options.max_type_chars).into(),
+            describe: display_ty.describe().map(|text| {
+                truncate_dump_string(text.to_string(), self.options.max_type_chars).into()
+            }),
+            repr: display_ty.repr().map(|text| {
+                truncate_dump_string(text.to_string(), self.options.max_type_chars).into()
+            }),
+        };
+        self.cache.insert(source, dump.clone());
+        dump
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -338,16 +395,17 @@ fn dump_file_scope(
 ) -> DumpFile {
     let fid = source.id();
     let file = dump_file_id(fid);
+    let mut types = TypeDumper::new(type_info, options);
 
     let file_scope = DumpScope {
         kind: "file",
         name: file.path.clone(),
         declaration: None,
-        variables: dump_scope_variables(source, type_info, exports, "export", true, options),
+        variables: dump_scope_variables(source, &mut types, exports, "export", true),
     };
 
     let mut scopes = vec![file_scope];
-    collect_function_scopes(source, type_info, root_expr, &mut scopes, options);
+    collect_function_scopes(source, &mut types, root_expr, &mut scopes);
 
     DumpFile {
         file_id: file.file_id,
@@ -355,17 +413,16 @@ fn dump_file_scope(
         path: file.path,
         imports,
         scopes,
-        type_mappings: dump_type_mappings(source, type_info, options),
+        type_mappings: dump_type_mappings(source, &mut types),
     }
 }
 
 fn dump_scope_variables(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     scope: &LexicalScope,
     var_source: &'static str,
     exported: bool,
-    options: PackageTyckDumpOptions,
 ) -> Vec<DumpVariable> {
     let origin = DumpVariableOrigin {
         source: var_source,
@@ -377,12 +434,11 @@ fn dump_scope_variables(
             let decl = expr_decl(expr)?;
             Some(dump_variable(
                 source,
-                type_info,
+                types,
                 name.as_ref(),
                 decl,
                 Some(expr),
                 origin,
-                options,
             ))
         })
         .collect::<Vec<_>>();
@@ -396,22 +452,14 @@ fn dump_scope_variables(
 
 fn collect_function_scopes(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     expr: &Expr,
     scopes: &mut Vec<DumpScope>,
-    options: PackageTyckDumpOptions,
 ) {
     if let Expr::Func(func) = expr {
         let mut variables = vec![];
-        collect_pattern_sig_variables(
-            source,
-            type_info,
-            &func.params,
-            "parameter",
-            &mut variables,
-            options,
-        );
-        collect_local_variables(source, type_info, &func.body, &mut variables, options);
+        collect_pattern_sig_variables(source, types, &func.params, "parameter", &mut variables);
+        collect_local_variables(source, types, &func.body, &mut variables);
         variables.sort_by(variable_cmp);
         variables.dedup_by(|left, right| {
             left.name == right.name && left.declaration.debug == right.declaration.debug
@@ -424,52 +472,37 @@ fn collect_function_scopes(
             variables,
         });
 
-        collect_function_scopes(source, type_info, &func.body, scopes, options);
+        collect_function_scopes(source, types, &func.body, scopes);
         return;
     }
 
     walk_expr_children(expr, &mut |child| {
-        collect_function_scopes(source, type_info, child, scopes, options);
+        collect_function_scopes(source, types, child, scopes);
     });
 }
 
 fn collect_local_variables(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     expr: &Expr,
     variables: &mut Vec<DumpVariable>,
-    options: PackageTyckDumpOptions,
 ) {
     match expr {
         Expr::Func(_) => {}
         Expr::Let(let_expr) => {
-            collect_pattern_variables(
-                source,
-                type_info,
-                &let_expr.pattern,
-                "local",
-                variables,
-                options,
-            );
+            collect_pattern_variables(source, types, &let_expr.pattern, "local", variables);
             if let Some(body) = &let_expr.body {
-                collect_local_variables(source, type_info, body, variables, options);
+                collect_local_variables(source, types, body, variables);
             }
         }
         Expr::ForLoop(for_loop) => {
-            collect_pattern_variables(
-                source,
-                type_info,
-                &for_loop.pattern,
-                "local",
-                variables,
-                options,
-            );
-            collect_local_variables(source, type_info, &for_loop.iter, variables, options);
-            collect_local_variables(source, type_info, &for_loop.body, variables, options);
+            collect_pattern_variables(source, types, &for_loop.pattern, "local", variables);
+            collect_local_variables(source, types, &for_loop.iter, variables);
+            collect_local_variables(source, types, &for_loop.body, variables);
         }
         _ => {
             walk_expr_children(expr, &mut |child| {
-                collect_local_variables(source, type_info, child, variables, options);
+                collect_local_variables(source, types, child, variables);
             });
         }
     }
@@ -477,19 +510,18 @@ fn collect_local_variables(
 
 fn collect_pattern_sig_variables(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     sig: &PatternSig,
     var_source: &'static str,
     variables: &mut Vec<DumpVariable>,
-    options: PackageTyckDumpOptions,
 ) {
     for pattern in &sig.pos {
-        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+        collect_pattern_variables(source, types, pattern, var_source, variables);
     }
     for (decl, pattern) in &sig.named {
         variables.push(dump_variable(
             source,
-            type_info,
+            types,
             decl.name().as_ref(),
             decl,
             None,
@@ -497,14 +529,13 @@ fn collect_pattern_sig_variables(
                 source: var_source,
                 exported: false,
             },
-            options,
         ));
-        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+        collect_pattern_variables(source, types, pattern, var_source, variables);
     }
     for (decl, pattern) in sig.spread_left.iter().chain(sig.spread_right.iter()) {
         variables.push(dump_variable(
             source,
-            type_info,
+            types,
             decl.name().as_ref(),
             decl,
             None,
@@ -512,26 +543,24 @@ fn collect_pattern_sig_variables(
                 source: var_source,
                 exported: false,
             },
-            options,
         ));
-        collect_pattern_variables(source, type_info, pattern, var_source, variables, options);
+        collect_pattern_variables(source, types, pattern, var_source, variables);
     }
 }
 
 fn collect_pattern_variables(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     pattern: &Pattern,
     var_source: &'static str,
     variables: &mut Vec<DumpVariable>,
-    options: PackageTyckDumpOptions,
 ) {
     match pattern {
-        Pattern::Expr(expr) => collect_local_variables(source, type_info, expr, variables, options),
+        Pattern::Expr(expr) => collect_local_variables(source, types, expr, variables),
         Pattern::Simple(decl) => {
             variables.push(dump_variable(
                 source,
-                type_info,
+                types,
                 decl.name().as_ref(),
                 decl,
                 None,
@@ -539,11 +568,10 @@ fn collect_pattern_variables(
                     source: var_source,
                     exported: false,
                 },
-                options,
             ));
         }
         Pattern::Sig(sig) => {
-            collect_pattern_sig_variables(source, type_info, sig, var_source, variables, options);
+            collect_pattern_sig_variables(source, types, sig, var_source, variables);
         }
     }
 }
@@ -677,13 +705,19 @@ fn expr_decl(expr: &Expr) -> Option<&DeclExpr> {
 
 fn dump_variable(
     source: &Source,
-    type_info: &TypeInfo,
+    types: &mut TypeDumper,
     name: &str,
     decl: &DeclExpr,
     expr: Option<&Expr>,
     origin: DumpVariableOrigin,
-    options: PackageTyckDumpOptions,
 ) -> DumpVariable {
+    let ty = types
+        .type_info
+        .vars
+        .get(decl)
+        .map(|bounds| bounds.as_type())
+        .map(|ty| types.dump(ty));
+
     DumpVariable {
         name: name.to_owned(),
         kind: decl.kind().to_string(),
@@ -691,10 +725,7 @@ fn dump_variable(
         exported: origin.exported,
         declaration: dump_decl(source, decl),
         expression: expr.map(ToString::to_string),
-        ty: type_info
-            .vars
-            .get(decl)
-            .map(|bounds| dump_type(type_info, bounds.as_type(), options)),
+        ty,
     }
 }
 
@@ -707,111 +738,150 @@ fn dump_decl(source: &Source, decl: &DeclExpr) -> DumpDecl {
     }
 }
 
-fn dump_type(type_info: &TypeInfo, ty: Ty, options: PackageTyckDumpOptions) -> DumpType {
-    let display_source = ty.clone();
-    let ty = type_info.simplify(ty, true);
-    let display_ty = if contains_signature_binders(&ty) {
-        type_info.simplify(display_source, false)
-    } else {
-        ty.clone()
-    };
-    DumpType {
-        debug: format_debug_dump(&ty, options.max_type_chars),
-        describe: display_ty
-            .describe()
-            .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
-        repr: display_ty
-            .repr()
-            .map(|text| truncate_dump_string(text.to_string(), options.max_type_chars)),
-    }
+fn contains_signature_binders(ty: &Ty) -> bool {
+    contains_signature_binders_inner(ty, &mut FxHashSet::default(), &mut FxHashSet::default())
 }
 
-fn contains_signature_binders(ty: &Ty) -> bool {
+#[allow(clippy::mutable_key_type)]
+fn contains_signature_binders_inner(
+    ty: &Ty,
+    traversed: &mut FxHashSet<Ty>,
+    type_var_traversed: &mut FxHashSet<Ty>,
+) -> bool {
+    if !traversed.insert(ty.clone()) {
+        return false;
+    }
+
     match ty {
         Ty::Func(sig) | Ty::Pattern(sig) => {
-            sig.inputs().any(contains_type_var)
-                || sig.inputs().any(contains_signature_binders)
-                || sig.body.as_ref().is_some_and(contains_signature_binders)
+            sig.inputs()
+                .any(|ty| contains_type_var(ty, type_var_traversed))
+                || sig
+                    .inputs()
+                    .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed))
+                || sig.body.as_ref().is_some_and(|ty| {
+                    contains_signature_binders_inner(ty, traversed, type_var_traversed)
+                })
         }
         Ty::Args(sig) => {
-            sig.inputs().any(contains_signature_binders)
-                || sig.body.as_ref().is_some_and(contains_signature_binders)
+            sig.inputs()
+                .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed))
+                || sig.body.as_ref().is_some_and(|ty| {
+                    contains_signature_binders_inner(ty, traversed, type_var_traversed)
+                })
         }
         Ty::With(with) => {
-            contains_signature_binders(&with.sig)
-                || with.with.inputs().any(contains_signature_binders)
+            contains_signature_binders_inner(&with.sig, traversed, type_var_traversed)
                 || with
                     .with
-                    .body
-                    .as_ref()
-                    .is_some_and(contains_signature_binders)
+                    .inputs()
+                    .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed))
+                || with.with.body.as_ref().is_some_and(|ty| {
+                    contains_signature_binders_inner(ty, traversed, type_var_traversed)
+                })
         }
-        Ty::Param(param) => contains_signature_binders(&param.ty),
-        Ty::Union(types) | Ty::Tuple(types) => types.iter().any(contains_signature_binders),
+        Ty::Param(param) => {
+            contains_signature_binders_inner(&param.ty, traversed, type_var_traversed)
+        }
+        Ty::Union(types) | Ty::Tuple(types) => types
+            .iter()
+            .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed)),
         Ty::Let(bounds) => bounds
             .lbs
             .iter()
             .chain(&bounds.ubs)
-            .any(contains_signature_binders),
-        Ty::Dict(record) => record.types.iter().any(contains_signature_binders),
-        Ty::Array(elem) => contains_signature_binders(elem),
-        Ty::Select(select) => contains_signature_binders(&select.ty),
-        Ty::Unary(unary) => contains_signature_binders(&unary.lhs),
+            .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed)),
+        Ty::Dict(record) => record
+            .types
+            .iter()
+            .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed)),
+        Ty::Array(elem) => contains_signature_binders_inner(elem, traversed, type_var_traversed),
+        Ty::Select(select) => {
+            contains_signature_binders_inner(&select.ty, traversed, type_var_traversed)
+        }
+        Ty::Unary(unary) => {
+            contains_signature_binders_inner(&unary.lhs, traversed, type_var_traversed)
+        }
         Ty::Binary(binary) => binary
             .operands()
             .iter()
-            .any(|ty| contains_signature_binders(ty)),
+            .any(|ty| contains_signature_binders_inner(ty, traversed, type_var_traversed)),
         Ty::If(if_ty) => {
-            contains_signature_binders(&if_ty.cond)
-                || contains_signature_binders(&if_ty.then)
-                || contains_signature_binders(&if_ty.else_)
+            contains_signature_binders_inner(&if_ty.cond, traversed, type_var_traversed)
+                || contains_signature_binders_inner(&if_ty.then, traversed, type_var_traversed)
+                || contains_signature_binders_inner(&if_ty.else_, traversed, type_var_traversed)
         }
         Ty::Var(_) | Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => false,
     }
 }
 
-fn contains_type_var(ty: &Ty) -> bool {
+#[allow(clippy::mutable_key_type)]
+fn contains_type_var(ty: &Ty, traversed: &mut FxHashSet<Ty>) -> bool {
+    if !traversed.insert(ty.clone()) {
+        return false;
+    }
+
     match ty {
         Ty::Var(_) => true,
         Ty::Func(sig) | Ty::Args(sig) | Ty::Pattern(sig) => {
-            sig.inputs().any(contains_type_var) || sig.body.as_ref().is_some_and(contains_type_var)
+            sig.inputs().any(|ty| contains_type_var(ty, traversed))
+                || sig
+                    .body
+                    .as_ref()
+                    .is_some_and(|ty| contains_type_var(ty, traversed))
         }
         Ty::With(with) => {
-            contains_type_var(&with.sig)
-                || with.with.inputs().any(contains_type_var)
-                || with.with.body.as_ref().is_some_and(contains_type_var)
+            contains_type_var(&with.sig, traversed)
+                || with
+                    .with
+                    .inputs()
+                    .any(|ty| contains_type_var(ty, traversed))
+                || with
+                    .with
+                    .body
+                    .as_ref()
+                    .is_some_and(|ty| contains_type_var(ty, traversed))
         }
-        Ty::Param(param) => contains_type_var(&param.ty),
-        Ty::Union(types) | Ty::Tuple(types) => types.iter().any(contains_type_var),
-        Ty::Let(bounds) => bounds.lbs.iter().chain(&bounds.ubs).any(contains_type_var),
-        Ty::Dict(record) => record.types.iter().any(contains_type_var),
-        Ty::Array(elem) => contains_type_var(elem),
-        Ty::Select(select) => contains_type_var(&select.ty),
-        Ty::Unary(unary) => contains_type_var(&unary.lhs),
-        Ty::Binary(binary) => binary.operands().iter().any(|ty| contains_type_var(ty)),
+        Ty::Param(param) => contains_type_var(&param.ty, traversed),
+        Ty::Union(types) | Ty::Tuple(types) => {
+            types.iter().any(|ty| contains_type_var(ty, traversed))
+        }
+        Ty::Let(bounds) => bounds
+            .lbs
+            .iter()
+            .chain(&bounds.ubs)
+            .any(|ty| contains_type_var(ty, traversed)),
+        Ty::Dict(record) => record
+            .types
+            .iter()
+            .any(|ty| contains_type_var(ty, traversed)),
+        Ty::Array(elem) => contains_type_var(elem, traversed),
+        Ty::Select(select) => contains_type_var(&select.ty, traversed),
+        Ty::Unary(unary) => contains_type_var(&unary.lhs, traversed),
+        Ty::Binary(binary) => binary
+            .operands()
+            .iter()
+            .any(|ty| contains_type_var(ty, traversed)),
         Ty::If(if_ty) => {
-            contains_type_var(&if_ty.cond)
-                || contains_type_var(&if_ty.then)
-                || contains_type_var(&if_ty.else_)
+            contains_type_var(&if_ty.cond, traversed)
+                || contains_type_var(&if_ty.then, traversed)
+                || contains_type_var(&if_ty.else_, traversed)
         }
         Ty::Any | Ty::Boolean(_) | Ty::Builtin(_) | Ty::Value(_) => false,
     }
 }
 
-fn dump_type_mappings(
-    source: &Source,
-    type_info: &TypeInfo,
-    options: PackageTyckDumpOptions,
-) -> Vec<DumpTypeMapping> {
+fn dump_type_mappings(source: &Source, types: &mut TypeDumper) -> Vec<DumpTypeMapping> {
+    let type_info = types.type_info;
     let mut mappings = type_info
         .mapping
         .iter()
-        .filter_map(|(span, types)| {
+        .filter_map(|(span, mapped_types)| {
             let range = dump_span_range(source, *span)?;
-            let ty = Ty::from_types(types.clone().into_iter());
+            let ty = Ty::from_types(mapped_types.clone().into_iter());
             Some(DumpTypeMapping {
                 range,
-                ty: dump_type(type_info, ty, options),
+                ty: types.dump(ty),
             })
         })
         .collect::<Vec<_>>();
@@ -1106,6 +1176,9 @@ mod tests {
     use typst::syntax::package::PackageSpec;
 
     use super::*;
+    use crate::syntax::Decl;
+    use crate::tests::{run_with_ctx, run_with_sources};
+    use crate::ty::{SigTy, TypeVar};
 
     fn manifest_id() -> FileId {
         FileId::new(RootedPath::new(
@@ -1132,5 +1205,131 @@ mod tests {
 
         assert_eq!(entrypoint.root(), manifest_id.root());
         assert_eq!(entrypoint.vpath().get_with_slash(), "/lib.typ");
+    }
+
+    #[test]
+    #[allow(clippy::mutable_key_type)]
+    fn signature_binder_detection_visits_shared_type_once() {
+        const DEPTH: usize = 16;
+
+        let mut shared = Ty::Any;
+        for _ in 0..DEPTH {
+            shared = Ty::Tuple(vec![shared.clone(), shared].into());
+        }
+        let mut traversed = FxHashSet::default();
+        assert!(!contains_signature_binders_inner(
+            &shared,
+            &mut traversed,
+            &mut FxHashSet::default(),
+        ));
+        assert_eq!(traversed.len(), DEPTH + 1);
+
+        let binder = TypeVar::new("input".into(), Decl::lit("input").into());
+        let binder_ty = Ty::Var(binder);
+        assert!(contains_signature_binders(&Ty::Func(SigTy::unary(
+            binder_ty,
+            Ty::Any,
+        ))));
+    }
+
+    #[test]
+    fn type_dumper_reuses_dumped_types() {
+        let info = TypeInfo::default();
+        let mut dumper = TypeDumper::new(
+            &info,
+            PackageTyckDumpOptions {
+                max_type_chars: Some(128),
+            },
+        );
+
+        let first = dumper.dump(Ty::Any);
+        let second = dumper.dump(Ty::Any);
+
+        assert_eq!(dumper.cache.len(), 1);
+        assert_eq!(first.debug, second.debug);
+        assert_eq!(first.describe, second.describe);
+        assert_eq!(first.repr, second.repr);
+    }
+
+    #[test]
+    #[allow(clippy::mutable_key_type)]
+    fn principal_dump_preserves_type_guard_branches() {
+        run_with_sources(
+            r#"
+#let auto-cast(pat) = {
+  if type(pat) == dictionary {
+    pat
+  } else if type(pat) == array {
+    pat.map(auto-cast)
+  }
+}
+"#,
+            |verse, path| {
+                run_with_ctx(verse, path, &|ctx, path| {
+                    let source = ctx.source_by_path(&path).unwrap();
+                    let info = ctx.type_check(&source);
+                    let mapped = info
+                        .mapping
+                        .iter()
+                        .find_map(|(span, mapped)| {
+                            let range = source_range(&source, *span)?;
+                            (source.text().get(range) == Some("pat.map")).then_some(mapped)
+                        })
+                        .expect("pat.map must have a mapped type");
+                    let source_ty = Ty::from_types(mapped.clone().into_iter());
+                    let mut dumper = TypeDumper::new(
+                        &info,
+                        PackageTyckDumpOptions {
+                            max_type_chars: Some(1024),
+                        },
+                    );
+                    let dumped = dumper.dump(source_ty);
+
+                    assert!(dumped.debug.contains("Type(array)"));
+                    assert!(dumped.debug.contains("Type(dictionary)"));
+                    assert!(dumped.debug.contains(".map"));
+                });
+            },
+        );
+    }
+
+    #[test]
+    fn package_tyck_files_skip_unreadable_imports() {
+        run_with_sources(
+            r#"
+// path: present.typ
+#let present = true
+-----
+// path: main.typ
+#import "present.typ"
+#import "missing.typ"
+"#,
+            |verse, path| {
+                run_with_ctx(verse, path, &|ctx, path| {
+                    let entrypoint = ctx.source_by_path(&path).unwrap().id();
+                    let files = collect_package_tyck_files(ctx, entrypoint, Default::default())
+                        .expect("missing imports should not abort a package scan");
+
+                    assert_eq!(
+                        files
+                            .iter()
+                            .map(|file| file.path.as_str())
+                            .collect::<Vec<_>>(),
+                        ["main.typ", "present.typ"]
+                    );
+                    let main = files
+                        .iter()
+                        .find(|file| file.path == "main.typ")
+                        .expect("entrypoint must be dumped");
+                    assert_eq!(
+                        main.imports
+                            .iter()
+                            .map(|import| import.path.as_str())
+                            .collect::<Vec<_>>(),
+                        ["missing.typ", "present.typ"]
+                    );
+                });
+            },
+        );
     }
 }
