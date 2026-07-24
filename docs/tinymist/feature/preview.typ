@@ -127,7 +127,7 @@ tinymist preview /abs-path/to/main.typ --partial-rendering
 If the document is compiled by lsp, you can use `sys.inputs` to get the preview arguments:
 
 ```typ
-#let preview-args = json.decode(sys.inputs.at("x-preview", default: "{}"))
+#let preview-args = json(bytes(sys.inputs.at("x-preview", default: "{}")))
 ```
 
 There is a `version` field in the `preview-args` object, which will increase when the scheme of the preview arguments is changed.
