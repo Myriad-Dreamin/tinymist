@@ -15,7 +15,7 @@ require('tinymist').setup {
   lsp = {
     init_options = {
         exportPdf = 'onType',
-        outputPath = '/home/runner/test/$name',
+        outputPath = '/home/runner/test/on-type/$name',
         development = true,
         systemFonts = false,
     },
@@ -30,7 +30,7 @@ async_tests.describe('Export', function()
   assert.is.empty(vim.lsp.get_clients { bufnr = 0, name = 'tinymist', _uninitialized = true })
 
   async_tests.it('pdf is created onType', function()
-    local pdf_path = '/home/runner/test/main.pdf'
+    local pdf_path = '/home/runner/test/on-type/main.pdf'
     assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created before testing')
 
     local pdf_exported = async.wrap(function(cb)
