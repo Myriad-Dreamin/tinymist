@@ -16,7 +16,7 @@ require('tinymist').setup {
     init_options = {
         projectResolution = 'lockDatabase',
         exportPdf = 'onType',
-        outputPath = '/home/runner/test/$name',
+        outputPath = '/home/runner/test/lockfile/$name',
         development = true,
         systemFonts = false,
     },
@@ -31,8 +31,8 @@ async_tests.describe('Lockfile', function()
   assert.is.empty(vim.lsp.get_clients { bufnr = 0, name = 'tinymist', _uninitialized = true })
 
   async_tests.it('pdf of main is created onType', function()
-    local pdf_path = '/home/runner/test/main.pdf'
-    local pdf_sub_path = '/home/runner/test/chapter1.pdf'
+    local pdf_path = '/home/runner/test/lockfile/main.pdf'
+    local pdf_sub_path = '/home/runner/test/lockfile/chapter1.pdf'
     assert.is.same(nil, vim.uv.fs_stat(pdf_path), 'PDF file should not be created before testing')
     assert.is.same(nil, vim.uv.fs_stat(pdf_sub_path), 'PDF sub file should not be created before testing')
 
