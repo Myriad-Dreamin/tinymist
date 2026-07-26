@@ -6727,7 +6727,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tempfile",
- "tinymist-assets 0.15.2",
+ "tinymist-assets 0.15.4-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-dap",
  "tinymist-debug",
  "tinymist-l10n",
@@ -6794,13 +6794,13 @@ dependencies = [
 
 [[package]]
 name = "tinymist-assets"
-version = "0.15.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "622c13ea683278225c21aaf38215e6f7c581ad12d241a2dfd3f683f31dcb560f"
+version = "0.15.4-rc1"
 
 [[package]]
 name = "tinymist-assets"
 version = "0.15.4-rc1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60d4aba63140c9edc32b39c7dfc35a3f066f8d0ff95c7bf468c178abd2dac371"
 
 [[package]]
 name = "tinymist-bench-font-load"
@@ -6857,7 +6857,7 @@ dependencies = [
  "sync-ls",
  "temp-env",
  "tinymist",
- "tinymist-assets 0.15.2",
+ "tinymist-assets 0.15.4-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-debug",
  "tinymist-l10n",
  "tinymist-preview",
@@ -7035,7 +7035,7 @@ dependencies = [
  "reflexo-vec2svg",
  "serde",
  "serde_json",
- "tinymist-assets 0.15.2",
+ "tinymist-assets 0.15.4-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-std",
  "tinymist-task",
  "tinymist-tests",
@@ -7294,7 +7294,7 @@ dependencies = [
  "sha2",
  "smallvec",
  "svgtypes 0.15.3",
- "tinymist-assets 0.15.2",
+ "tinymist-assets 0.15.4-rc1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-preview",
  "tinymist-std",
  "tinymist-tests",
