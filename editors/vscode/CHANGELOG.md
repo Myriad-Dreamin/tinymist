@@ -21,7 +21,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Added SCIP index support in https://github.com/Myriad-Dreamin/tinymist/pull/2613
 * Added SCIP package queries in https://github.com/Myriad-Dreamin/tinymist/pull/2627
 
-### Editor Tools
+### DAP
 
 * Added function breakpoint support in https://github.com/Myriad-Dreamin/tinymist/pull/2541
 * Added line breakpoint support in https://github.com/Myriad-Dreamin/tinymist/pull/2615
@@ -30,9 +30,12 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Editor
 
 * (Fix) Added hints for joined Typst extra args in https://github.com/Myriad-Dreamin/tinymist/pull/2601
+* Added the IntelliJ LSP integration plugin by @bratorange in https://github.com/Myriad-Dreamin/tinymist/pull/2087
+
+### GPU Viewer
+
 * (Fix) Supported the GPU previewer in remote Windows sessions in https://github.com/Myriad-Dreamin/tinymist/pull/2635
 * (Fix) Allowed the GPU viewer to activate in the UI host in https://github.com/Myriad-Dreamin/tinymist/pull/2636
-* Added the IntelliJ LSP integration plugin by @bratorange in https://github.com/Myriad-Dreamin/tinymist/pull/2087
 
 ### Preview
 
