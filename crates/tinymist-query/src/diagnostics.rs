@@ -139,26 +139,35 @@ impl<'w> DiagWorker<'w> {
             diag
         };
 
-        let (id, span) = self.diagnostic_span_id(&typst_diagnostic);
+        let (origin_id, origin_span) = self.diagnostic_origin_span_id(&typst_diagnostic);
+        let (id, span) =
+            self.diagnostic_display_span_id(&typst_diagnostic, (origin_id, origin_span));
         let uri = self.ctx.uri_for_id(id)?;
         let source = self.ctx.source_by_id(id)?;
         let lsp_range = self.diagnostic_range(&source, span);
 
         let lsp_severity = diagnostic_severity(typst_diagnostic.severity);
         let lsp_message = diagnostic_message(&typst_diagnostic);
+        let mut related_information = typst_diagnostic
+            .trace
+            .iter()
+            .flat_map(|tracepoint| self.to_related_info(tracepoint))
+            .collect::<Vec<_>>();
+
+        if id != origin_id {
+            if let Some(origin) =
+                self.to_related_span(origin_id, origin_span, "diagnostic originated here")
+            {
+                related_information.insert(0, origin);
+            }
+        }
 
         let diagnostic = Diagnostic {
             range: lsp_range,
             severity: Some(lsp_severity),
             message: lsp_message,
             source: Some(self.source.to_owned()),
-            related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
-                typst_diagnostic
-                    .trace
-                    .iter()
-                    .flat_map(|tracepoint| self.to_related_info(tracepoint))
-                    .collect()
-            }),
+            related_information: (!related_information.is_empty()).then_some(related_information),
             ..Default::default()
         };
 
@@ -170,11 +179,20 @@ impl<'w> DiagWorker<'w> {
         tracepoint: &Spanned<Tracepoint>,
     ) -> Option<DiagnosticRelatedInformation> {
         let id = tracepoint.span.id()?;
+        self.to_related_span(id, tracepoint.span.into(), tracepoint.v.to_string())
+    }
+
+    fn to_related_span(
+        &self,
+        id: TypstFileId,
+        span: DiagSpan,
+        message: impl Into<String>,
+    ) -> Option<DiagnosticRelatedInformation> {
         // todo: expensive uri_for_id
         let uri = self.ctx.uri_for_id(id).ok()?;
         let source = self.ctx.source_by_id(id).ok()?;
 
-        let typst_range = source_range(&source, tracepoint.span)?;
+        let typst_range = source_range(&source, span)?;
         let lsp_range = self.ctx.to_lsp_range(typst_range, &source);
 
         Some(DiagnosticRelatedInformation {
@@ -182,11 +200,35 @@ impl<'w> DiagWorker<'w> {
                 uri,
                 range: lsp_range,
             },
-            message: tracepoint.v.to_string(),
+            message: message.into(),
         })
     }
 
-    fn diagnostic_span_id(&self, typst_diagnostic: &TypstDiagnostic) -> (TypstFileId, DiagSpan) {
+    fn diagnostic_display_span_id(
+        &self,
+        typst_diagnostic: &TypstDiagnostic,
+        origin: (TypstFileId, DiagSpan),
+    ) -> (TypstFileId, DiagSpan) {
+        let main = self.ctx.world().main();
+        if origin.0 == main {
+            return origin;
+        }
+
+        typst_diagnostic
+            .trace
+            .iter()
+            .rev()
+            .find_map(|tracepoint| {
+                let id = tracepoint.span.id()?;
+                (id == main).then_some((id, tracepoint.span.into()))
+            })
+            .unwrap_or(origin)
+    }
+
+    fn diagnostic_origin_span_id(
+        &self,
+        typst_diagnostic: &TypstDiagnostic,
+    ) -> (TypstFileId, DiagSpan) {
         iter::once(typst_diagnostic.span)
             .chain(typst_diagnostic.trace.iter().map(|trace| trace.span.into()))
             .find_map(|span| Some((span.id()?, span)))
@@ -269,5 +311,33 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
     fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {
         raw.hints.clear();
         raw.with_hint("Cannot read file outside of project root.")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use typst::diag::Warned;
+    use typst_layout::PagedDocument;
+
+    use super::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing("diagnostics", &|ctx, _| {
+            let Warned { output, warnings } = typst_shim::compile_opt::<PagedDocument>(ctx.world());
+            let errors = output.err().unwrap_or_default();
+            let diagnostics = warnings.iter().chain(errors.iter());
+
+            let result = DiagWorker::new(ctx)
+                .convert_all(diagnostics)
+                .into_iter()
+                .map(|(uri, diagnostics)| (file_uri_(&uri), diagnostics))
+                .collect::<BTreeMap<_, _>>();
+
+            assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
+        });
     }
 }
