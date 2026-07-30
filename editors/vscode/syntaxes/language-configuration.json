@@ -22,8 +22,32 @@
       "close": ")"
     },
     {
+      "open": "<",
+      "close": ">"
+    },
+    {
       "open": "\"",
       "close": "\"",
+      "notIn": ["string"]
+    },
+        {
+      "open": "'",
+      "close": "'",
+      "notIn": ["string"]
+    },
+    {
+      "open": "*",
+      "close": "*",
+      "notIn": ["string"]
+    },
+    {
+      "open": "_",
+      "close": "_",
+      "notIn": ["string"]
+    },
+    {
+      "open": "`",
+      "close": "`",
       "notIn": ["string"]
     },
     {
@@ -32,12 +56,14 @@
       "notIn": ["string"]
     }
   ],
-  "autoCloseBefore": ";:.,=}])>$ \n\t",
+  "autoCloseBefore": ";:.,=}])>\"'*_`$ \n\t",
   "surroundingPairs": [
     ["[", "]"],
     ["{", "}"],
     ["(", ")"],
+    ["<", ">"],
     ["\"", "\""],
+    ["'", "'"],
     ["*", "*"],
     ["_", "_"],
     ["`", "`"],
