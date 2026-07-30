@@ -344,6 +344,8 @@ export class LanguageState {
     // Reset server health warning flag when client successfully starts
     extensionState.mut.serverHealthWarningShown = false;
 
+    this.registerAutoPairMathFilter();
+
     return;
   }
 
@@ -684,7 +686,51 @@ export class LanguageState {
       await saveStoredViewerWindowState(this.context, data);
     });
   }
+  /**
+   * Filters auto-closing pairs for * and _ when inside math mode.
+   * Uses LSP modeAt to determine whether the cursor is in math context.
+   */
+  private _mathFilterDebounce: NodeJS.Timeout | undefined;
+  registerAutoPairMathFilter() {
+    vscode.workspace.onDidChangeTextDocument(async (e) => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || e.document !== editor.document) return;
 
+      const change = e.contentChanges[0];
+      if (!change) return;
+
+      const ch = change.text;
+      if (ch !== "*" && ch !== "_") return;
+
+      clearTimeout(this._mathFilterDebounce);
+      this._mathFilterDebounce = setTimeout(async () => {
+        const pos = change.range.start;
+
+        try {
+          const result = await this.interactCodeContext(e.document.uri, [{
+            kind: "modeAt",
+            position: { line: pos.line, character: pos.character },
+          }]);
+
+          const mode = result?.[0]?.mode;
+          if (mode === "math") {
+            const afterPos = pos.translate({ characterDelta: 1 });
+            const afterRange = new vscode.Range(afterPos, afterPos.translate({ characterDelta: 1 }));
+            const afterChar = e.document.getText(afterRange);
+            
+            if (afterChar === ch) {
+              await editor.edit((builder) => builder.delete(afterRange), {
+                undoStopBefore: false,
+                undoStopAfter: false,
+              });
+            }
+          }
+        } catch (err) {
+          console.debug("tinymist: modeAt request failed", err);
+        }
+      }, 30);
+    });
+  }
   /**
    * End of {@link _GroupDocumentPreviewFeatureCommands}
    */
