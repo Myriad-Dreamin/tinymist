@@ -24,9 +24,34 @@ use crate::{
 
 use super::{DocCommentMatcher, InterpretMode, def::*};
 
-/// Maps file identifiers to their lexical scopes for expression analysis
-/// routing.
-pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
+/// Tracks active and completed expression analyses for one traversal.
+#[derive(Default, Clone)]
+pub(crate) struct ExprRoute {
+    visiting: FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>,
+    completed: FxHashMap<TypstFileId, ExprInfo>,
+}
+
+impl ExprRoute {
+    pub(crate) fn get(&self, fid: &TypstFileId) -> Option<&Option<Arc<LazyHash<LexicalScope>>>> {
+        self.visiting.get(fid)
+    }
+
+    pub(crate) fn insert(&mut self, fid: TypstFileId, scope: Option<Arc<LazyHash<LexicalScope>>>) {
+        self.visiting.insert(fid, scope);
+    }
+
+    pub(crate) fn remove(&mut self, fid: &TypstFileId) {
+        self.visiting.remove(fid);
+    }
+
+    pub(crate) fn completed(&self, fid: &TypstFileId) -> Option<&ExprInfo> {
+        self.completed.get(fid)
+    }
+
+    pub(crate) fn complete(&mut self, info: ExprInfo) {
+        self.completed.insert(info.fid, info);
+    }
+}
 
 /// Analyzes expressions in a source file and produces expression information.
 ///
@@ -77,6 +102,7 @@ pub(crate) fn expr_of(
 
     if let Some(prev) = cache_hit {
         route.remove(&source.id());
+        route.complete(prev.clone());
         return prev;
     }
     guard.miss();
@@ -148,8 +174,10 @@ pub(crate) fn expr_of(
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
+    let info = ExprInfo::new(info);
     route.remove(&info.fid);
-    ExprInfo::new(info)
+    route.complete(info.clone());
+    info
 }
 
 type ConcolicExpr = (Option<Expr>, Option<Ty>);

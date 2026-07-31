@@ -14,7 +14,7 @@ use super::{
 };
 use crate::{
     docs::UntypedDefDocs,
-    syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
+    syntax::{Decl, DeclExpr, Expr, ExprInfo, ExprRoute, UnaryOp},
     ty::*,
 };
 
@@ -26,19 +26,64 @@ mod syntax;
 pub(crate) use apply::*;
 pub(crate) use select::*;
 
-#[derive(Default)]
-pub struct TypeEnv {
+/// Owns all traversal-local state for one top-level type-check query.
+pub(crate) struct TypeEnv {
+    ctx: Arc<SharedContext>,
+    expr_route: ExprRoute,
     visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
     exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
+    type_infos: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+}
+
+impl TypeEnv {
+    pub(super) fn new(ctx: Arc<SharedContext>) -> Self {
+        Self {
+            ctx,
+            expr_route: Default::default(),
+            visiting: Default::default(),
+            exprs: Default::default(),
+            type_infos: Default::default(),
+        }
+    }
+
+    fn expr_info(&mut self, fid: TypstFileId) -> Option<ExprInfo> {
+        if let Some(cached) = self.exprs.get(&fid) {
+            return cached.clone();
+        }
+
+        let ctx = self.ctx.clone();
+        let info = ctx
+            .source_by_id(fid)
+            .ok()
+            .map(|source| ctx.expr_stage_in(&source, &mut self.expr_route));
+        self.exprs.insert(fid, info.clone());
+        info
+    }
+
+    fn type_info(&mut self, ei: ExprInfo) -> Arc<TypeInfo> {
+        if let Some(cached) = self.type_infos.get(&ei.fid) {
+            return cached.clone();
+        }
+
+        let ctx = self.ctx.clone();
+        let guard = ctx.query_stat(ei.fid, "type_check");
+        if let Some(cached) = ctx.completed_type_check(&ei) {
+            self.type_infos.insert(ei.fid, cached.clone());
+            return cached;
+        }
+
+        guard.miss();
+        let fid = ei.fid;
+        let type_info = type_check(ei, self);
+        self.type_infos.insert(fid, type_info.clone());
+        type_info
+    }
 }
 
 /// Type checking at the source unit level.
 #[typst_macros::time(span = ei.source.root().span())]
-pub(crate) fn type_check(
-    ctx: Arc<SharedContext>,
-    ei: ExprInfo,
-    env: &mut TypeEnv,
-) -> Arc<TypeInfo> {
+pub(crate) fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
+    let ctx = env.ctx.clone();
     let mut info = TypeInfo::default();
     info.valid = true;
     info.fid = Some(ei.fid);
@@ -143,12 +188,7 @@ impl TyCtxMut for TypeChecker<'_> {
             .or_default()
             .clone()
             .get_or_init(|| {
-                let ei = self
-                    .env
-                    .exprs
-                    .entry(fid)
-                    .or_insert_with(|| self.ctx.expr_stage_by_id(fid))
-                    .clone()?;
+                let ei = self.env.expr_info(fid)?;
 
                 Some(self.check(ei.exports.get(name)?))
             })
@@ -185,7 +225,7 @@ impl TypeChecker<'_> {
             Entry::Occupied(entry) => entry.get().var.clone(),
             Entry::Vacant(entry) => {
                 let name = decl.name().clone();
-                let init = Self::external_var_bounds(&self.ctx, self.env, self.ei.fid, decl, &name)
+                let init = Self::external_var_bounds(self.env, self.ei.fid, decl, &name)
                     .map(|(bounds, docs, input_bounds)| {
                         imported_docs = docs;
                         imported_input_bounds = input_bounds;
@@ -230,7 +270,6 @@ impl TypeChecker<'_> {
     }
 
     fn external_var_bounds(
-        ctx: &Arc<SharedContext>,
         env: &mut TypeEnv,
         current_fid: TypstFileId,
         decl: &DeclExpr,
@@ -247,13 +286,13 @@ impl TypeChecker<'_> {
 
         crate::log_debug_ct!("import_ty {name} from {fid:?}");
 
-        let ext_def_use_info = ctx.expr_stage_by_id(fid)?;
+        let ext_def_use_info = env.expr_info(fid)?;
         let source = &ext_def_use_info.source;
         // todo: check types in cycle
         let ext_type_info = if let Some(scheme) = env.visiting.get(&source.id()) {
             scheme.clone()
         } else {
-            ctx.clone().type_check_(source, env)
+            env.type_info(ext_def_use_info.clone())
         };
         let ext_def = ext_def_use_info.exports.get(name)?;
 

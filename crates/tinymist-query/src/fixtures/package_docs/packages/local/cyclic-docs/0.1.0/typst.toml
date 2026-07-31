@@ -1,0 +1,7 @@
+[package]
+name = "cyclic-docs"
+version = "0.1.0"
+entrypoint = "lib.typ"
+authors = ["Tinymist Contributors"]
+license = "MIT"
+description = "Hermetic package documentation cycle fixture."
