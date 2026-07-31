@@ -7,3 +7,12 @@
   import "b.typ": beta
   beta(value * scale)
 }
+
+/// Selects a documented function through module B.
+///
+/// - value (int): The value to pass through the module cycle.
+/// -> int
+#let alpha-module(value) = {
+  import "b.typ" as b
+  b.beta-module(value)
+}

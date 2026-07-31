@@ -1,9 +1,6 @@
 //! Type checking on source file
 
-use std::{
-    collections::hash_map::Entry,
-    sync::{Arc, OnceLock},
-};
+use std::{collections::hash_map::Entry, sync::Arc};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
@@ -30,18 +27,23 @@ pub(crate) use select::*;
 pub(crate) struct TypeEnv {
     ctx: Arc<SharedContext>,
     expr_route: ExprRoute,
-    visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+    checking: FxHashSet<TypstFileId>,
     exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
     type_infos: FxHashMap<TypstFileId, Arc<TypeInfo>>,
 }
 
 impl TypeEnv {
-    pub(super) fn new(ctx: Arc<SharedContext>) -> Self {
+    pub(super) fn new(ctx: Arc<SharedContext>, root: ExprInfo) -> Self {
+        let mut expr_route = ExprRoute::default();
+        expr_route.complete(root.clone());
+        let mut exprs = FxHashMap::default();
+        exprs.insert(root.fid, Some(root));
+
         Self {
             ctx,
-            expr_route: Default::default(),
-            visiting: Default::default(),
-            exprs: Default::default(),
+            expr_route,
+            checking: Default::default(),
+            exprs,
             type_infos: Default::default(),
         }
     }
@@ -67,11 +69,6 @@ impl TypeEnv {
 
         let ctx = self.ctx.clone();
         let guard = ctx.query_stat(ei.fid, "type_check");
-        if let Some(cached) = ctx.completed_type_check(&ei) {
-            self.type_infos.insert(ei.fid, cached.clone());
-            return cached;
-        }
-
         guard.miss();
         let fid = ei.fid;
         let type_info = type_check(ei, self);
@@ -89,7 +86,7 @@ pub(crate) fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
     info.fid = Some(ei.fid);
     info.revision = ei.revision;
 
-    env.visiting.insert(ei.fid, Arc::new(TypeInfo::default()));
+    env.checking.insert(ei.fid);
 
     // Retrieve expression information for the source.
     let root = ei.root.clone();
@@ -101,6 +98,7 @@ pub(crate) fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
         env,
         call_cache: Default::default(),
         module_exports: Default::default(),
+        checking_module_exports: Default::default(),
         overwritten_vars: Default::default(),
         live_input_vars: Default::default(),
         input_contract_bounds: Default::default(),
@@ -122,7 +120,7 @@ pub(crate) fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
     let elapsed = type_check_start.elapsed();
     crate::log_debug_ct!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
-    checker.env.visiting.remove(&checker.ei.fid);
+    checker.env.checking.remove(&checker.ei.fid);
 
     Arc::new(checker.info)
 }
@@ -138,7 +136,8 @@ pub(crate) struct TypeChecker<'a> {
     ei: ExprInfo,
 
     info: TypeInfo,
-    module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
+    module_exports: FxHashMap<(TypstFileId, Interned<str>), Option<Ty>>,
+    checking_module_exports: FxHashSet<(TypstFileId, Interned<str>)>,
 
     call_cache: FxHashSet<CallCacheDesc>,
     overwritten_vars: FxHashSet<DeclExpr>,
@@ -183,16 +182,23 @@ impl TyCtxMut for TypeChecker<'_> {
     }
 
     fn check_module_item(&mut self, fid: TypstFileId, name: &StrRef) -> Option<Ty> {
-        self.module_exports
-            .entry((fid, name.clone()))
-            .or_default()
-            .clone()
-            .get_or_init(|| {
-                let ei = self.env.expr_info(fid)?;
+        let key = (fid, name.clone());
+        if let Some(cached) = self.module_exports.get(&key) {
+            return cached.clone();
+        }
 
-                Some(self.check(ei.exports.get(name)?))
-            })
-            .clone()
+        if !self.checking_module_exports.insert(key.clone()) {
+            return None;
+        }
+
+        let result = self
+            .env
+            .expr_info(fid)
+            .and_then(|ei| ei.exports.get(name).map(|expr| self.check(expr)));
+
+        self.checking_module_exports.remove(&key);
+        self.module_exports.insert(key, result.clone());
+        result
     }
 }
 
@@ -288,12 +294,12 @@ impl TypeChecker<'_> {
 
         let ext_def_use_info = env.expr_info(fid)?;
         let source = &ext_def_use_info.source;
-        // todo: check types in cycle
-        let ext_type_info = if let Some(scheme) = env.visiting.get(&source.id()) {
-            scheme.clone()
-        } else {
-            env.type_info(ext_def_use_info.clone())
-        };
+        // A cycle has no complete external TypeInfo yet. Do not manufacture or
+        // consume a placeholder result; leave this edge unconstrained instead.
+        if env.checking.contains(&source.id()) {
+            return None;
+        }
+        let ext_type_info = env.type_info(ext_def_use_info.clone());
         let ext_def = ext_def_use_info.exports.get(name)?;
 
         // todo: rest expressions

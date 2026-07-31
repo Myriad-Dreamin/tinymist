@@ -2,7 +2,7 @@ use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::ops::Deref;
 use tinymist_analysis::adt::interner::Interned;
 use tinymist_std::hash::hash128;
@@ -27,21 +27,33 @@ use super::{DocCommentMatcher, InterpretMode, def::*};
 /// Tracks active and completed expression analyses for one traversal.
 #[derive(Default, Clone)]
 pub(crate) struct ExprRoute {
-    visiting: FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>,
+    checking: FxHashSet<TypstFileId>,
+    declared_exports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
     completed: FxHashMap<TypstFileId, ExprInfo>,
 }
 
 impl ExprRoute {
-    pub(crate) fn get(&self, fid: &TypstFileId) -> Option<&Option<Arc<LazyHash<LexicalScope>>>> {
-        self.visiting.get(fid)
+    pub(crate) fn begin(&mut self, fid: TypstFileId) {
+        self.checking.insert(fid);
     }
 
-    pub(crate) fn insert(&mut self, fid: TypstFileId, scope: Option<Arc<LazyHash<LexicalScope>>>) {
-        self.visiting.insert(fid, scope);
+    pub(crate) fn is_checking(&self, fid: &TypstFileId) -> bool {
+        self.checking.contains(fid)
     }
 
-    pub(crate) fn remove(&mut self, fid: &TypstFileId) {
-        self.visiting.remove(fid);
+    pub(crate) fn declared_exports(
+        &self,
+        fid: &TypstFileId,
+    ) -> Option<&Arc<LazyHash<LexicalScope>>> {
+        self.declared_exports.get(fid)
+    }
+
+    pub(crate) fn declare_exports(
+        &mut self,
+        fid: TypstFileId,
+        exports: Arc<LazyHash<LexicalScope>>,
+    ) {
+        self.declared_exports.insert(fid, exports);
     }
 
     pub(crate) fn completed(&self, fid: &TypstFileId) -> Option<&ExprInfo> {
@@ -49,6 +61,8 @@ impl ExprRoute {
     }
 
     pub(crate) fn complete(&mut self, info: ExprInfo) {
+        self.checking.remove(&info.fid);
+        self.declared_exports.remove(&info.fid);
         self.completed.insert(info.fid, info);
     }
 }
@@ -76,7 +90,7 @@ pub(crate) fn expr_of(
 ) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
 
-    route.insert(source.id(), None);
+    route.begin(source.id());
 
     let cache_hit = prev.and_then(|prev| {
         if prev.source.lines().len_bytes() != source.lines().len_bytes()
@@ -101,7 +115,6 @@ pub(crate) fn expr_of(
     });
 
     if let Some(prev) = cache_hit {
-        route.remove(&source.id());
         route.complete(prev.clone());
         return prev;
     }
@@ -145,8 +158,10 @@ pub(crate) fn expr_of(
 
     let root_markup = source.root().cast::<ast::Markup>().unwrap();
     worker.check_root_scope(root_markup.to_untyped().children());
-    let first_scope = Arc::new(LazyHash::new(worker.summarize_scope()));
-    worker.route.insert(worker.fid, Some(first_scope.clone()));
+    // This immutable declaration interface is complete for the first pass. A
+    // cyclic import may consume it, but never the still-building ExprInfo.
+    let declared_exports = Arc::new(LazyHash::new(worker.summarize_scope()));
+    worker.route.declare_exports(worker.fid, declared_exports);
 
     worker.lexical = LexicalContext::default();
     worker.comment_matcher.reset();
@@ -175,7 +190,6 @@ pub(crate) fn expr_of(
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
     let info = ExprInfo::new(info);
-    route.remove(&info.fid);
     route.complete(info.clone());
     info
 }

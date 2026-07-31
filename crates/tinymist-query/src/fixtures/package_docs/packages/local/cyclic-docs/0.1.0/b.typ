@@ -7,3 +7,12 @@
   import "a.typ": alpha
   alpha(value + offset)
 }
+
+/// Selects a documented function through module A.
+///
+/// - value (int): The value to pass through the module cycle.
+/// -> int
+#let beta-module(value) = {
+  import "a.typ" as a
+  a.alpha-module(value)
+}

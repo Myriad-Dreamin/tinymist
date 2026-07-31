@@ -8,7 +8,7 @@ use std::{collections::HashSet, ops::Deref};
 use comemo::{Track, Tracked};
 use ecow::EcoString;
 use lsp_types::Url;
-use parking_lot::{Condvar, Mutex};
+use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;
 use tinymist_analysis::docs::DocString;
@@ -849,10 +849,6 @@ impl SharedContext {
             return cached.clone();
         }
 
-        if let Some(cached) = self.slot.expr_stage.get(&hash128(&source)) {
-            return cached;
-        }
-
         let guard = self.query_stat(source.id(), "expr_stage");
         expr_of(self.clone(), source.clone(), route, guard, None)
     }
@@ -866,8 +862,12 @@ impl SharedContext {
             return Some(ei.exports.clone());
         }
 
-        if let Some(s) = route.get(&source.id()) {
-            return s.clone();
+        if let Some(exports) = route.declared_exports(&source.id()) {
+            return Some(exports.clone());
+        }
+
+        if route.is_checking(&source.id()) {
+            return None;
         }
 
         Some(self.expr_stage_in(source, route).exports.clone())
@@ -877,8 +877,8 @@ impl SharedContext {
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
         use crate::analysis::type_check;
 
-        let mut route = TypeEnv::new(self.clone());
         let ei = self.expr_stage(source);
+        let mut route = TypeEnv::new(self.clone(), ei.clone());
         let guard = self.query_stat(source.id(), "type_check");
         self.slot.type_check.compute(hash128(&ei), |prev| {
             // todo: recursively check changed scheme type
@@ -889,11 +889,6 @@ impl SharedContext {
             guard.miss();
             type_check(ei, &mut route)
         })
-    }
-
-    /// Reads a completed type-check result from the current revision.
-    pub(super) fn completed_type_check(&self, ei: &ExprInfo) -> Option<Arc<TypeInfo>> {
-        self.slot.type_check.get(&hash128(ei))
     }
 
     /// Gets the lint result of a source file.
@@ -1271,88 +1266,13 @@ impl SharedContext {
 
 // Needed by recursive computation
 type DeferredCompute<T> = Arc<OnceLock<T>>;
-type IncrDeferredCompute<T> = Arc<DeferredSlot<T>>;
-
-#[derive(Default)]
-enum DeferredState<T> {
-    #[default]
-    Fresh,
-    Running,
-    Done(T),
-}
-
-struct DeferredSlot<T> {
-    state: Mutex<DeferredState<T>>,
-    ready: Condvar,
-}
-
-impl<T> Default for DeferredSlot<T> {
-    fn default() -> Self {
-        Self {
-            state: Mutex::new(DeferredState::Fresh),
-            ready: Condvar::new(),
-        }
-    }
-}
-
-impl<T: Clone> DeferredSlot<T> {
-    fn get(&self) -> Option<T> {
-        let state = self.state.lock();
-        match &*state {
-            DeferredState::Done(value) => Some(value.clone()),
-            DeferredState::Fresh | DeferredState::Running => None,
-        }
-    }
-
-    fn compute(&self, compute: impl FnOnce() -> T) -> T {
-        let mut compute = Some(compute);
-        loop {
-            let mut state = self.state.lock();
-            match &*state {
-                DeferredState::Done(value) => return value.clone(),
-                DeferredState::Fresh => {
-                    *state = DeferredState::Running;
-                    drop(state);
-                    return self.finish(compute.take().expect("compute closure used once"));
-                }
-                DeferredState::Running => self.ready.wait(&mut state),
-            }
-        }
-    }
-
-    fn finish(&self, compute: impl FnOnce() -> T) -> T {
-        let mut reset = ResetDeferredSlot {
-            slot: self,
-            armed: true,
-        };
-        let value = compute();
-        *self.state.lock() = DeferredState::Done(value.clone());
-        reset.armed = false;
-        self.ready.notify_all();
-        value
-    }
-}
-
-struct ResetDeferredSlot<'a, T> {
-    slot: &'a DeferredSlot<T>,
-    armed: bool,
-}
-
-impl<T> Drop for ResetDeferredSlot<'_, T> {
-    fn drop(&mut self) {
-        if self.armed {
-            *self.slot.state.lock() = DeferredState::Fresh;
-            self.slot.ready.notify_all();
-        }
-    }
-}
 
 #[derive(Clone)]
 struct IncrCacheMap<K, V> {
     revision: usize,
     global: Arc<Mutex<FxDashMap<K, (usize, V)>>>,
-    prev: Arc<Mutex<FxHashMap<K, IncrDeferredCompute<V>>>>,
-    next: Arc<Mutex<FxHashMap<K, IncrDeferredCompute<V>>>>,
+    prev: Arc<Mutex<FxHashMap<K, DeferredCompute<V>>>>,
+    next: Arc<Mutex<FxHashMap<K, DeferredCompute<V>>>>,
 }
 
 impl<K: Eq + Hash, V> Default for IncrCacheMap<K, V> {
@@ -1367,17 +1287,6 @@ impl<K: Eq + Hash, V> Default for IncrCacheMap<K, V> {
 }
 
 impl<K, V> IncrCacheMap<K, V> {
-    fn get(&self, key: &K) -> Option<V>
-    where
-        K: Eq + Hash,
-        V: Clone,
-    {
-        // Only reuse a completed slot from this revision. Global values are
-        // consumed by the blocking owner so recursive routes stay isolated.
-        let next = self.next.lock().get(key).cloned();
-        next.and_then(|slot| slot.get())
-    }
-
     fn compute(&self, key: K, compute: impl FnOnce(Option<V>) -> V) -> V
     where
         K: Clone + Eq + Hash,
@@ -1385,7 +1294,8 @@ impl<K, V> IncrCacheMap<K, V> {
     {
         let next = self.next.lock().entry(key.clone()).or_default().clone();
 
-        next.compute(|| self.compute_and_publish(key, compute))
+        next.get_or_init(|| self.compute_and_publish(key, compute))
+            .clone()
     }
 
     fn compute_and_publish(&self, key: K, compute: impl FnOnce(Option<V>) -> V) -> V
@@ -1394,7 +1304,7 @@ impl<K, V> IncrCacheMap<K, V> {
         V: Clone,
     {
         let prev = self.prev.lock().get(&key).cloned();
-        let prev = prev.and_then(|prev| prev.get());
+        let prev = prev.and_then(|prev| prev.get().cloned());
         let prev = prev.or_else(|| {
             let global = self.global.lock();
             global
@@ -1435,45 +1345,16 @@ impl<K, V> IncrCacheMap<K, V> {
 
 #[cfg(test)]
 mod incr_cache_tests {
-    use std::sync::{Arc, Barrier, mpsc::sync_channel};
-
     use super::IncrCacheMap;
 
     #[test]
-    fn recursive_lookup_does_not_wait_on_running_slot() {
-        let cache = IncrCacheMap::<u8, u8>::default();
-        let started = Arc::new(Barrier::new(2));
-        let (release, wait) = sync_channel(0);
-
-        std::thread::scope(|scope| {
-            let owner_cache = cache.clone();
-            let owner_started = started.clone();
-            let owner = scope.spawn(move || {
-                owner_cache.compute(1, |_| {
-                    owner_started.wait();
-                    wait.recv().unwrap();
-                    1
-                })
-            });
-
-            started.wait();
-            assert_eq!(cache.get(&1), None);
-            release.send(()).unwrap();
-            assert_eq!(owner.join().unwrap(), 1);
-        });
-
-        assert_eq!(cache.get(&1), Some(1));
-    }
-
-    #[test]
-    fn panicked_owner_releases_deferred_slot() {
+    fn panicked_initializer_leaves_slot_empty() {
         let cache = IncrCacheMap::<u8, u8>::default();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             cache.compute(1, |_| panic!("test panic"))
         }));
 
         assert!(result.is_err());
-        assert_eq!(cache.get(&1), None);
         assert_eq!(cache.compute(1, |_| 2), 2);
     }
 
@@ -1491,7 +1372,10 @@ mod incr_cache_tests {
             }),
             10
         );
-        assert_eq!(older.get(&1), Some(10));
+        assert_eq!(
+            older.compute(1, |_| panic!("completed value must be reused")),
+            10
+        );
     }
 }
 

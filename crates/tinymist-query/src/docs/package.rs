@@ -1162,6 +1162,20 @@ mod tests {
         assert!(beta_sig.named.keys().any(|name| name.as_ref() == "offset"));
     }
 
+    fn assert_module_cycle_docs(head: &DefInfo) {
+        for name in ["alpha-module", "beta-module"] {
+            let function = find_function(head, name)
+                .unwrap_or_else(|| panic!("documented function {name:?} must be present"));
+            let Some(DefDocs::Function(sig)) = &function.parsed_docs else {
+                panic!("{name} must retain function signature docs");
+            };
+            assert_eq!(
+                sig.pos.first().map(|param| param.name.as_ref()),
+                Some("value")
+            );
+        }
+    }
+
     fn test(pkg: PackageSpec) {
         run_with_sources("", |verse: &mut LspUniverse, path| {
             let pkg_root = verse.registry.resolve(&pkg).unwrap();
@@ -1288,6 +1302,7 @@ mod tests {
                 let beta = find_function(&docs.root, "beta")
                     .expect("documented function beta must be present");
                 assert_cyclic_function_docs(alpha, beta);
+                assert_module_cycle_docs(&docs.root);
             },
         );
     }
@@ -1316,6 +1331,16 @@ mod tests {
                 };
 
                 assert_cyclic_function_docs(find("alpha"), find("beta"));
+                for name in ["alpha-module", "beta-module"] {
+                    let function = find(name);
+                    let Some(DefDocs::Function(sig)) = &function.parsed_docs else {
+                        panic!("{name} must retain function signature docs");
+                    };
+                    assert_eq!(
+                        sig.pos.first().map(|param| param.name.as_ref()),
+                        Some("value")
+                    );
+                }
             },
         );
     }
