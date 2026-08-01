@@ -3,12 +3,12 @@
 //! This module must hide all **AST details** from the rest of the codebase.
 
 pub(crate) mod docs;
-pub(crate) mod expr;
+mod expr;
 pub(crate) mod index;
 pub(crate) mod lexical_hierarchy;
 pub(crate) mod module;
 
-pub(crate) use expr::*;
+pub(crate) use expr::ExprRoute;
 pub use index::*;
 pub use lexical_hierarchy::*;
 pub use module::*;

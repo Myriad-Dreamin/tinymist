@@ -34,8 +34,7 @@ pub(crate) struct TypeEnv {
 
 impl TypeEnv {
     pub(super) fn new(ctx: Arc<SharedContext>, root: ExprInfo) -> Self {
-        let mut expr_route = ExprRoute::default();
-        expr_route.complete(root.clone());
+        let expr_route = ExprRoute::with_root(root.clone());
         let mut exprs = FxHashMap::default();
         exprs.insert(root.fid, Some(root));
 
@@ -54,10 +53,10 @@ impl TypeEnv {
         }
 
         let ctx = self.ctx.clone();
-        let info = ctx
-            .source_by_id(fid)
-            .ok()
-            .map(|source| ctx.expr_stage_in(&source, &mut self.expr_route));
+        let info = ctx.source_by_id(fid).ok().map(|source| {
+            let guard = ctx.query_stat(fid, "expr_stage");
+            self.expr_route.analyze(ctx.clone(), source, guard, None)
+        });
         self.exprs.insert(fid, info.clone());
         info
     }

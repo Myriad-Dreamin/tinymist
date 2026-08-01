@@ -824,33 +824,11 @@ impl SharedContext {
     /// Gets the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
-        use crate::syntax::expr_of;
 
         let guard = self.query_stat(source.id(), "expr_stage");
         self.slot.expr_stage.compute(hash128(&source), |prev| {
-            expr_of(self.clone(), source.clone(), &mut route, guard, prev)
+            route.analyze(self.clone(), source.clone(), guard, prev)
         })
-    }
-
-    /// Computes expression information within an existing traversal.
-    ///
-    /// Results computed here stay route-local; only [`Self::expr_stage`]
-    /// initializes and publishes a shared cache slot.
-    pub(super) fn expr_stage_in(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut ExprRoute,
-    ) -> ExprInfo {
-        use crate::syntax::expr_of;
-
-        // Recursive expression traversals must not wait for another worker's
-        // initializer; their route-local result is intentionally unpublished.
-        if let Some(cached) = route.completed(&source.id()) {
-            return cached.clone();
-        }
-
-        let guard = self.query_stat(source.id(), "expr_stage");
-        expr_of(self.clone(), source.clone(), route, guard, None)
     }
 
     pub(crate) fn exports_of(
@@ -870,7 +848,13 @@ impl SharedContext {
             return None;
         }
 
-        Some(self.expr_stage_in(source, route).exports.clone())
+        let guard = self.query_stat(source.id(), "expr_stage");
+        Some(
+            route
+                .analyze(self.clone(), source.clone(), guard, None)
+                .exports
+                .clone(),
+        )
     }
 
     /// Gets the type check information of a source file.

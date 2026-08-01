@@ -25,7 +25,7 @@ use crate::{
 use super::{DocCommentMatcher, InterpretMode, def::*};
 
 /// Tracks active and completed expression analyses for one traversal.
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub(crate) struct ExprRoute {
     checking: FxHashSet<TypstFileId>,
     declared_exports: FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>,
@@ -33,7 +33,33 @@ pub(crate) struct ExprRoute {
 }
 
 impl ExprRoute {
-    pub(crate) fn begin(&mut self, fid: TypstFileId) {
+    /// Creates a traversal rooted at an already completed expression result.
+    pub(crate) fn with_root(root: ExprInfo) -> Self {
+        let mut route = Self::default();
+        route.completed.insert(root.fid, root);
+        route
+    }
+
+    /// The only entry point that may start expression analysis.
+    pub(crate) fn analyze(
+        &mut self,
+        ctx: Arc<SharedContext>,
+        source: Source,
+        guard: QueryStatGuard,
+        prev: Option<ExprInfo>,
+    ) -> ExprInfo {
+        if let Some(cached) = self.completed.get(&source.id()) {
+            return cached.clone();
+        }
+
+        assert!(
+            !self.checking.contains(&source.id()),
+            "recursive expression analysis must resolve through declared exports"
+        );
+        expr_of(ctx, source, self, guard, prev)
+    }
+
+    fn begin(&mut self, fid: TypstFileId) {
         self.checking.insert(fid);
     }
 
@@ -48,11 +74,7 @@ impl ExprRoute {
         self.declared_exports.get(fid)
     }
 
-    pub(crate) fn declare_exports(
-        &mut self,
-        fid: TypstFileId,
-        exports: Arc<LazyHash<LexicalScope>>,
-    ) {
+    fn declare_exports(&mut self, fid: TypstFileId, exports: Arc<LazyHash<LexicalScope>>) {
         self.declared_exports.insert(fid, exports);
     }
 
@@ -60,7 +82,7 @@ impl ExprRoute {
         self.completed.get(fid)
     }
 
-    pub(crate) fn complete(&mut self, info: ExprInfo) {
+    fn complete(&mut self, info: ExprInfo) {
         self.checking.remove(&info.fid);
         self.declared_exports.remove(&info.fid);
         self.completed.insert(info.fid, info);
@@ -81,7 +103,7 @@ impl ExprRoute {
 ///    identifiers, tracking imports, and building the expression tree with type
 ///    information.
 #[typst_macros::time(span = source.root().span())]
-pub(crate) fn expr_of(
+fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
     route: &mut ExprRoute,
@@ -216,7 +238,7 @@ impl Default for LexicalContext {
 }
 
 /// Worker for processing expressions during source file analysis.
-pub(crate) struct ExprWorker<'a> {
+struct ExprWorker<'a> {
     fid: TypstFileId,
     source: Source,
     ctx: Arc<SharedContext>,
