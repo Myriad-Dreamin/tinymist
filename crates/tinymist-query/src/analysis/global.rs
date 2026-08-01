@@ -822,6 +822,11 @@ impl SharedContext {
     }
 
     /// Gets the expression information of a source file.
+    pub(crate) fn expr_stage_by_id(self: &Arc<Self>, fid: TypstFileId) -> Option<ExprInfo> {
+        Some(self.expr_stage(&self.source_by_id(fid).ok()?))
+    }
+
+    /// Gets the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
 
@@ -1033,8 +1038,7 @@ impl SharedContext {
                 Some(DefDocs::Variable(docs))
             }
             DefKind::Module => {
-                let source = self.source_by_id(def.decl.file_id()?).ok()?;
-                let ei = self.expr_stage(&source);
+                let ei = self.expr_stage_by_id(def.decl.file_id()?)?;
                 Some(DefDocs::Module(TidyModuleDocs {
                     docs: ei.module_docstring.docs.clone().unwrap_or_default(),
                 }))
