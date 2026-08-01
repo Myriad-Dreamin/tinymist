@@ -53,10 +53,10 @@ impl TypeEnv {
         }
 
         let ctx = self.ctx.clone();
-        let info = ctx.source_by_id(fid).ok().map(|source| {
-            let guard = ctx.query_stat(fid, "expr_stage");
-            self.expr_route.analyze(ctx.clone(), source, guard, None)
-        });
+        let info = ctx
+            .source_by_id(fid)
+            .ok()
+            .map(|source| self.expr_route.analyze(ctx.clone(), source, None));
         self.exprs.insert(fid, info.clone());
         info
     }

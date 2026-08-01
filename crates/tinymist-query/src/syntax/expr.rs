@@ -15,7 +15,7 @@ use typst::{
 };
 
 use crate::{
-    analysis::{QueryStatGuard, SharedContext},
+    analysis::SharedContext,
     docs::DocString,
     prelude::*,
     syntax::{DefKind, find_module_level_docs, resolve_id_by_path},
@@ -45,7 +45,6 @@ impl ExprRoute {
         &mut self,
         ctx: Arc<SharedContext>,
         source: Source,
-        guard: QueryStatGuard,
         prev: Option<ExprInfo>,
     ) -> ExprInfo {
         if let Some(cached) = self.completed.get(&source.id()) {
@@ -56,7 +55,7 @@ impl ExprRoute {
             !self.checking.contains(&source.id()),
             "recursive expression analysis must resolve through declared exports"
         );
-        expr_of(ctx, source, self, guard, prev)
+        expr_of(ctx, source, self, prev)
     }
 
     fn begin(&mut self, fid: TypstFileId) {
@@ -107,7 +106,6 @@ fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
     route: &mut ExprRoute,
-    guard: QueryStatGuard,
     prev: Option<ExprInfo>,
 ) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
@@ -140,6 +138,8 @@ fn expr_of(
         route.complete(prev.clone());
         return prev;
     }
+
+    let guard = ctx.expr_stage_stat(source.id());
     guard.miss();
 
     let revision = ctx.revision();

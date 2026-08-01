@@ -825,9 +825,8 @@ impl SharedContext {
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
         let mut route = ExprRoute::default();
 
-        let guard = self.query_stat(source.id(), "expr_stage");
         self.slot.expr_stage.compute(hash128(&source), |prev| {
-            route.analyze(self.clone(), source.clone(), guard, prev)
+            route.analyze(self.clone(), source.clone(), prev)
         })
     }
 
@@ -848,10 +847,9 @@ impl SharedContext {
             return None;
         }
 
-        let guard = self.query_stat(source.id(), "expr_stage");
         Some(
             route
-                .analyze(self.clone(), source.clone(), guard, None)
+                .analyze(self.clone(), source.clone(), None)
                 .exports
                 .clone(),
         )
@@ -1183,6 +1181,11 @@ impl SharedContext {
 
     pub(super) fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
         self.analysis.stats.stat(Some(id), query)
+    }
+
+    /// Starts statistics collection for a full expression analysis.
+    pub(crate) fn expr_stage_stat(&self, id: TypstFileId) -> QueryStatGuard {
+        self.query_stat(id, "expr_stage")
     }
 
     /// Check on a module before really needing them. But we likely use them

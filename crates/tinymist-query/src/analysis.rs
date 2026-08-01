@@ -190,8 +190,17 @@ mod expr_tests {
     use typst::syntax::Source;
     use typst_shim::syntax::{RootedPathExt, VirtualPathExt, source_range};
 
-    use crate::syntax::{Expr, RefExpr};
+    use crate::analysis::Analysis;
+    use crate::syntax::{Expr, ExprRoute, RefExpr};
     use crate::tests::*;
+
+    fn expr_stage_count(analysis: &Analysis) -> u64 {
+        analysis
+            .report_query_stats_json()
+            .into_iter()
+            .find(|stat| stat.file.is_none() && stat.query == "expr_stage")
+            .map_or(0, |stat| stat.count)
+    }
 
     trait ShowExpr {
         fn show_expr(&self, expr: &Expr) -> String;
@@ -220,6 +229,51 @@ mod expr_tests {
                 _ => format!("{node}"),
             }
         }
+    }
+
+    #[test]
+    fn cached_expr_stage_is_not_counted() {
+        const SOURCE: &str = "#let answer = 42";
+
+        run_with_sources(SOURCE, |verse, path| {
+            let analysis = Analysis::default();
+            let first_revision = {
+                let mut world = verse.snapshot();
+                world.set_is_compiling(false);
+                let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+                let source = ctx.source_by_path(&path).unwrap();
+                let shared = ctx.shared_();
+
+                assert_eq!(expr_stage_count(&analysis), 0);
+                let first = shared.expr_stage(&source);
+                assert_eq!(expr_stage_count(&analysis), 1);
+
+                // This call reuses the completed OnceLock in the current revision.
+                shared.expr_stage(&source);
+                assert_eq!(expr_stage_count(&analysis), 1);
+
+                // Incremental validation and route-local completed results are
+                // both cache hits, so neither starts a new statistics guard.
+                let mut route = ExprRoute::default();
+                route.analyze(shared.clone(), source.clone(), Some(first));
+                assert_eq!(expr_stage_count(&analysis), 1);
+                route.analyze(shared, source, None);
+                assert_eq!(expr_stage_count(&analysis), 1);
+                ctx.revision()
+            };
+
+            // Advance the world revision without changing the source. The new
+            // revision must validate and reuse the previous expression result.
+            verse.increment_revision(|revision| revision.flush());
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            assert_ne!(ctx.revision(), first_revision);
+
+            let source = ctx.source_by_path(&path).unwrap();
+            ctx.shared_().expr_stage(&source);
+            assert_eq!(expr_stage_count(&analysis), 1);
+        });
     }
 
     #[test]
