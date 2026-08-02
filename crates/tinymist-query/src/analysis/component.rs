@@ -1,0 +1,876 @@
+//! Coordinates expression and type analysis at import-component granularity.
+
+use std::{
+    collections::VecDeque,
+    sync::{Arc, OnceLock},
+};
+
+use parking_lot::Mutex;
+use rustc_hash::{FxHashMap, FxHashSet};
+use typst::syntax::FileId;
+
+use super::TypeInfo;
+use crate::syntax::ExprInfo;
+
+type ComponentId = usize;
+
+/// Dependencies admitted before a component starts analysis.
+pub(super) struct DependencyDiscovery {
+    /// Dependencies whose targets were resolved during discovery.
+    pub(super) dependencies: Vec<FileId>,
+    /// Whether at least one dependency site could not be resolved completely.
+    pub(super) has_unresolved: bool,
+}
+
+impl From<Vec<FileId>> for DependencyDiscovery {
+    fn from(dependencies: Vec<FileId>) -> Self {
+        Self {
+            dependencies,
+            has_unresolved: false,
+        }
+    }
+}
+
+/// Whether a dependency may acquire another component's completed result.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(super) enum DependencyAdmission {
+    /// Both files are members of the same SCC and use the same local route.
+    SameComponent,
+    /// The target is reachable through the frozen condensation DAG.
+    Reachable,
+    /// Discovery retained an unresolved dynamic edge on a reachable source.
+    ///
+    /// The caller must use an unknown/unconstrained fallback without acquiring
+    /// the target component's result slot.
+    Unresolved,
+    /// Discovery proved neither a path nor a possible unresolved path.
+    Rejected,
+}
+
+/// A sealed strongly connected component of the module import graph.
+///
+/// Components are sealed only after the complete known forward dependency
+/// closure has been discovered. Unresolved dynamic sites remain explicit and
+/// cannot acquire an unadmitted result slot. Consequently, component-level
+/// result slots are never invalidated by a later merge in the same revision.
+pub(super) struct AnalysisComponent {
+    /// Members of the component in stable file-id order.
+    pub(super) members: Arc<[FileId]>,
+    /// Complete expression results for all component members.
+    pub(super) expr_stage: OnceLock<Arc<FxHashMap<FileId, ExprInfo>>>,
+    /// Complete type-check results for all component members.
+    pub(super) type_check: OnceLock<Arc<FxHashMap<FileId, Arc<TypeInfo>>>>,
+}
+
+impl AnalysisComponent {
+    fn new(mut members: Vec<FileId>) -> Self {
+        // FileId allocation order can depend on which request touched a path
+        // first. Sort by the stable rooted path so the component owner always
+        // starts from the same file across worker schedules and revisions.
+        members.sort_by_cached_key(|fid| format!("{fid:?}"));
+        members.dedup();
+
+        Self {
+            members: members.into(),
+            expr_stage: OnceLock::new(),
+            type_check: OnceLock::new(),
+        }
+    }
+}
+
+/// Discovers module dependencies and assigns files to sealed import SCCs.
+///
+/// A coordinator is revision-local. Clones share one graph mutex so that a
+/// file is discovered exactly once and every directed-edge insertion, SCC
+/// merge, and component seal is atomic with respect to other requests.
+#[derive(Clone, Default)]
+pub(super) struct ComponentCoordinator {
+    state: Arc<Mutex<CoordinatorState>>,
+}
+
+impl ComponentCoordinator {
+    /// Returns the sealed component containing `root`.
+    ///
+    /// `discover` is called at most once for each file known to this
+    /// coordinator. This method discovers the complete known forward closure
+    /// before sealing any newly reached component, retaining unresolved sites
+    /// as no-wait admission markers. The callback runs while the coordinator
+    /// mutex is held and therefore must not recursively call this coordinator.
+    pub(super) fn component_for<D>(
+        &self,
+        root: FileId,
+        discover: impl FnMut(FileId) -> D,
+    ) -> Arc<AnalysisComponent>
+    where
+        D: Into<DependencyDiscovery>,
+    {
+        self.state.lock().component_for(root, discover)
+    }
+
+    /// Determines whether analysis may acquire `target` from `source`.
+    ///
+    /// An expression import may select a module re-exported through an
+    /// intermediate file. Such an import is safe when the admission graph
+    /// already contains the equivalent transitive path. Otherwise, an
+    /// unresolved dynamic dependency reachable from `source` requires a
+    /// no-wait fallback. This method never mutates the frozen graph.
+    pub(super) fn admit_dependency(&self, source: FileId, target: FileId) -> DependencyAdmission {
+        self.state.lock().admit_dependency(source, target)
+    }
+
+    /// Whether `source` can reach an unresolved dynamic dependency site.
+    ///
+    /// An unknown source is treated conservatively as unresolved.
+    pub(super) fn has_unresolved_dependencies(&self, source: FileId) -> bool {
+        self.state.lock().has_unresolved_dependencies(source)
+    }
+
+    /// Returns every file reachable from `root` in the frozen admission graph.
+    ///
+    /// Members of `root`'s SCC are included. The result is ordered by rooted
+    /// path so it is stable across file interning and worker schedules.
+    pub(super) fn reachable_files(&self, root: FileId) -> Vec<FileId> {
+        self.state.lock().reachable_files(root)
+    }
+
+    /// Returns the dependency identities captured when `source` was
+    /// discovered, but only after its component graph has been sealed.
+    pub(super) fn direct_dependencies(&self, source: FileId) -> Option<Vec<FileId>> {
+        self.state.lock().direct_dependencies(source)
+    }
+}
+
+#[derive(Default)]
+struct CoordinatorState {
+    files: FxHashMap<FileId, ComponentId>,
+    dependencies: FxHashMap<FileId, Vec<FileId>>,
+    discovered: FxHashSet<FileId>,
+    groups: Vec<Group>,
+}
+
+struct Group {
+    parent: ComponentId,
+    members: FxHashSet<FileId>,
+    outgoing: FxHashSet<ComponentId>,
+    incoming: FxHashSet<ComponentId>,
+    has_unresolved_outgoing: bool,
+    state: GroupState,
+}
+
+enum GroupState {
+    Open,
+    Redirect(ComponentId),
+    Sealed(Arc<AnalysisComponent>),
+}
+
+impl CoordinatorState {
+    fn component_for<D>(
+        &mut self,
+        root: FileId,
+        mut discover: impl FnMut(FileId) -> D,
+    ) -> Arc<AnalysisComponent>
+    where
+        D: Into<DependencyDiscovery>,
+    {
+        self.ensure_file(root);
+        let root_group = self.group_for_file(root);
+        if let GroupState::Sealed(component) = &self.groups[root_group].state {
+            // Sealing freezes the complete known forward closure. A later
+            // query for the same canonical group therefore has no graph work
+            // to replay and can reuse its component owner immediately.
+            return component.clone();
+        }
+
+        let mut pending = VecDeque::from([root]);
+        let mut closure = FxHashSet::default();
+
+        while let Some(fid) = pending.pop_front() {
+            if !closure.insert(fid) {
+                continue;
+            }
+
+            self.ensure_file(fid);
+            let dependencies = if self.discovered.contains(&fid) {
+                self.dependencies.get(&fid).cloned().unwrap_or_default()
+            } else {
+                let discovery = discover(fid).into();
+                let mut dependencies = discovery.dependencies;
+                dependencies.sort_unstable_by_key(|dep| dep.into_raw().get());
+                dependencies.dedup();
+
+                for &dependency in &dependencies {
+                    self.ensure_file(dependency);
+                    self.add_edge(fid, dependency);
+                }
+
+                if discovery.has_unresolved {
+                    let group = self.group_for_file(fid);
+                    self.groups[group].has_unresolved_outgoing = true;
+                }
+
+                self.dependencies.insert(fid, dependencies.clone());
+                self.discovered.insert(fid);
+                dependencies
+            };
+
+            pending.extend(dependencies);
+        }
+
+        let mut reached_groups = FxHashSet::default();
+        for fid in closure {
+            let group = self.group_for_file(fid);
+            reached_groups.insert(group);
+        }
+
+        let mut reached_groups: Vec<_> = reached_groups.into_iter().collect();
+        reached_groups.sort_unstable();
+        for group in reached_groups {
+            self.seal(group);
+        }
+
+        let root_group = self.group_for_file(root);
+        match &self.groups[root_group].state {
+            GroupState::Sealed(component) => component.clone(),
+            GroupState::Open | GroupState::Redirect(_) => {
+                unreachable!("the complete dependency closure must be sealed")
+            }
+        }
+    }
+
+    fn ensure_file(&mut self, fid: FileId) -> ComponentId {
+        if let Some(&group) = self.files.get(&fid) {
+            return self.find(group);
+        }
+
+        let id = self.groups.len();
+        self.groups.push(Group {
+            parent: id,
+            members: FxHashSet::from_iter([fid]),
+            outgoing: FxHashSet::default(),
+            incoming: FxHashSet::default(),
+            has_unresolved_outgoing: false,
+            state: GroupState::Open,
+        });
+        self.files.insert(fid, id);
+        id
+    }
+
+    fn group_for_file(&mut self, fid: FileId) -> ComponentId {
+        let group = self.files[&fid];
+        self.find(group)
+    }
+
+    fn admit_dependency(&self, source: FileId, target: FileId) -> DependencyAdmission {
+        let Some(&source) = self.files.get(&source) else {
+            return DependencyAdmission::Unresolved;
+        };
+        let source = self.find_const(source);
+        if !matches!(self.groups[source].state, GroupState::Sealed(_)) {
+            // A discovery panic can leave a valid but incomplete Open graph.
+            // Never turn that graph into a wait-for edge.
+            return DependencyAdmission::Unresolved;
+        }
+
+        let target = self
+            .files
+            .get(&target)
+            .map(|&target| self.find_const(target));
+        if let Some(target) = target {
+            if source == target {
+                return DependencyAdmission::SameComponent;
+            }
+            if self.groups[source]
+                .outgoing
+                .iter()
+                .any(|&direct| self.find_const(direct) == target)
+            {
+                return DependencyAdmission::Reachable;
+            }
+        }
+
+        let reachable = self.reachable_set(source, Direction::Outgoing);
+        if let Some(target) = target
+            && reachable.contains(&target)
+        {
+            return DependencyAdmission::Reachable;
+        }
+
+        if reachable
+            .into_iter()
+            .any(|group| self.groups[group].has_unresolved_outgoing)
+        {
+            DependencyAdmission::Unresolved
+        } else {
+            DependencyAdmission::Rejected
+        }
+    }
+
+    fn has_unresolved_dependencies(&self, source: FileId) -> bool {
+        let Some(&source) = self.files.get(&source) else {
+            return true;
+        };
+        let source = self.find_const(source);
+        !matches!(self.groups[source].state, GroupState::Sealed(_))
+            || self.group_has_unresolved_dependencies(source)
+    }
+
+    fn group_has_unresolved_dependencies(&self, source: ComponentId) -> bool {
+        self.reachable_set(source, Direction::Outgoing)
+            .into_iter()
+            .any(|group| self.groups[group].has_unresolved_outgoing)
+    }
+
+    fn reachable_files(&self, root: FileId) -> Vec<FileId> {
+        let Some(&root) = self.files.get(&root) else {
+            return vec![];
+        };
+        let root = self.find_const(root);
+        let mut files: Vec<_> = self
+            .reachable_set(root, Direction::Outgoing)
+            .into_iter()
+            .flat_map(|group| self.groups[group].members.iter().copied())
+            .collect();
+        files.sort_by_cached_key(|fid| format!("{fid:?}"));
+        files.dedup();
+        files
+    }
+
+    fn direct_dependencies(&self, source: FileId) -> Option<Vec<FileId>> {
+        let group = self.find_const(*self.files.get(&source)?);
+        if !matches!(self.groups[group].state, GroupState::Sealed(_)) {
+            return None;
+        }
+        self.dependencies.get(&source).cloned()
+    }
+
+    fn find(&mut self, mut group: ComponentId) -> ComponentId {
+        let mut root = group;
+        while self.groups[root].parent != root {
+            root = self.groups[root].parent;
+        }
+
+        while self.groups[group].parent != group {
+            let parent = self.groups[group].parent;
+            debug_assert!(matches!(
+                &self.groups[group].state,
+                GroupState::Redirect(target) if *target == parent
+            ));
+            self.groups[group].parent = root;
+            self.groups[group].state = GroupState::Redirect(root);
+            group = parent;
+        }
+
+        root
+    }
+
+    fn find_const(&self, mut group: ComponentId) -> ComponentId {
+        while self.groups[group].parent != group {
+            group = self.groups[group].parent;
+        }
+        group
+    }
+
+    fn add_edge(&mut self, source: FileId, target: FileId) {
+        let source = self.group_for_file(source);
+        let target = self.group_for_file(target);
+        if source == target {
+            return;
+        }
+
+        assert!(
+            matches!(&self.groups[source].state, GroupState::Open),
+            "a sealed component cannot discover a new outgoing import"
+        );
+
+        self.groups[source].outgoing.insert(target);
+        self.groups[target].incoming.insert(source);
+
+        if !self.reachable(target, source, Direction::Outgoing) {
+            return;
+        }
+
+        let forward = self.reachable_set(target, Direction::Outgoing);
+        let backward = self.reachable_set(source, Direction::Incoming);
+        let cycle: FxHashSet<_> = forward.intersection(&backward).copied().collect();
+
+        debug_assert!(cycle.contains(&source));
+        debug_assert!(cycle.contains(&target));
+        self.merge(cycle);
+    }
+
+    fn reachable(&self, start: ComponentId, goal: ComponentId, direction: Direction) -> bool {
+        self.reachable_set(start, direction).contains(&goal)
+    }
+
+    fn reachable_set(&self, start: ComponentId, direction: Direction) -> FxHashSet<ComponentId> {
+        let start = self.find_const(start);
+        let mut reached = FxHashSet::from_iter([start]);
+        let mut pending = vec![start];
+
+        while let Some(group) = pending.pop() {
+            let edges = match direction {
+                Direction::Outgoing => &self.groups[group].outgoing,
+                Direction::Incoming => &self.groups[group].incoming,
+            };
+
+            for &next in edges {
+                let next = self.find_const(next);
+                if reached.insert(next) {
+                    pending.push(next);
+                }
+            }
+        }
+
+        reached
+    }
+
+    fn merge(&mut self, groups: FxHashSet<ComponentId>) -> ComponentId {
+        let mut roots: Vec<_> = groups.into_iter().map(|group| self.find(group)).collect();
+        roots.sort_unstable();
+        roots.dedup();
+
+        if roots.len() == 1 {
+            return roots[0];
+        }
+
+        for &root in &roots {
+            assert!(
+                matches!(&self.groups[root].state, GroupState::Open),
+                "a sealed component cannot be merged by a later import"
+            );
+        }
+
+        let roots_set: FxHashSet<_> = roots.iter().copied().collect();
+        let mut members = FxHashSet::default();
+        let mut outgoing = FxHashSet::default();
+        let mut incoming = FxHashSet::default();
+        let mut has_unresolved_outgoing = false;
+
+        for &root in &roots {
+            members.extend(self.groups[root].members.iter().copied());
+            has_unresolved_outgoing |= self.groups[root].has_unresolved_outgoing;
+            outgoing.extend(
+                self.groups[root]
+                    .outgoing
+                    .iter()
+                    .copied()
+                    .filter(|next| !roots_set.contains(next)),
+            );
+            incoming.extend(
+                self.groups[root]
+                    .incoming
+                    .iter()
+                    .copied()
+                    .filter(|next| !roots_set.contains(next)),
+            );
+        }
+
+        for &predecessor in &incoming {
+            self.groups[predecessor]
+                .outgoing
+                .retain(|target| !roots_set.contains(target));
+        }
+        for &successor in &outgoing {
+            self.groups[successor]
+                .incoming
+                .retain(|source| !roots_set.contains(source));
+        }
+
+        let fresh = self.groups.len();
+        for &predecessor in &incoming {
+            self.groups[predecessor].outgoing.insert(fresh);
+        }
+        for &successor in &outgoing {
+            self.groups[successor].incoming.insert(fresh);
+        }
+
+        self.groups.push(Group {
+            parent: fresh,
+            members,
+            outgoing,
+            incoming,
+            has_unresolved_outgoing,
+            state: GroupState::Open,
+        });
+
+        for root in roots {
+            let group = &mut self.groups[root];
+            group.parent = fresh;
+            group.outgoing.clear();
+            group.incoming.clear();
+            group.has_unresolved_outgoing = false;
+            group.state = GroupState::Redirect(fresh);
+        }
+
+        fresh
+    }
+
+    fn seal(&mut self, group: ComponentId) -> Arc<AnalysisComponent> {
+        let group = self.find(group);
+        match &self.groups[group].state {
+            GroupState::Sealed(component) => return component.clone(),
+            GroupState::Redirect(_) => unreachable!("canonical groups cannot be redirects"),
+            GroupState::Open => {}
+        }
+
+        assert!(
+            self.groups[group]
+                .members
+                .iter()
+                .all(|member| self.discovered.contains(member)),
+            "a component cannot be sealed before every member is discovered"
+        );
+
+        let members = self.groups[group].members.iter().copied().collect();
+        let component = Arc::new(AnalysisComponent::new(members));
+        self.groups[group].state = GroupState::Sealed(component.clone());
+        component
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Direction {
+    Outgoing,
+    Incoming,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Barrier};
+
+    use typst::syntax::{RootedPath, VirtualPath, VirtualRoot};
+
+    use super::*;
+
+    fn file(name: &str) -> FileId {
+        FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new(name).expect("test path must be valid"),
+        ))
+    }
+
+    fn members(component: &AnalysisComponent) -> Vec<FileId> {
+        component.members.iter().copied().collect()
+    }
+
+    fn discovery(dependencies: Vec<FileId>, has_unresolved: bool) -> DependencyDiscovery {
+        DependencyDiscovery {
+            dependencies,
+            has_unresolved,
+        }
+    }
+
+    #[test]
+    fn reverse_edge_redirects_both_roots_to_a_fresh_group() {
+        // Allocate B first to ensure canonical order does not follow FileId
+        // interning order.
+        let b = file("component-fresh-b.typ");
+        let a = file("component-fresh-a.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        let component = coordinator.component_for(a, |fid| match fid {
+            _ if fid == a => vec![b],
+            _ if fid == b => vec![a],
+            _ => vec![],
+        });
+
+        assert_eq!(members(&component), vec![a, b]);
+
+        let mut state = coordinator.state.lock();
+        let old_a = state.files[&a];
+        let old_b = state.files[&b];
+        let fresh = state.find(old_a);
+        assert_eq!(fresh, state.find(old_b));
+        assert_ne!(fresh, old_a);
+        assert_ne!(fresh, old_b);
+        assert!(matches!(
+            &state.groups[old_a].state,
+            GroupState::Redirect(target) if *target == fresh
+        ));
+        assert!(matches!(
+            &state.groups[old_b].state,
+            GroupState::Redirect(target) if *target == fresh
+        ));
+    }
+
+    #[test]
+    fn closing_a_three_node_cycle_merges_the_whole_cycle_region() {
+        let a = file("component-cycle-a.typ");
+        let b = file("component-cycle-b.typ");
+        let c = file("component-cycle-c.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        let component = coordinator.component_for(a, |fid| match fid {
+            _ if fid == a => vec![b],
+            _ if fid == b => vec![c],
+            _ if fid == c => vec![a],
+            _ => vec![],
+        });
+
+        assert_eq!(members(&component), vec![a, b, c]);
+        let mut state = coordinator.state.lock();
+        let group = state.group_for_file(a);
+        assert_eq!(group, state.group_for_file(b));
+        assert_eq!(group, state.group_for_file(c));
+    }
+
+    #[test]
+    fn acyclic_edges_keep_components_separate() {
+        let a = file("component-dag-a.typ");
+        let b = file("component-dag-b.typ");
+        let c = file("component-dag-c.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        let component_a = coordinator.component_for(a, |fid| match fid {
+            _ if fid == a => vec![b],
+            _ if fid == b => vec![c],
+            _ => vec![],
+        });
+        let component_b = coordinator.component_for(b, |_| -> Vec<FileId> {
+            panic!("an already discovered file must not be scanned again")
+        });
+        let component_c = coordinator.component_for(c, |_| -> Vec<FileId> {
+            panic!("an already discovered file must not be scanned again")
+        });
+
+        assert_eq!(members(&component_a), vec![a]);
+        assert_eq!(members(&component_b), vec![b]);
+        assert_eq!(members(&component_c), vec![c]);
+        assert!(!Arc::ptr_eq(&component_a, &component_b));
+        assert!(!Arc::ptr_eq(&component_b, &component_c));
+    }
+
+    #[test]
+    fn reachable_files_include_scc_and_condensation_closure_in_path_order() {
+        let a = file("component-reachable-a.typ");
+        let b = file("component-reachable-b.typ");
+        let c = file("component-reachable-c.typ");
+        let d = file("component-reachable-d.typ");
+        let unknown = file("component-reachable-unknown.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        coordinator.component_for(a, |fid| match fid {
+            _ if fid == a => vec![b],
+            _ if fid == b => vec![a, c],
+            _ => vec![],
+        });
+        coordinator.component_for(d, |_| vec![]);
+
+        assert_eq!(coordinator.reachable_files(a), vec![a, b, c]);
+        assert_eq!(coordinator.reachable_files(b), vec![a, b, c]);
+        assert_eq!(coordinator.reachable_files(c), vec![c]);
+        assert_eq!(coordinator.reachable_files(d), vec![d]);
+        assert!(coordinator.reachable_files(unknown).is_empty());
+    }
+
+    #[test]
+    fn unresolved_reachable_source_uses_no_wait_admission_without_mutating_graph() {
+        let a = file("component-unresolved-a.typ");
+        let b = file("component-unresolved-b.typ");
+        let c = file("component-unresolved-c.typ");
+        let unknown = file("component-unresolved-unknown.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        let component_a = coordinator.component_for(a, |fid| match fid {
+            _ if fid == a => discovery(vec![b], false),
+            _ if fid == b => discovery(vec![], true),
+            _ => discovery(vec![], false),
+        });
+        let component_b = coordinator.component_for(b, |_| -> DependencyDiscovery {
+            panic!("an already discovered file must not be scanned again")
+        });
+        let component_c = coordinator.component_for(c, |_| discovery(vec![], false));
+
+        assert!(!Arc::ptr_eq(&component_a, &component_b));
+        assert!(!Arc::ptr_eq(&component_b, &component_c));
+        assert!(coordinator.has_unresolved_dependencies(a));
+        assert!(coordinator.has_unresolved_dependencies(b));
+        assert!(!coordinator.has_unresolved_dependencies(c));
+        assert!(coordinator.has_unresolved_dependencies(unknown));
+
+        let before = {
+            let state = coordinator.state.lock();
+            (
+                state.groups.len(),
+                state.files.len(),
+                state.dependencies.clone(),
+                state
+                    .groups
+                    .iter()
+                    .map(|group| {
+                        (
+                            group.parent,
+                            group.outgoing.clone(),
+                            group.incoming.clone(),
+                            group.has_unresolved_outgoing,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        };
+
+        assert_eq!(
+            coordinator.admit_dependency(a, b),
+            DependencyAdmission::Reachable
+        );
+        assert_eq!(
+            coordinator.admit_dependency(b, b),
+            DependencyAdmission::SameComponent
+        );
+        assert_eq!(
+            coordinator.admit_dependency(a, c),
+            DependencyAdmission::Unresolved
+        );
+        assert_eq!(
+            coordinator.admit_dependency(b, a),
+            DependencyAdmission::Unresolved
+        );
+        assert_eq!(
+            coordinator.admit_dependency(c, a),
+            DependencyAdmission::Rejected
+        );
+
+        let after = {
+            let state = coordinator.state.lock();
+            (
+                state.groups.len(),
+                state.files.len(),
+                state.dependencies.clone(),
+                state
+                    .groups
+                    .iter()
+                    .map(|group| {
+                        (
+                            group.parent,
+                            group.outgoing.clone(),
+                            group.incoming.clone(),
+                            group.has_unresolved_outgoing,
+                        )
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn dependency_discovery_is_exactly_once() {
+        let a = file("component-once-a.typ");
+        let b = file("component-once-b.typ");
+        let coordinator = ComponentCoordinator::default();
+        let mut counts = FxHashMap::<FileId, usize>::default();
+
+        coordinator.component_for(a, |fid| {
+            *counts.entry(fid).or_default() += 1;
+            if fid == a { vec![b] } else { vec![] }
+        });
+        coordinator.component_for(a, |fid| {
+            *counts.entry(fid).or_default() += 1;
+            vec![]
+        });
+        coordinator.component_for(b, |fid| {
+            *counts.entry(fid).or_default() += 1;
+            vec![]
+        });
+
+        assert_eq!(counts.get(&a), Some(&1));
+        assert_eq!(counts.get(&b), Some(&1));
+    }
+
+    #[test]
+    fn incomplete_graph_never_admits_a_wait_and_can_be_retried() {
+        let a = file("component-retry-discovery-a.typ");
+        let b = file("component-retry-discovery-b.typ");
+        let coordinator = ComponentCoordinator::default();
+
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            coordinator.component_for(a, |fid| {
+                if fid == a {
+                    vec![b]
+                } else {
+                    panic!("test discovery panic")
+                }
+            });
+        }));
+        assert!(panicked.is_err());
+        assert_eq!(
+            coordinator.admit_dependency(a, b),
+            DependencyAdmission::Unresolved
+        );
+        assert_eq!(
+            coordinator.admit_dependency(b, b),
+            DependencyAdmission::Unresolved
+        );
+        assert!(coordinator.has_unresolved_dependencies(a));
+        assert!(coordinator.has_unresolved_dependencies(b));
+
+        let component_a = coordinator.component_for(a, |fid| {
+            assert_eq!(fid, b, "A was completed before the discovery panic");
+            vec![]
+        });
+        let component_b = coordinator.component_for(b, |_| -> Vec<FileId> {
+            panic!("the retry must complete B's discovery")
+        });
+
+        assert_eq!(members(&component_a), vec![a]);
+        assert_eq!(members(&component_b), vec![b]);
+        assert_eq!(
+            coordinator.admit_dependency(a, b),
+            DependencyAdmission::Reachable
+        );
+        assert_eq!(
+            coordinator.admit_dependency(b, b),
+            DependencyAdmission::SameComponent
+        );
+    }
+
+    #[test]
+    fn independent_component_result_slots_initialize_in_parallel() {
+        let a = file("component-parallel-a.typ");
+        let b = file("component-parallel-b.typ");
+        let coordinator = ComponentCoordinator::default();
+        let component_a = coordinator.component_for(a, |_| vec![]);
+        let component_b = coordinator.component_for(b, |_| vec![]);
+        let barrier = Arc::new(Barrier::new(2));
+
+        std::thread::scope(|scope| {
+            let barrier_a = barrier.clone();
+            let component_a = component_a.clone();
+            scope.spawn(move || {
+                component_a.type_check.get_or_init(|| {
+                    barrier_a.wait();
+                    Arc::new(FxHashMap::from_iter([(a, Arc::new(TypeInfo::default()))]))
+                });
+            });
+
+            let barrier_b = barrier.clone();
+            let component_b = component_b.clone();
+            scope.spawn(move || {
+                component_b.type_check.get_or_init(|| {
+                    barrier_b.wait();
+                    Arc::new(FxHashMap::from_iter([(b, Arc::new(TypeInfo::default()))]))
+                });
+            });
+        });
+
+        assert!(component_a.type_check.get().is_some());
+        assert!(component_b.type_check.get().is_some());
+    }
+
+    #[test]
+    fn panicked_batch_initializer_publishes_nothing_and_can_retry() {
+        let a = file("component-retry-a.typ");
+        let component = ComponentCoordinator::default().component_for(a, |_| vec![]);
+
+        let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            component.expr_stage.get_or_init(|| panic!("test panic"));
+        }));
+        assert!(panicked.is_err());
+        assert!(component.expr_stage.get().is_none());
+
+        let result = component
+            .expr_stage
+            .get_or_init(|| Arc::new(FxHashMap::default()));
+        assert!(result.is_empty());
+    }
+}

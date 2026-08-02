@@ -6,12 +6,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
-    TypeVarBounds, prelude::*,
+    BuiltinTy, DependencyAdmission, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo,
+    TypeVar, TypeVarBounds, prelude::*,
 };
 use crate::{
     docs::UntypedDefDocs,
-    syntax::{Decl, DeclExpr, Expr, ExprInfo, ExprRoute, UnaryOp},
+    syntax::{Decl, DeclExpr, Expr, ExprInfo, UnaryOp},
     ty::*,
 };
 
@@ -23,62 +23,119 @@ mod syntax;
 pub(crate) use apply::*;
 pub(crate) use select::*;
 
-/// Owns all traversal-local state for one top-level type-check query.
-pub(crate) struct TypeEnv {
+/// Owns all type-check state for one stable dependency component.
+struct TypeEnv {
     ctx: Arc<SharedContext>,
-    expr_route: ExprRoute,
+    component: FxHashSet<TypstFileId>,
     checking: FxHashSet<TypstFileId>,
-    exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
+    exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
     type_infos: FxHashMap<TypstFileId, Arc<TypeInfo>>,
 }
 
 impl TypeEnv {
-    pub(super) fn new(ctx: Arc<SharedContext>, root: ExprInfo) -> Self {
-        let expr_route = ExprRoute::with_root(root.clone());
-        let mut exprs = FxHashMap::default();
-        exprs.insert(root.fid, Some(root));
+    fn new(
+        ctx: Arc<SharedContext>,
+        component: impl IntoIterator<Item = TypstFileId>,
+        exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
+        type_infos: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+    ) -> Self {
+        let component: FxHashSet<_> = component.into_iter().collect();
+        assert!(
+            exprs.len() == component.len() && exprs.keys().all(|fid| component.contains(fid)),
+            "expression results must cover the complete type-check component"
+        );
+        assert!(
+            type_infos.is_empty()
+                || (type_infos.len() == component.len()
+                    && type_infos.keys().all(|fid| component.contains(fid))),
+            "previous type results must cover the complete component or be empty"
+        );
 
         Self {
             ctx,
-            expr_route,
+            component,
             checking: Default::default(),
             exprs,
-            type_infos: Default::default(),
+            type_infos,
         }
     }
 
-    fn expr_info(&mut self, fid: TypstFileId) -> Option<ExprInfo> {
+    fn expr_info(&mut self, importer: TypstFileId, fid: TypstFileId) -> Option<ExprInfo> {
         if let Some(cached) = self.exprs.get(&fid) {
-            return cached.clone();
+            return Some(cached.clone());
         }
 
-        let ctx = self.ctx.clone();
-        let info = ctx
-            .source_by_id(fid)
-            .ok()
-            .map(|source| self.expr_route.analyze(ctx.clone(), source, None));
-        self.exprs.insert(fid, info.clone());
-        info
+        match self.ctx.dependency_admission(importer, fid) {
+            DependencyAdmission::Reachable => self.ctx.expr_stage_by_id(fid),
+            DependencyAdmission::SameComponent => {
+                unreachable!("same-component expression is missing from TypeEnv")
+            }
+            DependencyAdmission::Unresolved | DependencyAdmission::Rejected => None,
+        }
     }
 
-    fn type_info(&mut self, ei: ExprInfo) -> Arc<TypeInfo> {
+    fn type_info(&mut self, importer: TypstFileId, ei: ExprInfo) -> Option<Arc<TypeInfo>> {
+        // A cycle has no completed TypeInfo for the active member. Cut the
+        // edge here so no caller can bypass the complete-only invariant.
+        if self.checking.contains(&ei.fid) {
+            return None;
+        }
         if let Some(cached) = self.type_infos.get(&ei.fid) {
-            return cached.clone();
+            return Some(cached.clone());
         }
 
         let ctx = self.ctx.clone();
+        if !self.component.contains(&ei.fid) {
+            if ctx.dependency_admission(importer, ei.fid) != DependencyAdmission::Reachable {
+                return None;
+            }
+            let source = ctx
+                .source_by_id(ei.fid)
+                .expect("an imported expression result must have a source");
+            return Some(ctx.type_check(&source));
+        }
+
         let guard = ctx.query_stat(ei.fid, "type_check");
         guard.miss();
         let fid = ei.fid;
         let type_info = type_check(ei, self);
         self.type_infos.insert(fid, type_info.clone());
-        type_info
+        Some(type_info)
     }
+
+    fn check_all(mut self, members: &[TypstFileId]) -> FxHashMap<TypstFileId, Arc<TypeInfo>> {
+        for fid in members {
+            if self.type_infos.contains_key(fid) {
+                continue;
+            }
+
+            let ei = self
+                .exprs
+                .get(fid)
+                .unwrap_or_else(|| panic!("component expression batch is missing {fid:?}"))
+                .clone();
+            self.type_info(*fid, ei)
+                .expect("every component member must be checked in its shared TypeEnv");
+        }
+
+        self.type_infos
+    }
+}
+
+/// Type checks every member of a stable component in one standardized
+/// environment and returns only completed results.
+pub(super) fn type_check_component(
+    ctx: Arc<SharedContext>,
+    members: &[TypstFileId],
+    exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
+    previous: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+) -> FxHashMap<TypstFileId, Arc<TypeInfo>> {
+    TypeEnv::new(ctx, members.iter().copied(), exprs, previous).check_all(members)
 }
 
 /// Type checking at the source unit level.
 #[typst_macros::time(span = ei.source.root().span())]
-pub(crate) fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
+fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
     let ctx = env.ctx.clone();
     let mut info = TypeInfo::default();
     info.valid = true;
@@ -192,7 +249,7 @@ impl TyCtxMut for TypeChecker<'_> {
 
         let result = self
             .env
-            .expr_info(fid)
+            .expr_info(self.ei.fid, fid)
             .and_then(|ei| ei.exports.get(name).map(|expr| self.check(expr)));
 
         self.checking_module_exports.remove(&key);
@@ -291,14 +348,8 @@ impl TypeChecker<'_> {
 
         crate::log_debug_ct!("import_ty {name} from {fid:?}");
 
-        let ext_def_use_info = env.expr_info(fid)?;
-        let source = &ext_def_use_info.source;
-        // A cycle has no complete external TypeInfo yet. Do not manufacture or
-        // consume a placeholder result; leave this edge unconstrained instead.
-        if env.checking.contains(&source.id()) {
-            return None;
-        }
-        let ext_type_info = env.type_info(ext_def_use_info.clone());
+        let ext_def_use_info = env.expr_info(current_fid, fid)?;
+        let ext_type_info = env.type_info(current_fid, ext_def_use_info.clone())?;
         let ext_def = ext_def_use_info.exports.get(name)?;
 
         // todo: rest expressions
