@@ -10,6 +10,9 @@ use crate::{SemanticRequest, prelude::*};
 pub struct CodeLensRequest {
     /// The path of the document to request for.
     pub path: PathBuf,
+    /// Whether this document is the one currently pinned as the main file by
+    /// the user (via `tinymist.pinMain`).
+    pub is_pinned_here: bool,
 }
 
 impl SemanticRequest for CodeLensRequest {
@@ -21,6 +24,38 @@ impl SemanticRequest for CodeLensRequest {
         let mut res = vec![];
 
         let doc_start = ctx.to_lsp_range(0..0, &source);
+
+        // Unlike the lenses below, `tinymist.pinMain` is a real, directly
+        // executable LSP command, so this lens works for every client and is
+        // not gated behind `support_client_codelens`. It is the only way for a
+        // client that cannot run arbitrary editor commands (e.g. Zed, Helix,
+        // Neovim) to keep the background/browsing preview on one document:
+        // that preview otherwise follows whichever document was most recently
+        // opened, and closing a second document does not hand it back. See
+        // `ServerState::focus_main_file`.
+        let pin_title = if self.is_pinned_here {
+            tinymist_l10n::t!("tinymist-query.code-lens.unpinMain", "📌 Unpin Preview")
+        } else {
+            tinymist_l10n::t!(
+                "tinymist-query.code-lens.pinMain",
+                "📌 Pin Preview to This File"
+            )
+        };
+        let pin_arg = if self.is_pinned_here {
+            JsonValue::Null
+        } else {
+            self.path.display().to_string().into()
+        };
+        res.push(CodeLens {
+            range: doc_start,
+            command: Some(Command {
+                title: pin_title.to_string(),
+                command: "tinymist.pinMain".to_string(),
+                arguments: Some(vec![pin_arg]),
+            }),
+            data: None,
+        });
+
         let mut doc_lens = |title: &str, args: Vec<JsonValue>| {
             if !ctx.analysis.support_client_codelens {
                 return;

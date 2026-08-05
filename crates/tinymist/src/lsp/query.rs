@@ -144,7 +144,9 @@ impl ServerState {
 
     pub(crate) fn code_lens(&mut self, params: CodeLensParams) -> ScheduleResult {
         let path = as_path(params.text_document);
-        run_query!(self.CodeLens(path))
+        let is_pinned_here =
+            self.pinning_by_user && self.focusing.as_deref() == Some(path.as_path());
+        run_query!(self.CodeLens(path, is_pinned_here))
     }
 
     pub(crate) fn completion(&mut self, params: CompletionParams) -> ScheduleResult {

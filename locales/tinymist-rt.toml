@@ -56,6 +56,14 @@ zh = "性能分析"
 en = "Wrap {func_name} in figure with a caption"
 zh = "将 {func_name} 包裹在 figure 中，并添加一个标题"
 
+[tinymist-query.code-lens.pinMain]
+en = "📌 Pin Preview to This File"
+zh = "📌 将预览固定到此文件"
+
+[tinymist-query.code-lens.unpinMain]
+en = "📌 Unpin Preview"
+zh = "📌 取消固定预览"
+
 [tinymist.config.badCompileStatus]
 en = "compileStatus must be either `\"enable\"` or `\"disable\"`, got {value}"
 zh = "compileStatus 必须是`\"enable\"`（打开）或 `\"disable\"`（关闭），得到 {value}"
