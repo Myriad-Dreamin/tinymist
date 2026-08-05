@@ -955,6 +955,10 @@ pub struct ConstConfig {
     pub doc_line_folding_only: bool,
     /// Allow dynamic registration of document formatting.
     pub doc_fmt_dynamic_registration: bool,
+    /// Allow dynamic registration of code lenses. Some clients (e.g. Zed)
+    /// declare this but never query `textDocument/codeLens` when the server
+    /// only advertises `codeLensProvider` statically in `initialize`.
+    pub code_lens_dynamic_registration: bool,
     /// Allow insert/replace text edits in completion items.
     pub completion_insert_replace_support: bool,
     /// The locale of the editor.
@@ -993,6 +997,7 @@ impl From<&InitializeParams> for ConstConfig {
         let sema = try_(|| doc?.semantic_tokens.as_ref());
         let fold = try_(|| doc?.folding_range.as_ref());
         let format = try_(|| doc?.formatting.as_ref());
+        let code_lens = try_(|| doc?.code_lens.as_ref());
         let completion_item = try_(|| doc?.completion.as_ref()?.completion_item.as_ref());
 
         let locale = params
@@ -1010,6 +1015,7 @@ impl From<&InitializeParams> for ConstConfig {
             tokens_multiline_token_support: try_or(|| sema?.multiline_token_support, false),
             doc_line_folding_only: try_or(|| fold?.line_folding_only, true),
             doc_fmt_dynamic_registration: try_or(|| format?.dynamic_registration, false),
+            code_lens_dynamic_registration: try_or(|| code_lens?.dynamic_registration, false),
             completion_insert_replace_support: try_or(
                 || completion_item?.insert_replace_support,
                 false,

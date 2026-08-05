@@ -102,6 +102,10 @@ impl Initializer for SuperInit {
         });
         let document_formatting_provider =
             (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
+        let code_lens_provider =
+            (!const_config.code_lens_dynamic_registration).then_some(CodeLensOptions {
+                resolve_provider: Some(false),
+            });
         let document_range_formatting_provider =
             (!const_config.doc_fmt_dynamic_registration).then_some(OneOf::Left(true));
 
@@ -198,9 +202,7 @@ impl Initializer for SuperInit {
                 document_range_formatting_provider,
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
-                code_lens_provider: Some(CodeLensOptions {
-                    resolve_provider: Some(false),
-                }),
+                code_lens_provider,
 
                 experimental: Some(json!({
                   "onEnter": true,

@@ -49,6 +49,23 @@ impl ServerState {
                 .log_error("could not register formatter for initialization");
         }
 
+        if self.const_config().code_lens_dynamic_registration {
+            const CODE_LENS_REGISTRATION_ID: &str = "code-lens";
+            const CODE_LENS_METHOD_ID: &str = "textDocument/codeLens";
+
+            self.register_capability(vec![Registration {
+                id: CODE_LENS_REGISTRATION_ID.to_owned(),
+                method: CODE_LENS_METHOD_ID.to_owned(),
+                register_options: Some(
+                    serde_json::to_value(CodeLensOptions {
+                        resolve_provider: Some(false),
+                    })
+                    .expect("code lens options should be representable as JSON value"),
+                ),
+            }])
+            .log_error("could not register code lens capability dynamically");
+        }
+
         if self.const_config().cfg_change_registration {
             log::trace!("setting up to request config change notifications");
 
