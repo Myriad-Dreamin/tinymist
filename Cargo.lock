@@ -1670,7 +1670,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1911,7 +1911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2934,7 +2934,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.61.2",
 ]
 
 [[package]]
@@ -3288,7 +3288,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4060,7 +4060,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5108,7 +5108,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5327,8 +5327,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.8.0-rc3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b95f4f301964673cc454985f793c5ce8177ec9dc6f134d76d8751c30d23af61"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3#04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5354,8 +5353,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.8.0-rc3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df0e6f39e411443742c6644ca95f9c603c8681222716ffd288c56d132c60f457"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3#04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5387,8 +5385,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.8.0-rc3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c09d4ea8296270cee0e90c735760ce1cba0aef1dbb46a3f60e0177678c333cb"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3#04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5417,8 +5414,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.8.0-rc3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2153dbe9eac42142cada8529ea42b26337962c8760164622a48b726b7f9849c5"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3#04606d4f6147aa1edfd2ebdfe99ac9b8dde9cfc3"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -5711,7 +5707,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6362,7 +6358,7 @@ version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0811b01ca2c4e8718760713911feaf4675c24f94e50530a015ec646cfb622f7c"
 dependencies = [
- "skrifa 0.37.0",
+ "skrifa 0.42.1",
  "yazi",
  "zeno",
 ]
@@ -6488,7 +6484,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -6518,7 +6514,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix 1.1.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -7204,6 +7200,7 @@ dependencies = [
  "notify",
  "parking_lot",
  "rayon",
+ "reflexo-vec2svg",
  "rpds",
  "semver",
  "serde",
@@ -9215,7 +9212,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
