@@ -29,8 +29,6 @@ pub use tinymist_project::LspUniverse;
 pub use tinymist_tests::{assert_snapshot, run_with_sources, with_settings};
 pub use tinymist_world::WorldComputeGraph;
 
-mod analysis;
-
 use crate::index::query::IndexQueryCtx;
 pub use crate::syntax::find_module_level_docs;
 use crate::{CompletionFeat, to_lsp_position, to_typst_position};

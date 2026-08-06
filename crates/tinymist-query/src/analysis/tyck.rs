@@ -1998,3 +1998,68 @@ mod function_resultant_closer_tests {
         assert_eq!(closer.visited, 2);
     }
 }
+
+#[cfg(test)]
+mod type_check_tests {
+
+    use core::fmt;
+
+    use typst::syntax::Source;
+
+    use crate::tests::*;
+    use typst_shim::syntax::source_range;
+
+    use crate::analysis::{Ty, TypeInfo};
+
+    #[test]
+    fn test() {
+        snapshot_testing_at("..", "type_check", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let result = ctx.type_check(&source);
+            let result = format!("{:#?}", TypeCheckSnapshot(&source, &result));
+
+            assert_snapshot!(result);
+        });
+    }
+
+    struct TypeCheckSnapshot<'a>(&'a Source, &'a TypeInfo);
+
+    impl fmt::Debug for TypeCheckSnapshot<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let source = self.0;
+            let info = self.1;
+            let mut vars = info
+                .vars
+                .values()
+                .map(|bounds| (bounds.name(), bounds))
+                .collect::<Vec<_>>();
+
+            vars.sort_by(|x, y| x.1.var.strict_cmp(&y.1.var));
+
+            for (name, bounds) in vars {
+                writeln!(f, "{name:?} = {:?}", info.simplify(bounds.as_type(), true))?;
+            }
+
+            writeln!(f, "=====")?;
+            let mut mapping = info
+                .mapping
+                .iter()
+                .map(|pair| (source_range(source, *pair.0).unwrap_or_default(), pair.1))
+                .collect::<Vec<_>>();
+
+            mapping.sort_by(|x, y| {
+                x.0.start
+                    .cmp(&y.0.start)
+                    .then_with(|| x.0.end.cmp(&y.0.end))
+            });
+
+            for (range, value) in mapping {
+                let ty = Ty::from_types(value.clone().into_iter());
+                writeln!(f, "{range:?} -> {ty:?}")?;
+            }
+
+            Ok(())
+        }
+    }
+}

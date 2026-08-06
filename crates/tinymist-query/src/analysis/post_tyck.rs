@@ -468,6 +468,76 @@ impl<T: PostSigChecker> SigChecker for PostSigCheckWorker<'_, '_, T> {
     }
 }
 
+#[cfg(test)]
+mod post_type_check_tests {
+
+    use typst::syntax::LinkedNode;
+    use typst_shim::syntax::LinkedNodeExt;
+
+    use crate::analysis::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing_at("..", "post_type_check", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at_compat(pos + 1).unwrap();
+            let text = node.get().clone().full_text();
+
+            let result = ctx.type_check(&source);
+            let post_ty = post_type_check(ctx.shared_(), &result, node);
+
+            with_settings!({
+                description => format!("Check on {text:?} ({pos:?})"),
+            }, {
+                let post_ty = post_ty.map(|ty| format!("{ty:#?}"))
+                    .unwrap_or_else(|| "<nil>".to_string());
+                assert_snapshot!(post_ty);
+            })
+        });
+    }
+}
+
+#[cfg(test)]
+mod type_describe_tests {
+
+    use typst::syntax::LinkedNode;
+    use typst_shim::syntax::LinkedNodeExt;
+
+    use crate::analysis::*;
+    use crate::tests::*;
+
+    #[test]
+    fn test() {
+        snapshot_testing_at("..", "type_describe", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+            let root = LinkedNode::new(source.root());
+            let node = root.leaf_at_compat(pos + 1).unwrap();
+            let text = node.get().clone().full_text();
+
+            let ti = ctx.type_check(&source);
+            let post_ty = post_type_check(ctx.shared_(), &ti, node);
+
+            with_settings!({
+                description => format!("Check on {text:?} ({pos:?})"),
+            }, {
+                let post_ty = post_ty.and_then(|ty| ty.describe())
+                    .unwrap_or_else(|| "<nil>".into());
+                assert_snapshot!(post_ty);
+            })
+        });
+    }
+}
+
 fn sig_context_of(context: &LinkedNode) -> SigSurfaceKind {
     match context.kind() {
         SyntaxKind::Parenthesized => SigSurfaceKind::ArrayOrDict,

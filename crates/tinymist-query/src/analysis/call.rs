@@ -244,3 +244,61 @@ pub fn analyze_call_no_cache(
 
     Some(info)
 }
+
+#[cfg(test)]
+mod call_info_tests {
+
+    use core::fmt;
+
+    use typst::syntax::{LinkedNode, SyntaxKind};
+    use typst_shim::syntax::LinkedNodeExt;
+
+    use crate::analysis::analyze_call;
+    use crate::tests::*;
+
+    use crate::analysis::CallInfo;
+
+    #[test]
+    fn test() {
+        snapshot_testing_at("..", "call_info", &|ctx, path| {
+            let source = ctx.source_by_path(&path).unwrap();
+
+            let pos = ctx
+                .to_typst_pos(find_test_position(&source), &source)
+                .unwrap();
+
+            let root = LinkedNode::new(source.root());
+            let mut call_node = root.leaf_at_compat(pos + 1).unwrap();
+
+            while let Some(parent) = call_node.parent() {
+                if call_node.kind() == SyntaxKind::FuncCall {
+                    break;
+                }
+                call_node = parent.clone();
+            }
+
+            let result = analyze_call(ctx, source.clone(), call_node);
+
+            assert_snapshot!(CallSnapshot(result.as_deref()));
+        });
+    }
+
+    struct CallSnapshot<'a>(pub Option<&'a CallInfo>);
+
+    impl fmt::Display for CallSnapshot<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let Some(ci) = self.0 else {
+                return write!(f, "<nil>");
+            };
+
+            let mut w = ci.arg_mapping.iter().collect::<Vec<_>>();
+            w.sort_by(|x, y| x.0.span().into_raw().cmp(&y.0.span().into_raw()));
+
+            for (arg, arg_call_info) in w {
+                writeln!(f, "{} -> {:?}", arg.clone().full_text(), arg_call_info)?;
+            }
+
+            Ok(())
+        }
+    }
+}
