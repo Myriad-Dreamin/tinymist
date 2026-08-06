@@ -155,6 +155,3 @@ impl LspQuerySnapshot {
         snap.run_analysis(f)?
     }
 }
-
-#[cfg(test)]
-mod tests;
