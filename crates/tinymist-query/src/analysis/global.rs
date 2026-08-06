@@ -47,9 +47,9 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    Decl, DefKind, DependencyTarget, ExprInfo, ExprRoute, LexicalScope, ModuleDependency,
-    SyntaxClass, classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
-    scan_dependency_sites, scan_workspace_files,
+    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
+    classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
+    scan_workspace_files,
 };
 use crate::upstream::{Tooltip, tooltip_};
 use crate::{
@@ -841,13 +841,17 @@ impl SharedContext {
             fid: TypstFileId,
             value: Value,
             dependencies: &mut HashSet<TypstFileId>,
-        ) {
+        ) -> bool {
             let target = match value {
                 Value::Str(path) => resolve_id_by_path(ctx.world(), fid, path.as_str()),
                 Value::Module(module) => module.file_id(),
                 _ => None,
             };
-            dependencies.extend(target);
+            let Some(target) = target else {
+                return false;
+            };
+            dependencies.insert(target);
+            true
         }
 
         let Ok(source) = self.source_by_id(fid) else {
@@ -858,51 +862,55 @@ impl SharedContext {
         };
         let mut dependencies = HashSet::new();
         let mut has_unresolved = false;
-        for site in scan_dependency_sites(&source) {
+        Self::walk_dependency_sites(source.root(), &mut |kind, site| {
             crate::log_debug_ct!(
-                "dependency discovery: {fid:?} {:?} at {:?}",
-                site.kind,
-                site.source_span
+                "dependency discovery: {fid:?} {kind:?} at {:?}",
+                site.span()
             );
-            match site.target {
-                DependencyTarget::Exact(paths) => {
-                    for path in paths {
-                        if let Some(target) = resolve_id_by_path(self.world(), fid, path.as_str()) {
-                            dependencies.insert(target);
-                        } else {
-                            has_unresolved = true;
-                        }
-                    }
-                }
-                DependencyTarget::UnknownDynamic => {
-                    // Runtime tracing can reveal observed targets, but it
-                    // cannot prove that an arbitrary dynamic expression has no
-                    // other target. Retain the unresolved marker even when an
-                    // observed target is admitted below.
-                    has_unresolved = true;
-                    let Some(node) = LinkedNode::new(source.root()).find(site.source_span) else {
-                        continue;
-                    };
 
-                    let previous_len = dependencies.len();
-                    for (value, _) in self.analyze_expr(node.get()) {
-                        add_value(self, fid, value, &mut dependencies);
-                    }
-
-                    if dependencies.len() == previous_len {
-                        let (source_value, module_value) = self.analyze_import(node.get());
-                        for value in source_value.into_iter().chain(module_value) {
-                            add_value(self, fid, value, &mut dependencies);
-                        }
-                    }
-                }
+            // Reuse the normal const/type-backed import evaluator. It first
+            // handles direct constants and then falls back to the existing
+            // runtime import tracer; this pass does not maintain a second
+            // lexical evaluator.
+            let (source_value, module_value) = self.analyze_import(site);
+            let mut resolved = false;
+            for value in source_value.into_iter().chain(module_value) {
+                resolved |= add_value(self, fid, value, &mut dependencies);
             }
-        }
+
+            // A traced result is only an observation for a non-literal site.
+            // Preserve the no-wait admission for any target that the normal
+            // evaluator cannot prove to be the one exact source.
+            let exact_literal = site
+                .cast::<ast::Expr>()
+                .is_some_and(|expr| matches!(expr, ast::Expr::Str(_)));
+            has_unresolved |= !exact_literal || !resolved;
+        });
         let mut dependencies: Vec<_> = dependencies.into_iter().collect();
         dependencies.sort_unstable_by_key(|fid| fid.into_raw().get());
         DependencyDiscovery {
             dependencies,
             has_unresolved,
+        }
+    }
+
+    fn walk_dependency_sites(node: &SyntaxNode, f: &mut impl FnMut(SyntaxKind, &SyntaxNode)) {
+        match node.kind() {
+            SyntaxKind::ModuleImport => {
+                if let Some(import) = node.cast::<ast::ModuleImport>() {
+                    f(SyntaxKind::ModuleImport, import.source().to_untyped());
+                }
+            }
+            SyntaxKind::ModuleInclude => {
+                if let Some(include) = node.cast::<ast::ModuleInclude>() {
+                    f(SyntaxKind::ModuleInclude, include.source().to_untyped());
+                }
+            }
+            _ => {}
+        }
+
+        for child in node.children() {
+            Self::walk_dependency_sites(child, f);
         }
     }
 
