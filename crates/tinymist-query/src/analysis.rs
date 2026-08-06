@@ -2,8 +2,8 @@
 
 mod bib;
 pub(crate) use bib::*;
-mod component;
-use component::*;
+mod pdg;
+use pdg::*;
 pub mod call;
 pub use call::*;
 pub mod completion;

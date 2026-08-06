@@ -1,92 +1,19 @@
 //! Coordinates expression and type analysis at import-component granularity.
 
-use std::{
-    collections::VecDeque,
-    sync::{Arc, OnceLock},
-};
+use std::{collections::VecDeque, sync::Arc};
 
-use parking_lot::Mutex;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use typst::syntax::FileId;
-
-use super::TypeInfo;
-use crate::syntax::ExprInfo;
-
-type ComponentId = usize;
-
-/// Dependencies admitted before a component starts analysis.
-pub(super) struct DependencyDiscovery {
-    /// Dependencies whose targets were resolved during discovery.
-    pub(super) dependencies: Vec<FileId>,
-    /// Whether at least one dependency site could not be resolved completely.
-    pub(super) has_unresolved: bool,
-}
-
-impl From<Vec<FileId>> for DependencyDiscovery {
-    fn from(dependencies: Vec<FileId>) -> Self {
-        Self {
-            dependencies,
-            has_unresolved: false,
-        }
-    }
-}
-
-/// Whether a dependency may acquire another component's completed result.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub(super) enum DependencyAdmission {
-    /// Both files are members of the same SCC and use the same local route.
-    SameComponent,
-    /// The target is reachable through the frozen condensation DAG.
-    Reachable,
-    /// Discovery retained an unresolved dynamic edge on a reachable source.
-    ///
-    /// The caller must use an unknown/unconstrained fallback without acquiring
-    /// the target component's result slot.
-    Unresolved,
-    /// Discovery proved neither a path nor a possible unresolved path.
-    Rejected,
-}
-
-/// A sealed strongly connected component of the module import graph.
-///
-/// Components are sealed only after the complete known forward dependency
-/// closure has been discovered. Unresolved dynamic sites remain explicit and
-/// cannot acquire an unadmitted result slot. Consequently, component-level
-/// result slots are never invalidated by a later merge in the same revision.
-pub(super) struct AnalysisComponent {
-    /// Members of the component in stable file-id order.
-    pub(super) members: Arc<[FileId]>,
-    /// Complete expression results for all component members.
-    pub(super) expr_stage: OnceLock<Arc<FxHashMap<FileId, ExprInfo>>>,
-    /// Complete type-check results for all component members.
-    pub(super) type_check: OnceLock<Arc<FxHashMap<FileId, Arc<TypeInfo>>>>,
-}
-
-impl AnalysisComponent {
-    fn new(mut members: Vec<FileId>) -> Self {
-        // FileId allocation order can depend on which request touched a path
-        // first. Sort by the stable rooted path so the component owner always
-        // starts from the same file across worker schedules and revisions.
-        members.sort_by_cached_key(|fid| format!("{fid:?}"));
-        members.dedup();
-
-        Self {
-            members: members.into(),
-            expr_stage: OnceLock::new(),
-            type_check: OnceLock::new(),
-        }
-    }
-}
 
 /// Discovers module dependencies and assigns files to sealed import SCCs.
 ///
 /// A coordinator is revision-local. Clones share one graph mutex so that a
 /// file is discovered exactly once and every directed-edge insertion, SCC
 /// merge, and component seal is atomic with respect to other requests.
-#[derive(Clone, Default)]
-pub(super) struct ComponentCoordinator {
-    state: Arc<Mutex<CoordinatorState>>,
-}
+pub(crate) use crate::adt::pdg::{
+    AnalysisComponent, ComponentCoordinator, DependencyAdmission, DependencyDiscovery,
+};
+use crate::adt::pdg::{ComponentId, CoordinatorState, Group, GroupState};
 
 impl ComponentCoordinator {
     /// Returns the sealed component containing `root`.
@@ -138,29 +65,6 @@ impl ComponentCoordinator {
     pub(super) fn direct_dependencies(&self, source: FileId) -> Option<Vec<FileId>> {
         self.state.lock().direct_dependencies(source)
     }
-}
-
-#[derive(Default)]
-struct CoordinatorState {
-    files: FxHashMap<FileId, ComponentId>,
-    dependencies: FxHashMap<FileId, Vec<FileId>>,
-    discovered: FxHashSet<FileId>,
-    groups: Vec<Group>,
-}
-
-struct Group {
-    parent: ComponentId,
-    members: FxHashSet<FileId>,
-    outgoing: FxHashSet<ComponentId>,
-    incoming: FxHashSet<ComponentId>,
-    has_unresolved_outgoing: bool,
-    state: GroupState,
-}
-
-enum GroupState {
-    Open,
-    Redirect(ComponentId),
-    Sealed(Arc<AnalysisComponent>),
 }
 
 impl CoordinatorState {
@@ -538,7 +442,10 @@ enum Direction {
 mod tests {
     use std::sync::{Arc, Barrier};
 
+    use rustc_hash::FxHashMap;
     use typst::syntax::{RootedPath, VirtualPath, VirtualRoot};
+
+    use crate::analysis::TypeInfo;
 
     use super::*;
 
