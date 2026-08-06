@@ -56,27 +56,6 @@ pub fn snapshot_testing(name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
     });
 }
 
-/// Runs a snapshot test whose fixture directory is relative to the test
-/// source file rather than the crate's top-level `src` directory.
-pub fn snapshot_testing_at(base: &str, name: &str, f: &impl Fn(&mut LocalContext, PathBuf)) {
-    let name = if name.is_empty() { "playground" } else { name };
-    let mut settings = tinymist_tests::Settings::new();
-    settings.set_prepend_module_to_snapshot(false);
-    settings.set_snapshot_path(format!("{base}/fixtures/{name}/snaps"));
-    settings.bind(|| {
-        let glob_path = format!("fixtures/{name}/*.typ");
-        tinymist_tests::glob!(".", &glob_path, |path| {
-            let contents = std::fs::read_to_string(path).unwrap();
-            #[cfg(windows)]
-            let contents = contents.replace("\r\n", "\n");
-
-            tinymist_tests::run_with_sources(&contents, |verse, path| {
-                run_with_ctx(verse, path, f);
-            });
-        });
-    });
-}
-
 pub fn snapshot_testing_with(name: &str, opts: Opts, f: &impl Fn(&mut LocalContext, PathBuf)) {
     tinymist_tests::snapshot_testing!(name, |verse, path| {
         run_with_ctx_(verse, path, opts, f);

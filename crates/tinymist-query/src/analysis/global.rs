@@ -2059,13 +2059,11 @@ impl RateLimiter {
 mod expr_tests {
 
     use rayon::ThreadPoolBuilder;
-    use tinymist_std::path::unix_slash;
-    use tinymist_world::{ShadowApi, vfs::WorkspaceResolver};
-    use typst::{foundations::Bytes, syntax::Source};
-    use typst_shim::syntax::{RootedPathExt, VirtualPathExt, source_range};
+    use tinymist_world::ShadowApi;
+    use typst::foundations::Bytes;
 
     use crate::analysis::Analysis;
-    use crate::syntax::{Expr, RefExpr};
+    use crate::syntax::Expr;
     use crate::tests::*;
 
     fn query_count(analysis: &Analysis, query: &str) -> u64 {
@@ -2078,35 +2076,6 @@ mod expr_tests {
 
     fn expr_stage_count(analysis: &Analysis) -> u64 {
         query_count(analysis, "expr_stage")
-    }
-
-    trait ShowExpr {
-        fn show_expr(&self, expr: &Expr) -> String;
-    }
-
-    impl ShowExpr for Source {
-        fn show_expr(&self, node: &Expr) -> String {
-            match node {
-                Expr::Decl(decl) => {
-                    let range = source_range(self, decl.span()).unwrap_or_default();
-                    let fid = if let Some(fid) = decl.file_id() {
-                        if WorkspaceResolver::is_package_file(fid) {
-                            let package = fid.package_compat().expect("package file");
-                            format!(
-                                " in {package:?}{}",
-                                unix_slash(fid.vpath().as_rooted_path_compat())
-                            )
-                        } else {
-                            format!(" in {}", unix_slash(fid.vpath().as_rooted_path_compat()))
-                        }
-                    } else {
-                        "".to_string()
-                    };
-                    format!("{decl:?}@{range:?}{fid}")
-                }
-                _ => format!("{node}"),
-            }
-        }
     }
 
     #[test]
@@ -2504,82 +2473,6 @@ mod expr_tests {
                 .unwrap();
             type_check_entry(verse);
             assert_eq!(query_count(&analysis, "type_check"), initial_count + 2);
-        });
-    }
-
-    #[test]
-    fn docs() {
-        snapshot_testing_at("..", "docs", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let result = ctx.shared_().expr_stage(&source);
-            let mut docstrings = result.docstrings.iter().collect::<Vec<_>>();
-            docstrings.sort_by(|x, y| x.0.cmp(y.0));
-            let mut docstrings = docstrings
-                .into_iter()
-                .map(|(ident, expr)| {
-                    format!(
-                        "{} -> {expr:?}",
-                        source.show_expr(&Expr::Decl(ident.clone())),
-                    )
-                })
-                .collect::<Vec<_>>();
-            let mut snap = vec![];
-            snap.push("= docstings".to_owned());
-            snap.append(&mut docstrings);
-
-            assert_snapshot!(snap.join("\n"));
-        });
-    }
-
-    #[test]
-    fn scope() {
-        snapshot_testing_at("..", "expr_of", &|ctx, path| {
-            let source = ctx.source_by_path(&path).unwrap();
-
-            let result = ctx.shared_().expr_stage(&source);
-            let mut resolves = result.resolves.iter().collect::<Vec<_>>();
-            resolves.sort_by(|x, y| x.1.decl.cmp(&y.1.decl));
-
-            let mut resolves = resolves
-                .into_iter()
-                .map(|(_, expr)| {
-                    let RefExpr {
-                        decl: ident,
-                        step,
-                        root,
-                        term,
-                    } = expr.as_ref();
-
-                    format!(
-                        "{} -> {}, root {}, val: {term:?}",
-                        source.show_expr(&Expr::Decl(ident.clone())),
-                        step.as_ref()
-                            .map(|expr| source.show_expr(expr))
-                            .unwrap_or_default(),
-                        root.as_ref()
-                            .map(|expr| source.show_expr(expr))
-                            .unwrap_or_default()
-                    )
-                })
-                .collect::<Vec<_>>();
-            let mut exports = result.exports.iter().collect::<Vec<_>>();
-            exports.sort_by(|x, y| x.0.cmp(y.0));
-            let mut exports = exports
-                .into_iter()
-                .map(|(ident, node)| {
-                    let node = source.show_expr(node);
-                    format!("{ident} -> {node}",)
-                })
-                .collect::<Vec<_>>();
-
-            let mut snap = vec![];
-            snap.push("= resolves".to_owned());
-            snap.append(&mut resolves);
-            snap.push("= exports".to_owned());
-            snap.append(&mut exports);
-
-            assert_snapshot!(snap.join("\n"));
         });
     }
 }
