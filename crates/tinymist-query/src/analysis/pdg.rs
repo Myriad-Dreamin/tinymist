@@ -781,3 +781,424 @@ mod tests {
         assert!(result.is_empty());
     }
 }
+#[cfg(test)]
+mod expr_tests {
+
+    use rayon::ThreadPoolBuilder;
+    use tinymist_world::ShadowApi;
+    use typst::foundations::Bytes;
+
+    use crate::analysis::Analysis;
+    use crate::syntax::Expr;
+    use crate::tests::*;
+
+    fn query_count(analysis: &Analysis, query: &str) -> u64 {
+        analysis
+            .report_query_stats_json()
+            .into_iter()
+            .find(|stat| stat.file.is_none() && stat.query == query)
+            .map_or(0, |stat| stat.count)
+    }
+
+    fn expr_stage_count(analysis: &Analysis) -> u64 {
+        query_count(analysis, "expr_stage")
+    }
+
+    #[test]
+    fn cached_expr_stage_is_not_counted() {
+        const SOURCE: &str = "#let answer = 42";
+
+        run_with_sources(SOURCE, |verse, path| {
+            let analysis = Analysis::default();
+            let first_revision = {
+                let mut world = verse.snapshot();
+                world.set_is_compiling(false);
+                let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+                let source = ctx.source_by_path(&path).unwrap();
+                let shared = ctx.shared_();
+
+                assert_eq!(expr_stage_count(&analysis), 0);
+                let first = shared.expr_stage(&source);
+                assert_eq!(expr_stage_count(&analysis), 1);
+
+                // This call reuses the completed OnceLock in the current revision.
+                shared.expr_stage(&source);
+                assert_eq!(expr_stage_count(&analysis), 1);
+
+                assert_eq!(first.fid, source.id());
+                ctx.revision()
+            };
+
+            // Advance the world revision without changing the source. The new
+            // revision must validate and reuse the previous expression result.
+            verse.increment_revision(|revision| revision.flush());
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            assert_ne!(ctx.revision(), first_revision);
+
+            let source = ctx.source_by_path(&path).unwrap();
+            ctx.shared_().expr_stage(&source);
+            assert_eq!(expr_stage_count(&analysis), 1);
+        });
+    }
+
+    #[test]
+    fn cyclic_component_is_analyzed_once_for_parallel_roots() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#import "b.typ": beta
+#let alpha = beta
+-----
+// path: b.typ
+#import "a.typ": alpha
+#let beta = alpha
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            let root = entry.parent().expect("entry must have a parent");
+            let source_a = ctx.source_by_path(&root.join("a.typ")).unwrap();
+            let source_b = ctx.source_by_path(&root.join("b.typ")).unwrap();
+            let shared = ctx.shared_();
+            let pool = ThreadPoolBuilder::new()
+                .num_threads(2)
+                .build()
+                .expect("two-thread component test pool must initialize");
+
+            let (expr_a, expr_b) = pool.install(|| {
+                rayon::join(
+                    || shared.expr_stage(&source_a),
+                    || shared.expr_stage(&source_b),
+                )
+            });
+            assert_eq!(expr_a.fid, source_a.id());
+            assert_eq!(expr_b.fid, source_b.id());
+            assert_eq!(expr_stage_count(&analysis), 2);
+
+            let (type_a, type_b) = pool.install(|| {
+                rayon::join(
+                    || shared.type_check(&source_a),
+                    || shared.type_check(&source_b),
+                )
+            });
+            assert!(type_a.valid);
+            assert!(type_b.valid);
+            assert_eq!(query_count(&analysis, "type_check"), 2);
+
+            shared.expr_stage(&source_a);
+            shared.expr_stage(&source_b);
+            shared.type_check(&source_a);
+            shared.type_check(&source_b);
+            assert_eq!(expr_stage_count(&analysis), 2);
+            assert_eq!(query_count(&analysis, "type_check"), 2);
+        });
+    }
+
+    #[test]
+    fn cyclic_component_invalidates_expression_history_as_a_batch() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#import "b.typ": beta
+#let alpha = beta
+-----
+// path: b.typ
+#import "a.typ": *
+#let beta = alpha
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let root = entry.parent().expect("entry must have a parent");
+            let a_path = root.join("a.typ");
+            let b_path = root.join("b.typ");
+            let analyze = |verse: &LspUniverse| {
+                let mut world = verse.snapshot();
+                world.set_is_compiling(false);
+                let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+                let source_a = ctx.source_by_path(&a_path).unwrap();
+                let source_b = ctx.source_by_path(&b_path).unwrap();
+                let shared = ctx.shared_();
+                shared.expr_stage(&source_a);
+                shared.expr_stage(&source_b)
+            };
+
+            let first_b = analyze(verse);
+            assert_eq!(expr_stage_count(&analysis), 2);
+            assert!(first_b.exports.keys().any(|name| name.as_ref() == "alpha"));
+            assert!(first_b.exports.keys().any(|name| name.as_ref() == "beta"));
+
+            verse.increment_revision(|revision| revision.flush());
+            let cached_b = analyze(verse);
+            assert_eq!(expr_stage_count(&analysis), 2);
+            assert_eq!(cached_b.revision, first_b.revision);
+
+            // Keep the A -> B -> A component intact while changing only A's
+            // local declaration. B's source is unchanged, but its wildcard
+            // interface and expression result both depend on A.
+            verse
+                .map_shadow(
+                    &a_path,
+                    Bytes::from_string("#import \"b.typ\": beta\n#let renamed = beta"),
+                )
+                .unwrap();
+
+            let second_b = analyze(verse);
+            assert_eq!(expr_stage_count(&analysis), 4);
+            assert_ne!(first_b.revision, second_b.revision);
+            assert!(!second_b.exports.keys().any(|name| name.as_ref() == "alpha"));
+            assert!(
+                second_b
+                    .exports
+                    .keys()
+                    .any(|name| name.as_ref() == "renamed")
+            );
+            assert!(second_b.exports.keys().any(|name| name.as_ref() == "beta"));
+        });
+    }
+
+    #[test]
+    fn cyclic_wildcard_declarations_are_sealed_as_a_batch() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#import "b.typ": *
+#let alpha = 1
+-----
+// path: b.typ
+#import "a.typ": *
+#let beta = 2
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            let root = entry.parent().expect("entry must have a parent");
+            let source_a = ctx.source_by_path(&root.join("a.typ")).unwrap();
+            let source_b = ctx.source_by_path(&root.join("b.typ")).unwrap();
+            let shared = ctx.shared_();
+
+            let expr_a = shared.expr_stage(&source_a);
+            let expr_b = shared.expr_stage(&source_b);
+            for info in [&expr_a, &expr_b] {
+                assert!(info.exports.keys().any(|name| name.as_ref() == "alpha"));
+                assert!(info.exports.keys().any(|name| name.as_ref() == "beta"));
+            }
+            assert_eq!(expr_stage_count(&analysis), 2);
+            assert!(shared.type_check(&source_a).valid);
+            assert!(shared.type_check(&source_b).valid);
+            assert_eq!(query_count(&analysis, "type_check"), 2);
+        });
+    }
+
+    #[test]
+    fn cyclic_wildcard_declarations_reach_a_three_member_fixed_point() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#import "b.typ": *
+#let alpha = 1
+-----
+// path: b.typ
+#import "c.typ": *
+#let beta = 2
+-----
+// path: c.typ
+#import "a.typ": *
+#let gamma = 3
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            let root = entry.parent().expect("entry must have a parent");
+            let shared = ctx.shared_();
+
+            for name in ["a.typ", "b.typ", "c.typ"] {
+                let source = ctx.source_by_path(&root.join(name)).unwrap();
+                let info = shared.expr_stage(&source);
+                for export in ["alpha", "beta", "gamma"] {
+                    assert!(
+                        info.exports.keys().any(|name| name.as_ref() == export),
+                        "{name} is missing re-exported declaration {export}"
+                    );
+                }
+            }
+            assert_eq!(expr_stage_count(&analysis), 3);
+        });
+    }
+
+    #[test]
+    fn cyclic_wildcard_declarations_preserve_source_order_shadowing() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#let x = 1
+#import "b.typ": *
+-----
+// path: b.typ
+#import "a.typ": *
+#let x = 2
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            let root = entry.parent().expect("entry must have a parent");
+            let source_a = ctx.source_by_path(&root.join("a.typ")).unwrap();
+            let source_b = ctx.source_by_path(&root.join("b.typ")).unwrap();
+            let shared = ctx.shared_();
+
+            for info in [shared.expr_stage(&source_a), shared.expr_stage(&source_b)] {
+                let (_, binding) = info
+                    .exports
+                    .iter()
+                    .find(|(name, _)| name.as_ref() == "x")
+                    .expect("x must be exported");
+                let Expr::Decl(binding) = binding else {
+                    panic!("x must resolve to B's final local declaration: {binding:?}");
+                };
+                assert_eq!(binding.file_id(), Some(source_b.id()));
+            }
+            assert_eq!(expr_stage_count(&analysis), 2);
+        });
+    }
+
+    #[test]
+    fn external_export_change_invalidates_the_whole_cyclic_expression_batch() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#import "b.typ": beta
+#let alpha = beta
+-----
+// path: b.typ
+#import "a.typ": alpha
+#import "c.typ": *
+#let beta = alpha
+-----
+// path: c.typ
+#let downstream = 1
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let root = entry.parent().expect("entry must have a parent");
+            let a_path = root.join("a.typ");
+            let b_path = root.join("b.typ");
+            let c_path = root.join("c.typ");
+            let analyze = |verse: &LspUniverse| {
+                let mut world = verse.snapshot();
+                world.set_is_compiling(false);
+                let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+                let source_a = ctx.source_by_path(&a_path).unwrap();
+                let source_b = ctx.source_by_path(&b_path).unwrap();
+                let shared = ctx.shared_();
+                (shared.expr_stage(&source_a), shared.expr_stage(&source_b))
+            };
+
+            let (first_a, first_b) = analyze(verse);
+            assert_eq!(expr_stage_count(&analysis), 3);
+            assert!(
+                first_b
+                    .exports
+                    .keys()
+                    .any(|name| name.as_ref() == "downstream")
+            );
+
+            verse
+                .map_shadow(&c_path, Bytes::from_string("#let changed = 2"))
+                .unwrap();
+            let (second_a, second_b) = analyze(verse);
+            assert_eq!(expr_stage_count(&analysis), 6);
+            assert_ne!(first_a.revision, second_a.revision);
+            assert_ne!(first_b.revision, second_b.revision);
+            assert!(
+                second_b
+                    .exports
+                    .keys()
+                    .any(|name| name.as_ref() == "changed")
+            );
+            assert!(
+                !second_b
+                    .exports
+                    .keys()
+                    .any(|name| name.as_ref() == "downstream")
+            );
+        });
+    }
+
+    #[test]
+    fn dependency_admission_covers_assignment_path_resolution() {
+        const SOURCES: &str = r#"
+// path: a.typ
+#let path = "b.typ"
+#{
+  path = "c.typ"
+  import path
+}
+-----
+// path: b.typ
+#let value = 1
+-----
+// path: c.typ
+#let value = 2
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let mut world = verse.snapshot();
+            world.set_is_compiling(false);
+            let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+            let source = ctx.source_by_path(&entry).unwrap();
+            let info = ctx.shared_().expr_stage(&source);
+            assert_eq!(info.fid, source.id());
+        });
+    }
+
+    #[test]
+    fn type_component_cache_tracks_transitive_expression_inputs() {
+        const SOURCES: &str = r#"
+// path: b.typ
+#let value = 1
+-----
+// path: a.typ
+#import "b.typ": value
+#let result = value
+"#;
+
+        run_with_sources(SOURCES, |verse, entry| {
+            let analysis = Analysis::default();
+            let type_check_entry = |verse: &LspUniverse| {
+                let mut world = verse.snapshot();
+                world.set_is_compiling(false);
+                let ctx = analysis.enter(WorldComputeGraph::from_world(world));
+                let source = ctx.source_by_path(&entry).unwrap();
+                ctx.shared_().type_check(&source)
+            };
+
+            type_check_entry(verse);
+            let initial_count = query_count(&analysis, "type_check");
+            assert_eq!(initial_count, 2);
+
+            // An unchanged revision reuses the complete component histories.
+            verse.increment_revision(|revision| revision.flush());
+            type_check_entry(verse);
+            assert_eq!(query_count(&analysis, "type_check"), initial_count);
+
+            // A's lexical import interface is unchanged, but B's expression
+            // input changed. A must not reuse a TypeInfo keyed only by A.
+            let b_path = entry.parent().unwrap().join("b.typ");
+            verse
+                .map_shadow(&b_path, Bytes::from_string("#let value = \"x\""))
+                .unwrap();
+            type_check_entry(verse);
+            assert_eq!(query_count(&analysis, "type_check"), initial_count + 2);
+        });
+    }
+}
