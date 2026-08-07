@@ -102,6 +102,9 @@ impl CoordinatorState {
                 dependencies.sort_unstable_by_key(|dep| dep.into_raw().get());
                 dependencies.dedup();
 
+                self.dependencies.insert(fid, dependencies.clone());
+                self.discovered.insert(fid);
+
                 for &dependency in &dependencies {
                     self.ensure_file(dependency);
                     self.add_edge(fid, dependency);
@@ -112,8 +115,6 @@ impl CoordinatorState {
                     self.groups[group].has_unresolved_outgoing = true;
                 }
 
-                self.dependencies.insert(fid, dependencies.clone());
-                self.discovered.insert(fid);
                 dependencies
             };
 
@@ -149,9 +150,7 @@ impl CoordinatorState {
         let id = self.groups.len();
         self.groups.push(Group {
             parent: id,
-            members: FxHashSet::from_iter([fid]),
-            outgoing: FxHashSet::default(),
-            incoming: FxHashSet::default(),
+            members: vec![fid],
             has_unresolved_outgoing: false,
             state: GroupState::Open,
         });
@@ -179,20 +178,13 @@ impl CoordinatorState {
             .files
             .get(&target)
             .map(|&target| self.find_const(target));
-        if let Some(target) = target {
-            if source == target {
-                return DependencyAdmission::SameComponent;
-            }
-            if self.groups[source]
-                .outgoing
-                .iter()
-                .any(|&direct| self.find_const(direct) == target)
-            {
-                return DependencyAdmission::Reachable;
-            }
+        if let Some(target) = target
+            && source == target
+        {
+            return DependencyAdmission::SameComponent;
         }
 
-        let reachable = self.reachable_set(source, Direction::Outgoing);
+        let reachable = self.reachable_set(source);
         if let Some(target) = target
             && reachable.contains(&target)
         {
@@ -219,7 +211,7 @@ impl CoordinatorState {
     }
 
     fn group_has_unresolved_dependencies(&self, source: ComponentId) -> bool {
-        self.reachable_set(source, Direction::Outgoing)
+        self.reachable_set(source)
             .into_iter()
             .any(|group| self.groups[group].has_unresolved_outgoing)
     }
@@ -230,7 +222,7 @@ impl CoordinatorState {
         };
         let root = self.find_const(root);
         let mut files: Vec<_> = self
-            .reachable_set(root, Direction::Outgoing)
+            .reachable_set(root)
             .into_iter()
             .flat_map(|group| self.groups[group].members.iter().copied())
             .collect();
@@ -286,15 +278,16 @@ impl CoordinatorState {
             "a sealed component cannot discover a new outgoing import"
         );
 
-        self.groups[source].outgoing.insert(target);
-        self.groups[target].incoming.insert(source);
-
-        if !self.reachable(target, source, Direction::Outgoing) {
+        let forward = self.reachable_set(target);
+        if !forward.contains(&source) {
             return;
         }
 
-        let forward = self.reachable_set(target, Direction::Outgoing);
-        let backward = self.reachable_set(source, Direction::Incoming);
+        // The persistent graph is stored once in `dependencies`, indexed by
+        // file. Build only the reverse index needed for this cycle search;
+        // keeping incoming/outgoing sets on every historical Group would
+        // duplicate and repeatedly rewrite the same edges during unions.
+        let backward = self.reverse_reachable_set(source, &forward);
         let cycle: FxHashSet<_> = forward.intersection(&backward).copied().collect();
 
         debug_assert!(cycle.contains(&source));
@@ -302,25 +295,65 @@ impl CoordinatorState {
         self.merge(cycle);
     }
 
-    fn reachable(&self, start: ComponentId, goal: ComponentId, direction: Direction) -> bool {
-        self.reachable_set(start, direction).contains(&goal)
-    }
-
-    fn reachable_set(&self, start: ComponentId, direction: Direction) -> FxHashSet<ComponentId> {
+    fn reachable_set(&self, start: ComponentId) -> FxHashSet<ComponentId> {
         let start = self.find_const(start);
         let mut reached = FxHashSet::from_iter([start]);
         let mut pending = vec![start];
 
         while let Some(group) = pending.pop() {
-            let edges = match direction {
-                Direction::Outgoing => &self.groups[group].outgoing,
-                Direction::Incoming => &self.groups[group].incoming,
-            };
+            for &member in &self.groups[group].members {
+                let Some(dependencies) = self.dependencies.get(&member) else {
+                    continue;
+                };
+                for &dependency in dependencies {
+                    let Some(&dependency_group) = self.files.get(&dependency) else {
+                        continue;
+                    };
+                    let dependency_group = self.find_const(dependency_group);
+                    if reached.insert(dependency_group) {
+                        pending.push(dependency_group);
+                    }
+                }
+            }
+        }
 
-            for &next in edges {
-                let next = self.find_const(next);
-                if reached.insert(next) {
-                    pending.push(next);
+        reached
+    }
+
+    fn reverse_reachable_set(
+        &self,
+        start: ComponentId,
+        within: &FxHashSet<ComponentId>,
+    ) -> FxHashSet<ComponentId> {
+        let start = self.find_const(start);
+        let mut reverse_edges = vec![Vec::new(); self.groups.len()];
+
+        for (&source, dependencies) in &self.dependencies {
+            let Some(&source_group) = self.files.get(&source) else {
+                continue;
+            };
+            let source_group = self.find_const(source_group);
+            if !within.contains(&source_group) {
+                continue;
+            }
+
+            for &dependency in dependencies {
+                let Some(&target_group) = self.files.get(&dependency) else {
+                    continue;
+                };
+                let target_group = self.find_const(target_group);
+                if within.contains(&target_group) && source_group != target_group {
+                    reverse_edges[target_group].push(source_group);
+                }
+            }
+        }
+
+        let mut reached = FxHashSet::from_iter([start]);
+        let mut pending = vec![start];
+        while let Some(group) = pending.pop() {
+            for &predecessor in &reverse_edges[group] {
+                if reached.insert(predecessor) {
+                    pending.push(predecessor);
                 }
             }
         }
@@ -344,55 +377,18 @@ impl CoordinatorState {
             );
         }
 
-        let roots_set: FxHashSet<_> = roots.iter().copied().collect();
-        let mut members = FxHashSet::default();
-        let mut outgoing = FxHashSet::default();
-        let mut incoming = FxHashSet::default();
+        let mut members = Vec::new();
         let mut has_unresolved_outgoing = false;
 
         for &root in &roots {
-            members.extend(self.groups[root].members.iter().copied());
+            members.extend(std::mem::take(&mut self.groups[root].members));
             has_unresolved_outgoing |= self.groups[root].has_unresolved_outgoing;
-            outgoing.extend(
-                self.groups[root]
-                    .outgoing
-                    .iter()
-                    .copied()
-                    .filter(|next| !roots_set.contains(next)),
-            );
-            incoming.extend(
-                self.groups[root]
-                    .incoming
-                    .iter()
-                    .copied()
-                    .filter(|next| !roots_set.contains(next)),
-            );
-        }
-
-        for &predecessor in &incoming {
-            self.groups[predecessor]
-                .outgoing
-                .retain(|target| !roots_set.contains(target));
-        }
-        for &successor in &outgoing {
-            self.groups[successor]
-                .incoming
-                .retain(|source| !roots_set.contains(source));
         }
 
         let fresh = self.groups.len();
-        for &predecessor in &incoming {
-            self.groups[predecessor].outgoing.insert(fresh);
-        }
-        for &successor in &outgoing {
-            self.groups[successor].incoming.insert(fresh);
-        }
-
         self.groups.push(Group {
             parent: fresh,
             members,
-            outgoing,
-            incoming,
             has_unresolved_outgoing,
             state: GroupState::Open,
         });
@@ -400,8 +396,6 @@ impl CoordinatorState {
         for root in roots {
             let group = &mut self.groups[root];
             group.parent = fresh;
-            group.outgoing.clear();
-            group.incoming.clear();
             group.has_unresolved_outgoing = false;
             group.state = GroupState::Redirect(fresh);
         }
@@ -425,17 +419,11 @@ impl CoordinatorState {
             "a component cannot be sealed before every member is discovered"
         );
 
-        let members = self.groups[group].members.iter().copied().collect();
+        let members = self.groups[group].members.to_vec();
         let component = Arc::new(AnalysisComponent::new(members));
         self.groups[group].state = GroupState::Sealed(component.clone());
         component
     }
-}
-
-#[derive(Clone, Copy)]
-enum Direction {
-    Outgoing,
-    Incoming,
 }
 
 #[cfg(test)]
@@ -607,8 +595,7 @@ mod tests {
                     .map(|group| {
                         (
                             group.parent,
-                            group.outgoing.clone(),
-                            group.incoming.clone(),
+                            group.members.clone(),
                             group.has_unresolved_outgoing,
                         )
                     })
@@ -649,8 +636,7 @@ mod tests {
                     .map(|group| {
                         (
                             group.parent,
-                            group.outgoing.clone(),
-                            group.incoming.clone(),
+                            group.members.clone(),
                             group.has_unresolved_outgoing,
                         )
                     })

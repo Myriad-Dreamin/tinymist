@@ -92,9 +92,7 @@ pub(crate) struct CoordinatorState {
 /// One incremental SCC group in the graph.
 pub(crate) struct Group {
     pub(crate) parent: ComponentId,
-    pub(crate) members: FxHashSet<FileId>,
-    pub(crate) outgoing: FxHashSet<ComponentId>,
-    pub(crate) incoming: FxHashSet<ComponentId>,
+    pub(crate) members: Vec<FileId>,
     pub(crate) has_unresolved_outgoing: bool,
     pub(crate) state: GroupState,
 }
