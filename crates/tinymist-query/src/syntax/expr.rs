@@ -2,7 +2,7 @@ use std::ops::DerefMut;
 
 use parking_lot::Mutex;
 use rpds::RedBlackTreeMapSync;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use tinymist_analysis::adt::interner::Interned;
 use typst::{
@@ -23,9 +23,8 @@ use crate::{
 
 use super::{DocCommentMatcher, InterpretMode, def::*};
 
-type DeclarationInterfaces = Arc<FxHashMap<TypstFileId, Arc<LazyHash<LexicalScope>>>>;
-
-trait ExportLookup {
+/// Resolves module exports while one syntax-analysis pass is running.
+pub(crate) trait ExportLookup {
     fn exports_of(
         &mut self,
         ctx: &Arc<SharedContext>,
@@ -34,203 +33,10 @@ trait ExportLookup {
     ) -> Option<Arc<LazyHash<LexicalScope>>>;
 }
 
-/// Immutable symbolic inputs for one declaration name-discovery round.
-struct DeclarationInputs {
-    interfaces: DeclarationInterfaces,
-}
-
-impl ExportLookup for DeclarationInputs {
-    fn exports_of(
-        &mut self,
-        ctx: &Arc<SharedContext>,
-        importer: TypstFileId,
-        source: &Source,
-    ) -> Option<Arc<LazyHash<LexicalScope>>> {
-        self.interfaces
-            .get(&source.id())
-            .cloned()
-            .or_else(|| ctx.external_exports_of(importer, source))
-    }
-}
-
-/// Builds a complete component declaration batch without publishing a pending
-/// member interface.
-struct DeclarationBuilder {
-    sources: Vec<Source>,
-    inputs: DeclarationInputs,
-}
-
-impl DeclarationBuilder {
-    fn new(sources: impl IntoIterator<Item = Source>) -> Self {
-        let sources: Vec<_> = sources.into_iter().collect();
-        let component: FxHashSet<_> = sources.iter().map(Source::id).collect();
-        assert_eq!(
-            component.len(),
-            sources.len(),
-            "an expression component cannot contain duplicate sources"
-        );
-        let empty_inputs = component
-            .into_iter()
-            .map(|fid| (fid, Arc::new(LazyHash::new(LexicalScope::default()))))
-            .collect();
-        Self {
-            sources,
-            inputs: DeclarationInputs {
-                interfaces: Arc::new(empty_inputs),
-            },
-        }
-    }
-
-    fn finish(mut self, ctx: Arc<SharedContext>) -> DeclarationInterfaces {
-        loop {
-            // Keep this round's outputs local until every member has finished.
-            // A declaration worker can only observe the preceding immutable
-            // symbolic input batch.
-            let mut outputs = FxHashMap::default();
-            for source in &self.sources {
-                let interface = declaration_of(ctx.clone(), source.clone(), &mut self.inputs);
-                outputs.insert(source.id(), interface);
-            }
-
-            // The least declaration solution for a singleton's self-import
-            // equation is its first local/explicit result. This also keeps the
-            // ordinary acyclic-file path at one declaration pass.
-            if self.sources.len() == 1 {
-                return Arc::new(outputs);
-            }
-
-            let mut stable = true;
-            for source in &self.sources {
-                let fid = source.id();
-                let input = self
-                    .inputs
-                    .interfaces
-                    .get(&fid)
-                    .expect("every declaration round must contain every component member");
-                let output = outputs
-                    .get(&fid)
-                    .expect("every declaration round must produce every component member");
-                assert!(
-                    input.keys().all(|name| output.contains_key(name)),
-                    "component declaration names must grow monotonically for {fid:?}"
-                );
-                stable &= input.keys().count() == output.keys().count();
-            }
-
-            if stable {
-                return Arc::new(outputs);
-            }
-
-            // Only names flow between discovery rounds. Their values are
-            // stable symbolic module selections, so mutually re-exported names
-            // cannot copy and indefinitely wrap a preceding round's RefExpr.
-            let symbolic_inputs = outputs
-                .iter()
-                .map(|(&fid, interface)| {
-                    let module = Expr::Decl(Decl::module(fid).into());
-                    let mut symbolic = LexicalScope::default();
-                    for name in interface.keys() {
-                        let field = Decl::lit_(name.clone()).into();
-                        symbolic.insert_mut(
-                            name.clone(),
-                            Expr::Select(SelectExpr::new(field, module.clone())),
-                        );
-                    }
-                    (fid, Arc::new(LazyHash::new(symbolic)))
-                })
-                .collect();
-            self.inputs = DeclarationInputs {
-                interfaces: Arc::new(symbolic_inputs),
-            };
-        }
-    }
-}
-
-/// Tracks active and completed expression analyses for one component.
-pub(crate) struct ExprRoute {
-    component: FxHashSet<TypstFileId>,
-    declarations: DeclarationInterfaces,
-    checking: FxHashSet<TypstFileId>,
-    completed: FxHashMap<TypstFileId, ExprInfo>,
-}
-
-impl ExprRoute {
-    /// Creates a route only after its private builder has sealed every
-    /// component declaration interface.
-    pub(crate) fn new(ctx: Arc<SharedContext>, sources: impl IntoIterator<Item = Source>) -> Self {
-        let sources: Vec<_> = sources.into_iter().collect();
-        let component: FxHashSet<_> = sources.iter().map(Source::id).collect();
-        let declarations = DeclarationBuilder::new(sources).finish(ctx);
-        assert!(
-            declarations.len() == component.len()
-                && declarations.keys().all(|fid| component.contains(fid)),
-            "sealed declarations must cover the complete expression component"
-        );
-        Self {
-            component,
-            declarations,
-            checking: Default::default(),
-            completed: Default::default(),
-        }
-    }
-
-    /// Whether the file belongs to this route's stable component.
-    fn contains(&self, fid: &TypstFileId) -> bool {
-        self.component.contains(fid)
-    }
-
-    /// The only entry point that may start expression analysis.
-    pub(crate) fn analyze(&mut self, ctx: Arc<SharedContext>, source: Source) -> ExprInfo {
-        assert!(
-            self.contains(&source.id()),
-            "cross-component expression analysis must use the shared component entry point"
-        );
-        if let Some(cached) = self.completed.get(&source.id()) {
-            return cached.clone();
-        }
-
-        assert!(
-            !self.checking.contains(&source.id()),
-            "recursive expression analysis must resolve through declared exports"
-        );
-        expr_of(ctx, source, self)
-    }
-
-    fn begin(&mut self, fid: TypstFileId) {
-        self.checking.insert(fid);
-    }
-
-    fn complete(&mut self, info: ExprInfo) {
-        self.checking.remove(&info.fid);
-        self.completed.insert(info.fid, info);
-    }
-}
-
-impl ExportLookup for ExprRoute {
-    fn exports_of(
-        &mut self,
-        ctx: &Arc<SharedContext>,
-        importer: TypstFileId,
-        source: &Source,
-    ) -> Option<Arc<LazyHash<LexicalScope>>> {
-        if !self.contains(&source.id()) {
-            return ctx.external_exports_of(importer, source);
-        }
-
-        if let Some(info) = self.completed.get(&source.id()) {
-            return Some(info.exports.clone());
-        }
-        if self.checking.contains(&source.id()) {
-            return self.declarations.get(&source.id()).cloned();
-        }
-        Some(self.analyze(ctx.clone(), source.clone()).exports.clone())
-    }
-}
-
 /// Produces one member's declaration interface against the preceding complete
 /// symbolic input batch. The caller keeps the result private until every member
 /// in the round has produced an interface.
-fn declaration_of(
+pub(crate) fn declaration_of(
     ctx: Arc<SharedContext>,
     source: Source,
     lookup: &mut dyn ExportLookup,
@@ -266,13 +72,12 @@ fn declaration_of(
 /// This pass resolves identifiers, tracks imports, and builds the expression
 /// tree with type information.
 #[typst_macros::time(span = source.root().span())]
-fn expr_of(ctx: Arc<SharedContext>, source: Source, route: &mut ExprRoute) -> ExprInfo {
+pub(crate) fn expr_of(
+    ctx: Arc<SharedContext>,
+    source: Source,
+    lookup: &mut dyn ExportLookup,
+) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
-
-    route.begin(source.id());
-
-    let guard = ctx.expr_stage_stat(source.id());
-    guard.miss();
 
     let revision = ctx.revision();
 
@@ -307,7 +112,7 @@ fn expr_of(ctx: Arc<SharedContext>, source: Source, route: &mut ExprRoute) -> Ex
         module_items: FxHashMap::default(),
         init_stage: false,
         comment_matcher: DocCommentMatcher::default(),
-        lookup: route,
+        lookup,
     };
 
     let root_markup = source.root().cast::<ast::Markup>().unwrap();
@@ -332,9 +137,7 @@ fn expr_of(ctx: Arc<SharedContext>, source: Source, route: &mut ExprRoute) -> Ex
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
-    let info = ExprInfo::new(info);
-    route.complete(info.clone());
-    info
+    ExprInfo::new(info)
 }
 
 type ConcolicExpr = (Option<Expr>, Option<Ty>);

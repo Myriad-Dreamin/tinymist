@@ -35,8 +35,8 @@ use typst_shim::eval::{Eval, eval_compat};
 use typst_shim::syntax::VirtualPathExt;
 
 use super::{
-    AnalysisComponent, ComponentCoordinator, DependencyAdmission, DependencyDiscovery,
-    LspQuerySnapshot, type_check_component,
+    AnalysisComponent, ComponentCoordinator, DependencyAdmission, ExprStage, LspQuerySnapshot,
+    type_check_component,
 };
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
@@ -47,9 +47,8 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
-    classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
-    scan_workspace_files,
+    Decl, DefKind, ExprInfo, LexicalScope, ModuleDependency, SyntaxClass, classify_syntax,
+    construct_module_dependencies, is_mark, resolve_id_by_path, scan_workspace_files,
 };
 use crate::upstream::{Tooltip, tooltip_};
 use crate::{
@@ -604,6 +603,10 @@ pub struct SharedContext {
 }
 
 impl SharedContext {
+    pub(super) fn components(&self) -> &ComponentCoordinator {
+        &self.slot.components
+    }
+
     /// Gets the revision of current analysis
     pub fn revision(&self) -> usize {
         self.slot.revision
@@ -829,91 +832,6 @@ impl SharedContext {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
-    fn analysis_component(self: &Arc<Self>, fid: TypstFileId) -> Arc<AnalysisComponent> {
-        self.slot
-            .components
-            .component_for(fid, |fid| self.discover_dependencies(fid))
-    }
-
-    fn discover_dependencies(self: &Arc<Self>, fid: TypstFileId) -> DependencyDiscovery {
-        fn add_value(
-            ctx: &SharedContext,
-            fid: TypstFileId,
-            value: Value,
-            dependencies: &mut HashSet<TypstFileId>,
-        ) -> bool {
-            let target = match value {
-                Value::Str(path) => resolve_id_by_path(ctx.world(), fid, path.as_str()),
-                Value::Module(module) => module.file_id(),
-                _ => None,
-            };
-            let Some(target) = target else {
-                return false;
-            };
-            dependencies.insert(target);
-            true
-        }
-
-        let Ok(source) = self.source_by_id(fid) else {
-            return DependencyDiscovery {
-                dependencies: vec![],
-                has_unresolved: true,
-            };
-        };
-        let mut dependencies = HashSet::new();
-        let mut has_unresolved = false;
-        Self::walk_dependency_sites(source.root(), &mut |kind, site| {
-            crate::log_debug_ct!(
-                "dependency discovery: {fid:?} {kind:?} at {:?}",
-                site.span()
-            );
-
-            // Reuse the normal const/type-backed import evaluator. It first
-            // handles direct constants and then falls back to the existing
-            // runtime import tracer; this pass does not maintain a second
-            // lexical evaluator.
-            let (source_value, module_value) = self.analyze_import(site);
-            let mut resolved = false;
-            for value in source_value.into_iter().chain(module_value) {
-                resolved |= add_value(self, fid, value, &mut dependencies);
-            }
-
-            // A traced result is only an observation for a non-literal site.
-            // Preserve the no-wait admission for any target that the normal
-            // evaluator cannot prove to be the one exact source.
-            let exact_literal = site
-                .cast::<ast::Expr>()
-                .is_some_and(|expr| matches!(expr, ast::Expr::Str(_)));
-            has_unresolved |= !exact_literal || !resolved;
-        });
-        let mut dependencies: Vec<_> = dependencies.into_iter().collect();
-        dependencies.sort_unstable_by_key(|fid| fid.into_raw().get());
-        DependencyDiscovery {
-            dependencies,
-            has_unresolved,
-        }
-    }
-
-    fn walk_dependency_sites(node: &SyntaxNode, f: &mut impl FnMut(SyntaxKind, &SyntaxNode)) {
-        match node.kind() {
-            SyntaxKind::ModuleImport => {
-                if let Some(import) = node.cast::<ast::ModuleImport>() {
-                    f(SyntaxKind::ModuleImport, import.source().to_untyped());
-                }
-            }
-            SyntaxKind::ModuleInclude => {
-                if let Some(include) = node.cast::<ast::ModuleInclude>() {
-                    f(SyntaxKind::ModuleInclude, include.source().to_untyped());
-                }
-            }
-            _ => {}
-        }
-
-        for child in node.children() {
-            Self::walk_dependency_sites(child, f);
-        }
-    }
-
     fn previous_expr_component(
         self: &Arc<Self>,
         component: &AnalysisComponent,
@@ -1020,14 +938,6 @@ impl SharedContext {
         hash128(&(component.members.as_ref(), inputs))
     }
 
-    pub(super) fn dependency_admission(
-        &self,
-        source: TypstFileId,
-        target: TypstFileId,
-    ) -> DependencyAdmission {
-        self.slot.components.admit_dependency(source, target)
-    }
-
     fn expr_component(
         self: &Arc<Self>,
         component: &Arc<AnalysisComponent>,
@@ -1050,7 +960,7 @@ impl SharedContext {
                     return Arc::new(previous);
                 }
 
-                let mut route = ExprRoute::new(self.clone(), sources.iter().cloned());
+                let mut route = ExprStage::new(self.clone(), sources.iter().cloned());
                 let mut result = FxHashMap::default();
 
                 for source in sources {
@@ -1060,7 +970,7 @@ impl SharedContext {
 
                 for (&fid, info) in &result {
                     for imported in info.imports.keys() {
-                        match self.dependency_admission(fid, *imported) {
+                        match self.slot.components.record_dependency(fid, *imported) {
                             DependencyAdmission::SameComponent
                             | DependencyAdmission::Reachable => {}
                             DependencyAdmission::Unresolved => {
@@ -1081,9 +991,14 @@ impl SharedContext {
             })
             .clone();
 
-        for info in result.values() {
-            let key = self.expr_history_key(component, &info.source);
-            self.slot.expr_stage.publish(key, info.clone());
+        // A late dynamic edge can redirect this owner to a fresh SCC while the
+        // initializer is running. The old batch is complete, but obsolete, so
+        // it must never enter revision history.
+        if self.slot.components.is_current(component) {
+            for info in result.values() {
+                let key = self.expr_history_key(component, &info.source);
+                self.slot.expr_stage.publish(key, info.clone());
+            }
         }
 
         result
@@ -1091,8 +1006,17 @@ impl SharedContext {
 
     /// Gets the expression information of a source file.
     pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
-        let component = self.analysis_component(source.id());
-        if let Some(result) = component.expr_stage.get() {
+        loop {
+            let component = self.analysis_component(source.id());
+            let result = component
+                .expr_stage
+                .get()
+                .cloned()
+                .unwrap_or_else(|| self.expr_component(&component));
+            if !self.slot.components.is_current(&component) {
+                continue;
+            }
+
             return result
                 .get(&source.id())
                 .unwrap_or_else(|| {
@@ -1104,17 +1028,6 @@ impl SharedContext {
                 })
                 .clone();
         }
-
-        self.expr_component(&component)
-            .get(&source.id())
-            .unwrap_or_else(|| {
-                panic!(
-                    "expression component {:?} is missing requested file {:?}",
-                    component.members,
-                    source.id()
-                )
-            })
-            .clone()
     }
 
     pub(crate) fn external_exports_of(
@@ -1122,13 +1035,21 @@ impl SharedContext {
         importer: TypstFileId,
         source: &Source,
     ) -> Option<Arc<LazyHash<LexicalScope>>> {
-        // Consult the frozen graph before acquiring another component's result
-        // slot. An unresolved or rejected late edge must remain a no-wait
-        // unknown instead of becoming a wait-for edge.
-        match self.dependency_admission(importer, source.id()) {
+        // Commit the resolved edge before acquiring another component's result
+        // slot. A cycle redirects this route to a fresh component, so this
+        // obsolete pass uses a no-wait fallback and is retried by expr_stage.
+        match self
+            .slot
+            .components
+            .record_dependency(importer, source.id())
+        {
             DependencyAdmission::Reachable => Some(self.expr_stage(source).exports.clone()),
             DependencyAdmission::SameComponent => {
-                unreachable!("same-component expression lookup bypassed its component route")
+                // A dependency discovered by the full pass can merge the route
+                // currently being computed. Finish this obsolete batch without
+                // reading another owner; expr_stage will retry from the fresh
+                // component before publishing or returning it.
+                None
             }
             DependencyAdmission::Unresolved => None,
             DependencyAdmission::Rejected => {
@@ -1143,8 +1064,79 @@ impl SharedContext {
 
     /// Gets the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
-        let component = self.analysis_component(source.id());
-        if let Some(result) = component.type_check.get() {
+        loop {
+            let component = self.analysis_component(source.id());
+            if let Some(result) = component.type_check.get() {
+                if !self.slot.components.is_current(&component) {
+                    continue;
+                }
+                return result
+                    .get(&source.id())
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "type component {:?} is missing requested file {:?}",
+                            component.members,
+                            source.id()
+                        )
+                    })
+                    .clone();
+            }
+
+            let exprs = self.expr_component(&component);
+            if !self.slot.components.is_current(&component) {
+                continue;
+            }
+
+            // Compute the dependency fingerprint before taking this component's
+            // type slot. Fingerprinting may initialize expression batches along
+            // the condensation DAG, but never waits on another type slot.
+            let fingerprint = self.type_component_fingerprint(&component, &exprs);
+            let result = component
+                .type_check
+                .get_or_init(|| {
+                    let mut previous = FxHashMap::default();
+                    for &fid in component.members.iter() {
+                        let ei = exprs.get(&fid).unwrap_or_else(|| {
+                            panic!("component expression batch is missing {fid:?}")
+                        });
+                        if let Some(cache_hint) = self
+                            .slot
+                            .type_check
+                            .previous(&hash128(&(fid, fingerprint)))
+                            .filter(|prev| prev.fid == Some(fid) && prev.revision == ei.revision)
+                        {
+                            previous.insert(fid, cache_hint);
+                        }
+                    }
+                    if previous.len() != component.members.len() {
+                        // SCC members are checked in one environment and can
+                        // depend on each other's completed result. Reuse the
+                        // previous batch only when every member is reusable.
+                        previous.clear();
+                    }
+
+                    let result = type_check_component(
+                        self.clone(),
+                        &component.members,
+                        exprs.clone(),
+                        previous,
+                    );
+
+                    Arc::new(result)
+                })
+                .clone();
+
+            if !self.slot.components.is_current(&component) {
+                continue;
+            }
+
+            // Publish history only after the complete current batch is ready.
+            for (&fid, info) in result.iter() {
+                self.slot
+                    .type_check
+                    .publish(hash128(&(fid, fingerprint)), info.clone());
+            }
+
             return result
                 .get(&source.id())
                 .unwrap_or_else(|| {
@@ -1156,60 +1148,6 @@ impl SharedContext {
                 })
                 .clone();
         }
-
-        let exprs = self.expr_component(&component);
-        // Compute the dependency fingerprint before taking this component's
-        // type slot. Fingerprinting may initialize expression batches along
-        // the condensation DAG, but never waits on another type slot.
-        let fingerprint = self.type_component_fingerprint(&component, &exprs);
-        let result = component
-            .type_check
-            .get_or_init(|| {
-                let mut previous = FxHashMap::default();
-                for &fid in component.members.iter() {
-                    let ei = exprs
-                        .get(&fid)
-                        .unwrap_or_else(|| panic!("component expression batch is missing {fid:?}"));
-                    if let Some(cache_hint) = self
-                        .slot
-                        .type_check
-                        .previous(&hash128(&(fid, fingerprint)))
-                        .filter(|prev| prev.fid == Some(fid) && prev.revision == ei.revision)
-                    {
-                        previous.insert(fid, cache_hint);
-                    }
-                }
-                if previous.len() != component.members.len() {
-                    // SCC members are checked in one environment and can
-                    // depend on each other's completed result. Reuse the
-                    // previous batch only when every member is reusable.
-                    previous.clear();
-                }
-
-                let result =
-                    type_check_component(self.clone(), &component.members, exprs.clone(), previous);
-
-                Arc::new(result)
-            })
-            .clone();
-
-        // Publish history only after the complete component batch is ready.
-        for (&fid, info) in result.iter() {
-            self.slot
-                .type_check
-                .publish(hash128(&(fid, fingerprint)), info.clone());
-        }
-
-        result
-            .get(&source.id())
-            .unwrap_or_else(|| {
-                panic!(
-                    "type component {:?} is missing requested file {:?}",
-                    component.members,
-                    source.id()
-                )
-            })
-            .clone()
     }
 
     /// Gets the lint result of a source file.
@@ -1522,7 +1460,7 @@ impl SharedContext {
     }
 
     /// Starts statistics collection for a full expression analysis.
-    pub(crate) fn expr_stage_stat(&self, id: TypstFileId) -> QueryStatGuard {
+    pub(super) fn expr_stage_stat(&self, id: TypstFileId) -> QueryStatGuard {
         self.query_stat(id, "expr_stage")
     }
 
