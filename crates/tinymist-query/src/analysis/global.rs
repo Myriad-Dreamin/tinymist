@@ -994,7 +994,7 @@ impl SharedContext {
         // A late dynamic edge can redirect this owner to a fresh SCC while the
         // initializer is running. The old batch is complete, but obsolete, so
         // it must never enter revision history.
-        if self.slot.components.is_current(component) {
+        if component.is_current() {
             for info in result.values() {
                 let key = self.expr_history_key(component, &info.source);
                 self.slot.expr_stage.publish(key, info.clone());
@@ -1013,7 +1013,7 @@ impl SharedContext {
                 .get()
                 .cloned()
                 .unwrap_or_else(|| self.expr_component(&component));
-            if !self.slot.components.is_current(&component) {
+            if !component.is_current() {
                 continue;
             }
 
@@ -1067,7 +1067,7 @@ impl SharedContext {
         loop {
             let component = self.analysis_component(source.id());
             if let Some(result) = component.type_check.get() {
-                if !self.slot.components.is_current(&component) {
+                if !component.is_current() {
                     continue;
                 }
                 return result
@@ -1083,7 +1083,7 @@ impl SharedContext {
             }
 
             let exprs = self.expr_component(&component);
-            if !self.slot.components.is_current(&component) {
+            if !component.is_current() {
                 continue;
             }
 
@@ -1126,7 +1126,7 @@ impl SharedContext {
                 })
                 .clone();
 
-            if !self.slot.components.is_current(&component) {
+            if !component.is_current() {
                 continue;
             }
 
