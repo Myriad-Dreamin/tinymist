@@ -577,11 +577,7 @@ fn cmp_type_source(
             };
             file(x)
                 .cmp(&file(y))
-                .then_with(|| {
-                    let x_name = x.name_node.clone().into_text();
-                    let y_name = y.name_node.clone().into_text();
-                    x_name.cmp(&y_name)
-                })
+                .then_with(|| x.name().cmp(&y.name()))
                 .then_with(|| x.doc.cmp(&y.doc))
         }
     }
