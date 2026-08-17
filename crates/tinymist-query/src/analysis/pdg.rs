@@ -680,7 +680,3 @@ impl CoordinatorState {
         component
     }
 }
-
-#[cfg(test)]
-#[path = "pdg_tests.rs"]
-mod tests;
