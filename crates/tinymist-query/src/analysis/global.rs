@@ -602,6 +602,24 @@ pub struct SharedContext {
     slot: Arc<RevisionSlot<AnalysisRevSlot>>,
 }
 
+/// Extracts one member's result from a complete component batch.
+fn component_member<T: Clone>(
+    kind: &str,
+    component: &AnalysisComponent,
+    result: &FxHashMap<TypstFileId, T>,
+    fid: TypstFileId,
+) -> T {
+    result
+        .get(&fid)
+        .unwrap_or_else(|| {
+            panic!(
+                "{kind} component {:?} is missing requested file {fid:?}",
+                component.members
+            )
+        })
+        .clone()
+}
+
 impl SharedContext {
     pub(super) fn components(&self) -> &ComponentCoordinator {
         &self.slot.components
@@ -1017,16 +1035,7 @@ impl SharedContext {
                 continue;
             }
 
-            return result
-                .get(&source.id())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "expression component {:?} is missing requested file {:?}",
-                        component.members,
-                        source.id()
-                    )
-                })
-                .clone();
+            return component_member("expression", &component, &result, source.id());
         }
     }
 
@@ -1070,16 +1079,7 @@ impl SharedContext {
                 if !component.is_current() {
                     continue;
                 }
-                return result
-                    .get(&source.id())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "type component {:?} is missing requested file {:?}",
-                            component.members,
-                            source.id()
-                        )
-                    })
-                    .clone();
+                return component_member("type", &component, result, source.id());
             }
 
             let exprs = self.expr_component(&component);
@@ -1137,16 +1137,7 @@ impl SharedContext {
                     .publish(hash128(&(fid, fingerprint)), info.clone());
             }
 
-            return result
-                .get(&source.id())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "type component {:?} is missing requested file {:?}",
-                        component.members,
-                        source.id()
-                    )
-                })
-                .clone();
+            return component_member("type", &component, &result, source.id());
         }
     }
 

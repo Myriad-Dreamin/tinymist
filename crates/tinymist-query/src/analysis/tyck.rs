@@ -51,36 +51,18 @@ impl TypeEnv {
             "previous type results must cover the complete component or be empty"
         );
 
-        let mut component_vars = FxHashMap::default();
-        if results.is_empty() {
-            for expr in exprs.values().flat_map(|info| info.exports.values()) {
-                let Expr::Decl(decl) = expr else {
-                    continue;
-                };
-                if !decl.file_id().is_some_and(|fid| component.contains(&fid)) {
-                    continue;
-                }
-                component_vars.entry(decl.clone()).or_insert_with(|| {
-                    TypeVarBounds::new(
-                        TypeVar {
-                            name: decl.name().clone(),
-                            def: decl.clone(),
-                        },
-                        DynTypeBounds::default(),
-                    )
-                });
-            }
-        }
-
         Self {
             ctx,
             component,
             exprs,
             results,
-            component_vars,
+            component_vars: FxHashMap::default(),
         }
     }
 
+    /// Returns the type variable shared by every member of the component for
+    /// an in-component declaration. The variable is created by whichever
+    /// member first references the declaration.
     fn component_var(&mut self, decl: &DeclExpr) -> Option<TypeVarBounds> {
         let fid = decl.file_id()?;
         if !self.component.contains(&fid) {
