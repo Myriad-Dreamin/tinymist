@@ -416,12 +416,17 @@ impl NameBone {
 }
 
 /// The state of a type variable (bounds of some type in program).
+///
+/// The bound sets iterate in content order. [`Interned`] hashes by pointer
+/// address, so a hash-based set would iterate in allocation order, which
+/// depends on thread scheduling; checker invocation order over the bounds
+/// would then leak scheduling into inferred types.
 #[derive(Clone, Default)]
 pub struct DynTypeBounds {
     /// The lower bounds
-    pub lbs: rpds::HashTrieSetSync<Ty>,
+    pub lbs: rpds::RedBlackTreeSetSync<Ty>,
     /// The upper bounds
-    pub ubs: rpds::HashTrieSetSync<Ty>,
+    pub ubs: rpds::RedBlackTreeSetSync<Ty>,
 }
 
 impl From<TypeBounds> for DynTypeBounds {
@@ -537,9 +542,48 @@ impl PartialOrd for Interned<InsTy> {
 
 /// Since we compare values by pointer ([`ptr_cmp`]), only interned instances
 /// are comparable.
+///
+/// Distinct instances with equal values are tie-broken by their syntax
+/// source content, so ordered collections do not collapse two instances that
+/// pointer equality keeps apart.
 impl Ord for Interned<InsTy> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
         cmp_value(&self.val, &other.val)
+            .then_with(|| cmp_type_source(&self.syntax, &other.syntax))
+    }
+}
+
+/// Orders syntax sources by stable content. Span identities are not used:
+/// they embed file ids assigned in interning order, which depends on thread
+/// scheduling.
+fn cmp_type_source(
+    x: &Option<Interned<TypeSource>>,
+    y: &Option<Interned<TypeSource>>,
+) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (x, y) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => {
+            if x == y {
+                return Ordering::Equal;
+            }
+            let file = |source: &TypeSource| {
+                source.name_node.span().id().map(|fid| format!("{fid:?}"))
+            };
+            file(x)
+                .cmp(&file(y))
+                .then_with(|| {
+                    let x_name = x.name_node.clone().into_text();
+                    let y_name = y.name_node.clone().into_text();
+                    x_name.cmp(&y_name)
+                })
+                .then_with(|| x.doc.cmp(&y.doc))
+        }
     }
 }
 
@@ -871,8 +915,7 @@ pub struct TypeVar {
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // todo: buggy
-        self.def.cmp(&other.def)
+        self.def.strict_cmp(&other.def)
     }
 }
 

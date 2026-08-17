@@ -749,14 +749,12 @@ impl Decl {
 
 impl Ord for Decl {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        let base = match (self, other) {
-            (Self::Generated(l), Self::Generated(r)) => l.0.0.cmp(&r.0.0),
-            (Self::Module(l), Self::Module(r)) => l.fid.into_raw().cmp(&r.fid.into_raw()),
-            (Self::Docs(l), Self::Docs(r)) => l.var.cmp(&r.var).then_with(|| l.base.cmp(&r.base)),
-            _ => self.span().into_raw().cmp(&other.span().into_raw()),
-        };
-
-        base.then_with(|| self.name().cmp(other.name()))
+        // Raw file-id and span identities are assigned in interning order,
+        // which depends on thread scheduling. Every ordered collection and
+        // sort over declarations (and types containing them) must therefore
+        // use the content-stable comparison, or inferred results change
+        // between runs.
+        self.strict_cmp(other)
     }
 }
 
@@ -785,6 +783,13 @@ impl Decl {
 
 impl StrictCmp for TypstFileId {
     fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // Identical ids need no path comparison; this keeps the common
+        // same-file case cheap now that the default `Decl` ordering is
+        // content-stable.
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
+
         fn root_cmp(left: &VirtualRoot, right: &VirtualRoot) -> std::cmp::Ordering {
             match (left, right) {
                 (VirtualRoot::Project, VirtualRoot::Project) => std::cmp::Ordering::Equal,
