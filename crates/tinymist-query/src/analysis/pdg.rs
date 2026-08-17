@@ -617,7 +617,11 @@ impl CoordinatorState {
         let mut members = Vec::new();
         let mut has_unresolved_outgoing = false;
         for group in roots {
-            match self.groups.remove(&group).expect("a merged group must be live") {
+            match self
+                .groups
+                .remove(&group)
+                .expect("a merged group must be live")
+            {
                 Group::Open {
                     members: group_members,
                     has_unresolved_outgoing: group_has_unresolved,
