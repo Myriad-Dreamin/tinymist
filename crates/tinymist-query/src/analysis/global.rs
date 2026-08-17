@@ -874,9 +874,14 @@ impl SharedContext {
             return None;
         }
 
+        // One consistent snapshot of the dependency identities; None means a
+        // concurrent merge retracted this owner, and expr_stage retries from
+        // the fresh component.
+        let deps = self.slot.components.member_dependencies(component)?;
+
         let mut previous = FxHashMap::default();
         for source in sources {
-            let key = self.expr_history_key(component, source);
+            let key = Self::expr_history_key(source, component, &deps);
             let info = self.slot.expr_stage.previous(&key)?;
             if info.fid != source.id()
                 || info.source.lines().len_bytes() != source.lines().len_bytes()
@@ -915,18 +920,14 @@ impl SharedContext {
         Some(previous)
     }
 
-    fn expr_history_key(&self, component: &AnalysisComponent, source: &Source) -> u128 {
-        let dependencies = self
-            .slot
-            .components
-            .direct_dependencies(source.id())
-            .unwrap_or_else(|| {
-                panic!(
-                    "sealed expression component has no dependency identity for {:?}",
-                    source.id()
-                )
-            });
-        hash128(&(source, component.members.as_ref(), dependencies))
+    /// Builds one member's expression history key from a dependency snapshot
+    /// taken while `component` owned its group.
+    fn expr_history_key(
+        source: &Source,
+        component: &AnalysisComponent,
+        deps: &FxHashMap<TypstFileId, Vec<TypstFileId>>,
+    ) -> u128 {
+        hash128(&(source, component.members.as_ref(), &deps[&source.id()]))
     }
 
     /// Hashes every current expression input that can affect a component's
@@ -1010,14 +1011,17 @@ impl SharedContext {
             .clone();
 
         // A late dynamic edge can redirect this owner to a fresh SCC while the
-        // initializer is running. The old batch is complete, but obsolete, so
-        // it must never enter revision history.
-        if component.is_current() {
+        // initializer is running. The old batch is complete, but obsolete —
+        // its same-component imports used no-wait fallbacks — so it must
+        // never enter revision history. The ownership check, the dependency
+        // identity reads, and the batch publication run in one critical
+        // section so no merge can interleave between them.
+        self.slot.components.commit_current(component, |deps| {
             for info in result.values() {
-                let key = self.expr_history_key(component, &info.source);
+                let key = Self::expr_history_key(&info.source, component, deps);
                 self.slot.expr_stage.publish(key, info.clone());
             }
-        }
+        });
 
         result
     }
@@ -1126,15 +1130,19 @@ impl SharedContext {
                 })
                 .clone();
 
-            if !component.is_current() {
-                continue;
-            }
-
             // Publish history only after the complete current batch is ready.
-            for (&fid, info) in result.iter() {
-                self.slot
-                    .type_check
-                    .publish(hash128(&(fid, fingerprint)), info.clone());
+            // The ownership check and the publication run in one critical
+            // section so a merged-away owner never publishes an obsolete
+            // batch.
+            let published = self.slot.components.commit_current(&component, |_deps| {
+                for (&fid, info) in result.iter() {
+                    self.slot
+                        .type_check
+                        .publish(hash128(&(fid, fingerprint)), info.clone());
+                }
+            });
+            if published.is_none() {
+                continue;
             }
 
             return component_member("type", &component, &result, source.id());

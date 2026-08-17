@@ -93,9 +93,12 @@ impl AnalysisComponent {
 
     /// Whether this batch still owns its component.
     ///
-    /// [`CoordinatorState::merge`] retracts a sealed component in the same
-    /// critical section that relabels its members to the fresh owner, so an
-    /// obsolete batch is detected atomically with the ownership change.
+    /// This flag is advisory: a merge can retract the owner the instant after
+    /// it is read. Retry loops use it to discard obsolete batches cheaply.
+    /// Anything whose correctness depends on ownership — reading dependency
+    /// identities or publishing a batch to revision history — must instead go
+    /// through [`ComponentCoordinator::commit_current`], which verifies
+    /// ownership and runs the action in one critical section.
     pub(super) fn is_current(&self) -> bool {
         !self.retracted.load(Ordering::Acquire)
     }
@@ -274,10 +277,37 @@ impl ComponentCoordinator {
         self.state.lock().reachable_files(root)
     }
 
-    /// Returns the dependency identities captured when `source` was
-    /// discovered, but only after its component graph has been sealed.
-    pub(super) fn direct_dependencies(&self, source: FileId) -> Option<Vec<FileId>> {
-        self.state.lock().direct_dependencies(source)
+    /// Runs `commit` iff `component` still owns its sealed group, in one
+    /// critical section on the graph mutex.
+    ///
+    /// Ownership is verified by pointer identity against the live group, and
+    /// `commit` receives every member's discovery-time dependency identities.
+    /// Because [`CoordinatorState::merge`] retracts owners under the same
+    /// mutex, no merge can interleave between the ownership check, the
+    /// dependency reads, and whatever `commit` publishes. Returns `None`
+    /// without calling `commit` when the component no longer owns its group.
+    pub(super) fn commit_current<R>(
+        &self,
+        component: &Arc<AnalysisComponent>,
+        commit: impl FnOnce(&FxHashMap<FileId, Vec<FileId>>) -> R,
+    ) -> Option<R> {
+        let state = self.state.lock();
+        if !state.owns_group(component) {
+            return None;
+        }
+        Some(commit(&state.member_dependencies(component)))
+    }
+
+    /// Returns one consistent snapshot of every member's discovery-time
+    /// dependency identities, or `None` when `component` was retracted.
+    pub(super) fn member_dependencies(
+        &self,
+        component: &Arc<AnalysisComponent>,
+    ) -> Option<FxHashMap<FileId, Vec<FileId>>> {
+        let state = self.state.lock();
+        state
+            .owns_group(component)
+            .then(|| state.member_dependencies(component))
     }
 }
 
@@ -542,12 +572,34 @@ impl CoordinatorState {
         result
     }
 
-    fn direct_dependencies(&self, source: FileId) -> Option<Vec<FileId>> {
-        let group = *self.files.get(&source)?;
-        if !matches!(self.groups[&group], Group::Sealed { .. }) {
-            return None;
-        }
-        self.dependencies.get(&source).cloned()
+    /// Whether `component` is still the sealed owner of its members' group,
+    /// verified by pointer identity against the live group map.
+    fn owns_group(&self, component: &Arc<AnalysisComponent>) -> bool {
+        let Some(&group) = self.files.get(&component.members[0]) else {
+            return false;
+        };
+        matches!(
+            &self.groups[&group],
+            Group::Sealed { component: current, .. } if Arc::ptr_eq(current, component)
+        )
+    }
+
+    /// Snapshots every member's discovery-time dependency identities.
+    ///
+    /// Only meaningful while the caller has verified ownership under the same
+    /// lock guard; sealing guarantees every member has been discovered.
+    fn member_dependencies(&self, component: &AnalysisComponent) -> FxHashMap<FileId, Vec<FileId>> {
+        component
+            .members
+            .iter()
+            .map(|&fid| {
+                let dependencies = self
+                    .dependencies
+                    .get(&fid)
+                    .expect("a sealed member must have committed dependencies");
+                (fid, dependencies.clone())
+            })
+            .collect()
     }
 
     fn add_edge(&mut self, source: FileId, target: FileId) {
@@ -564,18 +616,56 @@ impl CoordinatorState {
 
         // The new edge closes at least one cycle. Its region is every group
         // that the edge target reaches and that reaches the edge source back.
-        // Cycle-closing edges are rare and merge only this small region, so
-        // each candidate runs its own forward search instead of the state
-        // maintaining a reverse edge index.
-        let cycle: FxHashSet<_> = forward
-            .iter()
-            .copied()
-            .filter(|&group| self.reachable_set(group).contains(&source))
-            .collect();
+        // The reverse index is built once per closing edge and restricted to
+        // `forward`, so a long chain closing a cycle stays O(V + E) instead
+        // of degrading to one forward search per candidate group.
+        let backward = self.reverse_reachable_set(source, &forward);
+        let cycle: FxHashSet<_> = forward.intersection(&backward).copied().collect();
 
         debug_assert!(cycle.contains(&source));
         debug_assert!(cycle.contains(&target));
         self.merge(cycle);
+    }
+
+    fn reverse_reachable_set(
+        &self,
+        start: ComponentId,
+        within: &FxHashSet<ComponentId>,
+    ) -> FxHashSet<ComponentId> {
+        let mut reverse_edges = FxHashMap::<ComponentId, Vec<ComponentId>>::default();
+
+        for (&source, dependencies) in &self.dependencies {
+            let Some(&source_group) = self.files.get(&source) else {
+                continue;
+            };
+            if !within.contains(&source_group) {
+                continue;
+            }
+
+            for &dependency in dependencies {
+                let Some(&target_group) = self.files.get(&dependency) else {
+                    continue;
+                };
+                if within.contains(&target_group) && source_group != target_group {
+                    reverse_edges
+                        .entry(target_group)
+                        .or_default()
+                        .push(source_group);
+                }
+            }
+        }
+
+        let mut reached = FxHashSet::from_iter([start]);
+        let mut pending = vec![start];
+        while let Some(group) = pending.pop() {
+            for &predecessor in reverse_edges.get(&group).into_iter().flatten() {
+                if reached.insert(predecessor) {
+                    pending.push(predecessor);
+                }
+            }
+        }
+
+        reached
     }
 
     fn reachable_set(&self, start: ComponentId) -> FxHashSet<ComponentId> {
@@ -678,5 +768,59 @@ impl CoordinatorState {
             },
         );
         component
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use typst::syntax::{RootedPath, VirtualPath, VirtualRoot};
+
+    use super::*;
+
+    fn file(name: &str) -> FileId {
+        FileId::new(RootedPath::new(
+            VirtualRoot::Project,
+            VirtualPath::new(name).expect("test path must be valid"),
+        ))
+    }
+
+    #[test]
+    fn commit_current_is_linearized_with_late_cycle_merges() {
+        let a = file("commit-late-cycle-a.typ");
+        let b = file("commit-late-cycle-b.typ");
+        let coordinator = ComponentCoordinator::default();
+        let component_a = coordinator.component_for(a, |_| DependencyDiscovery {
+            dependencies: vec![],
+            has_unresolved: true,
+        });
+        let component_b = coordinator.component_for(b, |fid| {
+            assert_eq!(fid, b);
+            vec![a]
+        });
+
+        let deps_a = coordinator
+            .commit_current(&component_a, |deps| deps.clone())
+            .expect("the sealed owner must be committable");
+        assert_eq!(deps_a.get(&a), Some(&vec![]));
+
+        // The late back edge merges both sealed owners into a fresh group; a
+        // commit racing with the merge must observe the retraction.
+        assert_eq!(
+            coordinator.record_dependency(a, b),
+            DependencyAdmission::SameComponent
+        );
+        assert!(coordinator.commit_current(&component_a, |_| ()).is_none());
+        assert!(coordinator.commit_current(&component_b, |_| ()).is_none());
+        assert!(coordinator.member_dependencies(&component_a).is_none());
+
+        let merged = coordinator.component_for(a, |_| -> Vec<FileId> {
+            panic!("all members of the late cycle were already discovered")
+        });
+        let deps = coordinator
+            .member_dependencies(&merged)
+            .expect("the fresh owner must provide a dependency snapshot");
+        assert_eq!(deps.get(&a), Some(&vec![b]));
+        assert_eq!(deps.get(&b), Some(&vec![a]));
+        assert!(coordinator.commit_current(&merged, |_| ()).is_some());
     }
 }
