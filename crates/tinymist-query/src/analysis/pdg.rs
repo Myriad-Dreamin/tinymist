@@ -288,7 +288,7 @@ impl ComponentCoordinator {
     /// without calling `commit` when the component no longer owns its group.
     pub(super) fn commit_current<R>(
         &self,
-        component: &Arc<AnalysisComponent>,
+        component: &AnalysisComponent,
         commit: impl FnOnce(&FxHashMap<FileId, Vec<FileId>>) -> R,
     ) -> Option<R> {
         let state = self.state.lock();
@@ -302,7 +302,7 @@ impl ComponentCoordinator {
     /// dependency identities, or `None` when `component` was retracted.
     pub(super) fn member_dependencies(
         &self,
-        component: &Arc<AnalysisComponent>,
+        component: &AnalysisComponent,
     ) -> Option<FxHashMap<FileId, Vec<FileId>>> {
         let state = self.state.lock();
         state
@@ -574,13 +574,14 @@ impl CoordinatorState {
 
     /// Whether `component` is still the sealed owner of its members' group,
     /// verified by pointer identity against the live group map.
-    fn owns_group(&self, component: &Arc<AnalysisComponent>) -> bool {
+    fn owns_group(&self, component: &AnalysisComponent) -> bool {
         let Some(&group) = self.files.get(&component.members[0]) else {
             return false;
         };
         matches!(
             &self.groups[&group],
-            Group::Sealed { component: current, .. } if Arc::ptr_eq(current, component)
+            Group::Sealed { component: current, .. }
+                if std::ptr::eq(Arc::as_ptr(current), component)
         )
     }
 
