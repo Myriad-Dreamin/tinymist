@@ -551,8 +551,7 @@ impl Ord for Interned<InsTy> {
         if self == other {
             return std::cmp::Ordering::Equal;
         }
-        cmp_value(&self.val, &other.val)
-            .then_with(|| cmp_type_source(&self.syntax, &other.syntax))
+        cmp_value(&self.val, &other.val).then_with(|| cmp_type_source(&self.syntax, &other.syntax))
     }
 }
 
@@ -572,9 +571,8 @@ fn cmp_type_source(
             if x == y {
                 return Ordering::Equal;
             }
-            let file = |source: &TypeSource| {
-                source.name_node.span().id().map(|fid| format!("{fid:?}"))
-            };
+            let file =
+                |source: &TypeSource| source.name_node.span().id().map(|fid| format!("{fid:?}"));
             file(x)
                 .cmp(&file(y))
                 .then_with(|| x.name().cmp(&y.name()))
