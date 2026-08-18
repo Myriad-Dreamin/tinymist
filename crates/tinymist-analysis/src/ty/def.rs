@@ -619,9 +619,7 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 .then_with(|| x.abs.em.cmp(&y.abs.em))
         }),
         (Value::Func(x), Value::Func(y)) => cmp_func(x, y),
-        (Value::Args(x), Value::Args(y)) => {
-            x.span.strict_cmp(&y.span).then_with(|| repr_cmp(x, y))
-        }
+        (Value::Args(x), Value::Args(y)) => x.span.strict_cmp(&y.span).then_with(|| repr_cmp(x, y)),
         (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
             (Some(x), Some(y)) => x.strict_cmp(&y),
             (Some(..), None) => std::cmp::Ordering::Less,
