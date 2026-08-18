@@ -758,9 +758,10 @@ impl Ord for Decl {
     }
 }
 
-trait StrictCmp {
-    /// Low-performance comparison but it is free from the concurrency issue.
-    /// This is only used for making stable test snapshots.
+pub(crate) trait StrictCmp {
+    /// Compares by stable content instead of raw interned identity, which is
+    /// assigned in interning order and therefore depends on thread
+    /// scheduling.
     fn strict_cmp(&self, other: &Self) -> std::cmp::Ordering;
 }
 

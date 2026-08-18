@@ -13,7 +13,7 @@ use parking_lot::{Mutex, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::{Content, Element, ParamInfo, Type, Value},
+    foundations::{Content, Element, ParamInfo, Repr, Type, Value},
     syntax::{FileId, Span, SyntaxKind, SyntaxNode, ast},
 };
 
@@ -21,7 +21,7 @@ use super::{BoundPred, BuiltinTy, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     docs::{DocText, UntypedDefDocs},
-    syntax::{DeclExpr, UnaryOp},
+    syntax::{DeclExpr, UnaryOp, def::StrictCmp},
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -532,16 +532,15 @@ pub struct InsTy {
 /// For example, a float instance which is NaN.
 impl Eq for InsTy {}
 
-/// Since we compare values by pointer ([`ptr_cmp`]), only interned instances
-/// are comparable.
+/// Orders instances by stable value content; see [`Ord`] on this type.
 impl PartialOrd for Interned<InsTy> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-/// Since we compare values by pointer ([`ptr_cmp`]), only interned instances
-/// are comparable.
+/// Orders instances by stable value content ([`cmp_value`]), never by raw
+/// interned identity or address.
 ///
 /// Distinct instances with equal values are tie-broken by their syntax
 /// source content, so ordered collections do not collapse two instances that
@@ -604,7 +603,7 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
         (Value::Version(x), Value::Version(y)) => x.cmp(y),
         (Value::Bytes(x), Value::Bytes(y)) => x.cmp(y),
         (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
-        (Value::Type(x), Value::Type(y)) => x.cmp(y),
+        (Value::Type(x), Value::Type(y)) => x.long_name().cmp(y.long_name()),
         (Value::None, Value::None) | (Value::Auto, Value::Auto) => std::cmp::Ordering::Equal,
         (Value::Array(x), Value::Array(y)) => cmp_by(x.iter(), y.iter(), cmp_value),
         (Value::Dict(x), Value::Dict(y)) => cmp_by(x.iter(), y.iter(), |(xk, xv), (yk, yv)| {
@@ -619,42 +618,51 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 .cmp(&y.abs.abs)
                 .then_with(|| x.abs.em.cmp(&y.abs.em))
         }),
-        (Value::Func(x), Value::Func(y)) => {
-            if !x.span().is_detached() && !y.span().is_detached() {
-                return x.span().into_raw().cmp(&y.span().into_raw());
-            }
-
-            use typst::foundations::FuncInner;
-            match (x.inner(), y.inner()) {
-                (FuncInner::Element(x), FuncInner::Element(y)) => x.cmp(y),
-                _ => ptr_cmp(x, y),
-            }
-        }
+        (Value::Func(x), Value::Func(y)) => cmp_func(x, y),
         (Value::Args(x), Value::Args(y)) => {
-            if !x.span.is_detached() && !y.span.is_detached() {
-                return x.span.into_raw().cmp(&y.span.into_raw());
-            }
-
-            ptr_cmp(x, y)
+            x.span.strict_cmp(&y.span).then_with(|| repr_cmp(x, y))
         }
         (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
-            (Some(x), Some(y)) => x.into_raw().cmp(&y.into_raw()),
+            (Some(x), Some(y)) => x.strict_cmp(&y),
             (Some(..), None) => std::cmp::Ordering::Less,
             (None, Some(..)) => std::cmp::Ordering::Greater,
-            (None, None) => ptr_cmp(x, y),
+            (None, None) => repr_cmp(x, y),
         },
         (Value::Datetime(x), Value::Datetime(y)) => {
-            x.partial_cmp(y).unwrap_or_else(|| ptr_cmp(x, y))
+            x.partial_cmp(y).unwrap_or_else(|| repr_cmp(x, y))
         }
-        (Value::Color(x), Value::Color(y)) => ptr_cmp(x, y),
-        (Value::Gradient(x), Value::Gradient(y)) => ptr_cmp(x, y),
-        (Value::Tiling(x), Value::Tiling(y)) => ptr_cmp(x, y),
-        (Value::Symbol(x), Value::Symbol(y)) => ptr_cmp(x, y),
-        (Value::Content(x), Value::Content(y)) => ptr_cmp(x, y),
-        (Value::Styles(x), Value::Styles(y)) => ptr_cmp(x, y),
-        (Value::Dyn(x), Value::Dyn(y)) => ptr_cmp(x, y),
-        _ => ptr_cmp(x, y),
+        (Value::Color(x), Value::Color(y)) => repr_cmp(x, y),
+        (Value::Gradient(x), Value::Gradient(y)) => repr_cmp(x, y),
+        (Value::Tiling(x), Value::Tiling(y)) => repr_cmp(x, y),
+        (Value::Symbol(x), Value::Symbol(y)) => repr_cmp(x, y),
+        (Value::Content(x), Value::Content(y)) => repr_cmp(x, y),
+        (Value::Styles(x), Value::Styles(y)) => repr_cmp(x, y),
+        (Value::Dyn(x), Value::Dyn(y)) => repr_cmp(x, y),
+        _ => x.repr().cmp(&y.repr()),
     }
+}
+
+/// Compares functions by content-stable identity: the name, the source
+/// location, and finally the display representation. Raw span and pointer
+/// identities depend on interning and allocation order, which vary with
+/// thread scheduling and across processes.
+fn cmp_func(x: &typst::foundations::Func, y: &typst::foundations::Func) -> std::cmp::Ordering {
+    use typst::foundations::FuncInner;
+    x.name()
+        .cmp(&y.name())
+        .then_with(|| x.span().strict_cmp(&y.span()))
+        .then_with(|| match (x.inner(), y.inner()) {
+            (FuncInner::Element(x), FuncInner::Element(y)) => x.name().cmp(y.name()),
+            _ => repr_cmp(x, y),
+        })
+}
+
+/// Compares by display representation as the content-stable last resort.
+/// Distinct values with an identical representation compare equal; an
+/// ordered collection may then keep only one of them, which is acceptable
+/// because they also render identically everywhere the type is shown.
+fn repr_cmp<T: Repr>(x: &T, y: &T) -> std::cmp::Ordering {
+    x.repr().cmp(&y.repr())
 }
 
 fn cmp_by<T>(
@@ -708,16 +716,6 @@ fn val_discriminant(val: &Value) -> TypstValueEnum {
         Value::Styles(..) => TypstValueEnum::Styles,
         Value::Type(..) => TypstValueEnum::Type,
         Value::Dyn(..) => TypstValueEnum::Dyn,
-    }
-}
-
-fn ptr_cmp<T: PartialEq>(x: &T, y: &T) -> std::cmp::Ordering {
-    if x == y {
-        std::cmp::Ordering::Equal
-    } else {
-        let x = std::ptr::from_ref(x);
-        let y = std::ptr::from_ref(y);
-        x.cmp(&y)
     }
 }
 
