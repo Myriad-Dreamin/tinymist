@@ -570,10 +570,9 @@ fn cmp_type_source(
             if x == y {
                 return Ordering::Equal;
             }
-            let file =
-                |source: &TypeSource| source.name_node.span().id().map(|fid| format!("{fid:?}"));
+            let file = |source: &TypeSource| source.name_node.span().id();
             file(x)
-                .cmp(&file(y))
+                .strict_cmp(&file(y))
                 .then_with(|| x.name().cmp(&y.name()))
                 .then_with(|| x.doc.cmp(&y.doc))
         }
@@ -640,15 +639,23 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
     }
 }
 
-/// Compares functions by content-stable identity: the name, the source
-/// location, and finally the display representation. Raw span and pointer
-/// identities depend on interning and allocation order, which vary with
-/// thread scheduling and across processes.
+/// Compares functions by content-stable identity: the name, source location,
+/// definition site, and finally the display representation. Raw span and
+/// pointer identities depend on interning and allocation order, which vary
+/// with thread scheduling and across processes. The definition site is needed
+/// because native methods with different receivers share a name and detached
+/// span (for example, `array.at` and `str.at`).
 fn cmp_func(x: &typst::foundations::Func, y: &typst::foundations::Func) -> std::cmp::Ordering {
     use typst::foundations::FuncInner;
     x.name()
         .cmp(&y.name())
         .then_with(|| x.span().strict_cmp(&y.span()))
+        .then_with(|| match (x.def_site(), y.def_site()) {
+            (Some(x), Some(y)) => x.path.cmp(y.path).then_with(|| x.key.cmp(y.key)),
+            (Some(..), None) => std::cmp::Ordering::Less,
+            (None, Some(..)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        })
         .then_with(|| match (x.inner(), y.inner()) {
             (FuncInner::Element(x), FuncInner::Element(y)) => x.name().cmp(y.name()),
             _ => repr_cmp(x, y),
@@ -1710,6 +1717,35 @@ mod tests {
         let ty = Ty::Builtin(BuiltinTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
+    }
+
+    #[test]
+    fn native_method_order_uses_definition_site() {
+        use super::*;
+        use typst::foundations::{Array, Bytes, Dict, Str, Type, Value, Version};
+
+        fn method(ty: Type, name: &str) -> typst::foundations::Func {
+            match ty.scope().get(name).expect("native method").read() {
+                Value::Func(func) => func.clone(),
+                _ => panic!("native method is not a function"),
+            }
+        }
+
+        let methods = [
+            method(Type::of::<Array>(), "at"),
+            method(Type::of::<Bytes>(), "at"),
+            method(Type::of::<Dict>(), "at"),
+            method(Type::of::<Str>(), "at"),
+            method(Type::of::<Version>(), "at"),
+        ];
+
+        for (idx, lhs) in methods.iter().enumerate() {
+            for rhs in &methods[idx + 1..] {
+                assert_ne!(lhs, rhs);
+                assert_ne!(cmp_func(lhs, rhs), std::cmp::Ordering::Equal);
+                assert_eq!(cmp_func(lhs, rhs), cmp_func(rhs, lhs).reverse());
+            }
+        }
     }
 
     #[test]
