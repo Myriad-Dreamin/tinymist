@@ -367,10 +367,9 @@ typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = 
 # reflexo-typst = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "bd58ec034584828c272fac1b842acad5b1d79e61" }
 # reflexo-vec2svg = { git = "https://github.com/Myriad-Dreamin/typst.ts.git", rev = "bd58ec034584828c272fac1b842acad5b1d79e61" }
 
-# These patches use local `reflexo` for development.
-# reflexo = { path = "../typst.ts/crates/reflexo/" }
-# reflexo-typst = { path = "../typst.ts/crates/reflexo-typst/" }
-# reflexo-vec2svg = { path = "../typst.ts/crates/conversion/vec2svg/" }
+reflexo = { git = "https://github.com/syrkis/typst.ts.git", rev = "aff5118373569e25a01ce68ce65fd96472bd369f" }
+reflexo-typst = { git = "https://github.com/syrkis/typst.ts.git", rev = "aff5118373569e25a01ce68ce65fd96472bd369f" }
+reflexo-vec2svg = { git = "https://github.com/syrkis/typst.ts.git", rev = "aff5118373569e25a01ce68ce65fd96472bd369f" }
 
 typst-shim = { path = "crates/typst-shim" }
 tinymist-analysis = { path = "crates/tinymist-analysis" }
