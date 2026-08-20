@@ -26,12 +26,47 @@ export type ExportKind =
 
 export function exportActivate(context: IContext) {
   context.subscriptions.push(
-    commands.registerCommand("tinymist.exportCurrentPdf", () => commandExport("Pdf")),
+    commands.registerCommand("tinymist.exportCurrentPdf", commandExportCurrentPdf),
+    commands.registerCommand("tinymist.exportCurrentPdfFromContext", commandExportCurrentPdf),
     commands.registerCommand("tinymist.export", commandExport),
     commands.registerCommand("tinymist.exportCurrentFile", commandAskAndExport),
     commands.registerCommand("tinymist.showPdf", () => commandShow("Pdf")),
     commands.registerCommand("tinymist.exportCurrentFileAndShow", commandAskAndShow),
   );
+}
+
+export async function commandExportCurrentPdf(): Promise<ExportResponse | null> {
+  let exportResponse: ExportResponse | null;
+  try {
+    exportResponse = await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Window,
+        title: l10nMsg("Exporting PDF"),
+      },
+      async () => await commandExport("Pdf"),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await vscode.window.showErrorMessage(
+      l10nMsg("Failed to export PDF: {message}", { message }),
+    );
+    return null;
+  }
+
+  if (!exportResponse) {
+    await vscode.window.showErrorMessage(l10nMsg("Failed to export PDF"));
+    return null;
+  }
+
+  if ("path" in exportResponse && exportResponse.path) {
+    await vscode.window.showInformationMessage(
+      l10nMsg("Exported successfully to: {path}", { path: exportResponse.path }),
+    );
+  } else {
+    await vscode.window.showInformationMessage(l10nMsg("Export completed"));
+  }
+
+  return exportResponse;
 }
 
 export interface QuickExportFormatMeta {

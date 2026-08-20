@@ -85,6 +85,11 @@ vi = "Xuất tệp đã mở dưới dạng PDF"
 zh = "将当前打开的文件导出为 PDF"
 zh-TW = "將當前打開的文件導出為 PDF"
 
+[extension.tinymist.command.tinymist.exportCurrentPdfFromContext]
+en = "Typst: Export as PDF"
+zh = "Typst：导出为 PDF"
+zh-TW = "Typst：匯出為 PDF"
+
 [extension.tinymist.command.tinymist.pinMainToCurrent]
 en = "Pin the Main File to the Currently Open Document"
 ar = "تثبيت الملف الرئيسي على المستند المفتوح"

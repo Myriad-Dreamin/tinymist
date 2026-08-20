@@ -1300,6 +1300,10 @@
         "category": "Typst"
       },
       {
+        "command": "tinymist.exportCurrentPdfFromContext",
+        "title": "%extension.tinymist.command.tinymist.exportCurrentPdfFromContext%"
+      },
+      {
         "command": "tinymist.pinMainToCurrent",
         "title": "%extension.tinymist.command.tinymist.pinMainToCurrent%",
         "category": "Typst"
@@ -1490,6 +1494,10 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "tinymist.exportCurrentPdfFromContext",
+          "when": "false"
+        },
+        {
           "command": "tinymist.exportCurrentPdf",
           "when": "editorLangId == typst"
         },
@@ -1535,6 +1543,11 @@
         }
       ],
       "editor/context": [
+        {
+          "command": "tinymist.exportCurrentPdfFromContext",
+          "when": "resourceLangId == typst && editorTextFocus",
+          "group": "1_modification@100"
+        },
         {
           "command": "tinymist.copyAnsiHighlight",
           "when": "resourceLangId == typst && editorTextFocus",

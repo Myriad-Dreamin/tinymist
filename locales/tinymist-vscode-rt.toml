@@ -56,6 +56,10 @@ zh = "合并页面并导出为单个 PNG"
 en = "Export as a single SVG by merging pages"
 zh = "合并页面并导出为单个 SVG"
 
+["Export completed"]
+en = "Export completed"
+zh = "导出完成"
+
 ["Export the specified pages as multiple PNGs"]
 en = "Export the specified pages as multiple PNGs"
 zh = "将指定页面导出为多个单独 PNG"
@@ -63,6 +67,22 @@ zh = "将指定页面导出为多个单独 PNG"
 ["Export the specified pages as multiple SVGs"]
 en = "Export the specified pages as multiple SVGs"
 zh = "将指定页面导出为多个单独 SVG"
+
+["Exported successfully to: {path}"]
+en = "Exported successfully to: {path}"
+zh = "已成功导出到：{path}"
+
+["Exporting PDF"]
+en = "Exporting PDF"
+zh = "正在导出 PDF"
+
+["Failed to export PDF"]
+en = "Failed to export PDF"
+zh = "PDF 导出失败"
+
+["Failed to export PDF: {message}"]
+en = "Failed to export PDF: {message}"
+zh = "PDF 导出失败：{message}"
 
 ["Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."]
 en = "Hint: you can create and find local packages in the sidebar. See https://github.com/Myriad-Dreamin/tinymist/tree/bc15eb55cee9f9b048aafd5f22472894961a1f51/editors/vscode/e2e-workspaces/ieee-paper for more information."
