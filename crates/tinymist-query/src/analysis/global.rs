@@ -34,7 +34,10 @@ use typst::syntax::{Span, VirtualPath};
 use typst_shim::eval::{Eval, eval_compat};
 use typst_shim::syntax::VirtualPathExt;
 
-use super::{LspQuerySnapshot, TypeEnv};
+use super::{
+    AnalysisComponent, ComponentCoordinator, DependencyAdmission, ExprStage, LspQuerySnapshot,
+    type_check_component,
+};
 use crate::adt::revision::{RevisionLock, RevisionManager, RevisionManagerLike, RevisionSlot};
 use crate::analysis::prelude::*;
 use crate::analysis::{
@@ -44,9 +47,8 @@ use crate::analysis::{
 };
 use crate::docs::{DefDocs, TidyModuleDocs};
 use crate::syntax::{
-    Decl, DefKind, ExprInfo, ExprRoute, LexicalScope, ModuleDependency, SyntaxClass,
-    classify_syntax, construct_module_dependencies, is_mark, resolve_id_by_path,
-    scan_workspace_files,
+    Decl, DefKind, ExprInfo, LexicalScope, ModuleDependency, SyntaxClass, classify_syntax,
+    construct_module_dependencies, is_mark, resolve_id_by_path, scan_workspace_files,
 };
 use crate::upstream::{Tooltip, tooltip_};
 use crate::{
@@ -600,7 +602,29 @@ pub struct SharedContext {
     slot: Arc<RevisionSlot<AnalysisRevSlot>>,
 }
 
+/// Extracts one member's result from a complete component batch.
+fn component_member<T: Clone>(
+    kind: &str,
+    component: &AnalysisComponent,
+    result: &FxHashMap<TypstFileId, T>,
+    fid: TypstFileId,
+) -> T {
+    result
+        .get(&fid)
+        .unwrap_or_else(|| {
+            panic!(
+                "{kind} component {:?} is missing requested file {fid:?}",
+                component.members
+            )
+        })
+        .clone()
+}
+
 impl SharedContext {
+    pub(super) fn components(&self) -> &ComponentCoordinator {
+        &self.slot.components
+    }
+
     /// Gets the revision of current analysis
     pub fn revision(&self) -> usize {
         self.slot.revision
@@ -826,62 +850,303 @@ impl SharedContext {
         Some(self.expr_stage(&self.source_by_id(fid).ok()?))
     }
 
-    /// Gets the expression information of a source file.
-    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
-        let mut route = ExprRoute::default();
-        self.expr_stage_(source, &mut route)
-    }
-
-    /// Gets the expression information of a source file.
-    pub(crate) fn expr_stage_(
+    fn previous_expr_component(
         self: &Arc<Self>,
-        source: &Source,
-        route: &mut ExprRoute,
-    ) -> ExprInfo {
-        use crate::syntax::expr_of;
-        let guard = self.query_stat(source.id(), "expr_stage");
-        self.slot.expr_stage.compute(hash128(&source), |prev| {
-            expr_of(self.clone(), source.clone(), route, guard, prev)
-        })
-    }
-
-    pub(crate) fn exports_of(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut ExprRoute,
-    ) -> Option<Arc<LazyHash<LexicalScope>>> {
-        if let Some(s) = route.get(&source.id()) {
-            return s.clone();
+        component: &AnalysisComponent,
+        sources: &[Source],
+    ) -> Option<FxHashMap<TypstFileId, ExprInfo>> {
+        if sources.len() != component.members.len()
+            || sources
+                .iter()
+                .zip(component.members.iter())
+                .any(|(source, member)| source.id() != *member)
+        {
+            return None;
+        }
+        // An unresolved site can select a different target even when its
+        // source text is unchanged. Every member of an SCC has the same
+        // condensation-DAG closure, so one query covers the complete batch.
+        if self
+            .slot
+            .components
+            .has_unresolved_dependencies(component.members[0])
+        {
+            return None;
         }
 
-        Some(self.expr_stage_(source, route).exports.clone())
+        // One consistent snapshot of the dependency identities; None means a
+        // concurrent merge retracted this owner, and expr_stage retries from
+        // the fresh component.
+        let deps = self.slot.components.member_dependencies(component)?;
+
+        let mut previous = FxHashMap::default();
+        for source in sources {
+            let key = Self::expr_history_key(source, component, &deps);
+            let info = self.slot.expr_stage.previous(&key)?;
+            if info.fid != source.id()
+                || info.source.lines().len_bytes() != source.lines().len_bytes()
+                || hash128(&info.source) != hash128(source)
+            {
+                return None;
+            }
+            previous.insert(source.id(), info);
+        }
+
+        // Internal imports are valid because every member source was accepted
+        // as one batch above. Only external completed exports need comparison.
+        for (&importer, info) in &previous {
+            for (&target, old_exports) in &info.imports {
+                match self.dependency_admission(importer, target) {
+                    DependencyAdmission::SameComponent => {
+                        if !previous.contains_key(&target) {
+                            return None;
+                        }
+                    }
+                    DependencyAdmission::Reachable => {
+                        let current = self.expr_stage_by_id(target)?.exports.clone();
+                        if old_exports.size() != current.size()
+                            || hash128(old_exports) != hash128(&current)
+                        {
+                            return None;
+                        }
+                    }
+                    DependencyAdmission::Unresolved | DependencyAdmission::Rejected => {
+                        return None;
+                    }
+                }
+            }
+        }
+
+        Some(previous)
+    }
+
+    /// Builds one member's expression history key from a dependency snapshot
+    /// taken while `component` owned its group.
+    fn expr_history_key(
+        source: &Source,
+        component: &AnalysisComponent,
+        deps: &FxHashMap<TypstFileId, Vec<TypstFileId>>,
+    ) -> u128 {
+        hash128(&(source, component.members.as_ref(), &deps[&source.id()]))
+    }
+
+    /// Hashes every current expression input that can affect a component's
+    /// type results. The component membership is included separately from its
+    /// transitive condensation-DAG closure, so a changed SCC partition also
+    /// invalidates the batch.
+    fn type_component_fingerprint(
+        self: &Arc<Self>,
+        component: &AnalysisComponent,
+        exprs: &FxHashMap<TypstFileId, ExprInfo>,
+    ) -> u128 {
+        let inputs: Vec<_> = self
+            .slot
+            .components
+            .reachable_files(component.members[0])
+            .into_iter()
+            .map(|fid| {
+                let hash = exprs
+                    .get(&fid)
+                    .cloned()
+                    .or_else(|| self.expr_stage_by_id(fid))
+                    .map(|info| hash128(&info));
+                (fid, hash)
+            })
+            .collect();
+
+        hash128(&(component.members.as_ref(), inputs))
+    }
+
+    fn expr_component(
+        self: &Arc<Self>,
+        component: &Arc<AnalysisComponent>,
+    ) -> Arc<FxHashMap<TypstFileId, ExprInfo>> {
+        let result = component
+            .expr_stage
+            .get_or_init(|| {
+                let sources: Vec<_> = component
+                    .members
+                    .iter()
+                    .map(|&fid| {
+                        self.source_by_id(fid).unwrap_or_else(|err| {
+                            panic!(
+                                "sealed expression component contains unreadable {fid:?}: {err:?}"
+                            )
+                        })
+                    })
+                    .collect();
+                if let Some(previous) = self.previous_expr_component(component, &sources) {
+                    return Arc::new(previous);
+                }
+
+                let mut route = ExprStage::new(self.clone(), sources.iter().cloned());
+                let mut result = FxHashMap::default();
+
+                for source in sources {
+                    let info = route.analyze(self.clone(), source.clone());
+                    result.insert(source.id(), info);
+                }
+
+                for (&fid, info) in &result {
+                    for imported in info.imports.keys() {
+                        match self.slot.components.record_dependency(fid, *imported) {
+                            DependencyAdmission::SameComponent
+                            | DependencyAdmission::Reachable => {}
+                            DependencyAdmission::Unresolved => {
+                                crate::log_debug_ct!(
+                                    "expression analysis kept unresolved import {fid:?} -> {imported:?} as no-wait"
+                                );
+                            }
+                            DependencyAdmission::Rejected => {
+                                log::warn!(
+                                    "dependency admission missed import {fid:?} -> {imported:?}; keeping it as no-wait"
+                                );
+                            }
+                        }
+                    }
+                }
+
+                Arc::new(result)
+            })
+            .clone();
+
+        // A late dynamic edge can redirect this owner to a fresh SCC while the
+        // initializer is running. The old batch is complete, but obsolete —
+        // its same-component imports used no-wait fallbacks — so it must
+        // never enter revision history. The ownership check, the dependency
+        // identity reads, and the batch publication run in one critical
+        // section so no merge can interleave between them.
+        self.slot.components.commit_current(component, |deps| {
+            for info in result.values() {
+                let key = Self::expr_history_key(&info.source, component, deps);
+                self.slot.expr_stage.publish(key, info.clone());
+            }
+        });
+
+        result
+    }
+
+    /// Gets the expression information of a source file.
+    pub(crate) fn expr_stage(self: &Arc<Self>, source: &Source) -> ExprInfo {
+        loop {
+            let component = self.analysis_component(source.id());
+            let result = component
+                .expr_stage
+                .get()
+                .cloned()
+                .unwrap_or_else(|| self.expr_component(&component));
+            if !component.is_current() {
+                continue;
+            }
+
+            return component_member("expression", &component, &result, source.id());
+        }
+    }
+
+    pub(crate) fn external_exports_of(
+        self: &Arc<Self>,
+        importer: TypstFileId,
+        source: &Source,
+    ) -> Option<Arc<LazyHash<LexicalScope>>> {
+        // Commit the resolved edge before acquiring another component's result
+        // slot. A cycle redirects this route to a fresh component, so this
+        // obsolete pass uses a no-wait fallback and is retried by expr_stage.
+        match self
+            .slot
+            .components
+            .record_dependency(importer, source.id())
+        {
+            DependencyAdmission::Reachable => Some(self.expr_stage(source).exports.clone()),
+            DependencyAdmission::SameComponent => {
+                // A dependency discovered by the full pass can merge the route
+                // currently being computed. Finish this obsolete batch without
+                // reading another owner; expr_stage will retry from the fresh
+                // component before publishing or returning it.
+                None
+            }
+            DependencyAdmission::Unresolved => None,
+            DependencyAdmission::Rejected => {
+                log::warn!(
+                    "rejected expression dependency {importer:?} -> {:?}; using empty exports",
+                    source.id()
+                );
+                None
+            }
+        }
     }
 
     /// Gets the type check information of a source file.
     pub(crate) fn type_check(self: &Arc<Self>, source: &Source) -> Arc<TypeInfo> {
-        let mut route = TypeEnv::default();
-        self.type_check_(source, &mut route)
-    }
-
-    /// Gets the type check information of a source file.
-    pub(crate) fn type_check_(
-        self: &Arc<Self>,
-        source: &Source,
-        route: &mut TypeEnv,
-    ) -> Arc<TypeInfo> {
-        use crate::analysis::type_check;
-
-        let ei = self.expr_stage(source);
-        let guard = self.query_stat(source.id(), "type_check");
-        self.slot.type_check.compute(hash128(&ei), |prev| {
-            // todo: recursively check changed scheme type
-            if let Some(cache_hint) = prev.filter(|prev| prev.revision == ei.revision) {
-                return cache_hint;
+        loop {
+            let component = self.analysis_component(source.id());
+            if let Some(result) = component.type_check.get() {
+                if !component.is_current() {
+                    continue;
+                }
+                return component_member("type", &component, result, source.id());
             }
 
-            guard.miss();
-            type_check(self.clone(), ei, route)
-        })
+            let exprs = self.expr_component(&component);
+            if !component.is_current() {
+                continue;
+            }
+
+            // Compute the dependency fingerprint before taking this component's
+            // type slot. Fingerprinting may initialize expression batches along
+            // the condensation DAG, but never waits on another type slot.
+            let fingerprint = self.type_component_fingerprint(&component, &exprs);
+            let result = component
+                .type_check
+                .get_or_init(|| {
+                    let mut previous = FxHashMap::default();
+                    for &fid in component.members.iter() {
+                        let ei = exprs.get(&fid).unwrap_or_else(|| {
+                            panic!("component expression batch is missing {fid:?}")
+                        });
+                        if let Some(cache_hint) = self
+                            .slot
+                            .type_check
+                            .previous(&hash128(&(fid, fingerprint)))
+                            .filter(|prev| prev.fid == Some(fid) && prev.revision == ei.revision)
+                        {
+                            previous.insert(fid, cache_hint);
+                        }
+                    }
+                    if previous.len() != component.members.len() {
+                        // SCC members are checked in one environment and can
+                        // depend on each other's completed result. Reuse the
+                        // previous batch only when every member is reusable.
+                        previous.clear();
+                    }
+
+                    let result = type_check_component(
+                        self.clone(),
+                        &component.members,
+                        exprs.clone(),
+                        previous,
+                    );
+
+                    Arc::new(result)
+                })
+                .clone();
+
+            // Publish history only after the complete current batch is ready.
+            // The ownership check and the publication run in one critical
+            // section so a merged-away owner never publishes an obsolete
+            // batch.
+            let published = self.slot.components.commit_current(&component, |_deps| {
+                for (&fid, info) in result.iter() {
+                    self.slot
+                        .type_check
+                        .publish(hash128(&(fid, fingerprint)), info.clone());
+                }
+            });
+            if published.is_none() {
+                continue;
+            }
+
+            return component_member("type", &component, &result, source.id());
+        }
     }
 
     /// Gets the lint result of a source file.
@@ -1189,8 +1454,13 @@ impl SharedContext {
             .into()
     }
 
-    fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
+    pub(super) fn query_stat(&self, id: TypstFileId, query: &'static str) -> QueryStatGuard {
         self.analysis.stats.stat(Some(id), query)
+    }
+
+    /// Starts statistics collection for a full expression analysis.
+    pub(super) fn expr_stage_stat(&self, id: TypstFileId) -> QueryStatGuard {
+        self.query_stat(id, "expr_stage")
     }
 
     /// Check on a module before really needing them. But we likely use them
@@ -1249,7 +1519,7 @@ impl SharedContext {
 
         let preloader = Preloader {
             shared: self,
-            analyzed: Arc::default(),
+            analyzed: Arc::new(Mutex::new(HashSet::from([entry_point]))),
         };
 
         preloader.work(entry_point);
@@ -1279,6 +1549,37 @@ impl<K: Eq + Hash, V> Default for IncrCacheMap<K, V> {
 }
 
 impl<K, V> IncrCacheMap<K, V> {
+    /// Returns only a completed value from an earlier revision.
+    fn previous(&self, key: &K) -> Option<V>
+    where
+        K: Clone + Eq + Hash,
+        V: Clone,
+    {
+        let prev = self.prev.lock().get(key).cloned();
+        let prev = prev.and_then(|prev| prev.get().cloned());
+        prev.or_else(|| {
+            let global = self.global.lock();
+            global
+                .get(key)
+                .filter(|global| global.0 <= self.revision)
+                .map(|global| global.1.clone())
+        })
+    }
+
+    /// Publishes a completed value for this revision.
+    fn publish(&self, key: K, value: V) -> V
+    where
+        K: Clone + Eq + Hash,
+        V: Clone,
+    {
+        let next = self.next.lock().entry(key.clone()).or_default().clone();
+        next.get_or_init(|| {
+            self.publish_global(key, value.clone());
+            value
+        })
+        .clone()
+    }
+
     fn compute(&self, key: K, compute: impl FnOnce(Option<V>) -> V) -> V
     where
         K: Clone + Eq + Hash,
@@ -1286,34 +1587,39 @@ impl<K, V> IncrCacheMap<K, V> {
     {
         let next = self.next.lock().entry(key.clone()).or_default().clone();
 
-        next.get_or_init(|| {
-            let prev = self.prev.lock().get(&key).cloned();
-            let prev = prev.and_then(|prev| prev.get().cloned());
-            let prev = prev.or_else(|| {
-                let global = self.global.lock();
-                global.get(&key).map(|global| global.1.clone())
-            });
+        next.get_or_init(|| self.compute_and_publish(key, compute))
+            .clone()
+    }
 
-            let res = compute(prev);
+    fn compute_and_publish(&self, key: K, compute: impl FnOnce(Option<V>) -> V) -> V
+    where
+        K: Clone + Eq + Hash,
+        V: Clone,
+    {
+        let res = compute(self.previous(&key));
+        self.publish_global(key, res.clone());
+        res
+    }
 
-            let global = self.global.lock();
-            let entry = global.entry(key.clone());
-            use dashmap::mapref::entry::Entry;
-            match entry {
-                Entry::Occupied(mut entry) => {
-                    let (revision, _) = entry.get();
-                    if *revision < self.revision {
-                        entry.insert((self.revision, res.clone()));
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert((self.revision, res.clone()));
+    fn publish_global(&self, key: K, value: V)
+    where
+        K: Clone + Eq + Hash,
+        V: Clone,
+    {
+        let global = self.global.lock();
+        let entry = global.entry(key);
+        use dashmap::mapref::entry::Entry;
+        match entry {
+            Entry::Occupied(mut entry) => {
+                let (revision, _) = entry.get();
+                if *revision < self.revision {
+                    entry.insert((self.revision, value));
                 }
             }
-
-            res
-        })
-        .clone()
+            Entry::Vacant(entry) => {
+                entry.insert((self.revision, value));
+            }
+        }
     }
 
     fn crawl(&self, revision: usize) -> Self {
@@ -1323,6 +1629,42 @@ impl<K, V> IncrCacheMap<K, V> {
             global: self.global.clone(),
             next: Default::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod incr_cache_tests {
+    use super::IncrCacheMap;
+
+    #[test]
+    fn panicked_initializer_leaves_slot_empty() {
+        let cache = IncrCacheMap::<u8, u8>::default();
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            cache.compute(1, |_| panic!("test panic"))
+        }));
+
+        assert!(result.is_err());
+        assert_eq!(cache.compute(1, |_| 2), 2);
+    }
+
+    #[test]
+    fn older_revision_does_not_read_newer_global_value() {
+        let cache = IncrCacheMap::<u8, u8>::default();
+        let newer = cache.crawl(2);
+        assert_eq!(newer.compute(1, |_| 20), 20);
+
+        let older = cache.crawl(1);
+        assert_eq!(
+            older.compute(1, |prev| {
+                assert_eq!(prev, None);
+                10
+            }),
+            10
+        );
+        assert_eq!(
+            older.compute(1, |_| panic!("completed value must be reused")),
+            10
+        );
     }
 }
 
@@ -1467,13 +1809,8 @@ impl AnalysisRevCache {
         self.manager.find_revision(revision, |slot_base| {
             log::debug!("analysis revision {} is created", revision.get());
             slot_base
-                .map(|slot| AnalysisRevSlot {
-                    revision: slot.revision,
-                    expr_stage: slot.data.expr_stage.crawl(revision.get()),
-                    type_check: slot.data.type_check.crawl(revision.get()),
-                    lint: slot.data.lint.crawl(revision.get()),
-                })
-                .unwrap_or_else(|| self.default_slot.clone())
+                .map(|slot| slot.data.crawl(revision.get()))
+                .unwrap_or_else(|| self.default_slot.crawl(revision.get()))
         })
     }
 }
@@ -1499,12 +1836,26 @@ impl Drop for AnalysisRevLock {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default)]
 struct AnalysisRevSlot {
     revision: usize,
+    components: ComponentCoordinator,
     expr_stage: IncrCacheMap<u128, ExprInfo>,
     type_check: IncrCacheMap<u128, Arc<TypeInfo>>,
     lint: IncrCacheMap<u128, LintInfo>,
+}
+
+impl AnalysisRevSlot {
+    fn crawl(&self, revision: usize) -> Self {
+        Self {
+            revision,
+            // Import membership and all in-flight ownership are revision-local.
+            components: ComponentCoordinator::default(),
+            expr_stage: self.expr_stage.crawl(revision),
+            type_check: self.type_check.crawl(revision),
+            lint: self.lint.crawl(revision),
+        }
+    }
 }
 
 impl Drop for AnalysisRevSlot {

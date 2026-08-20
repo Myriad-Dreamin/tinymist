@@ -1,16 +1,13 @@
 //! Type checking on source file
 
-use std::{
-    collections::hash_map::Entry,
-    sync::{Arc, OnceLock},
-};
+use std::{collections::hash_map::Entry, sync::Arc};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use tinymist_derive::BindTyCtx;
 
 use super::{
-    BuiltinTy, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo, TypeVar,
-    TypeVarBounds, prelude::*,
+    BuiltinTy, DependencyAdmission, DynTypeBounds, FlowVarKind, SharedContext, TyCtxMut, TypeInfo,
+    TypeVar, TypeVarBounds, prelude::*,
 };
 use crate::{
     docs::UntypedDefDocs,
@@ -26,25 +23,147 @@ mod syntax;
 pub(crate) use apply::*;
 pub(crate) use select::*;
 
-#[derive(Default)]
-pub struct TypeEnv {
-    visiting: FxHashMap<TypstFileId, Arc<TypeInfo>>,
-    exprs: FxHashMap<TypstFileId, Option<ExprInfo>>,
+/// Owns all type-check state for one stable dependency component.
+struct TypeEnv {
+    ctx: Arc<SharedContext>,
+    component: FxHashSet<TypstFileId>,
+    exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
+    results: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+    component_vars: FxHashMap<DeclExpr, TypeVarBounds>,
+}
+
+impl TypeEnv {
+    fn new(
+        ctx: Arc<SharedContext>,
+        component: impl IntoIterator<Item = TypstFileId>,
+        exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
+        results: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+    ) -> Self {
+        let component: FxHashSet<_> = component.into_iter().collect();
+        assert!(
+            exprs.len() == component.len() && exprs.keys().all(|fid| component.contains(fid)),
+            "expression results must cover the complete type-check component"
+        );
+        assert!(
+            results.is_empty()
+                || (results.len() == component.len()
+                    && results.keys().all(|fid| component.contains(fid))),
+            "previous type results must cover the complete component or be empty"
+        );
+
+        Self {
+            ctx,
+            component,
+            exprs,
+            results,
+            component_vars: FxHashMap::default(),
+        }
+    }
+
+    /// Returns the type variable shared by every member of the component for
+    /// an in-component declaration. The variable is created by whichever
+    /// member first references the declaration.
+    fn component_var(&mut self, decl: &DeclExpr) -> Option<TypeVarBounds> {
+        let fid = decl.file_id()?;
+        if !self.component.contains(&fid) {
+            return None;
+        }
+
+        Some(
+            self.component_vars
+                .entry(decl.clone())
+                .or_insert_with(|| {
+                    TypeVarBounds::new(
+                        TypeVar {
+                            name: decl.name().clone(),
+                            def: decl.clone(),
+                        },
+                        DynTypeBounds::default(),
+                    )
+                })
+                .clone(),
+        )
+    }
+
+    fn expr_info(&mut self, importer: TypstFileId, fid: TypstFileId) -> Option<ExprInfo> {
+        if let Some(cached) = self.exprs.get(&fid) {
+            return Some(cached.clone());
+        }
+
+        match self.ctx.dependency_admission(importer, fid) {
+            DependencyAdmission::Reachable => self.ctx.expr_stage_by_id(fid),
+            DependencyAdmission::SameComponent => {
+                unreachable!("same-component expression is missing from TypeEnv")
+            }
+            DependencyAdmission::Unresolved | DependencyAdmission::Rejected => None,
+        }
+    }
+
+    fn external_type_info(&mut self, importer: TypstFileId, ei: ExprInfo) -> Option<Arc<TypeInfo>> {
+        let ctx = self.ctx.clone();
+        if self.component.contains(&ei.fid) {
+            panic!(
+                "same-component type lookup for {:?} bypassed shared component variables",
+                ei.fid
+            );
+        }
+
+        if ctx.dependency_admission(importer, ei.fid) != DependencyAdmission::Reachable {
+            return None;
+        }
+        let source = ctx
+            .source_by_id(ei.fid)
+            .expect("an imported expression result must have a source");
+        Some(ctx.type_check(&source))
+    }
+
+    fn check_all(mut self, members: &[TypstFileId]) -> FxHashMap<TypstFileId, Arc<TypeInfo>> {
+        if self.results.len() == self.component.len() {
+            return self.results;
+        }
+
+        for fid in members {
+            let guard = self.ctx.query_stat(*fid, "type_check");
+            guard.miss();
+        }
+
+        // This mirrors dependency-first DFS while remaining independent of
+        // which worker requested the component. Every member writes to the
+        // same pre-created component variables, and no member reads another
+        // member's TypeInfo candidate.
+        for fid in members.iter().rev() {
+            let ei = self
+                .exprs
+                .get(fid)
+                .unwrap_or_else(|| panic!("component expression batch is missing {fid:?}"))
+                .clone();
+            let type_info = type_check(ei, &mut self);
+            self.results.insert(*fid, type_info);
+        }
+
+        self.results
+    }
+}
+
+/// Type checks every member of a stable component in one standardized
+/// environment and returns only completed results.
+pub(super) fn type_check_component(
+    ctx: Arc<SharedContext>,
+    members: &[TypstFileId],
+    exprs: Arc<FxHashMap<TypstFileId, ExprInfo>>,
+    previous: FxHashMap<TypstFileId, Arc<TypeInfo>>,
+) -> FxHashMap<TypstFileId, Arc<TypeInfo>> {
+    TypeEnv::new(ctx, members.iter().copied(), exprs, previous).check_all(members)
 }
 
 /// Type checking at the source unit level.
 #[typst_macros::time(span = ei.source.root().span())]
-pub(crate) fn type_check(
-    ctx: Arc<SharedContext>,
-    ei: ExprInfo,
-    env: &mut TypeEnv,
-) -> Arc<TypeInfo> {
+fn type_check(ei: ExprInfo, env: &mut TypeEnv) -> Arc<TypeInfo> {
+    let ctx = env.ctx.clone();
     let mut info = TypeInfo::default();
     info.valid = true;
     info.fid = Some(ei.fid);
     info.revision = ei.revision;
-
-    env.visiting.insert(ei.fid, Arc::new(TypeInfo::default()));
 
     // Retrieve expression information for the source.
     let root = ei.root.clone();
@@ -56,6 +175,7 @@ pub(crate) fn type_check(
         env,
         call_cache: Default::default(),
         module_exports: Default::default(),
+        checking_module_exports: Default::default(),
         overwritten_vars: Default::default(),
         live_input_vars: Default::default(),
         input_contract_bounds: Default::default(),
@@ -77,8 +197,6 @@ pub(crate) fn type_check(
     let elapsed = type_check_start.elapsed();
     crate::log_debug_ct!("Type checking on {:?} took {elapsed:?}", checker.ei.fid);
 
-    checker.env.visiting.remove(&checker.ei.fid);
-
     Arc::new(checker.info)
 }
 
@@ -93,7 +211,8 @@ pub(crate) struct TypeChecker<'a> {
     ei: ExprInfo,
 
     info: TypeInfo,
-    module_exports: FxHashMap<(TypstFileId, Interned<str>), OnceLock<Option<Ty>>>,
+    module_exports: FxHashMap<(TypstFileId, Interned<str>), Option<Ty>>,
+    checking_module_exports: FxHashSet<(TypstFileId, Interned<str>)>,
 
     call_cache: FxHashSet<CallCacheDesc>,
     overwritten_vars: FxHashSet<DeclExpr>,
@@ -138,21 +257,23 @@ impl TyCtxMut for TypeChecker<'_> {
     }
 
     fn check_module_item(&mut self, fid: TypstFileId, name: &StrRef) -> Option<Ty> {
-        self.module_exports
-            .entry((fid, name.clone()))
-            .or_default()
-            .clone()
-            .get_or_init(|| {
-                let ei = self
-                    .env
-                    .exprs
-                    .entry(fid)
-                    .or_insert_with(|| self.ctx.expr_stage_by_id(fid))
-                    .clone()?;
+        let key = (fid, name.clone());
+        if let Some(cached) = self.module_exports.get(&key) {
+            return cached.clone();
+        }
 
-                Some(self.check(ei.exports.get(name)?))
-            })
-            .clone()
+        if !self.checking_module_exports.insert(key.clone()) {
+            return None;
+        }
+
+        let result = self
+            .env
+            .expr_info(self.ei.fid, fid)
+            .and_then(|ei| ei.exports.get(name).map(|expr| self.check(expr)));
+
+        self.checking_module_exports.remove(&key);
+        self.module_exports.insert(key, result.clone());
+        result
     }
 }
 
@@ -181,27 +302,34 @@ impl TypeChecker<'_> {
         crate::log_debug_ct!("get_var {decl:?}");
         let mut imported_docs = None;
         let mut imported_input_bounds = vec![];
+        let component_var = self.env.component_var(decl);
         let var = match self.info.vars.entry(decl.clone()) {
             Entry::Occupied(entry) => entry.get().var.clone(),
             Entry::Vacant(entry) => {
-                let name = decl.name().clone();
-                let init = Self::external_var_bounds(&self.ctx, self.env, self.ei.fid, decl, &name)
-                    .map(|(bounds, docs, input_bounds)| {
-                        imported_docs = docs;
-                        imported_input_bounds = input_bounds;
-                        bounds
-                    })
-                    .unwrap_or_default();
-                let bounds = TypeVarBounds::new(
-                    TypeVar {
-                        name,
-                        def: decl.clone(),
-                    },
-                    init,
-                );
-                let var = bounds.var.clone();
-                entry.insert(bounds);
-                var
+                if let Some(bounds) = component_var {
+                    let var = bounds.var.clone();
+                    entry.insert(bounds);
+                    var
+                } else {
+                    let name = decl.name().clone();
+                    let init = Self::external_var_bounds(self.env, self.ei.fid, decl, &name)
+                        .map(|(bounds, docs, input_bounds)| {
+                            imported_docs = docs;
+                            imported_input_bounds = input_bounds;
+                            bounds
+                        })
+                        .unwrap_or_default();
+                    let bounds = TypeVarBounds::new(
+                        TypeVar {
+                            name,
+                            def: decl.clone(),
+                        },
+                        init,
+                    );
+                    let var = bounds.var.clone();
+                    entry.insert(bounds);
+                    var
+                }
             }
         };
 
@@ -230,7 +358,6 @@ impl TypeChecker<'_> {
     }
 
     fn external_var_bounds(
-        ctx: &Arc<SharedContext>,
         env: &mut TypeEnv,
         current_fid: TypstFileId,
         decl: &DeclExpr,
@@ -247,14 +374,8 @@ impl TypeChecker<'_> {
 
         crate::log_debug_ct!("import_ty {name} from {fid:?}");
 
-        let ext_def_use_info = ctx.expr_stage_by_id(fid)?;
-        let source = &ext_def_use_info.source;
-        // todo: check types in cycle
-        let ext_type_info = if let Some(scheme) = env.visiting.get(&source.id()) {
-            scheme.clone()
-        } else {
-            ctx.clone().type_check_(source, env)
-        };
+        let ext_def_use_info = env.expr_info(current_fid, fid)?;
+        let ext_type_info = env.external_type_info(current_fid, ext_def_use_info.clone())?;
         let ext_def = ext_def_use_info.exports.get(name)?;
 
         // todo: rest expressions

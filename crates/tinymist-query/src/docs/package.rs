@@ -1046,15 +1046,135 @@ struct ConvertResult {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
+    use rayon::ThreadPoolBuilder;
+    use tinymist_project::{
+        CompileFontArgs, CompilePackageArgs, DynAccessModel, EntryState, ExportTarget,
+        LspUniverseBuilder,
+    };
+    use tinymist_world::ShadowApi;
     use tinymist_world::package::{PackageRegistry, PackageSpec, registry::PREVIEW_NS};
+    use tinymist_world::vfs::system::SystemAccessModel;
+    use typst::{foundations::Bytes, syntax::VirtualPath};
 
     use super::{
         PackageInfo, package_docs, package_docs_bundle_typ, package_docs_md, package_docs_typ,
     };
     use crate::analysis::Analysis;
+    use crate::docs::{DefDocs, DefInfo, package_module_docs};
     use crate::tests::*;
+    use crate::tests::{Opts, run_with_ctx_};
+
+    fn cyclic_package_fixture() -> (LspUniverse, PathBuf, PackageInfo) {
+        let packages_root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/fixtures/package_docs/packages");
+        let package_root = packages_root.join("local/cyclic-docs/0.1.0");
+        let workspace_root = if cfg!(windows) {
+            PathBuf::from(r"C:\dummy-root")
+        } else {
+            PathBuf::from("/dummy-root")
+        };
+        let entry_path = workspace_root.join("lib.typ");
+
+        let entry = EntryState::new_rooted(
+            workspace_root.as_path().into(),
+            Some(VirtualPath::new("lib.typ").expect("valid fixture entrypoint")),
+        );
+        let registry = LspUniverseBuilder::resolve_package(
+            None,
+            Some(&CompilePackageArgs {
+                package_path: Some(packages_root),
+                package_cache_path: None,
+            }),
+        );
+        let fonts = Arc::new(
+            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
+                ignore_system_fonts: true,
+                ..Default::default()
+            })
+            .expect("fixture font resolver must initialize"),
+        );
+        let mut verse = LspUniverseBuilder::build(
+            entry,
+            ExportTarget::Paged,
+            Default::default(),
+            Default::default(),
+            registry,
+            fonts,
+            None,
+            DynAccessModel(Arc::new(SystemAccessModel)),
+        );
+        for file in ["lib.typ", "a.typ", "b.typ"] {
+            let path = workspace_root.join(file);
+            let content = std::fs::read_to_string(package_root.join(file))
+                .expect("fixture source must be readable");
+            verse
+                .map_shadow(&path, Bytes::from_string(content))
+                .expect("fixture source must be shadowable");
+        }
+        let package = PackageInfo {
+            path: package_root,
+            namespace: "local".into(),
+            name: "cyclic-docs".into(),
+            version: "0.1.0".into(),
+        };
+
+        (verse, entry_path, package)
+    }
+
+    fn find_function<'a>(head: &'a DefInfo, name: &str) -> Option<&'a DefInfo> {
+        if head.name == name && matches!(&head.parsed_docs, Some(DefDocs::Function(_))) {
+            return Some(head);
+        }
+
+        head.children
+            .iter()
+            .find_map(|child| find_function(child, name))
+    }
+
+    fn assert_cyclic_function_docs(alpha: &DefInfo, beta: &DefInfo) {
+        assert_ne!(
+            alpha.decl.as_ref().and_then(|decl| decl.file_id()),
+            beta.decl.as_ref().and_then(|decl| decl.file_id()),
+            "documented functions must originate from different files"
+        );
+
+        let Some(DefDocs::Function(alpha_sig)) = &alpha.parsed_docs else {
+            panic!("alpha must retain function signature docs");
+        };
+        assert!(alpha_sig.docs.contains("module B"));
+        assert_eq!(
+            alpha_sig.pos.first().map(|param| param.name.as_ref()),
+            Some("value")
+        );
+        assert!(alpha_sig.named.keys().any(|name| name.as_ref() == "scale"));
+
+        let Some(DefDocs::Function(beta_sig)) = &beta.parsed_docs else {
+            panic!("beta must retain function signature docs");
+        };
+        assert!(beta_sig.docs.contains("module A"));
+        assert_eq!(
+            beta_sig.pos.first().map(|param| param.name.as_ref()),
+            Some("value")
+        );
+        assert!(beta_sig.named.keys().any(|name| name.as_ref() == "offset"));
+    }
+
+    fn assert_module_cycle_docs(head: &DefInfo) {
+        for name in ["alpha-module", "beta-module"] {
+            let function = find_function(head, name)
+                .unwrap_or_else(|| panic!("documented function {name:?} must be present"));
+            let Some(DefDocs::Function(sig)) = &function.parsed_docs else {
+                panic!("{name} must retain function signature docs");
+            };
+            assert_eq!(
+                sig.pos.first().map(|param| param.name.as_ref()),
+                Some("value")
+            );
+        }
+    }
 
     fn test(pkg: PackageSpec) {
         run_with_sources("", |verse: &mut LspUniverse, path| {
@@ -1158,5 +1278,70 @@ mod tests {
             name: "cetz".into(),
             version: "0.2.2".parse().unwrap(),
         });
+    }
+
+    #[test]
+    fn cyclic_package_module_docs_retain_functions_and_signatures() {
+        let (mut verse, entry_path, package) = cyclic_package_fixture();
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .expect("fixture Rayon pool must initialize");
+
+        run_with_ctx_(
+            &mut verse,
+            entry_path,
+            Opts { need_compile: true },
+            &|ctx, _| {
+                let docs = pool
+                    .install(|| package_module_docs(ctx, &package))
+                    .expect("cyclic package module docs must complete");
+
+                let alpha = find_function(&docs.root, "alpha")
+                    .expect("documented function alpha must be present");
+                let beta = find_function(&docs.root, "beta")
+                    .expect("documented function beta must be present");
+                assert_cyclic_function_docs(alpha, beta);
+                assert_module_cycle_docs(&docs.root);
+            },
+        );
+    }
+
+    #[test]
+    fn cyclic_package_docs_retain_functions_and_signatures() {
+        let (mut verse, entry_path, package) = cyclic_package_fixture();
+        let pool = ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .expect("fixture Rayon pool must initialize");
+
+        run_with_ctx_(
+            &mut verse,
+            entry_path,
+            Opts { need_compile: true },
+            &|ctx, _| {
+                let docs = pool
+                    .install(|| package_docs(ctx, &package))
+                    .expect("cyclic package docs must complete");
+                let find = |name| {
+                    docs.modules
+                        .iter()
+                        .find_map(|(_, head, _)| find_function(head, name))
+                        .unwrap_or_else(|| panic!("documented function {name:?} must be present"))
+                };
+
+                assert_cyclic_function_docs(find("alpha"), find("beta"));
+                for name in ["alpha-module", "beta-module"] {
+                    let function = find(name);
+                    let Some(DefDocs::Function(sig)) = &function.parsed_docs else {
+                        panic!("{name} must retain function signature docs");
+                    };
+                    assert_eq!(
+                        sig.pos.first().map(|param| param.name.as_ref()),
+                        Some("value")
+                    );
+                }
+            },
+        );
     }
 }

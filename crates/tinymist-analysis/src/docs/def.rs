@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, OnceLock};
 
-use ecow::{EcoString, eco_format};
+use ecow::EcoString;
 use serde::{Deserialize, Serialize};
 
 use super::tidy::*;
@@ -444,10 +444,58 @@ impl ParamDocs {
 pub fn format_ty(ty: Option<&Ty>) -> TypeRepr {
     let ty = ty?;
     let short = ty.repr().unwrap_or_else(|| "any".into());
-    let long = eco_format!("{ty:?}");
+    let long = format_type_debug(ty);
     let value = ty.value_repr().unwrap_or_else(|| "".into());
 
     Some((short, long, value))
+}
+
+// The long form is diagnostic metadata. Keep short and value representations
+// intact, but do not let a deeply shared type graph expand exponentially while
+// SCIP hover documentation is being generated.
+const MAX_TYPE_DEBUG_BYTES: usize = 4096;
+const TYPE_DEBUG_TRUNCATION_SUFFIX: &str = " ... truncated ...";
+
+struct TruncatingDebug {
+    text: String,
+    remaining_bytes: usize,
+    truncated: bool,
+}
+
+impl fmt::Write for TruncatingDebug {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        if text.len() <= self.remaining_bytes {
+            self.text.push_str(text);
+            self.remaining_bytes -= text.len();
+            return Ok(());
+        }
+
+        let mut end = self.remaining_bytes.min(text.len());
+        while !text.is_char_boundary(end) {
+            end -= 1;
+        }
+        self.text.push_str(&text[..end]);
+        self.remaining_bytes = 0;
+        self.truncated = true;
+        Err(fmt::Error)
+    }
+}
+
+fn format_debug_bounded(value: &impl fmt::Debug) -> EcoString {
+    let mut output = TruncatingDebug {
+        text: String::new(),
+        remaining_bytes: MAX_TYPE_DEBUG_BYTES,
+        truncated: false,
+    };
+    let _ = fmt::write(&mut output, format_args!("{value:?}"));
+    if output.truncated {
+        output.text.push_str(TYPE_DEBUG_TRUNCATION_SUFFIX);
+    }
+    output.text.into()
+}
+
+fn format_type_debug(ty: &Ty) -> EcoString {
+    format_debug_bounded(ty)
 }
 
 /// Formats the type when only the short display form is needed.
@@ -455,4 +503,53 @@ pub fn format_ty_short(ty: Option<&Ty>) -> TypeRepr {
     let ty = ty?;
     let short = ty.repr().unwrap_or_else(|| "any".into());
     Some((short.clone(), short.clone(), short))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::*;
+
+    struct BranchingDebug<'a> {
+        depth: usize,
+        calls: &'a Cell<usize>,
+    }
+
+    impl fmt::Debug for BranchingDebug<'_> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.calls.set(self.calls.get() + 1);
+            if self.depth == 0 {
+                return f.write_str("leaf");
+            }
+
+            let left = Self {
+                depth: self.depth - 1,
+                calls: self.calls,
+            };
+            let right = Self {
+                depth: self.depth - 1,
+                calls: self.calls,
+            };
+            f.debug_tuple("branch").field(&left).field(&right).finish()
+        }
+    }
+
+    #[test]
+    fn type_debug_stops_exponential_expansion() {
+        let calls = Cell::new(0);
+        let output = format_debug_bounded(&BranchingDebug {
+            depth: 64,
+            calls: &calls,
+        });
+
+        assert!(output.ends_with(TYPE_DEBUG_TRUNCATION_SUFFIX));
+        assert!(output.len() <= MAX_TYPE_DEBUG_BYTES + TYPE_DEBUG_TRUNCATION_SUFFIX.len());
+        assert!(calls.get() < 10_000);
+    }
+
+    #[test]
+    fn type_debug_preserves_small_values() {
+        assert_eq!(format_debug_bounded(&(1, "two")), "(1, \"two\")");
+    }
 }

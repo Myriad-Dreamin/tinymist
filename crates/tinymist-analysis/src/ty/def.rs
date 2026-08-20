@@ -13,7 +13,7 @@ use parking_lot::{Mutex, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use typst::{
-    foundations::{Content, Element, ParamInfo, Type, Value},
+    foundations::{Content, Element, ParamInfo, Repr, Type, Value},
     syntax::{FileId, Span, SyntaxKind, SyntaxNode, ast},
 };
 
@@ -21,7 +21,7 @@ use super::{BoundPred, BuiltinTy, PackageId};
 use crate::{
     adt::{interner::impl_internable, snapshot_map},
     docs::{DocText, UntypedDefDocs},
-    syntax::{DeclExpr, UnaryOp},
+    syntax::{DeclExpr, UnaryOp, def::StrictCmp},
 };
 
 pub(crate) use super::{TyCtx, TyCtxMut};
@@ -416,12 +416,17 @@ impl NameBone {
 }
 
 /// The state of a type variable (bounds of some type in program).
+///
+/// The bound sets iterate in content order. [`Interned`] hashes by pointer
+/// address, so a hash-based set would iterate in allocation order, which
+/// depends on thread scheduling; checker invocation order over the bounds
+/// would then leak scheduling into inferred types.
 #[derive(Clone, Default)]
 pub struct DynTypeBounds {
     /// The lower bounds
-    pub lbs: rpds::HashTrieSetSync<Ty>,
+    pub lbs: rpds::RedBlackTreeSetSync<Ty>,
     /// The upper bounds
-    pub ubs: rpds::HashTrieSetSync<Ty>,
+    pub ubs: rpds::RedBlackTreeSetSync<Ty>,
 }
 
 impl From<TypeBounds> for DynTypeBounds {
@@ -527,19 +532,50 @@ pub struct InsTy {
 /// For example, a float instance which is NaN.
 impl Eq for InsTy {}
 
-/// Since we compare values by pointer ([`ptr_cmp`]), only interned instances
-/// are comparable.
+/// Orders instances by stable value content; see [`Ord`] on this type.
 impl PartialOrd for Interned<InsTy> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-/// Since we compare values by pointer ([`ptr_cmp`]), only interned instances
-/// are comparable.
+/// Orders instances by stable value content ([`cmp_value`]), never by raw
+/// interned identity or address.
+///
+/// Distinct instances with equal values are tie-broken by their syntax
+/// source content, so ordered collections do not collapse two instances that
+/// pointer equality keeps apart.
 impl Ord for Interned<InsTy> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        cmp_value(&self.val, &other.val)
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
+        cmp_value(&self.val, &other.val).then_with(|| cmp_type_source(&self.syntax, &other.syntax))
+    }
+}
+
+/// Orders syntax sources by stable content. Span identities are not used:
+/// they embed file ids assigned in interning order, which depends on thread
+/// scheduling.
+fn cmp_type_source(
+    x: &Option<Interned<TypeSource>>,
+    y: &Option<Interned<TypeSource>>,
+) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    match (x, y) {
+        (None, None) => Ordering::Equal,
+        (None, Some(_)) => Ordering::Less,
+        (Some(_), None) => Ordering::Greater,
+        (Some(x), Some(y)) => {
+            if x == y {
+                return Ordering::Equal;
+            }
+            let file = |source: &TypeSource| source.name_node.span().id();
+            file(x)
+                .strict_cmp(&file(y))
+                .then_with(|| x.name().cmp(&y.name()))
+                .then_with(|| x.doc.cmp(&y.doc))
+        }
     }
 }
 
@@ -566,7 +602,7 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
         (Value::Version(x), Value::Version(y)) => x.cmp(y),
         (Value::Bytes(x), Value::Bytes(y)) => x.cmp(y),
         (Value::Duration(x), Value::Duration(y)) => x.cmp(y),
-        (Value::Type(x), Value::Type(y)) => x.cmp(y),
+        (Value::Type(x), Value::Type(y)) => x.long_name().cmp(y.long_name()),
         (Value::None, Value::None) | (Value::Auto, Value::Auto) => std::cmp::Ordering::Equal,
         (Value::Array(x), Value::Array(y)) => cmp_by(x.iter(), y.iter(), cmp_value),
         (Value::Dict(x), Value::Dict(y)) => cmp_by(x.iter(), y.iter(), |(xk, xv), (yk, yv)| {
@@ -581,42 +617,57 @@ fn cmp_value(x: &Value, y: &Value) -> std::cmp::Ordering {
                 .cmp(&y.abs.abs)
                 .then_with(|| x.abs.em.cmp(&y.abs.em))
         }),
-        (Value::Func(x), Value::Func(y)) => {
-            if !x.span().is_detached() && !y.span().is_detached() {
-                return x.span().into_raw().cmp(&y.span().into_raw());
-            }
-
-            use typst::foundations::FuncInner;
-            match (x.inner(), y.inner()) {
-                (FuncInner::Element(x), FuncInner::Element(y)) => x.cmp(y),
-                _ => ptr_cmp(x, y),
-            }
-        }
-        (Value::Args(x), Value::Args(y)) => {
-            if !x.span.is_detached() && !y.span.is_detached() {
-                return x.span.into_raw().cmp(&y.span.into_raw());
-            }
-
-            ptr_cmp(x, y)
-        }
+        (Value::Func(x), Value::Func(y)) => cmp_func(x, y),
+        (Value::Args(x), Value::Args(y)) => x.span.strict_cmp(&y.span).then_with(|| repr_cmp(x, y)),
         (Value::Module(x), Value::Module(y)) => match (x.file_id(), y.file_id()) {
-            (Some(x), Some(y)) => x.into_raw().cmp(&y.into_raw()),
+            (Some(x), Some(y)) => x.strict_cmp(&y),
             (Some(..), None) => std::cmp::Ordering::Less,
             (None, Some(..)) => std::cmp::Ordering::Greater,
-            (None, None) => ptr_cmp(x, y),
+            (None, None) => repr_cmp(x, y),
         },
         (Value::Datetime(x), Value::Datetime(y)) => {
-            x.partial_cmp(y).unwrap_or_else(|| ptr_cmp(x, y))
+            x.partial_cmp(y).unwrap_or_else(|| repr_cmp(x, y))
         }
-        (Value::Color(x), Value::Color(y)) => ptr_cmp(x, y),
-        (Value::Gradient(x), Value::Gradient(y)) => ptr_cmp(x, y),
-        (Value::Tiling(x), Value::Tiling(y)) => ptr_cmp(x, y),
-        (Value::Symbol(x), Value::Symbol(y)) => ptr_cmp(x, y),
-        (Value::Content(x), Value::Content(y)) => ptr_cmp(x, y),
-        (Value::Styles(x), Value::Styles(y)) => ptr_cmp(x, y),
-        (Value::Dyn(x), Value::Dyn(y)) => ptr_cmp(x, y),
-        _ => ptr_cmp(x, y),
+        (Value::Color(x), Value::Color(y)) => repr_cmp(x, y),
+        (Value::Gradient(x), Value::Gradient(y)) => repr_cmp(x, y),
+        (Value::Tiling(x), Value::Tiling(y)) => repr_cmp(x, y),
+        (Value::Symbol(x), Value::Symbol(y)) => repr_cmp(x, y),
+        (Value::Content(x), Value::Content(y)) => repr_cmp(x, y),
+        (Value::Styles(x), Value::Styles(y)) => repr_cmp(x, y),
+        (Value::Dyn(x), Value::Dyn(y)) => repr_cmp(x, y),
+        _ => x.repr().cmp(&y.repr()),
     }
+}
+
+/// Compares functions by content-stable identity: the name, source location,
+/// definition site, and finally the display representation. Raw span and
+/// pointer identities depend on interning and allocation order, which vary
+/// with thread scheduling and across processes. The definition site is needed
+/// because native methods with different receivers share a name and detached
+/// span (for example, `array.at` and `str.at`).
+fn cmp_func(x: &typst::foundations::Func, y: &typst::foundations::Func) -> std::cmp::Ordering {
+    use typst::foundations::FuncInner;
+    x.name()
+        .cmp(&y.name())
+        .then_with(|| x.span().strict_cmp(&y.span()))
+        .then_with(|| match (x.def_site(), y.def_site()) {
+            (Some(x), Some(y)) => x.path.cmp(y.path).then_with(|| x.key.cmp(y.key)),
+            (Some(..), None) => std::cmp::Ordering::Less,
+            (None, Some(..)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        })
+        .then_with(|| match (x.inner(), y.inner()) {
+            (FuncInner::Element(x), FuncInner::Element(y)) => x.name().cmp(y.name()),
+            _ => repr_cmp(x, y),
+        })
+}
+
+/// Compares by display representation as the content-stable last resort.
+/// Distinct values with an identical representation compare equal; an
+/// ordered collection may then keep only one of them, which is acceptable
+/// because they also render identically everywhere the type is shown.
+fn repr_cmp<T: Repr>(x: &T, y: &T) -> std::cmp::Ordering {
+    x.repr().cmp(&y.repr())
 }
 
 fn cmp_by<T>(
@@ -670,16 +721,6 @@ fn val_discriminant(val: &Value) -> TypstValueEnum {
         Value::Styles(..) => TypstValueEnum::Styles,
         Value::Type(..) => TypstValueEnum::Type,
         Value::Dyn(..) => TypstValueEnum::Dyn,
-    }
-}
-
-fn ptr_cmp<T: PartialEq>(x: &T, y: &T) -> std::cmp::Ordering {
-    if x == y {
-        std::cmp::Ordering::Equal
-    } else {
-        let x = std::ptr::from_ref(x);
-        let y = std::ptr::from_ref(y);
-        x.cmp(&y)
     }
 }
 
@@ -871,8 +912,7 @@ pub struct TypeVar {
 
 impl Ord for TypeVar {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // todo: buggy
-        self.def.cmp(&other.def)
+        self.def.strict_cmp(&other.def)
     }
 }
 
@@ -1677,6 +1717,35 @@ mod tests {
         let ty = Ty::Builtin(BuiltinTy::Clause);
         let ty_ref = TyRef::new(ty.clone());
         assert_debug_snapshot!(ty_ref, @"Clause");
+    }
+
+    #[test]
+    fn native_method_order_uses_definition_site() {
+        use super::*;
+        use typst::foundations::{Array, Bytes, Dict, Str, Type, Value, Version};
+
+        fn method(ty: Type, name: &str) -> typst::foundations::Func {
+            match ty.scope().get(name).expect("native method").read() {
+                Value::Func(func) => func.clone(),
+                _ => panic!("native method is not a function"),
+            }
+        }
+
+        let methods = [
+            method(Type::of::<Array>(), "at"),
+            method(Type::of::<Bytes>(), "at"),
+            method(Type::of::<Dict>(), "at"),
+            method(Type::of::<Str>(), "at"),
+            method(Type::of::<Version>(), "at"),
+        ];
+
+        for (idx, lhs) in methods.iter().enumerate() {
+            for rhs in &methods[idx + 1..] {
+                assert_ne!(lhs, rhs);
+                assert_ne!(cmp_func(lhs, rhs), std::cmp::Ordering::Equal);
+                assert_eq!(cmp_func(lhs, rhs), cmp_func(rhs, lhs).reverse());
+            }
+        }
     }
 
     #[test]

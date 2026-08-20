@@ -5,7 +5,6 @@ use rpds::RedBlackTreeMapSync;
 use rustc_hash::FxHashMap;
 use std::ops::Deref;
 use tinymist_analysis::adt::interner::Interned;
-use tinymist_std::hash::hash128;
 use typst::{
     foundations::{Element, NativeElement, Str, Type, Value},
     model::{EmphElem, EnumElem, HeadingElem, ListElem, ParbreakElem, StrongElem, TermsElem},
@@ -15,7 +14,7 @@ use typst::{
 };
 
 use crate::{
-    analysis::{QueryStatGuard, SharedContext},
+    analysis::SharedContext,
     docs::DocString,
     prelude::*,
     syntax::{DefKind, find_module_level_docs, resolve_id_by_path},
@@ -24,62 +23,61 @@ use crate::{
 
 use super::{DocCommentMatcher, InterpretMode, def::*};
 
-/// Maps file identifiers to their lexical scopes for expression analysis
-/// routing.
-pub type ExprRoute = FxHashMap<TypstFileId, Option<Arc<LazyHash<LexicalScope>>>>;
+/// Resolves module exports while one syntax-analysis pass is running.
+pub(crate) trait ExportLookup {
+    fn exports_of(
+        &mut self,
+        ctx: &Arc<SharedContext>,
+        importer: TypstFileId,
+        source: &Source,
+    ) -> Option<Arc<LazyHash<LexicalScope>>>;
+}
+
+/// Produces one member's declaration interface against the preceding complete
+/// symbolic input batch. The caller keeps the result private until every member
+/// in the round has produced an interface.
+pub(crate) fn declaration_of(
+    ctx: Arc<SharedContext>,
+    source: Source,
+    lookup: &mut dyn ExportLookup,
+) -> Arc<LazyHash<LexicalScope>> {
+    let mut worker = ExprWorker {
+        fid: source.id(),
+        source: source.clone(),
+        ctx,
+        imports: Arc::new(Mutex::new(FxHashMap::default())),
+        docstrings: Arc::new(Mutex::new(FxHashMap::default())),
+        exprs: Arc::new(Mutex::new(FxHashMap::default())),
+        import_buffer: Vec::new(),
+        lexical: LexicalContext::default(),
+        resolves: Arc::new(Mutex::new(vec![])),
+        buffer: vec![],
+        module_items: FxHashMap::default(),
+        init_stage: true,
+        comment_matcher: DocCommentMatcher::default(),
+        lookup,
+    };
+
+    let root_markup = source.root().cast::<ast::Markup>().unwrap();
+    worker.check_root_scope(root_markup.to_untyped().children());
+    Arc::new(LazyHash::new(worker.summarize_scope()))
+}
 
 /// Analyzes expressions in a source file and produces expression information.
 ///
 /// This is the core function for expression analysis, which powers features
-/// like go-to-definition, hover, and completion. It performs a two-pass
-/// analysis:
+/// like go-to-definition, hover, and completion. The component-wide
+/// declaration pass is sealed before this full pass can run.
 ///
-/// 1. **First pass (init_stage)**: Builds the root lexical scope by scanning
-///    top-level definitions without resolving them. This handles forward
-///    references and circular dependencies.
-///
-/// 2. **Second pass**: Performs full expression analysis, resolving
-///    identifiers, tracking imports, and building the expression tree with type
-///    information.
+/// This pass resolves identifiers, tracks imports, and builds the expression
+/// tree with type information.
 #[typst_macros::time(span = source.root().span())]
 pub(crate) fn expr_of(
     ctx: Arc<SharedContext>,
     source: Source,
-    route: &mut ExprRoute,
-    guard: QueryStatGuard,
-    prev: Option<ExprInfo>,
+    lookup: &mut dyn ExportLookup,
 ) -> ExprInfo {
     crate::log_debug_ct!("expr_of: {:?}", source.id());
-
-    route.insert(source.id(), None);
-
-    let cache_hit = prev.and_then(|prev| {
-        if prev.source.lines().len_bytes() != source.lines().len_bytes()
-            || hash128(&prev.source) != hash128(&source)
-        {
-            return None;
-        }
-        for (fid, prev_exports) in &prev.imports {
-            let ei = ctx.exports_of(&ctx.source_by_id(*fid).ok()?, route);
-
-            // If there is a cycle, the expression will be stable as the source is
-            // unchanged.
-            if let Some(exports) = ei
-                && (prev_exports.size() != exports.size()
-                    || hash128(&prev_exports) != hash128(&exports))
-            {
-                return None;
-            }
-        }
-
-        Some(prev)
-    });
-
-    if let Some(prev) = cache_hit {
-        route.remove(&source.id());
-        return prev;
-    }
-    guard.miss();
 
     let revision = ctx.revision();
 
@@ -112,21 +110,12 @@ pub(crate) fn expr_of(
         resolves,
         buffer: vec![],
         module_items: FxHashMap::default(),
-        init_stage: true,
+        init_stage: false,
         comment_matcher: DocCommentMatcher::default(),
-        route,
+        lookup,
     };
 
     let root_markup = source.root().cast::<ast::Markup>().unwrap();
-    worker.check_root_scope(root_markup.to_untyped().children());
-    let first_scope = Arc::new(LazyHash::new(worker.summarize_scope()));
-    worker.route.insert(worker.fid, Some(first_scope.clone()));
-
-    worker.lexical = LexicalContext::default();
-    worker.comment_matcher.reset();
-    worker.buffer.clear();
-    worker.import_buffer.clear();
-    worker.module_items.clear();
     let root = worker.check_in_mode(root_markup.to_untyped().children(), InterpretMode::Markup);
     let exports = Arc::new(LazyHash::new(worker.summarize_scope()));
 
@@ -148,7 +137,6 @@ pub(crate) fn expr_of(
     };
     crate::log_debug_ct!("expr_of end {:?}", source.id());
 
-    route.remove(&info.fid);
     ExprInfo::new(info)
 }
 
@@ -174,7 +162,7 @@ impl Default for LexicalContext {
 }
 
 /// Worker for processing expressions during source file analysis.
-pub(crate) struct ExprWorker<'a> {
+struct ExprWorker<'a> {
     fid: TypstFileId,
     source: Source,
     ctx: Arc<SharedContext>,
@@ -188,7 +176,7 @@ pub(crate) struct ExprWorker<'a> {
     module_items: FxHashMap<DeclExpr, ModuleItemLayout>,
     init_stage: bool,
 
-    route: &'a mut ExprRoute,
+    lookup: &'a mut dyn ExportLookup,
     comment_matcher: DocCommentMatcher,
 }
 
@@ -1433,7 +1421,7 @@ impl ExprWorker<'_> {
             .ctx
             .source_by_id(fid)
             .ok()
-            .and_then(|src| self.ctx.exports_of(&src, self.route))
+            .and_then(|src| self.lookup.exports_of(&self.ctx, self.fid, &src))
             .unwrap_or_default();
         let res = imported.as_ref().deref().clone();
         self.import_buffer.push((fid, imported));
