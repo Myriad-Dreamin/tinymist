@@ -19,10 +19,10 @@ const HelpPanel = () => {
     ),
     h4("Cannot find some symbols?"),
     p(
-      "🔍: Check the supported symbols listed in ",
+      "🔍: Check the supported symbols in ",
       a(
-        { href: "https://github.com/QuarticCat/detypify/blob/main/assets/supported-symbols.txt" },
-        "supported-symbols.txt",
+        { href: "https://github.com/QuarticCat/detypify-data" },
+        "Detypify Data",
       ),
       ".",
     ),
