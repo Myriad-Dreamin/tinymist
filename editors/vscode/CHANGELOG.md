@@ -54,6 +54,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 * Added package documentation rendering from LSIF indexes in https://github.com/Myriad-Dreamin/tinymist/pull/2144
 * Added source-page enrichment from indexes in https://github.com/Myriad-Dreamin/tinymist/pull/2618
 * (Fix) Avoided eager package preloading in https://github.com/Myriad-Dreamin/tinymist/pull/2629
+* (Fix) Avoided cyclic package docs deadlocks in https://github.com/Myriad-Dreamin/tinymist/pull/2681
 * (Perf) Cached source span lookups in https://github.com/Myriad-Dreamin/tinymist/pull/2631
 * (Docs) Added package READMEs and licenses in https://github.com/Myriad-Dreamin/tinymist/pull/2632
 * (Docs) Applied minor typo and language fixes by @navdeeprana in https://github.com/Myriad-Dreamin/tinymist/pull/2604
