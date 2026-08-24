@@ -97,6 +97,82 @@ ${table}
 `;
 };
 
+const generateGpuViewerInstall = (version) => {
+  const platforms = [
+    {
+      name: "win32-x64",
+      displayName: "x64 Windows",
+      viewerTarget: "x86_64-pc-windows-msvc",
+      viewerArchive: "zip",
+    },
+    {
+      name: "win32-arm64",
+      displayName: "ARM64 Windows",
+      viewerTarget: "aarch64-pc-windows-msvc",
+      viewerArchive: "zip",
+    },
+    {
+      name: "linux-x64",
+      displayName: "x64 Linux",
+      viewerTarget: "x86_64-unknown-linux-gnu",
+      viewerArchive: "tar.gz",
+    },
+    {
+      name: "linux-arm64",
+      displayName: "ARM64 Linux",
+      viewerTarget: "aarch64-unknown-linux-gnu",
+      viewerArchive: "tar.gz",
+    },
+    {
+      name: "linux-armhf",
+      displayName: "ARMv7 Linux",
+      viewerTarget: "arm-unknown-linux-gnueabihf",
+      viewerArchive: "tar.gz",
+    },
+    {
+      name: "darwin-x64",
+      displayName: "Intel macOS",
+      viewerTarget: "x86_64-apple-darwin",
+      viewerArchive: "tar.gz",
+    },
+    {
+      name: "darwin-arm64",
+      displayName: "Apple Silicon macOS",
+      viewerTarget: "aarch64-apple-darwin",
+      viewerArchive: "tar.gz",
+    },
+  ];
+
+  const urlBase = `https://github.com/Myriad-Dreamin/tinymist/releases/download/v${version}`;
+  const rows = platforms.map((platform) => {
+    const extension = `tinymist-gpu-viewer-${platform.name}.vsix`;
+    const viewer = `tinymist-viewer-${platform.viewerTarget}.${platform.viewerArchive}`;
+    return `| [${extension}](${urlBase}/${extension}) | ${platform.displayName} | [${viewer}](${urlBase}/${viewer}) |`;
+  });
+
+  return `## Download tinymist-gpu-viewer VS Code Extension ${version}
+|  Extension  | Platform | Native Viewer |
+|-------------|----------|----------------|
+${rows.join("\n")}
+`;
+};
+
+const generateIntellijPluginInstall = (version) => {
+  const gradleProperties = fs.readFileSync("editors/intellij/gradle.properties", "utf8");
+  const pluginVersion = gradleProperties.match(/^pluginVersion\s*=\s*(.+)$/m)?.[1].trim();
+  if (!pluginVersion) {
+    throw new Error(
+      "Failed to find the IntelliJ plugin version in editors/intellij/gradle.properties",
+    );
+  }
+
+  const file = `tinymist-intellij-${pluginVersion}.zip`;
+  const url = `https://github.com/Myriad-Dreamin/tinymist/releases/download/v${version}/${file}`;
+  return `## Download Tinymist IntelliJ Plugin ${pluginVersion}
+[${file}](${url})
+`;
+};
+
 const collapsed = (content, summary) => {
   return `<details>
 
@@ -168,11 +244,24 @@ const main = async () => {
 
   fs.writeFileSync("target/announcement-changelog.md", changelogPlain);
 
-  const extensionInstallText = generateExtensionInstall(versionToUpload);
+  const extensionInstallText = [
+    generateExtensionInstall(versionToUpload),
+    generateGpuViewerInstall(versionToUpload),
+  ].join("\n\n");
+  const intellijPluginInstallText = generateIntellijPluginInstall(versionToUpload);
   // concat and generate final announcement
   const binInstallSection = collapsed(binInstallText, `Download Binary`);
-  const extensionInstallSection = collapsed(extensionInstallText, `Download VS Code Extension`);
-  const announcement = [changelogPlain, binInstallSection, extensionInstallSection].join("\n\n");
+  const extensionInstallSection = collapsed(extensionInstallText, `Download VS Code Extensions`);
+  const intellijPluginInstallSection = collapsed(
+    intellijPluginInstallText,
+    `Download IntelliJ Plugin`,
+  );
+  const announcement = [
+    changelogPlain,
+    binInstallSection,
+    extensionInstallSection,
+    intellijPluginInstallSection,
+  ].join("\n\n");
   fs.writeFileSync("target/announcement.gen.md", announcement);
 
   console.log("Please check the generated announcement in target/announcement.gen.md");

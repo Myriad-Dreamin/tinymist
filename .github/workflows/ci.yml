@@ -201,6 +201,29 @@ jobs:
   build-intellij:
     uses: ./.github/workflows/build-intellij-plugin.yml
 
+  release-intellij:
+    name: Upload IntelliJ plugin to release
+    needs: [prepare-build, announce, build, build-intellij]
+    if: ${{ success() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download IntelliJ plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tinymist-intellij-plugin
+          path: artifacts
+      - name: Upload IntelliJ plugin
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare-build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          plugin=$(find artifacts -type f -name '*.zip' -print -quit)
+          test -n "$plugin"
+          gh release upload "$RELEASE_TAG" "$plugin" --clobber
+
   checks-neovim:
     name: Neovim Spec Tests
     runs-on: ubuntu-latest
