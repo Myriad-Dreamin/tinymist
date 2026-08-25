@@ -702,7 +702,10 @@ impl CompletionPair<'_, '_, '_> {
                 let target = var.accessed_node()?;
                 let field = var.accessing_field()?;
 
-                self.cursor.from = field.offset(&self.cursor.source)?;
+                // The field offset can land past the cursor on incomplete input
+                // like `f(...x)`, where the classified dot access is the whole
+                // call. Keep `from <= cursor` so the replace range stays valid.
+                self.cursor.from = field.offset(&self.cursor.source)?.min(self.cursor.cursor);
 
                 self.doc_access_completions(&target);
                 return Some(());
