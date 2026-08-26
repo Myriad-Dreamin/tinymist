@@ -67,11 +67,10 @@ impl SyntaxRequest for OnEnterRequest {
                     return None;
                 }
 
-                match prev_leaf.kind() {
-                    SyntaxKind::ListItem | SyntaxKind::EnumItem => {
-                        return Some(Cases::ListOrEnum(prev_leaf));
-                    }
-                    _ => {}
+                // The previous sibling may be an ancestor of the item to
+                // continue. See `deepest_trailing_item` for details.
+                if let Some(item) = deepest_trailing_item(prev_leaf) {
+                    return Some(Cases::ListOrEnum(item));
                 }
 
                 None
@@ -88,17 +87,52 @@ impl SyntaxRequest for OnEnterRequest {
     }
 }
 
+/// Finds the innermost list/enum item that trails the given node by walking
+/// down the last child chain, skipping whitespace.
+///
+/// Nested items parse into their ancestor's body, so the sibling preceding
+/// trailing whitespace may be an ancestor of the item to continue.
+fn deepest_trailing_item(node: LinkedNode<'_>) -> Option<LinkedNode<'_>> {
+    let mut deepest = None;
+    let mut current = node;
+    loop {
+        if matches!(current.kind(), SyntaxKind::ListItem | SyntaxKind::EnumItem) {
+            deepest = Some(current.clone());
+        }
+
+        let Some(mut child) = current.children().last() else {
+            break;
+        };
+        while matches!(
+            child.kind(),
+            SyntaxKind::Space | SyntaxKind::Linebreak | SyntaxKind::Parbreak
+        ) {
+            match child.prev_sibling() {
+                Some(prev) => child = prev,
+                None => return deepest,
+            }
+        }
+        current = child;
+    }
+    deepest
+}
+
 struct OnEnterWorker<'a> {
     source: &'a Source,
     position_encoding: PositionEncoding,
 }
 
 impl OnEnterWorker<'_> {
+    /// Returns the exact leading whitespace of the line containing `of`,
+    /// preserving tabs and any mix of whitespace characters.
     fn indent_of(&self, of: usize) -> String {
         let all_text = self.source.text();
-        let start = all_text[..of].rfind('\n').map(|lf_offset| lf_offset + 1);
-        let indent_size = all_text[start.unwrap_or_default()..of].chars().count();
-        " ".repeat(indent_size)
+        let line_start = all_text[..of].rfind('\n').map_or(0, |lf| lf + 1);
+        let prefix = &all_text[line_start..of];
+        let ws_end = prefix
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(prefix.len());
+        prefix[..ws_end].to_owned()
     }
 
     fn enter_line_doc_comment(&self, leaf: LinkedNode, rng: Range<usize>) -> Option<Vec<TextEdit>> {
