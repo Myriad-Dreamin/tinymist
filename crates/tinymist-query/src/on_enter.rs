@@ -209,24 +209,39 @@ impl OnEnterWorker<'_> {
     fn enter_list_or_enum(&self, node: LinkedNode<'_>, rng: Range<usize>) -> Option<Vec<TextEdit>> {
         let rng_end = rng.end;
         let node_end = node.range().end;
+        let node_text = self.source.text();
         let in_middle_of_node = rng_end < node_end
-            && self.source.text()[rng_end..node_end].contains(|c: char| !c.is_whitespace());
-
-        if in_middle_of_node {
-            return None;
-        }
-
-        let indent = self.indent_of(node.range().start);
+            && node_text[rng_end..node_end].contains(|c: char| !c.is_whitespace());
 
         let is_list = matches!(node.kind(), SyntaxKind::ListItem);
         let marker = if is_list { "-" } else { "+" };
+        let indent = self.indent_of(node.range().start);
 
-        let edit = TextEdit {
-            range: to_lsp_range(rng, self.source, self.position_encoding),
-            new_text: format!("\n{indent}{marker} $0"),
-        };
+        if !in_middle_of_node {
+            let edit = TextEdit {
+                range: to_lsp_range(rng, self.source, self.position_encoding),
+                new_text: format!("\n{indent}{marker} $0"),
+            };
+            return Some(vec![edit]);
+        }
 
-        Some(vec![edit])
+        let line_end = node_text[rng_end..]
+            .find('\n')
+            .map(|offset| rng_end + offset)
+            .unwrap_or(node_end);
+
+        let remaining_on_line = &node_text[rng_end..line_end];
+        let remaining_trimmed = remaining_on_line.trim_start();
+
+        if !remaining_trimmed.is_empty() {
+            let edit = TextEdit {
+                range: to_lsp_range(rng.start..line_end, self.source, self.position_encoding),
+                new_text: format!("\n{indent}{marker} {remaining_trimmed}$0"),
+            };
+            return Some(vec![edit]);
+        }
+
+        None
     }
 }
 
