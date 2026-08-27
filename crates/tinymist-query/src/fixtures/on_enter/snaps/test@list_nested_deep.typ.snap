@@ -1,6 +1,5 @@
 ---
 source: crates/tinymist-query/src/on_enter.rs
-assertion_line: 257
 description: "On Enter on  b\n    - c||\n"
 expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
 input_file: crates/tinymist-query/src/fixtures/on_enter/list_nested_deep.typ
