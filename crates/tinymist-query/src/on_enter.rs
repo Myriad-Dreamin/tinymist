@@ -37,6 +37,12 @@ impl SyntaxRequest for OnEnterRequest {
         source: &Source,
         position_encoding: PositionEncoding,
     ) -> Option<Self::Response> {
+        enum Cases<'a> {
+            LineComment(LinkedNode<'a>),
+            Equation(LinkedNode<'a>),
+            ListOrEnum(LinkedNode<'a>),
+        }
+
         let root = LinkedNode::new(source.root());
         let rng = to_typst_range(self.range, position_encoding, source)?;
         let cursor = rng.start;
@@ -46,12 +52,6 @@ impl SyntaxRequest for OnEnterRequest {
             source,
             position_encoding,
         };
-
-        enum Cases<'a> {
-            LineComment(LinkedNode<'a>),
-            Equation(LinkedNode<'a>),
-            ListOrEnum(LinkedNode<'a>),
-        }
 
         let case = node_ancestors(&leaf).find_map(|node| match node.kind() {
             SyntaxKind::LineComment => Some(Cases::LineComment(node.clone())),
@@ -196,10 +196,10 @@ impl OnEnterWorker<'_> {
         let edit = TextEdit {
             range: to_lsp_range(rng, self.source, self.position_encoding),
             // todo: read indent configuration
-            new_text: if !content.contains('\n') {
-                format!("\n{indent}  $0\n{indent}")
-            } else {
+            new_text: if content.contains('\n') {
                 format!("\n{indent}  $0")
+            } else {
+                format!("\n{indent}  $0\n{indent}")
             },
         };
 
@@ -210,12 +210,54 @@ impl OnEnterWorker<'_> {
         let rng_end = rng.end;
         let node_end = node.range().end;
         let node_text = self.source.text();
-        let in_middle_of_node = rng_end < node_end
-            && node_text[rng_end..node_end].contains(|c: char| !c.is_whitespace());
-
         let is_list = matches!(node.kind(), SyntaxKind::ListItem);
         let marker = if is_list { "-" } else { "+" };
         let indent = self.indent_of(node.range().start);
+
+        let node_start = node.range().start;
+        let line_start = node_text[..node_start].rfind('\n').map_or(0, |pos| pos + 1);
+        let line_end = node_text[line_start..]
+            .find('\n')
+            .map_or(node_text.len(), |o| line_start + o);
+        let extended_end = node_end
+            + node_text[node_end..]
+                .bytes()
+                .take_while(|&b| b == b' ' || b == b'\t')
+                .count();
+        let extended_end = extended_end.min(line_end);
+
+        let after_marker_start = node.range().start + marker.len();
+        if rng_end >= after_marker_start
+            && rng_end <= extended_end
+            && node_text[after_marker_start..extended_end]
+                .trim()
+                .is_empty()
+        {
+            if indent.is_empty() {
+                let edit = TextEdit {
+                    range: to_lsp_range(
+                        line_start..extended_end,
+                        self.source,
+                        self.position_encoding,
+                    ),
+                    new_text: String::new(),
+                };
+                return Some(vec![edit]);
+            }
+            let parent_indent = &indent[..indent.len().saturating_sub(2)];
+            let edit = TextEdit {
+                range: to_lsp_range(
+                    line_start..extended_end,
+                    self.source,
+                    self.position_encoding,
+                ),
+                new_text: format!("{parent_indent}{marker} $0"),
+            };
+            return Some(vec![edit]);
+        }
+
+        let in_middle_of_node = rng_end < node_end
+            && node_text[rng_end..node_end].contains(|c: char| !c.is_whitespace());
 
         if !in_middle_of_node {
             let edit = TextEdit {
@@ -227,8 +269,7 @@ impl OnEnterWorker<'_> {
 
         let line_end = node_text[rng_end..]
             .find('\n')
-            .map(|offset| rng_end + offset)
-            .unwrap_or(node_end);
+            .map_or(node_end, |offset| rng_end + offset);
 
         let remaining_on_line = &node_text[rng_end..line_end];
         let remaining_trimmed = remaining_on_line.trim_start();
@@ -260,7 +301,7 @@ mod tests {
             let source = world.source_by_path(&path).unwrap();
 
             let request = OnEnterRequest {
-                path: path.clone(),
+                path,
                 range: find_test_range(&source),
                 handle_list: true,
             };
@@ -271,7 +312,7 @@ mod tests {
                 description => format!("On Enter on {}", make_range_annotation(&source)),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            })
+            });
         });
     }
 }
