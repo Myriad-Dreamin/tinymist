@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/on_enter/enum_let2.typ
 ---
 [
  {
-  "newText": "\n+ ) = 1;$0",
+  "newText": "\n+ $0) = 1;",
   "range": "1:1:1:15"
  }
 ]

@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/on_enter/list_mid_select.typ
 ---
 [
  {
-  "newText": "\n  - d second part$0",
+  "newText": "\n  - $0d second part",
   "range": "2:12:2:30"
  }
 ]

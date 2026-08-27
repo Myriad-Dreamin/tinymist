@@ -277,7 +277,7 @@ impl OnEnterWorker<'_> {
         if !remaining_trimmed.is_empty() {
             let edit = TextEdit {
                 range: to_lsp_range(rng.start..line_end, self.source, self.position_encoding),
-                new_text: format!("\n{indent}{marker} {remaining_trimmed}$0"),
+                new_text: format!("\n{indent}{marker} $0{remaining_trimmed}"),
             };
             return Some(vec![edit]);
         }
