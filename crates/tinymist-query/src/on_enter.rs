@@ -241,7 +241,11 @@ impl OnEnterWorker<'_> {
             return Some(vec![edit]);
         }
 
-        None
+        let edit = TextEdit {
+            range: to_lsp_range(rng, self.source, self.position_encoding),
+            new_text: format!("\n{indent}{marker} $0"),
+        };
+        Some(vec![edit])
     }
 }
 
