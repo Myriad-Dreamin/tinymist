@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/on_enter/list_nested_mid.typ
 ---
 [
  {
-  "newText": "\n    - dle part and rest$0",
+  "newText": "\n    - $0dle part and rest",
   "range": "6:9:6:26"
  }
 ]

@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/on_enter/enum.typ
 ---
 [
  {
-  "newText": "\n+ a$0",
+  "newText": "\n+ $0a",
   "range": "1:2:1:3"
  }
 ]
