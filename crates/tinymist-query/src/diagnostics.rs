@@ -154,12 +154,11 @@ impl<'w> DiagWorker<'w> {
             .flat_map(|tracepoint| self.to_related_info(tracepoint))
             .collect::<Vec<_>>();
 
-        if id != origin_id {
-            if let Some(origin) =
+        if id != origin_id
+            && let Some(origin) =
                 self.to_related_span(origin_id, origin_span, "diagnostic originated here")
-            {
-                related_information.insert(0, origin);
-            }
+        {
+            related_information.insert(0, origin);
         }
 
         let diagnostic = Diagnostic {
