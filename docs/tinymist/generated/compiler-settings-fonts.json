@@ -1,7 +1,7 @@
 {
   "generatedBy": "cargo run --quiet --bin tinymist-docs-tool -- --output docs/tinymist/generated/compiler-settings-fonts.json",
   "typstAssets": {
-    "version": "0.15.0"
+    "version": "0.15.1"
   },
   "fonts": [
     {
@@ -105,9 +105,9 @@
       "relativePath": "fonts/LibertinusSerif-SemiboldItalic.otf"
     },
     {
-      "family": "NewComputerModern10",
-      "displayFamily": "New Computer Modern 10",
-      "style": "Bold",
+      "family": "NewComputerModern",
+      "displayFamily": "New Computer Modern",
+      "style": "10 Bold",
       "fullName": "NewComputerModern10-Bold",
       "displayName": "New Computer Modern 10 Bold",
       "postscriptName": "NewCM10-Bold",
@@ -115,9 +115,9 @@
       "relativePath": "fonts/NewCM10-Bold.otf"
     },
     {
-      "family": "NewComputerModern10",
-      "displayFamily": "New Computer Modern 10",
-      "style": "BoldItalic",
+      "family": "NewComputerModern",
+      "displayFamily": "New Computer Modern",
+      "style": "10 BoldItalic",
       "fullName": "NewComputerModern10-BoldItalic",
       "displayName": "New Computer Modern 10 Bold Italic",
       "postscriptName": "NewCM10-BoldItalic",
@@ -125,9 +125,9 @@
       "relativePath": "fonts/NewCM10-BoldItalic.otf"
     },
     {
-      "family": "NewComputerModern10",
-      "displayFamily": "New Computer Modern 10",
-      "style": "Italic",
+      "family": "NewComputerModern",
+      "displayFamily": "New Computer Modern",
+      "style": "10 Italic",
       "fullName": "NewComputerModern10-Italic",
       "displayName": "New Computer Modern 10 Italic",
       "postscriptName": "NewCM10-Italic",
@@ -135,9 +135,9 @@
       "relativePath": "fonts/NewCM10-Italic.otf"
     },
     {
-      "family": "NewComputerModern10",
-      "displayFamily": "New Computer Modern 10",
-      "style": "Regular",
+      "family": "NewComputerModern",
+      "displayFamily": "New Computer Modern",
+      "style": "10 Regular",
       "fullName": "NewComputerModern10-Regular",
       "displayName": "New Computer Modern 10 Regular",
       "postscriptName": "NewCM10-Regular",
@@ -145,7 +145,7 @@
       "relativePath": "fonts/NewCM10-Regular.otf"
     },
     {
-      "family": "NewComputerModernMath",
+      "family": "NewComputerModern Math",
       "displayFamily": "New Computer Modern Math",
       "style": "Bold",
       "fullName": "NewComputerModernMath-Bold",
@@ -155,7 +155,7 @@
       "relativePath": "fonts/NewCMMath-Bold.otf"
     },
     {
-      "family": "NewComputerModernMath",
+      "family": "NewComputerModern Math",
       "displayFamily": "New Computer Modern Math",
       "style": "Book",
       "fullName": "NewComputerModernMath-Book",
@@ -165,7 +165,7 @@
       "relativePath": "fonts/NewCMMath-Book.otf"
     },
     {
-      "family": "NewComputerModernMath",
+      "family": "NewComputerModern Math",
       "displayFamily": "New Computer Modern Math",
       "style": "Regular",
       "fullName": "NewComputerModernMath-Regular",
