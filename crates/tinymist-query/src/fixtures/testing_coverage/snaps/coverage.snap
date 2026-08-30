@@ -1,0 +1,22 @@
+---
+source: crates/tinymist-query/src/tests.rs
+expression: coverage_report
+input_file: crates/tinymist-query/src/fixtures/testing_coverage/coverage_test.typ
+---
+{"/dummy-root/s0.typ":[{"executed":true,"location":{"end":{"character":18,"line":0},"start":{"character":17,"line":0}}},{"executed":true,"location":{"end":{"character":22,"line":0},"start":{"character":21,"line":0}}},{"executed":false,"location":{"end":{"character":18,"line":1},"start":{"character":17,"line":1}}},{"executed":false,"location":{"end":{"character":22,"line":1},"start":{"character":21,"line":1}}},{"executed":true,"location":{"end":{"character":18,"line":2},"start":{"character":17,"line":2}}},{"executed":true,"location":{"end":{"character":22,"line":2},"start":{"character":21,"line":2}}},{"executed":true,"location":{"end":{"character":19,"line":4},"start":{"character":18,"line":4}}},{"executed":true,"location":{"end":{"character":1,"line":6},"start":{"character":0,"line":6}}},{"executed":true,"location":{"end":{"character":19,"line":8},"start":{"character":18,"line":8}}},{"executed":true,"location":{"end":{"character":1,"line":10},"start":{"character":0,"line":10}}}]}
+--- /dummy-root/s0.typ
++ #let add(a, b) = [a] + [b]
+- #let sub(a, b) = <a> - <b>
++ #let mul(a, b) = [a] * [b]
+  
++ #let test-add() = [{]
+    assert(add(1, 2) == 3)
++ [}]
+  
++ #let test-mul() = [{]
+    assert(mul(2, 3) == 6)
++ [}]
+  
+  #test-add()
+  
+  #test-mul()

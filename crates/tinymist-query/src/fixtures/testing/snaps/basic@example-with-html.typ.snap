@@ -1,0 +1,6 @@
+---
+source: crates/tinymist-query/src/tests.rs
+expression: "json!({\n    \"tests\":\n    suites.tests.iter().map(|t|\n    json!({\n        \"name\": t.name, \"kind\": format!(\"{:?}\", t.kind),\n    })).collect::<Vec<_>>(), \"examples\":\n    suites.examples.iter().map(|e|\n    {\n        e.id().vpath().as_rooted_path().to_string_lossy().to_string()\n    }).collect::<Vec<_>>(),\n})"
+input_file: crates/tinymist-query/src/fixtures/testing/example-with-html.typ
+---
+{"examples":[],"tests":[]}
