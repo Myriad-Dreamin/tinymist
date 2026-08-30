@@ -628,19 +628,6 @@ dependencies = [
 
 [[package]]
 name = "biblatex"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53d0c374feba1b9a59042a7c1cf00ce7c34b977b9134fe7c42b08e5183729f66"
-dependencies = [
- "paste",
- "roman-numerals-rs",
- "strum",
- "unicode-normalization",
- "unscanny",
-]
-
-[[package]]
-name = "biblatex"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "591eba69b7c085632e22ca03606f0bbea68d53bbe26c8962e2d549af20c6a561"
@@ -2630,7 +2617,7 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b6c185c5c72546d50b25b70187f01ab9a1a2fa21c4db8691e2426fa5fce805c"
 dependencies = [
- "biblatex 0.12.0",
+ "biblatex",
  "ciborium",
  "citationberg",
  "icu_collator",
@@ -2656,7 +2643,7 @@ dependencies = [
  "bytemuck",
  "hayro-interpret",
  "image",
- "kurbo 0.13.1",
+ "kurbo",
  "pic-scale",
  "vello_cpu",
 ]
@@ -2686,7 +2673,7 @@ dependencies = [
  "bitflags 2.13.0",
  "hayro-cmap",
  "hayro-syntax",
- "kurbo 0.13.1",
+ "kurbo",
  "moxcms",
  "phf 0.13.1",
  "rustc-hash 2.1.2",
@@ -2730,7 +2717,7 @@ dependencies = [
  "base64 0.22.1",
  "hayro-interpret",
  "image",
- "kurbo 0.13.1",
+ "kurbo",
  "siphasher",
  "xmlwriter",
 ]
@@ -3544,17 +3531,6 @@ dependencies = [
  "smallvec",
  "tiny-skia 0.12.0",
  "usvg",
-]
-
-[[package]]
-name = "kurbo"
-version = "0.11.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c62026ae44756f8a599ba21140f350303d4f08dcdcc71b5ad9c9bb8128c13c62"
-dependencies = [
- "arrayvec",
- "euclid",
- "smallvec",
 ]
 
 [[package]]
@@ -4581,7 +4557,7 @@ checksum = "839c8299360d2e998bdb106dc0a6cd71dcc5f4df51df1b620361bf50e283cca6"
 dependencies = [
  "bytemuck",
  "color",
- "kurbo 0.13.1",
+ "kurbo",
  "linebender_resource_handle",
  "smallvec",
 ]
@@ -5327,7 +5303,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=9521cb0c851ce7d2753c183aafe23a02ebbe35b9#9521cb0c851ce7d2753c183aafe23a02ebbe35b9"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5344,7 +5320,7 @@ dependencies = [
  "serde_repr",
  "serde_with",
  "siphasher",
- "tiny-skia-path 0.11.4",
+ "tiny-skia-path 0.12.0",
  "tinymist-std",
  "tinymist-world",
  "typst",
@@ -5353,7 +5329,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=9521cb0c851ce7d2753c183aafe23a02ebbe35b9#9521cb0c851ce7d2753c183aafe23a02ebbe35b9"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5385,7 +5361,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=9521cb0c851ce7d2753c183aafe23a02ebbe35b9#9521cb0c851ce7d2753c183aafe23a02ebbe35b9"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5401,9 +5377,9 @@ dependencies = [
  "serde",
  "serde_json",
  "skrifa 0.42.1",
- "svgtypes 0.15.3",
- "tiny-skia 0.11.4",
- "tiny-skia-path 0.11.4",
+ "svgtypes",
+ "tiny-skia 0.12.0",
+ "tiny-skia-path 0.12.0",
  "ttf-parser",
  "typst",
  "typst-html",
@@ -5414,15 +5390,15 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=9521cb0c851ce7d2753c183aafe23a02ebbe35b9#9521cb0c851ce7d2753c183aafe23a02ebbe35b9"
+source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
 dependencies = [
  "base64 0.22.1",
  "comemo",
  "log",
  "reflexo",
  "reflexo-typst2vec",
- "svgtypes 0.15.3",
- "tiny-skia-path 0.11.4",
+ "svgtypes",
+ "tiny-skia-path 0.12.0",
  "typst",
 ]
 
@@ -5528,7 +5504,7 @@ dependencies = [
  "log",
  "pico-args",
  "rgb",
- "svgtypes 0.16.1",
+ "svgtypes",
  "tiny-skia 0.12.0",
  "usvg",
  "zune-jpeg",
@@ -6314,7 +6290,7 @@ version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38803281d1c23166c5ebcb455439a5d2afe711cc909cf88af72448c297756ad6"
 dependencies = [
- "kurbo 0.13.1",
+ "kurbo",
  "rustc-hash 2.1.2",
  "skrifa 0.42.1",
  "write-fonts",
@@ -6334,21 +6310,11 @@ checksum = "0193cc4331cfd2f3d2011ef287590868599a2f33c3e69bc22c1a3d3acf9e02fb"
 
 [[package]]
 name = "svgtypes"
-version = "0.15.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68c7541fff44b35860c1a7a47a7cadf3e4a304c457b58f9870d9706ece028afc"
-dependencies = [
- "kurbo 0.11.3",
- "siphasher",
-]
-
-[[package]]
-name = "svgtypes"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "695b5790b3131dafa99b3bbfd25a216edb3d216dad9ca208d4657bfb8f2abc3d"
 dependencies = [
- "kurbo 0.13.1",
+ "kurbo",
  "siphasher",
 ]
 
@@ -6634,7 +6600,6 @@ dependencies = [
  "bytemuck",
  "cfg-if",
  "log",
- "png 0.17.16",
  "tiny-skia-path 0.11.4",
 ]
 
@@ -7080,7 +7045,7 @@ version = "0.15.4"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
- "biblatex 0.11.0",
+ "biblatex",
  "comemo",
  "dashmap",
  "dirs",
@@ -7289,7 +7254,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "smallvec",
- "svgtypes 0.15.3",
+ "svgtypes",
  "tinymist-assets 0.15.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tinymist-preview",
  "tinymist-std",
@@ -7935,7 +7900,7 @@ dependencies = [
  "icu_provider",
  "icu_provider_blob",
  "icu_segmenter",
- "kurbo 0.13.1",
+ "kurbo",
  "libm",
  "memchr",
  "rustc-hash 2.1.2",
@@ -7978,7 +7943,7 @@ dependencies = [
  "image",
  "indexmap 2.14.0",
  "kamadak-exif",
- "kurbo 0.13.1",
+ "kurbo",
  "libm",
  "lipsum",
  "memchr",
@@ -8273,7 +8238,7 @@ checksum = "e3e29e3e199888d594edd191c5917a2d5c1893b8bf20076c2bf4df7a40a2ee71"
 dependencies = [
  "dpi",
  "keyboard-types",
- "kurbo 0.13.1",
+ "kurbo",
 ]
 
 [[package]]
@@ -8470,7 +8435,7 @@ dependencies = [
  "flate2",
  "fontdb",
  "imagesize",
- "kurbo 0.13.1",
+ "kurbo",
  "log",
  "pico-args",
  "roxmltree 0.21.1",
@@ -8478,7 +8443,7 @@ dependencies = [
  "simplecss",
  "siphasher",
  "strict-num",
- "svgtypes 0.16.1",
+ "svgtypes",
  "tiny-skia-path 0.12.0",
  "ttf-parser",
  "unicode-bidi",
@@ -9738,7 +9703,7 @@ checksum = "cb731d4c4d93eacc69a1ad2f270f905788a98e4a3438267bcafbe08d3431c8d8"
 dependencies = [
  "font-types 0.11.3",
  "indexmap 2.14.0",
- "kurbo 0.13.1",
+ "kurbo",
  "log",
  "read-fonts 0.39.2",
 ]
