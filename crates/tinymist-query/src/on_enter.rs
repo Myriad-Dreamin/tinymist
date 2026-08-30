@@ -117,6 +117,17 @@ fn deepest_trailing_item(node: LinkedNode<'_>) -> Option<LinkedNode<'_>> {
     deepest
 }
 
+/// Removes up to `units` indent characters from the end of `indent`.
+///
+/// The count is char-based so the result is always valid UTF-8, even when
+/// the indent contains multi-byte whitespace such as `U+3000`.
+fn strip_indent_units(indent: &str, units: usize) -> String {
+    indent
+        .chars()
+        .take(indent.chars().count().saturating_sub(units))
+        .collect()
+}
+
 struct OnEnterWorker<'a> {
     source: &'a Source,
     position_encoding: PositionEncoding,
@@ -133,6 +144,20 @@ impl OnEnterWorker<'_> {
             .find(|c: char| !c.is_whitespace())
             .unwrap_or(prefix.len());
         prefix[..ws_end].to_owned()
+    }
+
+    /// Returns the indent of the nearest enclosing list/enum item of `node`,
+    /// if any. Nested items parse into their ancestor item's body, so the
+    /// parent's indent is the correct dedent target.
+    fn parent_item_indent(&self, node: &LinkedNode<'_>) -> Option<String> {
+        let mut current = node.parent();
+        while let Some(ancestor) = current {
+            if matches!(ancestor.kind(), SyntaxKind::ListItem | SyntaxKind::EnumItem) {
+                return Some(self.indent_of(ancestor.range().start));
+            }
+            current = ancestor.parent();
+        }
+        None
     }
 
     fn enter_line_doc_comment(&self, leaf: LinkedNode, rng: Range<usize>) -> Option<Vec<TextEdit>> {
@@ -244,7 +269,9 @@ impl OnEnterWorker<'_> {
                 };
                 return Some(vec![edit]);
             }
-            let parent_indent = &indent[..indent.len().saturating_sub(2)];
+            let parent_indent = self
+                .parent_item_indent(&node)
+                .unwrap_or_else(|| strip_indent_units(&indent, 2));
             let edit = TextEdit {
                 range: to_lsp_range(
                     line_start..extended_end,
@@ -294,6 +321,20 @@ impl OnEnterWorker<'_> {
 mod tests {
     use super::*;
     use crate::tests::*;
+
+    #[test]
+    fn strip_indent_units_is_char_based() {
+        assert_eq!(strip_indent_units("    ", 2), "  ");
+        assert_eq!(strip_indent_units("\t ", 2), "");
+        assert_eq!(strip_indent_units(" ", 2), "");
+        // Multi-byte whitespace must never be split in the middle.
+        assert_eq!(strip_indent_units("\u{3000}\u{3000}", 2), "");
+        assert_eq!(
+            strip_indent_units("\u{3000}\u{3000}\u{3000}", 2),
+            "\u{3000}"
+        );
+        assert_eq!(strip_indent_units(" \u{3000}", 1), " ");
+    }
 
     #[test]
     fn test() {

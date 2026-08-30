@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/on_enter.rs
+description: "On Enter on ent\n    - ||\n"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/on_enter/list_dedent_4space.typ
+---
+[
+ {
+  "newText": "- $0",
+  "range": "2:0:2:6"
+ }
+]
