@@ -437,6 +437,12 @@ function inspectChangelog(filePath, releaseVersion) {
   const pullRequests = extractPullRequests(entryText);
   const itemCount = entryLines.filter((line) => line.trim().startsWith("* ")).length;
 
+  // scripts/draft-release.mjs patches the `**Full Changelog**` compare link of
+  // the newest entry; it must exist and point at this release version.
+  const fullChangelogMatch = entryText.match(
+    /\*\*Full Changelog\*\*: https:\/\/github\.com\/Myriad-Dreamin\/tinymist\/compare\/v(\d+\.\d+\.\d+)\.\.\.v(\d+\.\d+\.\d+(?:-rc\d+)?)/,
+  );
+
   return {
     path: filePath,
     entryVersion: releaseVersion,
@@ -444,6 +450,9 @@ function inspectChangelog(filePath, releaseVersion) {
     hasEntry: true,
     heading: lines[headingIndex],
     itemCount,
+    fullChangelog: fullChangelogMatch
+      ? { previousVersion: fullChangelogMatch[1], releaseVersion: fullChangelogMatch[2] }
+      : null,
     entryLines,
     pullRequests,
   };
@@ -813,6 +822,16 @@ function buildReadiness({
     blockers.push({
       code: "empty-changelog-entry",
       message: `Changelog entry ${changelogInfo.heading} does not contain any bullet items yet.`,
+    });
+  } else if (!changelogInfo.fullChangelog) {
+    blockers.push({
+      code: "missing-full-changelog-link",
+      message: `Changelog entry ${changelogInfo.heading} is missing the "**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v<prev>...v<release>" line required by scripts/draft-release.mjs.`,
+    });
+  } else if (!targetVersionValue.startsWith(changelogInfo.fullChangelog.releaseVersion)) {
+    blockers.push({
+      code: "stale-full-changelog-link",
+      message: `The Full Changelog link in ${changelogInfo.heading} targets v${changelogInfo.fullChangelog.releaseVersion}, but the release version is ${targetVersionValue}. Update the compare link to end with ...v${targetVersionValue.replace(/-rc\d+$/, "")}.`,
     });
   }
 
