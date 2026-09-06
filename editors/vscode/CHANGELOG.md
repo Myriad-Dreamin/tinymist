@@ -23,6 +23,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 
 * Added PDF export editor context action by @dlshuangchenyue1210 in https://github.com/Myriad-Dreamin/tinymist/pull/2684
 
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.4...v0.15.6
+
 ## v0.15.4 - [2026-07-26]
 
 * Bumped typst.ts to 0.8.0-rc3 in https://github.com/Myriad-Dreamin/tinymist/pull/2638
