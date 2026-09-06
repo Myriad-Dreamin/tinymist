@@ -6,7 +6,7 @@ input_file: crates/tinymist-query/src/fixtures/on_enter/list2.typ
 ---
 [
  {
-  "newText": "\n- $0",
-  "range": "1:2:1:2"
+  "newText": "",
+  "range": "1:0:1:2"
  }
 ]
