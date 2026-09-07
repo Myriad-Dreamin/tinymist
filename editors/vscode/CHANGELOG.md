@@ -10,6 +10,23 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.15.8 - [2026-09-04]
+
+* Bumped typst to v0.15.1 in https://github.com/Myriad-Dreamin/tinymist/pull/2702
+
+This re-releases v0.15.6, whose release announcement failed to be generated.
+
+### Docs
+
+* (Fix) Replaced the outdated link to detypify supported-symbols.txt by @YDX-2147483647 in https://github.com/Myriad-Dreamin/tinymist/pull/2688
+* (Docs) Changed `json.decode(...)` to `json(bytes(...))` for preview args by @Leedehai in https://github.com/Myriad-Dreamin/tinymist/pull/2673
+
+### Editor
+
+* Added PDF export editor context action by @dlshuangchenyue1210 in https://github.com/Myriad-Dreamin/tinymist/pull/2684
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.4...v0.15.8
+
 ## v0.15.6 - [2026-09-04]
 
 * Bumped typst to v0.15.1 in https://github.com/Myriad-Dreamin/tinymist/pull/2702
@@ -22,6 +39,8 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Editor
 
 * Added PDF export editor context action by @dlshuangchenyue1210 in https://github.com/Myriad-Dreamin/tinymist/pull/2684
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.4...v0.15.6
 
 ## v0.15.4 - [2026-07-26]
 
