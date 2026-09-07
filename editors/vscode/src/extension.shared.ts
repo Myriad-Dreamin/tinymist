@@ -158,6 +158,9 @@ export async function tinymistActivate(
       await tinymistDeactivate(trait);
       await tinymistActivate(context, trait);
     }),
+    commands.registerCommand("tinymist.getLogText", (options?: { maxChars?: number }) => {
+      return tinymist.getLogText(options?.maxChars);
+    }),
     commands.registerCommand("tinymist.showLog", () => tinymist.showLog()),
   );
   // Activates platform-dependent features
