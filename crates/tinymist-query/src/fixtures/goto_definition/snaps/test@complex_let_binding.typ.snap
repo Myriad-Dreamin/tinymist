@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/goto_definition.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/goto_definition/complex_let_binding.typ
+---
+[
+ {
+  "originSelectionRange": "15:23:15:25",
+  "targetRange": "13:5:13:7",
+  "targetSelectionRange": "13:5:13:7",
+  "targetUri": "s0.typ"
+ }
+]
