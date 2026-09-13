@@ -3322,6 +3322,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8206,11 +8215,12 @@ dependencies = [
 
 [[package]]
 name = "typstyle-core"
-version = "0.14.4"
-source = "git+https://github.com/Myriad-Dreamin/typstyle.git?rev=992f36112200bc0ea61df8a7c2af6d9ae56781dd#992f36112200bc0ea61df8a7c2af6d9ae56781dd"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c80a95fb8a007c740c5f5362b86a6be9b9aa3bcea2d7ffabf0bb4aeb188d90b6"
 dependencies = [
- "ecow",
- "itertools 0.14.0",
+ "icu_segmenter",
+ "itertools 0.15.0",
  "prettyless",
  "rustc-hash 2.1.2",
  "smallvec",
