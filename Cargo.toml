@@ -195,7 +195,7 @@ typst-eval = "0.15.1"
 typst-assets = "0.15.1"
 typstfmt = { version = "0", git = "https://github.com/Myriad-Dreamin/typstfmt", tag = "v0.13.1" }
 typst-ansi-hl = "0.5.0"
-typstyle-core = { version = "0.14.4", default-features = false }
+typstyle-core = { version = "0.15.1", default-features = false }
 
 # LSP
 crossbeam-channel = "0.5.15"
@@ -340,7 +340,10 @@ typst-timing = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tin
 typst-utils = { git = "https://github.com/Myriad-Dreamin/typst.git", tag = "tinymist/v0.15.1" }
 
 typst-ansi-hl = { git = "https://github.com/Myriad-Dreamin/typst-ansi-hl.git", rev = "3867cb7229ec6b3e3c8f5b1222af96f98bba9bff" }
-typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = "992f36112200bc0ea61df8a7c2af6d9ae56781dd" }
+# `typstyle-core` now comes from crates.io. The fork only existed to carry the
+# `0.15.0-rc.1` `typst-syntax` requirement, and its `mapping`/`ast_mapping`
+# additions are in upstream `v0.15.1`, which targets `typst-syntax = "0.15.1"`.
+# typstyle-core = { git = "https://github.com/Myriad-Dreamin/typstyle.git", rev = "992f36112200bc0ea61df8a7c2af6d9ae56781dd" }
 
 # These patches use local `typst` for development.
 # typst = { path = "../typst/crates/typst" }

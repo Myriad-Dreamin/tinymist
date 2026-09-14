@@ -116,10 +116,21 @@ Sets the print width for the formatter, which is a **soft limit** of characters 
 
 ## `formatterProseWrap`
 
-Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces.
+Controls how the formatter handles prose line wrapping. If disabled, the formatter keeps the original line breaks and spaces. If enabled, the formatter will insert hard line breaks at the specified print width, or at the end of each sentence with the `sentence` mode.
 
-- **Type**: `boolean`
-- **Default**: `false`
+This configuration item can be one of following types:
+
+- Selects a prose wrapping mode. `sentence` reflows prose so that each sentence starts on its own line, which keeps diffs small when collaborating on prose.
+  - **Type**: `string`
+  - **Valid Values**:
+    - `"none"` : Keep the original line breaks and spaces in prose.
+    - `"fill"` : Wrap prose to fit within the configured print width.
+    - `"sentence"` : Place each sentence on its own line.
+  - **Default**: `"none"`
+- Boolean form of the setting: `true` is equivalent to `fill` and `false` to `none`.
+  - **Type**: `boolean`
+  - **Default**: `false`
+- **Default**: `"none"`
 
 ## `lint.enabled`
 

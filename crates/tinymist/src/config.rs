@@ -164,7 +164,7 @@ pub struct Config {
     /// Sets the indent size (using space) for the formatter.
     pub formatter_indent_size: Option<u32>,
     /// Sets the hard line wrapping mode for the formatter.
-    pub formatter_prose_wrap: Option<bool>,
+    pub formatter_prose_wrap: Option<FormatterProseWrap>,
     /// The warnings during configuration update.
     pub warnings: Vec<CowStr>,
 }
@@ -395,7 +395,7 @@ impl Config {
         assign_config!(formatter_mode := "formatterMode"?: FormatterMode);
         assign_config!(formatter_print_width := "formatterPrintWidth"?: Option<u32>);
         assign_config!(formatter_indent_size := "formatterIndentSize"?: Option<u32>);
-        assign_config!(formatter_prose_wrap := "formatterProseWrap"?: Option<bool>);
+        assign_config!(formatter_prose_wrap := "formatterProseWrap"?: Option<FormatterProseWrap>);
         assign_config!(output_path := "outputPath"?: PathPattern);
         assign_config!(preview := "preview"?: PreviewFeat);
         assign_config!(lint := "lint"?: LintFeat);
@@ -576,7 +576,10 @@ impl Config {
     pub fn formatter(&self) -> FormatUserConfig {
         let formatter_print_width = self.formatter_print_width.unwrap_or(120) as usize;
         let formatter_indent_size = self.formatter_indent_size.unwrap_or(2) as usize;
-        let formatter_line_wrap = self.formatter_prose_wrap.unwrap_or(false);
+        let formatter_prose_wrap = self.formatter_prose_wrap.unwrap_or_default();
+        // `typstfmt` only distinguishes whether text is wrapped at all, so both
+        // `fill` and `sentence` map to its line wrapping.
+        let formatter_line_wrap = formatter_prose_wrap != FormatterProseWrap::None;
 
         FormatUserConfig {
             config: match self.formatter_mode {
@@ -584,7 +587,7 @@ impl Config {
                     FormatterConfig::Typstyle(Box::new(typstyle_core::Config {
                         tab_spaces: formatter_indent_size,
                         max_width: formatter_print_width,
-                        wrap_text: formatter_line_wrap,
+                        wrap_mode: formatter_prose_wrap.to_typstyle(),
                         ..typstyle_core::Config::default()
                     }))
                 }
@@ -1073,6 +1076,88 @@ pub enum FormatterMode {
     Typstyle,
     /// Use `typstfmt` formatter.
     Typstfmt,
+}
+
+/// How the formatter reflows prose inside markup.
+///
+/// This models `typstyle`'s text wrapping modes. It also accepts the boolean
+/// form, which predates the wrapping modes: `true` means
+/// [`FormatterProseWrap::Fill`] and `false` means [`FormatterProseWrap::None`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FormatterProseWrap {
+    /// Keep the original line breaks and spaces.
+    #[default]
+    None,
+    /// Wrap prose to fit within the configured print width.
+    Fill,
+    /// Place each sentence on its own line.
+    Sentence,
+}
+
+impl FormatterProseWrap {
+    /// Converts this setting to the `typstyle` text wrapping mode.
+    pub fn to_typstyle(self) -> typstyle_core::WrapMode {
+        match self {
+            FormatterProseWrap::None => typstyle_core::WrapMode::None,
+            FormatterProseWrap::Fill => typstyle_core::WrapMode::Fill,
+            FormatterProseWrap::Sentence => typstyle_core::WrapMode::Sentence,
+        }
+    }
+}
+
+impl Serialize for FormatterProseWrap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(match self {
+            FormatterProseWrap::None => "none",
+            FormatterProseWrap::Fill => "fill",
+            FormatterProseWrap::Sentence => "sentence",
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for FormatterProseWrap {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = FormatterProseWrap;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("one of \"none\", \"fill\", \"sentence\", or a boolean")
+            }
+
+            fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(if v {
+                    FormatterProseWrap::Fill
+                } else {
+                    FormatterProseWrap::None
+                })
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match v {
+                    "none" => Ok(FormatterProseWrap::None),
+                    "fill" => Ok(FormatterProseWrap::Fill),
+                    "sentence" => Ok(FormatterProseWrap::Sentence),
+                    _ => Err(E::unknown_variant(v, &["none", "fill", "sentence"])),
+                }
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 /// The mode of semantic tokens.

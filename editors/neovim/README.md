@@ -77,7 +77,7 @@ Either [`typstyle`](https://typstyle-rs.github.io/typstyle/) or [`typstfmt`](htt
 
 ```lua
 formatterMode = "typstyle", -- or "typstfmt"
-formatterProseWrap = true, -- wrap lines in content mode
+formatterProseWrap = "sentence", -- "none", "fill", or "sentence"
 formatterPrintWidth = 80,  -- limit line length to 80 if possible
 formatterIndentSize = 4,   -- indentation width
 ```

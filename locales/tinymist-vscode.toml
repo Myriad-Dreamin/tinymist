@@ -1329,8 +1329,36 @@ en = "Prose Wrapping Control"
 zh = "文本换行控制"
 
 [extension.tinymist.config.tinymist.formatterProseWrap.desc]
-en = "Controls how the formatter handles prose line wrapping. If enabled, the formatter will insert hard line breaks at the specified print width. If disabled, the formatter keeps the original line breaks and spaces."
-zh = "控制格式化程序如何处理文本换行。如果启用，格式化程序将在指定的打印宽度处插入换行符。如果禁用，格式化程序将保留原始换行符和空格。"
+en = "Controls how the formatter handles prose line wrapping. If disabled, the formatter keeps the original line breaks and spaces. If enabled, the formatter will insert hard line breaks at the specified print width, or at the end of each sentence with the `sentence` mode."
+zh = "控制格式化程序如何处理文本换行。如果禁用，格式化程序将保留原始换行符和空格。如果启用，格式化程序将在指定的打印宽度处插入换行符；`sentence` 模式下则在每个句子末尾换行。"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.string.title]
+en = "Prose wrapping mode"
+zh = "文本换行模式"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.string.desc]
+en = "Selects a prose wrapping mode. `sentence` reflows prose so that each sentence starts on its own line, which keeps diffs small when collaborating on prose."
+zh = "选择文本换行模式。`sentence` 会重排文本，使每个句子独占一行，便于协作写作时减少无谓的差异。"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.string.enum.none]
+en = "Keep the original line breaks and spaces in prose."
+zh = "保留文本中原有的换行符和空格。"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.string.enum.fill]
+en = "Wrap prose to fit within the configured print width."
+zh = "在配置的打印宽度内对文本进行换行。"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.string.enum.sentence]
+en = "Place each sentence on its own line."
+zh = "让每个句子独占一行。"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.boolean.title]
+en = "Prose wrapping toggle"
+zh = "文本换行开关"
+
+[extension.tinymist.config.tinymist.formatterProseWrap.anyOf.boolean.desc]
+en = "Boolean form of the setting: `true` is equivalent to `fill` and `false` to `none`."
+zh = "该设置的布尔形式:`true` 等价于 `fill`,`false` 等价于 `none`。"
 
 [extension.tinymist.config.tinymist.showExportFileIn.title]
 en = "Show Export File In"
