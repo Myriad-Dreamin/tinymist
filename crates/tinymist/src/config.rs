@@ -1,4 +1,5 @@
 use core::fmt;
+use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock, OnceLock};
 
@@ -298,17 +299,52 @@ impl Config {
     }
 
     /// Converts config values to a map object.
+    ///
+    /// The server asks for both the `tinymist.<key>` and the `<key>` section of
+    /// every setting, and a client may answer the whole `tinymist` section with
+    /// a namespaced object. All of those describe settings in the same
+    /// namespace, so they are merged into the flat shape that
+    /// [`Config::update_by_map`] reads, keeping the precedence that the
+    /// namespace has over top-level settings.
+    ///
+    /// The answer of a single `tinymist.<key>` section wins over the namespace
+    /// object: the client resolved it for that key, and some clients normalize
+    /// it there but not inside the object, e.g. VS Code substitutes editor
+    /// variables in the former only.
     pub fn values_to_map(values: Vec<JsonValue>) -> Map<String, JsonValue> {
-        let unpaired_values = values
-            .into_iter()
-            .tuples()
-            .map(|(a, b)| if !a.is_null() { a } else { b });
+        // The object answered for the whole `tinymist` section.
+        let mut namespace = Map::new();
+        let mut map = Map::new();
 
-        CONFIG_ITEMS
-            .iter()
-            .map(|&item| item.to_owned())
-            .zip(unpaired_values)
-            .collect()
+        for (&item, (namespaced, top_level)) in CONFIG_ITEMS.iter().zip(values.into_iter().tuples())
+        {
+            if item == "tinymist" {
+                namespace = top_level.as_object().cloned().unwrap_or_default();
+                continue;
+            }
+
+            map.insert(
+                item.to_owned(),
+                if !namespaced.is_null() {
+                    namespaced
+                } else {
+                    top_level
+                },
+            );
+        }
+
+        // Settings the client did not resolve per key come from the namespace
+        // object, which is the only answer a pure eglot client gives.
+        for (key, value) in namespace {
+            match map.get(&key) {
+                Some(existing) if !existing.is_null() => {}
+                _ => {
+                    map.insert(key, value);
+                }
+            }
+        }
+
+        map
     }
 
     /// Updates (and validates) the configuration by a JSON object.
@@ -317,14 +353,7 @@ impl Config {
     /// configuration before updating and revert if the update fails.
     pub fn update(&mut self, update: &JsonValue) -> Result<()> {
         if let JsonValue::Object(update) = update {
-            self.update_by_map(update)?;
-
-            // Configurations in the tinymist namespace take precedence.
-            if let Some(namespaced) = update.get("tinymist").and_then(JsonValue::as_object) {
-                self.update_by_map(namespaced)?;
-            }
-
-            Ok(())
+            self.update_by_map(update)
         } else {
             tinymist_l10n::bail!(
                 "tinymist.config.invalidObject",
@@ -332,6 +361,23 @@ impl Config {
                 object = update.debug_l10n(),
             )
         }
+    }
+
+    /// Unpacks a `tinymist`-namespaced configuration object.
+    ///
+    /// The two forms documented for clients, `{"exportTarget": "bundle"}` and
+    /// `{"tinymist": {"exportTarget": "bundle"}}`, describe the same settings,
+    /// so they are flattened into one shape here.
+    fn unpack_namespace(update: &Map<String, JsonValue>) -> Cow<'_, Map<String, JsonValue>> {
+        let Some(JsonValue::Object(namespaced)) = update.get("tinymist") else {
+            return Cow::Borrowed(update);
+        };
+
+        // Configurations in the tinymist namespace take precedence.
+        let mut flat = update.clone();
+        flat.extend(namespaced.clone());
+
+        Cow::Owned(flat)
     }
 
     /// Updates (and validates) the configuration by a map object.
@@ -343,6 +389,9 @@ impl Config {
             "ServerState: config update_by_map {}",
             serde_json::to_string(update).unwrap_or_else(|e| e.to_string())
         );
+
+        let flattened = Self::unpack_namespace(update);
+        let update = flattened.as_ref();
 
         self.warnings.clear();
 
@@ -1390,6 +1439,174 @@ mod tests {
         good_config(&mut config, &update);
 
         assert_eq!(config.export_pdf, TaskWhen::OnType);
+    }
+
+    /// A `tinymist`-namespaced object must be honored by every configuration
+    /// delivery path, not only by `initializationOptions`. This is the payload
+    /// shape `workspace/didChangeConfiguration` delivers.
+    #[test]
+    fn test_namespaced_config_update_by_map() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "tinymist": {
+                "exportPdf": "onType",
+                "formatterProseWrap": "sentence",
+            }
+        });
+
+        config
+            .update_by_map(update.as_object().unwrap())
+            .expect("valid config");
+
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+        assert_eq!(config.export_pdf, TaskWhen::OnType);
+        assert_eq!(
+            config.formatter_prose_wrap,
+            Some(FormatterProseWrap::Sentence)
+        );
+    }
+
+    /// A namespaced key still wins over the same key outside of the namespace,
+    /// whichever path delivers the payload.
+    #[test]
+    fn test_namespaced_config_takes_precedence_in_update_by_map() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "exportPdf": "onSave",
+            "tinymist": {
+                "exportPdf": "onType",
+            }
+        });
+
+        config
+            .update_by_map(update.as_object().unwrap())
+            .expect("valid config");
+
+        assert_eq!(config.export_pdf, TaskWhen::OnType);
+    }
+
+    /// The namespace takes precedence, it does not replace the payload: a
+    /// setting that only the top level carries still applies.
+    #[test]
+    fn test_namespaced_config_keeps_top_level_settings() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "exportPdf": "onSave",
+            "compileStatus": "enable",
+            "tinymist": {
+                "formatterProseWrap": "sentence",
+            }
+        });
+
+        config
+            .update_by_map(update.as_object().unwrap())
+            .expect("valid config");
+
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+        assert_eq!(config.export_pdf, TaskWhen::OnSave);
+        assert!(config.notify_status);
+        assert_eq!(
+            config.formatter_prose_wrap,
+            Some(FormatterProseWrap::Sentence)
+        );
+    }
+
+    /// Clients such as Zed report unset settings as `null`, and a namespaced
+    /// `null` must be as harmless as a `null` at the top level.
+    #[test]
+    fn test_namespaced_config_tolerates_null_settings() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "tinymist": {
+                "exportPdf": null,
+                "fontPaths": null,
+                "colorTheme": null,
+            }
+        });
+
+        config
+            .update_by_map(update.as_object().unwrap())
+            .expect("valid config");
+
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+        assert_eq!(config.export_pdf, TaskWhen::Never);
+        assert!(config.font_paths.is_empty());
+        assert_eq!(config.color_theme, None);
+    }
+
+    /// A namespaced setting that cannot be deserialized reports the failure
+    /// through the configuration warnings instead of being silently dropped.
+    #[test]
+    fn test_namespaced_config_reports_invalid_settings() {
+        let mut config = Config::default();
+
+        let update = json!({
+            "tinymist": {
+                "exportPdf": "not-a-task-when",
+            }
+        });
+
+        config
+            .update_by_map(update.as_object().unwrap())
+            .expect("valid config");
+
+        assert!(
+            warning_text(&config).contains("exportPdf"),
+            "warnings: {}",
+            warning_text(&config)
+        );
+    }
+
+    /// A client that only answers the requested `tinymist` section, like eglot,
+    /// answers it with a namespaced object, so the pull path must unpack it too.
+    #[test]
+    fn test_values_to_map_unpacks_namespaced_section() {
+        let values = Config::get_items()
+            .into_iter()
+            .map(|item| match item.section.as_deref() {
+                Some("tinymist") => json!({
+                    "exportTarget": "bundle",
+                    "exportPdf": "onType",
+                }),
+                _ => JsonValue::Null,
+            })
+            .collect::<Vec<_>>();
+
+        let mut config = Config::default();
+        config
+            .update_by_map(&Config::values_to_map(values))
+            .expect("valid config");
+
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+        assert_eq!(config.export_target, ExportTarget::Bundle);
+        assert_eq!(config.export_pdf, TaskWhen::OnType);
+    }
+
+    /// An answer for a `tinymist.<key>` section is already namespace-resolved by
+    /// the client, and some editors normalize it there, so it stays authoritative
+    /// over the answer for the whole `tinymist` section.
+    #[test]
+    fn test_values_to_map_prefers_named_sections() {
+        let values = Config::get_items()
+            .into_iter()
+            .map(|item| match item.section.as_deref() {
+                Some("tinymist") => json!({ "exportTarget": "bundle" }),
+                Some("tinymist.exportTarget") => json!("paged"),
+                _ => JsonValue::Null,
+            })
+            .collect::<Vec<_>>();
+
+        let mut config = Config::default();
+        config
+            .update_by_map(&Config::values_to_map(values))
+            .expect("valid config");
+
+        assert!(config.warnings.is_empty(), "{:?}", config.warnings);
+        assert_eq!(config.export_target, ExportTarget::Paged);
     }
 
     #[test]
