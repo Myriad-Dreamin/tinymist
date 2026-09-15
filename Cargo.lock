@@ -6850,7 +6850,6 @@ dependencies = [
  "typst-svg",
  "typst-timing 0.15.1",
  "typstfmt",
- "typstyle-core",
  "unicode-script",
  "vergen",
  "walkdir",

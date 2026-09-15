@@ -86,7 +86,6 @@ typst-shim.workspace = true
 typst-svg.workspace = true
 typst-timing.workspace = true
 typstfmt.workspace = true
-typstyle-core.workspace = true
 unicode-script.workspace = true
 walkdir.workspace = true
 
