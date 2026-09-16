@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/on_enter.rs
+description: "On Enter on \n  + asdf ||\n"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/on_enter/enum_nested_trailing_ws.typ
+---
+[
+ {
+  "newText": "\n  + $0",
+  "range": "2:9:2:9"
+ }
+]
