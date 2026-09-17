@@ -140,7 +140,22 @@ impl ServerState {
         match self.config.update_by_map(&values) {
             Ok(()) => {}
             Err(err) => {
+                // The whole update is rejected. Collect the warnings gathered
+                // by this update before rolling back, so they are not silently
+                // dropped together with the new configuration.
+                let warnings = std::mem::take(&mut self.config.warnings);
                 self.config = old_config;
+
+                // `didChangeConfiguration` is a notification, so the returned
+                // error never reaches the client. Report the rejection (and
+                // the per-key warnings that accompany it) to the user.
+                let mut reason = format!("error applying new settings: {err}");
+                for warning in warnings.iter() {
+                    reason.push_str("; ");
+                    reason.push_str(warning);
+                }
+                self.show_config_warning(&reason);
+
                 log::error!("error applying new settings: {err}");
                 return Err(invalid_params(format!(
                     "error applying new settings: {err}"
@@ -196,6 +211,10 @@ impl ServerState {
             self.formatter.change_config(new_formatter_config);
         }
 
+        // Report rejected settings collected by this update. This must happen
+        // in the same update cycle, as the next `update_by_map` clears them.
+        self.show_config_warnings();
+
         log::info!("new settings applied");
         self.schedule_async();
         Ok(())
@@ -236,11 +255,8 @@ impl ServerState {
         else {
             return;
         };
+        // `on_changed_configuration` shows the configuration warnings, if any.
         let _ = this.on_changed_configuration(Config::values_to_map(resp));
-
-        if !this.config.warnings.is_empty() {
-            this.show_config_warnings();
-        }
     }
 }
 

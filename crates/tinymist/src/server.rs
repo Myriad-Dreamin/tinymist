@@ -475,28 +475,31 @@ pub enum ServerEvent {
 
 impl ServerState {
     /// Shows the configuration warnings to the client.
-    pub fn show_config_warnings(&mut self) {
-        if !self.config.warnings.is_empty() {
-            for warning in self.config.warnings.iter() {
-                self.client.send_lsp_request::<ShowMessageRequest>(
-                    ShowMessageRequestParams {
-                        typ: MessageType::WARNING,
-                        message: tinymist_l10n::t!(
-                            "tinymist.config.badServerConfig",
-                            "bad server configuration: {warning}",
-                            warning = warning.as_ref().into()
-                        )
-                        .into(),
-                        actions: None,
-                    },
-                    |_s, r| {
-                        if let Some(err) = r.error {
-                            log::error!("failed to send warning message: {err:?}");
-                        }
-                    },
-                );
-            }
+    pub fn show_config_warnings(&self) {
+        for warning in &self.config.warnings {
+            self.show_config_warning(warning);
         }
+    }
+
+    /// Shows a single configuration warning to the client.
+    pub fn show_config_warning(&self, warning: &str) {
+        self.client.send_lsp_request::<ShowMessageRequest>(
+            ShowMessageRequestParams {
+                typ: MessageType::WARNING,
+                message: tinymist_l10n::t!(
+                    "tinymist.config.badServerConfig",
+                    "bad server configuration: {warning}",
+                    warning = warning.into()
+                )
+                .into(),
+                actions: None,
+            },
+            |_s, r| {
+                if let Some(err) = r.error {
+                    log::error!("failed to send warning message: {err:?}");
+                }
+            },
+        );
     }
 
     /// Gets the current server info.
