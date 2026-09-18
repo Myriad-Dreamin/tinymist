@@ -1267,6 +1267,177 @@ fn o20_mixed_batch_exercises_all_focus_api_groups_from_one_fresh_case() {
     assert_main_label_references_current_file(&mut harness);
 }
 
+impl LspHarness {
+    /// Collects the LSP requests the server has sent to the client so far.
+    ///
+    /// Unlike [`LspHarness::pump_project_event`] and
+    /// [`LspHarness::drain_project_events`], which panic on unexpected client
+    /// requests, this helper intentionally collects them so tests can assert
+    /// on notifications like `window/showMessageRequest`.
+    fn take_client_requests(&mut self) -> Vec<sync_ls::lsp::Request> {
+        let mut requests = Vec::new();
+        while let Ok(message) = self.receiver.lsp.try_recv() {
+            if let Message::Lsp(sync_ls::lsp::Message::Request(request)) = message {
+                requests.push(request);
+            }
+        }
+        requests
+    }
+
+    fn show_message_requests(&mut self) -> Vec<ShowMessageRequestParams> {
+        self.take_client_requests()
+            .into_iter()
+            .filter(|request| request.method == "window/showMessageRequest")
+            .map(|request| {
+                serde_json::from_value(request.params)
+                    .expect("showMessageRequest params should deserialize")
+            })
+            .collect()
+    }
+}
+
+#[test]
+fn did_change_configuration_reports_rejected_value_to_client() {
+    let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+    harness
+        .server
+        .did_change_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({"exportPdf": "bogus"}),
+        })
+        .expect("a scalar deserialization failure should warn, not reject");
+
+    let messages = harness.show_message_requests();
+    assert_eq!(
+        messages.len(),
+        1,
+        "expected exactly one showMessageRequest, got {messages:?}"
+    );
+    assert_eq!(messages[0].typ, MessageType::WARNING);
+    assert!(
+        messages[0].message.contains("exportPdf"),
+        "warning should name the rejected key: {}",
+        messages[0].message
+    );
+}
+
+#[test]
+fn did_change_configuration_reports_rejected_namespaced_value_to_client() {
+    let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+    harness
+        .server
+        .did_change_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({"tinymist": {"exportPdf": "bogus"}}),
+        })
+        .expect("a scalar deserialization failure should warn, not reject");
+
+    let messages = harness.show_message_requests();
+    assert_eq!(
+        messages.len(),
+        1,
+        "expected exactly one showMessageRequest, got {messages:?}"
+    );
+    assert_eq!(messages[0].typ, MessageType::WARNING);
+    assert!(
+        messages[0].message.contains("exportPdf"),
+        "warning should name the rejected key: {}",
+        messages[0].message
+    );
+}
+
+#[test]
+fn did_change_configuration_with_valid_value_sends_no_warning() {
+    let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+    harness
+        .server
+        .did_change_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({"exportPdf": "onSave"}),
+        })
+        .expect("a valid value should apply");
+
+    let messages = harness.show_message_requests();
+    assert!(
+        messages.is_empty(),
+        "expected no showMessageRequest for a valid value, got {messages:?}"
+    );
+}
+
+#[test]
+fn did_change_configuration_reports_fully_rejected_update_to_client() {
+    let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+    let result = harness
+        .server
+        .did_change_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({"rootPath": "relative-root"}),
+        });
+    assert!(
+        result.is_err(),
+        "a relative rootPath should reject the whole update"
+    );
+
+    let messages = harness.show_message_requests();
+    assert_eq!(
+        messages.len(),
+        1,
+        "expected exactly one showMessageRequest for the rejected update, got {messages:?}"
+    );
+    assert_eq!(messages[0].typ, MessageType::WARNING);
+    assert!(
+        messages[0].message.contains("absolute path"),
+        "message should explain the rejection: {}",
+        messages[0].message
+    );
+
+    // A follow-up valid update must not replay the old warnings.
+    harness
+        .server
+        .did_change_configuration(DidChangeConfigurationParams {
+            settings: serde_json::json!({"exportPdf": "onSave"}),
+        })
+        .expect("a valid value should apply");
+    let messages = harness.show_message_requests();
+    assert!(
+        messages.is_empty(),
+        "expected no replay of the rejected update's warnings, got {messages:?}"
+    );
+}
+
+#[test]
+fn workspace_configuration_pull_reports_rejected_value_exactly_once() {
+    let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+
+    // Build a workspace/configuration answer where only the namespaced
+    // `tinymist.exportPdf` item answers with a bogus value.
+    let items = Config::get_items();
+    let mut values = vec![JsonValue::Null; items.len()];
+    let export_pdf_index = items
+        .iter()
+        .position(|item| item.section.as_deref() == Some("tinymist.exportPdf"))
+        .expect("tinymist.exportPdf should be requested");
+    values[export_pdf_index] = JsonValue::from("bogus");
+
+    ServerState::workspace_configuration_callback(
+        &mut harness.server,
+        sync_ls::lsp::Response {
+            id: sync_ls::RequestId::from(0),
+            result: Some(JsonValue::Array(values)),
+            error: None,
+        },
+    );
+
+    let messages = harness.show_message_requests();
+    assert_eq!(
+        messages.len(),
+        1,
+        "the pull path should report the rejection exactly once, got {messages:?}"
+    );
+    assert_eq!(messages[0].typ, MessageType::WARNING);
+    assert!(
+        messages[0].message.contains("exportPdf"),
+        "warning should name the rejected key: {}",
+        messages[0].message
+    );
+}
+
 #[test]
 #[ignore = "uses the host filesystem watcher; CI runs real_fs_* explicitly"]
 fn real_fs_dependency_content_change_publishes_diagnostics_without_lsp_fs_change() {
