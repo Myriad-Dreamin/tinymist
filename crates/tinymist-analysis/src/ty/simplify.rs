@@ -754,4 +754,110 @@ mod tests {
             "(@body) => Color"
         );
     }
+
+    /// A regression test for <https://github.com/Myriad-Dreamin/tinymist/issues/2148>.
+    ///
+    /// The LSP crashed with `user-provided comparison function does not
+    /// correctly implement a total order` inside the sorts performed by type
+    /// simplification (`transform_let` sorts variable bounds, `iter_union`
+    /// sorts union members). The offending comparator is the `Ord` of
+    /// `Ty::Value` instances (`cmp_value`), which mixes two contradictory
+    /// orders: typst's cross-type numeric comparisons (`ops::compare`) for
+    /// pairs typst can compare, and a type-discriminant fallback for the
+    /// pairs it cannot. Concretely:
+    ///
+    /// - `Int(3) < Float(1e100)` (numeric comparison),
+    /// - `Float(1e100) < Decimal(2.0)` (typst cannot compare them, so the
+    ///   `TypstValueEnum` discriminant orders `Float` before `Decimal`),
+    /// - `Decimal(2.0) < Int(3)` (numeric comparison).
+    ///
+    /// These three pairwise results form a cycle `Int < Float < Decimal <
+    /// Int`, which is not a total order. Additionally, the lossy `Int` to
+    /// `f64` bridge makes `Int(9007199254740993) == Float(9007199254740992.0)`
+    /// even though they denote different numbers, breaking the transitivity
+    /// of equality.
+    ///
+    /// Depending on the standard library's sort implementation such a
+    /// comparator either panics or silently produces mis-ordered bounds, so
+    /// this test asserts the total-order property itself instead of relying
+    /// on any particular sort detecting it.
+    #[test]
+    fn test_value_order_is_total() {
+        use std::cmp::Ordering;
+        use typst::foundations::{Decimal, Value};
+
+        fn val(v: Value) -> Ty {
+            Ty::Value(InsTy::new(v))
+        }
+
+        let int = val(Value::Int(3));
+        let float = val(Value::Float(1e100));
+        let decimal = val(Value::Decimal("2.0".parse::<Decimal>().unwrap()));
+
+        // The pairwise comparisons must not form a cycle.
+        assert!(
+            !(int.cmp(&float) == Ordering::Less
+                && float.cmp(&decimal) == Ordering::Less
+                && decimal.cmp(&int) == Ordering::Less),
+            "value ordering is not a total order: \
+             Int(3) < Float(1e100) < Decimal(2.0) < Int(3)"
+        );
+
+        // Lossy `Int` -> `f64` conversion must not equate distinct numbers.
+        let big_int = val(Value::Int(9007199254740993));
+        let big_float = val(Value::Float(9007199254740992.0));
+        let small_int = val(Value::Int(9007199254740992));
+        assert!(
+            !(big_int.cmp(&big_float) == Ordering::Equal
+                && big_float.cmp(&small_int) == Ordering::Equal
+                && big_int.cmp(&small_int) == Ordering::Greater),
+            "value ordering is not a total order: \
+             Int(9007199254740993) == Float(9007199254740992.0) \
+             == Int(9007199254740992) < Int(9007199254740993)"
+        );
+    }
+
+    /// A regression test for <https://github.com/Myriad-Dreamin/tinymist/issues/2148>.
+    ///
+    /// Simplification sorts the bounds of a type variable
+    /// (`TypeSimplifier::transform_let`); the crash reported in the issue
+    /// happened on exactly this path. The bounds of the variable below
+    /// contain the cyclically-ordered values from
+    /// [`test_value_order_is_total`], so the sorted result cannot satisfy
+    /// pairwise ordering under a non-total comparator, whatever permutation
+    /// the sort outputs.
+    #[test]
+    fn test_simplify_sorts_value_bounds_totally() {
+        use std::cmp::Ordering;
+        use typst::foundations::{Decimal, Value};
+
+        fn val(v: Value) -> Ty {
+            Ty::Value(InsTy::new(v))
+        }
+
+        let mut info = TypeInfo::default();
+        let one = var("one");
+        info.vars.insert(one.var.def.clone(), one.clone());
+        {
+            let bounds = info.vars.get(&one.var.def).unwrap().bounds.bounds();
+            let mut w = bounds.write();
+            w.lbs.insert_mut(val(Value::Int(3)));
+            w.lbs.insert_mut(val(Value::Float(1e100)));
+            w.lbs.insert_mut(val(Value::Decimal("2.0".parse::<Decimal>().unwrap())));
+        }
+
+        let simplified = info.simplify(one.as_type(), true);
+        let Ty::Let(bounds) = &simplified else {
+            panic!("simplification should retain the bounds, got {simplified:?}");
+        };
+
+        for (idx, lhs) in bounds.lbs.iter().enumerate() {
+            for rhs in &bounds.lbs[idx + 1..] {
+                assert!(
+                    lhs.cmp(rhs) != Ordering::Greater,
+                    "simplified bounds are not totally ordered: {lhs:?} > {rhs:?}"
+                );
+            }
+        }
+    }
 }
