@@ -363,9 +363,6 @@ impl ExportTask {
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if write_to.is_dir() {
-            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
-        }
 
         // Apply page template if any
         let write_to = match task {
@@ -380,7 +377,10 @@ impl ExportTask {
             _ => write_to,
         };
         let write_to = write_to.with_extension(task.extension());
-
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
+        }
+        
         Ok(Some(write_to))
     }
 
