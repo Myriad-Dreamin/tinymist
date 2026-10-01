@@ -576,3 +576,68 @@ impl RegexCowExt for Regex {
         }
     }
 }
+
+mod expression_trace_tests {
+    use tinymist_std::typst::TypstPagedDocument;
+    use tinymist_tests::mock::{MockWorkspace, MockWorkspaceWorldExt};
+    use typst::World;
+    use typst::syntax::{LinkedNode, SyntaxKind};
+
+    fn import_path(node: LinkedNode<'_>) -> Option<LinkedNode<'_>> {
+        if node.kind() == SyntaxKind::Ident
+            && node.get().leaf_text() == "path"
+            && node.parent_kind() == Some(SyntaxKind::ModuleImport)
+        {
+            return Some(node);
+        }
+        node.children().find_map(import_path)
+    }
+
+    #[test]
+    fn expression_trace_preserves_values_and_styles() {
+        for (name, early, fail) in [
+            ("below_cap", 9, false),
+            ("at_cap", 10, false),
+            ("error_after_cap", 10, true),
+        ] {
+            let tail = if fail {
+                "#panic(\"deliberate error after repeated imports\")"
+            } else {
+                "#context load(\"late.typ\")"
+            };
+            let main = format!(
+                r#"#import "loader.typ": load
+#for i in range({early}) {{
+  load(if calc.rem(i, 2) == 0 {{ "early.typ" }} else {{ "other.typ" }})
+}}
+{tail}
+"#
+            );
+            let workspace = MockWorkspace::default_builder()
+                .file("main.typ", main)
+                .file("loader.typ", "#let load(path) = { import path: *; \"\" }")
+                .file("early.typ", "#let marker = 1")
+                .file("other.typ", "#let marker = 3")
+                .file("late.typ", "#let marker = 2")
+                .build();
+            let world = workspace.world("main.typ").build_world().unwrap();
+            let source = world
+                .source(workspace.file_id("loader.typ").unwrap())
+                .unwrap();
+            let node = import_path(LinkedNode::new(source.root())).unwrap();
+            let compiled = typst::compile::<TypstPagedDocument>(&world);
+            assert_eq!(compiled.output.is_err(), fail, "{name}");
+
+            let expected = typst::trace::<TypstPagedDocument>(&world, node.span());
+            let actual = tinymist_analysis::analyze_expr_(&world, node.get());
+
+            assert_eq!(expected.len(), 10, "{name}");
+            assert_eq!(
+                expected.iter().any(|(_, styles)| styles.is_some()),
+                early < 10,
+                "{name}"
+            );
+            assert_eq!(actual, expected, "{name}");
+        }
+    }
+}
