@@ -18,6 +18,7 @@
 use std::{
     fmt::{self, Debug, Display},
     hash::{BuildHasherDefault, Hash, Hasher},
+    mem::ManuallyDrop,
     ops::Deref,
     sync::{LazyLock, OnceLock},
 };
@@ -39,13 +40,13 @@ type Guard<T> = dashmap::RwLockWriteGuard<
 // https://news.ycombinator.com/item?id=22220342
 
 pub struct Interned<T: Internable + ?Sized> {
-    arc: Option<Arc<T>>,
+    arc: ManuallyDrop<Arc<T>>,
 }
 
 impl<T: Internable + ?Sized> Interned<T> {
     #[inline]
     fn arc(&self) -> &Arc<T> {
-        self.arc.as_ref().expect("live interned value")
+        &self.arc
     }
 }
 
@@ -61,12 +62,12 @@ impl<T: Internable> Interned<T> {
         // inserting it.
         match shard.raw_entry_mut().from_key_hashed_nocheck(hash, &obj) {
             RawEntryMut::Occupied(occ) => Self {
-                arc: Some(occ.key().clone()),
+                arc: ManuallyDrop::new(occ.key().clone()),
             },
             RawEntryMut::Vacant(vac) => {
                 T::storage().alloc().increment();
                 Self {
-                    arc: Some(
+                    arc: ManuallyDrop::new(
                         vac.insert_hashed_nocheck(hash, Arc::new(obj), SharedValue::new(()))
                             .0
                             .clone(),
@@ -95,13 +96,13 @@ impl Interned<str> {
         // inserting it.
         match shard.raw_entry_mut().from_key_hashed_nocheck(hash, s) {
             RawEntryMut::Occupied(occ) => Self {
-                arc: Some(occ.key().clone()),
+                arc: ManuallyDrop::new(occ.key().clone()),
             },
             RawEntryMut::Vacant(vac) => {
                 str::storage().alloc().increment();
 
                 Self {
-                    arc: Some(
+                    arc: ManuallyDrop::new(
                         vac.insert_hashed_nocheck(hash, Arc::from(s), SharedValue::new(()))
                             .0
                             .clone(),
@@ -198,7 +199,11 @@ impl<T: Internable + ?Sized> Interned<T> {
 
 impl<T: Internable + ?Sized> Drop for Interned<T> {
     fn drop(&mut self) {
-        let arc = self.arc.take().expect("live interned value");
+        // SAFETY: Drop runs once for this value. This takes its sole field owner
+        // before any fallible work; the local Arc is dropped on every exit and
+        // unwind path. The field is never read or dropped again, and self is
+        // not moved after taking it. ManuallyDrop preserves Arc's null niche.
+        let arc = unsafe { ManuallyDrop::take(&mut self.arc) };
         let storage = T::storage();
         let release = storage.release.lock();
 
@@ -361,7 +366,7 @@ impl<T: Internable + ?Sized> Deref for Interned<T> {
 impl<T: Internable + ?Sized> Clone for Interned<T> {
     fn clone(&self) -> Self {
         Self {
-            arc: Some(self.arc().clone()),
+            arc: ManuallyDrop::new(self.arc().clone()),
         }
     }
 }
@@ -573,6 +578,14 @@ mod regression {
         assert_eq!(
             std::mem::size_of::<Interned<str>>(),
             std::mem::size_of::<triomphe::Arc<str>>()
+        );
+        assert_eq!(
+            std::mem::size_of::<Option<Interned<RaceKey>>>(),
+            std::mem::size_of::<Option<triomphe::Arc<RaceKey>>>()
+        );
+        assert_eq!(
+            std::mem::size_of::<Option<Interned<str>>>(),
+            std::mem::size_of::<Option<triomphe::Arc<str>>>()
         );
     }
 }
