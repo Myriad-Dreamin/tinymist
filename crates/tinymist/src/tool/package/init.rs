@@ -181,7 +181,8 @@ fn scan_package_files(
 
         let id = TypstFileId::new(RootedPath::new(
             VirtualRoot::Package(package.clone().expect("template package")),
-            VirtualPath::new(relative_path.to_string_lossy()).expect("valid template file path"),
+            VirtualPath::new(relative_path.to_string_lossy().replace('\\', "/"))
+                .expect("valid template file path"),
         ));
         res.push(id);
     }
