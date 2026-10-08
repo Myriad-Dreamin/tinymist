@@ -378,6 +378,9 @@ mod tests {
         let main = Some(root.join("a\\b.typ"));
         let entry_opts = EntryOpts::new_rooted(root, main);
         let entry_state: Result<EntryState> = entry_opts.try_into();
-        assert!(entry_state.is_ok())
+        let entry_state = entry_state.unwrap();
+        let vpath = entry_state.main().unwrap().vpath().get_with_slash().to_string();
+        assert!(!vpath.contains('\\'), "backslash leaked into virtual path: {vpath}");
+        assert!(vpath.ends_with("/a/b.typ"), "unexpected virtual path: {vpath}");
     }
 }
