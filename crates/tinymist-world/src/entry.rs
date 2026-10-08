@@ -239,7 +239,7 @@ impl TryFrom<EntryOpts> for EntryState {
             EntryOpts::Workspace { root, main: entry } => Ok(EntryState::new_rooted(
                 root.as_path().into(),
                 entry.map(|entry| {
-                    VirtualPath::new(entry.to_string_lossy())
+                    VirtualPath::new(entry.to_string_lossy().replace('\\', "/"))
                         .expect("entry path must be a valid virtual path")
                 }),
             )),
@@ -353,5 +353,14 @@ mod tests {
             .unwrap();
 
         assert_workspace_entry(&selected, &root, "/main.typ");
+    }
+
+    #[test]
+    fn handle_backslashes_in_path() {
+        let root = Path::new(ROOT).to_path_buf();
+        let main = Some(root.join("a\\b.typ"));
+        let entry_opts = EntryOpts::new_rooted(root, main);
+        let entry_state: Result<EntryState> = entry_opts.try_into();
+        assert!(entry_state.is_ok())
     }
 }
