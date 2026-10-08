@@ -113,7 +113,7 @@ impl ServerState {
             export.output = subst.map(|s| PathPattern::new(&s.as_os_str().to_string_lossy()));
         }
 
-        let entry = origin_entry.select_in_workspace(Path::new("/__md_main.typ"));
+        let entry = origin_entry.select_in_workspace("/__md_main.typ");
         let md_content = self
             .memory_changes
             .get(path.as_path())
