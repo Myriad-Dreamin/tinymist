@@ -224,9 +224,7 @@ fn eval_path_expr(
 ) -> Option<QueryResult<serde_json::Value>> {
     let entry = ctx.world().entry_state();
     let path = if code.starts_with("{") && code.ends_with("}") {
-        let id = entry
-            .select_in_workspace(Path::new("/__path__.typ"))
-            .main()?;
+        let id = entry.select_in_workspace("/__path__.typ").main()?;
 
         let inputs = make_sys(&entry, ctx.world().inputs(), inputs);
         let (inputs, root, dir, name) = match inputs {

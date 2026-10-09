@@ -132,10 +132,10 @@ impl EntryState {
     }
 
     /// Selects an entry in the workspace.
-    pub fn select_in_workspace(&self, path: &Path) -> EntryState {
+    pub fn select_in_workspace(&self, path: &str) -> EntryState {
         let id = WorkspaceResolver::workspace_file(
             self.root.as_ref(),
-            VirtualPath::new(path.to_str().expect("virtual path must be utf-8")).unwrap(),
+            VirtualPath::new(path).expect("valid virtual path"),
         );
 
         Self {
@@ -327,9 +327,26 @@ mod tests {
     fn select_in_workspace_accepts_virtual_path_without_leading_slash() {
         let root = ImmutPath::from(Path::new(ROOT));
         let entry = EntryState::new_workspace(root.clone());
-        let selected = entry.select_in_workspace(Path::new("main.typ"));
+        let selected = entry.select_in_workspace("main.typ");
 
         assert_workspace_entry(&selected, &root, "/main.typ");
+    }
+
+    #[test]
+    fn select_in_workspace_resolves_multi_segment_virtual_path() {
+        let root = ImmutPath::from(Path::new(ROOT));
+        let entry = EntryState::new_workspace(root.clone());
+        let selected = entry.select_in_workspace("sub/main.typ");
+
+        assert_workspace_entry(&selected, &root, "/sub/main.typ");
+    }
+
+    #[test]
+    #[should_panic(expected = "valid virtual path")]
+    fn select_in_workspace_rejects_backslash_in_virtual_path() {
+        let root = ImmutPath::from(Path::new(ROOT));
+        let entry = EntryState::new_workspace(root);
+        let _ = entry.select_in_workspace("a\\b.typ");
     }
 
     #[test]
@@ -361,6 +378,20 @@ mod tests {
         let main = Some(root.join("a\\b.typ"));
         let entry_opts = EntryOpts::new_rooted(root, main);
         let entry_state: Result<EntryState> = entry_opts.try_into();
-        assert!(entry_state.is_ok())
+        let entry_state = entry_state.unwrap();
+        let vpath = entry_state
+            .main()
+            .unwrap()
+            .vpath()
+            .get_with_slash()
+            .to_string();
+        assert!(
+            !vpath.contains('\\'),
+            "backslash leaked into virtual path: {vpath}"
+        );
+        assert!(
+            vpath.ends_with("/a/b.typ"),
+            "unexpected virtual path: {vpath}"
+        );
     }
 }

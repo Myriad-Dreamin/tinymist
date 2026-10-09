@@ -117,7 +117,8 @@ fn scaffold_project(
 
     let template_dir = TypstFileId::new(RootedPath::new(
         toml_id.root().clone(),
-        VirtualPath::new(tmpl_info.path.as_str()).expect("valid template path"),
+        VirtualPath::new(tmpl_info.path.as_str())
+            .map_err(|err| eco_format!("invalid template path: {err}"))?,
     ));
     // todo: template in memory
     let real_template_dir = world.path_for_id(template_dir)?.to_err()?;
