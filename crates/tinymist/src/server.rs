@@ -417,6 +417,19 @@ impl ServerState {
             return Ok(());
         };
 
+        // Update the in-memory route/material state after each compilation so
+        // that newly imported files are mapped to the correct project.
+        #[cfg(feature = "lock")]
+        {
+            use crate::project::EntryReader;
+            if let LspInterrupt::Compiled(artifact) = &params {
+                let entry = artifact.world().entry_state();
+                if let Some(lock_dir) = ready.entry_resolver().resolve_lock(&entry) {
+                    ready.route.update_material(lock_dir, &artifact.snap);
+                }
+            }
+        }
+
         ready.project.interrupt(params);
 
         ready.schedule_async();
