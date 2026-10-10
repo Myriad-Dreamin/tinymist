@@ -271,3 +271,188 @@ impl DiagnosticRefiner for OutOfRootHintRefiner {
         raw.with_hint("Cannot read file outside of project root.")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+    use std::sync::Arc;
+
+    use tinymist_project::{
+        CompileFontArgs, DynAccessModel, EntryState, ExportTarget, LspCompileSnapshot,
+        LspUniverseBuilder, base::ShadowApi, vfs::system::SystemAccessModel,
+    };
+    use tinymist_std::typst_shim::syntax::RootedPathExt;
+    use tinymist_world::WorldComputeGraph;
+    use tinymist_world::args::CompilePackageArgs;
+    use typst::syntax::VirtualPath;
+
+    use super::*;
+
+    /// Regression test for <https://github.com/Myriad-Dreamin/tinymist/issues/2717>.
+    ///
+    /// Setup mirrors the reporter's layout: a workspace root plus a *local
+    /// package* living outside the root, with `packagePath` configured as a
+    /// *relative* path (`--package-path ../.typst/packages` style), exactly as
+    /// their logs show (`could not convert path to URI: path:
+    /// "../.typst/packages\..."`).
+    ///
+    /// The main document imports the package; evaluating the package errors.
+    /// The compiler produces the error, but since the package file's resolved
+    /// path is relative, `uri_for_id` fails in [`DiagWorker::convert_diagnostic`]
+    /// and [`DiagWorker::handle`] only logs the failure — the diagnostic is
+    /// silently dropped, so the editor shows nothing.
+    ///
+    /// This test asserts the *desired* behavior and therefore **fails until
+    /// the root cause is fixed** (see the assertion message for the drop
+    /// mechanism). The absolute-path control arm below asserts the same
+    /// delivery and passes, pinning the relative `package_path` as the
+    /// discriminating input.
+    #[test]
+    fn package_diag_dropped_with_relative_package_path_issue_2717() {
+        // Relative package path, like the reporter's configuration.
+        let diags = run(Path::new("../../target/issue-2717-cases/rel/pkg"), "rel");
+        // #2717: currently FAILS — the package file resolves to a relative
+        // path, `Url::from_file_path` rejects it, and `DiagWorker::handle`
+        // swallows the conversion error, so this diagnostic never reaches the
+        // editor (the reporter's Cases 2 and 3).
+        assert!(
+            !diags.is_empty(),
+            "#2717: package diagnostics must reach the editor even with a \
+             relative `package_path`; convert_diagnostics returned an empty map \
+             (diagnostic dropped)"
+        );
+    }
+
+    /// Control arm of the #2717 test: with an *absolute* package path the very
+    /// same document reports its package error fine, which pins the relative
+    /// `package_path` as the discriminating input.
+    #[test]
+    fn package_diag_reported_with_absolute_package_path_issue_2717() {
+        let diags = run(&repo_root().join("target/issue-2717-cases/abs/pkg"), "abs");
+        let messages: Vec<_> = diags
+            .values()
+            .flatten()
+            .map(|d| d.message.as_str())
+            .collect();
+        assert!(
+            messages.iter().any(|m| m.contains("boom")),
+            "the package error must reach the editor, got: {messages:?}"
+        );
+    }
+
+    /// Compiles `#import "@sisags/doc-system:0.0.1": buildDocInfo /
+    /// #buildDocInfo()` where the package errors at runtime, with
+    /// `package_path` set to `package_path`, and returns the LSP diagnostics
+    /// the server would push to the editor.
+    /// The repository root, derived from this crate's manifest location at
+    /// compile time (robust to wherever the test process runs from).
+    fn repo_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            // `canonicalize` collapses the `..` segments; the shadow overlay
+            // matches on cleaned paths only.
+            .canonicalize()
+            .unwrap()
+    }
+
+    fn run(package_path: &Path, tag: &str) -> DiagnosticsMap {
+        let case_root = repo_root().join(format!("target/issue-2717-cases/{tag}"));
+        // A relative `package_path` is interpreted against the process CWD,
+        // exactly like the server does at runtime.
+        let pkg_abs = std::path::absolute(package_path).unwrap();
+
+        // Layout like the reporter's:
+        //   pkg/<namespace>/<name>/<version>/{typst.toml,lib.typ}
+        // i.e. the resolved package dir for `@sisags/doc-system:0.0.1`.
+        let pkg_dir = pkg_abs.join("sisags/doc-system/0.0.1");
+        std::fs::create_dir_all(&pkg_dir).unwrap();
+        std::fs::write(
+            pkg_dir.join("typst.toml"),
+            "[package]\nname = \"doc-system\"\nversion = \"0.0.1\"\nentrypoint = \"lib.typ\"\n",
+        )
+        .unwrap();
+        // Runtime error inside the package (like the reporter's
+        // `buildDocInfo.typ`).
+        std::fs::write(
+            pkg_dir.join("lib.typ"),
+            "#let buildDocInfo() = panic(\"boom\")\n",
+        )
+        .unwrap();
+
+        // Workspace root (absolute, canonical) holding only `main.typ`.
+        let proj = case_root.join("proj");
+        std::fs::create_dir_all(&proj).unwrap();
+        let root = proj;
+
+        let font_resolver = Arc::new(
+            LspUniverseBuilder::resolve_fonts(CompileFontArgs {
+                ignore_system_fonts: true,
+                ..Default::default()
+            })
+            .unwrap(),
+        );
+        // The key bit of the buggy arm: the local package path is *relative*,
+        // like the reporter's configuration.
+        let registry = LspUniverseBuilder::resolve_package(
+            None,
+            Some(&CompilePackageArgs {
+                package_path: Some(PathBuf::from(package_path)),
+                package_cache_path: None,
+            }),
+        );
+        let mut verse = LspUniverseBuilder::build(
+            EntryState::new_rooted(
+                root.as_path().into(),
+                Some(VirtualPath::new("main.typ").unwrap()),
+            ),
+            ExportTarget::Paged,
+            Default::default(),
+            Default::default(),
+            registry,
+            font_resolver,
+            None,
+            DynAccessModel(Arc::new(SystemAccessModel {})),
+        );
+        verse
+            .map_shadow(
+                root.join("main.typ").as_path(),
+                typst::foundations::Bytes::from_string(
+                    "#import \"@sisags/doc-system:0.0.1\": buildDocInfo\n#buildDocInfo()\n"
+                        .to_owned(),
+                ),
+            )
+            .unwrap();
+
+        // Compile the world, as the server would on a preview request.
+        let mut snap = LspCompileSnapshot::from_world(verse.snapshot());
+        snap.world.set_is_compiling(true);
+        let compiled = typst_shim::compile_opt::<typst_layout::PagedDocument>(&snap.world);
+        assert!(
+            compiled.output.is_err(),
+            "the document must fail to compile (error inside the package)"
+        );
+        let mut diags = compiled.warnings.clone();
+        if let Err(errors) = &compiled.output {
+            diags.extend(errors.iter().cloned());
+        }
+        assert_eq!(diags.len(), 1, "exactly one error must be produced");
+
+        // The error's span must indeed point into the package file — the same
+        // shape as the reporter's failing diagnostic.
+        let span_pkg = diags[0]
+            .span
+            .id()
+            .and_then(|id| id.package_compat().cloned())
+            .expect("the error span must live in the package file");
+        assert_eq!(span_pkg.namespace.as_str(), "sisags");
+
+        // What the server does before pushing to the editor:
+        let graph = WorldComputeGraph::new(snap);
+        let map = convert_diagnostics(graph, diags.iter(), PositionEncoding::Utf16);
+
+        // Cleanup (best effort).
+        let _ = std::fs::remove_dir_all(&case_root);
+
+        map
+    }
+}
