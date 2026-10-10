@@ -16,7 +16,7 @@ use crate::{
 };
 
 use super::protocol::*;
-use lsp_types::{GotoDefinitionResponse, Hover, LocationLink, Position, Range, Url};
+use lsp_types::{DefinitionResponse, Hover, LocationLink, Position, Range, Uri as Url};
 
 /// The context for querying an LSIF JSONL index.
 #[derive(Default)]
@@ -107,7 +107,7 @@ impl IndexQueryCtx {
         Some(hover)
     }
 
-    fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<GotoDefinitionResponse> {
+    fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<DefinitionResponse> {
         let uri = path_to_url(&request.path).ok()?;
         let doc_id = *self.document_by_uri.get(&uri)?;
         let source_range_id = self.find_range(doc_id, request.position)?;
@@ -128,7 +128,7 @@ impl IndexQueryCtx {
         if links.is_empty() {
             None
         } else {
-            Some(GotoDefinitionResponse::Link(links))
+            Some(DefinitionResponse::DefinitionLinkList(links))
         }
     }
 
@@ -165,12 +165,12 @@ impl IndexQueryCtx {
         document_id: Id,
         range_id: Id,
         target_range: Range,
-    ) -> Option<GotoDefinitionResponse> {
+    ) -> Option<DefinitionResponse> {
         if !self.definition_ranges.contains(&range_id) {
             return None;
         }
 
-        Some(GotoDefinitionResponse::Link(vec![LocationLink {
+        Some(DefinitionResponse::DefinitionLinkList(vec![LocationLink {
             origin_selection_range: Some(target_range),
             target_uri: self.document_uri(document_id)?,
             target_range,
@@ -330,7 +330,8 @@ mod tests {
     use std::io::BufReader;
     use std::path::{Path, PathBuf};
 
-    use lsp_types::{HoverContents, MarkedString};
+    #[allow(deprecated)]
+    use lsp_types::{Contents, MarkedString};
 
     use super::*;
 
@@ -410,7 +411,10 @@ mod tests {
         );
         assert_eq!(
             hover.contents,
-            HoverContents::Scalar(MarkedString::String("hello".to_owned()))
+            Contents::MarkedString(
+                #[allow(deprecated)]
+                MarkedString::String("hello".to_owned())
+            )
         );
     }
 }

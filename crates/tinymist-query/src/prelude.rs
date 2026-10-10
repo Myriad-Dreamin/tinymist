@@ -7,14 +7,15 @@ pub use std::sync::{Arc, LazyLock, OnceLock};
 pub use ecow::{EcoVec, eco_vec};
 pub use itertools::Itertools;
 pub use lsp_types::{
-    CodeActionKind, CodeLens, ColorInformation, ColorPresentation, Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentHighlight, DocumentLink,
-    DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, GotoDefinitionResponse,
-    Hover, HoverContents, InlayHint, Location as LspLocation, LocationLink, MarkedString,
-    MarkupContent, MarkupKind, ParameterInformation, Position as LspPosition,
-    PrepareRenameResponse, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensResult, SignatureHelp, SignatureInformation,
-    SymbolInformation, TextEdit, Url, WorkspaceEdit, request::GotoDeclarationResponse,
+    ActiveParameter, BaseSymbolInformation, CodeActionKind, CodeLens, ColorInformation,
+    ColorPresentation, Contents, DeclarationResponse, DefinitionResponse, Diagnostic,
+    DiagnosticRelatedInformation, DiagnosticSeverity, DocumentChange, DocumentHighlight,
+    DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, Hover,
+    InlayHint, Location as LspLocation, LocationLink, MarkupContent, MarkupKind,
+    ParameterInformation, Position as LspPosition, PrepareRenamePlaceholder, PrepareRenameResult,
+    SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensDeltaResponse,
+    SignatureHelp, SignatureInformation, SymbolInformation, TextDocumentIdentifier, TextEdit,
+    Uri as Url, WorkspaceEdit,
 };
 pub use serde_json::Value as JsonValue;
 pub use tinymist_project::LspComputeGraph;

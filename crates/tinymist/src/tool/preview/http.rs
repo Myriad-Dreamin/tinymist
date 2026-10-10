@@ -8,7 +8,7 @@ use hyper::service::service_fn;
 use hyper_tungstenite::HyperWebsocket;
 use hyper_util::rt::TokioIo;
 use hyper_util::server::graceful::GracefulShutdown;
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use tinymist_std::error::IgnoreLogging;
 use tokio::sync::{mpsc, oneshot};
 
