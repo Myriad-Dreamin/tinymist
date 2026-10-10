@@ -58,7 +58,6 @@ body {
 
 #typst-app {
   width: fit-content;
-  min-height: 100%;
   margin: 0;
   transform-origin: 0 0;
   background-color: #fff;
