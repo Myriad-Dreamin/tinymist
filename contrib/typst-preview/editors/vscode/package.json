@@ -89,6 +89,12 @@
       }
     ],
     "menus": {
+      "commandPalette": [
+        {
+          "command": "typst-preview.noteOutline",
+          "when": "false"
+        }
+      ],
       "editor/title": [
         {
           "command": "typst-preview.preview",
