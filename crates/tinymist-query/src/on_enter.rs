@@ -37,6 +37,12 @@ impl SyntaxRequest for OnEnterRequest {
         source: &Source,
         position_encoding: PositionEncoding,
     ) -> Option<Self::Response> {
+        enum Cases<'a> {
+            LineComment(LinkedNode<'a>),
+            Equation(LinkedNode<'a>),
+            ListOrEnum(LinkedNode<'a>),
+        }
+
         let root = LinkedNode::new(source.root());
         let rng = to_typst_range(self.range, position_encoding, source)?;
         let cursor = rng.start;
@@ -46,12 +52,6 @@ impl SyntaxRequest for OnEnterRequest {
             source,
             position_encoding,
         };
-
-        enum Cases<'a> {
-            LineComment(LinkedNode<'a>),
-            Equation(LinkedNode<'a>),
-            ListOrEnum(LinkedNode<'a>),
-        }
 
         let case = node_ancestors(&leaf).find_map(|node| match node.kind() {
             SyntaxKind::LineComment => Some(Cases::LineComment(node.clone())),
@@ -67,11 +67,10 @@ impl SyntaxRequest for OnEnterRequest {
                     return None;
                 }
 
-                match prev_leaf.kind() {
-                    SyntaxKind::ListItem | SyntaxKind::EnumItem => {
-                        return Some(Cases::ListOrEnum(prev_leaf));
-                    }
-                    _ => {}
+                // The previous sibling may be an ancestor of the item to
+                // continue. See `deepest_trailing_item` for details.
+                if let Some(item) = deepest_trailing_item(prev_leaf) {
+                    return Some(Cases::ListOrEnum(item));
                 }
 
                 None
@@ -88,17 +87,77 @@ impl SyntaxRequest for OnEnterRequest {
     }
 }
 
+/// Finds the innermost list/enum item that trails the given node by walking
+/// down the last child chain, skipping whitespace.
+///
+/// Nested items parse into their ancestor's body, so the sibling preceding
+/// trailing whitespace may be an ancestor of the item to continue.
+fn deepest_trailing_item(node: LinkedNode<'_>) -> Option<LinkedNode<'_>> {
+    let mut deepest = None;
+    let mut current = node;
+    loop {
+        if matches!(current.kind(), SyntaxKind::ListItem | SyntaxKind::EnumItem) {
+            deepest = Some(current.clone());
+        }
+
+        let Some(mut child) = current.children().last() else {
+            break;
+        };
+        while matches!(
+            child.kind(),
+            SyntaxKind::Space | SyntaxKind::Linebreak | SyntaxKind::Parbreak
+        ) {
+            match child.prev_sibling() {
+                Some(prev) => child = prev,
+                None => return deepest,
+            }
+        }
+        current = child;
+    }
+    deepest
+}
+
+/// Removes up to `units` indent characters from the end of `indent`.
+///
+/// The count is char-based so the result is always valid UTF-8, even when
+/// the indent contains multi-byte whitespace such as `U+3000`.
+fn strip_indent_units(indent: &str, units: usize) -> String {
+    indent
+        .chars()
+        .take(indent.chars().count().saturating_sub(units))
+        .collect()
+}
+
 struct OnEnterWorker<'a> {
     source: &'a Source,
     position_encoding: PositionEncoding,
 }
 
 impl OnEnterWorker<'_> {
+    /// Returns the exact leading whitespace of the line containing `of`,
+    /// preserving tabs and any mix of whitespace characters.
     fn indent_of(&self, of: usize) -> String {
         let all_text = self.source.text();
-        let start = all_text[..of].rfind('\n').map(|lf_offset| lf_offset + 1);
-        let indent_size = all_text[start.unwrap_or_default()..of].chars().count();
-        " ".repeat(indent_size)
+        let line_start = all_text[..of].rfind('\n').map_or(0, |lf| lf + 1);
+        let prefix = &all_text[line_start..of];
+        let ws_end = prefix
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(prefix.len());
+        prefix[..ws_end].to_owned()
+    }
+
+    /// Returns the indent of the nearest enclosing list/enum item of `node`,
+    /// if any. Nested items parse into their ancestor item's body, so the
+    /// parent's indent is the correct dedent target.
+    fn parent_item_indent(&self, node: &LinkedNode<'_>) -> Option<String> {
+        let mut current = node.parent();
+        while let Some(ancestor) = current {
+            if matches!(ancestor.kind(), SyntaxKind::ListItem | SyntaxKind::EnumItem) {
+                return Some(self.indent_of(ancestor.range().start));
+            }
+            current = ancestor.parent();
+        }
+        None
     }
 
     fn enter_line_doc_comment(&self, leaf: LinkedNode, rng: Range<usize>) -> Option<Vec<TextEdit>> {
@@ -162,10 +221,10 @@ impl OnEnterWorker<'_> {
         let edit = TextEdit {
             range: to_lsp_range(rng, self.source, self.position_encoding),
             // todo: read indent configuration
-            new_text: if !content.contains('\n') {
-                format!("\n{indent}  $0\n{indent}")
-            } else {
+            new_text: if content.contains('\n') {
                 format!("\n{indent}  $0")
+            } else {
+                format!("\n{indent}  $0\n{indent}")
             },
         };
 
@@ -175,23 +234,85 @@ impl OnEnterWorker<'_> {
     fn enter_list_or_enum(&self, node: LinkedNode<'_>, rng: Range<usize>) -> Option<Vec<TextEdit>> {
         let rng_end = rng.end;
         let node_end = node.range().end;
-        let in_middle_of_node = rng_end < node_end
-            && self.source.text()[rng_end..node_end].contains(|c: char| !c.is_whitespace());
-
-        if in_middle_of_node {
-            return None;
-        }
-
-        let indent = self.indent_of(node.range().start);
-
+        let node_text = self.source.text();
         let is_list = matches!(node.kind(), SyntaxKind::ListItem);
         let marker = if is_list { "-" } else { "+" };
+        let indent = self.indent_of(node.range().start);
+
+        let node_start = node.range().start;
+        let line_start = node_text[..node_start].rfind('\n').map_or(0, |pos| pos + 1);
+        let line_end = node_text[line_start..]
+            .find('\n')
+            .map_or(node_text.len(), |o| line_start + o);
+        let extended_end = node_end
+            + node_text[node_end..]
+                .bytes()
+                .take_while(|&b| b == b' ' || b == b'\t')
+                .count();
+        let extended_end = extended_end.min(line_end);
+
+        let after_marker_start = node.range().start + marker.len();
+        if rng_end >= after_marker_start
+            && rng_end <= extended_end
+            && node_text[after_marker_start..extended_end]
+                .trim()
+                .is_empty()
+        {
+            if indent.is_empty() {
+                let edit = TextEdit {
+                    range: to_lsp_range(
+                        line_start..extended_end,
+                        self.source,
+                        self.position_encoding,
+                    ),
+                    new_text: String::new(),
+                };
+                return Some(vec![edit]);
+            }
+            let parent_indent = self
+                .parent_item_indent(&node)
+                .unwrap_or_else(|| strip_indent_units(&indent, 2));
+            let edit = TextEdit {
+                range: to_lsp_range(
+                    line_start..extended_end,
+                    self.source,
+                    self.position_encoding,
+                ),
+                new_text: format!("{parent_indent}{marker} $0"),
+            };
+            return Some(vec![edit]);
+        }
+
+        let in_middle_of_node = rng_end < node_end
+            && node_text[rng_end..node_end].contains(|c: char| !c.is_whitespace());
+
+        if !in_middle_of_node {
+            let edit = TextEdit {
+                range: to_lsp_range(rng, self.source, self.position_encoding),
+                new_text: format!("\n{indent}{marker} $0"),
+            };
+            return Some(vec![edit]);
+        }
+
+        let line_end = node_text[rng_end..]
+            .find('\n')
+            .map_or(node_end, |offset| rng_end + offset);
+
+        let remaining_on_line = &node_text[rng_end..line_end];
+        let remaining_trimmed = remaining_on_line.trim_start();
+
+        if !remaining_trimmed.is_empty() {
+            let edit = TextEdit {
+                range: to_lsp_range(rng.start..line_end, self.source, self.position_encoding),
+                new_text: format!("\n{indent}{marker} $0{remaining_trimmed}"),
+            };
+            return Some(vec![edit]);
+        }
 
         let edit = TextEdit {
             range: to_lsp_range(rng, self.source, self.position_encoding),
             new_text: format!("\n{indent}{marker} $0"),
         };
-
         Some(vec![edit])
     }
 }
@@ -202,12 +323,26 @@ mod tests {
     use crate::tests::*;
 
     #[test]
+    fn strip_indent_units_is_char_based() {
+        assert_eq!(strip_indent_units("    ", 2), "  ");
+        assert_eq!(strip_indent_units("\t ", 2), "");
+        assert_eq!(strip_indent_units(" ", 2), "");
+        // Multi-byte whitespace must never be split in the middle.
+        assert_eq!(strip_indent_units("\u{3000}\u{3000}", 2), "");
+        assert_eq!(
+            strip_indent_units("\u{3000}\u{3000}\u{3000}", 2),
+            "\u{3000}"
+        );
+        assert_eq!(strip_indent_units(" \u{3000}", 1), " ");
+    }
+
+    #[test]
     fn test() {
         snapshot_testing("on_enter", &|world, path| {
             let source = world.source_by_path(&path).unwrap();
 
             let request = OnEnterRequest {
-                path: path.clone(),
+                path,
                 range: find_test_range(&source),
                 handle_list: true,
             };
@@ -218,7 +353,7 @@ mod tests {
                 description => format!("On Enter on {}", make_range_annotation(&source)),
             }, {
                 assert_snapshot!(JsonRepr::new_redacted(result, &REDACT_LOC));
-            })
+            });
         });
     }
 }
