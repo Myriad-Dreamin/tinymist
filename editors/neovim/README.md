@@ -26,8 +26,9 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
   }
   ```
 - Or manually:
-  To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+  To enable LSP, you must install `tinymist` and make sure the executable is in your `PATH` (the editor configurations refer to it by name; `tinymist --version` verifies the installation). You can find `tinymist` by:
   - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).\
+    The release page contains many assets; pick the CLI archive for your platform, e.g. `tinymist-x86_64-pc-windows-msvc.zip` or `tinymist-x86_64-unknown-linux-gnu.tar.gz`.\
     If you are using the latest version of [typst-ts-mode](https://codeberg.org/meow_king/typst-ts-mode), then you can use command `typst-ts-lsp-download-binary` to download the latest stable binary of `tinymist` at `typst-ts-lsp-download-path`.- Build from source by cargo. You can also compile and install **latest** `tinymist` by [Cargo](https://www.rust-lang.org/tools/install).
     ```bash
     cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist-cli
@@ -125,7 +126,7 @@ Make sure to change `exportPdf` to “onType” or “onSave”.
 
 ### Working under Power-Saving Mode or with Resource-consumed Projects
 
-When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting `tinymist.syntaxOnly` (the VS Code extension setting) or the `syntaxOnly` server option (used by other editors’ language server configurations) to `enable` or `onPowerSaving`.
 
 For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
 

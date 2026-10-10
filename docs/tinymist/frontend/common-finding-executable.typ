@@ -1,9 +1,12 @@
 
-To enable LSP, you must install `tinymist`. You can find `tinymist` by:
+To enable LSP, you must install `tinymist` and make sure the executable is in your `PATH` (the editor configurations refer to it by name; `tinymist --version` verifies the installation). You can find `tinymist` by:
 
 - Night versions available at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].
 
 - Stable versions available at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases]. \
+  The release page contains many assets; pick the CLI archive for your platform,
+  e.g. `tinymist-x86_64-pc-windows-msvc.zip` or
+  `tinymist-x86_64-unknown-linux-gnu.tar.gz`. \
   If you are using the latest version of
   #link("https://codeberg.org/meow_king/typst-ts-mode")[typst-ts-mode], then
   you can use command `typst-ts-lsp-download-binary` to download the latest
@@ -15,3 +18,4 @@ To enable LSP, you must install `tinymist`. You can find `tinymist` by:
   ```bash
   cargo install --git https://github.com/Myriad-Dreamin/tinymist --locked tinymist-cli
   ```
+
