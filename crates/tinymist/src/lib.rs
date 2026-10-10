@@ -73,8 +73,20 @@ use world::*;
 
 /// The long version description of the library
 pub static LONG_VERSION: LazyLock<String> = LazyLock::new(|| {
+    // Vergen emits an empty string when a git command fails, and
+    // `VERGEN_IDEMPOTENT_OUTPUT` in idempotent builds (some release pipeline
+    // builds). Fallback to the package version or `None` accordingly, so
+    // `tinymist --version` always reports a readable version.
+    let describe = match env!("VERGEN_GIT_DESCRIBE") {
+        "" | "VERGEN_IDEMPOTENT_OUTPUT" => env!("CARGO_PKG_VERSION"),
+        s => s,
+    };
+    let git_env = |v: Option<&'static str>| match v {
+        None | Some("") | Some("VERGEN_IDEMPOTENT_OUTPUT") => "None",
+        Some(s) => s,
+    };
     format!(
-        "
+        "{}
 Build Timestamp:     {}
 Build Git Describe:  {}
 Commit SHA:          {}
@@ -84,13 +96,42 @@ Cargo Target Triple: {}
 Typst Version:       {}
 Typst Source:        {}
 ",
+        env!("CARGO_PKG_VERSION"),
         env!("VERGEN_BUILD_TIMESTAMP"),
-        env!("VERGEN_GIT_DESCRIBE"),
-        option_env!("VERGEN_GIT_SHA").unwrap_or("None"),
-        option_env!("VERGEN_GIT_COMMIT_TIMESTAMP").unwrap_or("None"),
-        option_env!("VERGEN_GIT_BRANCH").unwrap_or("None"),
+        describe,
+        git_env(option_env!("VERGEN_GIT_SHA")),
+        git_env(option_env!("VERGEN_GIT_COMMIT_TIMESTAMP")),
+        git_env(option_env!("VERGEN_GIT_BRANCH")),
         env!("VERGEN_CARGO_TARGET_TRIPLE"),
         env!("TYPST_VERSION"),
         env!("TYPST_SOURCE"),
     )
 });
+
+#[cfg(test)]
+mod version_tests {
+    use super::LONG_VERSION;
+
+    #[test]
+    fn long_version_starts_with_package_version() {
+        let version = &*LONG_VERSION;
+        let first_line = version.lines().next().unwrap();
+        assert!(
+            first_line == env!("CARGO_PKG_VERSION"),
+            "unexpected first line: {first_line}"
+        );
+
+        let describe = version
+            .lines()
+            .find(|l| l.starts_with("Build Git Describe:"))
+            .expect("missing describe line")
+            .rsplit_once(':')
+            .unwrap()
+            .1
+            .trim();
+        assert!(
+            !describe.is_empty() && describe != "VERGEN_IDEMPOTENT_OUTPUT",
+            "unfilled git describe: {describe}"
+        );
+    }
+}
