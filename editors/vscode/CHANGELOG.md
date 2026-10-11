@@ -10,6 +10,25 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.15.10 - [2026-10-11]
+
+### Formatting
+
+* Exposed typstyle `sentence` prose wrapping in https://github.com/Myriad-Dreamin/tinymist/pull/2711
+
+### Server
+
+* (Fix) Applied the `tinymist` namespace on every delivery path in https://github.com/Myriad-Dreamin/tinymist/pull/2716
+* (Fix) Reported settings rejected by didChangeConfiguration in https://github.com/Myriad-Dreamin/tinymist/pull/2718
+* (Fix) Avoided panics on invalid template manifest path and virtual path misuse in https://github.com/Myriad-Dreamin/tinymist/pull/2741
+* (Fix) Handled backslashes before creating VirtualPath on Windows by @Andrew15-5 in https://github.com/Myriad-Dreamin/tinymist/pull/2739
+
+### Misc
+
+* Dropped the unused `typstyle-core` dependency from tinymist-cli in https://github.com/Myriad-Dreamin/tinymist/pull/2713
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.8...v0.15.10
+
 ## v0.15.8 - [2026-09-04]
 
 * Bumped typst to v0.15.1 in https://github.com/Myriad-Dreamin/tinymist/pull/2702
