@@ -15,6 +15,7 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 ### Formatting
 
 * Exposed typstyle `sentence` prose wrapping in https://github.com/Myriad-Dreamin/tinymist/pull/2711
+* Bumped typstyle to v0.15.2 in https://github.com/Myriad-Dreamin/tinymist/pull/2746. This involves a few bug fixes in range formatting: preserve code separators, comments, semicolons, and `@typstyle off` directives; avoid unwanted layout outside the selection; and match document formatting when selecting the whole source. See [typstyle's changelog](https://github.com/typstyle-rs/typstyle/blob/master/CHANGELOG.md#v0152---2026-10-11).
 
 ### Server
 
