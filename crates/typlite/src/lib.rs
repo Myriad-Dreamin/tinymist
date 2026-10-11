@@ -23,7 +23,7 @@ use tinymist_project::base::ShadowApi;
 use tinymist_project::vfs::WorkspaceResolver;
 use tinymist_project::{EntryReader, LspWorld, TaskInputs};
 use tinymist_std::error::prelude::*;
-use tinymist_std::typst_shim::syntax::{VirtualPathExt, resolve_path_from_id};
+use tinymist_std::typst_shim::syntax::resolve_path_from_id;
 use typst::World;
 use typst::WorldExt;
 use typst::diag::SourceDiagnostic;
@@ -366,7 +366,7 @@ impl TypliteFeat {
         }
 
         let task_inputs = TaskInputs {
-            entry: Some(entry.select_in_workspace(main_id.vpath().as_rooted_path_compat())),
+            entry: Some(entry.select_in_workspace(main_id.vpath().get_with_slash())),
             inputs: Some(Arc::new(LazyHash::new(dict))),
         };
 

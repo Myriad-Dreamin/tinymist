@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::sync::Arc;
 
 use ecow::{EcoString, eco_format};
@@ -54,7 +53,7 @@ pub(crate) fn convert_docs(
         ..Default::default()
     };
 
-    let entry = entry.select_in_workspace(Path::new("__tinymist_docs__.typ"));
+    let entry = entry.select_in_workspace("__tinymist_docs__.typ");
 
     let mut w = ctx.world().task(TaskInputs {
         entry: Some(entry),

@@ -177,7 +177,7 @@ pub fn compile_doc_for_test(
         _ if need_compile => prev.clone(),
         Some("true") => prev.clone(),
         None | Some("false") => return WorldComputeGraph::from_world(world.clone()),
-        Some(path) if path.ends_with(".typ") => prev.select_in_workspace(Path::new(path)),
+        Some(path) if path.ends_with(".typ") => prev.select_in_workspace(path),
         v => panic!("invalid value for 'compile' property: {v:?}"),
     };
 
