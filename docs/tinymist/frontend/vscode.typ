@@ -14,6 +14,53 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 <features>
 See #link("https://github.com/Myriad-Dreamin/tinymist#features")[Tinymist Features] for a list of features.
 
+= Installation & Troubleshooting
+
+When the extension cannot find a usable tinymist binary, it shows a message with buttons to open this
+section, to configure the `tinymist.serverPath` setting, or to dismiss it. The extension probes two
+candidates for the binary:
+
+- The binary bundled in the installed package. Platform-specific marketplace packages (for example
+  `tinymist-win32-x64.vsix` on Windows x64) bundle one; the *universal* marketplace package, which
+  VS Code installs when no platform-specific package matches your setup, deliberately ships without
+  a binary.
+- The `tinymist` command in `PATH`, which is also where a manually installed CLI is picked up.
+
+The `tinymist.serverPath` setting overrides both candidates with an explicit path. Full probe
+diagnostics for the last activation are written to the `Tinymist Typst` output channel.
+
+== Install the CLI yourself
+
+If your package does not bundle the binary, or the bundled binary is unusable, install the CLI
+yourself and let the extension pick it up from `PATH` or via `tinymist.serverPath`:
+
+- Download the archive matching your platform from
+  #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases] and unpack it:
+  - Windows x64 / arm64: `tinymist-x86_64-pc-windows-msvc.zip` / `tinymist-aarch64-pc-windows-msvc.zip`
+  - macOS x64 / arm64: `tinymist-x86_64-apple-darwin.tar.gz` / `tinymist-aarch64-apple-darwin.tar.gz`
+  - Linux x64 / arm64: `tinymist-x86_64-unknown-linux-gnu.tar.gz` / `tinymist-aarch64-unknown-linux-gnu.tar.gz`
+  - Alpine and other musl systems, x64 / arm64: `tinymist-x86_64-unknown-linux-musl.tar.gz` /
+    `tinymist-aarch64-unknown-linux-musl.tar.gz`
+- Or install with Cargo: `cargo install tinymist`.
+- Put the unpacked `tinymist` executable on `PATH`, or set `tinymist.serverPath` to its absolute
+  path, then restart VS Code.
+
+On musl-based systems (such as Alpine Linux), note that the binary bundled in the `linux-arm64`
+VSIX is a glibc binary and does not work there — use the musl CLI archive instead.
+
+== Antivirus false positives (Windows)
+
+Symptoms: the extension reports that the tinymist binary cannot be found or executed even though
+VS Code just downloaded the package, and reinstalling does not help. Antivirus software (Microsoft
+Defender and third-party suites alike) can quarantine a freshly downloaded, unsigned binary like
+`tinymist.exe`, which makes the next activation fail in exactly this way.
+
+- Open your antivirus quarantine, restore `tinymist.exe`, and add it to the allow list.
+- Restart VS Code afterwards; the extension will re-probe the binary.
+- If the removal repeats after every reinstall, the allow-list rule did not cover the extension's
+  install directory — allow-list the directory shown in the probe diagnostics
+  (`%USERPROFILE%\.vscode\extensions\...`) instead of the single file.
+
 = LLM-Assisted Documentation
 
 The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm/vscode-ui.md")[Software Specification] contains user interface provided by this extension, You could find solutions by text search in the docs or ask LLMs with plugging the docs.
