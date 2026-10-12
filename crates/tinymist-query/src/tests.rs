@@ -576,3 +576,77 @@ impl RegexCowExt for Regex {
         }
     }
 }
+
+/// Regression test for <https://github.com/Myriad-Dreamin/tinymist/issues/2731>.
+///
+/// A `while` loop that calls a function which itself contains a `while` loop
+/// (and returns one of its parameters) makes the analysis type checker record a
+/// self-referential lower bound like `Var(i) >= Var(i)`. The constant-string-key
+/// lookup for `nodes.at(key)` used to expand such variable bounds without a
+/// cycle guard and recurse until the LSP worker thread overflowed its stack.
+///
+/// The test type checks the two-file component of the issue's reproduction; on
+/// the unfixed code this aborts the test process with a stack overflow, and the
+/// document length (`#lorem(800)` in the original report) is irrelevant to the
+/// analysis-level trigger.
+#[test]
+fn while_loop_analysis_no_stack_overflow_2731() {
+    let dep = r#"#let _g-skip(nodes, i) = {
+  while i < nodes.len() and nodes.at(i).at(0) == "sp" { i += 1 }
+  i
+}
+#let _g-parse(nodes, i, min-prec, token-names) = {
+  i = _g-skip(nodes, i)
+  let left = none
+  if i < nodes.len() and nodes.at(i) == ("punct", "!") {
+    let (sub, ni) = _g-parse(nodes, i + 1, 3, token-names)
+    left = ("not", sub); i = ni
+  } else if i < nodes.len() and nodes.at(i).at(0) == "group" {
+    let g = nodes.at(i)
+    let (sub, _ig) = _g-parse(g.at(2), 0, 0, token-names)
+    left = sub; i += 1
+  } else {
+    let (atom, ni) = _g-atom(nodes, i, token-names); left = atom; i = ni
+  }
+  while i < nodes.len() {
+    let j = _g-skip(nodes, i)
+    if j >= nodes.len() { i = j; break }
+    let nd = nodes.at(j)
+    let prec = if nd == ("punct", "&") { 2 } else if nd == ("punct", "?") { 1 } else { 0 }
+    if prec == 0 or prec < min-prec { i = j; break }
+    let (right, nk) = _g-skip(nodes, j + 1)
+    left = right
+    i = nk + 1
+  }
+  (left, i)
+}"#;
+
+    let main = r#"#import "./dep.typ": *
+
+= Heading test"#;
+
+    let contents = format!("// path: dep.typ\n{dep}\n-----\n// path: main.typ\n{main}");
+
+    run_with_sources(&contents, |verse: &mut LspUniverse, path| {
+        run_with_ctx(verse, path, &|ctx: &mut LocalContext, path| {
+            let dep_path = path.parent().unwrap().join("dep.typ");
+            let dep_id = ctx.file_id_by_path(&dep_path).unwrap();
+            let dep_source = ctx.source_by_id(dep_id).unwrap();
+            let main_source = ctx.source_by_path(&path).unwrap();
+
+            let main_info = ctx.type_check(&main_source);
+            let dep_info = ctx.type_check(&dep_source);
+
+            // The component type checks completely: both files are covered by
+            // one result and the imported module exports resolve.
+            assert!(main_info.valid, "main.typ type info must be valid");
+            assert!(dep_info.valid, "dep.typ type info must be valid");
+            for name in ["_g-parse", "_g-skip"] {
+                assert!(
+                    dep_info.exports.keys().any(|k| &**k == name),
+                    "dep.typ exports must contain `{name}`"
+                );
+            }
+        });
+    });
+}

@@ -57,40 +57,56 @@ impl TypeChecker<'_> {
             this: &TypeChecker<'_>,
             lbs: impl IntoIterator<Item = &'a Ty>,
             acc: &mut Option<Interned<str>>,
+            seen: &mut FxHashSet<DeclExpr>,
         ) -> Option<()> {
             let mut any = false;
             for lb in lbs {
                 any = true;
-                visit(this, lb, acc)?;
+                visit(this, lb, acc, seen)?;
             }
             any.then_some(())
         }
 
-        fn visit(this: &TypeChecker<'_>, ty: &Ty, acc: &mut Option<Interned<str>>) -> Option<()> {
+        fn visit(
+            this: &TypeChecker<'_>,
+            ty: &Ty,
+            acc: &mut Option<Interned<str>>,
+            seen: &mut FxHashSet<DeclExpr>,
+        ) -> Option<()> {
             match ty {
                 Ty::Value(ins) => match &ins.val {
                     Value::Str(s) => unify(acc, Interned::new_str(s.as_str())),
                     _ => None,
                 },
                 Ty::Var(v) => {
+                    // The bounds of a variable may refer back to the variable
+                    // itself (for example `i = f(i)` for a function `f` that
+                    // returns one of its parameters, a shape reached by
+                    // `while` loops calling functions with their own `while`
+                    // loops). Expand every variable at most once per lookup: a
+                    // cyclic bound chain determines no unique constant key.
+                    if !seen.insert(v.def.clone()) {
+                        return None;
+                    }
                     let bounds = this.info.vars.get(&v.def)?;
                     let bounds_guard = bounds.bounds.bounds().read();
-                    visit_lbs(this, bounds_guard.lbs.iter(), acc)
+                    visit_lbs(this, bounds_guard.lbs.iter(), acc, seen)
                 }
-                Ty::Let(bounds) => visit_lbs(this, bounds.lbs.iter(), acc),
+                Ty::Let(bounds) => visit_lbs(this, bounds.lbs.iter(), acc, seen),
                 Ty::Union(types) => {
                     for ty in types.iter() {
-                        visit(this, ty, acc)?;
+                        visit(this, ty, acc, seen)?;
                     }
                     Some(())
                 }
-                Ty::Param(p) => visit(this, &p.ty, acc),
+                Ty::Param(p) => visit(this, &p.ty, acc, seen),
                 _ => None,
             }
         }
 
         let mut acc = None;
-        visit(self, ty, &mut acc)?;
+        let mut seen = FxHashSet::default();
+        visit(self, ty, &mut acc, &mut seen)?;
         acc
     }
 
