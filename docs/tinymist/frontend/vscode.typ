@@ -48,6 +48,21 @@ yourself and let the extension pick it up from `PATH` or via `tinymist.serverPat
 On musl-based systems (such as Alpine Linux), note that the binary bundled in the `linux-arm64`
 VSIX is a glibc binary and does not work there — use the musl CLI archive instead.
 
+== PATH version mismatch
+
+Symptoms: the extension never reports a missing binary, yet language features behave like an
+older tinymist release, and the `Tinymist Typst` output channel shows the server started from
+`PATH` rather than from the bundled binary. This happens when the installed package ships without
+a bundled binary (the universal package) and an outdated `tinymist` happens to be on `PATH`: the
+probe succeeds, so the installation guide never appears, and the running server is the stale one.
+
+- Check which candidate the extension actually probed: the per-candidate diagnostics in the
+  output channel list the bundled candidate and the `PATH` candidate separately.
+- Update the `tinymist` on `PATH` — for example `cargo install tinymist` or a fresh GitHub
+  Releases archive — or remove the stale one so a bundled binary or a fresh install takes over.
+- The `tinymist.serverPath` setting overrides both candidates; point it at the binary you
+  actually want.
+
 == Antivirus false positives (Windows)
 
 Symptoms: the extension reports that the tinymist binary cannot be found or executed even though
