@@ -1,4 +1,5 @@
 import { beforeEach, expect, test, vi } from "vitest";
+import type * as vscode from "vscode";
 import * as path from "node:path";
 
 const hoisted = vi.hoisted(() => ({
@@ -48,7 +49,9 @@ import {
   showInstallGuideOnProbeFailure,
 } from "./install-guide";
 
-const context = { extensionPath: "/extensions/tinymist-0.15.10-win32-x64" } as never;
+const context = {
+  extensionPath: "/extensions/tinymist-0.15.10-win32-x64",
+} as unknown as vscode.ExtensionContext;
 
 beforeEach(() => {
   vi.clearAllMocks();
