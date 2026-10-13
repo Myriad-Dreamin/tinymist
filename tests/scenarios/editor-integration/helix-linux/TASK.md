@@ -10,11 +10,12 @@ non-interactively, to catch documentation drift and server regressions before re
 
 ## Environment
 
-- Platform: Linux (validated on a Debian-based distribution).
-- Helix 25.07.1 (`hx --version` reports `helix 25.07.1 (...)`). Unpack `hx` together
-  with the `runtime/` directory from the release archive — `hx` locates its runtime
-  relative to its own path, so moving `hx` alone breaks it.
-- tinymist stable release binary, reachable on `PATH` (verify with `tinymist -V`).
+- Platform: Linux.
+- A recent Helix release (`hx --version` reports the installed version). Unpack `hx`
+  together with the `runtime/` directory from the release archive — `hx` locates its
+  runtime relative to its own path, so moving `hx` alone breaks it.
+- tinymist stable release binary, reachable on `PATH` (verify with
+  `command -v tinymist`).
 - tmux to drive the editor non-interactively (`send-keys` + `capture-pane`). Start the
   tmux server with a `PATH` that includes the tinymist binary — a detached server
   started without it fails to launch language servers.
@@ -42,24 +43,24 @@ non-interactively, to catch documentation drift and server regressions before re
    Expected: the PDF appears at the configured `outputPath`; editor-triggered export
    fires without any `atomic-save` workaround.
 7. **Background preview**: set `preview.background.enabled = true`, reopen the file.
-   Expected: the preview server listens on `127.0.0.1:23635`; `GET /` over HTTP returns
-   200; subsequent edits are reflected in the viewer.
+   Expected: the preview server listens on the configured `--data-plane-host` address
+   (default `127.0.0.1:23635`); `GET /` over HTTP returns 200; subsequent edits are
+   reflected in the viewer.
 8. **Syntax-only mode**: set `syntaxOnly = "enable"` in the server config, reopen.
    Expected: semantic diagnostics and export stop; syntax checking, syntax-level
    completion, and formatting keep responding.
 
 ## Coverage notes
 
-- Every step above was executed and captured during the 2026-10 QA probe. Raw evidence
-  (LSP mirror logs, pane captures, environment notes) stays in the organization's QA
-  workspace and is not committed to the repository.
-- Known platform-independent caveats — the entry file may not compile on the first open
-  with `typstExtraArgs` configured (first edit or save activates it), and label
-  completion/`gd` on `@label` references currently returns nothing — are tracked as
-  separate proposals; do not mark this scenario failed on those without checking the
-  tracker first.
+- Raw evidence for a run (LSP mirror logs, pane captures, environment notes) stays in
+  the QA workspace and is not committed to the repository.
+- Known caveats and their current status are maintained in the QA scenario status page
+  in that workspace; a step whose expectation fails is not by itself a scenario
+  failure — consult the status page before judging.
 
 ## Artifacts
 
 Only this `TASK.md` is committed to the repository. Anything captured while running the
-scenario (captures, mirror logs, screenshots) belongs to the QA workspace.
+scenario (captures, mirror logs, screenshots) belongs to the QA workspace; the scenario
+status page — execution history, known caveats, and their current state — is maintained
+there as well.

@@ -12,14 +12,14 @@ specific to this platform.
 
 ## Environment
 
-- Platform: Windows 11.
-- Helix 25.07.1 (`hx --version` reports `helix 25.07.1 (...)`). Unpack `hx` together
-  with the `runtime/` directory; moving `hx` alone loses the runtime.
-- tinymist stable release binary, reachable on `PATH` (verify with `tinymist -V`).
+- Platform: Windows.
+- A recent Helix release (`hx --version` reports the installed version). Unpack `hx`
+  together with the `runtime/` directory; moving `hx` alone loses the runtime.
+- tinymist stable release binary, reachable on `PATH` (verify with `where tinymist`).
 - Configuration: `%APPDATA%\helix\languages.toml` (user-level), or the project-level
-  `.helix\languages.toml` form — both validated. A portable form using
+  `.helix\languages.toml` form — both are accepted. A portable form using
   `hx -c <config> --log <file>` with the config and its `languages.toml` kept together
-  also works for zero-AppData setups.
+  is also available for zero-AppData setups.
 - Terminal multiplexer: psmux (the Windows-native tmux reimplementation) to drive the
   editor and capture panes; any scripted driver with equivalent capabilities works.
 - A scratch project directory containing `main.typ`.
@@ -39,28 +39,26 @@ specific to this platform.
    Expected: the full signature popup.
 6. **Save awareness with atomic-save**: set `exportPdf = "onSave"`, then save with
    Helix's atomic-save enabled.
-   Expected: the export fires on save — atomic-save needs no workaround on current
-   releases (validated across multiple save cycles).
+   Expected: the export fires on save — no `atomic-save = false` workaround is
+   required.
 7. **Background preview**: set `preview.background.enabled = true`, reopen.
-   Expected: the preview server listens on `127.0.0.1:23635`; `GET /` returns 200.
+   Expected: the preview server listens on the configured `--data-plane-host` address
+   (default `127.0.0.1:23635`); `GET /` returns 200.
 8. **Syntax-only mode**: set `syntaxOnly = "enable"`, reopen.
    Expected: semantic diagnostics and export stop; syntax-level features keep working.
-9. **Stability stress**: run a scripted edit loop of a few hundred compiles (the QA
-   probe used 25 rounds / 389 compiles).
+9. **Stability stress**: run a scripted edit loop of a few hundred compiles.
    Expected: zero panics or crashes of the language server.
 
 ## Coverage notes
 
-- Every step above was executed and captured during the 2026-10 QA probe (the stress
-  step included). Raw evidence — LSP mirror logs across seven phases, pane captures,
-  and reproduction scripts — stays in the organization's QA workspace and is not
-  committed to the repository.
-- Platform-specific findings already recorded: older tinymist versions (checked
-  v0.13.10-rc2) also notice saves on Windows, so historical watcher bugs should not be
-  narrated as cross-platform facts; the first-open compile caveat and the label
-  completion/`gd` gap are the same as on Linux and are tracked as separate proposals.
+- Raw evidence for a run (LSP mirror logs, pane captures, reproduction scripts) stays
+  in the QA workspace and is not committed to the repository.
+- Known caveats — including platform-specific ones — and their current status are
+  maintained in the QA scenario status page in that workspace; a step whose expectation
+  fails is not by itself a scenario failure — consult the status page before judging.
 
 ## Artifacts
 
 Only this `TASK.md` is committed to the repository. Anything captured while running the
-scenario belongs to the QA workspace.
+scenario belongs to the QA workspace; the scenario status page — execution history,
+known caveats, and their current state — is maintained there as well.
