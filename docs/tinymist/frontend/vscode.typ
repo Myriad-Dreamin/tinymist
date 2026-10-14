@@ -6,7 +6,8 @@
 
 A VS Code or VS Codium extension for Typst. You can find the extension on:
 
-- Stable and pre-release versions available at #link("https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist")[Visual Studio Marketplace] and #link("https://open-vsx.org/extension/myriad-dreamin/tinymist")[Open VSX].
+- Stable versions are available at #link("https://marketplace.visualstudio.com/items?itemName=myriad-dreamin.tinymist")[Visual Studio Marketplace] and #link("https://open-vsx.org/extension/myriad-dreamin/tinymist")[Open VSX].
+- Neither marketplace currently carries an up-to-date pre-release channel: the Marketplace listing has no pre-release version, and Open VSX's pre-release tag still points to an old universal package without the bundled binary, so switching to pre-release there downgrades the extension. Pick pre-release builds from the artifacts below instead.
 - The artifacts built per commits at #link("https://github.com/Myriad-Dreamin/tinymist/actions")[GitHub Actions].
 - The artifacts built per release at #link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases].
 
@@ -48,6 +49,24 @@ yourself and let the extension pick it up from `PATH` or via `tinymist.serverPat
 On musl-based systems (such as Alpine Linux), note that the binary bundled in the `linux-arm64`
 VSIX is a glibc binary and does not work there — use the musl CLI archive instead.
 
+== Install from a VSIX file
+
+To install a specific release manually — for example, when the marketplace packages are not usable
+on your setup — download a VSIX matching your platform from
+#link("https://github.com/Myriad-Dreamin/tinymist/releases")[GitHub Releases] and install it from
+the command line:
+
+```
+code --install-extension <file>.vsix
+```
+
+or from the editor: open the Extensions view, open the `…` menu and choose *Install from VSIX…*,
+then pick the downloaded file, and restart VS Code afterwards.
+
+Platform-specific packages like `tinymist-win32-x64.vsix` bundle the language server binary; the
+universal VSIX ships without a binary, so it additionally needs the CLI installed as in the
+previous section.
+
 == PATH version mismatch
 
 Symptoms: the extension never reports a missing binary, yet language features behave like an
@@ -75,6 +94,13 @@ Defender and third-party suites alike) can quarantine a freshly downloaded, unsi
 - If the removal repeats after every reinstall, the allow-list rule did not cover the extension's
   install directory — allow-list the directory shown in the probe diagnostics
   (`%USERPROFILE%\.vscode\extensions\...`) instead of the single file.
+
+== Restricted mode (Workspace Trust)
+
+The extension does not declare support for untrusted workspaces, so when VS Code opens a workspace
+in restricted mode, the extension does not activate at all, without any message. If language
+features are entirely missing, check whether the workspace is running in restricted mode, and
+trust it — or configure the workspace trust settings accordingly — to let the extension start.
 
 = LLM-Assisted Documentation
 
@@ -255,7 +281,7 @@ for more information.
 
 == Working under Power-Saving Mode or with Resource-consumed Projects
 <working-with-resource-consumed-projects>
-When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting, by:
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. stopping full document compilation and semantic analysis, while elementary tasks like syntax checking, syntax-level analysis (which keeps features like hover and definition working), and formatting still run, by:
 + Open settings.
 + Search for "Tinymist Syntax Only Mode".
 + Toggle the "Syntax Only Mode" setting to always enable, disable syntax only mode, or enable on power-saving mode.
