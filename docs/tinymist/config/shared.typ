@@ -104,9 +104,14 @@
   ]
 
   // Default Section
-  let default = cfg.at("default", default: if key == "tinymist.compileStatus" {
+  // The language server disables compile-status notifications unless configured, so for the
+  // server-side configuration docs the effective default is "disable"; the "enable" default
+  // recorded in the VS Code package is an extension-level override.
+  let default = if key == "tinymist.compileStatus" and not is-vscode.get() {
     "disable"
-  })
+  } else {
+    cfg.at("default", default: none)
+  }
   if default != none {
     list.item[*Default*: #raw(lang: "json", json.encode(default))]
   }
@@ -132,6 +137,13 @@
   = #raw(name)
 
   #description
+
+  #if key == "tinymist.preview.background.enabled" and not is-vscode {
+    // The background preview is created when the server starts, so this is an
+    // initialization-time option: configuration updates sent later are not
+    // picked up by the running server.
+    [The server only reads this configuration at startup: it must be provided via `initializationOptions`, and changes sent afterwards (for example through `workspace/didChangeConfiguration`) have no effect.]
+  }
 
   #config-shape(cfg, key)
 ]
