@@ -1,0 +1,10 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on er 0..4 */|quad| b $\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_quad_spacing.typ
+---
+1,286.792pt,78.500pt
+1,286.792pt,78.500pt
+1,286.792pt,78.500pt
+1,303.611pt,78.500pt

@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on er 0..5 */|alpha| $\n#body\n#)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_repeated_pages.typ
+---
+1,294.118pt,75.728pt;2,294.118pt,75.728pt
+1,294.118pt,75.728pt;2,294.118pt,75.728pt
+1,294.118pt,75.728pt;2,294.118pt,75.728pt
+1,294.118pt,75.728pt;2,294.118pt,75.728pt
+1,294.118pt,75.728pt;2,294.118pt,75.728pt
