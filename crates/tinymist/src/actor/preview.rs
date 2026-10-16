@@ -137,3 +137,19 @@ impl Notification for DisposePreview {
     type Params = Self;
     const METHOD: &'static str = "tinymist/preview/dispose";
 }
+
+/// The current compilation entry for a preview task, including compilations
+/// that have not yet produced a rendered document.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RenderedEntry {
+    /// The preview task whose entry changed.
+    pub task_id: String,
+    /// The normalized rooted virtual path of the compilation entry.
+    pub path: String,
+}
+
+impl Notification for RenderedEntry {
+    type Params = Self;
+    const METHOD: &'static str = "tinymist/preview/renderedEntry";
+}
