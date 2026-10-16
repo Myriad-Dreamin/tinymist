@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 use std::str::FromStr;
 
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use tinymist_world::package::PackageSpec;
 use tinymist_world::vfs::PathResolution;
 

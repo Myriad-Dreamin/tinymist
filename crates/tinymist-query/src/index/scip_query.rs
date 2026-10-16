@@ -9,8 +9,9 @@ use crate::{
     url_to_path,
 };
 
+#[allow(deprecated)]
 use lsp_types::{
-    GotoDefinitionResponse, Hover, HoverContents, LocationLink, MarkedString, Position, Range, Url,
+    Contents, DefinitionResponse, Hover, LocationLink, MarkedString, Position, Range, Uri as Url,
 };
 use protobuf::{Enum, Message};
 
@@ -221,7 +222,7 @@ impl ScipQueryCtx {
             .collect()
     }
 
-    fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<GotoDefinitionResponse> {
+    fn goto_definition(&self, request: GotoDefinitionRequest) -> Option<DefinitionResponse> {
         let uri = path_to_url(&request.path).ok()?;
         let document = self.documents_by_uri.get(&uri)?;
         let occurrence = find_scip_occurrence(document, request.position)?;
@@ -230,7 +231,7 @@ impl ScipQueryCtx {
         if links.is_empty() {
             None
         } else {
-            Some(GotoDefinitionResponse::Link(links))
+            Some(DefinitionResponse::DefinitionLinkList(links))
         }
     }
 
@@ -263,7 +264,7 @@ impl ScipQueryCtx {
     }
 
     /// Requests the definition for a SCIP symbol.
-    pub fn goto_definition_symbol(&self, symbol: &str) -> Option<GotoDefinitionResponse> {
+    pub fn goto_definition_symbol(&self, symbol: &str) -> Option<DefinitionResponse> {
         let links = self
             .definitions
             .get(symbol)?
@@ -279,7 +280,7 @@ impl ScipQueryCtx {
         if links.is_empty() {
             None
         } else {
-            Some(GotoDefinitionResponse::Link(links))
+            Some(DefinitionResponse::DefinitionLinkList(links))
         }
     }
 }
@@ -480,7 +481,8 @@ fn hover_from_scip_signature_symbol(
     }
 
     Some(Hover {
-        contents: HoverContents::Scalar(MarkedString::String(markdown)),
+        #[allow(deprecated)]
+        contents: Contents::MarkedString(MarkedString::String(markdown)),
         range: None,
     })
 }
@@ -613,7 +615,8 @@ fn hover_from_scip_docs(docs: &[String]) -> Option<Hover> {
     }
 
     Some(Hover {
-        contents: HoverContents::Scalar(MarkedString::String(docs.join("\n\n---\n\n"))),
+        #[allow(deprecated)]
+        contents: Contents::MarkedString(MarkedString::String(docs.join("\n\n---\n\n"))),
         range: None,
     })
 }
@@ -641,7 +644,8 @@ fn range_len_key(range: &Range) -> (u32, u32) {
 mod tests {
     use std::path::PathBuf;
 
-    use lsp_types::{HoverContents, MarkedString};
+    #[allow(deprecated)]
+    use lsp_types::{Contents, MarkedString};
     use protobuf::{Enum, EnumOrUnknown, Message, MessageField};
     use scip::types::{
         Document as ScipDocument, Index as ScipIndex, Metadata as ScipMetadata,
@@ -678,7 +682,10 @@ mod tests {
         };
         assert_eq!(
             hover.contents,
-            HoverContents::Scalar(MarkedString::String("hello".to_owned()))
+            Contents::MarkedString(
+                #[allow(deprecated)]
+                MarkedString::String("hello".to_owned())
+            )
         );
 
         let definition = index.request(CompilerQueryRequest::GotoDefinition(
@@ -690,8 +697,9 @@ mod tests {
                 },
             },
         ));
-        let Some(CompilerQueryResponse::GotoDefinition(Some(GotoDefinitionResponse::Link(links)))) =
-            definition
+        let Some(CompilerQueryResponse::GotoDefinition(Some(
+            DefinitionResponse::DefinitionLinkList(links),
+        ))) = definition
         else {
             panic!("expected SCIP definition response");
         };
@@ -747,9 +755,12 @@ mod tests {
         };
         assert_eq!(
             hover.contents,
-            HoverContents::Scalar(MarkedString::String(
-                "```typc\nlet foo(\n  arg: int,\n) = none;\n```\n\nFunction docs.\n\n# Positional Parameters\n\n## arg\n\n```typc\ntype: int\n```\n\nArg docs.".to_owned()
-            ))
+            Contents::MarkedString(
+                #[allow(deprecated)]
+                MarkedString::String(
+                    "```typc\nlet foo(\n  arg: int,\n) = none;\n```\n\nFunction docs.\n\n# Positional Parameters\n\n## arg\n\n```typc\ntype: int\n```\n\nArg docs.".to_owned()
+                )
+            )
         );
     }
 
@@ -809,7 +820,10 @@ mod tests {
         );
         assert_eq!(
             tokens[1].hover.as_ref().unwrap().contents,
-            HoverContents::Scalar(MarkedString::String("hello".to_owned()))
+            Contents::MarkedString(
+                #[allow(deprecated)]
+                MarkedString::String("hello".to_owned())
+            )
         );
         assert_eq!(
             tokens[1]

@@ -82,15 +82,17 @@ fn filter_document_symbols(
             let rng = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             Some(SymbolInformation {
-                name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().into(),
-                tags: None,
+                base_symbol_information: BaseSymbolInformation {
+                    name: hierarchy.info.name.to_string(),
+                    kind: hierarchy.info.kind.clone().into(),
+                    tags: None,
+                    container_name: None,
+                },
                 deprecated: None,
                 location: LspLocation {
                     uri: uri.clone(),
                     range: rng,
                 },
-                container_name: None,
             })
         })
         .collect()
@@ -120,8 +122,9 @@ mod tests {
             if let Some(result) = &mut result {
                 // Sort the symbols by name for consistent output
                 result.sort_by(|x, y| {
-                    x.name
-                        .cmp(&y.name)
+                    x.base_symbol_information
+                        .name
+                        .cmp(&y.base_symbol_information.name)
                         .then_with(|| x.location.uri.cmp(&y.location.uri))
                 });
             }

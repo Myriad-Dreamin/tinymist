@@ -150,7 +150,7 @@ impl<'w> DiagWorker<'w> {
         let diagnostic = Diagnostic {
             range: lsp_range,
             severity: Some(lsp_severity),
-            message: lsp_message,
+            message: lsp_message.into(),
             source: Some(self.source.to_owned()),
             related_information: (!typst_diagnostic.trace.is_empty()).then(|| {
                 typst_diagnostic
@@ -209,8 +209,8 @@ impl<'w> DiagWorker<'w> {
 
 fn diagnostic_severity(typst_severity: TypstSeverity) -> DiagnosticSeverity {
     match typst_severity {
-        TypstSeverity::Error => DiagnosticSeverity::ERROR,
-        TypstSeverity::Warning => DiagnosticSeverity::WARNING,
+        TypstSeverity::Error => DiagnosticSeverity::Error,
+        TypstSeverity::Warning => DiagnosticSeverity::Warning,
     }
 }
 

@@ -77,7 +77,7 @@ impl<'a> CodeActionWorker<'a> {
                 func_name = func_name.into()
             )
             .to_string(),
-            kind: Some(CodeActionKind::REFACTOR_REWRITE),
+            kind: Some(CodeActionKind::RefactorRewrite),
             edit: Some(edit_before),
             ..CodeAction::default()
         };
