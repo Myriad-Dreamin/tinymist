@@ -11,7 +11,7 @@ In VSCode, enable compile status meaning that the extension will show the compil
 - **Valid Values**:
   - `"enable"`
   - `"disable"`
-- **Default**: `"enable"`
+- **Default**: `"disable"`
 
 ## `completion.postfix`
 
@@ -170,6 +170,8 @@ The arguments that the background preview server used for. It is only used when 
 ## `preview.background.enabled`
 
 This configuration is only used for the editors that doesn't support lsp well, e.g. helix and zed. When it is enabled, the preview server listens a specific tcp port in the background. You can discover the background previewers in the preview panel.
+
+The server only reads this configuration at startup: it must be provided via `initializationOptions`, and changes sent afterwards (for example through `workspace/didChangeConfiguration`) have no effect.
 
 - **Type**: `boolean`
 - **Default**: `false`
