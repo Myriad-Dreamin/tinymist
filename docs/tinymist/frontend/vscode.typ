@@ -76,6 +76,13 @@ Defender and third-party suites alike) can quarantine a freshly downloaded, unsi
   install directory — allow-list the directory shown in the probe diagnostics
   (`%USERPROFILE%\.vscode\extensions\...`) instead of the single file.
 
+== Restricted mode (Workspace Trust)
+
+The extension does not declare support for untrusted workspaces, so when VS Code opens a workspace
+in restricted mode, the extension does not activate at all, without any message. If language
+features are entirely missing, check whether the workspace is running in restricted mode, and
+trust it — or configure the workspace trust settings accordingly — to let the extension start.
+
 = LLM-Assisted Documentation
 
 The #link("https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm/vscode-ui.md")[Software Specification] contains user interface provided by this extension, You could find solutions by text search in the docs or ask LLMs with plugging the docs.
@@ -255,7 +262,7 @@ for more information.
 
 == Working under Power-Saving Mode or with Resource-consumed Projects
 <working-with-resource-consumed-projects>
-When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting, by:
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. stopping full document compilation and semantic analysis, while elementary tasks like syntax checking, syntax-level analysis (which keeps features like hover and definition working), and formatting still run, by:
 + Open settings.
 + Search for "Tinymist Syntax Only Mode".
 + Toggle the "Syntax Only Mode" setting to always enable, disable syntax only mode, or enable on power-saving mode.
