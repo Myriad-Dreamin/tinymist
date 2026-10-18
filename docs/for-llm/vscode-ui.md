@@ -12,7 +12,7 @@ There are following user interfaces for Tinymist:
 - You can press `Ctrl+Shift+P` to open the command palette and type `Typst` to see all [_Typst-Related Commands_](#typst-related-commands).
 - You can also perform some contextual actions in the editor, such as [_Drag and Drop_](#drag-and-drop) a file to the editor, or `Right Click` in the editor to see the [_Context Menu_](#context-menu).
 - There are tools in the [_Tool View_](#tool-view) that you can use to automate typst tasks.
-- You can interacts with the [_Tinymist LSP_](#tinymist-lsp) under the state model [_Entry File_](#entry-file), [_Focus State_](#focus-state), [_Pin State_](#pin-state), and [_Preview State_](#preview-state).
+- You can interact with the [_Tinymist LSP_](#tinymist-lsp) under the state model [_Entry File_](#entry-file), [_Focus State_](#focus-state), [_Pin State_](#pin-state), and [_Preview State_](#preview-state).
 - You can configure the extension and the language server by the [_Typst-Specific VS Code Configurations_](#typst-specific-vs-code-configurations).
 
 ## Tinymist Views
@@ -20,6 +20,7 @@ There are following user interfaces for Tinymist:
 There are following views in the [_Tinymist Views_](#tinymist-views):
 
 - [_Symbol View_](#symbol-view)
+- [_DevKit View_](#devkit-view)
 - [_Tool View_](#tool-view)
 - [_Package View_](#package-view)
 - [_Content View_](#content-view)
@@ -31,8 +32,13 @@ There are following views in the [_Tinymist Views_](#tinymist-views):
 There are following actions that you can perform in the [_Symbol View_](#symbol-view):
 
 - Search Symbol by Names: You can search for a symbol by its name. The search is case-insensitive and supports partial matching.
-- Search Symbol by Handwritten Strokes: You can draw a symbol and search for it. The symbol will be highlighted.
+- Search Symbol by Handwritten Strokes: You can draw a symbol and search for it. The stroke search is powered by [_Detypify_](#detypify) with handwriting recognition running inside the view’s webview.
+- The symbols are grouped by categories in the view.
 - Click to paste: You can click on a symbol to paste it to the editor.
+
+### DevKit View
+
+The [_DevKit View_](#devkit-view) shows development entries of the extension, for example, running the preview in development mode. The view is hidden by default: it only shows up when the extension is running in development mode or the `tinymist.devKit` setting is `enable`. This setting is not listed in the contributed settings, so you need to edit the settings JSON file to enable it.
 
 ### Tool View
 
@@ -63,7 +69,7 @@ You can get a thumbnail of the current document in the [_Content View_](#content
 
 ### Label View
 
-You can find all syntatical labels in the workspaces in the [_Label View_](#label-view). The labels are grouped by prefix.
+You can find all syntactic labels in the workspaces in the [_Label View_](#label-view). The labels are grouped by prefix. You can click the `Scan workspace and collect all labels again` button in the view’s title to refresh the labels.
 
 ### Outline View
 
@@ -91,6 +97,8 @@ The [_Document Summary_](#document-summary) shows the summary of the current doc
 
 - The resources used by the document.
 
+The summary is only available when the current document is a valid primary file that compiles successfully. For a document that fails to compile, the summary cannot be retrieved.
+
 ### Font View
 
 The [_Font View_](#font-view) shows all of the fonts and related information recognized by the LSP server. The related information includes:
@@ -112,6 +120,90 @@ The [_Profiling_](#profiling) tool allows you to profile the current file. It sh
 ### Profiling Server
 
 The [_Profiling Server_](#profiling-server) tool allows you to profile the language server. When you click the `Profiling Server` button in the tool view, the server will start profiling and you can see the profiling results in the [_Profiling_](#profiling) tool. You can stop profiling by clicking the `Stop Profiling` button.
+
+## Document Status Indicator
+
+In the status bar, the [_Document Status Indicator_](#document-status-indicator) shows the compilation status of the current document. It is controlled by the `tinymist.compileStatus` setting:
+
+- When the document is compiling, the indicator shows a spinning icon.
+- When the document compiles successfully, the indicator shows a normal status.
+- When the document fails to compile, the indicator is highlighted with the error background color.
+
+The text of the indicator is formatted by the `tinymist.statusBarFormat` setting, with the placeholders `{compileStatusIcon}`, `{wordCount}`, `{charCount}`, `{pageCount}`, and `{fileName}`. The indicator will be hidden if the format string is empty.
+
+Hovering on the indicator shows the main file path and the word, character, space, and CJK character counts of the document. Clicking the indicator runs the `tinymist.showLog` command to show the logs of the language server.
+
+## Problem Indicator
+
+The general [_Problem Indicator_](#problem-indicator) in the status bar and the `Problems` panel show the diagnostics from the language server:
+
+- Compile diagnostics are reported with the source `typst`.
+- Lint diagnostics are reported with the source `tinymist-lint`, when the lint checks are enabled.
+- Diagnostics are published when the document is opened, changed, or saved, so they appear in the `Problems` panel without extra configuration.
+
+## Typst-Related Commands
+
+You can press `Ctrl+Shift+P` to open the command palette and type `Typst` or `tinymist` to see all [_Typst-Related Commands_](#typst-related-commands). The command surface includes:
+
+- Export commands: export the current document to PDF, SVG, PNG, plain text, HTML, Markdown, TeX, query results, or a bundle. The `tinymist.exportCurrentFile` command shows a quick pick of the available formats.
+- Preview commands: start and kill the preview of the document in a webview panel, a browser, or in slide mode.
+- Pin commands: `tinymist.pinMainToCurrent`, `tinymist.unpinMain`, and `tinymist.focusMain` for multi-file projects.
+- Template commands: `tinymist.initTemplate`, `tinymist.initTemplateInPlace`, and `tinymist.showTemplateGallery`.
+- Profiling commands: `tinymist.profileCurrentFile` and `tinymist.profileServer`.
+- Server commands: `tinymist.showLog`, `tinymist.restartServer`, and `tinymist.clearCache`.
+- Task system: tasks of type `typst` in the `tasks.json` file are provided to VS Code’s task system.
+- Debugging: `tinymist.debugCurrentFile` starts a debugging session of the current document through the Debug Adapter Protocol.
+
+The editor also shows code lenses on the first line of a document for profiling, previewing, and exporting the document.
+
+## Drag and Drop
+
+You can perform [_Drag and Drop_](#drag-and-drop) of resource files into the editor to insert them into the document. The dropping and pasting of resources are controlled by the `tinymist.dragAndDrop` and `tinymist.copyAndPaste` settings, and the inserted path is computed by the `tinymist.onPaste` script.
+
+## Context Menu
+
+You can `Right Click` in the editor to see the [_Context Menu_](#context-menu):
+
+- `tinymist.exportCurrentPdfFromContext`: export the current document to PDF.
+- `tinymist.copyAnsiHighlight`: copy the syntax highlighted document in ANSI escape sequences.
+- `tinymist.viewAst`: view the abstract syntax tree of the current document.
+
+## Tinymist LSP
+
+You can interact with the [_Tinymist LSP_](#tinymist-lsp) under the state model [_Entry File_](#entry-file), [_Focus State_](#focus-state), [_Pin State_](#pin-state), and [_Preview State_](#preview-state).
+
+### Entry File
+
+The [_Entry File_](#entry-file) is the main file that the language server compiles and analyzes for the current document. It is resolved by the `tinymist.projectResolution` setting:
+
+- `singleFile` (default): each document is compiled like a Markdown document, where each single file is an individual document and no project resolution is needed.
+- `lockDatabase`: for each workspace, tinymist tracks your preview and compilation history in a lock file, and automatically selects the main file according to the lock file.
+
+An explicit entry file can also be provided by the `tinymist.typstExtraArgs` setting.
+
+### Focus State
+
+The currently focused document is the implicit entry file. Opening a document focuses it implicitly, and you can focus a document explicitly by the `tinymist.focusMain` command. A browsing preview always follows the focused document.
+
+### Pin State
+
+You can pin a specific main file by the `tinymist.pinMainToCurrent` command, and unpin it by the `tinymist.unpinMain` command. The pin state resolves by the following precedence:
+
+- The user’s pin always wins.
+- Otherwise, a non-browsing preview pins the file it was launched from.
+- Otherwise, the default entry file (the focused document) is used.
+
+The pin state is kept in the language server process, so it is not remembered across editor sessions.
+
+### Preview State
+
+There are following forms of previews:
+
+- [_Document preview_](#document-preview): shows the compiled document in a webview panel or the browser, and can scroll with the editor.
+- [_Slide preview_](#slide-preview): shows the document in the slide mode, for documents that are made of slides.
+- [_Background preview_](#background-preview): runs a headless preview service without any window. It serves as the primary preview task, so starting a default preview will reuse it instead of creating a new one.
+
+The [_Content View_](#content-view) and [_Outline View_](#outline-view) show the content of the current document when a preview is running.
 
 ## Typst-Specific VS Code Configurations
 
