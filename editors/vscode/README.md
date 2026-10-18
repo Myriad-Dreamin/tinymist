@@ -13,6 +13,49 @@ A VS Code or VS Codium extension for Typst. You can find the extension on:
 
 See [Tinymist Features](https://github.com/Myriad-Dreamin/tinymist#features) for a list of features.
 
+## Installation & Troubleshooting
+
+When the extension cannot find a usable tinymist binary, it shows a message with buttons to open this section, to configure the `tinymist.serverPath` setting, or to dismiss it. The extension probes two candidates for the binary:
+
+- The binary bundled in the installed package. Platform-specific marketplace packages (for example `tinymist-win32-x64.vsix` on Windows x64) bundle one; the **universal** marketplace package, which VS Code installs when no platform-specific package matches your setup, deliberately ships without a binary.
+- The `tinymist` command in `PATH`, which is also where a manually installed CLI is picked up.
+
+The `tinymist.serverPath` setting overrides both candidates with an explicit path. Full probe diagnostics for the last activation are written to the `Tinymist Typst` output channel.
+
+### Install the CLI yourself
+
+If your package does not bundle the binary, or the bundled binary is unusable, install the CLI yourself and let the extension pick it up from `PATH` or via `tinymist.serverPath`:
+
+- Download the archive matching your platform from [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases) and unpack it:
+  - Windows x64 / arm64: `tinymist-x86_64-pc-windows-msvc.zip` / `tinymist-aarch64-pc-windows-msvc.zip`
+  - macOS x64 / arm64: `tinymist-x86_64-apple-darwin.tar.gz` / `tinymist-aarch64-apple-darwin.tar.gz`
+  - Linux x64 / arm64: `tinymist-x86_64-unknown-linux-gnu.tar.gz` / `tinymist-aarch64-unknown-linux-gnu.tar.gz`
+  - Alpine and other musl systems, x64 / arm64: `tinymist-x86_64-unknown-linux-musl.tar.gz` / `tinymist-aarch64-unknown-linux-musl.tar.gz`
+- Or install with Cargo: `cargo install tinymist`.
+- Put the unpacked `tinymist` executable on `PATH`, or set `tinymist.serverPath` to its absolute path, then restart VS Code.
+
+On musl-based systems (such as Alpine Linux), note that the binary bundled in the `linux-arm64` VSIX is a glibc binary and does not work there — use the musl CLI archive instead.
+
+### PATH version mismatch
+
+Symptoms: the extension never reports a missing binary, yet language features behave like an older tinymist release, and the `Tinymist Typst` output channel shows the server started from `PATH` rather than from the bundled binary. This happens when the installed package ships without a bundled binary (the universal package) and an outdated `tinymist` happens to be on `PATH`: the probe succeeds, so the installation guide never appears, and the running server is the stale one.
+
+- Check which candidate the extension actually probed: the per-candidate diagnostics in the output channel list the bundled candidate and the `PATH` candidate separately.
+- Update the `tinymist` on `PATH` — for example `cargo install tinymist` or a fresh GitHub Releases archive — or remove the stale one so a bundled binary or a fresh install takes over.
+- The `tinymist.serverPath` setting overrides both candidates; point it at the binary you actually want.
+
+### Antivirus false positives (Windows)
+
+Symptoms: the extension reports that the tinymist binary cannot be found or executed even though VS Code just downloaded the package, and reinstalling does not help. Antivirus software (Microsoft Defender and third-party suites alike) can quarantine a freshly downloaded, unsigned binary like `tinymist.exe`, which makes the next activation fail in exactly this way.
+
+- Open your antivirus quarantine, restore `tinymist.exe`, and add it to the allow list.
+- Restart VS Code afterwards; the extension will re-probe the binary.
+- If the removal repeats after every reinstall, the allow-list rule did not cover the extension’s install directory — allow-list the directory shown in the probe diagnostics (`%USERPROFILE%\.vscode\extensions\...`) instead of the single file.
+
+### Restricted mode (Workspace Trust)
+
+The extension does not declare support for untrusted workspaces, so when VS Code opens a workspace in restricted mode, the extension does not activate at all, without any message. If language features are entirely missing, check whether the workspace is running in restricted mode, and trust it — or configure the workspace trust settings accordingly — to let the extension start.
+
 ## LLM-Assisted Documentation
 
 The [Software Specification](https://github.com/Myriad-Dreamin/tinymist/tree/main/docs/for-llm/vscode-ui.md) contains user interface provided by this extension, You could find solutions by text search in the docs or ask LLMs with plugging the docs.
@@ -192,7 +235,7 @@ See [Docs: Exporting Documents](https://myriad-dreamin.github.io/tinymist/featur
 
 ### Working under Power-Saving Mode or with Resource-consumed Projects
 
-When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting, by:
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. stopping full document compilation and semantic analysis, while elementary tasks like syntax checking, syntax-level analysis (which keeps features like hover and definition working), and formatting still run, by:
 
 1. Open settings.
 2. Search for “Tinymist Syntax Only Mode”.
