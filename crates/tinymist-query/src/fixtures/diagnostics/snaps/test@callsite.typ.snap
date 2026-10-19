@@ -1,0 +1,26 @@
+---
+source: crates/tinymist-query/src/diagnostics.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/diagnostics/callsite.typ
+---
+{
+ "s1.typ": [
+  {
+   "message": "panicked with: the value is invalid",
+   "range": "2:1:2:8",
+   "relatedInformation": [
+    {
+     "message": "diagnostic originated here"
+    },
+    {
+     "message": "while calling `inner`"
+    },
+    {
+     "message": "while calling `outer`"
+    }
+   ],
+   "severity": 1,
+   "source": "typst"
+  }
+ ]
+}
