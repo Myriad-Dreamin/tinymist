@@ -14,17 +14,7 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
 
 ## Installation
 
-- (Recommended) [mason.nvim](https://github.com/mason-org/mason.nvim).
-  ```lua
-  {
-    "mason-org/mason.nvim",
-    opts = {
-      ensure_installed = {
-        "tinymist",
-      },
-    },
-  }
-  ```
+- (Recommended) [mason.nvim](https://github.com/mason-org/mason.nvim), installing the server with the `:MasonInstall tinymist` command. In distributions like LazyVim, adding `"tinymist"` to the `ensure_installed` table of their mason.nvim integration installs the server as well; plain mason.nvim has no `ensure_installed` option, so that form installs nothing without such an integration.
 - Or manually:
   To enable LSP, you must install `tinymist`. You can find `tinymist` by:
   - Night versions available at [GitHub Actions](https://github.com/Myriad-Dreamin/tinymist/actions).- Stable versions available at [GitHub Releases](https://github.com/Myriad-Dreamin/tinymist/releases).\
@@ -67,9 +57,28 @@ Run and configure `tinymist` in Neovim with support for all major distros and pa
           -- ...
       }
   }
+  vim.lsp.enable("tinymist")
   ```
 
 For a full list of available settings see [Tinymist Server Configuration](/editors/neovim/Configuration.md).
+
+## The Bundled Neovim Plugin
+
+Beside the routes above, this repository itself ships a canonical Neovim plugin in [`editors/neovim`](/editors/neovim): `lua/tinymist` provides a `require("tinymist")` setup that layers over the lspconfig route and additionally delivers configuration through `init_options` (the `initializationOptions` channel) and exposes the `tinymist/devEvent` notification API that the end-to-end specs in `spec/` use to verify editor behavior.
+
+The plugin is the reference implementation of a tinymist editor client: its functionality is documented in [Specification.md](/editors/neovim/Specification.md), development is described in [the contributing guide](/editors/neovim/CONTRIBUTING.md), and `samples/` contains ready-made LazyVim and Nixvim setups.
+
+```lua
+-- requires `editors/neovim` from a checkout of this repository on your runtime path
+require("tinymist").setup {
+  lsp = {
+    init_options = {
+      -- configuration delivered via initializationOptions, e.g.
+      -- exportPdf = "onType",
+    },
+  },
+}
+```
 
 ## Formatting
 
@@ -82,7 +91,7 @@ formatterPrintWidth = 80,  -- limit line length to 80 if possible
 formatterIndentSize = 4,   -- indentation width
 ```
 
-Note that, since [this Neovim PR](https://github.com/neovim/neovim/pull/19677), neovim uses LSP servers (hence `tinymist` in our case) by default when formatting code. This applies to calls to `vim.lsp.buf.format()` (which formats the whole current buffer) and also to the `gq` command.
+Note that, since [this Neovim PR](https://github.com/neovim/neovim/pull/19677), neovim uses LSP servers (hence `tinymist` in our case) by default when formatting code. This applies to calls to `vim.lsp.buf.format()` (which formats the whole current buffer) and also to the `gq` command. Also note that tinymist provides the formatting capability through a dynamic registration: right after the client attaches, the registration may not have completed yet, in which case `vim.lsp.buf.format()` reports no matching language servers, and `gq` silently falls back to Neovim’s own reformatting, which does not preserve Typst code. The registration settles shortly after the server starts.
 
 ## Live Preview
 
@@ -100,7 +109,20 @@ Live preview can be achieved with either a web preview or a pdf reader that supp
 }
 ```
 
-See [typst-preview](https://github.com/chomosuke/typst-preview.nvim) for more installation and configuration options.
+See [typst-preview](https://github.com/chomosuke/typst-preview.nvim) for more installation and configuration options. Note that typst-preview.nvim downloads and runs its own `tinymist` binary for the preview, pinned and updated by the plugin, independent of the language server configured above — the two versions can differ.
+
+**Background Preview**
+
+Instead of a plugin, the server itself can run a background preview: the `preview.background.enabled` configuration starts a preview server when the language server starts. This is an initialization-time option — the server reads it only at startup, so it must be set through `init_options` (the `initializationOptions` channel); setting it via `settings` has no effect:
+
+```lua
+vim.lsp.config["tinymist"] = {
+    cmd = { "tinymist" },
+    filetypes = { "typst" },
+    init_options = { preview = { background = { enabled = true } } },
+}
+vim.lsp.enable("tinymist")
+```
 
 **Pdf Preview**
 
@@ -113,6 +135,9 @@ vim.api.nvim_create_user_command("OpenPdf", function()
   local filepath = vim.api.nvim_buf_get_name(0)
   if filepath:match("%.typ$") then
     local pdf_path = filepath:gsub("%.typ$", ".pdf")
+    -- `open` is the macOS opener; on Windows use e.g.
+    --   vim.system({ "cmd", "/c", "start", "", pdf_path })
+    -- and on Linux e.g. `xdg-open`.
     vim.system({ "open", pdf_path })
   end
 end, {})
@@ -125,7 +150,7 @@ Make sure to change `exportPdf` to “onType” or “onSave”.
 
 ### Working under Power-Saving Mode or with Resource-consumed Projects
 
-When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. only performing elementary tasks, like syntax checking, syntax-only code analysis and formatting by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
+When working under power-saving mode or with resource-consumed projects, typst compilations costs too much CPU and memory resources. You can configure the extension to run in syntax only mode, i.e. stopping full document compilation and semantic analysis, while elementary tasks like syntax checking, syntax-level analysis (which keeps features like hover and definition working), and formatting still run, by setting the `tinymist.syntaxOnly` to `enable` or `onPowerSaving` in the configuration.
 
 For more information about power-saving mode, see [Syntax-Only Mode](https://myriad-dreamin.github.io/tinymist/feature/syntax-only-mode.html).
 
@@ -139,6 +164,7 @@ Tinymist cannot know the main file of a multiple-files project if you don’t te
 @label-in-main
 // in file: /main.typ
 #include "sub.typ"
+#set heading(numbering: "1.")
 = Heading <label-in-main>
 ```
 
@@ -184,17 +210,17 @@ This could be improved in the future.
 
 ## Troubleshooting
 
-Generally you can find in depth information via the `:mes` command. `:checkhealth` and `LspInfo` can also provide valuable information. Tinymist also creates a debug log that is usually at `~/.local/state/nvim/lsp.log`. Reporting bugs is welcome.
+Generally you can find in depth information via the `:mes` command. `:checkhealth vim.lsp` can also provide valuable information, including the exact location of the language server log, which Neovim maintains in `lsp.log` under `stdpath('state')` and which collects the messages tinymist prints. Reporting bugs is welcome.
 
 ### tinymist not starting when creating/opening files
 
-This is most commonly due to nvim not recognizing the `.typ` file extension as a `typst` source file. In most cases is can be resolved with:
+Recent versions of Neovim recognize the `.typ` file extension as a `typst` source file out of the box. In older versions, this is most commonly due to nvim not recognizing the extension, and it can be resolved with:
 
 ```typ
 :set filetype=typst
 ```
 
-In older versions of Neovim an autocommand may be necessary.
+In those versions an autocommand may be necessary:
 
 ```vim
 autocmd BufNewFile,BufRead *.typ setfiletype typst
