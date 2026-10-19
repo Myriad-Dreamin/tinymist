@@ -57,10 +57,40 @@ const systemActivateTable = (): FeatureEntry[] => [
 
 export async function activate(context: ExtensionContext): Promise<void> {
   try {
-    return await tinymistActivate(context, {
+    await tinymistActivate(context, {
       activateTable: systemActivateTable,
       config: loadTinymistConfig(),
     });
+
+    let lastUri: string | undefined;
+    context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+        if (!editor) {
+          return;
+        }
+
+        const autoPinEnabled = vscode.workspace
+          .getConfiguration("tinymist.preview")
+          .get<boolean>("autoPin", false);
+
+        if (!autoPinEnabled) {
+          return;
+        }
+
+        const doc = editor.document;
+        const currentUri = doc.uri.toString();
+
+        if (
+          (doc.languageId === "typst" || doc.fileName.endsWith(".typ")) &&
+          currentUri !== lastUri
+        ) {
+          lastUri = currentUri;
+          await vscode.commands.executeCommand("tinymist.pinMain", doc.uri.fsPath);
+        }
+      }),
+    );
+
+    return;
   } catch (e) {
     void window.showErrorMessage(`Failed to activate tinymist: ${e}`);
     throw e;
