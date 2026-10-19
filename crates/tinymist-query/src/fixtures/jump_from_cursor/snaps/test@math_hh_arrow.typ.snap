@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on er 0..2 */|HH| -> K $\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_hh_arrow.typ
+---
+1,279.765pt,78.401pt
+1,279.765pt,78.401pt
