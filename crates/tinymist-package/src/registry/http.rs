@@ -1,6 +1,8 @@
 //! Http registry for tinymist.
 
 use std::path::Path;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use parking_lot::Mutex;
@@ -72,13 +74,17 @@ impl HttpRegistry {
     /// Get `typst-kit` implementing package storage
     pub fn storage(&self) -> &PackageStorage {
         self.storage.get_or_init(|| {
-            PackageStorage::new(
+            let package_paths = self
+                .package_path
+                .clone()
+                .map(|path| vec![path])
+                .unwrap_or_else(default_package_paths);
+
+            PackageStorage::with_package_paths(
                 self.package_cache_path
                     .clone()
                     .or_else(|| Some(dirs::cache_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into())),
-                self.package_path
-                    .clone()
-                    .or_else(|| Some(dirs::data_dir()?.join(DEFAULT_PACKAGES_SUBDIR).into())),
+                package_paths,
                 self.cert_path.clone(),
                 self.notifier.clone(),
             )
@@ -92,9 +98,9 @@ impl HttpRegistry {
 
     /// Get data & cache dir
     pub fn paths(&self) -> Vec<ImmutPath> {
-        let data_dir = self.storage().package_path().cloned();
+        let data_dirs = self.storage().package_paths().iter().cloned();
         let cache_dir = self.storage().package_cache_path().cloned();
-        data_dir.into_iter().chain(cache_dir).collect::<Vec<_>>()
+        data_dirs.chain(cache_dir).collect::<Vec<_>>()
     }
 
     /// Set list of packages for testing.
@@ -117,13 +123,44 @@ impl PackageRegistry for HttpRegistry {
 /// paths.
 pub const DEFAULT_PACKAGES_SUBDIR: &str = "typst/packages";
 
+fn default_package_paths() -> Vec<ImmutPath> {
+    let paths = dirs::data_dir()
+        .map(|dir| dir.join(DEFAULT_PACKAGES_SUBDIR).into())
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    #[cfg(target_os = "linux")]
+    {
+        let mut paths = paths;
+        append_linux_home_fallback(&mut paths, dirs::home_dir());
+        paths
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        paths
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn append_linux_home_fallback(paths: &mut Vec<ImmutPath>, home_dir: Option<PathBuf>) {
+    let Some(home_dir) = home_dir else {
+        return;
+    };
+
+    let fallback = home_dir.join(".local/share").join(DEFAULT_PACKAGES_SUBDIR);
+    if paths.iter().all(|path| path.as_ref() != fallback.as_path()) {
+        paths.push(fallback.into());
+    }
+}
+
 /// Holds information about where packages should be stored and downloads them
 /// on demand, if possible.
 pub struct PackageStorage {
     /// The path at which non-local packages should be stored when downloaded.
     package_cache_path: Option<ImmutPath>,
-    /// The path at which local packages are stored.
-    package_path: Option<ImmutPath>,
+    /// The paths at which local packages are stored.
+    package_paths: Vec<ImmutPath>,
     /// The downloader used for fetching the index and packages.
     cert_path: Option<ImmutPath>,
     /// The cached index of the preview namespace.
@@ -141,9 +178,23 @@ impl PackageStorage {
         cert_path: Option<ImmutPath>,
         notifier: Arc<Mutex<dyn Notifier + Send>>,
     ) -> Self {
+        Self::with_package_paths(
+            package_cache_path,
+            package_path.into_iter().collect(),
+            cert_path,
+            notifier,
+        )
+    }
+
+    fn with_package_paths(
+        package_cache_path: Option<ImmutPath>,
+        package_paths: Vec<ImmutPath>,
+        cert_path: Option<ImmutPath>,
+        notifier: Arc<Mutex<dyn Notifier + Send>>,
+    ) -> Self {
         Self {
             package_cache_path,
-            package_path,
+            package_paths,
             cert_path,
             notifier,
             index: OnceLock::new(),
@@ -158,14 +209,19 @@ impl PackageStorage {
 
     /// Returns the path at which local packages are stored.
     pub fn package_path(&self) -> Option<&ImmutPath> {
-        self.package_path.as_ref()
+        self.package_paths.first()
+    }
+
+    /// Returns the paths searched for local packages.
+    pub fn package_paths(&self) -> &[ImmutPath] {
+        &self.package_paths
     }
 
     /// Make a package available in the on-disk cache.
     pub fn prepare_package(&self, spec: &PackageSpec) -> PackageResult<ImmutPath> {
         let subdir = format!("{}/{}/{}", spec.namespace, spec.name, spec.version);
 
-        if let Some(packages_dir) = &self.package_path {
+        for packages_dir in &self.package_paths {
             let dir = packages_dir.join(&subdir);
             if dir.exists() {
                 return Ok(dir.into());
@@ -209,7 +265,7 @@ impl PackageStorage {
             // directory and not the cache directory, because the latter is not
             // intended for storage of local packages.
             let subdir = format!("{}/{}", spec.namespace, spec.name);
-            self.package_path
+            self.package_paths
                 .iter()
                 .flat_map(|dir| std::fs::read_dir(dir.join(&subdir)).ok())
                 .flatten()
@@ -319,4 +375,72 @@ pub(crate) fn threaded_http<T: Send + Sync>(
         .join()
         .ok()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::*;
+
+    fn local_package_spec() -> PackageSpec {
+        PackageSpec::from_str("@local/foo:0.1.0").expect("valid local package spec")
+    }
+
+    #[test]
+    fn package_storage_searches_all_local_roots_in_order() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let primary = temp.path().join("xdg-data/typst/packages");
+        let fallback = temp.path().join("home/.local/share/typst/packages");
+        let package_dir = fallback.join("local/foo/0.1.0");
+        std::fs::create_dir_all(&package_dir).expect("local package directory");
+
+        let storage = PackageStorage::with_package_paths(
+            None,
+            vec![primary.into(), fallback.into()],
+            None,
+            Arc::new(Mutex::<DummyNotifier>::default()),
+        );
+
+        let resolved = storage
+            .prepare_package(&local_package_spec())
+            .expect("package should resolve from fallback root");
+        assert_eq!(resolved.as_ref(), package_dir);
+    }
+
+    #[test]
+    fn explicit_package_path_does_not_add_default_fallbacks() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let explicit = temp.path().join("packages");
+        let registry = HttpRegistry::new(None, Some(explicit.clone().into()), None);
+
+        assert_eq!(
+            registry
+                .storage()
+                .package_paths()
+                .iter()
+                .map(|path| path.as_ref())
+                .collect::<Vec<_>>(),
+            vec![explicit.as_path()]
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn linux_home_fallback_is_added_once() {
+        let temp = tempfile::tempdir().expect("temporary directory");
+        let home = temp.path().join("home");
+        let xdg_root = temp.path().join("xdg-data/typst/packages");
+        let home_root = home.join(".local/share/typst/packages");
+
+        let mut paths = vec![xdg_root.clone().into()];
+        append_linux_home_fallback(&mut paths, Some(home.clone()));
+        assert_eq!(
+            paths.iter().map(|path| path.as_ref()).collect::<Vec<_>>(),
+            vec![xdg_root.as_path(), home_root.as_path()]
+        );
+
+        append_linux_home_fallback(&mut paths, Some(home));
+        assert_eq!(paths.len(), 2);
+    }
 }
