@@ -1,6 +1,6 @@
 use lsp_types::{
-    AnnotatedTextEdit, ChangeAnnotation, DocumentChangeOperation, DocumentChanges, OneOf,
-    OptionalVersionedTextDocumentIdentifier, RenameFile, TextDocumentEdit,
+    AnnotatedTextEdit, ChangeAnnotation, OptionalVersionedTextDocumentIdentifier, RenameFile,
+    TextDocumentEdit,
 };
 use rustc_hash::FxHashSet;
 use tinymist_std::path::{PathClean, unix_slash};
@@ -78,18 +78,16 @@ impl SemanticRequest for RenameRequest {
 
                 let mut document_changes = edits_to_document_changes(edits, None);
 
-                document_changes.push(lsp_types::DocumentChangeOperation::Op(
-                    lsp_types::ResourceOp::Rename(RenameFile {
-                        old_uri,
-                        new_uri,
-                        options: None,
-                        annotation_id: None,
-                    }),
-                ));
+                document_changes.push(lsp_types::DocumentChange::RenameFile(RenameFile {
+                    old_uri,
+                    new_uri,
+                    options: None,
+                    annotation_id: None,
+                }));
 
                 // todo: validate: workspace.workspaceEdit.resourceOperations
                 Some(WorkspaceEdit {
-                    document_changes: Some(DocumentChanges::Operations(document_changes)),
+                    document_changes: Some(document_changes),
                     ..Default::default()
                 })
             }
@@ -128,7 +126,7 @@ impl SemanticRequest for RenameRequest {
                     ));
 
                     Some(WorkspaceEdit {
-                        document_changes: Some(DocumentChanges::Operations(document_changes)),
+                        document_changes: Some(document_changes),
                         change_annotations,
                         ..Default::default()
                     })
@@ -325,23 +323,29 @@ impl RenameFileWorker<'_> {
 pub(crate) fn edits_to_document_changes(
     edits: HashMap<Url, Vec<TextEdit>>,
     change_id: Option<&str>,
-) -> Vec<DocumentChangeOperation> {
+) -> Vec<DocumentChange> {
     let mut document_changes = vec![];
 
     for (uri, edits) in edits {
-        document_changes.push(lsp_types::DocumentChangeOperation::Edit(TextDocumentEdit {
-            text_document: OptionalVersionedTextDocumentIdentifier { uri, version: None },
-            edits: edits
-                .into_iter()
-                .map(|edit| match change_id {
-                    Some(change_id) => OneOf::Right(AnnotatedTextEdit {
-                        text_edit: edit,
-                        annotation_id: change_id.to_owned(),
-                    }),
-                    None => OneOf::Left(edit),
-                })
-                .collect(),
-        }));
+        document_changes.push(lsp_types::DocumentChange::TextDocumentEdit(
+            TextDocumentEdit {
+                text_document: OptionalVersionedTextDocumentIdentifier {
+                    text_document_identifier: TextDocumentIdentifier { uri },
+                    version: None,
+                },
+                edits: edits
+                    .into_iter()
+                    .map(|edit| match change_id {
+                        Some(change_id) => AnnotatedTextEdit {
+                            text_edit: edit,
+                            annotation_id: change_id.to_owned(),
+                        }
+                        .into(),
+                        None => edit.into(),
+                    })
+                    .collect(),
+            },
+        ));
     }
 
     document_changes

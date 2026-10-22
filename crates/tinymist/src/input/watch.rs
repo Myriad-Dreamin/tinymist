@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use lsp_types::request::Request;
+use lsp_types::{LspRequestMethod, Request};
 use reflexo::ImmutPath;
 use reflexo_typst::vfs::{FileChangeSet, PathAccessModel};
 use reflexo_typst::Bytes;
@@ -123,12 +123,14 @@ impl PathAccessModel for WatchAccessModel {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FsWatchRequest {
-    inserts: Vec<lsp_types::Url>,
-    removes: Vec<lsp_types::Url>,
+    inserts: Vec<lsp_types::Uri>,
+    removes: Vec<lsp_types::Uri>,
 }
 
 impl Request for FsWatchRequest {
     type Params = Self;
     type Result = ();
-    const METHOD: &'static str = "tinymist/fs/watch";
+    const METHOD: LspRequestMethod<'_> = LspRequestMethod::Custom("tinymist/fs/watch");
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ServerToClient;
 }

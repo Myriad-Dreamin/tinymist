@@ -13,7 +13,7 @@
 
 use std::sync::{Mutex, OnceLock};
 
-use lsp_types::{GotoDefinitionParams, HoverParams};
+use lsp_types::{DefinitionParams, HoverParams};
 use tinymist_query::{
     CompilerQueryRequest, CompilerQueryResponse, GotoDefinitionRequest, HoverRequest,
     index::scip_query::{ScipPublicSymbol, ScipQueryCtx, ScipSourceToken},
@@ -121,7 +121,7 @@ fn parse_goto_definition_request(request: &[u8]) -> StrResult<CompilerQueryReque
         return Ok(CompilerQueryRequest::GotoDefinitionSymbol(symbol));
     }
 
-    let req: GotoDefinitionParams = serde_json::from_slice(request).map_err(to_string)?;
+    let req: DefinitionParams = serde_json::from_slice(request).map_err(to_string)?;
     Ok(CompilerQueryRequest::GotoDefinition(
         GotoDefinitionRequest {
             path: url_to_path(&req.text_document_position_params.text_document.uri),

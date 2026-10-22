@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use lsp_types::notification::Notification;
+use lsp_types::{LspNotificationMethod, Notification};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sync_ls::{internal_error, LspClient, LspResult};
@@ -135,5 +135,8 @@ struct DisposePreview {
 
 impl Notification for DisposePreview {
     type Params = Self;
-    const METHOD: &'static str = "tinymist/preview/dispose";
+    const METHOD: LspNotificationMethod<'_> =
+        LspNotificationMethod::Custom("tinymist/preview/dispose");
+    const MESSAGE_DIRECTION: lsp_types::MessageDirection =
+        lsp_types::MessageDirection::ClientToServer;
 }

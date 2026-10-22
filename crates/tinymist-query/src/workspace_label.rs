@@ -63,15 +63,17 @@ fn filter_document_labels(
             let rng = to_lsp_range(hierarchy.info.range.clone(), source, position_encoding);
 
             Some(SymbolInformation {
-                name: hierarchy.info.name.to_string(),
-                kind: hierarchy.info.kind.clone().into(),
-                tags: None,
+                base_symbol_information: BaseSymbolInformation {
+                    name: hierarchy.info.name.to_string(),
+                    kind: hierarchy.info.kind.clone().into(),
+                    tags: None,
+                    container_name: None,
+                },
                 deprecated: None,
                 location: LspLocation {
                     uri: uri.clone(),
                     range: rng,
                 },
-                container_name: None,
             })
         })
         .collect()

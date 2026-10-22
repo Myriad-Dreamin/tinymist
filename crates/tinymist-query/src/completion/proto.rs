@@ -39,18 +39,18 @@ pub enum CompletionKind {
 impl From<&CompletionKind> for lsp_types::CompletionItemKind {
     fn from(value: &CompletionKind) -> Self {
         match value {
-            CompletionKind::Syntax => Self::SNIPPET,
-            CompletionKind::Func => Self::FUNCTION,
-            CompletionKind::Param => Self::VARIABLE,
-            CompletionKind::Field => Self::FIELD,
-            CompletionKind::Variable => Self::VARIABLE,
-            CompletionKind::Constant => Self::CONSTANT,
-            CompletionKind::Reference => Self::REFERENCE,
-            CompletionKind::Symbol(_) => Self::FIELD,
-            CompletionKind::Type => Self::CLASS,
-            CompletionKind::Module => Self::MODULE,
-            CompletionKind::File => Self::FILE,
-            CompletionKind::Folder => Self::FOLDER,
+            CompletionKind::Syntax => Self::Snippet,
+            CompletionKind::Func => Self::Function,
+            CompletionKind::Param => Self::Variable,
+            CompletionKind::Field => Self::Field,
+            CompletionKind::Variable => Self::Variable,
+            CompletionKind::Constant => Self::Constant,
+            CompletionKind::Reference => Self::Reference,
+            CompletionKind::Symbol(_) => Self::Field,
+            CompletionKind::Type => Self::Class,
+            CompletionKind::Module => Self::Module,
+            CompletionKind::File => Self::File,
+            CompletionKind::Folder => Self::Folder,
         }
     }
 }
@@ -71,16 +71,16 @@ impl<'de> serde::Deserialize<'de> for CompletionKind {
     {
         let kind = lsp_types::CompletionItemKind::deserialize(deserializer)?;
         Ok(match kind {
-            lsp_types::CompletionItemKind::SNIPPET => CompletionKind::Syntax,
-            lsp_types::CompletionItemKind::FUNCTION => CompletionKind::Func,
-            lsp_types::CompletionItemKind::VARIABLE => CompletionKind::Param,
-            lsp_types::CompletionItemKind::FIELD => CompletionKind::Field,
-            lsp_types::CompletionItemKind::CONSTANT => CompletionKind::Constant,
-            lsp_types::CompletionItemKind::REFERENCE => CompletionKind::Reference,
-            lsp_types::CompletionItemKind::CLASS => CompletionKind::Type,
-            lsp_types::CompletionItemKind::MODULE => CompletionKind::Module,
-            lsp_types::CompletionItemKind::FILE => CompletionKind::File,
-            lsp_types::CompletionItemKind::FOLDER => CompletionKind::Folder,
+            lsp_types::CompletionItemKind::Snippet => CompletionKind::Syntax,
+            lsp_types::CompletionItemKind::Function => CompletionKind::Func,
+            lsp_types::CompletionItemKind::Variable => CompletionKind::Param,
+            lsp_types::CompletionItemKind::Field => CompletionKind::Field,
+            lsp_types::CompletionItemKind::Constant => CompletionKind::Constant,
+            lsp_types::CompletionItemKind::Reference => CompletionKind::Reference,
+            lsp_types::CompletionItemKind::Class => CompletionKind::Type,
+            lsp_types::CompletionItemKind::Module => CompletionKind::Module,
+            lsp_types::CompletionItemKind::File => CompletionKind::File,
+            lsp_types::CompletionItemKind::Folder => CompletionKind::Folder,
             _ => CompletionKind::Variable,
         })
     }
