@@ -1144,6 +1144,25 @@ mod tests {
 
             WorldComputeGraph::new(snap)
         }
+
+        fn graph_with_features(&self, main: &str, features: &[&str]) -> LspComputeGraph {
+            let input = self.root.join(main);
+            let mut cmd = vec![
+                "tinymist".to_owned(),
+                input.to_string_lossy().into_owned(),
+                "--root".to_owned(),
+                self.root.to_string_lossy().into_owned(),
+            ];
+            if !features.is_empty() {
+                cmd.push("--features".to_owned());
+                cmd.push(features.join(","));
+            }
+            let args = CompileOnceArgs::parse_from(cmd);
+            let verse = args.resolve().expect("failed to resolve lsp universe");
+            let snap = CompileSnapshot::from_world(verse.snapshot());
+
+            WorldComputeGraph::new(snap)
+        }
     }
 
     impl Drop for TestWorkspace {
@@ -1214,5 +1233,162 @@ mod tests {
                 expected
             );
         }
+    }
+
+    use tinymist_task::Scalar;
+
+    fn bundle_task(output: Option<&str>) -> ProjectTask {
+        ProjectTask::ExportBundle(ExportBundleTask {
+            export: ProjectExportTask {
+                when: TaskWhen::Never,
+                output: output.map(PathPattern::new),
+                transform: vec![],
+            },
+            pages: None,
+            pdf_standards: vec![],
+            no_pdf_tags: false,
+            creation_timestamp: None,
+            ppi: Scalar::try_from(144.0).expect("valid ppi"),
+        })
+    }
+
+    /// The sample from
+    /// <https://github.com/Myriad-Dreamin/tinymist/issues/2742>, with the
+    /// elided `...` parts replaced by real content.
+    const ISSUE_2742_SAMPLE: &str = r##"
+#document("index.html", title: [Home])[
+  #title()
+  - #link(<blog>)[Go to blog]
+]
+
+#document("blog.html", title: [Blog])[
+  #title()
+  Welcome to my blog!
+  This blog also exists as a
+  #link(<blog-pdf>)[single PDF].
+] <blog>
+
+#document("blog.pdf", title: [Blog])[
+  #title()
+] <blog-pdf>
+"##;
+
+    /// A sample that is valid in both the bundle and the paged target: a bare
+    /// introspectable tag realizes to an empty bundle and to a blank paged
+    /// document.
+    const BUNDLE_AND_PAGED_SAMPLE: &str = r#"#metadata("issue-2742")"#;
+
+    fn export_runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("failed to create test runtime")
+    }
+
+    /// <https://github.com/Myriad-Dreamin/tinymist/issues/2742>
+    /// A bundle export of `test.typ` writes its files into the `test/`
+    /// directory beside the source, so the directory sits at the stem of the
+    /// default output path. A later PDF export must resolve its own artifact
+    /// path (`test.pdf`) beside that directory instead of mistaking the
+    /// bundle directory for its output path.
+    #[test]
+    fn test_prepare_output_path_resolves_pdf_beside_bundle_directory() {
+        let workspace = TestWorkspace::new(&[("test.typ", ISSUE_2742_SAMPLE)]);
+        let graph = workspace.graph("test.typ");
+
+        let bundle_write_to = ExportTask::prepare_output_path(&bundle_task(None), &graph)
+            .expect("failed to prepare bundle output path")
+            .expect("bundle output path should resolve");
+        assert_eq!(bundle_write_to, workspace.root.join("test"));
+
+        // The bundle export has written its directory.
+        fs::create_dir_all(&bundle_write_to).expect("failed to create bundle directory");
+        fs::write(bundle_write_to.join("index.html"), "").expect("failed to write bundle file");
+
+        let pdf_write_to = ExportTask::prepare_output_path(&pdf_task(None), &graph)
+            .expect("pdf output path must resolve beside the bundle directory");
+        assert_eq!(pdf_write_to, Some(workspace.root.join("test.pdf")));
+    }
+
+    /// The directory guard must reject a resolved artifact path that is a
+    /// directory itself.
+    #[test]
+    fn test_prepare_output_path_rejects_directory_at_artifact_path() {
+        let workspace = TestWorkspace::new(&[("test.typ", ISSUE_2742_SAMPLE)]);
+        let graph = workspace.graph("test.typ");
+
+        fs::create_dir_all(workspace.root.join("blocked.pdf"))
+            .expect("failed to create blocking directory");
+
+        let err = ExportTask::prepare_output_path(&pdf_task(Some("$root/blocked")), &graph)
+            .expect_err("an artifact path that is a directory must be rejected");
+        assert!(err.to_string().contains("output path is a directory"));
+    }
+
+    /// <https://github.com/Myriad-Dreamin/tinymist/issues/2742>
+    /// The PDF export of a file must succeed after a bundle export of the
+    /// same file: the bundle directory at the stem of the output path must
+    /// not block the export.
+    #[test]
+    fn test_bundle_export_does_not_block_pdf_export() {
+        let workspace = TestWorkspace::new(&[("test.typ", BUNDLE_AND_PAGED_SAMPLE)]);
+        let graph = workspace.graph_with_features("test.typ", &["bundle"]);
+
+        export_runtime().block_on(async move {
+            let bundle_artifact = CompiledArtifact::from_graph_without_doc(graph.clone());
+            ExportTask::do_export(bundle_task(None), bundle_artifact, None)
+                .await
+                .expect("bundle export should succeed");
+            assert!(workspace.root.join("test").is_dir());
+
+            let pdf_artifact = CompiledArtifact::from_graph(graph.clone(), false);
+            let res = ExportTask::do_export(pdf_task(None), pdf_artifact, None)
+                .await
+                .expect("pdf export should succeed after a bundle export");
+            assert!(res.is_some(), "pdf export should report its result");
+            assert!(workspace.root.join("test.pdf").is_file());
+            assert!(workspace.root.join("test").is_dir());
+        });
+    }
+
+    /// <https://github.com/Myriad-Dreamin/tinymist/issues/2742>
+    /// The reported sample: the bundle export produces `test/` with the
+    /// three declared documents (including the in-bundle `blog.pdf`). A
+    /// subsequent PDF export of the whole file is rejected by typst itself
+    /// because the multi-document sample is not paged-compilable, but it
+    /// must no longer fail with the reported `output path is a directory`
+    /// error, which misreported the bundle directory as the PDF's output
+    /// path.
+    #[test]
+    fn test_report_sample_bundle_export_then_pdf_export() {
+        let workspace = TestWorkspace::new(&[("test.typ", ISSUE_2742_SAMPLE)]);
+        let graph = workspace.graph_with_features("test.typ", &["bundle", "html"]);
+
+        export_runtime().block_on(async move {
+            let bundle_artifact = CompiledArtifact::from_graph_without_doc(graph.clone());
+            ExportTask::do_export(bundle_task(None), bundle_artifact, None)
+                .await
+                .expect("bundle export of the report sample should succeed");
+            for name in ["index.html", "blog.html", "blog.pdf"] {
+                assert!(
+                    workspace.root.join("test").join(name).is_file(),
+                    "bundle should contain {name}"
+                );
+            }
+
+            let pdf_artifact = CompiledArtifact::from_graph(graph.clone(), false);
+            let err = ExportTask::do_export(pdf_task(None), pdf_artifact, None)
+                .await
+                .expect_err("the multi-document sample is not paged-compilable");
+            let msg = err.to_string();
+            assert!(
+                !msg.contains("output path is a directory"),
+                "pdf export must not fail with the reported path error, got: {msg}"
+            );
+            assert!(
+                msg.contains("bundle target"),
+                "pdf export should report the underlying compilation error, got: {msg}"
+            );
+        });
     }
 }
