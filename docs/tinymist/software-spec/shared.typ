@@ -86,7 +86,7 @@
 
   == DevKit View
 
-  The _DevKit View_ shows development entries of the extension, for example, running the preview in development mode. The view is hidden by default: it only shows up when the extension is running in development mode or the `tinymist.devKit` setting is `enable`. This setting is not listed in the contributed settings, so you need to edit the settings JSON file to enable it.
+  The _DevKit View_ shows development entries of the extension, for example, running the preview in development mode. The view is hidden by default: it only shows up when the extension is running in development mode or the `tinymist.devKit` setting is enabled. This setting is not listed in the contributed settings, so you need to edit the settings JSON file to enable it.
 
   == Tool View
 
@@ -170,7 +170,7 @@
   - When the document compiles successfully, the indicator shows a normal status.
   - When the document fails to compile, the indicator is highlighted with the error background color.
 
-  The text of the indicator is formatted by the `tinymist.statusBarFormat` setting, with the placeholders `{compileStatusIcon}`, `{wordCount}`, `{charCount}`, `{pageCount}`, and `{fileName}`. The indicator will be hidden if the format string is empty.
+  The text of the indicator is formatted by the `tinymist.statusBarFormat` setting; see #github-link("/editors/vscode/Configuration.md")[Tinymist Server Configuration] for the details of the setting. The indicator will be hidden if the format string is empty.
 
   Hovering on the indicator shows the main file path and the word, character, space, and CJK character counts of the document. Clicking the indicator runs the `tinymist.showLog` command to show the logs of the language server.
 
@@ -197,7 +197,7 @@
 
   = Drag and Drop
 
-  You can perform _Drag and Drop_ of resource files into the editor to insert them into the document. The dropping and pasting of resources are controlled by the `tinymist.dragAndDrop` and `tinymist.copyAndPaste` settings, and the inserted path is computed by the `tinymist.onPaste` script.
+  You can perform _Drag and Drop_ of resource files into the editor to insert them into the document. The dropping and pasting of resources are controlled by the `tinymist.dragAndDrop`, `tinymist.copyAndPaste`, and `tinymist.onPaste` settings; see #github-link("/editors/vscode/Configuration.md")[Tinymist Server Configuration] for the details of the settings.
 
   = Context Menu
 
@@ -212,11 +212,7 @@
 
   == Entry File
 
-  The _Entry File_ is the main file that the language server compiles and analyzes for the current document. It is resolved by the `tinymist.projectResolution` setting:
-  - `singleFile` (default): each document is compiled like a Markdown document, where each single file is an individual document and no project resolution is needed.
-  - `lockDatabase`: for each workspace, tinymist tracks your preview and compilation history in a lock file, and automatically selects the main file according to the lock file.
-
-  An explicit entry file can also be provided by the `tinymist.typstExtraArgs` setting.
+  The _Entry File_ is the main file that the language server compiles and analyzes for the current document. It is resolved by the `tinymist.projectResolution` setting, and an explicit entry file can also be provided by the `tinymist.typstExtraArgs` setting; see #github-link("/editors/vscode/Configuration.md")[Tinymist Server Configuration] for the details of the settings.
 
   == Focus State
 
@@ -269,12 +265,7 @@
 
   = Configuration
 
-  There are following channels to configure and start the language server:
-  - `nvim-lspconfig`: call `require("lspconfig")["tinymist"].setup { settings = { ... } }` with the settings in the _Typst-Specific LSP Configurations_ section.
-  - The built-in `vim.lsp` framework: define `vim.lsp.config["tinymist"] = { cmd = { "tinymist" }, filetypes = { "typst" }, settings = { ... } }` and then call `vim.lsp.enable("tinymist")`. The `vim.lsp.enable` call is required: defining the configuration alone never starts the server.
-  - `coc.nvim`: add a `tinymist` entry to the `languageserver` section of `coc-settings.json`.
-
-  The settings in the _Typst-Specific LSP Configurations_ section are sent to the server through the `settings` field. Some settings are only read at server startup, so changing them requires restarting the editor or the server.
+  The settings of the language server are documented in #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration].
 
   = Canonical Plugin
 
@@ -303,11 +294,7 @@
 
   = Document Export
 
-  You can export the current document to a PDF file by the `tinymist.exportPdf` setting:
-  - `onType`: export the document as you type.
-  - `onSave`: export the document when it is saved.
-
-  The export writes the PDF file next to the source file by default, and the output location can be changed by the `outputPath` setting. The export task only runs when the document compiles successfully: a document with compile errors is skipped without a message.
+  You can export the current document to a PDF file as you type or when it is saved, by the `tinymist.exportPdf` setting; see #github-link("/editors/neovim/Configuration.md")[Tinymist Server Configuration] for the details of the setting. The export writes the PDF file next to the source file by default, and the output location can be changed by the `outputPath` setting. The export task only runs when the document compiles successfully: a document with compile errors is skipped without a message.
 
   Other export formats are available through the `tinymist.exportSvg`, `tinymist.exportPng`, `tinymist.exportText`, `tinymist.exportHtml`, `tinymist.exportMarkdown`, and `tinymist.exportTeX` commands.
 
