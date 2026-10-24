@@ -38,7 +38,7 @@ There are following actions that you can perform in the [_Symbol View_](#symbol-
 
 ### DevKit View
 
-The [_DevKit View_](#devkit-view) shows development entries of the extension, for example, running the preview in development mode. The view is hidden by default: it only shows up when the extension is running in development mode or the `tinymist.devKit` setting is `enable`. This setting is not listed in the contributed settings, so you need to edit the settings JSON file to enable it.
+The [_DevKit View_](#devkit-view) shows development entries of the extension, for example, running the preview in development mode. The view is hidden by default: it only shows up when the extension is running in development mode or the `tinymist.devKit` setting is enabled. This setting is not listed in the contributed settings, so you need to edit the settings JSON file to enable it.
 
 ### Tool View
 
@@ -129,7 +129,7 @@ In the status bar, the [_Document Status Indicator_](#document-status-indicator)
 - When the document compiles successfully, the indicator shows a normal status.
 - When the document fails to compile, the indicator is highlighted with the error background color.
 
-The text of the indicator is formatted by the `tinymist.statusBarFormat` setting, with the placeholders `{compileStatusIcon}`, `{wordCount}`, `{charCount}`, `{pageCount}`, and `{fileName}`. The indicator will be hidden if the format string is empty.
+The text of the indicator is formatted by the `tinymist.statusBarFormat` setting; see [Tinymist Server Configuration](/editors/vscode/Configuration.md) for the details of the setting. The indicator will be hidden if the format string is empty.
 
 Hovering on the indicator shows the main file path and the word, character, space, and CJK character counts of the document. Clicking the indicator runs the `tinymist.showLog` command to show the logs of the language server.
 
@@ -158,7 +158,7 @@ The editor also shows code lenses on the first line of a document for profiling,
 
 ## Drag and Drop
 
-You can perform [_Drag and Drop_](#drag-and-drop) of resource files into the editor to insert them into the document. The dropping and pasting of resources are controlled by the `tinymist.dragAndDrop` and `tinymist.copyAndPaste` settings, and the inserted path is computed by the `tinymist.onPaste` script.
+You can perform [_Drag and Drop_](#drag-and-drop) of resource files into the editor to insert them into the document. The dropping and pasting of resources are controlled by the `tinymist.dragAndDrop`, `tinymist.copyAndPaste`, and `tinymist.onPaste` settings; see [Tinymist Server Configuration](/editors/vscode/Configuration.md) for the details of the settings.
 
 ## Context Menu
 
@@ -174,12 +174,7 @@ You can interact with the [_Tinymist LSP_](#tinymist-lsp) under the state model 
 
 ### Entry File
 
-The [_Entry File_](#entry-file) is the main file that the language server compiles and analyzes for the current document. It is resolved by the `tinymist.projectResolution` setting:
-
-- `singleFile` (default): each document is compiled like a Markdown document, where each single file is an individual document and no project resolution is needed.
-- `lockDatabase`: for each workspace, tinymist tracks your preview and compilation history in a lock file, and automatically selects the main file according to the lock file.
-
-An explicit entry file can also be provided by the `tinymist.typstExtraArgs` setting.
+The [_Entry File_](#entry-file) is the main file that the language server compiles and analyzes for the current document. It is resolved by the `tinymist.projectResolution` setting, and an explicit entry file can also be provided by the `tinymist.typstExtraArgs` setting; see [Tinymist Server Configuration](/editors/vscode/Configuration.md) for the details of the settings.
 
 ### Focus State
 

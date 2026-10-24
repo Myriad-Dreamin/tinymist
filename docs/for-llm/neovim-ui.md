@@ -30,13 +30,7 @@ Neovim 0.12 and later detect `.typ` files as the `typst` filetype natively, so n
 
 ## Configuration
 
-There are following channels to configure and start the language server:
-
-- `nvim-lspconfig`: call `require("lspconfig")["tinymist"].setup { settings = { ... } }` with the settings in the [_Typst-Specific LSP Configurations_](#typst-specific-lsp-configurations) section.
-- The built-in `vim.lsp` framework: define `vim.lsp.config["tinymist"] = { cmd = { "tinymist" }, filetypes = { "typst" }, settings = { ... } }` and then call `vim.lsp.enable("tinymist")`. The `vim.lsp.enable` call is required: defining the configuration alone never starts the server.
-- `coc.nvim`: add a `tinymist` entry to the `languageserver` section of `coc-settings.json`.
-
-The settings in the [_Typst-Specific LSP Configurations_](#typst-specific-lsp-configurations) section are sent to the server through the `settings` field. Some settings are only read at server startup, so changing them requires restarting the editor or the server.
+The settings of the language server are documented in [Tinymist Server Configuration](/editors/neovim/Configuration.md).
 
 ## Canonical Plugin
 
@@ -67,12 +61,7 @@ You can format documents by `vim.lsp.buf.format()` or the `gq` command when a fo
 
 ## Document Export
 
-You can export the current document to a PDF file by the `tinymist.exportPdf` setting:
-
-- `onType`: export the document as you type.
-- `onSave`: export the document when it is saved.
-
-The export writes the PDF file next to the source file by default, and the output location can be changed by the `outputPath` setting. The export task only runs when the document compiles successfully: a document with compile errors is skipped without a message.
+You can export the current document to a PDF file as you type or when it is saved, by the `tinymist.exportPdf` setting; see [Tinymist Server Configuration](/editors/neovim/Configuration.md) for the details of the setting. The export writes the PDF file next to the source file by default, and the output location can be changed by the `outputPath` setting. The export task only runs when the document compiles successfully: a document with compile errors is skipped without a message.
 
 Other export formats are available through the `tinymist.exportSvg`, `tinymist.exportPng`, `tinymist.exportText`, `tinymist.exportHtml`, `tinymist.exportMarkdown`, and `tinymist.exportTeX` commands.
 
