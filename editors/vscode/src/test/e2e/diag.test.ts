@@ -104,7 +104,14 @@ export async function getTests(ctx: Context) {
 
       ctx.expect(diags).to.have.lengthOf(1);
       const diag = diags[0];
-      ctx.expect(diag.message).contains("Hint: Cannot read file outside of project root");
+      // The error line comes from typst; the refined hint replaces the
+      // kernel's generic sandbox hint with an actionable one.
+      ctx.expect(diag.message).contains("would escape the package root");
+      ctx.expect(diag.message).contains("Hint: Cannot read file outside of the package root");
+      ctx.expect(diag.message).contains("move it inside the package root");
+      ctx
+        .expect(diag.message)
+        .not.contains("Hint: cannot access files outside of the package sandbox");
       ctx
         .expect(diag.message)
         .not.contains("Hint: you can adjust the project root with the --root argument");

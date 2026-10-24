@@ -259,15 +259,98 @@ struct OutOfRootHintRefiner();
 
 impl DiagnosticRefiner for OutOfRootHintRefiner {
     fn matches(&self, raw: &TypstDiagnostic) -> bool {
-        raw.message.contains("failed to load file (access denied)")
-            && raw
-                .hints
-                .iter()
-                .any(|hint| hint.v.contains("cannot read file outside of project root"))
+        // typst formats these errors as
+        // `path `..` would escape the {package|project} root` with a
+        // `cannot access files outside of the {package|project} sandbox` hint.
+        raw.message.contains(" would escape the ")
+            && raw.message.contains(" root")
+            && raw.hints.iter().any(|hint| {
+                hint.v.contains("cannot access files outside of the ")
+                    && hint.v.contains(" sandbox")
+            })
     }
 
     fn refine(&self, mut raw: TypstDiagnostic) -> TypstDiagnostic {
+        let hint = if raw.message.contains(" would escape the package root") {
+            "Cannot read file outside of the package root. To access the file, \
+             move it inside the package root, or make it available as a package."
+        } else {
+            "Cannot read file outside of the project root. To access the file, \
+             move it inside the project root, or adjust the project root with the \
+             `--root` argument."
+        };
         raw.hints.clear();
-        raw.with_hint("Cannot read file outside of project root.")
+        raw.with_hint(hint)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Creates a raw diagnostic like typst's `format_resolve_error` does.
+    fn sample(message: &str, hints: &[&str]) -> TypstDiagnostic {
+        let mut diag = TypstDiagnostic::error(Span::detached(), message);
+        for hint in hints {
+            diag = diag.with_hint(*hint);
+        }
+        diag
+    }
+
+    // Verbatim from the runtime records of the out-of-root probe
+    // (qa/feature-sweep/out-of-root-probe-2026-10-20/records.md): resolving a
+    // file from a single-file project hits the package root.
+    #[test]
+    fn out_of_root_refiner_matches_package_kind() {
+        let raw = sample(
+            "path `\"../out-of-root/library.typ\"` would escape the package root",
+            &["cannot access files outside of the package sandbox"],
+        );
+
+        assert!(OutOfRootHintRefiner().matches(&raw));
+
+        let refined = OutOfRootHintRefiner().refine(raw);
+        assert_eq!(refined.hints.len(), 1);
+        assert_eq!(
+            refined.hints[0].v.to_string(),
+            "Cannot read file outside of the package root. To access the file, \
+             move it inside the package root, or make it available as a package."
+        );
+    }
+
+    // Verbatim from typst's `format_resolve_error` for a project root, which
+    // also attaches the `--root` argument hint.
+    #[test]
+    fn out_of_root_refiner_matches_project_kind() {
+        let raw = sample(
+            "path `\"../out-of-root/library.typ\"` would escape the project root",
+            &[
+                "cannot access files outside of the project sandbox",
+                "you can adjust the project root with the `--root` argument",
+            ],
+        );
+
+        assert!(OutOfRootHintRefiner().matches(&raw));
+
+        let refined = OutOfRootHintRefiner().refine(raw);
+        assert_eq!(refined.hints.len(), 1);
+        assert_eq!(
+            refined.hints[0].v.to_string(),
+            "Cannot read file outside of the project root. To access the file, \
+             move it inside the project root, or adjust the project root with the \
+             `--root` argument."
+        );
+    }
+
+    // The bundle escape error shares the message key but carries no sandbox
+    // hint, so it must not hit the refiner.
+    #[test]
+    fn out_of_root_refiner_ignores_escape_errors_without_sandbox_hint() {
+        let raw = sample(
+            "path `\"../out-of-root/library.typ\"` would escape the bundle root",
+            &[],
+        );
+
+        assert!(!OutOfRootHintRefiner().matches(&raw));
     }
 }
