@@ -373,9 +373,6 @@ impl ExportTask {
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if write_to.is_dir() && !matches!(task, ProjectTask::ExportBundle { .. }) {
-            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
-        }
 
         // Apply page template if any
         let mut write_to = match task {
@@ -389,11 +386,20 @@ impl ExportTask {
             }) => write_to.with_file_name(page_number_template),
             _ => write_to,
         };
+        // A bundle is a directory of files: the resolved path is its root
+        // directory, which the export creates and fills.
         if matches!(task, ProjectTask::ExportBundle { .. }) {
             return Ok(Some(write_to));
         }
         if !write_to.add_extension(task.extension()) {
             write_to = write_to.with_file_name(format!("main.{}", task.extension()));
+        }
+        // Reject only the path the artifact will be written to. The stem of
+        // the path may legitimately be a directory: a bundle exported from
+        // the same file puts its directory there.
+        // See https://github.com/Myriad-Dreamin/tinymist/issues/2742
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
 
         Ok(Some(write_to))
