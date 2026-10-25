@@ -4,7 +4,8 @@
 //! todo: test about images' iccprofile.
 //! scene. todo: clean up code.
 
-use std::sync::{Arc, OnceLock};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use ecow::EcoVec;
 use image::codecs::gif::GifDecoder;
@@ -368,14 +369,13 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
             return;
         }
 
-        let Some((scene, transform)) = image_item_scene(image_item, ctx.svg_resource_resolver())
-        else {
+        let Some(scene) = cached_image_scene(image_item, ctx.svg_resource_resolver()) else {
             return;
         };
 
         self.items.push(GroupSceneItem::Scene {
             pos: Vec2::new(0., 0.),
-            scene: Arc::new(VecScene::Scene(Box::new(scene), Some(transform))),
+            scene,
         });
     }
 
@@ -402,10 +402,62 @@ impl<'m, C: RenderVm<'m, Resultant = Arc<VecScene>> + GlyphFactory> GroupContext
     }
 }
 
+/// Pixels per point kept for raster images and SVGs drawn by resvg (288 ppi).
+///
+/// Images stay sharp up to 400% zoom on a normal screen, or 200% on a 2x one.
+/// At 100% the GPU shrinks them with bilinear sampling, which is a little
+/// grainier than Typst's exact resampling; matching it at every zoom would
+/// need textures picked by the current zoom. Images smaller than this keep
+/// their own resolution.
+const IMAGE_PX_PER_PT: f64 = 4.0;
+
+/// Converts an image to a scene once, so that edits elsewhere on its page do
+/// not decode and convert it again.
+fn cached_image_scene(
+    image_item: &ir::ImageItem,
+    svg_resource_resolver: Option<&dyn SvgResourceResolver>,
+) -> Option<Arc<VecScene>> {
+    type Key = (Fingerprint, u32, u32, usize);
+    static CACHE: OnceLock<Mutex<HashMap<Key, Arc<VecScene>>>> = OnceLock::new();
+    const MAX_ENTRIES: usize = 64;
+
+    let key = (
+        image_item.image.hash,
+        image_item.size.x.0.to_bits(),
+        image_item.size.y.0.to_bits(),
+        svg_resource_resolver.map_or(0, |r| {
+            r as *const dyn SvgResourceResolver as *const () as usize
+        }),
+    );
+    let cache = CACHE.get_or_init(Default::default);
+    if let Some(scene) = cache.lock().ok()?.get(&key) {
+        return Some(scene.clone());
+    }
+
+    let (scene, transform) = image_item_scene(image_item, svg_resource_resolver)?;
+    let scene = Arc::new(VecScene::Scene(Box::new(scene), Some(transform)));
+    let mut cache = cache.lock().ok()?;
+    if cache.len() >= MAX_ENTRIES {
+        cache.clear();
+    }
+    cache.insert(key, scene.clone());
+    Some(scene)
+}
+
 fn image_item_scene(
     image_item: &ir::ImageItem,
     svg_resource_resolver: Option<&dyn SvgResourceResolver>,
 ) -> Option<(vello::Scene, Affine)> {
+    if matches!(image_item.image.format.as_ref(), "svg" | "svg+xml")
+        && let Some(vector) = svg_vector_scene(
+            &image_item.image.data,
+            image_item.size,
+            svg_resource_resolver,
+        )
+    {
+        return Some(vector);
+    }
+
     let (image_data, width, height, quality) = decode_image_data_for_item(
         image_item.image.format.as_ref(),
         &image_item.image.data,
@@ -426,6 +478,42 @@ fn image_item_scene(
     Some((scene, transform))
 }
 
+/// Draws an SVG image as vector paths, clipped to its view box. Returns `None` for SVGs
+/// that use features [`crate::svg`] can't draw, which are then drawn by resvg.
+fn svg_vector_scene(
+    data: &[u8],
+    target_size: Axes<Abs>,
+    svg_resource_resolver: Option<&dyn SvgResourceResolver>,
+) -> Option<(vello::Scene, Affine)> {
+    let options = svg_options(data, svg_resource_resolver);
+    let tree = resvg::usvg::Tree::from_data(data, &options).ok()?;
+    let width = tree.size().width() as f64;
+    let height = tree.size().height() as f64;
+    if width <= 0.0 || height <= 0.0 || !crate::svg::supports(&tree) {
+        return None;
+    }
+
+    let mut scene = vello::Scene::new();
+    let bounds = Rect::new(0.0, 0.0, width, height);
+    scene.push_clip_layer(peniko::Fill::NonZero, Affine::IDENTITY, &bounds);
+    scene.append(&crate::svg::render_tree(&tree), None);
+    scene.pop_layer();
+
+    let transform = Affine::scale_non_uniform(
+        target_size.x.0 as f64 / width,
+        target_size.y.0 as f64 / height,
+    );
+    Some((scene, transform))
+}
+
+fn image_quality(pixelated: bool) -> peniko::ImageQuality {
+    if pixelated {
+        peniko::ImageQuality::Low
+    } else {
+        peniko::ImageQuality::Medium
+    }
+}
+
 fn decode_image_data_for_item(
     format: &str,
     data: &[u8],
@@ -437,12 +525,13 @@ fn decode_image_data_for_item(
         "svg" | "svg+xml" => {
             let (image_data, width, height) =
                 decode_svg_image(data, target_size, svg_resource_resolver)?;
-            Some((image_data, width, height, peniko::ImageQuality::Low))
+            Some((image_data, width, height, image_quality(false)))
         }
         _ => {
+            let pixelated = is_pixelated(attrs);
             let (image_data, width, height) =
-                decode_raster_image(format, data, target_size, is_pixelated(attrs))?;
-            Some((image_data, width, height, peniko::ImageQuality::Low))
+                decode_raster_image(format, data, target_size, pixelated)?;
+            Some((image_data, width, height, image_quality(pixelated)))
         }
     }
 }
@@ -490,8 +579,8 @@ fn decode_svg_image(
 }
 
 fn target_texture_size(target_size: Axes<Abs>, aspect: f64) -> (u32, u32) {
-    let width = (target_size.x.0 as f64)
-        .max(aspect * target_size.y.0 as f64)
+    let width = (IMAGE_PX_PER_PT * target_size.x.0 as f64)
+        .max(IMAGE_PX_PER_PT * aspect * target_size.y.0 as f64)
         .ceil()
         .max(1.0) as u32;
     let height = (width as f64 / aspect).ceil().max(1.0) as u32;
@@ -612,15 +701,15 @@ fn resize_raster_image(
         image_data.width() as f64 / image_data.height() as f64,
     );
 
-    if (width, height) == (image_data.width(), image_data.height()) {
+    // Never enlarge on the CPU: the GPU scales the image when it is drawn.
+    if width >= image_data.width() || height >= image_data.height() {
         return image_data;
     }
 
-    let upscale = width > image_data.width();
-    let filter = match (pixelated, upscale) {
-        (true, _) => FilterType::Nearest,
-        (false, true) => FilterType::CatmullRom,
-        (false, false) => FilterType::Lanczos3,
+    let filter = if pixelated {
+        FilterType::Nearest
+    } else {
+        FilterType::Lanczos3
     };
 
     image_data.resize_exact(width, height, filter)
@@ -1530,6 +1619,103 @@ mod tests {
             spacing: Axes::new(Scalar(1.), Scalar(2.)),
             offset: Axes::new(Scalar(0.), Scalar(0.)),
         }))
+    }
+
+    fn png_image_item(width: u32, height: u32, size: (f32, f32), id: u64) -> ir::ImageItem {
+        let pixels = image::RgbImage::from_fn(width, height, |x, y| {
+            image::Rgb([(x * 255 / width) as u8, (y * 255 / height) as u8, 128])
+        });
+        let mut data = Vec::new();
+        image::DynamicImage::ImageRgb8(pixels)
+            .write_to(
+                &mut std::io::Cursor::new(&mut data),
+                image::ImageFormat::Png,
+            )
+            .unwrap();
+        image_item("png", data, (width, height), size, id)
+    }
+
+    fn image_item(
+        format: &str,
+        data: Vec<u8>,
+        pixels: (u32, u32),
+        size: (f32, f32),
+        id: u64,
+    ) -> ir::ImageItem {
+        ir::ImageItem {
+            image: Arc::new(ir::Image {
+                data: data.into(),
+                format: format.into(),
+                size: Axes {
+                    x: pixels.0,
+                    y: pixels.1,
+                },
+                hash: Fingerprint::from_pair(id, 0),
+                attrs: vec![],
+            }),
+            size: Axes {
+                x: Scalar(size.0),
+                y: Scalar(size.1),
+            },
+        }
+    }
+
+    #[test]
+    fn large_raster_images_keep_four_pixels_per_point() {
+        let item = png_image_item(400, 200, (50.0, 25.0), 1);
+        let (_, width, height, quality) =
+            decode_image_data_for_item("png", &item.image.data, item.size, &[], None).unwrap();
+        assert_eq!((width, height), (200, 100));
+        assert_eq!(quality, peniko::ImageQuality::Medium);
+    }
+
+    #[test]
+    fn small_raster_images_are_not_enlarged() {
+        // The GPU scales the image when it is drawn, so zooming in stays smooth.
+        let item = png_image_item(20, 10, (100.0, 50.0), 2);
+        let (_, width, height, _) =
+            decode_image_data_for_item("png", &item.image.data, item.size, &[], None).unwrap();
+        assert_eq!((width, height), (20, 10));
+    }
+
+    #[test]
+    fn converted_images_are_reused() {
+        let item = png_image_item(64, 32, (32.0, 16.0), 3);
+        let first = cached_image_scene(&item, None).unwrap();
+        let second = cached_image_scene(&item, None).unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn supported_svg_images_are_drawn_as_vectors() {
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="5" height="5"/></svg>"#;
+        assert!(
+            svg_vector_scene(
+                svg,
+                Axes {
+                    x: Scalar(20.0),
+                    y: Scalar(20.0)
+                },
+                None
+            )
+            .is_some()
+        );
+
+        // Patterns aren't supported, so this one falls back to a bitmap drawn by resvg.
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><pattern id="p" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/></pattern><rect width="10" height="10" fill="url(#p)"/></svg>"#;
+        assert!(
+            svg_vector_scene(
+                svg,
+                Axes {
+                    x: Scalar(20.0),
+                    y: Scalar(20.0)
+                },
+                None
+            )
+            .is_none()
+        );
+        let item = image_item("svg", svg.to_vec(), (10, 10), (20.0, 20.0), 4);
+        assert!(cached_image_scene(&item, None).is_some());
     }
 
     #[test]
