@@ -373,9 +373,6 @@ impl ExportTask {
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if write_to.is_dir() && !matches!(task, ProjectTask::ExportBundle { .. }) {
-            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
-        }
 
         // Apply page template if any
         let mut write_to = match task {
@@ -394,6 +391,10 @@ impl ExportTask {
         }
         if !write_to.add_extension(task.extension()) {
             write_to = write_to.with_file_name(format!("main.{}", task.extension()));
+        }
+
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
 
         Ok(Some(write_to))
