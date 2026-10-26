@@ -54,6 +54,9 @@ body {
   flex: 1;
   overflow: auto;
   position: relative;
+  /* Chromium does not composite this scroller at a device pixel ratio below 1.5
+     and would re-raster the whole document on every scroll frame. */
+  will-change: scroll-position;
 }
 
 #typst-app {
