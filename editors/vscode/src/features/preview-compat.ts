@@ -524,9 +524,7 @@ export class Addon2Server {
           const shouldScrollPanel =
             // scroll by mouse
             kind === vscode.TextEditorSelectionChangeKind.Mouse ||
-            // scroll by keyboard typing
-            (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange &&
-              kind === vscode.TextEditorSelectionChangeKind.Keyboard);
+            scrollSyncMode === ScrollSyncModeEnum.onSelectionChange;
           if (shouldScrollPanel) {
             console.log(`selection changed, sending src2doc jump request`);
             reportPosition(doc, editor, "panelScrollTo");
