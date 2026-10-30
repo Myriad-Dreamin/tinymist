@@ -168,6 +168,7 @@ export function previewActivate(context: vscode.ExtensionContext, isCompat: bool
       const tasks = Array.from(activeTask.values()).map((t) => {
         return {
           panel: !!t.panel,
+          title: t.panel?.title,
           taskId: t.taskId,
           source: t.previewSource,
         };
@@ -467,6 +468,28 @@ interface TaskControlBlock {
   dispose?: () => void;
 }
 const activeTask = new Map<vscode.TextDocument, TaskControlBlock>();
+// Track entries before the LSP launch request: compilation can finish before a panel exists.
+const previewEntries = new Map<string, string | undefined>();
+
+/**
+ * Updates the matching preview's title from its resolved compilation entry, independently of
+ * compile-status UI settings. Pending previews retain the entry until their panel is created.
+ */
+export function updatePreviewTitle(taskId: string, entryPath: string) {
+  if (!entryPath || !previewEntries.has(taskId)) {
+    return;
+  }
+  previewEntries.set(taskId, entryPath);
+  const title = `${path.posix.basename(entryPath)}${l10nMsg(" (Preview)")}`;
+  for (const t of activeTask.values()) {
+    if (t.taskId === taskId && t.panel) {
+      if (t.panel.title !== title) {
+        t.panel.title = title;
+      }
+      return;
+    }
+  }
+}
 
 async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask) {
   const { kind, context, editor, bindDocument, webviewPanel, isBrowsing, isDev, isNotPrimary } =
@@ -492,8 +515,13 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
 
   const disposes = new DisposeList();
   registerPreviewTaskDispose(taskId, disposes);
+  previewEntries.set(taskId, undefined);
+  disposes.add(() => previewEntries.delete(taskId));
 
-  const { dataPlanePort, staticServerPort, isPrimary } = await invokeLspCommand();
+  const { dataPlanePort, staticServerPort, isPrimary } = await invokeLspCommand().catch((error) => {
+    disposes.dispose();
+    throw error;
+  });
   if (!dataPlanePort || !staticServerPort) {
     disposes.dispose();
     throw new Error(`Failed to launch preview ${filePath}`);
@@ -564,6 +592,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
           disposes.dispose();
           await tinymist.killPreview(taskId);
         },
+      }).catch(async (error) => {
+        disposes.dispose();
+        await tinymist.killPreview(taskId);
+        throw error;
       });
       panel = openedPreview.panel;
       previewSource = openedPreview.previewSource;
@@ -583,6 +615,10 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
     previewSource,
     dispose: () => disposes.dispose(),
   });
+  const entryPath = previewEntries.get(taskId);
+  if (entryPath) {
+    updatePreviewTitle(taskId, entryPath);
+  }
   disposes.add(() => {
     if (activeTask.get(bindDocument)?.taskId === taskId) {
       activeTask.delete(bindDocument);
