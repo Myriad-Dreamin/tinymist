@@ -500,6 +500,16 @@ impl ExportTask {
             Some(())
         });
 
+        // `do_export_bytes` consumes `artifact`, but the SyncTeX file is generated
+        // after it, from the document and the world in `graph`, which maps source
+        // locations to files. Both are `Arc`s, so keeping them copies no data.
+        let synctex = match (&task, &artifact.doc) {
+            (ProjectTask::ExportPdf(config), Some(TypstDocument::Paged(doc))) if config.synctex => {
+                Some((graph.clone(), doc.clone()))
+            }
+            _ => None,
+        };
+
         // Generate the data using common logic
         let artifact = Self::do_export_bytes(task.clone(), artifact, export_id).await?;
 
@@ -514,6 +524,19 @@ impl ExportTask {
                 tokio::task::spawn_blocking(move || write_atomic(to, data))
                     .await
                     .context_ut("failed to export")??;
+
+                // If requested, write the SyncTeX file next to the PDF. Generating
+                // it walks the whole document, so it leaves the async executor
+                // like the PDF write above.
+                if let Some((graph, doc)) = synctex {
+                    let to = write_to.with_extension("synctex.gz");
+                    tokio::task::spawn_blocking(move || {
+                        let data = tinymist_task::synctex_gz(graph.world(), &doc)?;
+                        write_atomic(to, data)
+                    })
+                    .await
+                    .context_ut("failed to export synctex")??;
+                }
 
                 res
             }
@@ -854,6 +877,7 @@ impl Default for ExportUserConfig {
                 pdf_standards: vec![],
                 no_pdf_tags: false,
                 creation_timestamp: None,
+                synctex: false,
             }),
             count_words: false,
             development: false,

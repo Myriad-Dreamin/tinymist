@@ -187,6 +187,10 @@ fn shell_build_script(shell: Shell) -> Result<String> {
                     cmd.push("--no-pdf-tags");
                 }
 
+                if task.synctex {
+                    cmd.push("--synctex");
+                }
+
                 if let Some(output) = &task.creation_timestamp {
                     cmd.push("--creation-timestamp");
                     cmd.push(output.to_string());

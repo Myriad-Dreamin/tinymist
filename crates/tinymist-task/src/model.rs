@@ -260,6 +260,10 @@ pub struct ExportPdfTask {
     /// For more information, see <https://reproducible-builds.org/specs/source-date-epoch/>.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub creation_timestamp: Option<i64>,
+    /// Whether to write a `.synctex.gz` file next to the PDF, mapping PDF
+    /// positions to source lines for viewers such as Skim or Okular.
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub synctex: bool,
 }
 
 /// An export png task specifier.

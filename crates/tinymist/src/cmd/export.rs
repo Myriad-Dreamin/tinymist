@@ -135,6 +135,7 @@ impl ServerState {
             pdf_standards,
             no_pdf_tags,
             creation_timestamp,
+            synctex: false,
         });
 
         if path.extension().and_then(|ext| ext.to_str()) == Some("md") {

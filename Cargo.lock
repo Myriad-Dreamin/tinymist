@@ -6496,6 +6496,7 @@ dependencies = [
 name = "tests"
 version = "0.15.10"
 dependencies = [
+ "flate2",
  "insta",
  "insta-cmd",
  "lsp-types",
@@ -7169,6 +7170,7 @@ dependencies = [
  "comemo",
  "dirs",
  "ecow",
+ "flate2",
  "log",
  "notify",
  "parking_lot",
