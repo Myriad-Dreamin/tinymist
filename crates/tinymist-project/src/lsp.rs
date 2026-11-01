@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use tinymist_std::ImmutPath;
 use tinymist_std::error::prelude::*;
+#[cfg(feature = "system")]
+use tinymist_std::path::PathClean;
 use tinymist_task::ExportTarget;
 use tinymist_world::package::RegistryPathMapper;
 #[cfg(all(not(feature = "system"), feature = "web"))]
