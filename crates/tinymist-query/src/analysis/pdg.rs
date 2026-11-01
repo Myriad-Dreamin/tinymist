@@ -350,23 +350,32 @@ impl SharedContext {
                 site.span()
             );
 
-            // Reuse the normal const/type-backed import evaluator. It first
-            // handles direct constants and then falls back to the existing
-            // runtime import tracer; this pass does not maintain a second
-            // lexical evaluator.
+            // Only constant-evaluable (str literal) sites go through the
+            // import evaluator. Any other site would fall back to the runtime
+            // import tracer, which compiles the whole main document per site
+            // (#2754/#2756: 66 dynamic sites in a 439-page book meant 66 full
+            // compilations and unbounded comemo cache growth). A traced result
+            // was only ever an observation here — the site already carries
+            // `has_unresolved` and keeps its authoritative late edge from the
+            // full expression pass — so skipping the tracer changes nothing
+            // but the memory profile.
+            let exact_literal = site
+                .cast::<ast::Expr>()
+                .is_some_and(|expr| matches!(expr, ast::Expr::Str(_)));
+            if !exact_literal {
+                has_unresolved = true;
+                return;
+            }
+
+            // Reuse the normal const-backed import evaluator for the literal
+            // site; this pass does not maintain a second lexical evaluator.
             let (source_value, module_value) = self.analyze_import(site);
             let mut resolved = false;
             for value in source_value.into_iter().chain(module_value) {
                 resolved |= add_value(self, fid, value, &mut dependencies);
             }
 
-            // A traced result is only an observation for a non-literal site.
-            // Keep dynamic sites eligible for an authoritative late edge from
-            // the full expression pass.
-            let exact_literal = site
-                .cast::<ast::Expr>()
-                .is_some_and(|expr| matches!(expr, ast::Expr::Str(_)));
-            has_unresolved |= !exact_literal || !resolved;
+            has_unresolved |= !resolved;
         });
         let mut dependencies: Vec<_> = dependencies.into_iter().collect();
         dependencies.sort_unstable_by_key(|dependency| dependency.into_raw().get());
@@ -823,5 +832,69 @@ mod tests {
         assert_eq!(deps.get(&a), Some(&vec![b]));
         assert_eq!(deps.get(&b), Some(&vec![a]));
         assert!(coordinator.commit_current(&merged, |_| ()).is_some());
+    }
+
+    #[test]
+    fn non_literal_import_sites_never_reach_the_runtime_import_tracer() {
+        // The dynamic site `#import path: *` is only resolvable by the runtime
+        // import tracer, which compiles the whole main document per site — the
+        // #2754/#2756 OOM source. Its traced result would surface here as an
+        // observation edge to `target2.typ`, so asserting that edge absent is
+        // asserting the runtime tracer was never reached by discovery.
+        let sources = concat!(
+            "// path: pdg-trace/target.typ\n",
+            "#let used = 1\n",
+            "-----\n",
+            "// path: pdg-trace/target2.typ\n",
+            "#let used = 2\n",
+            "-----\n",
+            "// path: pdg-trace/main.typ\n",
+            "#import \"target.typ\": *\n",
+            "#let path = \"target2.typ\"\n",
+            "#import path: *\n",
+        );
+
+        crate::tests::run_with_sources(sources, |verse, path| {
+            crate::tests::run_with_ctx(
+                verse,
+                path,
+                &|ctx: &mut crate::prelude::LocalContext, path: std::path::PathBuf| {
+                    let shared = ctx.shared_();
+                    let fid = shared.source_by_path(&path).ok().unwrap().id();
+                    let source = |name: &str| {
+                        shared
+                            .source_by_path(&path.parent().unwrap().join(name))
+                            .ok()
+                            .unwrap()
+                            .id()
+                    };
+                    let target = source("target.typ");
+                    let dynamic_target = source("target2.typ");
+
+                    let discovery = shared.discover_dependencies(fid);
+
+                    // Str-literal sites keep resolving their target files.
+                    assert!(
+                        discovery.dependencies.contains(&target),
+                        "str-literal sites must resolve target files as before"
+                    );
+
+                    // A non-literal site must never enter the runtime import
+                    // tracer: the observation edge only the tracer could add
+                    // must be absent.
+                    assert!(
+                        !discovery.dependencies.contains(&dynamic_target),
+                        "dependency discovery must not reach the runtime import tracer"
+                    );
+
+                    // Non-literal sites stay unresolved for the late edges of
+                    // the full expression pass.
+                    assert!(
+                        discovery.has_unresolved,
+                        "non-literal sites must stay marked unresolved"
+                    );
+                },
+            )
+        });
     }
 }
