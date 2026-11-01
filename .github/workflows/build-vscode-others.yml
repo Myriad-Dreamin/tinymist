@@ -132,9 +132,18 @@ jobs:
           node-version: 24
           cache: 'yarn'
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: "v0.13.1"
+      - name: Install wasm-pack
+        # jetli/wasm-pack-action@v0.4.0 extracts into /tmp, which is a separate
+        # device from /home on current runners, so its io.mv fails with
+        # "EXDEV: cross-device link not permitted". Install the official
+        # release tarball into $HOME/.cargo/bin instead (same device, no rename).
+        run: |
+          curl -fsSL https://github.com/wasm-bindgen/wasm-pack/releases/download/v0.13.1/wasm-pack-v0.13.1-x86_64-unknown-linux-musl.tar.gz -o /tmp/wasm-pack.tar.gz
+          tar -xzf /tmp/wasm-pack.tar.gz -C /tmp
+          mkdir -p "$HOME/.cargo/bin"
+          mv /tmp/wasm-pack-v0.13.1-x86_64-unknown-linux-musl/wasm-pack "$HOME/.cargo/bin/wasm-pack"
+          chmod +x "$HOME/.cargo/bin/wasm-pack"
+          wasm-pack --version
       - name: Install deps
         run: yarn install
       - name: Build tinymist library
