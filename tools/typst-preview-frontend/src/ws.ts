@@ -190,6 +190,11 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     helpButton?.addEventListener("click", toggleHelp);
 
     window.addEventListener("keydown", (e) => {
+      // Browser and OS shortcuts (Cmd+T, Ctrl+L, Cmd+Up, ...) are not ours.
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+
       let handled = true;
 
       const scrollDelta = 50;
@@ -201,6 +206,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             blurInput();
             removeHelp();
             updatePrev();
+          } else {
+            handled = false;
           }
           break;
         case " ":
@@ -210,6 +217,8 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
             blurInput();
             removeHelp();
             updateNext();
+          } else {
+            handled = false;
           }
           break;
         case "j":
