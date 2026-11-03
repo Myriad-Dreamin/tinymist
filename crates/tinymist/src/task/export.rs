@@ -373,8 +373,10 @@ impl ExportTask {
         if write_to.is_relative() {
             bail!("ExportTask({task:?}): output path is relative: {write_to:?}");
         }
-        if write_to.is_dir() && !matches!(task, ProjectTask::ExportBundle { .. }) {
-            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
+
+        // Bundle tasks legitimately output to a directory.
+        if matches!(task, ProjectTask::ExportBundle { .. }) {
+            return Ok(Some(write_to));
         }
 
         // Apply page template if any
@@ -389,11 +391,18 @@ impl ExportTask {
             }) => write_to.with_file_name(page_number_template),
             _ => write_to,
         };
-        if matches!(task, ProjectTask::ExportBundle { .. }) {
-            return Ok(Some(write_to));
-        }
-        if !write_to.add_extension(task.extension()) {
-            write_to = write_to.with_file_name(format!("main.{}", task.extension()));
+        let write_to = if !write_to.add_extension(task.extension()) {
+            write_to.with_file_name(format!("main.{}", task.extension()))
+        } else {
+            write_to
+        };
+
+        // The resolved output must be a file, not an existing directory. This
+        // check runs after the extension is applied so that a sibling directory
+        // sharing the source file's base name (e.g. `test/` next to `test.typ`)
+        // does not wrongly block writing `test.pdf`/`test.png`.
+        if write_to.is_dir() {
+            bail!("ExportTask({task:?}): output path is a directory: {write_to:?}");
         }
 
         Ok(Some(write_to))
@@ -1214,5 +1223,21 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn test_prepare_output_path_sibling_directory_is_not_blocked() {
+        // Regression: a sibling directory sharing the source file's base name
+        // (e.g. `test/` next to `test.typ`) must not be treated as the output
+        // path, which is `test.pdf` once the extension is applied.
+        let workspace = TestWorkspace::new(&[("test.typ", "")]);
+        fs::create_dir_all(workspace.root.join("test"))
+            .expect("failed to create sibling directory");
+
+        let graph = workspace.graph("test.typ");
+        assert_eq!(
+            ExportTask::prepare_output_path(&pdf_task(None), &graph).unwrap(),
+            Some(workspace.root.join("test.pdf"))
+        );
     }
 }
