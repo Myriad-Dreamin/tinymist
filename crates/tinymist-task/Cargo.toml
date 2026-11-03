@@ -25,6 +25,7 @@ notify.workspace = true
 parking_lot.workspace = true
 rayon.workspace = true
 rpds.workspace = true
+reflexo-vec2svg.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -47,7 +48,7 @@ typst-svg.workspace = true
 [features]
 
 default = ["pdf", "text"]
-no-content-hint = []
+no-content-hint = ["reflexo-vec2svg/no-content-hint"]
 
 pdf = ["dep:chrono"]
 text = []

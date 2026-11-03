@@ -5312,7 +5312,7 @@ dependencies = [
 [[package]]
 name = "reflexo"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=53f1c427cb69156ee4bd2f9a814896a8cf040fb7#53f1c427cb69156ee4bd2f9a814896a8cf040fb7"
 dependencies = [
  "base64 0.22.1",
  "bitvec",
@@ -5338,7 +5338,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=53f1c427cb69156ee4bd2f9a814896a8cf040fb7#53f1c427cb69156ee4bd2f9a814896a8cf040fb7"
 dependencies = [
  "codespan-reporting 0.11.1",
  "comemo",
@@ -5370,7 +5370,7 @@ dependencies = [
 [[package]]
 name = "reflexo-typst2vec"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=53f1c427cb69156ee4bd2f9a814896a8cf040fb7#53f1c427cb69156ee4bd2f9a814896a8cf040fb7"
 dependencies = [
  "bitvec",
  "comemo",
@@ -5399,7 +5399,7 @@ dependencies = [
 [[package]]
 name = "reflexo-vec2svg"
 version = "0.8.0-rc3"
-source = "git+https://github.com/Myriad-Dreamin/typst.ts.git?rev=98ea19e0c32277646bf435b246477882ad818c9f#98ea19e0c32277646bf435b246477882ad818c9f"
+source = "git+https://github.com/syrkis/typst.ts.git?rev=53f1c427cb69156ee4bd2f9a814896a8cf040fb7#53f1c427cb69156ee4bd2f9a814896a8cf040fb7"
 dependencies = [
  "base64 0.22.1",
  "comemo",
@@ -7173,6 +7173,7 @@ dependencies = [
  "notify",
  "parking_lot",
  "rayon",
+ "reflexo-vec2svg",
  "rpds",
  "semver",
  "serde",
