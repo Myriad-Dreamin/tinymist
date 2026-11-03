@@ -6,7 +6,8 @@ use std::sync::Arc;
 use crate::analysis::SharedContext;
 use crate::prelude::Definition;
 use crate::syntax::DefKind;
-use lsp_types::{Hover, HoverContents, MarkedString, Range};
+#[allow(deprecated)]
+use lsp_types::{Contents, Hover, MarkedString, Range};
 use protobuf::{Enum, EnumOrUnknown, Message, MessageField};
 use scip::types::{
     Descriptor as ScipDescriptor, Document as ScipDocument, Index as ScipIndex,
@@ -692,10 +693,10 @@ fn hover_to_markdown(hover: &Hover) -> Option<String> {
     hover_contents_to_markdown(&hover.contents)
 }
 
-fn hover_contents_to_markdown(contents: &HoverContents) -> Option<String> {
+fn hover_contents_to_markdown(contents: &Contents) -> Option<String> {
     match contents {
-        HoverContents::Scalar(marked) => marked_string_to_markdown(marked),
-        HoverContents::Array(parts) => {
+        Contents::MarkedString(marked) => marked_string_to_markdown(marked),
+        Contents::MarkedStringList(parts) => {
             let parts = parts
                 .iter()
                 .filter_map(marked_string_to_markdown)
@@ -707,7 +708,7 @@ fn hover_contents_to_markdown(contents: &HoverContents) -> Option<String> {
                 Some(parts.join("\n\n---\n\n"))
             }
         }
-        HoverContents::Markup(markup) => {
+        Contents::MarkupContent(markup) => {
             if markup.value.trim().is_empty() {
                 None
             } else {
@@ -717,6 +718,7 @@ fn hover_contents_to_markdown(contents: &HoverContents) -> Option<String> {
     }
 }
 
+#[allow(deprecated)]
 fn marked_string_to_markdown(marked: &MarkedString) -> Option<String> {
     match marked {
         MarkedString::String(value) => {
@@ -726,7 +728,7 @@ fn marked_string_to_markdown(marked: &MarkedString) -> Option<String> {
                 Some(value.clone())
             }
         }
-        MarkedString::LanguageString(value) => {
+        MarkedString::MarkedStringWithLanguage(value) => {
             if value.value.trim().is_empty() {
                 None
             } else {

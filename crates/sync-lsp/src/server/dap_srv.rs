@@ -42,8 +42,10 @@ where
         mut self,
         handler: RawHandler<Args::S, JsonValue>,
     ) -> Self {
-        self.req_handlers
-            .insert(R::COMMAND, Box::new(move |s, _req_id, req| handler(s, req)));
+        self.req_handlers.insert(
+            R::COMMAND.into(),
+            Box::new(move |s, _req_id, req| handler(s, req)),
+        );
         self
     }
 
@@ -55,7 +57,7 @@ where
         handler: fn(&mut Args::S, RequestId, R::Arguments) -> ScheduledResult,
     ) -> Self {
         self.req_handlers.insert(
-            R::COMMAND,
+            R::COMMAND.into(),
             Box::new(move |s, req_id, req| scheduled_response(handler(s, req_id, from_json(req)?))),
         );
         self
@@ -67,7 +69,7 @@ where
         handler: AsyncHandler<Args::S, R::Arguments, R::Response>,
     ) -> Self {
         self.req_handlers.insert(
-            R::COMMAND,
+            R::COMMAND.into(),
             Box::new(move |s, _req_id, req| erased_response(handler(s, from_json(req)?))),
         );
         self
@@ -229,7 +231,7 @@ where
 
                 let is_disconnect = method == dapts::request::Disconnect::COMMAND;
 
-                let Some(handler) = self.requests.get(method) else {
+                let Some(handler) = self.requests.get(&method.into()) else {
                     log::warn!("unhandled dap request: {method}");
                     break 'serve_req just_result(Err(method_not_found()));
                 };
@@ -258,7 +260,7 @@ where
                           event,
                           body,
                       }: dap::Event| {
-            let Some(handler) = self.notifications.get(event.as_str()) else {
+            let Some(handler) = self.notifications.get(&event.as_str().into()) else {
                 log::warn!("unhandled event: {event}");
                 return Ok(());
             };

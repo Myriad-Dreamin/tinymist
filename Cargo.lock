@@ -2299,6 +2299,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gen-lsp-types"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b64887ac3a8083427ae935a7296db876871582cd57eac077564f8bc18fa49116"
+dependencies = [
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3709,19 +3720,6 @@ name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
-
-[[package]]
-name = "lsp-types"
-version = "0.95.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "158c1911354ef73e8fe42da6b10c0484cb65c7f1007f28022e847706c1ab6984"
-dependencies = [
- "bitflags 1.3.2",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
-]
 
 [[package]]
 name = "mach"
@@ -6369,9 +6367,9 @@ dependencies = [
  "crossbeam-channel",
  "dapts",
  "futures",
+ "gen-lsp-types",
  "js-sys",
  "log",
- "lsp-types",
  "parking_lot",
  "serde",
  "serde-wasm-bindgen",
@@ -6496,9 +6494,9 @@ dependencies = [
 name = "tests"
 version = "0.15.10"
 dependencies = [
+ "gen-lsp-types",
  "insta",
  "insta-cmd",
- "lsp-types",
  "serde",
  "serde_json",
  "sync-ls",
@@ -6673,6 +6671,7 @@ dependencies = [
  "dirs",
  "env_logger",
  "futures",
+ "gen-lsp-types",
  "http-body-util",
  "hyper",
  "hyper-tungstenite",
@@ -6680,7 +6679,6 @@ dependencies = [
  "itertools 0.13.0",
  "js-sys",
  "log",
- "lsp-types",
  "open",
  "parking_lot",
  "paste",
@@ -6738,11 +6736,11 @@ dependencies = [
  "dashmap",
  "ecow",
  "ena",
+ "gen-lsp-types",
  "hashbrown 0.14.5",
  "insta",
  "itertools 0.13.0",
  "log",
- "lsp-types",
  "parking_lot",
  "regex",
  "rpds",
@@ -6803,13 +6801,13 @@ dependencies = [
  "dirs",
  "env_logger",
  "futures",
+ "gen-lsp-types",
  "http-body-util",
  "hyper",
  "hyper-tungstenite",
  "hyper-util",
  "itertools 0.13.0",
  "log",
- "lsp-types",
  "open",
  "parking_lot",
  "paste",
@@ -6922,7 +6920,7 @@ name = "tinymist-index"
 version = "0.15.10"
 dependencies = [
  "comemo",
- "lsp-types",
+ "gen-lsp-types",
  "miniserde",
  "serde_json",
  "tinymist-analysis",
@@ -7059,12 +7057,12 @@ dependencies = [
  "dirs",
  "ecow",
  "ena",
+ "gen-lsp-types",
  "hayagriva",
  "hex",
  "indexmap 2.14.0",
  "itertools 0.13.0",
  "log",
- "lsp-types",
  "parking_lot",
  "percent-encoding",
  "protobuf",
@@ -7132,11 +7130,11 @@ dependencies = [
  "dashmap",
  "ecow",
  "fxhash",
+ "gen-lsp-types",
  "hex",
  "js-sys",
  "libc",
  "log",
- "lsp-types",
  "parking_lot",
  "path-clean",
  "pathdiff",
@@ -7296,10 +7294,10 @@ dependencies = [
  "ecow",
  "flate2",
  "fontdb",
+ "gen-lsp-types",
  "hex",
  "js-sys",
  "log",
- "lsp-types",
  "parking_lot",
  "rayon",
  "reqwest",

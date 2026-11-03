@@ -28,7 +28,7 @@ pub struct GotoDeclarationRequest {
 }
 
 impl SemanticRequest for GotoDeclarationRequest {
-    type Response = GotoDeclarationResponse;
+    type Response = DeclarationResponse;
 
     fn request(self, _ctx: &mut LocalContext) -> Option<Self::Response> {
         let _ = find_declarations;

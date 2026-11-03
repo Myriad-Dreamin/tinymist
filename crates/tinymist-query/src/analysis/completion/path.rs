@@ -165,7 +165,7 @@ impl CompletionPair<'_, '_, '_> {
                         text_edit: Some(text_edit.into()),
                         // don't sort me
                         sort_text: Some(sort_text),
-                        insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                        insert_text_format: Some(InsertTextFormat::PlainText),
                         command: self
                             .worker
                             .ctx

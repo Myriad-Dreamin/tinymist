@@ -24,7 +24,7 @@ pub struct GotoDefinitionRequest {
 }
 
 impl SemanticRequest for GotoDefinitionRequest {
-    type Response = GotoDefinitionResponse;
+    type Response = DefinitionResponse;
 
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
         let source = ctx.source_by_path(&self.path).ok()?;
@@ -37,7 +37,7 @@ impl SemanticRequest for GotoDefinitionRequest {
         let name_range = def.name_range(ctx.shared()).unwrap_or_default();
         let full_range = def.full_range().unwrap_or_else(|| name_range.clone());
 
-        let res = Some(GotoDefinitionResponse::Link(vec![LocationLink {
+        let res = Some(DefinitionResponse::DefinitionLinkList(vec![LocationLink {
             origin_selection_range: Some(origin_selection_range),
             target_uri: ctx.uri_for_id(fid).ok()?,
             target_range: ctx.to_lsp_range_(full_range, fid)?,

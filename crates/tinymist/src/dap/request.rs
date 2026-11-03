@@ -4,7 +4,7 @@ use std::{
 };
 
 use dapts::{BreakpointReason, ProcessEventStartMethod, ThreadEventReason};
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use reflexo::ImmutPath;
 use reflexo_typst::{EntryReader, TaskInputs};
 use serde::Deserialize;

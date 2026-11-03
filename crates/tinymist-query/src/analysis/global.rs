@@ -7,7 +7,7 @@ use std::{collections::HashSet, ops::Deref};
 
 use comemo::{Track, Tracked};
 use ecow::EcoString;
-use lsp_types::Url;
+use lsp_types::Uri as Url;
 use parking_lot::Mutex;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rustc_hash::FxHashMap;

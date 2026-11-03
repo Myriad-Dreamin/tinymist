@@ -105,8 +105,8 @@ impl ReplayBuilder {
             .push(lsp::Message::Request(lsp::Request::new(id, method, req)));
     }
 
-    fn request<R: lsp_types::request::Request>(&mut self, req: Value) {
-        self.request_(R::METHOD.to_owned(), req);
+    fn request<R: lsp_types::Request>(&mut self, req: Value) {
+        self.request_(R::METHOD.to_string(), req);
     }
 
     fn notify_(&mut self, method: String, params: Value) {
@@ -116,8 +116,8 @@ impl ReplayBuilder {
             )));
     }
 
-    fn notify<N: lsp_types::notification::Notification>(&mut self, params: Value) {
-        self.notify_(N::METHOD.to_owned(), params);
+    fn notify<N: lsp_types::Notification>(&mut self, params: Value) {
+        self.notify_(N::METHOD.to_string(), params);
     }
 }
 
@@ -162,14 +162,12 @@ struct SmokeArgs {
 }
 
 fn gen_smoke(args: SmokeArgs) {
-    use lsp_types::notification::*;
-    use lsp_types::request::*;
     use lsp_types::*;
 
     let SmokeArgs { root, init, log } = args;
     gen(&root, |srv| {
-        let root_uri = lsp_types::Url::from_directory_path(&root).unwrap();
-        srv.request::<Initialize>(fixture(&init, |v| {
+        let root_uri = lsp_types::Uri::from_directory_path(&root).unwrap();
+        srv.request::<InitializeRequest>(fixture(&init, |v| {
             v["rootUri"] = json!(root_uri);
             v["rootPath"] = json!(root);
             v["workspaceFolders"] = json!([{
@@ -177,7 +175,7 @@ fn gen_smoke(args: SmokeArgs) {
                 "name": "tinymist",
             }]);
         }));
-        srv.notify::<Initialized>(json!({}));
+        srv.notify::<InitializedNotification>(json!({}));
 
         // open editions/base.log and readlines
         let log = std::fs::read_to_string(&log).unwrap();
@@ -205,7 +203,7 @@ fn gen_smoke(args: SmokeArgs) {
 
             let uri_name = v["params"]["textDocument"]["uri"].as_str().unwrap();
             let url_v = if uri_name.starts_with("file:") || uri_name.starts_with("untitled:") {
-                lsp_types::Url::parse(uri_name).unwrap()
+                lsp_types::Uri::parse(uri_name).unwrap()
             } else {
                 root_uri.join(uri_name).unwrap()
             };
@@ -228,20 +226,20 @@ fn gen_smoke(args: SmokeArgs) {
                     text_document_position_params: pos.clone(),
                 }));
                 if log_lines == idx + 1 || log_lines == idx + 5 || log_lines == idx + 10 {
-                    srv.request::<Completion>(json!(CompletionParams {
-                        text_document_position: pos.clone(),
+                    srv.request::<CompletionRequest>(json!(CompletionParams {
+                        text_document_position_params: pos.clone(),
                         context: None,
                         work_done_progress_params: Default::default(),
                         partial_result_params: Default::default(),
                     }));
                 }
-                srv.request::<GotoDefinition>(json!(GotoDefinitionParams {
+                srv.request::<DefinitionRequest>(json!(DefinitionParams {
                     text_document_position_params: pos.clone(),
                     work_done_progress_params: Default::default(),
                     partial_result_params: Default::default(),
                 }));
-                srv.request::<References>(json!(ReferenceParams {
-                    text_document_position: pos.clone(),
+                srv.request::<ReferencesRequest>(json!(ReferenceParams {
+                    text_document_position_params: pos.clone(),
                     context: ReferenceContext {
                         include_declaration: false,
                     },
@@ -337,7 +335,7 @@ fn gen_smoke(args: SmokeArgs) {
                 }));
 
                 if log_lines == idx + 1 {
-                    srv.request::<SemanticTokensFullRequest>(json!(SemanticTokensParams {
+                    srv.request::<SemanticTokensRequest>(json!(SemanticTokensParams {
                         text_document: TextDocumentIdentifier { uri: u.clone() },
                         work_done_progress_params: Default::default(),
                         partial_result_params: Default::default(),
@@ -479,7 +477,7 @@ fn may_redact_uri(uri: &str) -> Value {
     if uri == "file://" || uri == "file:///" {
         Value::String("".to_owned())
     } else {
-        let uri = lsp_types::Url::parse(uri).unwrap();
+        let uri = lsp_types::Uri::parse(uri).unwrap();
 
         match uri.to_file_path() {
             Ok(path) => {

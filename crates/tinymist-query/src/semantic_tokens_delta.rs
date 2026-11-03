@@ -24,7 +24,7 @@ pub struct SemanticTokensDeltaRequest {
 }
 
 impl SemanticRequest for SemanticTokensDeltaRequest {
-    type Response = SemanticTokensFullDeltaResult;
+    type Response = SemanticTokensDeltaResponse;
     /// Handles the request to compute the semantic tokens delta for a given
     /// document.
     fn request(self, ctx: &mut LocalContext) -> Option<Self::Response> {
@@ -32,7 +32,7 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
         let (tokens, result_id) = ctx.cached_tokens(&source);
 
         Some(match ctx.tokens.as_ref().and_then(|t| t.prev.as_ref()) {
-            Some(cached) => SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+            Some(cached) => SemanticTokensDeltaResponse::SemanticTokensDelta(SemanticTokensDelta {
                 result_id,
                 edits: token_delta(cached, &tokens),
             }),
@@ -42,7 +42,7 @@ impl SemanticRequest for SemanticTokensDeltaRequest {
                     self.path.display(),
                     self.previous_result_id
                 );
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                SemanticTokensDeltaResponse::SemanticTokens(SemanticTokens {
                     result_id,
                     data: tokens.as_ref().clone(),
                 })
@@ -73,6 +73,18 @@ fn token_delta(from: &[SemanticToken], to: &[SemanticToken]) -> Vec<SemanticToke
 
     let (from, _) = from.split_at(from.len() - dist_from_end);
     let (to, _) = to.split_at(to.len() - dist_from_end);
+    let data = to
+        .iter()
+        .flat_map(|token| {
+            vec![
+                token.delta_line,
+                token.delta_start,
+                token.length,
+                token.token_type,
+                token.token_modifiers_bitset,
+            ]
+        })
+        .collect();
 
     if from.is_empty() && to.is_empty() {
         vec![]
@@ -80,7 +92,7 @@ fn token_delta(from: &[SemanticToken], to: &[SemanticToken]) -> Vec<SemanticToke
         vec![SemanticTokensEdit {
             start: 5 * start as u32,
             delete_count: 5 * from.len() as u32,
-            data: Some(to.into()),
+            data: Some(data),
         }]
     }
 }

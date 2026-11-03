@@ -9,7 +9,7 @@
 // todo: large_enum_variant
 
 use ecow::EcoString;
-use lsp_types::{Range, SemanticTokens, Url};
+use lsp_types::{Range, SemanticTokens, Uri as Url};
 use serde::{Deserialize, Serialize};
 
 pub type Id = i32;

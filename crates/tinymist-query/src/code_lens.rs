@@ -31,6 +31,7 @@ impl SemanticRequest for CodeLensRequest {
                     title: title.to_string(),
                     command: "tinymist.runCodeLens".to_string(),
                     arguments: Some(args),
+                    tooltip: None,
                 }),
                 data: None,
             })
@@ -87,6 +88,7 @@ impl SemanticRequest for CodeLensRequest {
                     }
                     .to_string(),
                     arguments: Some(vec![uri]),
+                    tooltip: None,
                 }),
                 data: None,
             })

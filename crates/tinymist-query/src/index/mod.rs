@@ -13,7 +13,7 @@ use crate::index::protocol::ResultSet;
 use crate::prelude::Definition;
 use crate::{LocalContext, path_to_url};
 use ecow::EcoString;
-use lsp_types::{Hover, Url};
+use lsp_types::{Hover, Uri as Url};
 use tinymist_analysis::docs::DefDocs;
 use tinymist_analysis::syntax::classify_syntax;
 use tinymist_std::error::WithContextUntyped;

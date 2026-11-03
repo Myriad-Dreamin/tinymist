@@ -32,7 +32,7 @@ impl SyntaxRequest for DocumentSymbolRequest {
     ) -> Option<Self::Response> {
         let hierarchy = get_lexical_hierarchy(source, LexicalScopeKind::Symbol)?;
         let symbols = symbols_in_hierarchy(&hierarchy, source, position_encoding);
-        Some(DocumentSymbolResponse::Nested(symbols))
+        Some(symbols.into())
     }
 }
 
