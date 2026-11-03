@@ -1,0 +1,8 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on r 1..3 */\n|He|llo World\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/line_start.typ
+---
+1,70.866pt,98.542pt
+1,70.866pt,98.542pt
