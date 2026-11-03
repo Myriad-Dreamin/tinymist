@@ -71,10 +71,33 @@ use sync_ls::*;
 use utils::*;
 use world::*;
 
+/// Placeholder value emitted by `vergen`'s idempotent mode when the
+/// corresponding instruction fails to collect real data.
+const VERGEN_IDEMPOTENT_OUTPUT: &str = "VERGEN_IDEMPOTENT_OUTPUT";
+
+/// Returns the input value unless it is empty or a `vergen` idempotent
+/// placeholder, in which case the package version is returned instead.
+fn git_describe_or_version(value: &str) -> &str {
+    if value.is_empty() || value == VERGEN_IDEMPOTENT_OUTPUT {
+        return env!("CARGO_PKG_VERSION");
+    }
+    value
+}
+
+/// Returns the input value unless it is empty or a `vergen` idempotent
+/// placeholder, in which case `None` is returned instead (same pattern as
+/// `VERGEN_GIT_SHA` above).
+fn value_or_none(value: &str) -> &str {
+    if value.is_empty() || value == VERGEN_IDEMPOTENT_OUTPUT {
+        return "None";
+    }
+    value
+}
+
 /// The long version description of the library
 pub static LONG_VERSION: LazyLock<String> = LazyLock::new(|| {
     format!(
-        "
+        "v{}
 Build Timestamp:     {}
 Build Git Describe:  {}
 Commit SHA:          {}
@@ -84,13 +107,45 @@ Cargo Target Triple: {}
 Typst Version:       {}
 Typst Source:        {}
 ",
+        env!("CARGO_PKG_VERSION"),
         env!("VERGEN_BUILD_TIMESTAMP"),
-        env!("VERGEN_GIT_DESCRIBE"),
+        git_describe_or_version(env!("VERGEN_GIT_DESCRIBE")),
         option_env!("VERGEN_GIT_SHA").unwrap_or("None"),
-        option_env!("VERGEN_GIT_COMMIT_TIMESTAMP").unwrap_or("None"),
-        option_env!("VERGEN_GIT_BRANCH").unwrap_or("None"),
+        value_or_none(option_env!("VERGEN_GIT_COMMIT_TIMESTAMP").unwrap_or_default()),
+        value_or_none(option_env!("VERGEN_GIT_BRANCH").unwrap_or_default()),
         env!("VERGEN_CARGO_TARGET_TRIPLE"),
         env!("TYPST_VERSION"),
         env!("TYPST_SOURCE"),
     )
 });
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_long_version_first_line_has_version() {
+        let first_line = LONG_VERSION.lines().next().unwrap();
+        let expected = format!("v{}", env!("CARGO_PKG_VERSION"));
+        assert_eq!(first_line, expected);
+        assert!(first_line.starts_with('v'));
+        assert!(first_line.len() > 1);
+    }
+
+    #[test]
+    fn test_git_describe_or_version_falls_back() {
+        assert_eq!(git_describe_or_version(""), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            git_describe_or_version("VERGEN_IDEMPOTENT_OUTPUT"),
+            env!("CARGO_PKG_VERSION")
+        );
+        assert_eq!(git_describe_or_version("v0.15.8"), "v0.15.8");
+    }
+
+    #[test]
+    fn test_value_or_none_falls_back() {
+        assert_eq!(value_or_none(""), "None");
+        assert_eq!(value_or_none("VERGEN_IDEMPOTENT_OUTPUT"), "None");
+        assert_eq!(value_or_none("main"), "main");
+    }
+}
