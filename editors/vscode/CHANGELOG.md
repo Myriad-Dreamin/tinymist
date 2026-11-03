@@ -10,6 +10,22 @@ The changelog lines unspecified with authors are all written by the @Myriad-Drea
 - [CHANGELOG-2025.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2025.md)
 - [CHANGELOG-2024.md](https://github.com/Myriad-Dreamin/tinymist/blob/main/CHANGELOG/CHANGELOG-2024.md)
 
+## v0.15.12 - [2026-11-03]
+
+### Server
+
+* (Fix) Skipped the runtime import tracer for non-literal import sites in https://github.com/Myriad-Dreamin/tinymist/pull/2761
+
+### Preview
+
+* (Fix) Composited the preview scroller on low-DPI displays in https://github.com/Myriad-Dreamin/tinymist/pull/2757
+
+### Misc
+
+* Fixed editor documentation inaccuracies for Neovim in https://github.com/Myriad-Dreamin/tinymist/pull/2752
+
+**Full Changelog**: https://github.com/Myriad-Dreamin/tinymist/compare/v0.15.10...v0.15.12
+
 ## v0.15.10 - [2026-10-16]
 
 ### Formatting
