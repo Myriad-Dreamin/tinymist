@@ -1,0 +1,13 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on er 0..7 */|<= b'''| $\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_shorthand_primes.typ
+---
+1,290.109pt,79.086pt
+1,290.109pt,79.086pt
+1,290.109pt,79.086pt
+1,301.722pt,79.086pt
+1,301.722pt,79.086pt
+1,301.722pt,79.086pt
+1,301.722pt,79.086pt

@@ -1,0 +1,11 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on ..9 */$ a |^ b_ |c $\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_attach_ops.typ
+---
+1,292.407pt,80.203pt
+1,292.407pt,80.203pt
+1,298.226pt,76.210pt
+1,298.226pt,76.210pt
+1,298.226pt,76.210pt
