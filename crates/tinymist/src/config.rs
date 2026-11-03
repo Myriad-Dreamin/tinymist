@@ -694,6 +694,7 @@ impl Config {
                 pdf_standards: self.pdf_standards().unwrap_or_default(),
                 no_pdf_tags: self.no_pdf_tags(),
                 creation_timestamp: self.creation_timestamp(),
+                synctex: false,
             }),
             count_words: self.notify_status,
             development: self.development,

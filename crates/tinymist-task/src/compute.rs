@@ -27,6 +27,10 @@ pub use svg::*;
 pub mod pdf;
 #[cfg(feature = "pdf")]
 pub use pdf::*;
+#[cfg(feature = "pdf")]
+pub mod synctex;
+#[cfg(feature = "pdf")]
+pub use synctex::*;
 #[cfg(feature = "text")]
 pub mod text;
 #[cfg(feature = "text")]

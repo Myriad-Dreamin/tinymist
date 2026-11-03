@@ -20,6 +20,7 @@ clap.workspace = true
 comemo.workspace = true
 dirs.workspace = true
 ecow.workspace = true
+flate2.workspace = true
 log.workspace = true
 notify.workspace = true
 parking_lot.workspace = true
