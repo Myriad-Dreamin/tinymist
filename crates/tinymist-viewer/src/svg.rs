@@ -42,18 +42,36 @@ fn group_supported(group: &usvg::Group) -> bool {
         .is_none_or(|clip| clip.clip_path().is_none() && clip_supported(clip.root()))
 }
 
-/// Clip paths are drawn as one non-zero path, so nested clip paths and even-odd clip rules
-/// are not supported.
+/// Clip paths are drawn as one non-zero path, so only clip paths with at most one shape are
+/// supported: SVG unites the shapes of a clip path, while one non-zero path made of
+/// oppositely wound shapes would leave holes where they overlap. Nested clip paths and
+/// even-odd clip rules are not supported either.
 fn clip_supported(group: &usvg::Group) -> bool {
-    group.clip_path().is_none()
-        && group.children().iter().all(|node| match node {
-            usvg::Node::Group(g) => clip_supported(g),
-            usvg::Node::Path(path) => path
-                .fill()
-                .is_none_or(|f| f.rule() == usvg::FillRule::NonZero),
-            usvg::Node::Text(_) => true,
-            usvg::Node::Image(_) => false,
-        })
+    clip_shape_count(group).is_some_and(|count| count <= 1)
+}
+
+/// The number of visible shapes in a clip path, or `None` if it uses something unsupported.
+fn clip_shape_count(group: &usvg::Group) -> Option<usize> {
+    if group.clip_path().is_some() {
+        return None;
+    }
+    group.children().iter().try_fold(0, |count, node| {
+        let shapes = match node {
+            usvg::Node::Group(g) => clip_shape_count(g)?,
+            usvg::Node::Path(path) => {
+                if path
+                    .fill()
+                    .is_some_and(|f| f.rule() != usvg::FillRule::NonZero)
+                {
+                    return None;
+                }
+                usize::from(path.is_visible())
+            }
+            usvg::Node::Text(text) => clip_shape_count(text.flattened())?,
+            usvg::Node::Image(_) => return None,
+        };
+        Some(count + shapes)
+    })
 }
 
 /// Draws `tree` into a new scene, in the tree's own coordinates.
@@ -171,14 +189,50 @@ fn collect_clip(group: &usvg::Group, transform: Affine, out: &mut BezPath) {
 /// Whether `clip` is a rectangle that contains everything the group draws, so that clipping
 /// changes nothing. Both are in the group's own coordinates.
 fn clips_nothing(clip: &BezPath, group: &usvg::Group) -> bool {
-    let bounds = clip.bounding_box();
-    let is_rectangle = (clip.area().abs() - bounds.area()).abs() <= 1e-6 * bounds.area().max(1.0);
+    let Some(bounds) = axis_aligned_rect(clip) else {
+        return false;
+    };
     let content = group.stroke_bounding_box();
-    is_rectangle
-        && bounds.x0 <= f64::from(content.left())
+    bounds.x0 <= f64::from(content.left())
         && bounds.y0 <= f64::from(content.top())
         && bounds.x1 >= f64::from(content.right())
         && bounds.y1 >= f64::from(content.bottom())
+}
+
+/// The rectangle `path` outlines, if it is one closed outline of four straight, axis-aligned
+/// sides.
+fn axis_aligned_rect(path: &BezPath) -> Option<Rect> {
+    use vello::kurbo::PathEl;
+
+    let mut points = Vec::with_capacity(5);
+    let mut elements = path.elements().iter();
+    let Some(PathEl::MoveTo(start)) = elements.next() else {
+        return None;
+    };
+    points.push(*start);
+    for element in elements {
+        match element {
+            PathEl::LineTo(p) => points.push(*p),
+            PathEl::ClosePath => {}
+            _ => return None,
+        }
+    }
+    if points.len() == 5 && points[4] == points[0] {
+        points.pop();
+    }
+    if points.len() != 4 {
+        return None;
+    }
+    let sides_axis_aligned = (0..4).all(|i| {
+        let (a, b) = (points[i], points[(i + 1) % 4]);
+        a.x == b.x || a.y == b.y
+    });
+    // Sides alternate between horizontal and vertical, and none has zero length.
+    let alternating = (0..4).all(|i| {
+        let (a, b, c) = (points[i], points[(i + 1) % 4], points[(i + 2) % 4]);
+        (a.x == b.x) != (b.x == c.x) && a != b
+    });
+    (sides_axis_aligned && alternating).then(|| path.bounding_box())
 }
 
 fn render_path(scene: &mut Scene, path: &usvg::Path, transform: Affine) {
@@ -447,6 +501,51 @@ mod tests {
         ));
         assert!((ink(&grouped, 16) - ink(&plain, 16)).abs() < 0.05);
         assert!(ink(&plain, 16) > 0.7);
+    }
+
+    #[test]
+    fn clip_paths_with_several_shapes_are_left_to_resvg() {
+        // SVG unites the shapes of a clip path. Drawn as one non-zero path, these two
+        // oppositely wound squares would cancel where they overlap.
+        let body = r#"<clipPath id="c"><path d="M0,0 h20 v20 h-20 Z"/><path d="M10,30 v-20 h20 v20 Z"/></clipPath>
+            <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#;
+        assert!(!supports(&tree(&svg(body))));
+        // One shape made of several subpaths is still one non-zero path, as in SVG.
+        let body = r#"<clipPath id="c"><path d="M0,0 h20 v20 h-20 Z M10,30 v-20 h20 v20 Z"/></clipPath>
+            <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#;
+        assert!(supports(&tree(&svg(body))));
+    }
+
+    #[test]
+    fn clip_with_the_area_of_its_bounding_box_still_clips() {
+        // A triangle outlined twice has the same signed area as its bounding square, but it
+        // is not a rectangle, so the clip must not be skipped.
+        let image = render(&svg(
+            r#"<clipPath id="c"><path d="M0,0 L32,0 L0,32 Z M0,0 L32,0 L0,32 Z"/></clipPath>
+                <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#,
+        ));
+        assert!(is_dark(&image, 4, 4));
+        assert!(!is_dark(&image, 24, 24));
+    }
+
+    #[test]
+    fn only_axis_aligned_rectangles_count_as_rectangles() {
+        let rect = |d: &str| axis_aligned_rect(&BezPath::from_svg(d).unwrap());
+        assert_eq!(
+            rect("M0,0 L10,0 L10,5 L0,5 Z"),
+            Some(Rect::new(0.0, 0.0, 10.0, 5.0))
+        );
+        assert_eq!(
+            rect("M0,0 L10,0 L10,5 L0,5 L0,0 Z"),
+            Some(Rect::new(0.0, 0.0, 10.0, 5.0))
+        );
+        assert_eq!(rect("M0,0 L10,0 L0,10 Z M10,10 L10,0 L0,10 Z"), None);
+        assert_eq!(rect("M5,0 L10,5 L5,10 L0,5 Z"), None);
+        assert_eq!(
+            rect("M0,0 L10,0 L10,5 L0,5 Z M20,0 L30,0 L30,5 L20,5 Z"),
+            None
+        );
+        assert_eq!(rect("M0,0 L10,0 L20,0 L10,0 Z"), None);
     }
 
     #[test]

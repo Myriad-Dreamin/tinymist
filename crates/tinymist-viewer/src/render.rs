@@ -5,6 +5,7 @@
 //! scene. todo: clean up code.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use ecow::EcoVec;
@@ -413,11 +414,14 @@ const IMAGE_PX_PER_PT: f64 = 4.0;
 
 /// Converts an image to a scene once, so that edits elsewhere on its page do
 /// not decode and convert it again.
+///
+/// Images whose conversion consulted the SVG resource resolver are not cached:
+/// what the resolver returns can change without the image's hash changing.
 fn cached_image_scene(
     image_item: &ir::ImageItem,
     svg_resource_resolver: Option<&dyn SvgResourceResolver>,
 ) -> Option<Arc<VecScene>> {
-    type Key = (Fingerprint, u32, u32, usize);
+    type Key = (Fingerprint, u32, u32);
     static CACHE: OnceLock<Mutex<HashMap<Key, Arc<VecScene>>>> = OnceLock::new();
     const MAX_ENTRIES: usize = 64;
 
@@ -425,23 +429,49 @@ fn cached_image_scene(
         image_item.image.hash,
         image_item.size.x.0.to_bits(),
         image_item.size.y.0.to_bits(),
-        svg_resource_resolver.map_or(0, |r| {
-            r as *const dyn SvgResourceResolver as *const () as usize
-        }),
     );
     let cache = CACHE.get_or_init(Default::default);
     if let Some(scene) = cache.lock().ok()?.get(&key) {
         return Some(scene.clone());
     }
 
-    let (scene, transform) = image_item_scene(image_item, svg_resource_resolver)?;
+    let resolver = svg_resource_resolver.map(UseTrackingResolver::new);
+    let (scene, transform) = image_item_scene(
+        image_item,
+        resolver.as_ref().map(|r| r as &dyn SvgResourceResolver),
+    )?;
     let scene = Arc::new(VecScene::Scene(Box::new(scene), Some(transform)));
+    if resolver.is_some_and(|r| r.used.load(Ordering::Relaxed)) {
+        return Some(scene);
+    }
     let mut cache = cache.lock().ok()?;
     if cache.len() >= MAX_ENTRIES {
         cache.clear();
     }
     cache.insert(key, scene.clone());
     Some(scene)
+}
+
+/// Passes requests on to another resolver and records whether there were any.
+struct UseTrackingResolver<'a> {
+    inner: &'a dyn SvgResourceResolver,
+    used: AtomicBool,
+}
+
+impl<'a> UseTrackingResolver<'a> {
+    fn new(inner: &'a dyn SvgResourceResolver) -> Self {
+        Self {
+            inner,
+            used: AtomicBool::new(false),
+        }
+    }
+}
+
+impl SvgResourceResolver for UseTrackingResolver<'_> {
+    fn resolve_svg_resource(&self, svg_data: &[u8], href: &str) -> Option<SvgResource> {
+        self.used.store(true, Ordering::Relaxed);
+        self.inner.resolve_svg_resource(svg_data, href)
+    }
 }
 
 fn image_item_scene(
@@ -1684,6 +1714,85 @@ mod tests {
         let first = cached_image_scene(&item, None).unwrap();
         let second = cached_image_scene(&item, None).unwrap();
         assert!(Arc::ptr_eq(&first, &second));
+    }
+
+    /// Returns a PNG for every link and counts the requests.
+    struct TestResolver {
+        png: Mutex<Arc<Vec<u8>>>,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl TestResolver {
+        fn new(png: Vec<u8>) -> Self {
+            Self {
+                png: Mutex::new(Arc::new(png)),
+                calls: Default::default(),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(Ordering::Relaxed)
+        }
+    }
+
+    impl SvgResourceResolver for TestResolver {
+        fn resolve_svg_resource(&self, _svg_data: &[u8], _href: &str) -> Option<SvgResource> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            Some(SvgResource {
+                format: SvgResourceFormat::Png,
+                data: self.png.lock().unwrap().clone(),
+            })
+        }
+    }
+
+    fn png_data(width: u32, height: u32) -> Vec<u8> {
+        png_image_item(width, height, (1.0, 1.0), 0)
+            .image
+            .data
+            .to_vec()
+    }
+
+    fn linked_image_svg_item(id: u64) -> ir::ImageItem {
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="10" height="10"><image xlink:href="photo.png" width="10" height="10"/></svg>"#;
+        image_item("svg", svg.to_vec(), (10, 10), (20.0, 20.0), id)
+    }
+
+    #[test]
+    fn images_that_use_the_resolver_are_resolved_again() {
+        // The resolver may return something else for the same link later, so a cached
+        // scene could be out of date.
+        let item = linked_image_svg_item(5);
+        let resolver = TestResolver::new(png_data(4, 4));
+        let first = cached_image_scene(&item, Some(&resolver)).unwrap();
+        let calls = resolver.calls();
+        assert!(calls > 0);
+
+        *resolver.png.lock().unwrap() = Arc::new(png_data(8, 8));
+        let second = cached_image_scene(&item, Some(&resolver)).unwrap();
+        assert!(resolver.calls() > calls);
+        assert!(!Arc::ptr_eq(&first, &second));
+    }
+
+    #[test]
+    fn a_replaced_resolver_is_asked() {
+        let item = linked_image_svg_item(6);
+        let old = TestResolver::new(png_data(4, 4));
+        cached_image_scene(&item, Some(&old)).unwrap();
+        drop(old);
+
+        let new = TestResolver::new(png_data(4, 4));
+        cached_image_scene(&item, Some(&new)).unwrap();
+        assert!(new.calls() > 0);
+    }
+
+    #[test]
+    fn images_that_do_not_use_the_resolver_are_reused() {
+        let item = png_image_item(64, 32, (32.0, 16.0), 7);
+        let resolver = TestResolver::new(png_data(4, 4));
+        let first = cached_image_scene(&item, Some(&resolver)).unwrap();
+        let second = cached_image_scene(&item, Some(&resolver)).unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(resolver.calls(), 0);
     }
 
     #[test]
