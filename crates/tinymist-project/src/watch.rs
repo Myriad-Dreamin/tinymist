@@ -1487,6 +1487,74 @@ mod tests {
         harness.assert_no_events();
     }
 
+    /// Reproduction of <https://github.com/Myriad-Dreamin/tinymist/issues/2697>.
+    ///
+    /// An editor's save of an external dependency (e.g. `test.yml`) makes the
+    /// file *transiently unreadable* at the exact moment the watcher processes
+    /// the modify event (observed on btrfs). The file recovers within
+    /// milliseconds, but for this save pattern no second notify event is ever
+    /// delivered, so:
+    ///
+    /// 1. the entry latches `EmptyOrRemoval` with a stale `NotFound` snapshot;
+    /// 2. the debounced recheck pushes that stale snapshot to the compiler
+    ///    *without re-reading the file* (`recheck_notify_event` sends
+    ///    `payload` verbatim) — a spurious `file not found` compile failure;
+    /// 3. `entry.prev` stays `Err(NotFound)`, so from the consumers' point of
+    ///    view the error is the last word on the file until some unrelated
+    ///    event happens to touch it.
+    ///
+    /// This currently (against the unfixed chain) fails: the recheck pushes
+    /// the stale `NotFound` payload without re-reading the file.
+    #[tokio::test(flavor = "current_thread")]
+    async fn issue_2697_transient_missing_read_recovers_on_recheck() {
+        let mut harness = NotifyActorHarness::new();
+        let dep = test_path("issue-2697-dep.yml");
+
+        harness.access.set_content(&dep, "initial");
+        harness
+            .apply(MatrixInput::SyncDependency(vec![dep.clone()]))
+            .await;
+        harness.take_events();
+        harness.take_commands();
+
+        // The save event arrives while the file is transiently unreadable
+        // (e.g. mid flush/rewrite on btrfs). The read at event-handling time
+        // fails with NotFound, so the entry latches EmptyOrRemoval and the
+        // consumer is not told yet.
+        harness.access.set_missing(&dep);
+        harness
+            .apply(MatrixInput::WatcherEvent {
+                kind: modify_data_event(),
+                paths: vec![dep.clone()],
+            })
+            .await;
+        harness.assert_no_events();
+
+        // The write finishes right away; the file is fine again. No further
+        // notify event is delivered for this save (coalesced into the first).
+        harness.access.set_content(&dep, "saved-new-content");
+
+        // Debounce window elapses: the recheck re-reads the file and, since
+        // it is intact again, delivers the fresh content.
+        let reads_before_recheck = harness.access.read_count(&dep);
+        harness
+            .apply(MatrixInput::DelayedRecheck(dep.clone()))
+            .await;
+
+        assert!(
+            harness.access.read_count(&dep) > reads_before_recheck,
+            "recheck should re-read the file before deciding"
+        );
+
+        let events = harness.take_events();
+        assert_eq!(events.len(), 1);
+        assert_update(
+            &events[0],
+            false,
+            &[(&dep, ExpectedSnapshot::Content("saved-new-content"))],
+        );
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn upstream_invalidation_refreshes_watches_and_carries_payload() {
         let mut harness = NotifyActorHarness::new();
