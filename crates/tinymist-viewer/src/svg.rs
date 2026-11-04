@@ -146,9 +146,19 @@ fn clip_supported(group: &usvg::Group) -> bool {
 }
 
 /// Draws `tree` into a new scene, in the tree's own coordinates.
+#[cfg(test)]
 pub(crate) fn render_tree(tree: &usvg::Tree) -> Scene {
+    render_tree_with_transform(tree, Affine::IDENTITY)
+}
+
+/// Draws `tree` into a new scene, transformed by `transform`.
+///
+/// The transform is part of the scene rather than applied when the scene is appended, so that
+/// [`conformal_linear_gradient`] sees the whole transform, including an uneven scale from
+/// stretching the image.
+pub(crate) fn render_tree_with_transform(tree: &usvg::Tree, transform: Affine) -> Scene {
     let mut scene = Scene::new();
-    render_group(&mut scene, tree.root(), Affine::IDENTITY);
+    render_group(&mut scene, tree.root(), transform);
     scene
 }
 
@@ -891,6 +901,62 @@ mod tests {
             [Point::new(3.0, 3.0), Point::new(4.0, 4.0)]
         );
         assert!(points("M1,1 L5,1 Z").is_empty());
+    }
+
+    /// Mean difference per channel between this converter and resvg, drawing `svg` scaled by
+    /// `(sx, sy)` onto a white canvas of `w` x `h` pixels.
+    fn difference_from_resvg(svg: &str, w: u32, h: u32, sx: f64, sy: f64) -> f64 {
+        let tree = tree(svg);
+        let scene = render_tree_with_transform(&tree, Affine::scale_non_uniform(sx, sy));
+        let page = PageCanvas::new(Arc::new(scene), 1.0, Some(Color::WHITE));
+        let mut params = TestHarnessParams::default();
+        params.window_size = Size::new(f64::from(w), f64::from(h));
+        let mut harness =
+            TestHarness::create_with(default_property_set(), page.with_auto_id(), params);
+        let ours = harness.render();
+
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(w, h).unwrap();
+        pixmap.fill(resvg::tiny_skia::Color::WHITE);
+        let ts = resvg::tiny_skia::Transform::from_scale(sx as f32, sy as f32);
+        resvg::render(&tree, ts, &mut pixmap.as_mut());
+
+        let total: u64 = ours
+            .pixels()
+            .zip(pixmap.data().chunks_exact(4))
+            .map(|(a, b)| {
+                (0..3)
+                    .map(|c| u64::from(a.0[c].abs_diff(b[c])))
+                    .sum::<u64>()
+            })
+            .sum();
+        total as f64 / f64::from(w * h * 3)
+    }
+
+    #[test]
+    fn diagonal_gradient_in_a_stretched_image_matches_resvg() {
+        // Vello lays out a linear gradient's bands at right angles to its line after the
+        // transform, which is wrong under an uneven scale.
+        let svg = svg(
+            r#"<linearGradient id="g" x2="1" y2="1"><stop offset="0"/><stop offset="1" stop-color="white"/></linearGradient>
+                <rect width="32" height="32" fill="url(#g)"/>"#,
+        );
+        // Vello 0.7's gradients are a few levels off resvg's even without a transform, so
+        // compare with that.
+        let unstretched = difference_from_resvg(&svg, 32, 32, 1.0, 1.0);
+        let wide = difference_from_resvg(&svg, 96, 32, 3.0, 1.0);
+        let tall = difference_from_resvg(&svg, 32, 96, 1.0, 3.0);
+        assert!(wide < unstretched + 1.0, "{wide} vs {unstretched}");
+        assert!(tall < unstretched + 1.0, "{tall} vs {unstretched}");
+    }
+
+    #[test]
+    fn caps_on_zero_length_subpaths_match_resvg_when_translucent() {
+        // A dot drawn twice would come out darker than resvg's.
+        let svg = svg(
+            r#"<path d="M6,8 Z M16,8 L16,8 M26,8 l0,0" stroke="black" stroke-opacity="0.5" stroke-width="8" stroke-linecap="round"/>
+                <path d="M6,24 Z M16,24 L16,24 M26,24 l0,0" stroke="black" stroke-opacity="0.5" stroke-width="8" stroke-linecap="square"/>"#,
+        );
+        assert!(difference_from_resvg(&svg, 32, 32, 1.0, 1.0) < 1.5);
     }
 
     #[test]

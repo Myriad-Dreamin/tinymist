@@ -523,17 +523,21 @@ fn svg_vector_scene(
         return None;
     }
 
-    let mut scene = vello::Scene::new();
-    let bounds = Rect::new(0.0, 0.0, width, height);
-    scene.push_clip_layer(peniko::Fill::NonZero, Affine::IDENTITY, &bounds);
-    scene.append(&crate::svg::render_tree(&tree), None);
-    scene.pop_layer();
-
+    // The image's scale goes into the scene itself, so that gradients can allow for an
+    // uneven scale (see `svg::conformal_linear_gradient`).
     let transform = Affine::scale_non_uniform(
         target_size.x.0 as f64 / width,
         target_size.y.0 as f64 / height,
     );
-    Some((scene, transform))
+    let mut scene = vello::Scene::new();
+    let bounds = Rect::new(0.0, 0.0, width, height);
+    scene.push_clip_layer(peniko::Fill::NonZero, transform, &bounds);
+    scene.append(
+        &crate::svg::render_tree_with_transform(&tree, transform),
+        None,
+    );
+    scene.pop_layer();
+    Some((scene, Affine::IDENTITY))
 }
 
 fn image_quality(pixelated: bool) -> peniko::ImageQuality {
