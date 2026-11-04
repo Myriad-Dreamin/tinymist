@@ -1,20 +1,23 @@
 //! Draws SVG images as vector scenes.
 //!
 //! Adapted from the rendering code of `vello_svg` (Apache-2.0 OR MIT, the Vello Authors),
-//! with three fixes from linebender/vello_svg#91: plain groups get no layer (a layer clipped
+//! with the fixes from linebender/vello_svg#91: plain groups get no layer (a layer clipped
 //! to a group's bounding box cuts off the outer half of strokes on its edge), clip paths use
-//! all their shapes with their transforms, and flattened text is not transformed twice.
+//! all their shapes, united as in SVG, and flattened text is not transformed twice.
 //! Transforms are accumulated from each group's own transform (see [`render_group`]).
+//! Gradients work around three differences between Vello 0.7 and resvg (see
+//! [`gradient_stops`] and [`conformal_linear_gradient`]).
 //!
 //! Only what can be drawn faithfully is supported. [`supports`] reports SVGs that use
-//! anything else (patterns, masks, filters, embedded raster images); the caller draws those
-//! with resvg instead.
+//! anything else (patterns, masks, filters, embedded raster images, nested clip paths, the
+//! colour-dodge blend mode, and round or square caps on zero-length dashes); the caller
+//! draws those with resvg instead.
 
 use resvg::usvg;
 use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Cap, Join, Point, Rect, Shape, Stroke};
 use vello::peniko::color::DynamicColor;
-use vello::peniko::{self, BlendMode, Brush, Color, Fill, Mix};
+use vello::peniko::{self, BlendMode, Brush, Color, Compose, Fill, Mix};
 
 /// Whether every part of `tree` can be drawn by [`render_tree`].
 pub(crate) fn supports(tree: &usvg::Tree) -> bool {
@@ -22,15 +25,20 @@ pub(crate) fn supports(tree: &usvg::Tree) -> bool {
 }
 
 fn group_supported(group: &usvg::Group) -> bool {
-    if group.mask().is_some() || !group.filters().is_empty() {
+    // Vello 0.7's colour dodge leaves stray lines where the source is transparent.
+    if group.mask().is_some()
+        || !group.filters().is_empty()
+        || group.blend_mode() == usvg::BlendMode::ColorDodge
+    {
         return false;
     }
     group.children().iter().all(|node| match node {
         usvg::Node::Group(g) => group_supported(g),
         usvg::Node::Path(path) => {
-            let paint_supported = |paint: &usvg::Paint| !matches!(paint, usvg::Paint::Pattern(_));
             path.fill().is_none_or(|f| paint_supported(f.paint()))
-                && path.stroke().is_none_or(|s| paint_supported(s.paint()))
+                && path
+                    .stroke()
+                    .is_none_or(|s| paint_supported(s.paint()) && caps_supported(s))
         }
         usvg::Node::Image(image) => match image.kind() {
             usvg::ImageKind::SVG(svg) => supports(svg),
@@ -42,36 +50,99 @@ fn group_supported(group: &usvg::Group) -> bool {
         .is_none_or(|clip| clip.clip_path().is_none() && clip_supported(clip.root()))
 }
 
-/// Clip paths are drawn as one non-zero path, so only clip paths with at most one shape are
-/// supported: SVG unites the shapes of a clip path, while one non-zero path made of
-/// oppositely wound shapes would leave holes where they overlap. Nested clip paths and
-/// even-odd clip rules are not supported either.
-fn clip_supported(group: &usvg::Group) -> bool {
-    clip_shape_count(group).is_some_and(|count| count <= 1)
+/// Patterns aren't supported, and neither are radial gradients whose focal circle is as
+/// large as the end circle, which resvg draws as a solid colour.
+fn paint_supported(paint: &usvg::Paint) -> bool {
+    match paint {
+        usvg::Paint::Pattern(_) => false,
+        usvg::Paint::RadialGradient(gr) => gr.fr().get() < gr.r().get(),
+        _ => true,
+    }
 }
 
-/// The number of visible shapes in a clip path, or `None` if it uses something unsupported.
-fn clip_shape_count(group: &usvg::Group) -> Option<usize> {
-    if group.clip_path().is_some() {
+/// Round and square caps on zero-length dashes draw a dot or square in SVG, but nothing when
+/// stroked by kurbo. Zero-length subpaths are drawn by [`zero_length_caps`].
+fn caps_supported(stroke: &usvg::Stroke) -> bool {
+    stroke.linecap() == usvg::LineCap::Butt
+        || !stroke
+            .dasharray()
+            .is_some_and(|dashes| dashes.contains(&0.0))
+}
+
+/// The points of the subpaths of `data` that stay on their start point.
+fn zero_length_subpaths(data: &usvg::tiny_skia_path::Path) -> Vec<Point> {
+    use usvg::tiny_skia_path::PathVerb;
+
+    let points = data.points();
+    let mut out = Vec::new();
+    let mut next = 0;
+    let mut start = None;
+    let mut moved = false;
+    for verb in data.verbs() {
+        let count = match verb {
+            PathVerb::Move => {
+                if let Some(p) = start
+                    && !moved
+                {
+                    out.push(p);
+                }
+                start = points.get(next).copied();
+                moved = false;
+                next += 1;
+                continue;
+            }
+            PathVerb::Line => 1,
+            PathVerb::Quad => 2,
+            PathVerb::Cubic => 3,
+            PathVerb::Close => continue,
+        };
+        let end = (next + count).min(points.len());
+        moved = moved || points[next..end].iter().any(|p| Some(*p) != start);
+        next = end;
+    }
+    if let Some(p) = start
+        && !moved
+    {
+        out.push(p);
+    }
+    out.into_iter()
+        .map(|p| Point::new(f64::from(p.x), f64::from(p.y)))
+        .collect()
+}
+
+/// The dots and squares that round and square caps draw on zero-length subpaths, which
+/// kurbo's stroker leaves out. Squares are aligned with the path's own axes.
+fn zero_length_caps(path: &usvg::Path, stroke: &usvg::Stroke) -> Option<BezPath> {
+    if stroke.linecap() == usvg::LineCap::Butt {
         return None;
     }
-    group.children().iter().try_fold(0, |count, node| {
-        let shapes = match node {
-            usvg::Node::Group(g) => clip_shape_count(g)?,
-            usvg::Node::Path(path) => {
-                if path
-                    .fill()
-                    .is_some_and(|f| f.rule() != usvg::FillRule::NonZero)
-                {
-                    return None;
-                }
-                usize::from(path.is_visible())
-            }
-            usvg::Node::Text(text) => clip_shape_count(text.flattened())?,
-            usvg::Node::Image(_) => return None,
-        };
-        Some(count + shapes)
-    })
+    let points = zero_length_subpaths(path.data());
+    if points.is_empty() {
+        return None;
+    }
+    let half = f64::from(stroke.width().get()) / 2.0;
+    let mut out = BezPath::new();
+    for p in points {
+        if stroke.linecap() == usvg::LineCap::Round {
+            out.extend(vello::kurbo::Circle::new(p, half).path_elements(0.1));
+        } else {
+            out.extend(
+                Rect::new(p.x - half, p.y - half, p.x + half, p.y + half).path_elements(0.1),
+            );
+        }
+    }
+    Some(out)
+}
+
+/// Nested clip paths and images inside clip paths are not supported.
+fn clip_supported(group: &usvg::Group) -> bool {
+    group.clip_path().is_none()
+        && group.children().iter().all(|node| match node {
+            usvg::Node::Group(g) => clip_supported(g),
+            usvg::Node::Path(_) => true,
+            usvg::Node::Text(text) => clip_supported(text.flattened()),
+            usvg::Node::Image(_) => false,
+        })
 }
 
 /// Draws `tree` into a new scene, in the tree's own coordinates.
@@ -109,26 +180,51 @@ fn render_child_group(scene: &mut Scene, g: &usvg::Group, parent_transform: Affi
     let blend = blend_mode(g.blend_mode());
     let alpha = g.opacity().get();
 
+    let mut mask = None;
     let pushed = if let Some(clip_path) = g.clip_path() {
         // The clip path's shapes, in the group's coordinates. usvg puts a shape that has a
         // transform into a group of its own.
-        let mut clip = BezPath::new();
+        let mut shapes = Vec::new();
         collect_clip(
             clip_path.root(),
             to_affine(&clip_path.transform()),
-            &mut clip,
+            &mut shapes,
         );
-        if clip.elements().is_empty() {
+        match shapes.as_slice() {
             // An empty clip path hides the whole group.
-            return;
-        }
-        if clips_nothing(&clip, g) {
-            // CAD exports often put a page-sized rectangle clip around every element.
-            // Thousands of large layers can exhaust the renderer's memory, so leave them out.
-            push_bounding_box_layer_if_needed(scene, g, blend, alpha, transform)
-        } else {
-            scene.push_layer(Fill::NonZero, blend, alpha, transform, &clip);
-            true
+            [] => return,
+            [(clip, Fill::NonZero)] => {
+                if clips_nothing(clip, g) {
+                    // CAD exports often put a page-sized rectangle clip around every
+                    // element. Thousands of large layers can exhaust the renderer's memory,
+                    // so leave them out.
+                    push_bounding_box_layer_if_needed(scene, g, blend, alpha, transform)
+                } else {
+                    scene.push_layer(Fill::NonZero, blend, alpha, transform, clip);
+                    true
+                }
+            }
+            _ if merging_unites(&shapes) => {
+                let mut clip = BezPath::new();
+                for (shape, _) in &shapes {
+                    clip.extend(shape.elements().iter().copied());
+                }
+                scene.push_layer(Fill::NonZero, blend, alpha, transform, &clip);
+                true
+            }
+            _ => {
+                // SVG unites the shapes of a clip path, each with its own clip rule. One
+                // non-zero path would leave holes where oppositely wound shapes overlap, so
+                // the shapes are drawn into a mask after the content.
+                let bounds = shapes
+                    .iter()
+                    .map(|(shape, _)| shape.bounding_box())
+                    .reduce(|a, b| a.union(b))
+                    .unwrap_or_default();
+                scene.push_layer(Fill::NonZero, blend, alpha, transform, &bounds);
+                mask = Some((shapes, bounds));
+                true
+            }
         }
     } else {
         push_bounding_box_layer_if_needed(scene, g, blend, alpha, transform)
@@ -136,6 +232,20 @@ fn render_child_group(scene: &mut Scene, g: &usvg::Group, parent_transform: Affi
 
     render_group(scene, g, transform);
 
+    if let Some((shapes, bounds)) = mask {
+        // Keep the content only where a clip shape covers it.
+        scene.push_layer(
+            Fill::NonZero,
+            BlendMode::new(Mix::Normal, Compose::DestIn),
+            1.0,
+            transform,
+            &bounds,
+        );
+        for (shape, rule) in &shapes {
+            scene.fill(*rule, transform, Color::BLACK, None, shape);
+        }
+        scene.pop_layer();
+    }
     if pushed {
         scene.pop_layer();
     }
@@ -163,14 +273,19 @@ fn push_bounding_box_layer_if_needed(
     needs_layer
 }
 
-/// Appends the shapes of a clip path to `out`, transformed by `transform`.
-fn collect_clip(group: &usvg::Group, transform: Affine, out: &mut BezPath) {
+/// Appends the shapes of a clip path and their clip rules to `out`, transformed by
+/// `transform`.
+fn collect_clip(group: &usvg::Group, transform: Affine, out: &mut Vec<(BezPath, Fill)>) {
     for node in group.children() {
         match node {
             usvg::Node::Path(path) if path.is_visible() => {
                 let mut shape = to_bez_path(path);
                 shape.apply_affine(transform);
-                out.extend(shape);
+                let rule = match path.fill().map(|fill| fill.rule()) {
+                    Some(usvg::FillRule::EvenOdd) => Fill::EvenOdd,
+                    _ => Fill::NonZero,
+                };
+                out.push((shape, rule));
             }
             usvg::Node::Group(g) => collect_clip(g, transform * to_affine(&g.transform()), out),
             usvg::Node::Text(text) => {
@@ -204,35 +319,87 @@ fn clips_nothing(clip: &BezPath, group: &usvg::Group) -> bool {
 fn axis_aligned_rect(path: &BezPath) -> Option<Rect> {
     use vello::kurbo::PathEl;
 
-    let mut points = Vec::with_capacity(5);
-    let mut elements = path.elements().iter();
-    let Some(PathEl::MoveTo(start)) = elements.next() else {
-        return None;
-    };
-    points.push(*start);
-    for element in elements {
-        match element {
-            PathEl::LineTo(p) => points.push(*p),
-            PathEl::ClosePath => {}
+    let mut points = [Point::ZERO; 5];
+    let mut count = 0;
+    for (i, element) in path.elements().iter().enumerate() {
+        let point = match (i, element) {
+            (0, PathEl::MoveTo(p)) | (1.., PathEl::LineTo(p)) => *p,
+            (1.., PathEl::ClosePath) => continue,
             _ => return None,
+        };
+        if count == points.len() {
+            return None;
+        }
+        points[count] = point;
+        count += 1;
+    }
+    if count == 5 && points[4] == points[0] {
+        count = 4;
+    }
+    if count != 4 {
+        return None;
+    }
+    // Sides alternate between horizontal and vertical, and none has zero length.
+    let is_rectangle = (0..4).all(|i| {
+        let (a, b, c) = (points[i], points[(i + 1) % 4], points[(i + 2) % 4]);
+        (a.x == b.x || a.y == b.y) && (a.x == b.x) != (b.x == c.x) && a != b
+    });
+    is_rectangle.then(|| path.bounding_box())
+}
+
+/// Whether filling `shapes` as one non-zero path gives their union: every shape is non-zero
+/// and every subpath is made of straight lines that all turn the same way (rectangles and
+/// other convex polygons, all wound in one direction). Overlapping parts then add up instead
+/// of cancelling out.
+fn merging_unites(shapes: &[(BezPath, Fill)]) -> bool {
+    use vello::kurbo::PathEl;
+
+    let mut direction = 0.0_f64;
+    for (shape, rule) in shapes {
+        if *rule != Fill::NonZero {
+            return false;
+        }
+        let mut points: Vec<Point> = Vec::new();
+        let mut check = |points: &mut Vec<Point>| -> bool {
+            if points.len() > 1 && points.first() == points.last() {
+                points.pop();
+            }
+            let n = points.len();
+            for i in 0..n {
+                let (a, b, c) = (points[i], points[(i + 1) % n], points[(i + 2) % n]);
+                let turn = (b - a).cross(c - b);
+                if turn != 0.0 {
+                    if direction * turn < 0.0 {
+                        return false;
+                    }
+                    direction = turn;
+                }
+            }
+            points.clear();
+            true
+        };
+        for element in shape.elements() {
+            match element {
+                PathEl::MoveTo(p) => {
+                    if !check(&mut points) {
+                        return false;
+                    }
+                    points.push(*p);
+                }
+                PathEl::LineTo(p) => {
+                    if points.last() != Some(p) {
+                        points.push(*p);
+                    }
+                }
+                PathEl::ClosePath => {}
+                _ => return false,
+            }
+        }
+        if !check(&mut points) {
+            return false;
         }
     }
-    if points.len() == 5 && points[4] == points[0] {
-        points.pop();
-    }
-    if points.len() != 4 {
-        return None;
-    }
-    let sides_axis_aligned = (0..4).all(|i| {
-        let (a, b) = (points[i], points[(i + 1) % 4]);
-        a.x == b.x || a.y == b.y
-    });
-    // Sides alternate between horizontal and vertical, and none has zero length.
-    let alternating = (0..4).all(|i| {
-        let (a, b, c) = (points[i], points[(i + 1) % 4], points[(i + 2) % 4]);
-        (a.x == b.x) != (b.x == c.x) && a != b
-    });
-    (sides_axis_aligned && alternating).then(|| path.bounding_box())
+    true
 }
 
 fn render_path(scene: &mut Scene, path: &usvg::Path, transform: Affine) {
@@ -242,7 +409,10 @@ fn render_path(scene: &mut Scene, path: &usvg::Path, transform: Affine) {
     let shape = to_bez_path(path);
     let fill = |scene: &mut Scene| {
         if let Some(fill) = path.fill()
-            && let Some((brush, brush_transform)) = to_brush(fill.paint(), fill.opacity())
+            && let Some((brush, brush_transform)) =
+                to_brush(fill.paint(), fill.opacity()).map(|(brush, brush_transform)| {
+                    conformal_linear_gradient(brush, brush_transform, transform)
+                })
         {
             let rule = match fill.rule() {
                 usvg::FillRule::NonZero => Fill::NonZero,
@@ -253,7 +423,10 @@ fn render_path(scene: &mut Scene, path: &usvg::Path, transform: Affine) {
     };
     let stroke = |scene: &mut Scene| {
         if let Some(stroke) = path.stroke()
-            && let Some((brush, brush_transform)) = to_brush(stroke.paint(), stroke.opacity())
+            && let Some((brush, brush_transform)) =
+                to_brush(stroke.paint(), stroke.opacity()).map(|(brush, brush_transform)| {
+                    conformal_linear_gradient(brush, brush_transform, transform)
+                })
         {
             scene.stroke(
                 &to_stroke(stroke),
@@ -262,6 +435,15 @@ fn render_path(scene: &mut Scene, path: &usvg::Path, transform: Affine) {
                 Some(brush_transform),
                 &shape,
             );
+            if let Some(caps) = zero_length_caps(path, stroke) {
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    &brush,
+                    Some(brush_transform),
+                    &caps,
+                );
+            }
         }
     };
     match path.paint_order() {
@@ -361,21 +543,109 @@ fn to_bez_path(path: &usvg::Path) -> BezPath {
     out
 }
 
-fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
-    let stops = |stops: &[usvg::Stop]| -> Vec<peniko::ColorStop> {
-        stops
-            .iter()
-            .map(|stop| peniko::ColorStop {
-                offset: stop.offset().get(),
-                color: DynamicColor::from_alpha_color(Color::from_rgba8(
-                    stop.color().red,
-                    stop.color().green,
-                    stop.color().blue,
-                    (stop.opacity() * opacity).to_u8(),
-                )),
-            })
-            .collect()
+/// Converts gradient stops, working around two differences between Vello 0.7 and resvg:
+/// Vello starts the first colour at offset 0 whatever its offset, and it interpolates
+/// premultiplied colours, while SVG renderers interpolate the colour and the alpha
+/// separately. Between stops whose opacities differ, extra stops follow the SVG curve.
+fn gradient_stops(stops: &[usvg::Stop], opacity: usvg::Opacity) -> Vec<peniko::ColorStop> {
+    /// Extra stops between two stops with different opacities.
+    const STEPS: usize = 16;
+
+    let rgba = |stop: &usvg::Stop| {
+        let c = stop.color();
+        [
+            f32::from(c.red),
+            f32::from(c.green),
+            f32::from(c.blue),
+            (stop.opacity() * opacity).get() * 255.0,
+        ]
     };
+    let color_stop = |offset: f32, [r, g, b, a]: [f32; 4]| peniko::ColorStop {
+        offset,
+        color: DynamicColor::from_alpha_color(Color::from_rgba8(
+            r.round() as u8,
+            g.round() as u8,
+            b.round() as u8,
+            a.round() as u8,
+        )),
+    };
+
+    let mut out = Vec::with_capacity(stops.len() + 1);
+    let Some(first) = stops.first() else {
+        return out;
+    };
+    if first.offset().get() > 0.0 {
+        out.push(color_stop(0.0, rgba(first)));
+    }
+    for (i, stop) in stops.iter().enumerate() {
+        if i > 0 {
+            let (prev, next) = (rgba(&stops[i - 1]), rgba(stop));
+            let (from, to) = (stops[i - 1].offset().get(), stop.offset().get());
+            if prev[3] != next[3] && prev[..3] != next[..3] && to > from {
+                for step in 1..STEPS {
+                    let t = step as f32 / STEPS as f32;
+                    let mixed = std::array::from_fn(|c| prev[c] + (next[c] - prev[c]) * t);
+                    out.push(color_stop(from + (to - from) * t, mixed));
+                }
+            }
+        }
+        out.push(color_stop(stop.offset().get(), rgba(stop)));
+    }
+    out
+}
+
+/// Vello lays out a linear gradient's colour bands at right angles to the line between its
+/// transformed end points, which is only right when the transform keeps angles. Under a
+/// skew or an uneven scale, this moves the end points to the drawing's own coordinates,
+/// where the bands are at right angles to the line, and draws the gradient untransformed.
+fn conformal_linear_gradient(
+    brush: Brush,
+    brush_transform: Affine,
+    transform: Affine,
+) -> (Brush, Affine) {
+    let Brush::Gradient(mut gradient) = brush else {
+        return (brush, brush_transform);
+    };
+    let peniko::GradientKind::Linear(line) = gradient.kind else {
+        return (Brush::Gradient(gradient), brush_transform);
+    };
+    let full = transform * brush_transform;
+    let [a, b, c, d, _, _] = full.as_coeffs();
+    let keeps_angles = |sign: f64| {
+        let tolerance = 1e-9 * (a.abs() + b.abs() + c.abs() + d.abs());
+        (a - sign * d).abs() <= tolerance && (b + sign * c).abs() <= tolerance
+    };
+    let inverse_transform = transform.inverse();
+    if keeps_angles(1.0)
+        || keeps_angles(-1.0)
+        || full.determinant().abs() < 1e-12
+        || !inverse_transform.is_finite()
+    {
+        return (Brush::Gradient(gradient), brush_transform);
+    }
+
+    // t(x) = dot(full⁻¹ x - start, dir) / |dir|², an affine function of the output point x.
+    let (start, end) = (line.start, line.end);
+    let dir = end - start;
+    let length_squared = dir.hypot2();
+    if length_squared == 0.0 {
+        return (Brush::Gradient(gradient), brush_transform);
+    }
+    let [ia, ib, ic, id, _, _] = full.inverse().as_coeffs();
+    // The gradient of t: the transpose of full⁻¹'s linear part times dir.
+    let grad =
+        vello::kurbo::Vec2::new(ia * dir.x + ib * dir.y, ic * dir.x + id * dir.y) / length_squared;
+    let new_start = full * start;
+    let new_end = new_start + grad / grad.hypot2();
+    gradient.kind = peniko::GradientKind::Linear(peniko::LinearGradientPosition {
+        start: new_start,
+        end: new_end,
+    });
+    (Brush::Gradient(gradient), inverse_transform)
+}
+
+fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affine)> {
+    let stops = |stops: &[usvg::Stop]| gradient_stops(stops, opacity);
     let extend = |spread: usvg::SpreadMethod| match spread {
         usvg::SpreadMethod::Pad => peniko::Extend::Pad,
         usvg::SpreadMethod::Reflect => peniko::Extend::Reflect,
@@ -403,7 +673,7 @@ fn to_brush(paint: &usvg::Paint, opacity: usvg::Opacity) -> Option<(Brush, Affin
         usvg::Paint::RadialGradient(gr) => {
             let gradient = peniko::Gradient::new_two_point_radial(
                 Point::new(f64::from(gr.fx()), f64::from(gr.fy())),
-                0.0,
+                gr.fr().get(),
                 Point::new(f64::from(gr.cx()), f64::from(gr.cy())),
                 gr.r().get(),
             )
@@ -504,16 +774,55 @@ mod tests {
     }
 
     #[test]
-    fn clip_paths_with_several_shapes_are_left_to_resvg() {
-        // SVG unites the shapes of a clip path. Drawn as one non-zero path, these two
-        // oppositely wound squares would cancel where they overlap.
-        let body = r#"<clipPath id="c"><path d="M0,0 h20 v20 h-20 Z"/><path d="M10,30 v-20 h20 v20 Z"/></clipPath>
-            <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#;
-        assert!(!supports(&tree(&svg(body))));
-        // One shape made of several subpaths is still one non-zero path, as in SVG.
-        let body = r#"<clipPath id="c"><path d="M0,0 h20 v20 h-20 Z M10,30 v-20 h20 v20 Z"/></clipPath>
-            <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#;
-        assert!(supports(&tree(&svg(body))));
+    fn clip_shapes_are_united() {
+        // Merged into one non-zero path, these oppositely wound squares would cancel where
+        // they overlap, around (15, 15).
+        let image = render(&svg(
+            r#"<clipPath id="c"><path d="M0,0 h20 v20 h-20 Z"/><path d="M10,10 v20 h20 v-20 Z"/></clipPath>
+                <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#,
+        ));
+        assert!(is_dark(&image, 15, 15));
+        assert!(is_dark(&image, 5, 5));
+        assert!(is_dark(&image, 25, 25));
+        assert!(!is_dark(&image, 25, 5));
+    }
+
+    #[test]
+    fn only_shapes_that_cannot_cancel_are_merged() {
+        let shapes = |paths: &[&str]| -> Vec<(BezPath, Fill)> {
+            paths
+                .iter()
+                .map(|d| (BezPath::from_svg(d).unwrap(), Fill::NonZero))
+                .collect()
+        };
+        // Same-way rectangles and a convex polygon: merged into one layer.
+        assert!(merging_unites(&shapes(&[
+            "M0,0 L20,0 L20,20 L0,20 Z",
+            "M10,10 L30,10 L30,30 L10,30 Z",
+            "M0,40 L10,35 L20,40 L10,50 Z",
+        ])));
+        // Opposite windings, curves and even-odd rules go through a mask.
+        assert!(!merging_unites(&shapes(&[
+            "M0,0 L20,0 L20,20 L0,20 Z",
+            "M10,10 L10,30 L30,30 L30,10 Z",
+        ])));
+        assert!(!merging_unites(&shapes(&[
+            "M0,0 Q10,10 20,0 Z",
+            "M0,0 L5,0 L5,5 Z"
+        ])));
+        let mut even_odd = shapes(&["M0,0 L20,0 L20,20 Z", "M0,0 L5,0 L5,5 Z"]);
+        even_odd[0].1 = Fill::EvenOdd;
+        assert!(!merging_unites(&even_odd));
+    }
+
+    #[test]
+    fn even_odd_clip_rule_is_kept() {
+        let image = render(&svg(
+            r#"<clipPath id="c"><path d="M0,0 h32 v32 h-32 Z M8,8 h16 v16 h-16 Z" clip-rule="evenodd"/></clipPath>
+                <g clip-path="url(#c)"><rect width="32" height="32"/></g>"#,
+        ));
+        assert!(is_dark(&image, 4, 4));
+        assert!(!is_dark(&image, 16, 16));
     }
 
     #[test]
@@ -549,13 +858,49 @@ mod tests {
     }
 
     #[test]
+    fn caps_on_zero_length_subpaths_are_drawn() {
+        let image = render(&svg(
+            r#"<path d="M8,16 Z M24,16 L24,16" stroke="black" stroke-width="8" stroke-linecap="round"/>
+                <path d="M16,6 Z" stroke="black" stroke-width="6" stroke-linecap="square"/>"#,
+        ));
+        assert!(is_dark(&image, 8, 16));
+        assert!(is_dark(&image, 24, 16));
+        // The square cap's corner, which a round cap of the same width wouldn't reach.
+        assert!(is_dark(&image, 13, 3));
+        assert!(!is_dark(&image, 16, 16));
+    }
+
+    #[test]
+    fn zero_length_subpaths_are_found() {
+        let points = |d: &str| {
+            zero_length_subpaths(
+                tree(&svg(&format!(r#"<path d="{d}" stroke="black"/>"#)))
+                    .root()
+                    .children()
+                    .iter()
+                    .find_map(|n| match n {
+                        usvg::Node::Path(p) => Some(p.data().clone()),
+                        _ => None,
+                    })
+                    .as_ref()
+                    .unwrap(),
+            )
+        };
+        assert_eq!(
+            points("M1,1 L5,1 M3,3 Z M4,4 L4,4"),
+            [Point::new(3.0, 3.0), Point::new(4.0, 4.0)]
+        );
+        assert!(points("M1,1 L5,1 Z").is_empty());
+    }
+
+    #[test]
     fn unsupported_features_are_reported() {
         assert!(supports(&tree(&svg(r#"<rect width="8" height="8"/>"#))));
         let unsupported = [
             r#"<pattern id="p" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="2"/></pattern><rect width="8" height="8" fill="url(#p)"/>"#,
             r#"<mask id="m"><rect width="4" height="4" fill="white"/></mask><rect width="8" height="8" mask="url(#m)"/>"#,
             r#"<filter id="f"><feGaussianBlur stdDeviation="1"/></filter><rect width="8" height="8" filter="url(#f)"/>"#,
-            r#"<clipPath id="c"><rect width="4" height="4" clip-rule="evenodd"/></clipPath><rect width="8" height="8" clip-path="url(#c)"/>"#,
+            r#"<clipPath id="c" clip-path="url(#d)"><rect width="4" height="4"/></clipPath><clipPath id="d"><rect width="2" height="2"/></clipPath><rect width="8" height="8" clip-path="url(#c)"/>"#,
         ];
         for body in unsupported {
             assert!(!supports(&tree(&svg(body))), "{body}");
