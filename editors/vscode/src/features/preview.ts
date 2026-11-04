@@ -628,9 +628,7 @@ async function launchPreviewLsp(task: LaunchInBrowserTask | LaunchInWebViewTask)
         const shouldScrollPanel =
           // scroll by mouse
           kind === vscode.TextEditorSelectionChangeKind.Mouse ||
-          // scroll by keyboard typing
-          (scrollSyncMode === ScrollSyncModeEnum.onSelectionChange &&
-            kind === vscode.TextEditorSelectionChangeKind.Keyboard);
+          scrollSyncMode === ScrollSyncModeEnum.onSelectionChange;
         if (shouldScrollPanel) {
           // console.log(`selection changed, sending src2doc jump request`);
           mayReportPosition(editor, "panelScrollTo");
