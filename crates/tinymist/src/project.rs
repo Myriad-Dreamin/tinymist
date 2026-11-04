@@ -481,12 +481,26 @@ pub trait ProjectClient: Send + Sync + 'static {
     /// Sends a server event back to the server.
     #[cfg(feature = "preview")]
     fn server_event(&self, event: ServerEvent);
+    /// Notifies the editor of a preview task's current compilation entry.
+    /// Standalone clients do not need to handle editor panel titles.
+    #[cfg(feature = "preview")]
+    fn preview_entry(&self, _task_id: &str, _path: String) {}
     /// Sends a dev event to the client, used for neovim's E2E testing.
     #[cfg(feature = "export")]
     fn dev_event(&self, event: DevEvent);
 }
 
 impl ProjectClient for LspClient {
+    #[cfg(feature = "preview")]
+    fn preview_entry(&self, task_id: &str, path: String) {
+        use crate::actor::preview::RenderedEntry;
+
+        self.send_notification::<RenderedEntry>(&RenderedEntry {
+            task_id: task_id.to_owned(),
+            path,
+        });
+    }
+
     fn interrupt(&self, event: LspInterrupt) {
         self.send_event(event);
     }
@@ -698,8 +712,19 @@ impl CompileHandler<LspCompilerFeat, ProjectInsStateExt> for CompileHandlerImpl 
 
         #[cfg(feature = "preview")]
         if let Some(inner) = self.preview.get(&rep.id) {
+            use reflexo::path::unix_slash;
             use tinymist_preview::CompileStatus;
             use tinymist_project::CompileStatusEnum::*;
+            use typst_shim::syntax::VirtualPathExt;
+
+            // Use the same resolved main file as compileStatus, independently
+            // of whether the editor has enabled compile-status notifications.
+            if let Some(id) = rep.compiling_id {
+                self.client.preview_entry(
+                    inner.task_id(),
+                    unix_slash(id.vpath().as_rooted_path_compat()),
+                );
+            }
 
             inner.status(match &rep.status {
                 Compiling => CompileStatus::Compiling,
