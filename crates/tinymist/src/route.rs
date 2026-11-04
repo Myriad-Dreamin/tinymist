@@ -91,7 +91,7 @@ impl ProjectRouteState {
         Some(())
     }
 
-    pub fn update_existing_material(
+    pub fn update_material(
         &mut self,
         lock_dir: ImmutPath,
         snap: &LspCompileSnapshot,
@@ -104,8 +104,7 @@ impl ProjectRouteState {
         let deps = snap.world.depended_fs_paths();
         let material = ProjectPathMaterial::from_deps(id, deps);
 
-        let old = path_route.materials.get_mut(&material.id)?;
-        if old == &material {
+        if path_route.materials.get(&material.id).is_some_and(|old| old == &material) {
             return Some(());
         }
 
