@@ -1,4 +1,3 @@
-use lsp_types::*;
 use serde_json::json;
 
 use super::*;
