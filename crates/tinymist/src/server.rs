@@ -20,7 +20,7 @@ use crate::lsp::query::OnEnter;
 use crate::project::{EntryResolver, LspInterrupt, ProjectInsId, ProjectState};
 use crate::task::FormatTask;
 use crate::vfs::notify::NotifyMessage;
-use crate::{lsp::init::*, *};
+use crate::*;
 
 #[cfg(feature = "lock")]
 use crate::route::ProjectRouteState;
