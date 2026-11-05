@@ -1,5 +1,7 @@
 use lsp_types::{InlayHintKind, InlayHintLabel};
-use typst::syntax::{LinkedNode, SyntaxKind, ast};
+use typst::foundations::NativeElement;
+use typst::model::HeadingElem;
+use typst::syntax::{LinkedNode, Span, SyntaxKind, ast};
 
 use crate::{
     analysis::{ParamKind, analyze_call, call_parts},
@@ -29,6 +31,10 @@ pub struct InlayHintConfig {
     // package version status
     /// Show package version status decorations.
     pub on_package_version_status: bool,
+
+    // document structure
+    /// Show the resolved numbering of headings, e.g. `1.2` before `== Title`.
+    pub on_heading_numbering: bool,
 }
 
 impl InlayHintConfig {
@@ -44,6 +50,8 @@ impl InlayHintConfig {
             on_content_block_args: false,
 
             on_package_version_status: true,
+
+            on_heading_numbering: true,
         }
     }
 }
@@ -78,6 +86,7 @@ impl SemanticRequest for InlayHintRequest {
             source: &source,
             range,
             hints: vec![],
+            heading_numbers: None,
         };
         worker.work(root);
 
@@ -92,6 +101,7 @@ struct InlayHintWorker<'a> {
     source: &'a Source,
     range: Range<usize>,
     hints: Vec<InlayHint>,
+    heading_numbers: Option<HashMap<Span, EcoString>>,
 }
 
 impl InlayHintWorker<'_> {
@@ -131,9 +141,17 @@ impl InlayHintWorker<'_> {
             SyntaxKind::Str if SMART.on_package_version_status => {
                 self.check_package_import(node);
             }
+            // Heading numbering
+            SyntaxKind::Heading if SMART.on_heading_numbering => {
+                self.check_heading_numbering(node);
+            }
             // Parameter inlay hints
             SyntaxKind::FuncCall | SyntaxKind::MathCall => {
                 log::trace!("func call found: {node:?}");
+                if SMART.on_heading_numbering {
+                    self.check_heading_numbering(node);
+                }
+
                 let call_info = analyze_call(self.ctx, self.source.clone(), node.clone())?;
                 crate::log_debug_ct!("got call_info {call_info:?}");
 
@@ -343,6 +361,53 @@ impl InlayHintWorker<'_> {
         });
 
         Some(())
+    }
+
+    fn check_heading_numbering(&mut self, node: &LinkedNode) -> Option<()> {
+        let numbers = self.heading_numbers()?.get(&node.span())?.clone();
+
+        let marker = node
+            .children()
+            .find(|child| child.kind() == SyntaxKind::HeadingMarker);
+
+        // Position for the hint - at the end of the heading marker, or of the
+        // whole call for `#heading(..)`
+        let pos = marker.map_or(node.range().end, |marker| marker.range().end);
+        let lsp_pos = self.ctx.to_lsp_pos(pos, self.source);
+
+        self.hints.push(InlayHint {
+            position: lsp_pos,
+            label: InlayHintLabel::String(numbers.to_string()),
+            kind: None,
+            text_edits: None,
+            tooltip: None,
+            padding_left: Some(true),
+            padding_right: None,
+            data: None,
+        });
+
+        Some(())
+    }
+
+    fn heading_numbers(&mut self) -> Option<&HashMap<Span, EcoString>> {
+        if self.heading_numbers.is_none() {
+            // Numbers are synthesized by typst during compilation, keyed here
+            // by the span of the heading element
+            let doc = self.ctx.success_doc()?;
+            let numbers = doc
+                .introspector()
+                .query(&HeadingElem::ELEM.select())
+                .iter()
+                .filter_map(|elem| {
+                    let heading = elem.to_packed::<HeadingElem>()?;
+                    let numbers = heading.numbers.clone()?;
+                    Some((heading.span(), numbers))
+                })
+                .collect();
+            self.heading_numbers = Some(numbers);
+        }
+
+        self.heading_numbers.as_ref()
     }
 }
 

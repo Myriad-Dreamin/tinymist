@@ -1,0 +1,47 @@
+---
+source: crates/tinymist-query/src/inlay_hint.rs
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/inlay_hints/heading_numbering.typ
+---
+[
+ {
+  "label": "1",
+  "paddingLeft": true,
+  "position": {
+   "character": 1,
+   "line": 6
+  }
+ },
+ {
+  "label": "1.1",
+  "paddingLeft": true,
+  "position": {
+   "character": 2,
+   "line": 7
+  }
+ },
+ {
+  "label": "1.1.1",
+  "paddingLeft": true,
+  "position": {
+   "character": 3,
+   "line": 8
+  }
+ },
+ {
+  "label": "1.2",
+  "paddingLeft": true,
+  "position": {
+   "character": 2,
+   "line": 9
+  }
+ },
+ {
+  "label": "2",
+  "paddingLeft": true,
+  "position": {
+   "character": 41,
+   "line": 11
+  }
+ }
+]
