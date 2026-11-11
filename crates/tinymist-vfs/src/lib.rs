@@ -395,6 +395,7 @@ impl<M: PathAccessModel + Sized> Vfs<M> {
                     || cache_entry.last_accessed_rev < self.revision.get();
                 if should_update {
                     cache_entry.recent_source = Some(next.clone());
+                    cache_entry.last_accessed_rev = self.revision.get();
                 }
 
                 Ok(next)
