@@ -186,6 +186,19 @@ impl ServerState {
 
         let task = self.resolve_task_or(path);
 
+        // If the current main file is the same as the new main file, we should
+        // avoid interrupting the compiler and forgetting the document state.
+        // This is wasteful and can lead to a degraded experience: if the main
+        // file has errors that prevent successful compilation, clearing the
+        // document state means that capabilities relying on it (e.g.
+        // completion) will no longer work until the errors are fixed, because
+        // there is no previous successful state to fall back on.
+        if let Some(ref new_entry) = task.entry {
+            if self.project.compiler.primary.verse.entry_state() == *new_entry {
+                return Ok(false);
+            }
+        }
+
         log::info!("the task of the primary is changing to {task:?}");
 
         let id = self.project.primary_id().clone();
