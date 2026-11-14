@@ -719,4 +719,77 @@ mod tests {
         is_send::<super::Vfs<super::dummy::DummyAccessModel>>();
         is_sync::<super::Vfs<super::dummy::DummyAccessModel>>();
     }
+
+    /// Regression test for
+    /// https://github.com/Myriad-Dreamin/tinymist/pull/2782:
+    /// `SourceIdShard::last_accessed_rev` must be recorded when updating
+    /// `recent_source`, otherwise `SourceCache::evict` drops the shard —
+    /// including the `recent_source` that serves as the base for incremental
+    /// reparsing — as soon as the revision passes the threshold.
+    #[test]
+    fn recent_source_survives_eviction_when_revision_advances() {
+        use crate::mock::MockWorkspace;
+
+        let workspace = MockWorkspace::default_builder()
+            .file("main.typ", "#let value = 0")
+            .file("dep.typ", "#let dep = 0")
+            .build();
+        let mut vfs = workspace.vfs();
+        let main_id = workspace.file_id("main.typ").unwrap();
+        let dep_id = workspace.file_id("dep.typ").unwrap();
+        let source_cache = vfs.clone_source_cache();
+
+        // Initial reads populate the shards and their recent sources.
+        assert_eq!(vfs.source(main_id).unwrap().text(), "#let value = 0");
+        assert_eq!(vfs.source(dep_id).unwrap().text(), "#let dep = 0");
+        assert!(
+            source_cache
+                .cache_entries
+                .get(&main_id)
+                .map(|shard| shard.recent_source.is_some())
+                .unwrap_or(false)
+        );
+
+        // Advance revisions well beyond any reasonable eviction threshold,
+        // reading the source at every revision so the shard stays touched.
+        for revision in 1..=8u32 {
+            workspace
+                .update_source("main.typ", format!("#let value = {revision}"))
+                .apply_to_vfs(&mut vfs);
+            assert_eq!(
+                vfs.source(main_id).unwrap().text(),
+                format!("#let value = {revision}")
+            );
+        }
+
+        // The recent source must track the latest content.
+        {
+            let shard = source_cache
+                .cache_entries
+                .get(&main_id)
+                .expect("shard for main.typ exists");
+            let recent = shard
+                .recent_source
+                .as_ref()
+                .expect("recent source is recorded");
+            assert_eq!(recent.text(), "#let value = 8");
+        }
+
+        // Evict strictly against the current revision: the shard of
+        // main.typ was accessed at the latest revision and must survive,
+        // while the untouched dep.typ shard is old enough to be evicted.
+        let curr = vfs.revision();
+        source_cache.evict(curr, 2);
+
+        let shard = source_cache
+            .cache_entries
+            .get(&main_id)
+            .expect("shard of the recently accessed file survives eviction");
+        let recent = shard
+            .recent_source
+            .as_ref()
+            .expect("recent source survives eviction");
+        assert_eq!(recent.text(), "#let value = 8");
+        assert!(source_cache.cache_entries.get(&dep_id).is_none());
+    }
 }
