@@ -3,6 +3,7 @@ use std::num::NonZeroUsize;
 use reflexo_typst::debug_loc::DocumentPosition;
 use serde::{Deserialize, Serialize};
 use tinymist_std::typst::TypstDocument;
+use typst::diag::EcoString;
 use typst::foundations::{Content, NativeElement, Packed, StyleChain};
 use typst::introspection::{Introspector, PagedPosition};
 use typst::model::HeadingElem;
@@ -14,6 +15,7 @@ use crate::debug_loc::SpanInternerImpl;
 #[derive(Debug, Clone)]
 pub(crate) struct HeadingNode {
     body: Content,
+    numbers: Option<EcoString>,
     span: Span,
     position: DocumentPosition,
     level: NonZeroUsize,
@@ -120,6 +122,7 @@ impl HeadingNode {
                 .get(StyleChain::default())
                 .unwrap_or_else(|| element.outlined.get(StyleChain::default())),
             body: element.body.clone(),
+            numbers: element.numbers.clone(),
             span: element.span(),
             children: Vec::new(),
         }
@@ -156,8 +159,13 @@ pub fn outline(interner: &mut SpanInternerImpl, document: &TypstDocument) -> Out
 }
 
 fn outline_item(interner: &mut SpanInternerImpl, src: &HeadingNode, res: &mut Vec<OutlineItem>) {
-    let body = src.body.clone();
-    let title = body.plain_text().trim().to_owned();
+    // Prefix the title with its numbering, matching the PDF outline.
+    let body = src.body.plain_text();
+    let body = body.trim();
+    let title = match &src.numbers {
+        Some(numbers) => format!("{numbers} {body}"),
+        None => body.to_owned(),
+    };
 
     let mut children = Vec::with_capacity(src.children.len());
     for child in src.children.iter() {
@@ -180,4 +188,56 @@ fn outline_item(interner: &mut SpanInternerImpl, src: &HeadingNode, res: &mut Ve
         position: Some(src.position),
         children,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
+
+    use super::*;
+
+    fn titles(items: &[OutlineItem]) -> Vec<String> {
+        items
+            .iter()
+            .flat_map(|item| std::iter::once(item.title.clone()).chain(titles(&item.children)))
+            .collect()
+    }
+
+    #[test]
+    fn outline_titles_carry_heading_numbering() {
+        tinymist_tests::run_with_sources(
+            r#"
+= Preface
+#set heading(numbering: "1.1")
+= Introduction
+== Background
+#heading(level: 1)[Methods]
+#set heading(numbering: none)
+= Appendix
+"#,
+            |verse, _| {
+                let world = verse.snapshot();
+                let doc = typst::compile::<TypstPagedDocument>(&world)
+                    .output
+                    .expect("outline fixture should compile");
+                let document = TypstDocument::Paged(Arc::new(doc));
+
+                let mut interner = SpanInternerImpl::new();
+                let outline = outline(&mut interner, &document);
+
+                assert_eq!(
+                    titles(&outline.items),
+                    [
+                        "Preface",
+                        "1 Introduction",
+                        "1.1 Background",
+                        "2 Methods",
+                        "Appendix"
+                    ]
+                );
+            },
+        );
+    }
 }

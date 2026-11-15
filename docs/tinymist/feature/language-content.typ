@@ -32,6 +32,7 @@ Language service (LSP) features:
   - Render docs according to #link("https://github.com/Mc-Zen/tidy")[tidy] style.
 - #link("https://www.jetbrains.com/help/idea/inlay-hints.html")[Inlay hints]
   - Inlay hints are special markers that appear in the editor and provide you with additional information about your code, like the names of the parameters that a called method expects.
+  - Shows the resolved numbering of headings, like `1.2`, next to `== Title` or `#heading(..)`, once the document has been compiled.
 - #link("https://code.visualstudio.com/api/language-extensions/programmatic-language-features#show-color-decorators")[Color Provider]
   - View all inlay colorful label for color literals in your document.
   - Change the color literal's value by a color picker or its code presentation.
