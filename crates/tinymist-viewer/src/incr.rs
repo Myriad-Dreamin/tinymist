@@ -668,6 +668,14 @@ hello
 #set page(width: 32pt, height: 32pt, margin: 0pt)
 #image(bytes(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#00ff00"/></svg>`.text), format: "svg", width: 6pt, height: 6pt)
 "##,
+                check: assert_vector_svg_encoding,
+            },
+            Case {
+                name: "svg image with a pattern fill",
+                source: r##"
+#set page(width: 32pt, height: 32pt, margin: 0pt)
+#image(bytes(`<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><pattern id="p" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/></pattern><rect width="10" height="10" fill="url(#p)"/></svg>`.text), format: "svg", width: 6pt, height: 6pt)
+"##,
                 check: assert_image_encoding,
             },
         ];
@@ -1043,6 +1051,18 @@ hello
         );
     }
 
+    fn assert_vector_svg_encoding(scene: &Scene) {
+        let encoding = scene.encoding();
+        assert!(
+            encoding.n_paths >= 2,
+            "svg image should encode its view box clip and its shapes as paths"
+        );
+        assert!(
+            encoding.resources.patches.is_empty(),
+            "svg image should be drawn as vectors, not as an image resource"
+        );
+    }
+
     fn assert_image_encoding(scene: &Scene) {
         let encoding = scene.encoding();
         assert!(
@@ -1051,7 +1071,7 @@ hello
         );
         assert!(
             !encoding.resources.patches.is_empty(),
-            "raster image should attach an image resource patch"
+            "raster image, or svg image drawn by resvg, should attach an image resource patch"
         );
     }
 }
