@@ -1,0 +1,19 @@
+---
+source: crates/tinymist-query/src/jump.rs
+description: "Jump cursor on r 0..13 */|divides.not n| $\n)"
+expression: results
+input_file: crates/tinymist-query/src/fixtures/jump_from_cursor/math_field_access.typ
+---
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,290.676pt,79.116pt
+1,298.000pt,79.116pt
