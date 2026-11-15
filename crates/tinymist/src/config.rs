@@ -1055,7 +1055,15 @@ impl From<&InitializeParams> for ConstConfig {
 
         Self {
             position_encoding,
-            cfg_change_registration: try_or(|| workspace?.configuration, false),
+            cfg_change_registration: try_or(
+                || {
+                    workspace?
+                        .did_change_configuration
+                        .as_ref()?
+                        .dynamic_registration
+                },
+                false,
+            ),
             notify_will_rename_files: try_or(|| file_operations?.will_rename, false),
             tokens_dynamic_registration: try_or(|| sema?.dynamic_registration, false),
             tokens_overlapping_token_support: try_or(|| sema?.overlapping_token_support, false),
@@ -1375,6 +1383,53 @@ mod tests {
     fn test_default_encoding() {
         let cc = ConstConfig::default();
         assert_eq!(cc.position_encoding, PositionEncoding::Utf16);
+    }
+
+    #[test]
+    fn test_configuration_change_dynamic_registration() {
+        // Configuration queries and dynamic registration are independent capabilities.
+        // In particular, Eglot supports queries without advertising registration.
+        for workspace in [None, Some(WorkspaceClientCapabilities::default())] {
+            let params = InitializeParams {
+                capabilities: ClientCapabilities {
+                    workspace,
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            assert!(!ConstConfig::from(&params).cfg_change_registration);
+        }
+
+        for configuration in [None, Some(false), Some(true)] {
+            for (did_change_configuration, expected) in [
+                (None, false),
+                (Some(None), false),
+                (Some(Some(false)), false),
+                (Some(Some(true)), true),
+            ] {
+                let params = InitializeParams {
+                    capabilities: ClientCapabilities {
+                        workspace: Some(WorkspaceClientCapabilities {
+                            configuration,
+                            did_change_configuration: did_change_configuration.map(
+                                |dynamic_registration| DidChangeConfigurationClientCapabilities {
+                                    dynamic_registration,
+                                },
+                            ),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                };
+                assert_eq!(
+                    ConstConfig::from(&params).cfg_change_registration,
+                    expected,
+                    "capabilities: {:?}",
+                    params.capabilities
+                );
+            }
+        }
     }
 
     #[test]
