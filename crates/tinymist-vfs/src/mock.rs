@@ -671,6 +671,61 @@ mod tests {
         );
     }
 
+    /// End-to-end smoke test for https://github.com/Myriad-Dreamin/tinymist/pull/2782
+    ///
+    /// Evicting the source cache between edits must not change observable
+    /// behavior: a file read at the current revision survives eviction and
+    /// the next edit still reads correctly. This is a functional smoke test
+    /// only: an implementation that wrongly evicted the shard would also
+    /// pass it (the source would just be parsed from scratch). The
+    /// regression itself (shard's `last_accessed_rev` never being recorded)
+    /// is asserted precisely by `recent_source_survives_eviction_when_revision_advances`
+    /// in `lib.rs`, since the retained-vs-dropped distinction is internal.
+    #[test]
+    fn source_cache_evict_keeps_recent_source_of_active_files() {
+        let workspace = MockWorkspace::default_builder()
+            .file("main.typ", "#let value = [before]\n#value")
+            .build();
+        let mut vfs = workspace.vfs();
+        let main_id = workspace.file_id("main.typ").unwrap();
+
+        // Populate the shard for main.typ.
+        assert_eq!(
+            vfs.source(main_id).unwrap().text(),
+            "#let value = [before]\n#value"
+        );
+
+        // Advance the revision well past any eviction threshold.
+        for text in [
+            "#let value = [v2]",
+            "#let value = [v3]",
+            "#let value = [v4]",
+        ] {
+            workspace
+                .update_source("main.typ", text)
+                .apply_to_vfs(&mut vfs);
+            assert_eq!(vfs.source(main_id).unwrap().text(), text);
+        }
+
+        // The shard is touched at the current revision; eviction with any
+        // threshold must retain it and its recent source.
+        let cache = vfs.clone_source_cache();
+        let revision = vfs.revision();
+        cache.evict(revision, 0);
+        cache.evict(revision, 30);
+
+        let next = workspace.update_source("main.typ", "#let value = [v5]");
+        next.apply_to_vfs(&mut vfs);
+
+        // If the shard was wrongly evicted, the new source is parsed from
+        // scratch instead of replacing the retained recent source.
+        assert_eq!(
+            vfs.source(main_id).unwrap().text(),
+            "#let value = [v5]",
+            "a file read at the current revision must survive eviction"
+        );
+    }
+
     #[test]
     fn vfs_cache_file_operation_matrix_is_explicit() {
         for id in [
