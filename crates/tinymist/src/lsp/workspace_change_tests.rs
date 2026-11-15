@@ -290,6 +290,12 @@ impl LspHarness {
         position_in(&source, needle, occurrence, offset)
     }
 
+    fn enable_focus_changes(&mut self) {
+        self.server.pinning_by_user = false;
+        self.server.config.entry_resolver.entry = None;
+        self.server.config.has_default_entry_path = false;
+    }
+
     fn compile_primary(&mut self) {
         self.server
             .project
@@ -1466,6 +1472,94 @@ fn real_fs_dependency_remove_and_recreate_publishes_diagnostics_without_lsp_fs_c
 
     harness.real_fs_insert(DEP, "#let alpha = 2\n");
     harness.assert_real_fs_diagnostics_empty();
+}
+
+#[test]
+fn changing_to_current_main_file_retains_compiler_state() {
+    // There are two ways the primary/main file can change: explicitly, via the
+    // tinymist.focusMain workspace/executeCommand request or implicitly via
+    // queries that pass the focused file as a parameter. In both cases, we
+    // want to make sure that trying to switch to the current file does not
+    // unnecessarily interrupt the compiler and create a new task.
+    for explicit in [false, true] {
+        let mut harness = LspHarness::new(&[(MAIN, &local_source("alpha"))]);
+        // The server must not have a pinned file or a default entry
+        harness.enable_focus_changes();
+
+        // Obtain an initial latest_success_doc
+        harness.compile_primary();
+        harness.assert_latest_diagnostics_empty();
+        assert_has_latest_success_doc(&harness, true);
+
+        // Introduce an error
+        harness.fs_insert(MAIN, "#let alpha = missing_identifier\n#alpha\n");
+
+        harness.compile_primary();
+        harness.assert_latest_diagnostics_present();
+        assert_has_latest_success_doc(&harness, true);
+
+        // "Switch" focus to the same file
+        if explicit {
+            let path = serde_json::to_value(harness.path(MAIN)).unwrap();
+            let response = harness.server.focus_document(vec![path]);
+            harness.resolve_json(response);
+        } else {
+            harness.semantic_full(MAIN);
+        }
+        harness.drain_project_events();
+
+        harness.compile_primary();
+        harness.assert_latest_diagnostics_present();
+        assert_has_latest_success_doc(&harness, true);
+    }
+}
+
+#[test]
+fn changing_to_different_main_file_forgets_compiler_state() {
+    for explicit in [false, true] {
+        let mut harness = LspHarness::new(&[
+            (MAIN, &local_source("alpha")),
+            (OTHER_DEP, "#let alpha = missing_identifier\n#alpha\n"),
+        ]);
+        harness.enable_focus_changes();
+
+        harness.compile_primary();
+        harness.assert_latest_diagnostics_empty();
+        assert_has_latest_success_doc(&harness, true);
+
+        if explicit {
+            let path = serde_json::to_value(harness.path(OTHER_DEP)).unwrap();
+            let response = harness.server.focus_document(vec![path]);
+            harness.resolve_json(response);
+        } else {
+            harness.semantic_full(OTHER_DEP);
+        }
+
+        harness.drain_project_events();
+
+        harness.compile_primary();
+        harness.assert_latest_diagnostics_present();
+        assert_has_latest_success_doc(&harness, false);
+    }
+}
+
+fn assert_has_latest_success_doc(harness: &LspHarness, expected: bool) {
+    assert_eq!(
+        harness
+            .server
+            .project
+            .compiler
+            .primary
+            .latest_success_doc
+            .is_some(),
+        expected,
+        "{}",
+        if expected {
+            "latest successful document should exist, but it doesn't"
+        } else {
+            "latest successful document should not exist, but it does"
+        }
+    );
 }
 
 fn assert_graph_resolves(harness: &mut LspHarness, rel: &str, symbol: &str, expected_rel: &str) {
