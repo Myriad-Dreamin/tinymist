@@ -71,14 +71,14 @@ aarch64-pc-windows-msvc = "windows-latest"
 
 # Begin: https://github.com/posit-dev/air/blob/d48bad11a28942ad11c19ca97c99d5b6d1c29218/dist-workspace.toml
 [dist.github-custom-runners.x86_64-apple-darwin]
-# Use Intel Mac runner to build Intel binary.
-# This is the dist default but we want to explicitly pin it.
-# The macOS 13 runner image will be retired by December 4th, 2025.
+# macOS 15 runners are ARM-only, so Intel binaries cross-compile from ARM.
+# (The previous pin was macos-14; both macOS 13 and 14 images are retired.)
 runner = "macos-15"
 
 [dist.github-custom-runners.aarch64-apple-darwin]
-# Use ARM Mac runner to build ARM binary (not strictly required, but nice).
+# Native ARM Mac runner to build ARM binary (not strictly required, but nice).
 # dist uses `macos-13` (Intel) by default and cross-compiles to ARM.
+# (The previous pin was macos-14; both macOS 13 and 14 images are retired.)
 runner = "macos-15"
 
 [dist.github-custom-runners.x86_64-unknown-linux-gnu]

@@ -675,10 +675,12 @@ mod tests {
     ///
     /// Evicting the source cache between edits must not change observable
     /// behavior: a file read at the current revision survives eviction and
-    /// the next edit still reads correctly. The regression itself
-    /// (shard's `last_accessed_rev` never being recorded) is asserted
-    /// precisely by `source_records_revision_and_survives_evict` in
-    /// `lib.rs`, since the retained-vs-dropped distinction is internal.
+    /// the next edit still reads correctly. This is a functional smoke test
+    /// only: an implementation that wrongly evicted the shard would also
+    /// pass it (the source would just be parsed from scratch). The
+    /// regression itself (shard's `last_accessed_rev` never being recorded)
+    /// is asserted precisely by `recent_source_survives_eviction_when_revision_advances`
+    /// in `lib.rs`, since the retained-vs-dropped distinction is internal.
     #[test]
     fn source_cache_evict_keeps_recent_source_of_active_files() {
         let workspace = MockWorkspace::default_builder()
