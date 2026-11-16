@@ -1141,6 +1141,9 @@ pub enum FormatterProseWrap {
     Fill,
     /// Place each sentence on its own line.
     Sentence,
+    /// Place each sentence on its own line, and wrap long sentences to the
+    /// line width.
+    FillSentence,
 }
 
 impl FormatterProseWrap {
@@ -1150,6 +1153,7 @@ impl FormatterProseWrap {
             FormatterProseWrap::None => typstyle_core::WrapMode::None,
             FormatterProseWrap::Fill => typstyle_core::WrapMode::Fill,
             FormatterProseWrap::Sentence => typstyle_core::WrapMode::Sentence,
+            FormatterProseWrap::FillSentence => typstyle_core::WrapMode::FillSentence,
         }
     }
 }
@@ -1163,6 +1167,7 @@ impl Serialize for FormatterProseWrap {
             FormatterProseWrap::None => "none",
             FormatterProseWrap::Fill => "fill",
             FormatterProseWrap::Sentence => "sentence",
+            FormatterProseWrap::FillSentence => "fill-sentence",
         })
     }
 }
@@ -1178,7 +1183,9 @@ impl<'de> Deserialize<'de> for FormatterProseWrap {
             type Value = FormatterProseWrap;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("one of \"none\", \"fill\", \"sentence\", or a boolean")
+                formatter.write_str(
+                    "one of \"none\", \"fill\", \"sentence\", \"fill-sentence\", or a boolean",
+                )
             }
 
             fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
@@ -1200,7 +1207,11 @@ impl<'de> Deserialize<'de> for FormatterProseWrap {
                     "none" => Ok(FormatterProseWrap::None),
                     "fill" => Ok(FormatterProseWrap::Fill),
                     "sentence" => Ok(FormatterProseWrap::Sentence),
-                    _ => Err(E::unknown_variant(v, &["none", "fill", "sentence"])),
+                    "fill-sentence" => Ok(FormatterProseWrap::FillSentence),
+                    _ => Err(E::unknown_variant(
+                        v,
+                        &["none", "fill", "sentence", "fill-sentence"],
+                    )),
                 }
             }
         }
