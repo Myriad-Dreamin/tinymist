@@ -811,6 +811,13 @@ pub fn classify_syntax(node: LinkedNode<'_>, cursor: usize) -> Option<SyntaxClas
 
         let dot_target = prev_leaf.and_then(first_ancestor_expr)?;
 
+        // On malformed input like `f(...x)` or `stroke: .`, the field access
+        // fails to parse and the ancestor search escapes to an enclosing call.
+        // The accessed target must end before the dot.
+        if dot_target.range().end > node.offset() {
+            return None;
+        }
+
         if matches!(mode, InterpretMode::Math | InterpretMode::Code) || {
             matches!(mode, InterpretMode::Markup)
                 && (matches!(
