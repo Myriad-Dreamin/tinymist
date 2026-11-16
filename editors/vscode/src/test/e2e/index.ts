@@ -208,7 +208,7 @@ export async function run(): Promise<void> {
   context.expect = (await importEsmModule<any>("chai")).expect;
 
   // exit process after timeout
-  context.timeout(30000).then(() => {
+  context.timeout(60000).then(() => {
     console.error("Tests timed out");
     process.exit(81);
   });

@@ -23,7 +23,7 @@ import {
   TinymistConfig,
 } from "./config";
 import { TinymistStatus, wordCountItemProcess } from "./ui-extends";
-import { previewProcessOutline } from "./features/preview";
+import { previewProcessOutline, updatePreviewTitle } from "./features/preview";
 import { saveStoredViewerWindowState } from "./features/preview-window-state";
 import { l10nMsg } from "./l10n";
 import { wordPattern } from "./language";
@@ -606,6 +606,12 @@ export class LanguageState {
    * {@link _GroupDocumentPreviewFeatureCommands} for more information.
    */
   registerPreviewNotifications(client: LanguageClient) {
+    // Entry reports are task-scoped and independent of compile-status UI notifications.
+    client.onNotification(
+      "tinymist/preview/renderedEntry",
+      ({ taskId, path }: { taskId: string; path: string }) => updatePreviewTitle(taskId, path),
+    );
+
     // (Required) The server requests to dispose (clean up) a preview task when it is no longer
     // needed.
     client.onNotification("tinymist/preview/dispose", ({ taskId }) => {
