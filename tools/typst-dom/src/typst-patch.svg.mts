@@ -138,9 +138,6 @@ function postReplaceNonSVGElements(prev: Element, frozen: FrozenReplacement) {
 /// End of Recursive Svg Patch
 /// Begin of Update to Global Svg Resources
 
-/// the first three elements in the svg patch are common resources used by svg.
-const SVG_HEADER_LENGTH = 3;
-
 function initOrPatchSvgHeader(svg: SVGElement) {
   if (!svg) {
     throw new Error("no initial svg found");
@@ -163,9 +160,8 @@ function initOrPatchSvgHeader(svg: SVGElement) {
   resourceHeader.style.position = "absolute";
 
   /// Move resources
-  for (let i = 0; i < SVG_HEADER_LENGTH; i++) {
-    // move ownership of elements
-    resourceHeader.append(svg.firstElementChild!);
+  while (svg.firstElementChild && !isGElem(svg.firstElementChild)) {
+    resourceHeader.append(svg.firstElementChild);
   }
 
   /// Insert resource header to somewhere visible to the svg element.
@@ -173,10 +169,20 @@ function initOrPatchSvgHeader(svg: SVGElement) {
 }
 
 function patchSvgHeader(prev: SVGElement, next: SVGElement) {
-  for (let i = 0; i < SVG_HEADER_LENGTH; i++) {
-    const prevChild = prev.children[i];
+  while (next.firstElementChild && !isGElem(next.firstElementChild)) {
     const nextChild = next.firstElementChild!;
     nextChild.remove();
+    const prevChild = Array.from(prev.children).find(
+      (child) =>
+        child.tagName === nextChild.tagName &&
+        child.getAttribute("class") === nextChild.getAttribute("class"),
+    );
+
+    if (!prevChild) {
+      const style = Array.from(prev.children).find((child) => child.tagName === "style");
+      prev.insertBefore(nextChild, style || null);
+      continue;
+    }
 
     // console.log("prev", prevChild);
     // console.log("next", nextChild);
@@ -188,6 +194,11 @@ function patchSvgHeader(prev: SVGElement, next: SVGElement) {
         // console.log("clip path: replace");
         // todo: gc
         prevChild.append(...nextChild.children);
+      } else if (prevChild.getAttribute("class") === "image") {
+        const installedIds = new Set(Array.from(prevChild.children, (child) => child.id));
+        prevChild.append(
+          ...Array.from(nextChild.children).filter((child) => !installedIds.has(child.id)),
+        );
       }
     } else if (prevChild.tagName === "style" && nextChild.getAttribute("data-reuse") !== "1") {
       // console.log("replace extra style", prevChild, nextChild);
