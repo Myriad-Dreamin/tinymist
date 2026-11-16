@@ -46,6 +46,12 @@ export function setupDrag() {
     if (elementUnderMouse !== null && elementUnderMouse.classList.contains("tsel")) {
       return;
     }
+    // Do not start a drag on a link: preventing this mousedown would also keep the
+    // click from focusing the preview, and VS Code ignores link clicks coming from a
+    // webview that does not have focus.
+    if (elementUnderMouse?.closest("a")) {
+      return;
+    }
     e.preventDefault();
     containerElement.style.cursor = "grabbing";
     moved = false;
