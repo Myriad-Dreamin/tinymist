@@ -851,6 +851,12 @@
           },
           "default": []
         },
+        "tinymist.preview.autoPin": {
+          "title": "%extension.tinymist.config.tinymist.preview.autoPin.title%",
+          "markdownDescription": "%extension.tinymist.config.tinymist.preview.autoPin.desc%",
+          "type": "boolean",
+          "default": false
+        },
         "tinymist.preview.refresh": {
           "title": "%extension.tinymist.config.tinymist.preview.refresh.title%",
           "markdownDescription": "%extension.tinymist.config.tinymist.preview.refresh.desc%",

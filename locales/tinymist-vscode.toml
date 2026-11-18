@@ -1544,6 +1544,14 @@ zh = "此配置项已被忽略。请改用 `tinymist.fontPaths` 来配置共享�
 en = "Absolute path to a directory or file containing font assets. Use `tinymist.fontPaths` instead."
 zh = "包含字体资产的目录或文件的绝对路径。请改用 `tinymist.fontPaths`。"
 
+[extension.tinymist.config.tinymist.preview.autoPin.title]
+en = "Preview Auto Pin"
+zh = "预览自动固定"
+
+[extension.tinymist.config.tinymist.preview.autoPin.desc]
+en = "Automatically pins the preview when a file is selected in the file explorer."
+zh = "在文件资源管理器中选中文件时，自动固定预览。"
+
 [extension.tinymist.config.tinymist.preview.refresh.title]
 en = "Preview Refresh"
 zh = "预览刷新"
