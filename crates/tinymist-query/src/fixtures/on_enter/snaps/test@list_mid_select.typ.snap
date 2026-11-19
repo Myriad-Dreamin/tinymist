@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/on_enter.rs
+description: On Enter on - first pa|rt an|d second p
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/on_enter/list_mid_select.typ
+---
+[
+ {
+  "newText": "\n  - $0d second part",
+  "range": "2:12:2:30"
+ }
+]

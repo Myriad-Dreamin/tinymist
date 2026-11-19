@@ -1,0 +1,12 @@
+---
+source: crates/tinymist-query/src/on_enter.rs
+description: "On Enter on \n    - mid||dle part a"
+expression: "JsonRepr::new_redacted(result, &REDACT_LOC)"
+input_file: crates/tinymist-query/src/fixtures/on_enter/list_nested_mid.typ
+---
+[
+ {
+  "newText": "\n    - $0dle part and rest",
+  "range": "6:9:6:26"
+ }
+]
