@@ -228,6 +228,15 @@ fn test_help_compile_alias() {
               Specify the path to the lock file. If the path is set, the lockfile will be saved
               (--save-lock)
 
+          --watch
+              Watch the input files and export again on every change, like `typst watch`. Prints
+              `compiled successfully` after each export
+
+          --on-export <COMMAND>
+              Run a command after every successful export in watch mode, with the path of the written
+              file as its last argument and in the environment variable `TINYMIST_OUTPUT`. The command
+              runs through the system shell; a failure is reported but does not stop watching
+
       -h, --help
               Print help (see a summary with '-h')
 
@@ -366,6 +375,15 @@ fn test_help_compile() {
           --lockfile <LOCKFILE>
               Specify the path to the lock file. If the path is set, the lockfile will be saved
               (--save-lock)
+
+          --watch
+              Watch the input files and export again on every change, like `typst watch`. Prints
+              `compiled successfully` after each export
+
+          --on-export <COMMAND>
+              Run a command after every successful export in watch mode, with the path of the written
+              file as its last argument and in the environment variable `TINYMIST_OUTPUT`. The command
+              runs through the system shell; a failure is reported but does not stop watching
 
       -h, --help
               Print help (see a summary with '-h')
@@ -646,6 +664,260 @@ fn test_compile_alias() {
 
         let output = rel_out.join("test_alias.pdf");
         assert!(output.exists(), "output file should exist: {output:?}");
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+/// A running `compile --watch`, killed when the test ends, on failure as well.
+struct WatchProcess {
+    child: std::process::Child,
+    stderr_lines: std::sync::mpsc::Receiver<String>,
+}
+
+impl WatchProcess {
+    fn start(command: &mut std::process::Command) -> Self {
+        use std::io::{BufRead, BufReader};
+        use std::process::Stdio;
+
+        let mut child = command
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("should start the watch process");
+        let stderr = child.stderr.take().expect("stderr should be piped");
+
+        // Status lines arrive on stderr; a thread forwards them so that the
+        // test can wait with a timeout.
+        let (tx, stderr_lines) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                let Ok(line) = line else { break };
+                if tx.send(line).is_err() {
+                    break;
+                }
+            }
+        });
+
+        Self {
+            child,
+            stderr_lines,
+        }
+    }
+
+    /// Returns the next status line, or `None` if none arrives in time.
+    fn next_status(&self, timeout: std::time::Duration) -> Option<String> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            match self.stderr_lines.recv_timeout(left) {
+                Ok(line) if line.starts_with("compiled ") || line.starts_with("export failed") => {
+                    return Some(line);
+                }
+                Ok(_) => continue,
+                Err(_) => return None,
+            }
+        }
+    }
+}
+
+impl Drop for WatchProcess {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
+/// Writes an executable shell script.
+fn write_hook(path: &std::path::Path, script: &str) {
+    std::fs::write(path, script).expect("should write hook");
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
+            .expect("should make hook executable");
+    }
+}
+
+#[test]
+fn test_compile_watch() {
+    use std::time::Duration;
+
+    let cwd = GIT_ROOT.clone();
+    let root = cwd.join("target/e2e/tinymist-cli");
+
+    std::env::set_current_dir(&cwd).expect("should change current directory");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        // A private copy of the book workspace, since the test edits a chapter.
+        let tmp = tmp.clean();
+        let fixture = cwd.join("tests/workspaces/book");
+        let book = tmp.join("workspace");
+        std::fs::create_dir_all(book.join("chapters")).expect("should create workspace");
+        for rel in ["main.typ", "chapters/chapter1.typ", "chapters/chapter2.typ"] {
+            std::fs::copy(fixture.join(rel), book.join(rel)).expect("should copy fixture");
+        }
+        let out = tmp.join("book.pdf");
+
+        // On Unix, a hook script records every export.
+        let exports_log = tmp.join("exports.log");
+        let hook = tmp.join("hook.sh");
+        let mut command = cli();
+        command
+            .arg("compile")
+            .arg("--watch")
+            .arg("--root")
+            .arg(&book)
+            .arg(book.join("main.typ"))
+            .arg(&out);
+        if cfg!(unix) {
+            let script = format!(
+                "#!/bin/sh\nprintf '%s\\n' \"$1\" >> \"{}\"\n",
+                exports_log.display()
+            );
+            write_hook(&hook, &script);
+            command.arg("--on-export").arg(&hook);
+        }
+
+        let watch = WatchProcess::start(&mut command);
+
+        let first_status = watch.next_status(Duration::from_secs(120));
+        assert_eq!(first_status.as_deref(), Some("compiled successfully"));
+        let first = std::fs::read(&out).expect("pdf should exist after the first compilation");
+
+        // Editing a dependency triggers another compilation and export. The
+        // file watches are installed shortly after the first compilation, so
+        // an edit that comes too early is repeated.
+        let chapter = book.join("chapters/chapter2.typ");
+        let mut second_status = None;
+        for _ in 0..6 {
+            let mut text = std::fs::read_to_string(&chapter).expect("should read chapter");
+            text.push_str("\nAppended while watching.\n");
+            std::fs::write(&chapter, text).expect("should edit chapter");
+            second_status = watch.next_status(Duration::from_secs(10));
+            if second_status.is_some() {
+                break;
+            }
+        }
+        assert_eq!(second_status.as_deref(), Some("compiled successfully"));
+        let second = std::fs::read(&out).expect("pdf should exist after the second compilation");
+        assert_ne!(
+            first, second,
+            "the pdf should be exported again with the edited chapter"
+        );
+
+        // A slow compilation can make the loop above edit twice, so this
+        // counts at least two exports.
+        if cfg!(unix) {
+            let log = std::fs::read_to_string(&exports_log).expect("hook should have run");
+            let exports: Vec<&str> = log.lines().collect();
+            assert!(exports.len() >= 2, "hook should run per export: {log}");
+            assert!(
+                exports.iter().all(|path| *path == out.to_str().unwrap()),
+                "hook should get the written file: {log}"
+            );
+        }
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+/// Changes that arrive during an export wait for it, so hooks never overlap.
+#[cfg(unix)]
+#[test]
+fn test_compile_watch_exports_one_at_a_time() {
+    use std::time::Duration;
+
+    let cwd = GIT_ROOT.clone();
+    let root = cwd.join("target/e2e/tinymist-cli");
+
+    std::env::set_current_dir(&cwd).expect("should change current directory");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        let main = tmp.join("main.typ");
+        std::fs::write(&main, "= Heading\n").expect("should write document");
+
+        let exports_log = tmp.join("exports.log");
+        let hook = tmp.join("hook.sh");
+        let log = exports_log.display();
+        let script =
+            format!("#!/bin/sh\necho start >> \"{log}\"\nsleep 1\necho end >> \"{log}\"\n");
+        write_hook(&hook, &script);
+
+        let watch = WatchProcess::start(
+            cli()
+                .arg("compile")
+                .arg("--watch")
+                .arg("--root")
+                .arg(&tmp)
+                .arg(&main)
+                .arg(tmp.join("out.pdf"))
+                .arg("--on-export")
+                .arg(&hook),
+        );
+        let first_status = watch.next_status(Duration::from_secs(120));
+        assert_eq!(first_status.as_deref(), Some("compiled successfully"));
+
+        // Three changes inside the duration of one hook.
+        for _ in 0..3 {
+            let mut text = std::fs::read_to_string(&main).expect("should read document");
+            text.push_str("More text.\n");
+            std::fs::write(&main, text).expect("should edit document");
+            std::thread::sleep(Duration::from_millis(300));
+        }
+        while watch.next_status(Duration::from_secs(3)).is_some() {}
+
+        let log = std::fs::read_to_string(&exports_log).expect("hook should have run");
+        let events: Vec<&str> = log.lines().collect();
+        assert!(events.len() > 2, "changes should export again: {log}");
+        for event in events.chunks(2) {
+            assert_eq!(event, ["start", "end"], "hooks should not overlap: {log}");
+        }
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+/// `--save-lock` records the same project as in a run without `--watch`.
+#[test]
+fn test_compile_watch_saves_lock() {
+    use std::time::Duration;
+
+    let cwd = GIT_ROOT.clone();
+    let root = cwd.join("target/e2e/tinymist-cli");
+
+    std::env::set_current_dir(&cwd).expect("should change current directory");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        std::fs::write(tmp.join("main.typ"), "= Heading\n").expect("should write document");
+        let lock = tmp.join("tinymist.lock");
+
+        let status = cli()
+            .current_dir(&tmp)
+            .args(["compile", "--save-lock", "main.typ", "out.pdf"])
+            .status()
+            .expect("should run compile");
+        assert!(status.success());
+        let one_shot = std::fs::read_to_string(&lock).expect("should write lock file");
+        std::fs::remove_file(&lock).expect("should remove lock file");
+
+        let mut command = cli();
+        command.current_dir(&tmp).args([
+            "compile",
+            "--watch",
+            "--save-lock",
+            "main.typ",
+            "out.pdf",
+        ]);
+        let watch = WatchProcess::start(&mut command);
+        let status = watch.next_status(Duration::from_secs(120));
+        assert_eq!(status.as_deref(), Some("compiled successfully"));
+
+        let watched = std::fs::read_to_string(&lock).expect("should write lock file");
+        assert_eq!(watched, one_shot);
 
         Ok(())
     })

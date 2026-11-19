@@ -62,6 +62,26 @@ tinymist compile --lockfile some/tinymist.lock path/to/main.typ
 
 The lock file feature is in development. It is to help the language server to understand the structure of your projects. See #github-link("/editors/vscode/Configuration.md#tinymistprojectresolution")[Configuration: tinymist.projectResolution].
 
+=== Watching a Document
+
+To compile and export again whenever a file the document depends on changes, add `--watch`:
+
+```bash
+tinymist compile --watch path/to/main.typ
+```
+
+The command runs until it is interrupted and keeps all other options, such as the output format. After each compilation it prints the diagnostics, followed by `compiled successfully` once the export is done, or `compiled with errors` if there is nothing to export. Both go to stderr. While the document has errors, the previous output stays in place.
+
+To run a command after each export, for example to tell a PDF viewer to reload, add `--on-export`:
+
+```bash
+tinymist compile --watch --on-export ./reload-viewer path/to/main.typ
+```
+
+The command runs through the system shell, once per written file, with the absolute path of the file as its last argument and in the environment variable `TINYMIST_OUTPUT`. `compiled successfully` is printed after it returns. If the command fails, the error is printed and watching continues.
+
+Exports run one at a time. When a document changes faster than it can be exported, the intermediate versions are skipped.
+
 == Running Tests
 
 To run tests, you can use the `test` command, which is also compatible with `typst compile`:
