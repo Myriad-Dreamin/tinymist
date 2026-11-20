@@ -22,7 +22,7 @@ Typst's `PagedDocument` holds, per page, a `Frame` of items. `FrameItem::Text` c
 
 ### 1. Emit a subset of pdfTeX's file layout, with scaled points from the top-left page corner
 
-The generator writes the header (`SyncTeX Version:1`, `Input:` lines, `Output:pdf`, `Magnification:1000`, `Unit:1`, offsets 0), then per page `{n`, one page-sized vbox `[`…`]`, one hbox `(`…`)` per text run, `}n`, and the postamble with the number of box records. Lengths are scaled points, `pt × 72.27 / 72 × 65536`, measured from the top-left corner with y downwards; this is what pdfTeX writes with zero offsets, so the parser's unit conversion applies unchanged.
+The generator writes the header (`SyncTeX Version:1`, `Input:` lines, `Output:pdf`, `Magnification:1000`, `Unit:1`, offsets 0), then per page `{n`, one page-sized vbox `[`…`]`, one hbox `(`…`)` per text run, `}n`, and the postamble with the number of box records. Lengths are scaled points, `pt × 72.27 / 72 × 65536`, measured from the top-left corner with y downwards; this is what pdfTeX writes with zero offsets, so the parser's unit conversion applies unchanged. A page with a bleed is larger in the PDF than its frame, with the frame shifted by the left and top bleed; the generator uses the same page size and shift as `typst-pdf`.
 
 pdfTeX writes more: `!` byte-offset anchors, which only speed up reading, records for glue, kerns and math, and a `Count` of all records. The generator writes none of these; `synctex_parser` does not need the anchors and does not check the count. A page without text runs gets `{n` and `}n` and no vbox, since any tag and line would be invented; the parser accepts this, finds nothing on that page, and keeps the page numbering of the pages after it.
 

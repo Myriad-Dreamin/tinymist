@@ -18,6 +18,7 @@
 - [x] 2.8 Write no vbox for a page without runs.
 - [x] 2.9 Index each file's spans in one traversal of its syntax tree.
 - [x] 2.10 Cut each run's box to the clips around it and drop runs clipped away entirely.
+- [x] 2.11 Include the page's bleed in the page box and shift the records by it, as `typst-pdf` does.
 
 ## 3. Export
 
@@ -34,6 +35,7 @@
 - [x] 4.7 Add e2e tests for generated text, scaled and rotated boxes, pages without text, and a failing SyncTeX write.
 - [x] 4.8 Compare `--synctex` and plain compile times on a flat file of 1200, 2400 and 4800 paragraphs.
 - [x] 4.9 Add an e2e test for wholly, partly and nested clipped text, and compare compile times on files with eight inline equations per paragraph.
+- [x] 4.10 Add an e2e test for a page with a bleed.
 
 ## 5. Documentation
 

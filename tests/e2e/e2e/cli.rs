@@ -914,6 +914,29 @@ fn test_compile_synctex_clipped_text() {
 }
 
 #[test]
+fn test_compile_synctex_bleed() {
+    // The PDF page includes the bleed, and the page content starts after the
+    // left and top bleed; the records must match.
+    const SOURCE: &str = "\
+#set page(width: 150pt, height: 150pt, margin: 10pt, bleed: (top: 24pt, left: 16pt))
+First paragraph.
+";
+    let text = compile_synctex(&[("main.typ", SOURCE)]);
+    let (width, height) = (sp(150.0 + 16.0), sp(150.0 + 24.0));
+    assert!(
+        text.contains(&format!("\n[1,2:0,{height}:{width},{height},0\n")),
+        "page box with bleed: {text}"
+    );
+
+    let hboxes = hboxes_by_page(&text).remove(0);
+    let [hbox] = &hboxes[..] else {
+        panic!("one record: {hboxes:?}");
+    };
+    assert_eq!(hbox.x, sp(16.0 + 10.0), "{hbox:?}");
+    assert!(hbox.y > sp(24.0 + 10.0), "{hbox:?}");
+}
+
+#[test]
 fn test_compile_synctex_only_for_correct_output() {
     let root = GIT_ROOT.join("target/e2e/tinymist-cli");
     tinymist_std::fs::paths::temp_dir_in(root, |tmp| {

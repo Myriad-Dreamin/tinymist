@@ -68,6 +68,7 @@ use typst::introspection::{Location, Tag};
 use typst::layout::{Abs, Frame, FrameItem, Point, Rect, Transform};
 use typst::model::OutlineEntry;
 use typst::syntax::{FileId, LinkedNode, Source, Span, SyntaxKind};
+use typst_layout::Page;
 
 /// Scaled points per PostScript point: 65536 sp per TeX point, 72.27 TeX
 /// points per 72 PostScript points.
@@ -89,7 +90,7 @@ pub fn synctex_gz<F: CompilerFeat>(
     };
 
     for (idx, page) in doc.pages().iter().enumerate() {
-        writer.page(idx + 1, &page.frame);
+        writer.page(idx + 1, page);
     }
 
     let mut out = String::new();
@@ -203,9 +204,13 @@ fn intersect(rect: Rect, clip: Option<Rect>) -> Option<Rect> {
 }
 
 impl<F: CompilerFeat> SyncTexGen<'_, F> {
-    fn page(&mut self, number: usize, frame: &Frame) {
+    fn page(&mut self, number: usize, page: &Page) {
+        // The PDF page includes the bleed, with the frame inside it, as in
+        // `typst-pdf`.
+        let bleed = page.bleed;
+        let ts = Transform::translate(bleed.left, bleed.top);
         let mut runs = Vec::new();
-        self.collect(frame, Transform::identity(), None, &mut runs);
+        self.collect(&page.frame, ts, None, &mut runs);
 
         let _ = writeln!(self.content, "{{{number}");
 
@@ -214,8 +219,8 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
         // would be invented; the reader then finds nothing there.
         if let Some(first) = runs.first() {
             let (tag, line) = (first.tag, first.line);
-            let w = sp(frame.width());
-            let h = sp(frame.height());
+            let w = sp(page.frame.width() + bleed.left + bleed.right);
+            let h = sp(page.frame.height() + bleed.top + bleed.bottom);
             let _ = writeln!(self.content, "[{tag},{line}:0,{h}:{w},{h},0");
             self.records += 1;
 

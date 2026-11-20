@@ -34,7 +34,7 @@
 - **THEN** the command fails and writes no SyncTeX file
 
 ### Requirement: SyncTeX records map text runs to source lines
-Every run of text with a source in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the run's box on the page as position and extent, in scaled points measured from the top-left corner of the page. Text that code generates SHALL map to the line where the syntax node of its span starts: the call for the output of `#lorem(80)`, the function's body for content that a function returns. A record's box SHALL be cut to the bounding box of the clips around the run, and a run clipped away entirely SHALL have no record.
+Every run of text with a source in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the run's box on the page as position and extent, in scaled points measured from the top-left corner of the PDF page, which includes the page's bleed. Text that code generates SHALL map to the line where the syntax node of its span starts: the call for the output of `#lorem(80)`, the function's body for content that a function returns. A record's box SHALL be cut to the bounding box of the clips around the run, and a run clipped away entirely SHALL have no record.
 
 #### Scenario: Forward search for a body line
 - **GIVEN** a document whose chapter file `kapitel/a.typ` has prose on line 81 that is typeset on page 9
@@ -68,6 +68,11 @@ Every run of text with a source in the paged document SHALL appear as an hbox re
 #### Scenario: Text without a source
 - **GIVEN** text whose span is detached, such as the rendered text of a reference
 - **THEN** it has no record
+
+#### Scenario: Page with bleed
+- **GIVEN** a page with a bleed
+- **THEN** its page box has the size of the PDF page, bleed included
+- **AND** its records are shifted by the left and top bleed, as the page content in the PDF
 
 #### Scenario: Page without text
 - **GIVEN** a page that contains only shapes, followed by a page with text
