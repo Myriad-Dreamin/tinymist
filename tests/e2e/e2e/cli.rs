@@ -656,6 +656,21 @@ fn test_compile_alias() {
 #[cfg(unix)]
 #[test]
 fn test_generate_script() {
+    // A dot in the file stem must survive the round trip through the lock.
+    check_generate_script("out/doc.v2.pdf", &[]);
+}
+
+/// The script keeps a non-default `--ppi`.
+#[cfg(unix)]
+#[test]
+fn test_generate_script_ppi() {
+    check_generate_script("out/doc.png", &["--ppi", "72"]);
+}
+
+/// Compiles `main.typ` to `output` with `--save-lock` and `args`, then checks
+/// that the generated script recreates `output` and leaves the lock unchanged.
+#[cfg(unix)]
+fn check_generate_script(output: &str, args: &[&str]) {
     use std::{path::Path, process::Command};
 
     use crate::artifact::CLI;
@@ -673,12 +688,13 @@ fn test_generate_script() {
         };
         let read = |path: &Path| std::fs::read_to_string(path).expect("should read");
 
-        // A dot in the file stem must survive the round trip through the lock.
-        let output = tmp.join("out/doc.v2.pdf");
         let lock = tmp.join("tinymist.lock");
 
         std::fs::write(tmp.join("main.typ"), "Hello\n").expect("should write input");
-        run(cli().args(["compile", "--save-lock", "main.typ", "out/doc.v2.pdf"]));
+        run(cli()
+            .args(["compile", "--save-lock", "main.typ", output])
+            .args(args));
+        let output = tmp.join(output);
         assert!(output.exists(), "output file should exist: {output:?}");
         let lock_before = read(&lock);
 

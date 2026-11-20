@@ -198,8 +198,10 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             ProjectTask::ExportBundle(..) => {
                 cmd.push("--format=bundle");
             }
-            ProjectTask::ExportPng(..) => {
+            ProjectTask::ExportPng(task) => {
                 cmd.push("--format=png");
+                cmd.push("--ppi");
+                cmd.push(task.ppi.to_f32().to_string());
             }
             // `compile` has no `--format` for these.
             ProjectTask::ExportSvgHtml(..)
