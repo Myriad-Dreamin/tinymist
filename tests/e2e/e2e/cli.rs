@@ -651,3 +651,55 @@ fn test_compile_alias() {
     })
     .expect("test should succeed");
 }
+
+/// The script from `generate-script` reruns the tasks in `tinymist.lock`.
+#[cfg(unix)]
+#[test]
+fn test_generate_script() {
+    use std::{path::Path, process::Command};
+
+    use crate::artifact::CLI;
+
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let run = |cmd: &mut Command| {
+            let out = cmd.current_dir(tmp).output().expect("should spawn");
+            assert!(
+                out.status.success(),
+                "{cmd:?} failed:\n{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        };
+        let read = |path: &Path| std::fs::read_to_string(path).expect("should read");
+
+        // A dot in the file stem must survive the round trip through the lock.
+        let output = tmp.join("out/doc.v2.pdf");
+        let lock = tmp.join("tinymist.lock");
+
+        std::fs::write(tmp.join("main.typ"), "Hello\n").expect("should write input");
+        run(cli().args(["compile", "--save-lock", "main.typ", "out/doc.v2.pdf"]));
+        assert!(output.exists(), "output file should exist: {output:?}");
+        let lock_before = read(&lock);
+
+        run(cli().args(["generate-script", "bash"]));
+        std::fs::remove_file(&output).expect("should remove output");
+
+        // The script calls `tinymist` from `PATH`.
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let dirs = std::iter::once(CLI.parent().expect("cli has a parent").to_path_buf())
+            .chain(std::env::split_paths(&path));
+        let path = std::env::join_paths(dirs).expect("should join PATH");
+        run(Command::new("bash").arg("build.sh").env("PATH", path));
+
+        assert!(output.exists(), "build.sh should recreate {output:?}");
+        assert_eq!(
+            read(&lock),
+            lock_before,
+            "build.sh should not change the lock"
+        );
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
