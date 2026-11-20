@@ -364,7 +364,7 @@ async fn export_docs_bundle(ctx: &PackageDocsContext) -> Result<()> {
         creation_timestamp: ctx.args.compile.creation_timestamp,
         ppi: Scalar::try_from(ctx.args.compile.png.ppi).context("cannot convert ppi")?,
     });
-    ExportTask::do_export(task, artifact, None).await?;
+    ExportTask::do_export(task, artifact).await?;
     Ok(())
 }
 

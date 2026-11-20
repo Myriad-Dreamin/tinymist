@@ -5,7 +5,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, OnceLock};
 use std::{ops::DerefMut, pin::Pin};
 
-use reflexo::ImmutPath;
 use reflexo_typst::{
     Bytes, CompilationTask, CompileSnapshot, ExportComputation, ShadowApi, WorldComputeGraph,
 };
@@ -39,8 +38,8 @@ use rayon::Scope;
 use super::SyncTaskFactory;
 use crate::lsp::query::QueryFuture;
 use crate::project::{
-    update_lock, ApplyProjectTask, CompiledArtifact, DevEvent, DevExportEvent, EntryReader,
-    ExportHtmlTask, ExportPdfTask, ExportTask as ProjectExportTask, ExportTeXTask, ExportTextTask,
+    update_lock, CompiledArtifact, DevEvent, DevExportEvent, EntryReader, ExportHtmlTask,
+    ExportPdfTask, ExportTask as ProjectExportTask, ExportTeXTask, ExportTextTask,
     LspCompiledArtifact, LspComputeGraph, ProjectClient, ProjectTask, TaskWhen,
     PROJECT_ROUTE_USER_ACTION_PRIORITY,
 };
@@ -171,7 +170,7 @@ impl ServerState {
 
         let res = if write {
             // Export to file and return path
-            ExportTask::do_export(task, artifact, None)
+            ExportTask::do_export(task, artifact)
                 .await
                 .map_err(internal_error)?
         } else {
@@ -308,7 +307,7 @@ impl ExportTask {
             let task = config.task.clone();
             let artifact = artifact.clone();
             Box::pin(async move {
-                log_err(Self::do_export(task, artifact, None).await);
+                log_err(Self::do_export(task, artifact).await);
                 if let Some(f) = export_hook {
                     f()
                 }
@@ -461,7 +460,6 @@ impl ExportTask {
     pub async fn do_export(
         task: ProjectTask,
         artifact: LspCompiledArtifact,
-        lock_dir: Option<ImmutPath>,
     ) -> Result<Option<OnExportResponse>> {
         let CompiledArtifact { graph, .. } = &artifact;
 
@@ -473,7 +471,7 @@ impl ExportTask {
         let export_id = EXPORT_ID.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
         log::debug!(
-            "ExportTask({export_id},lock={lock_dir:?}): exporting {entry:?} to {write_to:?}",
+            "ExportTask({export_id}): exporting {entry:?} to {write_to:?}",
             entry = graph.snap.world.entry_state()
         );
         if let Some(e) = write_to.parent() {
@@ -481,24 +479,6 @@ impl ExportTask {
                 std::fs::create_dir_all(e).context("failed to create directory")?;
             }
         }
-
-        let _: Option<()> = lock_dir.and_then(|lock_dir| {
-            let mut updater = crate::project::update_lock(lock_dir.clone());
-            let root = graph.world().entry_state().root()?;
-
-            let doc_id = updater.compiled(graph.world(), (&root, &lock_dir))?;
-
-            updater.task(ApplyProjectTask {
-                id: doc_id.clone(),
-                document: doc_id.clone(),
-                task: task.clone(),
-            });
-            updater.update_materials(doc_id.clone(), graph.world().depended_fs_paths());
-            updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
-            updater.commit();
-
-            Some(())
-        });
 
         // Generate the data using common logic
         let artifact = Self::do_export_bytes(task.clone(), artifact, export_id).await?;
