@@ -62,6 +62,12 @@ tinymist compile --lockfile some/tinymist.lock path/to/main.typ
 
 The lock file feature is in development. It is to help the language server to understand the structure of your projects. See #github-link("/editors/vscode/Configuration.md#tinymistprojectresolution")[Configuration: tinymist.projectResolution].
 
+To write a SyncTeX file next to the PDF, so that PDF viewers can jump between the PDF and its source lines (see #cross-link("/feature/preview.typ", [Preview Feature])):
+
+```bash
+tinymist compile --synctex path/to/main.typ
+```
+
 == Running Tests
 
 To run tests, you can use the `test` command, which is also compatible with `typst compile`:

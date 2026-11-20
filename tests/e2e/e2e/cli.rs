@@ -1,3 +1,6 @@
+use std::io::Read;
+use std::path::Path;
+
 use tinymist_std::path::PathClean;
 
 use crate::artifact::{cli, GIT_ROOT};
@@ -215,6 +218,10 @@ fn test_help_compile_alias() {
               written to provide a baseline of accessibility. In some circumstances (for example when
               trying to reduce the size of a document) it can be desirable to disable tagged PDF
 
+          --synctex
+              Write a `.synctex.gz` file next to the PDF, mapping PDF positions to source lines for
+              viewers such as Skim or Okular. Only for PDF output of all pages
+
           --ppi <PPI>
               Specify the PPI (pixels per inch) to use for PNG export
               
@@ -353,6 +360,10 @@ fn test_help_compile() {
               By default, even when not producing a `PDF/UA-1` document, a tagged PDF document is
               written to provide a baseline of accessibility. In some circumstances (for example when
               trying to reduce the size of a document) it can be desirable to disable tagged PDF
+
+          --synctex
+              Write a `.synctex.gz` file next to the PDF, mapping PDF positions to source lines for
+              viewers such as Skim or Okular. Only for PDF output of all pages
 
           --ppi <PPI>
               Specify the PPI (pixels per inch) to use for PNG export
@@ -646,6 +657,442 @@ fn test_compile_alias() {
 
         let output = rel_out.join("test_alias.pdf");
         assert!(output.exists(), "output file should exist: {output:?}");
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+/// Reads a SyncTeX file, which is gzip-compressed text.
+fn read_synctex(path: &Path) -> String {
+    let file = std::fs::File::open(path).expect("synctex file should exist");
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(file)
+        .read_to_string(&mut text)
+        .expect("synctex file should be gzip-compressed text");
+    text
+}
+
+/// Scaled points, the unit of SyncTeX coordinates.
+fn sp(pt: f64) -> i64 {
+    (pt * 65536.0 * 72.27 / 72.0).round() as i64
+}
+
+/// An hbox record `(tag,line:x,y:width,height,depth`.
+#[derive(Debug)]
+struct HBox {
+    line: usize,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    depth: i64,
+}
+
+fn hbox(record: &str) -> HBox {
+    let (_, rest) = record.split_once(',').expect("record should have a tag");
+    let mut fields = rest.split([':', ',']);
+    let mut field = || fields.next().expect("record should have all fields");
+    HBox {
+        line: field().parse().expect("line"),
+        x: field().parse().expect("x"),
+        y: field().parse().expect("y"),
+        width: field().parse().expect("width"),
+        height: field().parse().expect("height"),
+        depth: field().parse().expect("depth"),
+    }
+}
+
+/// The hbox records of each page.
+fn hboxes_by_page(text: &str) -> Vec<Vec<HBox>> {
+    let mut pages = Vec::new();
+    for line in text.lines() {
+        if line.starts_with('{') {
+            pages.push(Vec::new());
+        } else if line.starts_with('(') {
+            pages
+                .last_mut()
+                .expect("hbox inside a page")
+                .push(hbox(line));
+        }
+    }
+    pages
+}
+
+/// Compiles `main.typ`, with the given extra files, to a PDF with a SyncTeX
+/// file, and returns that file's text.
+fn compile_synctex(files: &[(&str, &str)]) -> String {
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+    let mut text = String::new();
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        for (name, content) in files {
+            std::fs::write(tmp.join(name), content).expect("should write the source");
+        }
+
+        let out = tmp.join("main.pdf");
+        let status = cli()
+            .arg("compile")
+            .arg("--synctex")
+            .arg(tmp.join("main.typ"))
+            .arg(&out)
+            .status();
+        assert!(status.expect("should run").success());
+
+        text = read_synctex(&out.with_extension("synctex.gz"));
+        Ok(())
+    })
+    .expect("test should succeed");
+    text
+}
+
+#[test]
+fn test_compile_synctex_records() {
+    const SOURCE: &str = "\
+#set page(width: 300pt, height: 300pt, margin: 0pt)
+#outline()
+
+= Alpha
+
+first source line
+second source line
+
+#place(top + left, dx: 100pt, dy: 200pt, scale(200%, origin: top + left)[Scaled])
+#place(top + left, dx: 0pt, dy: 250pt)[Scaled]
+#place(top + left, dx: 250pt, dy: 20pt, rotate(90deg, origin: top + left)[Rotated text])
+";
+    const HEADING: usize = 4;
+    const FIRST: usize = 6;
+    const SECOND: usize = 7;
+    const SCALED: usize = 9;
+    const UNSCALED: usize = 10;
+    const ROTATED: usize = 11;
+
+    let text = compile_synctex(&[("main.typ", SOURCE)]);
+    let hboxes = text
+        .lines()
+        .filter(|l| l.starts_with('('))
+        .map(hbox)
+        .collect::<Vec<_>>();
+    let on_line = |line| hboxes.iter().filter(|h| h.line == line).collect::<Vec<_>>();
+    let only = |line| match on_line(line)[..] {
+        [hbox] => hbox,
+        _ => panic!("one record on line {line}: {hboxes:?}"),
+    };
+
+    // The outline renders "Alpha" as well, with the heading's span.
+    only(HEADING);
+
+    // One typeset line from two source lines gives one record per source line.
+    let (first, second) = (only(FIRST), only(SECOND));
+    assert_eq!(first.y, second.y, "both on the same typeset line");
+    assert!(first.x < second.x, "second source line further right");
+
+    // The scaled text sits at the place offset, not at the origin of its group,
+    // and its box is scaled as well.
+    let (scaled, unscaled) = (only(SCALED), only(UNSCALED));
+    assert_eq!(scaled.x, sp(100.0));
+    assert!(scaled.y > sp(200.0), "baseline below the place offset");
+    for (big, small) in [
+        (scaled.width, unscaled.width),
+        (scaled.height, unscaled.height),
+    ] {
+        assert!(
+            (big - 2 * small).abs() <= 2,
+            "scaled twice: {scaled:?} {unscaled:?}"
+        );
+    }
+
+    // Text turned upright gives a box taller than wide.
+    let rotated = only(ROTATED);
+    assert!(
+        rotated.width < rotated.height + rotated.depth,
+        "{rotated:?}"
+    );
+}
+
+#[test]
+fn test_compile_synctex_generated_text() {
+    // Text that an expression generates maps to the expression, not to the
+    // source after it. The reference on page 2 renders with detached spans, so
+    // that page has no record.
+    const SOURCE: &str = "\
+#set page(width: 300pt, height: 300pt, margin: 10pt)
+#(\"ABCDEFGHIJ\" * 10)
+
+// comment a
+// comment b
+
+#lorem(80)
+
+#set heading(numbering: \"1.\")
+= Alpha <a>
+#pagebreak()
+@a
+";
+    const GENERATED: usize = 2;
+    const LOREM: usize = 7;
+    const HEADING: usize = 10;
+
+    let pages = hboxes_by_page(&compile_synctex(&[("main.typ", SOURCE)]));
+    assert_eq!(pages.len(), 2, "{pages:?}");
+    for hbox in pages.iter().flatten() {
+        assert!(
+            [GENERATED, LOREM, HEADING].contains(&hbox.line),
+            "no record on other lines: {pages:?}"
+        );
+    }
+
+    // Every typeset line of the paragraph has a record, up to the last.
+    let mut lorem_lines = pages[0]
+        .iter()
+        .filter(|hbox| hbox.line == LOREM)
+        .map(|hbox| hbox.y)
+        .collect::<Vec<_>>();
+    lorem_lines.dedup();
+    assert!(
+        lorem_lines.len() >= 4,
+        "lorem covers several lines: {pages:?}"
+    );
+
+    assert!(
+        pages[0].iter().any(|hbox| hbox.line == GENERATED),
+        "{pages:?}"
+    );
+    assert!(pages[1].is_empty(), "{pages:?}");
+}
+
+#[test]
+fn test_compile_synctex_unmapped_pages() {
+    // A page without text has no box, rather than one with an invented
+    // location; later pages keep theirs.
+    let text = compile_synctex(&[
+        (
+            "main.typ",
+            "#rect()\n#pagebreak()\n#include \"chapter.typ\"\n",
+        ),
+        ("chapter.typ", "Chapter first line\n"),
+    ]);
+    assert!(text.contains("\n{1\n}1\n{2\n[1,1:"), "{text}");
+    assert_eq!(hboxes_by_page(&text)[1].len(), 1, "{text}");
+
+    let text = compile_synctex(&[("main.typ", "#rect()\n")]);
+    assert!(!text.contains("Input:"), "{text}");
+    assert!(text.contains("\nContent:\n{1\n}1\nPostamble:\n"), "{text}");
+}
+
+#[test]
+fn test_compile_synctex_clipped_text() {
+    // Clipped text keeps only its visible part: wholly hidden text has no
+    // record, and partly hidden text a box within the clip. Nested clips
+    // intersect: the inner one alone would show the whole word.
+    const SOURCE: &str = "\
+#set page(width: 300pt, height: 300pt, margin: 0pt)
+#place(top + left, dx: 65pt, dy: 20pt)[The visible line is here.]
+#place(top + left, dx: 0pt, dy: 20pt, box(width: 12pt, height: 20pt, clip: true)[#place(top + left, dx: 80pt)[Hidden]])
+#place(top + left, dx: 10pt, dy: 100pt, box(width: 20pt, height: 20pt, clip: true)[Partlyhidden])
+#place(top + left, dx: 10pt, dy: 150pt, box(width: 20pt, height: 20pt, clip: true, box(width: 200pt, height: 20pt, clip: true)[Nestedpartlyhidden]))
+";
+    const VISIBLE: usize = 2;
+    const HIDDEN: usize = 3;
+    const PARTLY: usize = 4;
+    const NESTED: usize = 5;
+
+    let text = compile_synctex(&[("main.typ", SOURCE)]);
+    let hboxes = hboxes_by_page(&text).remove(0);
+    let on_line = |line| hboxes.iter().filter(|h| h.line == line).collect::<Vec<_>>();
+
+    assert_eq!(on_line(VISIBLE).len(), 1, "{hboxes:?}");
+    assert!(on_line(HIDDEN).is_empty(), "{hboxes:?}");
+    for (line, x) in [(PARTLY, 10.0), (NESTED, 10.0)] {
+        let [hbox] = on_line(line)[..] else {
+            panic!("one record on line {line}: {hboxes:?}");
+        };
+        assert_eq!(hbox.x, sp(x), "{hbox:?}");
+        assert!(hbox.width <= sp(20.0), "within the clip: {hbox:?}");
+    }
+}
+
+#[test]
+fn test_compile_synctex_bleed() {
+    // The PDF page includes the bleed, and the page content starts after the
+    // left and top bleed; the records must match.
+    const SOURCE: &str = "\
+#set page(width: 150pt, height: 150pt, margin: 10pt, bleed: (top: 24pt, left: 16pt))
+First paragraph.
+";
+    let text = compile_synctex(&[("main.typ", SOURCE)]);
+    let (width, height) = (sp(150.0 + 16.0), sp(150.0 + 24.0));
+    assert!(
+        text.contains(&format!("\n[1,2:0,{height}:{width},{height},0\n")),
+        "page box with bleed: {text}"
+    );
+
+    let hboxes = hboxes_by_page(&text).remove(0);
+    let [hbox] = &hboxes[..] else {
+        panic!("one record: {hboxes:?}");
+    };
+    assert_eq!(hbox.x, sp(16.0 + 10.0), "{hbox:?}");
+    assert!(hbox.y > sp(24.0 + 10.0), "{hbox:?}");
+}
+
+#[test]
+fn test_compile_synctex_only_for_correct_output() {
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        let input = tmp.join("main.typ");
+        std::fs::write(&input, "Hello\n").expect("should write the source");
+
+        let synctex_of = |name: &str| tmp.join(name).with_extension("synctex.gz");
+        let compile = |args: &[&str], name: &str| {
+            let status = cli()
+                .arg("compile")
+                .args(args)
+                .arg(&input)
+                .arg(tmp.join(name))
+                .status();
+            status.expect("should run").success()
+        };
+
+        assert!(compile(&[], "plain.pdf"));
+        assert!(
+            !synctex_of("plain.pdf").exists(),
+            "no file without the flag"
+        );
+
+        // Neither output can have a correct SyncTeX file, so they must not
+        // silently go without one or get a wrong one.
+        assert!(!compile(&["--synctex"], "image.png"));
+        assert!(!synctex_of("image.png").exists());
+        assert!(!compile(&["--synctex", "--pages", "1"], "subset.pdf"));
+        assert!(!synctex_of("subset.pdf").exists());
+
+        std::fs::write(&input, "#panic()\n").expect("should write the source");
+        assert!(!compile(&["--synctex"], "broken.pdf"));
+        assert!(
+            !synctex_of("broken.pdf").exists(),
+            "no file for a failed compilation"
+        );
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+#[test]
+fn test_compile_synctex_failure_keeps_pdf() {
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        let (input, out) = (tmp.join("main.typ"), tmp.join("main.pdf"));
+        let synctex = out.with_extension("synctex.gz");
+        let compile = || {
+            let status = cli()
+                .arg("compile")
+                .arg("--synctex")
+                .arg(&input)
+                .arg(&out)
+                .status();
+            status.expect("should run").success()
+        };
+
+        std::fs::write(&input, "Old\n").expect("should write the source");
+        assert!(compile());
+        let old = std::fs::read(&out).expect("pdf should exist");
+
+        // A directory in the way of the SyncTeX file makes the export fail,
+        // and the PDF must not get ahead of its SyncTeX file.
+        std::fs::write(&input, "New\n").expect("should write the source");
+        std::fs::remove_file(&synctex).expect("should remove the synctex file");
+        std::fs::create_dir(&synctex).expect("should create the directory");
+        assert!(!compile());
+        let new = std::fs::read(&out).expect("pdf should exist");
+        assert!(new == old, "the old pdf should be kept");
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+#[test]
+fn test_generate_script_keeps_synctex() {
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let tmp = tmp.clean();
+        std::fs::write(tmp.join("main.typ"), "Hello\n").expect("should write the source");
+
+        let run = |args: &[&str]| cli().current_dir(&tmp).args(args).status();
+        let compile = run(&["compile", "--save-lock", "--synctex", "main.typ"]);
+        assert!(compile.expect("should run").success());
+        assert!(run(&["generate-script", "bash"])
+            .expect("should run")
+            .success());
+
+        let script = std::fs::read_to_string(tmp.join("build.sh")).expect("script should exist");
+        assert!(
+            script.contains("--synctex"),
+            "script should keep the flag: {script}"
+        );
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
+
+#[test]
+fn test_compile_synctex() {
+    const INPUT_REL: &str = "tests/workspaces/book/main.typ";
+
+    let cwd = GIT_ROOT.clone();
+    let root = cwd.join("target/e2e/tinymist-cli");
+
+    std::env::set_current_dir(&cwd).expect("should change current directory");
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let out = tmp.clean().join("book.pdf");
+
+        insta_cmd::assert_cmd_snapshot!(cli().arg("compile").arg("--synctex").arg(INPUT_REL).arg(&out), @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        ");
+        assert!(out.exists(), "pdf should exist: {out:?}");
+
+        let text = read_synctex(&out.with_extension("synctex.gz"));
+
+        // The header names every file that contributed text, with absolute
+        // paths; main.typ only includes the chapters and has no text of its own.
+        let header = text
+            .lines()
+            .take_while(|line| !line.starts_with("Content:"))
+            .collect::<Vec<_>>()
+            .join("\n")
+            .replace(&*cwd.to_string_lossy(), "<root>")
+            .replace('\\', "/");
+        insta::assert_snapshot!(header, @"
+        SyncTeX Version:1
+        Input:1:<root>/tests/workspaces/book/chapters/chapter1.typ
+        Input:2:<root>/tests/workspaces/book/chapters/chapter2.typ
+        Output:pdf
+        Magnification:1000
+        Unit:1
+        X Offset:0
+        Y Offset:0
+        ");
+
+        // One page block with a page box and one hbox per text run; the
+        // heading of chapter 1 is on line 2 of its file, the lorem text on
+        // line 4.
+        assert!(text.contains("\n{1\n[1,2:"), "page 1 should start with the page box");
+        assert!(text.contains("\n}1\n"), "page 1 should be closed");
+        let hboxes = text.lines().filter(|line| line.starts_with('(')).collect::<Vec<_>>();
+        assert!(hboxes.len() >= 4, "expected text runs for two headings and two paragraphs, got {hboxes:?}");
+        assert!(hboxes.iter().any(|line| line.starts_with("(1,2:")), "heading of chapter 1 on line 2");
+        assert!(hboxes.iter().any(|line| line.starts_with("(1,4:")), "text of chapter 1 on line 4");
+        assert!(hboxes.iter().any(|line| line.starts_with("(2,2:")), "heading of chapter 2 on line 2");
+        assert!(text.contains("\nPostamble:\nCount:"), "postamble should carry a record count");
 
         Ok(())
     })

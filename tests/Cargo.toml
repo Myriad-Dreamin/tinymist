@@ -15,4 +15,5 @@ serde.workspace = true
 serde_json.workspace = true
 tinymist-std = { workspace = true, features = ["system"] }
 insta.workspace = true
+flate2.workspace = true
 insta-cmd.workspace = true

@@ -46,6 +46,20 @@ return {
   ```
 ]
 
+== Jumping between PDF and Source with SyncTeX
+
+SyncTeX is how LaTeX editors and PDF viewers link a PDF to its sources. The following command also writes `main.synctex.gz` next to `main.pdf`:
+
+```bash
+tinymist compile --synctex path/to/main.typ
+```
+
+Viewers such as Evince, Okular, Skim, SumatraPDF and Zathura use this file to show the PDF position of an editor line (forward search) and to open the source line of a clicked point (backward search). Set them up as for LaTeX. For example, Skim's `displayline` tool runs forward search, and its Sync preferences name the editor for backward search.
+
+Compared to the web preview, this shows the final PDF in a viewer of your choice and needs no language server, so it works with any editor that can run a command. In exchange, it jumps by line instead of by position, covers only text, and exports the whole PDF on each compilation. Generated text jumps to the source that Typst attributes it to: the output of `#lorem(50)` to the call, the content that a function such as `#let note() = [Note]` returns to the function's body. The text of a reference has no source and is skipped, and so is text that a clip hides entirely. A rounded or rotated clip counts as its bounding box, so text it hides can still catch clicks inside that box.
+
+`--synctex` requires PDF output of all pages, so it cannot be combined with `--pages`. A compilation without `--synctex` leaves an existing `main.synctex.gz` in place, which then no longer matches the PDF. The `tinymist.exportPdf` setting does not write the file.
+
 Also see:
 
 - #github-link("/editors/vscode/Configuration.md")[VS Cod(e,ium): Tinymist Server Configuration]

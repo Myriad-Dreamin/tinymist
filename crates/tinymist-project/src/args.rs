@@ -170,6 +170,12 @@ pub struct TaskCompileArgs {
     #[clap(flatten)]
     pub pdf: PdfExportArgs,
 
+    /// Write a `.synctex.gz` file next to the PDF, mapping PDF positions to
+    /// source lines for viewers such as Skim or Okular. Only for PDF output of
+    /// all pages.
+    #[arg(long = "synctex", conflicts_with = "pages")]
+    pub synctex: bool,
+
     /// Specify the PNG export related arguments.
     #[clap(flatten)]
     pub png: PngExportArgs,
@@ -203,6 +209,10 @@ impl TaskCompileArgs {
         } else {
             OutputFormat::Pdf
         };
+
+        if self.synctex && output_format != OutputFormat::Pdf {
+            bail!("--synctex requires PDF output");
+        }
 
         let output = self.output.as_ref().map(|output| {
             let output = Path::new(output);
@@ -238,6 +248,7 @@ impl TaskCompileArgs {
                 pdf_standards: self.pdf.standard.clone(),
                 no_pdf_tags: self.pdf.no_tags,
                 creation_timestamp: None,
+                synctex: self.synctex,
             }),
             OutputFormat::Png => ProjectTask::ExportPng(ExportPngTask {
                 export,
