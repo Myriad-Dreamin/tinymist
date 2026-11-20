@@ -6,7 +6,6 @@ version = "0.1.0-beta0"
 id = "file:main.typ"
 inputs = []
 main = "file:main.typ"
-root = "file:."
 system-fonts = true
 
 [[route]]

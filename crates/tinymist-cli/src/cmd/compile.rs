@@ -50,7 +50,8 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
 
     // Identifies the input and output
     let input = args.compile.declare.to_input((&cwd, &lock_dir));
-    let output = args.compile.to_task(input.id.clone(), &cwd)?;
+    let doc_id = input.id.clone();
+    let output = args.compile.to_task(doc_id.clone(), &cwd)?;
 
     if save_lock {
         LockFile::update(&lock_dir, |state| {
@@ -83,9 +84,16 @@ pub async fn compile_main(args: CompileArgs) -> Result<()> {
         std::process::exit(1);
     }
 
+    // Records the route and dependencies of the document saved above
+    if save_lock {
+        let mut updater = update_lock(lock_dir);
+        updater.update_materials(doc_id.clone(), compiled.world().depended_fs_paths());
+        updater.route(doc_id, PROJECT_ROUTE_USER_ACTION_PRIORITY);
+        updater.commit();
+    }
+
     // Exports the compiled project
-    let lock_dir = save_lock.then_some(lock_dir);
-    ExportTask::do_export(output.task, compiled, lock_dir).await?;
+    ExportTask::do_export(output.task, compiled).await?;
 
     Ok(())
 }
