@@ -55,11 +55,30 @@ pub fn analyze_expr_(world: &dyn World, node: &SyntaxNode) -> EcoVec<(Value, Opt
             }
 
             let _guard = GLOBAL_STATS.stat(node.span().id(), "analyze_expr");
-            return typst::trace::<TypstPagedDocument>(world, node.span());
+            return saturated_eval_trace(world, node.span())
+                .unwrap_or_else(|| typst::trace::<TypstPagedDocument>(world, node.span()));
         }
     };
 
     eco_vec![(val, None)]
+}
+
+fn saturated_eval_trace(world: &dyn World, span: Span) -> Option<EcoVec<(Value, Option<Styles>)>> {
+    let main = world.source(world.main()).ok()?;
+    let traced = Traced::new(span);
+    let mut sink = Sink::new();
+    typst_shim::eval::eval(
+        world.track(),
+        world.library(),
+        traced.track(),
+        sink.track_mut(),
+        Route::default().track(),
+        &main,
+    )
+    .ok();
+    let values = sink.values();
+    // Once the sink is full, layout cannot add or replace traced values.
+    (values.len() == Sink::MAX_VALUES).then_some(values)
 }
 
 /// Try to load a module from the current source file.
