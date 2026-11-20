@@ -33,7 +33,7 @@ Alternative considered:
 
 A text run (`FrameItem::Text`) is one shaped segment of one line of output, but its glyphs may come from several source lines when a paragraph is wrapped differently in the source. The generator walks the glyphs, resolves each to (tag, line), and starts a new hbox whenever that pair changes. The hbox origin is the baseline start, its width the sum of advances, its height the font's ascent and its depth the font's descent at the text size.
 
-A glyph's span names a syntax node, and its offset counts bytes into that node's text. Only `Text` and `MathText` nodes render their own source, so only for them is node start plus offset a source position, clamped to the node's end; any other node, such as the call of `lorem(50)` or a string expression, generated its text, and all its glyphs map to the node's start. This is the rule of `jump_from_click` in `typst-ide`. Adding the offset to other nodes would map generated text to the lines after its expression, or to no line once the offset passes the end of the file. Spans are resolved once and cached, because the glyphs of a text item mostly share one span and each lookup searches the syntax tree from its root.
+A glyph's span names a syntax node, and its offset counts bytes into that node's text. Only `Text` and `MathText` nodes render their own source, so only for them is node start plus offset a source position, clamped to the node's end; any other node, such as the call of `lorem(50)` or a string expression, generated its text, and all its glyphs map to the node's start. This is the rule of `jump_from_click` in `typst-ide`. Adding the offset to other nodes would map generated text to the lines after its expression, or to no line once the offset passes the end of the file. Content that a function returns keeps the spans of the function's body, so its text maps there, not to the call. When a file first contributes a glyph, the generator indexes every node of its syntax tree by span in one traversal. `Source::find` would search from the root for each distinct span instead, which is quadratic in a file with many of them: with eight inline equations per paragraph it took 11 s for 2400 paragraphs.
 
 Alternative considered:
 - One hbox per glyph. Rejected: ten times the records for no gain in line precision.
@@ -41,7 +41,7 @@ Alternative considered:
 
 ### 3. Map each run's box to page coordinates
 
-Groups carry translations for most layout and full affine transforms for rotated or scaled content. The generator composes the transforms along the path to a text item and transforms the four corners of each run's local box. SyncTeX boxes are upright, so the record is their bounding box: x and width from the corners, the baseline start's y clamped into the box, height and depth the distances to its top and bottom. Scaled text gets its scaled extent; rotated text gets a box that also covers some space next to the glyphs. Backward search finds the box enclosing a point, so a box in the item's own scale would send clicks on scaled text to a neighbouring line.
+Groups carry translations for most layout and full affine transforms for rotated or scaled content. The generator composes the transforms along the path to a text item and transforms the four corners of each run's local box. SyncTeX boxes are upright, so the record is their bounding box: x and width from the corners, the baseline start's y clamped into the box, height and depth the distances to its top and bottom. Scaled text gets its scaled extent; rotated text gets a box that also covers some space next to the glyphs. Backward search finds the box enclosing a point, so a box in the item's own scale would send clicks on scaled text to a neighbouring line. For the same reason, the generator cuts each box to the bounding box of the clips around it, intersected along the path, and drops a run with nothing left: text that a box clips away would otherwise catch clicks on the visible text over it.
 
 ### 4. Skip text inside outline entries
 
@@ -77,7 +77,8 @@ Alternative considered:
 - [Outline detection depends on frame tags] -> Tags are placed for every `Locatable` element in paged export; if a future Typst version drops them, records degrade to the pre-change behavior, nothing breaks.
 - [Viewers assume one `Input:` per file and stable paths] -> Paths come from the world's resolver, the same source the language server uses for diagnostics.
 - [Rotated text gets a bounding box larger than its glyphs] -> A click next to rotated text may resolve to it; acceptable for line lookup.
-- [Each distinct span is searched from the root of its syntax tree] -> The cost still grows faster than the file: on one flat file, `--synctex` adds 0.03 s at 2400 paragraphs and 0.12 s at 4800 to a release build's compile. A file with many more distinct spans would need an index of the tree.
+- [The span index covers whole files] -> A file that contributes one glyph is still indexed in full, in time linear in its size.
+- [Clips are approximated by their bounding box] -> Text hidden by a rounded or rotated clip can keep a box in the clip's corners.
 - [Generated text maps to the start of its expression] -> A multi-line expression maps all its text to its first line; it cannot map to anything more precise.
 
 ## Migration Plan

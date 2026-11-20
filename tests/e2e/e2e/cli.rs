@@ -882,6 +882,38 @@ fn test_compile_synctex_unmapped_pages() {
 }
 
 #[test]
+fn test_compile_synctex_clipped_text() {
+    // Clipped text keeps only its visible part: wholly hidden text has no
+    // record, and partly hidden text a box within the clip. Nested clips
+    // intersect: the inner one alone would show the whole word.
+    const SOURCE: &str = "\
+#set page(width: 300pt, height: 300pt, margin: 0pt)
+#place(top + left, dx: 65pt, dy: 20pt)[The visible line is here.]
+#place(top + left, dx: 0pt, dy: 20pt, box(width: 12pt, height: 20pt, clip: true)[#place(top + left, dx: 80pt)[Hidden]])
+#place(top + left, dx: 10pt, dy: 100pt, box(width: 20pt, height: 20pt, clip: true)[Partlyhidden])
+#place(top + left, dx: 10pt, dy: 150pt, box(width: 20pt, height: 20pt, clip: true, box(width: 200pt, height: 20pt, clip: true)[Nestedpartlyhidden]))
+";
+    const VISIBLE: usize = 2;
+    const HIDDEN: usize = 3;
+    const PARTLY: usize = 4;
+    const NESTED: usize = 5;
+
+    let text = compile_synctex(&[("main.typ", SOURCE)]);
+    let hboxes = hboxes_by_page(&text).remove(0);
+    let on_line = |line| hboxes.iter().filter(|h| h.line == line).collect::<Vec<_>>();
+
+    assert_eq!(on_line(VISIBLE).len(), 1, "{hboxes:?}");
+    assert!(on_line(HIDDEN).is_empty(), "{hboxes:?}");
+    for (line, x) in [(PARTLY, 10.0), (NESTED, 10.0)] {
+        let [hbox] = on_line(line)[..] else {
+            panic!("one record on line {line}: {hboxes:?}");
+        };
+        assert_eq!(hbox.x, sp(x), "{hbox:?}");
+        assert!(hbox.width <= sp(20.0), "within the clip: {hbox:?}");
+    }
+}
+
+#[test]
 fn test_compile_synctex_only_for_correct_output() {
     let root = GIT_ROOT.join("target/e2e/tinymist-cli");
     tinymist_std::fs::paths::temp_dir_in(root, |tmp| {

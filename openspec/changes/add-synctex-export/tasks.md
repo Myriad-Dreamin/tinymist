@@ -16,6 +16,8 @@
 - [x] 2.6 Map glyph offsets only within `Text` and `MathText` nodes, and other glyphs to their node's start; cache resolved spans.
 - [x] 2.7 Write each run's box as the page-space bounding box of its transformed local box.
 - [x] 2.8 Write no vbox for a page without runs.
+- [x] 2.9 Index each file's spans in one traversal of its syntax tree.
+- [x] 2.10 Cut each run's box to the clips around it and drop runs clipped away entirely.
 
 ## 3. Export
 
@@ -31,6 +33,7 @@
 - [x] 4.6 Add e2e tests for the `Input:` records of a two-file document, for outline entries, source line splits and group transforms, for rejected flag combinations, and for `generate-script`.
 - [x] 4.7 Add e2e tests for generated text, scaled and rotated boxes, pages without text, and a failing SyncTeX write.
 - [x] 4.8 Compare `--synctex` and plain compile times on a flat file of 1200, 2400 and 4800 paragraphs.
+- [x] 4.9 Add an e2e test for wholly, partly and nested clipped text, and compare compile times on files with eight inline equations per paragraph.
 
 ## 5. Documentation
 

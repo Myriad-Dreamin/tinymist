@@ -44,10 +44,11 @@
 //! Every text run becomes one hbox record carrying the file tag and line of its
 //! glyphs; runs are split where the source line changes. Glyphs with a detached
 //! span, such as the text of a reference, have no source and get no record. A
-//! page without records has no page box either, so a click there finds
-//! nothing. Outline entries are skipped: their text carries the heading's span,
-//! and a viewer would otherwise jump to the table of contents instead of the
-//! heading.
+//! run's box is cut to the bounding box of its clip, and a run clipped away
+//! entirely gets no record. A page without records has no page box either, so
+//! a click there finds nothing. Outline entries are skipped: their text carries
+//! the heading's span, and a viewer would otherwise jump to the table of
+//! contents instead of the heading.
 //!
 //! The file is gzip-compressed like the `.synctex.gz` files of `pdflatex
 //! -synctex=1`. The text compresses by a factor of about 5, and viewers read
@@ -64,9 +65,9 @@ use tinymist_world::{CompilerFeat, CompilerWorld};
 use typst::World;
 use typst::foundations::{Bytes, NativeElement};
 use typst::introspection::{Location, Tag};
-use typst::layout::{Abs, Frame, FrameItem, Point, Transform};
+use typst::layout::{Abs, Frame, FrameItem, Point, Rect, Transform};
 use typst::model::OutlineEntry;
-use typst::syntax::{FileId, Source, Span, SyntaxKind};
+use typst::syntax::{FileId, LinkedNode, Source, Span, SyntaxKind};
 
 /// Scaled points per PostScript point: 65536 sp per TeX point, 72.27 TeX
 /// points per 72 PostScript points.
@@ -80,7 +81,7 @@ pub fn synctex_gz<F: CompilerFeat>(
     let mut writer = SyncTexGen {
         world,
         files: Vec::new(),
-        tags: HashMap::new(),
+        sources: HashMap::new(),
         nodes: HashMap::new(),
         content: String::new(),
         records: 0,
@@ -116,21 +117,21 @@ struct SyncTexGen<'a, F: CompilerFeat> {
     world: &'a CompilerWorld<F>,
     /// Absolute paths, indexed by tag - 1.
     files: Vec<String>,
-    tags: HashMap<FileId, Option<(usize, Source)>>,
-    /// Resolved spans: finding a span's node searches the syntax tree, and the
-    /// glyphs of one text item mostly share their span.
-    nodes: HashMap<Span, Option<SpanNode>>,
+    /// Each file seen so far, with its tag; `None` if it has no source or path.
+    sources: HashMap<FileId, Option<(usize, Source)>>,
+    /// The syntax node of every span in those files. Indexing a file once is
+    /// linear in its size, while `Source::find` searches from the root for each
+    /// span, which is quadratic for text with many spans, such as inline math.
+    nodes: HashMap<Span, SpanNode>,
     content: String,
     records: usize,
     /// Outline entries whose end tag has not been seen yet.
     open_entries: Vec<Location>,
 }
 
-/// The source of a span: its file tag and byte range, and whether it is text
-/// whose glyph offsets index into that range.
-#[derive(Clone)]
+/// The byte range of a span's node, and whether it is text whose glyph offsets
+/// index into that range.
 struct SpanNode {
-    tag: usize,
     range: Range<usize>,
     is_text: bool,
 }
@@ -147,33 +148,24 @@ struct Run {
 }
 
 impl Run {
-    /// Maps the local box from `left` to `right`, from `ascent` above `baseline`
-    /// to `descent` below it, to page coordinates. SyncTeX boxes are upright, so
-    /// a rotated box becomes its bounding box, with the baseline kept inside.
+    /// Maps the local box `local`, whose baseline is at `baseline`, to page
+    /// coordinates, and cuts it to `clip`. SyncTeX boxes are upright, so a
+    /// rotated box becomes its bounding box, with the baseline kept inside. A
+    /// box clipped away entirely gives `None`.
     fn new(
         (tag, line): (usize, usize),
         ts: Transform,
-        left: Abs,
-        right: Abs,
+        clip: Option<Rect>,
+        local: Rect,
         baseline: Abs,
-        ascent: Abs,
-        descent: Abs,
-    ) -> Self {
-        let corners = [
-            Point::new(left, baseline - ascent),
-            Point::new(right, baseline - ascent),
-            Point::new(left, baseline + descent),
-            Point::new(right, baseline + descent),
-        ]
-        .map(|corner| corner.transform(ts));
-        let min = corners.into_iter().reduce(Point::min).unwrap_or_default();
-        let max = corners.into_iter().reduce(Point::max).unwrap_or_default();
-        let baseline = Point::new(left, baseline)
+    ) -> Option<Self> {
+        let Rect { min, max } = intersect(bounds(local, ts), clip)?;
+        let baseline = Point::new(local.min.x, baseline)
             .transform(ts)
             .y
             .clamp(min.y, max.y);
 
-        Run {
+        Some(Run {
             tag,
             line,
             x: min.x,
@@ -181,14 +173,39 @@ impl Run {
             width: max.x - min.x,
             height: baseline - min.y,
             depth: max.y - baseline,
-        }
+        })
     }
+}
+
+/// The upright bounding box of `rect` after transforming it by `ts`.
+fn bounds(rect: Rect, ts: Transform) -> Rect {
+    let corners = [
+        rect.min,
+        Point::new(rect.max.x, rect.min.y),
+        Point::new(rect.min.x, rect.max.y),
+        rect.max,
+    ]
+    .map(|corner| corner.transform(ts));
+    Rect::new(
+        corners.into_iter().reduce(Point::min).unwrap_or_default(),
+        corners.into_iter().reduce(Point::max).unwrap_or_default(),
+    )
+}
+
+/// The part of `rect` inside `clip`, or `None` if nothing of it is visible.
+fn intersect(rect: Rect, clip: Option<Rect>) -> Option<Rect> {
+    let Some(clip) = clip else {
+        return Some(rect);
+    };
+    let min = rect.min.max(clip.min);
+    let max = rect.max.min(clip.max);
+    (min.x < max.x && min.y < max.y).then(|| Rect::new(min, max))
 }
 
 impl<F: CompilerFeat> SyncTexGen<'_, F> {
     fn page(&mut self, number: usize, frame: &Frame) {
         let mut runs = Vec::new();
-        self.collect(frame, Transform::identity(), &mut runs);
+        self.collect(frame, Transform::identity(), None, &mut runs);
 
         let _ = writeln!(self.content, "{{{number}");
 
@@ -223,14 +240,26 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
         let _ = writeln!(self.content, "}}{number}");
     }
 
-    fn collect(&mut self, frame: &Frame, ts: Transform, runs: &mut Vec<Run>) {
+    /// Collects the text runs of `frame`, placed on the page by `ts` and visible
+    /// only within `clip`, in page coordinates.
+    fn collect(&mut self, frame: &Frame, ts: Transform, clip: Option<Rect>, runs: &mut Vec<Run>) {
         for &(pos, ref item) in frame.items() {
             match item {
                 FrameItem::Group(group) => {
                     let ts = ts
                         .pre_concat(Transform::translate(pos.x, pos.y))
                         .pre_concat(group.transform);
-                    self.collect(&group.frame, ts, runs);
+
+                    // The clip curve is in the group's coordinates. A group
+                    // clipped away entirely has no visible text.
+                    let clip = match &group.clip {
+                        Some(curve) => match intersect(bounds(curve.bbox(None), ts), clip) {
+                            Some(clip) => Some(clip),
+                            None => continue,
+                        },
+                        None => clip,
+                    };
+                    self.collect(&group.frame, ts, clip, runs);
                 }
                 FrameItem::Tag(Tag::Start(content, _)) => {
                     if content.elem() == OutlineEntry::ELEM
@@ -254,9 +283,14 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
                     let mut current: Option<((usize, usize), Abs)> = None;
                     let mut x = pos.x;
                     let finish = |current: Option<_>, end, runs: &mut Vec<Run>| {
-                        if let Some((loc, start)) = current {
-                            runs.push(Run::new(loc, ts, start, end, pos.y, ascent, descent));
-                        }
+                        let Some((loc, start)) = current else {
+                            return;
+                        };
+                        let local = Rect::new(
+                            Point::new(start, pos.y - ascent),
+                            Point::new(end, pos.y + descent),
+                        );
+                        runs.extend(Run::new(loc, ts, clip, local, pos.y));
                     };
                     for glyph in &text.glyphs {
                         let loc = self.locate(glyph.span.0, glyph.span.1 as usize);
@@ -275,14 +309,13 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
 
     /// Resolves a glyph's span and offset to its file tag and 1-based line.
     fn locate(&mut self, span: Span, offset: usize) -> Option<(usize, usize)> {
-        let node = match self.nodes.get(&span) {
-            Some(node) => node.clone(),
-            None => {
-                let node = self.resolve(span);
-                self.nodes.insert(span, node.clone());
-                node
-            }
-        }?;
+        let id = span.id()?;
+        if !self.sources.contains_key(&id) {
+            let entry = self.register(id);
+            self.sources.insert(id, entry);
+        }
+        let (tag, source) = self.sources.get(&id)?.as_ref()?;
+        let node = self.nodes.get(&span)?;
 
         // Only text renders its own source, so only there does the offset point
         // into the node. Other glyphs, such as those of `#lorem(50)` or of a
@@ -293,32 +326,29 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
         } else {
             node.range.start
         };
-        let (_, source) = self.tags.get(&span.id()?)?.as_ref()?;
         let line = source.lines().byte_to_line(byte)?;
-        Some((node.tag, line + 1))
+        Some((*tag, line + 1))
     }
 
-    fn resolve(&mut self, span: Span) -> Option<SpanNode> {
-        let id = span.id()?;
-        if !self.tags.contains_key(&id) {
-            let entry = self.register(id);
-            self.tags.insert(id, entry);
-        }
-        let (tag, source) = self.tags.get(&id)?.as_ref()?;
-
-        let node = source.find(span)?;
-        Some(SpanNode {
-            tag: *tag,
-            range: node.range(),
-            is_text: matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText),
-        })
-    }
-
+    /// Assigns the next tag to a file and indexes the spans of its syntax tree.
     fn register(&mut self, id: FileId) -> Option<(usize, Source)> {
         let source = self.world.source(id).ok()?;
         let path = self.world.path_for_id(id).ok()?;
         self.files
             .push(path.as_path().to_string_lossy().into_owned());
+
+        let mut stack = vec![LinkedNode::new(source.root())];
+        while let Some(node) = stack.pop() {
+            self.nodes.insert(
+                node.span(),
+                SpanNode {
+                    range: node.range(),
+                    is_text: matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText),
+                },
+            );
+            stack.extend(node.children());
+        }
+
         Some((self.files.len(), source))
     }
 }

@@ -34,7 +34,7 @@
 - **THEN** the command fails and writes no SyncTeX file
 
 ### Requirement: SyncTeX records map text runs to source lines
-Every run of text with a source in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the run's box on the page as position and extent, in scaled points measured from the top-left corner of the page. Text that an expression generates SHALL map to the line where that expression starts.
+Every run of text with a source in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the run's box on the page as position and extent, in scaled points measured from the top-left corner of the page. Text that code generates SHALL map to the line where the syntax node of its span starts: the call for the output of `#lorem(80)`, the function's body for content that a function returns. A record's box SHALL be cut to the bounding box of the clips around the run, and a run clipped away entirely SHALL have no record.
 
 #### Scenario: Forward search for a body line
 - **GIVEN** a document whose chapter file `kapitel/a.typ` has prose on line 81 that is typeset on page 9
@@ -53,6 +53,12 @@ Every run of text with a source in the paged document SHALL appear as an hbox re
 - **GIVEN** text placed through `place`, `move`, `rotate` or `scale`
 - **THEN** its record is the upright bounding box of the transformed run
 - **AND** a point inside the scaled or rotated text resolves to its line
+
+#### Scenario: Clipped text
+- **GIVEN** text that a clipping box hides entirely, beside visible text
+- **THEN** the hidden text has no record
+- **AND** a point inside the visible text resolves to the visible text's line
+- **AND** text that a box clips partly has a record within the clip
 
 #### Scenario: Generated text
 - **GIVEN** `#lorem(80)` on line 7, typeset as several lines, followed by other source lines
