@@ -114,10 +114,21 @@ fn shell_build_script(shell: Shell) -> Result<String> {
 
         let mut cmd = CmdBuilder::new();
         cmd.extend(base_cmd.iter().copied());
-        cmd.push("--task");
+        cmd.push("--name");
         cmd.push(quote(&task.id.to_string()));
 
         cmd.push(path_of(&input.main, "main"));
+
+        // The lock stores the output without its extension. Append it, so
+        // that `compile` strips the extension instead of a dotted file stem.
+        let ext = task.task.extension();
+        if let Some(p) = &export.output {
+            let p = p.to_string();
+            match ext {
+                "" => cmd.push(quote(&p)),
+                ext => cmd.push(quote(&format!("{p}.{ext}"))),
+            }
+        }
 
         if let Some(root) = &input.root {
             cmd.push("--root");
@@ -151,16 +162,8 @@ fn shell_build_script(shell: Shell) -> Result<String> {
             cmd.push(path_of(p, "package-cache-path"));
         }
 
-        if let Some(p) = &export.output {
-            cmd.push("--output");
-            cmd.push(quote(&p.to_string()));
-        }
-
         for t in &export.transform {
             match t {
-                ExportTransform::Pretty { .. } => {
-                    cmd.push("--pretty");
-                }
                 ExportTransform::Pages { ranges } => {
                     for r in ranges {
                         cmd.push("--pages");
@@ -168,7 +171,9 @@ fn shell_build_script(shell: Shell) -> Result<String> {
                     }
                 }
                 // todo: export me
-                ExportTransform::Merge { .. } | ExportTransform::Script { .. } => {}
+                ExportTransform::Pretty { .. }
+                | ExportTransform::Merge { .. }
+                | ExportTransform::Script { .. } => {}
             }
         }
 
@@ -186,40 +191,30 @@ fn shell_build_script(shell: Shell) -> Result<String> {
                 if task.no_pdf_tags {
                     cmd.push("--no-pdf-tags");
                 }
-
-                if let Some(output) = &task.creation_timestamp {
-                    cmd.push("--creation-timestamp");
-                    cmd.push(output.to_string());
-                }
             }
             ProjectTask::ExportSvg(..) => {
                 cmd.push("--format=svg");
             }
-            ProjectTask::ExportSvgHtml(..) => {
-                cmd.push("--format=svg_html");
-            }
             ProjectTask::ExportBundle(..) => {
                 cmd.push("--format=bundle");
-                cmd.push("--features=bundle");
             }
-            ProjectTask::ExportMd(..) => {
-                cmd.push("--format=md");
-            }
-            ProjectTask::ExportTeX(..) => {
-                cmd.push("--format=tex");
-            }
-            ProjectTask::ExportPng(..) => {
+            ProjectTask::ExportPng(task) => {
                 cmd.push("--format=png");
+                cmd.push("--ppi");
+                cmd.push(task.ppi.to_f32().to_string());
             }
-            ProjectTask::ExportText(..) => {
-                cmd.push("--format=txt");
+            // `compile` has no `--format` for these.
+            ProjectTask::ExportSvgHtml(..)
+            | ProjectTask::ExportMd(..)
+            | ProjectTask::ExportTeX(..)
+            | ProjectTask::ExportText(..) => {
+                log::warn!("cannot generate a command for task {:?}", task.id);
+                continue;
             }
             ProjectTask::ExportHtml(..) => {
                 cmd.push("--format=html");
             }
         }
-
-        let ext = task.task.extension();
 
         output.push_str(&format!(
             "# From {} to {} ({ext})\n",

@@ -651,3 +651,71 @@ fn test_compile_alias() {
     })
     .expect("test should succeed");
 }
+
+/// The script from `generate-script` reruns the tasks in `tinymist.lock`.
+#[cfg(unix)]
+#[test]
+fn test_generate_script() {
+    // A dot in the file stem must survive the round trip through the lock.
+    check_generate_script("out/doc.v2.pdf", &[]);
+}
+
+/// The script keeps a non-default `--ppi`.
+#[cfg(unix)]
+#[test]
+fn test_generate_script_ppi() {
+    check_generate_script("out/doc.png", &["--ppi", "72"]);
+}
+
+/// Compiles `main.typ` to `output` with `--save-lock` and `args`, then checks
+/// that the generated script recreates `output` and leaves the lock unchanged.
+#[cfg(unix)]
+fn check_generate_script(output: &str, args: &[&str]) {
+    use std::{path::Path, process::Command};
+
+    use crate::artifact::CLI;
+
+    let root = GIT_ROOT.join("target/e2e/tinymist-cli");
+
+    tinymist_std::fs::paths::temp_dir_in(root, |tmp| {
+        let run = |cmd: &mut Command| {
+            let out = cmd.current_dir(tmp).output().expect("should spawn");
+            assert!(
+                out.status.success(),
+                "{cmd:?} failed:\n{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        };
+        let read = |path: &Path| std::fs::read_to_string(path).expect("should read");
+
+        let lock = tmp.join("tinymist.lock");
+
+        std::fs::write(tmp.join("main.typ"), "Hello\n").expect("should write input");
+        run(cli()
+            .args(["compile", "--save-lock", "main.typ", output])
+            .args(args));
+        let output = tmp.join(output);
+        assert!(output.exists(), "output file should exist: {output:?}");
+        let lock_before = read(&lock);
+
+        run(cli().args(["generate-script", "bash"]));
+        std::fs::remove_file(&output).expect("should remove output");
+
+        // The script calls `tinymist` from `PATH`.
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let dirs = std::iter::once(CLI.parent().expect("cli has a parent").to_path_buf())
+            .chain(std::env::split_paths(&path));
+        let path = std::env::join_paths(dirs).expect("should join PATH");
+        run(Command::new("bash").arg("build.sh").env("PATH", path));
+
+        assert!(output.exists(), "build.sh should recreate {output:?}");
+        assert_eq!(
+            read(&lock),
+            lock_before,
+            "build.sh should not change the lock"
+        );
+
+        Ok(())
+    })
+    .expect("test should succeed");
+}
