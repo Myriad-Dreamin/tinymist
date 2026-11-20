@@ -16,7 +16,7 @@ Typst closed its SyncTeX request (typst/typst#289), pointing to its `ide` functi
 - Add `--synctex` to `tinymist compile`. After a successful PDF export the compiler writes `<output>.synctex.gz` next to the PDF.
 - Reject `--synctex` for non-PDF output and together with `--pages`, where it could only be ignored or wrong.
 - Add a `synctex` flag to the PDF export task so the lock file and `tinymist generate-script` keep the option.
-- Add a SyncTeX generator to `tinymist-task` that walks the page frames and emits one hbox record per text run, tagged with the source file and line of its glyphs, in the format of pdfTeX.
+- Add a SyncTeX generator to `tinymist-task` that walks the page frames and emits one hbox record per text run, tagged with the source file and line of its glyphs, in a subset of pdfTeX's format.
 - Document the option in the CLI and preview feature pages.
 
 ## Capabilities

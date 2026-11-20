@@ -13,10 +13,13 @@
 - [x] 2.3 Resolve spans to file tags and 1-based lines through the world; assign tags in order of first appearance and record absolute paths.
 - [x] 2.4 Skip text between the start and end tags of `OutlineEntry` elements.
 - [x] 2.5 Write header, per-page blocks, postamble and record count in pdfTeX's layout, coordinates in scaled points from the top-left corner, gzip-compressed.
+- [x] 2.6 Map glyph offsets only within `Text` and `MathText` nodes, and other glyphs to their node's start; cache resolved spans.
+- [x] 2.7 Write each run's box as the page-space bounding box of its transformed local box.
+- [x] 2.8 Write no vbox for a page without runs.
 
 ## 3. Export
 
-- [x] 3.1 In `ExportTask::do_export`, keep the paged document when the task is a PDF export with `synctex` set, and write `<output>.synctex.gz` with `write_atomic` after the PDF.
+- [x] 3.1 In `ExportTask::do_export`, keep the paged document when the task is a PDF export with `synctex` set, and write `<output>.synctex.gz` with `write_atomic` before the PDF.
 
 ## 4. Validate
 
@@ -26,6 +29,8 @@
 - [x] 4.4 A PDF viewer (Skim): forward search shows the line, Shift-Command-click opens the source line in the editor.
 - [x] 4.5 `cargo test -p tinymist-task`, `cargo clippy -p tinymist-task -p tinymist --all-targets`, `cargo fmt --check --all`.
 - [x] 4.6 Add e2e tests for the `Input:` records of a two-file document, for outline entries, source line splits and group transforms, for rejected flag combinations, and for `generate-script`.
+- [x] 4.7 Add e2e tests for generated text, scaled and rotated boxes, pages without text, and a failing SyncTeX write.
+- [x] 4.8 Compare `--synctex` and plain compile times on a flat file of 1200, 2400 and 4800 paragraphs.
 
 ## 5. Documentation
 

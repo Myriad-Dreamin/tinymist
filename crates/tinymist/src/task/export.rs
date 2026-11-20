@@ -520,14 +520,11 @@ impl ExportTask {
                     data: None,
                 };
 
-                let to = write_to.clone();
-                tokio::task::spawn_blocking(move || write_atomic(to, data))
-                    .await
-                    .context_ut("failed to export")??;
-
-                // If requested, write the SyncTeX file next to the PDF. Generating
-                // it walks the whole document, so it leaves the async executor
-                // like the PDF write above.
+                // If requested, write the SyncTeX file next to the PDF, and before
+                // it: a viewer that reloads the new PDF then reads the matching
+                // file, and if writing it fails, the old PDF stays. Generating it
+                // walks the whole document, so it leaves the async executor like
+                // the PDF write below.
                 if let Some((graph, doc)) = synctex {
                     let to = write_to.with_extension("synctex.gz");
                     tokio::task::spawn_blocking(move || {
@@ -537,6 +534,11 @@ impl ExportTask {
                     .await
                     .context_ut("failed to export synctex")??;
                 }
+
+                let to = write_to.clone();
+                tokio::task::spawn_blocking(move || write_atomic(to, data))
+                    .await
+                    .context_ut("failed to export")??;
 
                 res
             }

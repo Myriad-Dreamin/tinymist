@@ -12,7 +12,8 @@
 //! in J. Laurens, "Direct and reverse synchronization with SyncTeX", TUGboat
 //! 29:3 (2008), <https://tug.org/TUGboat/tb29-3/tb93laurens.pdf>. The reference
 //! reader is `synctex_parser`, which the `synctex` command-line tool of TeX
-//! Live wraps. Lengths are in scaled points; this generator writes:
+//! Live wraps. Lengths are in scaled points (sp), with y growing downwards; for
+//! an A4 page with one text run, this generator writes:
 //!
 //! ```text
 //! SyncTeX Version:1
@@ -24,20 +25,29 @@
 //! Y Offset:0
 //! Content:
 //! {1                               page 1
-//! [1,2:0,842:595,842,0             page box:  tag,line:x,y:width,height,depth
-//! (1,2:72,100:300,9,3              text run:  same fields, x,y at the baseline
+//! [1,2:0,55380990:39158276,55380990,0
+//!                                  page box:  tag,line:x,y:width,height,depth
+//! (1,2:4736287,6578176:19734528,592036,197345
+//!                                  text run:  same fields, x,y at the baseline
 //! )
 //! ]
 //! }1
 //! Postamble:
-//! Count:2                          number of boxes
+//! Count:2                          number of box records
 //! Post scriptum:
 //! ```
 //!
+//! This is a subset of what pdfTeX writes: there are no `!` byte-offset
+//! anchors, which only speed up reading, and no records for glue, kerns or
+//! math. pdfTeX counts all records in `Count`; the reader does not check it.
+//!
 //! Every text run becomes one hbox record carrying the file tag and line of its
-//! glyphs; runs are split where the source line changes. Outline entries are
-//! skipped: their text carries the heading's span, and a viewer would otherwise
-//! jump to the table of contents instead of the heading.
+//! glyphs; runs are split where the source line changes. Glyphs with a detached
+//! span, such as the text of a reference, have no source and get no record. A
+//! page without records has no page box either, so a click there finds
+//! nothing. Outline entries are skipped: their text carries the heading's span,
+//! and a viewer would otherwise jump to the table of contents instead of the
+//! heading.
 //!
 //! The file is gzip-compressed like the `.synctex.gz` files of `pdflatex
 //! -synctex=1`. The text compresses by a factor of about 5, and viewers read
@@ -46,6 +56,7 @@
 use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::io::Write as _;
+use std::ops::Range;
 
 use tinymist_std::error::prelude::*;
 use tinymist_std::typst::TypstPagedDocument;
@@ -55,7 +66,7 @@ use typst::foundations::{Bytes, NativeElement};
 use typst::introspection::{Location, Tag};
 use typst::layout::{Abs, Frame, FrameItem, Point, Transform};
 use typst::model::OutlineEntry;
-use typst::syntax::{FileId, Source};
+use typst::syntax::{FileId, Source, Span, SyntaxKind};
 
 /// Scaled points per PostScript point: 65536 sp per TeX point, 72.27 TeX
 /// points per 72 PostScript points.
@@ -70,6 +81,7 @@ pub fn synctex_gz<F: CompilerFeat>(
         world,
         files: Vec::new(),
         tags: HashMap::new(),
+        nodes: HashMap::new(),
         content: String::new(),
         records: 0,
         open_entries: Vec::new(),
@@ -105,20 +117,72 @@ struct SyncTexGen<'a, F: CompilerFeat> {
     /// Absolute paths, indexed by tag - 1.
     files: Vec<String>,
     tags: HashMap<FileId, Option<(usize, Source)>>,
+    /// Resolved spans: finding a span's node searches the syntax tree, and the
+    /// glyphs of one text item mostly share their span.
+    nodes: HashMap<Span, Option<SpanNode>>,
     content: String,
     records: usize,
     /// Outline entries whose end tag has not been seen yet.
     open_entries: Vec<Location>,
 }
 
-/// A text run's source location and extent.
+/// The source of a span: its file tag and byte range, and whether it is text
+/// whose glyph offsets index into that range.
+#[derive(Clone)]
+struct SpanNode {
+    tag: usize,
+    range: Range<usize>,
+    is_text: bool,
+}
+
+/// A text run's source location and its box in page coordinates.
 struct Run {
     tag: usize,
     line: usize,
-    origin: Point,
+    x: Abs,
+    baseline: Abs,
     width: Abs,
-    ascent: Abs,
-    descent: Abs,
+    height: Abs,
+    depth: Abs,
+}
+
+impl Run {
+    /// Maps the local box from `left` to `right`, from `ascent` above `baseline`
+    /// to `descent` below it, to page coordinates. SyncTeX boxes are upright, so
+    /// a rotated box becomes its bounding box, with the baseline kept inside.
+    fn new(
+        (tag, line): (usize, usize),
+        ts: Transform,
+        left: Abs,
+        right: Abs,
+        baseline: Abs,
+        ascent: Abs,
+        descent: Abs,
+    ) -> Self {
+        let corners = [
+            Point::new(left, baseline - ascent),
+            Point::new(right, baseline - ascent),
+            Point::new(left, baseline + descent),
+            Point::new(right, baseline + descent),
+        ]
+        .map(|corner| corner.transform(ts));
+        let min = corners.into_iter().reduce(Point::min).unwrap_or_default();
+        let max = corners.into_iter().reduce(Point::max).unwrap_or_default();
+        let baseline = Point::new(left, baseline)
+            .transform(ts)
+            .y
+            .clamp(min.y, max.y);
+
+        Run {
+            tag,
+            line,
+            x: min.x,
+            baseline,
+            width: max.x - min.x,
+            height: baseline - min.y,
+            depth: max.y - baseline,
+        }
+    }
 }
 
 impl<F: CompilerFeat> SyncTexGen<'_, F> {
@@ -126,32 +190,37 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
         let mut runs = Vec::new();
         self.collect(frame, Transform::identity(), &mut runs);
 
-        // The page vbox takes the location of its first run so that it maps to
-        // a meaningful line.
-        let (tag, line) = runs.first().map_or((1, 1), |run| (run.tag, run.line));
-        let w = sp(frame.width());
-        let h = sp(frame.height());
-
         let _ = writeln!(self.content, "{{{number}");
-        let _ = writeln!(self.content, "[{tag},{line}:0,{h}:{w},{h},0");
-        self.records += 1;
 
-        for run in runs {
-            let _ = writeln!(
-                self.content,
-                "({},{}:{},{}:{},{},{}\n)",
-                run.tag,
-                run.line,
-                sp(run.origin.x),
-                sp(run.origin.y),
-                sp(run.width),
-                sp(run.ascent),
-                sp(run.descent)
-            );
+        // The page vbox takes the location of its first run so that it maps to
+        // a meaningful line. A page without runs gets no box, since any location
+        // would be invented; the reader then finds nothing there.
+        if let Some(first) = runs.first() {
+            let (tag, line) = (first.tag, first.line);
+            let w = sp(frame.width());
+            let h = sp(frame.height());
+            let _ = writeln!(self.content, "[{tag},{line}:0,{h}:{w},{h},0");
             self.records += 1;
+
+            for run in runs {
+                let _ = writeln!(
+                    self.content,
+                    "({},{}:{},{}:{},{},{}\n)",
+                    run.tag,
+                    run.line,
+                    sp(run.x),
+                    sp(run.baseline),
+                    sp(run.width),
+                    sp(run.height),
+                    sp(run.depth)
+                );
+                self.records += 1;
+            }
+
+            let _ = writeln!(self.content, "]");
         }
 
-        let _ = writeln!(self.content, "]\n}}{number}");
+        let _ = writeln!(self.content, "}}{number}");
     }
 
     fn collect(&mut self, frame: &Frame, ts: Transform, runs: &mut Vec<Run>) {
@@ -181,46 +250,55 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
                     let ascent = metrics.ascender.at(text.size);
                     let descent = -metrics.descender.at(text.size);
 
-                    let mut start = pos;
+                    // The current run: its location and where it starts.
+                    let mut current: Option<((usize, usize), Abs)> = None;
                     let mut x = pos.x;
-                    let mut current: Option<Run> = None;
+                    let finish = |current: Option<_>, end, runs: &mut Vec<Run>| {
+                        if let Some((loc, start)) = current {
+                            runs.push(Run::new(loc, ts, start, end, pos.y, ascent, descent));
+                        }
+                    };
                     for glyph in &text.glyphs {
-                        let advance = glyph.x_advance.at(text.size);
                         let loc = self.locate(glyph.span.0, glyph.span.1 as usize);
-
-                        let same = matches!((&current, loc),
-                            (Some(run), Some((tag, line))) if run.tag == tag && run.line == line);
-                        if !same {
-                            if let Some(run) = current.take() {
-                                runs.push(run);
-                            }
-                            start = Point::new(x, pos.y);
-                            current = loc.map(|(tag, line)| Run {
-                                tag,
-                                line,
-                                origin: start.transform(ts),
-                                width: Abs::zero(),
-                                ascent,
-                                descent,
-                            });
+                        if current.map(|(loc, _)| loc) != loc {
+                            finish(current, x, runs);
+                            current = loc.map(|loc| (loc, x));
                         }
-
-                        x += advance;
-                        if let Some(run) = &mut current {
-                            run.width = x - start.x;
-                        }
+                        x += glyph.x_advance.at(text.size);
                     }
-                    if let Some(run) = current {
-                        runs.push(run);
-                    }
+                    finish(current, x, runs);
                 }
                 _ => {}
             }
         }
     }
 
-    /// Resolves a span to its file tag and 1-based line.
-    fn locate(&mut self, span: typst::syntax::Span, offset: usize) -> Option<(usize, usize)> {
+    /// Resolves a glyph's span and offset to its file tag and 1-based line.
+    fn locate(&mut self, span: Span, offset: usize) -> Option<(usize, usize)> {
+        let node = match self.nodes.get(&span) {
+            Some(node) => node.clone(),
+            None => {
+                let node = self.resolve(span);
+                self.nodes.insert(span, node.clone());
+                node
+            }
+        }?;
+
+        // Only text renders its own source, so only there does the offset point
+        // into the node. Other glyphs, such as those of `#lorem(50)` or of a
+        // string expression, map to the expression that generated them. This follows
+        // `jump_from_click` in `typst-ide`.
+        let byte = if node.is_text {
+            (node.range.start + offset).min(node.range.end)
+        } else {
+            node.range.start
+        };
+        let (_, source) = self.tags.get(&span.id()?)?.as_ref()?;
+        let line = source.lines().byte_to_line(byte)?;
+        Some((node.tag, line + 1))
+    }
+
+    fn resolve(&mut self, span: Span) -> Option<SpanNode> {
         let id = span.id()?;
         if !self.tags.contains_key(&id) {
             let entry = self.register(id);
@@ -229,8 +307,11 @@ impl<F: CompilerFeat> SyncTexGen<'_, F> {
         let (tag, source) = self.tags.get(&id)?.as_ref()?;
 
         let node = source.find(span)?;
-        let line = source.lines().byte_to_line(node.offset() + offset)?;
-        Some((*tag, line + 1))
+        Some(SpanNode {
+            tag: *tag,
+            range: node.range(),
+            is_text: matches!(node.kind(), SyntaxKind::Text | SyntaxKind::MathText),
+        })
     }
 
     fn register(&mut self, id: FileId) -> Option<(usize, Source)> {

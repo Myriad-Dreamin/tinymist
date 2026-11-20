@@ -20,9 +20,11 @@ Typst's `PagedDocument` holds, per page, a `Frame` of items. `FrameItem::Text` c
 
 ## Decisions
 
-### 1. Emit pdfTeX's file layout, with scaled points from the top-left page corner
+### 1. Emit a subset of pdfTeX's file layout, with scaled points from the top-left page corner
 
-The generator writes the header (`SyncTeX Version:1`, `Input:` lines, `Output:pdf`, `Magnification:1000`, `Unit:1`, offsets 0), then per page `{n`, one page-sized vbox `[`…`]`, one hbox `(`…`)` per text run, `}n`, and the postamble with a record count. Lengths are scaled points, `pt × 72.27 / 72 × 65536`, measured from the top-left corner with y downwards; this is what pdfTeX writes with zero offsets, so the parser's unit conversion applies unchanged.
+The generator writes the header (`SyncTeX Version:1`, `Input:` lines, `Output:pdf`, `Magnification:1000`, `Unit:1`, offsets 0), then per page `{n`, one page-sized vbox `[`…`]`, one hbox `(`…`)` per text run, `}n`, and the postamble with the number of box records. Lengths are scaled points, `pt × 72.27 / 72 × 65536`, measured from the top-left corner with y downwards; this is what pdfTeX writes with zero offsets, so the parser's unit conversion applies unchanged.
+
+pdfTeX writes more: `!` byte-offset anchors, which only speed up reading, records for glue, kerns and math, and a `Count` of all records. The generator writes none of these; `synctex_parser` does not need the anchors and does not check the count. A page without text runs gets `{n` and `}n` and no vbox, since any tag and line would be invented; the parser accepts this, finds nothing on that page, and keeps the page numbering of the pages after it.
 
 Alternative considered:
 - A reduced custom format read by a viewer plug-in. Rejected: the value of SyncTeX is that existing viewers already speak it.
@@ -31,17 +33,19 @@ Alternative considered:
 
 A text run (`FrameItem::Text`) is one shaped segment of one line of output, but its glyphs may come from several source lines when a paragraph is wrapped differently in the source. The generator walks the glyphs, resolves each to (tag, line), and starts a new hbox whenever that pair changes. The hbox origin is the baseline start, its width the sum of advances, its height the font's ascent and its depth the font's descent at the text size.
 
+A glyph's span names a syntax node, and its offset counts bytes into that node's text. Only `Text` and `MathText` nodes render their own source, so only for them is node start plus offset a source position, clamped to the node's end; any other node, such as the call of `lorem(50)` or a string expression, generated its text, and all its glyphs map to the node's start. This is the rule of `jump_from_click` in `typst-ide`. Adding the offset to other nodes would map generated text to the lines after its expression, or to no line once the offset passes the end of the file. Spans are resolved once and cached, because the glyphs of a text item mostly share one span and each lookup searches the syntax tree from its root.
+
 Alternative considered:
 - One hbox per glyph. Rejected: ten times the records for no gain in line precision.
 - One hbox per run with the first glyph's line. Rejected: a wrapped paragraph would send forward search for the second source line to the wrong place or nowhere.
 
-### 3. Apply group transforms to the origin
+### 3. Map each run's box to page coordinates
 
-Groups carry translations for most layout and full affine transforms for rotated or scaled content. The generator composes the transforms along the path to a text item and transforms the baseline origin; width, height and depth stay in the item's own scale. Rotated text therefore gets a correct anchor and an approximate extent, which is enough for line lookup.
+Groups carry translations for most layout and full affine transforms for rotated or scaled content. The generator composes the transforms along the path to a text item and transforms the four corners of each run's local box. SyncTeX boxes are upright, so the record is their bounding box: x and width from the corners, the baseline start's y clamped into the box, height and depth the distances to its top and bottom. Scaled text gets its scaled extent; rotated text gets a box that also covers some space next to the glyphs. Backward search finds the box enclosing a point, so a box in the item's own scale would send clicks on scaled text to a neighbouring line.
 
 ### 4. Skip text inside outline entries
 
-Entries of `outline()` render the heading's text with the heading's span, so forward search for a heading line would list the table of contents first and the viewer would show it instead of the heading. The generator tracks `Tag::Start`/`Tag::End` of `OutlineEntry` elements in the frame and emits no records between them. Index entries and cross references are not affected: their text carries the span of the `ref` or `index` call site, which is where a user expects to land.
+Entries of `outline()` render the heading's text with the heading's span, so forward search for a heading line would list the table of contents first and the viewer would show it instead of the heading. The generator tracks `Tag::Start`/`Tag::End` of `OutlineEntry` elements in the frame and emits no records between them. Text with a detached span has no source and gets no record. The text of a reference such as `@a` is of this kind; a click on it finds a neighbouring record, or nothing on a page without one.
 
 Alternative considered:
 - Keep all records and rely on the viewer choosing the best match. Rejected: `synctex_parser` returns matches in file order and Skim takes the first.
@@ -50,9 +54,9 @@ Alternative considered:
 
 `synctex_parser` resolves relative input names against the PDF's directory, which for Typst projects is usually an output directory outside the source tree. Absolute paths, resolved through the world's path mapper, work from any output location and let the viewer open package files from the cache. The main file is included like every other source; there is no distinguished tag.
 
-### 6. Generate in the export task after the PDF bytes are written
+### 6. Generate in the export task, and write the file before the PDF
 
-The SyncTeX file belongs to a specific PDF, so `ExportTask::do_export` keeps the paged document alongside the PDF bytes and writes `<output>.synctex.gz` with the same atomic write after the PDF. The generator runs in the blocking pool like the PDF export itself. The compile command and the language server share this path, so an export task with `synctex: true` produces the same file wherever it runs. The language server's own tasks set it to false for now.
+The SyncTeX file belongs to a specific PDF, so `ExportTask::do_export` keeps the paged document alongside the PDF bytes and writes `<output>.synctex.gz` with the same atomic write, before the PDF. A viewer that reloads when the PDF changes then reads the matching file, and if generating or writing the file fails, the command fails and the old PDF stays. If writing the PDF fails after that, the SyncTeX file is ahead of it until the next export. An export without the flag leaves an existing SyncTeX file in place, even though it no longer matches. The generator runs in the blocking pool like the PDF export itself. The compile command and the language server share this path, so an export task with `synctex: true` produces the same file wherever it runs. The language server's own tasks set it to false for now.
 
 ### 7. Compress with gzip
 
@@ -72,7 +76,9 @@ Alternative considered:
 
 - [Outline detection depends on frame tags] -> Tags are placed for every `Locatable` element in paged export; if a future Typst version drops them, records degrade to the pre-change behavior, nothing breaks.
 - [Viewers assume one `Input:` per file and stable paths] -> Paths come from the world's resolver, the same source the language server uses for diagnostics.
-- [Rotated or scaled text extents are approximate] -> Line lookup needs only the anchor; acceptable.
+- [Rotated text gets a bounding box larger than its glyphs] -> A click next to rotated text may resolve to it; acceptable for line lookup.
+- [Each distinct span is searched from the root of its syntax tree] -> The cost still grows faster than the file: on one flat file, `--synctex` adds 0.03 s at 2400 paragraphs and 0.12 s at 4800 to a release build's compile. A file with many more distinct spans would need an index of the tree.
+- [Generated text maps to the start of its expression] -> A multi-line expression maps all its text to its first line; it cannot map to anything more precise.
 
 ## Migration Plan
 

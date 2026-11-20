@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: `--synctex` writes a SyncTeX file next to the PDF
-`tinymist compile --synctex` SHALL write `<output>.synctex.gz` in the directory of the exported PDF after a successful PDF export, and SHALL write nothing extra without the flag.
+`tinymist compile --synctex` SHALL write `<output>.synctex.gz` in the directory of the exported PDF for a successful PDF export, before the PDF, and SHALL write nothing extra without the flag.
 
 #### Scenario: PDF export with the flag
 - **WHEN** `tinymist compile --synctex main.typ out/main.pdf` succeeds
@@ -11,6 +11,12 @@
 #### Scenario: PDF export without the flag
 - **WHEN** `tinymist compile main.typ out/main.pdf` succeeds
 - **THEN** no `out/main.synctex.gz` is written
+- **AND** an existing `out/main.synctex.gz` is left in place
+
+#### Scenario: The SyncTeX file cannot be written
+- **GIVEN** a directory named `out/main.synctex.gz`
+- **WHEN** `tinymist compile --synctex main.typ out/main.pdf` runs
+- **THEN** the command fails and `out/main.pdf` is not replaced
 
 #### Scenario: Compile error
 - **WHEN** the document fails to compile
@@ -28,7 +34,7 @@
 - **THEN** the command fails and writes no SyncTeX file
 
 ### Requirement: SyncTeX records map text runs to source lines
-Every run of text in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the baseline start as position and width, ascent and descent as extent, in scaled points measured from the top-left corner of the page.
+Every run of text with a source in the paged document SHALL appear as an hbox record whose tag and line name the source file and the 1-based line of its glyphs, with the run's box on the page as position and extent, in scaled points measured from the top-left corner of the page. Text that an expression generates SHALL map to the line where that expression starts.
 
 #### Scenario: Forward search for a body line
 - **GIVEN** a document whose chapter file `kapitel/a.typ` has prose on line 81 that is typeset on page 9
@@ -45,7 +51,22 @@ Every run of text in the paged document SHALL appear as an hbox record whose tag
 
 #### Scenario: Text inside a transformed group
 - **GIVEN** text placed through `place`, `move`, `rotate` or `scale`
-- **THEN** its record's position is the transformed baseline start on the page
+- **THEN** its record is the upright bounding box of the transformed run
+- **AND** a point inside the scaled or rotated text resolves to its line
+
+#### Scenario: Generated text
+- **GIVEN** `#lorem(80)` on line 7, typeset as several lines, followed by other source lines
+- **THEN** the records of every typeset line of the paragraph carry line 7
+- **AND** no record carries a line after it that has no text of its own
+
+#### Scenario: Text without a source
+- **GIVEN** text whose span is detached, such as the rendered text of a reference
+- **THEN** it has no record
+
+#### Scenario: Page without text
+- **GIVEN** a page that contains only shapes, followed by a page with text
+- **THEN** the first page's block has no records
+- **AND** backward search on it returns nothing, while both directions work on the second page
 
 ### Requirement: Every source file gets one `Input:` record with an absolute path
 The header SHALL list each source file that contributed text once, tagged consecutively from 1 in order of first appearance, with the absolute path the world resolves for it; package files resolve to their path in the package cache.
