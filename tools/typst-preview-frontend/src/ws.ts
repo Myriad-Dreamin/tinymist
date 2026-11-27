@@ -14,7 +14,8 @@ import renderModule from "@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer
 import { RenderSession } from "@myriaddreamin/typst.ts/dist/esm/renderer.mjs";
 import { WebSocketSubject, webSocket } from "rxjs/webSocket";
 import { Subject, Subscription, buffer, debounceTime, fromEvent, tap } from "rxjs";
-import { handleHtmlPreviewFrame } from "./html-preview";
+import { replaceWithHtmlPreviewDocument } from "./html-preview";
+import { setPagedLinkDescriptions } from "./link-hover";
 export { PreviewMode } from "typst-dom/typst-doc.mjs";
 
 // for debug propose
@@ -275,6 +276,7 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
           const sock = e.target;
           console.log("WebSocket connection opened", sock);
           windowElem.typstWebsocket = sock as any;
+          setPagedLinkDescriptions({});
           svgDoc.reset();
           windowElem.typstWebsocket.send("current");
         },
@@ -327,6 +329,9 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
     );
 
     function processMessage(data: ArrayBuffer) {
+      if (disposed) {
+        return;
+      }
       if (!(data instanceof ArrayBuffer)) {
         if (data === NOT_AVAILABLE) {
           return;
@@ -363,6 +368,11 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         ) {
           return;
         }
+      }
+
+      if (message[0] === "link-hover") {
+        setPagedLinkDescriptions(JSON.parse(dec.decode(message[1] as Uint8Array)));
+        return;
       }
 
       if (message[0] === "jump" || message[0] === "viewport") {
@@ -457,7 +467,10 @@ export async function wsMain({ url, previewMode, isContentPreview }: WsArgs) {
         return;
       }
 
-      if (handleHtmlPreviewFrame(message[0] as string, message[1] as Uint8Array, url, dec)) {
+      if (message[0] === "html") {
+        // Dispose the paged preview client before replacing the document.
+        dispose();
+        replaceWithHtmlPreviewDocument(dec.decode(message[1] as Uint8Array), url);
         return;
       }
 

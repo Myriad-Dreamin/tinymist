@@ -97,6 +97,10 @@ impl tinymist_preview::CompileView for PreviewCompileView {
         self.art.doc.clone()
     }
 
+    fn world(&self) -> Option<&dyn World> {
+        Some(self.art.world())
+    }
+
     fn status(&self) -> CompileStatus {
         match self.art.doc {
             Some(_) => CompileStatus::CompileSuccess,

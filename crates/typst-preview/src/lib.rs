@@ -3,6 +3,7 @@
 
 mod actor;
 mod debug_loc;
+mod link_hover;
 mod outline;
 pub mod protocol;
 
@@ -510,6 +511,11 @@ pub struct ViewerWindowStateMessage {
 pub trait CompileView: Send + Sync {
     /// Get the compiled document.
     fn doc(&self) -> Option<TypstDocument>;
+    /// Get the Typst world for this compilation, if available.
+    fn world(&self) -> Option<&dyn typst::World> {
+        None
+    }
+
     /// Get the compile status.
     fn status(&self) -> CompileStatus;
 
