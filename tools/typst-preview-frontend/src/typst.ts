@@ -6,6 +6,7 @@
 // @doc (event.timeStamp): http://api.jquery.com/event.timeStamp/
 
 import { TypstDomWindowElement } from "typst-dom";
+import { addPagedLinkTitles } from "./link-hover";
 
 // @bug (event.currentTime): https://bugzilla.mozilla.org/show_bug.cgi?id=238041
 let ignoredEvent = (function () {
@@ -95,6 +96,7 @@ function findAncestor(el: Element, cls: string) {
 const windowElem = document.getElementById("typst-container")! as TypstDomWindowElement;
 
 windowElem.initTypstSvg = function (docRoot: SVGElement) {
+  addPagedLinkTitles(docRoot);
   /// initialize pseudo links
   var elements = docRoot.getElementsByClassName("pseudo-link");
   for (var i = 0; i < elements.length; i++) {

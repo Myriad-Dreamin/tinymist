@@ -1,13 +1,14 @@
 use std::ops::Range;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use reflexo_typst::debug_loc::{DocumentPosition, LspPosition, SourceLocation, SourceSpanOffset};
 use reflexo_vec2svg::IncrSvgDocServer;
-use tinymist_std::typst::TypstDocument;
+use tinymist_std::typst::{TypstDocument, TypstPagedDocument};
 use tokio::sync::{broadcast, mpsc};
 
 use super::{editor::EditorActorRequest, webview::WebviewActorRequest};
 use crate::debug_loc::SpanInterner;
+use crate::link_hover;
 use crate::outline::Outline;
 use crate::protocol;
 use crate::{CompileView, DocToSrcJumpInfo, ResolveSourceLocRequest};
@@ -37,6 +38,7 @@ pub struct RenderActor {
     mailbox: broadcast::Receiver<RenderActorRequest>,
     view: Arc<parking_lot::RwLock<Option<Arc<dyn CompileView>>>>,
     renderer: IncrSvgDocServer,
+    hover_document: Weak<TypstPagedDocument>,
     editor_conn_sender: mpsc::UnboundedSender<EditorActorRequest>,
     svg_sender: mpsc::UnboundedSender<Vec<u8>>,
     webview_sender: broadcast::Sender<WebviewActorRequest>,
@@ -54,6 +56,7 @@ impl RenderActor {
             mailbox,
             view,
             renderer: Self::new_renderer(),
+            hover_document: Weak::new(),
             editor_conn_sender,
             svg_sender,
             webview_sender,
@@ -119,10 +122,24 @@ impl RenderActor {
             // otherwise, we render the incremental changes for only once
             let has_full_render = has_full_render;
             log::debug!("RenderActor: has_full_render: {has_full_render}");
-            let Some(document) = self.view.read().as_ref().and_then(|view| view.doc()) else {
+            let Some((view, document)) = self
+                .view()
+                .and_then(|view| view.doc().map(|doc| (view, doc)))
+            else {
                 log::info!("RenderActor: document is not ready");
                 continue;
             };
+
+            if let TypstDocument::Paged(paged) = &document {
+                let current = Arc::downgrade(paged);
+                if has_full_render || !self.hover_document.ptr_eq(&current) {
+                    let frame = link_hover::frame(paged, view.world());
+                    if self.svg_sender.send(frame).is_err() {
+                        break;
+                    }
+                    self.hover_document = current;
+                }
+            }
 
             let data = self.render(has_full_render, &document);
             let Ok(_) = self.svg_sender.send(data) else {

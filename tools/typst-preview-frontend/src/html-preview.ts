@@ -1,18 +1,6 @@
+import { addLinkTitles } from "./link-hover";
+
 const HTML_PREVIEW_SCROLL_KEY = "tinymist-html-preview-scroll";
-
-export function handleHtmlPreviewFrame(
-  kind: string,
-  payload: Uint8Array,
-  url: string,
-  decoder = new TextDecoder(),
-): boolean {
-  if (kind === "html") {
-    replaceWithHtmlPreviewDocument(decoder.decode(payload), url);
-    return true;
-  }
-
-  return false;
-}
 
 function storeHtmlPreviewScroll() {
   const root = document.documentElement;
@@ -29,13 +17,19 @@ function storeHtmlPreviewScroll() {
   );
 }
 
-function htmlPreviewClientScript(url: string): string {
+function serializeScriptString(value: string): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+export function htmlPreviewClientScript(url: string, initialHtml = ""): string {
   return `
 (() => {
-  const wsUrl = ${JSON.stringify(url)};
-  const scrollKey = ${JSON.stringify(HTML_PREVIEW_SCROLL_KEY)};
+  const wsUrl = ${serializeScriptString(url)};
+  const scrollKey = ${serializeScriptString(HTML_PREVIEW_SCROLL_KEY)};
   const decoder = new TextDecoder();
   const comma = ",".charCodeAt(0);
+  const addLinkTitles = ${addLinkTitles.toString()};
+  let lastHtml = ${serializeScriptString(initialHtml)};
 
   function storeScroll() {
     const root = document.documentElement;
@@ -69,30 +63,17 @@ function htmlPreviewClientScript(url: string): string {
     }
   }
 
-  function serializeHtmlDocument(doc) {
-    const doctype = doc.doctype ? "<!doctype " + doc.doctype.name + ">" : "<!doctype html>";
-    return doctype + "\\n" + doc.documentElement.outerHTML;
-  }
-
-  function injectClient(html) {
-    const current = document.currentScript;
-    const source = current && current.textContent ? current.textContent : "";
-    if (!source) {
-      return html;
-    }
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const script = doc.createElement("script");
-    script.dataset.tinymistHtmlPreviewClient = "";
-    script.text = source;
-    (doc.body || doc.documentElement).appendChild(script);
-    return serializeHtmlDocument(doc);
-  }
-
   function replaceDocument(html) {
+    if (html === lastHtml) {
+      return;
+    }
+    lastHtml = html;
     storeScroll();
     document.open();
-    document.write(injectClient(html));
+    document.write(html);
     document.close();
+    addLinkTitles(document);
+    requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
   }
 
   function splitFrame(data) {
@@ -107,6 +88,7 @@ function htmlPreviewClientScript(url: string): string {
   function connect() {
     const ws = new WebSocket(wsUrl);
     ws.binaryType = "arraybuffer";
+    ws.onopen = () => ws.send("current");
     ws.onmessage = (event) => {
       if (!(event.data instanceof ArrayBuffer)) {
         return;
@@ -123,6 +105,7 @@ function htmlPreviewClientScript(url: string): string {
   }
 
   requestAnimationFrame(() => requestAnimationFrame(restoreScroll));
+  addLinkTitles(document);
   connect();
 })();
 `;
@@ -137,12 +120,12 @@ function injectHtmlPreviewClient(html: string, url: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   const script = doc.createElement("script");
   script.dataset.tinymistHtmlPreviewClient = "";
-  script.text = htmlPreviewClientScript(url);
+  script.text = htmlPreviewClientScript(url, html);
   (doc.body || doc.documentElement).appendChild(script);
   return serializeHtmlDocument(doc);
 }
 
-function replaceWithHtmlPreviewDocument(html: string, url: string) {
+export function replaceWithHtmlPreviewDocument(html: string, url: string) {
   storeHtmlPreviewScroll();
   document.open();
   document.write(injectHtmlPreviewClient(html, url));
