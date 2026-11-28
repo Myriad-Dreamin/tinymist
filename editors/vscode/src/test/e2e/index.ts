@@ -67,21 +67,23 @@ type CompResponse = vscode.CompletionList | vscode.CompletionItem[];
 export class Context {
   expect!: typeof import("chai").expect;
 
-  enabled: boolean = !vscode.workspace.workspaceFolders;
+  /// Suites run by default, regardless of which folder the test runner was launched with.
+  /// A suite that requires a specific workspace must opt in via `workspaceCtx`, which returns
+  /// an independent view with its own enable state, so an unmatched workspace never disables
+  /// suites it does not belong to.
+  enabled: boolean = true;
 
   public workspaceCtx(workspace: string): Context {
-    this.enabled = !!vscode.workspace.workspaceFolders;
-    if (this.enabled) {
-      const filePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
-      const fileName = path.basename(filePath);
-      if (fileName !== workspace) {
-        console.log(`Skipping workspace ${workspace}`);
-        this.enabled = false;
-      } else {
-        console.log(`Continue workspace ${workspace}`);
-      }
+    const folders = vscode.workspace.workspaceFolders;
+    const ctx = new Context();
+    ctx.expect = this.expect;
+    ctx.enabled = !!folders && path.basename(folders[0].uri.fsPath) === workspace;
+    if (ctx.enabled) {
+      console.log(`Continue workspace ${workspace}`);
+    } else {
+      console.log(`Skipping workspace ${workspace}`);
     }
-    return this;
+    return ctx;
   }
 
   public async suite(name: string, f: (ctx: Suite) => Promise<void>): Promise<void> {

@@ -7,6 +7,7 @@ import { extensionState } from "./state";
 
 import { previewPreload } from "./features/preview";
 import { onEnterHandler } from "./lsp.on-enter";
+import { showInstallGuideOnProbeFailure } from "./install-guide";
 import { ExecContext, ExecResult, ICommand, IContext } from "./context";
 import { spawn } from "cross-spawn";
 
@@ -141,7 +142,7 @@ export async function tinymistActivate(
       isProbed = true;
       contextExt.tinymistExec = makeExecCommand(contextExt, executable);
     } catch (e) {
-      vscode.window.showErrorMessage(`Cannot find a valid tinymist binary. Some features like auto-formatting on Enter may not work. Please check your tinymist.serverPath configuration. Exception: ${e}`);
+      void showInstallGuideOnProbeFailure(context, "tinymist.serverPath", config.serverPath, e);
     }
   }
 
