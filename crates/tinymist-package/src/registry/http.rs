@@ -16,6 +16,26 @@ use super::{
     DEFAULT_REGISTRY, DummyNotifier, Notifier, PackageError, PackageRegistry, PackageSpec,
 };
 
+/// Absolutizes a user-specified package storage path.
+///
+/// A relative `package_path` (e.g. `--package-path ../.typst/packages`) is
+/// interpreted against the process's current working directory — the same base
+/// [`PackageStorage::prepare_package`] uses to locate local packages, so
+/// *which* packages are found is unchanged. Without this, resolved package
+/// roots stay relative and downstream path handling, which requires absolute
+/// paths (URI conversion, path-based file-id lookups), silently breaks; in
+/// particular, package diagnostics get dropped because `uri_for_id` fails.
+/// See <https://github.com/Myriad-Dreamin/tinymist/issues/2717>.
+///
+/// This is a purely lexical operation (no symlink resolution, unlike
+/// `canonicalize`). If the path cannot be absolutized, it is returned
+/// unchanged.
+fn absolutize_storage_path(path: ImmutPath) -> ImmutPath {
+    std::path::absolute(&path)
+        .map(ImmutPath::from)
+        .unwrap_or(path)
+}
+
 /// The http package registry for typst.ts.
 pub struct HttpRegistry {
     /// The path at which local packages (`@local` packages) are stored.
@@ -63,8 +83,8 @@ impl HttpRegistry {
     ) -> Self {
         Self {
             cert_path,
-            package_path,
-            package_cache_path,
+            package_path: package_path.map(absolutize_storage_path),
+            package_cache_path: package_cache_path.map(absolutize_storage_path),
             ..Default::default()
         }
     }
