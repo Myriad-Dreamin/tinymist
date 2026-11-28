@@ -1517,6 +1517,10 @@
     "menus": {
       "commandPalette": [
         {
+          "command": "typst-preview.noteOutline",
+          "when": "false"
+        },
+        {
           "command": "tinymist.exportCurrentPdfFromContext",
           "when": "false"
         },
